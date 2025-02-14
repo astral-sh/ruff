@@ -1,8 +1,9 @@
 use std::fmt;
 
+use ruff_python_ast::python_version::PythonVersion;
 use ruff_text_size::TextRange;
 
-use crate::{version::PythonVersion, TokenKind};
+use crate::TokenKind;
 
 /// Represents represent errors that occur during parsing and are
 /// returned by the `parse_*` functions.

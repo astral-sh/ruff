@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use std::io::Write;
 use std::ops::Deref;
 
-use ruff_python_parser::version::PythonVersion;
+use ruff_python_ast::python_version::PythonVersion;
 use rustc_hash::FxHashMap;
 
 pub use azure::AzureEmitter;

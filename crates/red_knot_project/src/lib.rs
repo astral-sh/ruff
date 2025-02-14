@@ -346,7 +346,7 @@ fn check_file_impl(db: &dyn Db, file: File) -> Vec<Box<dyn Diagnostic>> {
         let version = Program::try_get(db)
             .map(|p| p.python_version(db))
             .unwrap_or_default();
-        diagnostics.extend(parsed.syntax_errors(version.into()).map(|error| {
+        diagnostics.extend(parsed.syntax_errors(version).map(|error| {
             let diagnostic: Box<dyn Diagnostic> =
                 Box::new(SyntaxDiagnostic::from_syntax_error(error, file, version));
             diagnostic
