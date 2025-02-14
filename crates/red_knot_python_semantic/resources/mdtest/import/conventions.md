@@ -45,7 +45,7 @@ reveal_type(Iterable)  # revealed: Unknown
 
 ## Re-exported symbols in stub files
 
-When a symbol is re-exported, imporing it should not raise an error. This tests both `import ...`
+When a symbol is re-exported, importing it should not raise an error. This tests both `import ...`
 and `from ... import ...` forms.
 
 Note: Submodule imports in `import ...` form doesn't work because it's a syntax error. For example,
