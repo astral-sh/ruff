@@ -1,11 +1,10 @@
 use std::borrow::Cow;
 
-use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
+use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity, Span};
 use ruff_db::files::File;
+use ruff_python_ast::python_version::PythonVersion;
 use ruff_python_parser::SyntaxError;
 use ruff_text_size::TextRange;
-
-use crate::PythonVersion;
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct SyntaxDiagnostic {
@@ -24,25 +23,12 @@ impl Diagnostic for SyntaxDiagnostic {
         Cow::from(&self.message)
     }
 
-    fn file(&self) -> Option<File> {
-        Some(self.file)
-    }
-
-    fn range(&self) -> Option<TextRange> {
-        Some(self.range)
-    }
-
     fn severity(&self) -> ruff_db::diagnostic::Severity {
         Severity::Error
     }
-}
 
-impl From<PythonVersion> for ruff_python_parser::version::PythonVersion {
-    fn from(value: PythonVersion) -> Self {
-        Self {
-            major: value.major,
-            minor: value.minor,
-        }
+    fn span(&self) -> Option<ruff_db::diagnostic::Span> {
+        Some(Span::from(self.file).with_range(self.range))
     }
 }
 
@@ -54,7 +40,7 @@ impl SyntaxDiagnostic {
     ) -> Self {
         Self {
             id: DiagnosticId::invalid_syntax(Some(value.kind.as_str())),
-            message: value.message(target_version.into()),
+            message: value.message(target_version),
             file,
             range: value.range,
         }
