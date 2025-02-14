@@ -29,6 +29,8 @@
 use std::num::NonZeroU32;
 
 use itertools::{Either, Itertools};
+use ruff_db::diagnostic::{DiagnosticId, Severity};
+use ruff_db::display::FormatterJoinExtension;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::{self as ast, AnyNodeRef, ExprContext};
@@ -52,7 +54,7 @@ use crate::symbol::{
     builtins_module_scope, builtins_symbol, symbol, symbol_from_bindings, symbol_from_declarations,
     typing_extensions_symbol, LookupError,
 };
-use crate::types::call::{Argument, CallArguments};
+use crate::types::call::{Argument, CallArguments, CallOutcome};
 use crate::types::diagnostic::{
     report_invalid_arguments_to_annotated, report_invalid_assignment,
     report_invalid_attribute_assignment, report_unresolved_module, TypeCheckDiagnostics,
@@ -66,9 +68,9 @@ use crate::types::diagnostic::{
 use crate::types::mro::MroErrorKind;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
-    todo_type, Boundness, CallDunderResult, Class, ClassLiteralType, DynamicType, FunctionType,
+    todo_type, Boundness, Class, ClassLiteralType, DynamicType, FunctionType,
     InstanceType, IntersectionBuilder, IntersectionType, IterationOutcome, KnownClass,
-    KnownFunction, KnownInstanceType, MetaclassCandidate, MetaclassErrorKind, SliceLiteralType,
+    KnownFunction, KnownInstanceType, MetaclassCandidate, MetaclassErrorKind, NotCallableVariant, SliceLiteralType,
     SubclassOfType, Symbol, SymbolAndQualifiers, Truthiness, TupleType, Type, TypeAliasType,
     TypeAndQualifiers, TypeArrayDisplay, TypeQualifiers, TypeVarBoundOrConstraints,
     TypeVarInstance, UnionBuilder, UnionType,
@@ -77,18 +79,19 @@ use crate::unpack::Unpack;
 use crate::util::subscript::{PyIndex, PySlice};
 use crate::Db;
 
+use super::call::CallError;
 use super::context::{InNoTypeCheck, InferContext, WithDiagnostics};
 use super::diagnostic::{
     report_index_out_of_bounds, report_invalid_exception_caught, report_invalid_exception_cause,
     report_invalid_exception_raised, report_non_subscriptable,
     report_possibly_unresolved_reference, report_slice_step_size_zero, report_unresolved_reference,
-    INVALID_METACLASS, SUBCLASS_OF_FINAL_CLASS,
+    INVALID_METACLASS, STATIC_ASSERT_ERROR, SUBCLASS_OF_FINAL_CLASS, TYPE_ASSERTION_FAILURE,
 };
 use super::slots::check_class_slots;
 use super::string_annotation::{
     parse_string_annotation, BYTE_STRING_TYPE_ANNOTATION, FSTRING_TYPE_ANNOTATION,
 };
-use super::{global_symbol, ParameterExpectation, ParameterExpectations};
+use super::{global_symbol, CallDunderError, ParameterExpectation, ParameterExpectations};
 
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
 /// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
@@ -1616,7 +1619,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                 let target_ty = enter_ty
                     .call(self.db(), &CallArguments::positional([context_expression_ty]))
-                    .return_type_result(&self.context, context_expression.into())
+                    .map(|outcome| outcome.return_type(self.db()))
                     .unwrap_or_else(|err| {
                         self.context.report_lint(
                             &INVALID_CONTEXT_MANAGER,
@@ -1625,7 +1628,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 Object of type `{context_expression}` cannot be used with `with` because the method `__enter__` of type `{enter_ty}` is not callable", context_expression = context_expression_ty.display(self.db()), enter_ty = enter_ty.display(self.db())
                             ),
                         );
-                        err.return_type()
+                        err.unwrap_return_type(self.db())
                     });
 
                 match exit {
@@ -1663,7 +1666,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                                     Type::none(self.db()),
                                 ]),
                             )
-                            .return_type_result(&self.context, context_expression.into())
                             .is_err()
                         {
                             self.context.report_lint(
@@ -2207,10 +2209,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                         self.db(),
                         &CallArguments::positional([target_type, value_type]),
                     );
-                    let augmented_return_ty = match call
-                        .return_type_result(&self.context, AnyNodeRef::StmtAugAssign(assignment))
-                    {
-                        Ok(t) => t,
+                    let augmented_return_ty = match call {
+                        Ok(t) => t.return_type(self.db()),
                         Err(e) => {
                             self.context.report_lint(
                                 &UNSUPPORTED_OPERATOR,
@@ -2221,7 +2221,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                     value_type.display(self.db())
                                 ),
                             );
-                            e.return_type()
+                            e.unwrap_return_type(self.db())
                         }
                     };
 
@@ -3243,9 +3243,169 @@ impl<'db> TypeInferenceBuilder<'db> {
             .unwrap_or_default();
 
         let call_arguments = self.infer_arguments(arguments, parameter_expectations);
-        function_type
-            .call(self.db(), &call_arguments)
-            .unwrap_with_diagnostic(&self.context, call_expression.into())
+        let call = function_type.call(self.db(), &call_arguments);
+
+        match call {
+            Ok(outcome) => {
+                for binding in outcome.bindings() {
+                    let Some(known_function) = binding
+                        .callable_type()
+                        .into_function_literal()
+                        .and_then(|function_type| function_type.known(self.db()))
+                    else {
+                        continue;
+                    };
+
+                    match known_function {
+                        KnownFunction::RevealType => {
+                            if let Some(revealed_type) = binding.one_parameter_type() {
+                                self.context.report_diagnostic(
+                                    call_expression.into(),
+                                    DiagnosticId::RevealedType,
+                                    Severity::Info,
+                                    format_args!(
+                                        "Revealed type is `{}`",
+                                        revealed_type.display(self.db())
+                                    ),
+                                );
+                            }
+                        }
+                        KnownFunction::AssertType => {
+                            if let [actual_ty, asserted_ty] = binding.parameter_types() {
+                                if !actual_ty.is_gradual_equivalent_to(self.db(), *asserted_ty) {
+                                    self.context.report_lint(
+                                            &TYPE_ASSERTION_FAILURE,
+                                            call_expression.into(),
+                                            format_args!(
+                                                "Actual type `{}` is not the same as asserted type `{}`",
+                                                actual_ty.display(self.db()),
+                                                asserted_ty.display(self.db()),
+                                            ),
+                                        );
+                                }
+                            }
+                        }
+                        KnownFunction::StaticAssert => {
+                            if let Some((parameter_ty, message)) = binding.two_parameter_types() {
+                                let truthiness = parameter_ty.bool(self.db());
+
+                                if !truthiness.is_always_true() {
+                                    if let Some(message) =
+                                        message.into_string_literal().map(|s| &**s.value(self.db()))
+                                    {
+                                        self.context.report_lint(
+                                            &STATIC_ASSERT_ERROR,
+                                            call_expression.into(),
+                                            format_args!("Static assertion error: {message}"),
+                                        );
+                                    } else if parameter_ty == Type::BooleanLiteral(false) {
+                                        self.context.report_lint(
+                                                &STATIC_ASSERT_ERROR,
+                                                call_expression.into(),
+                                                format_args!("Static assertion error: argument evaluates to `False`"),
+                                            );
+                                    } else if truthiness.is_always_false() {
+                                        self.context.report_lint(
+                                                &STATIC_ASSERT_ERROR,
+                                                call_expression.into(),
+                                                format_args!(
+                                                    "Static assertion error: argument of type `{parameter_ty}` is statically known to be falsy",
+                                                    parameter_ty=parameter_ty.display(self.db())
+                                                ),
+                                            );
+                                    } else {
+                                        self.context.report_lint(
+                                                &STATIC_ASSERT_ERROR,
+                                                call_expression.into(),
+                                                format_args!(
+                                                    "Static assertion error: argument of type `{parameter_ty}` has an ambiguous static truthiness",
+                                                    parameter_ty=parameter_ty.display(self.db())
+                                                ),
+                                            );
+                                    };
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+
+                outcome.return_type(self.db())
+            }
+            Err(err) => {
+                match &err {
+                    CallError::NotCallable { not_callable_ty } => {
+                        self.context.report_lint(
+                            &CALL_NON_CALLABLE,
+                            call_expression.into(),
+                            format_args!(
+                                "Object of type `{}` is not callable",
+                                not_callable_ty.display(self.db())
+                            ),
+                        );
+                    }
+
+                    CallError::NotCallableVariants {
+                        called_ty,
+                        callable: _callable,
+                        not_callable,
+                    } => {
+                        if let [variant] = &**not_callable {
+                            self.context.report_lint(
+                                &CALL_NON_CALLABLE,
+                                call_expression.into(),
+                                format_args!(
+                                    "Object of type `{}` is not callable (due to union element `{}`)",
+                                    Type::Union(*called_ty).display(self.db()),
+                                    variant.not_callable_type().display(self.db()),
+                                ),
+                            );
+                        } else {
+                            struct DisplayNotCallables<'db> {
+                                db: &'db dyn Db,
+                                not_callable: &'db [NotCallableVariant<'db>],
+                            }
+
+                            impl std::fmt::Display for DisplayNotCallables<'_> {
+                                fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                                    let mut f = f.join(", ");
+                                    for item in self.not_callable {
+                                        f.entry(&item.not_callable_type().display(self.db));
+                                    }
+                                    f.finish()
+                                }
+                            }
+
+                            self.context.report_lint(
+                                &CALL_NON_CALLABLE,
+                                call_expression.into(),
+                                format_args!(
+                                    "Object of type `{}` is not callable (due to union elements {})",
+                                    Type::Union(*called_ty).display(self.db()),
+                                    DisplayNotCallables { not_callable, db: self.db()}
+                                ),
+                            );
+                        }
+                    }
+
+                    CallError::PossiblyUnboundDunderCall { called_type, .. } => {
+                        self.context.report_lint(
+                            &CALL_NON_CALLABLE,
+                            call_expression.into(),
+                            format_args!(
+                                "Object of type `{}` is not callable (possibly unbound `__call__` method)",
+                                called_type.display(self.db())
+                            ),
+                        );
+                    }
+                    CallError::BindingError { binding, .. } => {
+                        binding.report_diagnostics(&self.context, call_expression.into());
+                    }
+                }
+
+                err.unwrap_return_type(self.db())
+            }
+        }
     }
 
     fn infer_starred_expression(&mut self, starred: &ast::ExprStarred) -> Type<'db> {
@@ -3567,37 +3727,23 @@ impl<'db> TypeInferenceBuilder<'db> {
                     }
                 };
 
-                if let CallDunderResult::CallOutcome(call)
-                | CallDunderResult::PossiblyUnbound(call) = operand_type.call_dunder(
+                match operand_type.call_dunder(
                     self.db(),
                     unary_dunder_method,
                     &CallArguments::positional([operand_type]),
                 ) {
-                    match call.return_type_result(&self.context, AnyNodeRef::ExprUnaryOp(unary)) {
-                        Ok(t) => t,
-                        Err(e) => {
-                            self.context.report_lint(
-                                &UNSUPPORTED_OPERATOR,
-                                unary.into(),
-                                format_args!(
-                                    "Unary operator `{op}` is unsupported for type `{}`",
-                                    operand_type.display(self.db()),
-                                ),
-                            );
-                            e.return_type()
-                        }
+                    Ok(outcome) => outcome.return_type(self.db()),
+                    Err(e) => {
+                        self.context.report_lint(
+                            &UNSUPPORTED_OPERATOR,
+                            unary.into(),
+                            format_args!(
+                                "Unary operator `{op}` is unsupported for type `{}`",
+                                operand_type.display(self.db()),
+                            ),
+                        );
+                        e.unwrap_return_type(self.db())
                     }
-                } else {
-                    self.context.report_lint(
-                        &UNSUPPORTED_OPERATOR,
-                        unary.into(),
-                        format_args!(
-                            "Unary operator `{op}` is unsupported for type `{}`",
-                            operand_type.display(self.db()),
-                        ),
-                    );
-
-                    Type::unknown()
                 }
             }
         }
@@ -3835,25 +3981,33 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 reflected_dunder,
                                 &CallArguments::positional([right_ty, left_ty]),
                             )
-                            .return_type(self.db())
-                            .or_else(|| {
+                            .map(|outcome| outcome.return_type(self.db()))
+                            .or_else(|_| {
                                 left_ty
                                     .call_dunder(
                                         self.db(),
                                         op.dunder(),
                                         &CallArguments::positional([left_ty, right_ty]),
                                     )
-                                    .return_type(self.db())
-                            });
+                                    .map(|outcome| outcome.return_type(self.db()))
+                            })
+                            .ok();
                     }
                 }
 
+                // TODO: Use `call_dunder`?
                 let call_on_left_instance = if let Symbol::Type(class_member, _) =
                     left_class.member(self.db(), op.dunder())
                 {
                     class_member
                         .call(self.db(), &CallArguments::positional([left_ty, right_ty]))
-                        .return_type(self.db())
+                        .map(|outcome| Some(outcome.return_type(self.db())))
+                        // TODO: We shouldn't use `unwrap_or_else` here because it means we apply the
+                        // dunder method even if it can't be called with the given arguments. However,
+                        // we can't remove the fallback just yet because we don't handle support
+                        // the `int` to `float` assignability in parameters correctly yet (and for other number types).
+                        // See https://github.com/astral-sh/ruff/issues/14932
+                        .unwrap_or_else(|err| err.return_type(self.db()))
                 } else {
                     None
                 };
@@ -3865,9 +4019,16 @@ impl<'db> TypeInferenceBuilder<'db> {
                         if let Symbol::Type(class_member, _) =
                             right_class.member(self.db(), op.reflected_dunder())
                         {
+                            // TODO: Use `call_dunder`
                             class_member
                                 .call(self.db(), &CallArguments::positional([right_ty, left_ty]))
-                                .return_type(self.db())
+                                .map(|outcome| Some(outcome.return_type(self.db())))
+                                // TODO: We shouldn't use `unwrap_or_else` here because it means we apply the
+                                // dunder method even if it can't be called with the given arguments. However,
+                                // we can't remove the fallback just yet because we don't handle support
+                                // the `int` to `float` assignability in parameters correctly yet (and for other number types).
+                                // See https://github.com/astral-sh/ruff/issues/14932
+                                .unwrap_or_else(|err| err.return_type(self.db()))
                         } else {
                             None
                         }
@@ -4626,43 +4787,44 @@ impl<'db> TypeInferenceBuilder<'db> {
                 Type::IntLiteral(i64::from(bool)),
             ),
             (value_ty, slice_ty) => {
-                // Resolve the value to its class.
-                let value_meta_ty = value_ty.to_meta_type(self.db());
-
                 // If the class defines `__getitem__`, return its return type.
                 //
                 // See: https://docs.python.org/3/reference/datamodel.html#class-getitem-versus-getitem
-                match value_meta_ty.member(self.db(), "__getitem__") {
-                    Symbol::Unbound => {}
-                    Symbol::Type(dunder_getitem_method, boundness) => {
-                        if boundness == Boundness::PossiblyUnbound {
-                            self.context.report_lint(
-                                &CALL_POSSIBLY_UNBOUND_METHOD,
+                match value_ty.call_dunder(
+                    self.db(),
+                    "__getitem__",
+                    &CallArguments::positional([value_ty, slice_ty]),
+                ) {
+                    Ok(outcome) => return outcome.return_type(self.db()),
+                    Err(err @ CallDunderError::PossiblyUnbound { .. }) => {
+                        self.context.report_lint(
+                            &CALL_POSSIBLY_UNBOUND_METHOD,
+                            value_node.into(),
+                            format_args!(
+                                "Method `__getitem__` of type `{}` is possibly unbound",
+                                value_ty.display(self.db()),
+                            ),
+                        );
+
+                        return err.unwrap_return_type(self.db());
+                    }
+                    Err(CallDunderError::Call(err)) => {
+                        self.context.report_lint(
+                                &CALL_NON_CALLABLE,
                                 value_node.into(),
                                 format_args!(
-                                    "Method `__getitem__` of type `{}` is possibly unbound",
+                                    "Method `__getitem__` of type `{}` is not callable on object of type `{}`",
+                                    err.called_type().display(self.db()),
                                     value_ty.display(self.db()),
                                 ),
                             );
-                        }
 
-                        return dunder_getitem_method
-                            .call(self.db(), &CallArguments::positional([value_ty, slice_ty]))
-                            .return_type_result(&self.context, value_node.into())
-                            .unwrap_or_else(|err| {
-                                self.context.report_lint(
-                                    &CALL_NON_CALLABLE,
-                                    value_node.into(),
-                                    format_args!(
-                                        "Method `__getitem__` of type `{}` is not callable on object of type `{}`",
-                                        err.called_type().display(self.db()),
-                                        value_ty.display(self.db()),
-                                    ),
-                                );
-                                err.return_type()
-                            });
+                        return err.unwrap_return_type(self.db());
                     }
-                }
+                    Err(CallDunderError::MethodNotAvailable) => {
+                        // try `__class_getitem__`
+                    }
+                };
 
                 // Otherwise, if the value is itself a class and defines `__class_getitem__`,
                 // return its return type.
@@ -4693,7 +4855,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                             return ty
                                 .call(self.db(), &CallArguments::positional([value_ty, slice_ty]))
-                                .return_type_result(&self.context, value_node.into())
+                                .map(|outcome| outcome.return_type(self.db()))
                                 .unwrap_or_else(|err| {
                                     self.context.report_lint(
                                         &CALL_NON_CALLABLE,
@@ -4704,7 +4866,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                             value_ty.display(self.db()),
                                         ),
                                     );
-                                    err.return_type()
+                                    err.unwrap_return_type(self.db())
                                 });
                         }
                     }
@@ -5929,23 +6091,26 @@ fn perform_rich_comparison<'db>(
 ) -> Result<Type<'db>, CompareUnsupportedError<'db>> {
     // The following resource has details about the rich comparison algorithm:
     // https://snarky.ca/unravelling-rich-comparison-operators/
-    //
-    // TODO: this currently gives the return type even if the arg types are invalid
-    // (e.g. int.__lt__ with string instance should be errored, currently bool)
-
-    let call_dunder = |op: RichCompareOperator,
-                       left: InstanceType<'db>,
-                       right: InstanceType<'db>| {
-        match left.class.class_member(db, op.dunder()) {
-            Symbol::Type(class_member_dunder, Boundness::Bound) => class_member_dunder
-                .call(
-                    db,
-                    &CallArguments::positional([Type::Instance(left), Type::Instance(right)]),
-                )
-                .return_type(db),
-            _ => None,
-        }
-    };
+    let call_dunder =
+        |op: RichCompareOperator, left: InstanceType<'db>, right: InstanceType<'db>| {
+            // TODO: How do we want to handle possibly unbound dunder methods?
+            match left.class.class_member(db, op.dunder()) {
+                Symbol::Type(class_member_dunder, Boundness::Bound) => class_member_dunder
+                    .call(
+                        db,
+                        &CallArguments::positional([Type::Instance(left), Type::Instance(right)]),
+                    )
+                    .map(|outcome| outcome.return_type(db))
+                    .or_else(|err| match err {
+                        // TODO: We shouldn't ignore binding errors here but we currently have to not to regress
+                        //  float to int (etc) comparisons. See https://github.com/astral-sh/ruff/issues/14932
+                        CallError::BindingError { binding } => Ok(binding.return_type()),
+                        _ => Err(err),
+                    })
+                    .ok(),
+                _ => None,
+            }
+        };
 
     // The reflected dunder has priority if the right-hand side is a strict subclass of the left-hand side.
     if left != right && right.is_subtype_of(db, left) {
@@ -5989,7 +6154,14 @@ fn perform_membership_test_comparison<'db>(
                     db,
                     &CallArguments::positional([Type::Instance(right), Type::Instance(left)]),
                 )
-                .return_type(db)
+                // TODO: We shouldn't ignore binding errors here but we have to because we
+                // currently don't support assigning ints to floats.
+                .map_err(|err| match err {
+                    CallError::BindingError { binding } => Ok(CallOutcome::Single(binding)),
+                    err => Err(err),
+                })
+                .map(|outcome| outcome.return_type(db))
+                .ok()
         }
         _ => {
             // iteration-based membership test

@@ -247,7 +247,7 @@ class Test2:
 def _(flag: bool):
     # error: "Object of type `Test | Test2` is not iterable"
     for x in Test() if flag else Test2():
-        reveal_type(x)  # revealed: Unknown
+        reveal_type(x)  # revealed: int
 ```
 
 ## Union type as iterator where one union element has no `__next__` method
@@ -263,5 +263,5 @@ class Test:
 
 # error: [not-iterable] "Object of type `Test` is not iterable"
 for x in Test():
-    reveal_type(x)  # revealed: Unknown
+    reveal_type(x)  # revealed: int
 ```

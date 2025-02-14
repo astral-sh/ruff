@@ -1,10 +1,7 @@
 use super::context::InferContext;
-use super::diagnostic::{CALL_NON_CALLABLE, TYPE_ASSERTION_FAILURE};
-use super::{KnownFunction, Severity, Signature, Type, TypeArrayDisplay, UnionBuilder};
-use crate::types::diagnostic::STATIC_ASSERT_ERROR;
+use super::{Signature, Type};
+use crate::types::UnionType;
 use crate::Db;
-use ruff_db::diagnostic::DiagnosticId;
-use ruff_python_ast as ast;
 
 mod arguments;
 mod bind;
@@ -12,351 +9,174 @@ mod bind;
 pub(super) use arguments::{Argument, CallArguments};
 pub(super) use bind::{bind_call, CallBinding};
 
+/// A successfully bound call where all arguments are valid.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) enum CallOutcome<'db> {
-    Callable {
-        binding: CallBinding<'db>,
-    },
-    NotCallable {
-        not_callable_ty: Type<'db>,
-    },
-    Union {
-        called_ty: Type<'db>,
-        outcomes: Box<[CallOutcome<'db>]>,
-    },
-    PossiblyUnboundDunderCall {
-        called_ty: Type<'db>,
-        call_outcome: Box<CallOutcome<'db>>,
-    },
+    /// The call resolves to exactly one binding.
+    Single(CallBinding<'db>),
+
+    /// The call resolves to multiple bindings.
+    Union(Box<[CallBinding<'db>]>),
 }
 
 impl<'db> CallOutcome<'db> {
-    /// Create a new `CallOutcome::Callable` with given binding.
-    pub(super) fn callable(binding: CallBinding<'db>) -> CallOutcome<'db> {
-        CallOutcome::Callable { binding }
-    }
+    /// Tries calling each union element using the provided `call` function.
+    ///
+    /// Returns `Ok` if all variants are callable according to the callback and `Err` otherwise.
+    pub(super) fn try_call<F>(
+        db: &'db dyn Db,
+        union: UnionType<'db>,
+        call: F,
+    ) -> Result<Self, CallError<'db>>
+    where
+        F: Fn(Type<'db>) -> Result<Self, CallError<'db>>,
+    {
+        let elements = union.elements(db);
+        let mut bindings = Vec::with_capacity(elements.len());
+        let mut not_callable = Vec::new();
 
-    /// Create a new `CallOutcome::NotCallable` with given not-callable type.
-    pub(super) fn not_callable(not_callable_ty: Type<'db>) -> CallOutcome<'db> {
-        CallOutcome::NotCallable { not_callable_ty }
-    }
-
-    /// Create a new `CallOutcome::Union` with given wrapped outcomes.
-    pub(super) fn union(
-        called_ty: Type<'db>,
-        outcomes: impl IntoIterator<Item = CallOutcome<'db>>,
-    ) -> CallOutcome<'db> {
-        CallOutcome::Union {
-            called_ty,
-            outcomes: outcomes.into_iter().collect(),
-        }
-    }
-
-    /// Create a new `CallOutcome::AssertType` with given asserted and return types.
-    /// Get the return type of the call, or `None` if not callable.
-    pub(super) fn return_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
-        match self {
-            Self::Callable { binding } => Some(binding.return_type()),
-            Self::NotCallable { not_callable_ty: _ } => None,
-            Self::Union {
-                outcomes,
-                called_ty: _,
-            } => outcomes
-                .iter()
-                // If all outcomes are NotCallable, we return None; if some outcomes are callable
-                // and some are not, we return a union including Unknown.
-                .fold(None, |acc, outcome| {
-                    let ty = outcome.return_type(db);
-                    match (acc, ty) {
-                        (None, None) => None,
-                        (None, Some(ty)) => Some(UnionBuilder::new(db).add(ty)),
-                        (Some(builder), ty) => Some(builder.add(ty.unwrap_or(Type::unknown()))),
+        for element in elements {
+            match call(*element) {
+                Ok(CallOutcome::Single(binding)) => bindings.push(binding),
+                Ok(CallOutcome::Union(inner_bindings)) => {
+                    bindings.extend(inner_bindings);
+                }
+                Err(error) => match error {
+                    CallError::NotCallable { not_callable_ty } => {
+                        not_callable.push(NotCallableVariant::new(not_callable_ty, None));
                     }
-                })
-                .map(UnionBuilder::build),
-            Self::PossiblyUnboundDunderCall { call_outcome, .. } => call_outcome.return_type(db),
-        }
-    }
-
-    /// Get the return type of the call, emitting default diagnostics if needed.
-    pub(super) fn unwrap_with_diagnostic(
-        &self,
-        context: &InferContext<'db>,
-        node: ast::AnyNodeRef,
-    ) -> Type<'db> {
-        match self.return_type_result(context, node) {
-            Ok(return_ty) => return_ty,
-            Err(NotCallableError::Type {
-                not_callable_ty,
-                return_ty,
-            }) => {
-                context.report_lint(
-                    &CALL_NON_CALLABLE,
-                    node,
-                    format_args!(
-                        "Object of type `{}` is not callable",
-                        not_callable_ty.display(context.db())
-                    ),
-                );
-                return_ty
-            }
-            Err(NotCallableError::UnionElement {
-                not_callable_ty,
-                called_ty,
-                return_ty,
-            }) => {
-                context.report_lint(
-                    &CALL_NON_CALLABLE,
-                    node,
-                    format_args!(
-                        "Object of type `{}` is not callable (due to union element `{}`)",
-                        called_ty.display(context.db()),
-                        not_callable_ty.display(context.db()),
-                    ),
-                );
-                return_ty
-            }
-            Err(NotCallableError::UnionElements {
-                not_callable_tys,
-                called_ty,
-                return_ty,
-            }) => {
-                context.report_lint(
-                    &CALL_NON_CALLABLE,
-                    node,
-                    format_args!(
-                        "Object of type `{}` is not callable (due to union elements {})",
-                        called_ty.display(context.db()),
-                        not_callable_tys.display(context.db()),
-                    ),
-                );
-                return_ty
-            }
-            Err(NotCallableError::PossiblyUnboundDunderCall {
-                callable_ty: called_ty,
-                return_ty,
-            }) => {
-                context.report_lint(
-                    &CALL_NON_CALLABLE,
-                    node,
-                    format_args!(
-                        "Object of type `{}` is not callable (possibly unbound `__call__` method)",
-                        called_ty.display(context.db())
-                    ),
-                );
-                return_ty
-            }
-            Err(NotCallableError::BindingError { binding, .. }) => {
-                binding.report_diagnostics(context, node);
-                binding.return_type()
-            }
-        }
-    }
-
-    /// Get the return type of the call as a result.
-    pub(super) fn return_type_result(
-        &self,
-        context: &InferContext<'db>,
-        node: ast::AnyNodeRef,
-    ) -> Result<Type<'db>, NotCallableError<'db>> {
-        match self {
-            Self::Callable { binding } => {
-                if binding.has_binding_errors() {
-                    return Err(NotCallableError::BindingError {
-                        binding: binding.clone(),
-                    });
-                }
-
-                // TODO: Move to `infer_call_expression` after all so that this method doesn't require `context` or `node`.
-                if let Some(known_function) = binding
-                    .callable_type()
-                    .into_function_literal()
-                    .and_then(|function_type| function_type.known(context.db()))
-                {
-                    match known_function {
-                        KnownFunction::RevealType => {
-                            if let Some(revealed_type) = binding.one_parameter_type() {
-                                context.report_diagnostic(
-                                    node,
-                                    DiagnosticId::RevealedType,
-                                    Severity::Info,
-                                    format_args!(
-                                        "Revealed type is `{}`",
-                                        revealed_type.display(context.db())
-                                    ),
-                                );
-                            }
-                        }
-                        KnownFunction::AssertType => {
-                            if let [actual_ty, asserted_ty] = binding.parameter_types() {
-                                if !actual_ty.is_gradual_equivalent_to(context.db(), *asserted_ty) {
-                                    context.report_lint(
-                                            &TYPE_ASSERTION_FAILURE,
-                                            node,
-                                            format_args!(
-                                                "Actual type `{}` is not the same as asserted type `{}`",
-                                                actual_ty.display(context.db()),
-                                                asserted_ty.display(context.db()),
-                                            ),
-                                        );
-                                }
-                            }
-                        }
-                        KnownFunction::StaticAssert => {
-                            if let Some((parameter_ty, message)) = binding.two_parameter_types() {
-                                let truthiness = parameter_ty.bool(context.db());
-
-                                if !truthiness.is_always_true() {
-                                    if let Some(message) = message
-                                        .into_string_literal()
-                                        .map(|s| &**s.value(context.db()))
-                                    {
-                                        context.report_lint(
-                                            &STATIC_ASSERT_ERROR,
-                                            node,
-                                            format_args!("Static assertion error: {message}"),
-                                        );
-                                    } else if parameter_ty == Type::BooleanLiteral(false) {
-                                        context.report_lint(
-                                                &STATIC_ASSERT_ERROR,
-                                                node,
-                                                format_args!("Static assertion error: argument evaluates to `False`"),
-                                            );
-                                    } else if truthiness.is_always_false() {
-                                        context.report_lint(
-                                                &STATIC_ASSERT_ERROR,
-                                                node,
-                                                format_args!(
-                                                    "Static assertion error: argument of type `{parameter_ty}` is statically known to be falsy",
-                                                    parameter_ty=parameter_ty.display(context.db())
-                                                ),
-                                            );
-                                    } else {
-                                        context.report_lint(
-                                                &STATIC_ASSERT_ERROR,
-                                                node,
-                                                format_args!(
-                                                    "Static assertion error: argument of type `{parameter_ty}` has an ambiguous static truthiness",
-                                                    parameter_ty=parameter_ty.display(context.db())
-                                                ),
-                                            );
-                                    };
-                                }
-                            }
-                        }
-                        _ => {}
+                    CallError::NotCallableVariants {
+                        called_ty: _,
+                        callable: inner_callable,
+                        not_callable: inner_not_callable,
+                    } => {
+                        not_callable.extend(inner_not_callable);
+                        bindings.extend(inner_callable);
                     }
-                }
-
-                Ok(binding.return_type())
-            }
-            Self::NotCallable { not_callable_ty } => Err(NotCallableError::Type {
-                not_callable_ty: *not_callable_ty,
-                return_ty: Type::unknown(),
-            }),
-            Self::PossiblyUnboundDunderCall {
-                called_ty,
-                call_outcome,
-            } => Err(NotCallableError::PossiblyUnboundDunderCall {
-                callable_ty: *called_ty,
-                return_ty: call_outcome
-                    .return_type(context.db())
-                    .unwrap_or(Type::unknown()),
-            }),
-            Self::Union {
-                outcomes,
-                called_ty,
-            } => {
-                let mut not_callable = vec![];
-                let mut union_builder = UnionBuilder::new(context.db());
-                // We want to only do the minimal amount of work necessary. 
-                for outcome in outcomes {
-                    let return_ty = match outcome.return_type_result(context, node) {
-                        Ok(return_type) => return_type,
-                        Err(error) => {
-                            not_callable.push(error.called_type());
-                            error.return_type()
+                    // Should this be OK, or an error? We can't make it not_callable
+                    // because calling it would actually work because it ignores the
+                    // possibly unboundness.
+                    CallError::PossiblyUnboundDunderCall { outcome, .. } => match *outcome {
+                        CallOutcome::Union(inner_bindings) => {
+                            bindings.extend(inner_bindings);
                         }
-                    };
-                    union_builder = union_builder.add(return_ty);
-                }
-                let return_ty = union_builder.build();
-                match not_callable[..] {
-                    [] => Ok(return_ty),
-                    [elem] => Err(NotCallableError::UnionElement {
-                        not_callable_ty: elem,
-                        called_ty: *called_ty,
-                        return_ty,
-                    }),
-                    _ if not_callable.len() == outcomes.len() => Err(NotCallableError::Type {
-                        not_callable_ty: *called_ty,
-                        return_ty,
-                    }),
-                    _ => Err(NotCallableError::UnionElements {
-                        not_callable_tys: not_callable.into_boxed_slice(),
-                        called_ty: *called_ty,
-                        return_ty,
-                    }),
-                }
+                        CallOutcome::Single(binding) => {
+                            bindings.push(binding);
+                        }
+                    },
+                    CallError::BindingError { binding } => {
+                        not_callable.push(NotCallableVariant::new(
+                            binding.callable_type(),
+                            Some(binding),
+                        ));
+                    }
+                },
+            }
+        }
+
+        if not_callable.is_empty() {
+            Ok(CallOutcome::Union(bindings.into()))
+        } else {
+            Err(CallError::NotCallableVariants {
+                not_callable: not_callable.into(),
+                callable: bindings.into(),
+                called_ty: union,
+            })
+        }
+    }
+
+    /// The type returned by this call.
+    pub(super) fn return_type(&self, db: &'db dyn Db) -> Type<'db> {
+        match self {
+            Self::Single(binding) => binding.return_type(),
+            Self::Union(bindings) => {
+                UnionType::from_elements(db, bindings.iter().map(bind::CallBinding::return_type))
             }
         }
     }
-}
 
-pub(super) enum CallDunderResult<'db> {
-    CallOutcome(CallOutcome<'db>),
-    PossiblyUnbound(CallOutcome<'db>),
-    MethodNotAvailable,
-}
-
-impl<'db> CallDunderResult<'db> {
-    pub(super) fn return_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
+    pub(super) fn bindings(&self) -> &[CallBinding<'db>] {
         match self {
-            Self::CallOutcome(outcome) => outcome.return_type(db),
-            Self::PossiblyUnbound { .. } => None,
-            Self::MethodNotAvailable => None,
+            Self::Single(binding) => std::slice::from_ref(binding),
+            Self::Union(bindings) => bindings,
         }
     }
 }
 
+/// The reason why calling a type failed.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) enum NotCallableError<'db> {
+pub(super) enum CallError<'db> {
     /// The type is not callable.
-    Type {
+    NotCallable {
+        /// The type that can't be called.
         not_callable_ty: Type<'db>,
-        return_ty: Type<'db>,
-    },
-    /// A single union element is not callable.
-    UnionElement {
-        not_callable_ty: Type<'db>,
-        called_ty: Type<'db>,
-        return_ty: Type<'db>,
-    },
-    /// Multiple (but not all) union elements are not callable.
-    UnionElements {
-        not_callable_tys: Box<[Type<'db>]>,
-        called_ty: Type<'db>,
-        return_ty: Type<'db>,
-    },
-    PossiblyUnboundDunderCall {
-        callable_ty: Type<'db>,
-        return_ty: Type<'db>,
     },
 
-    /// The type is callable but there are binding errors
+    /// A call to a union failed because at least one variant
+    /// can't be called with the given arguments or isn't callable at all.
+    NotCallableVariants {
+        /// The variants that can't be called with the given arguments.
+        not_callable: Box<[NotCallableVariant<'db>]>,
+
+        /// The variants that can be called with the given arguments.
+        callable: Box<[CallBinding<'db>]>,
+
+        /// The union type that we tried calling.
+        called_ty: UnionType<'db>,
+    },
+
+    /// The type has a `__call__` method but it isn't always bound.
+    PossiblyUnboundDunderCall {
+        called_type: Type<'db>,
+        outcome: Box<CallOutcome<'db>>,
+    },
+
+    /// The type is callable but not with the given arguments.
     BindingError { binding: CallBinding<'db> },
 }
 
-impl<'db> NotCallableError<'db> {
-    /// The return type that should be used when a call is not callable.
-    pub(super) fn return_type(&self) -> Type<'db> {
+impl<'db> CallError<'db> {
+    /// Returns a fallback return type to use that best approximates the return type of the call.
+    ///
+    /// Returns `None` if the type isn't callable.
+    pub(super) fn return_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
         match self {
-            Self::Type { return_ty, .. } => *return_ty,
-            Self::UnionElement { return_ty, .. } => *return_ty,
-            Self::UnionElements { return_ty, .. } => *return_ty,
-            Self::PossiblyUnboundDunderCall { return_ty, .. } => *return_ty,
-            Self::BindingError { binding } => binding.return_type(),
+            CallError::NotCallable { .. } => None,
+            CallError::NotCallableVariants {
+                not_callable,
+                callable,
+                ..
+            } => {
+                // If all variants are not callable, return `None`
+                if callable.is_empty()
+                    && not_callable.iter().all(|binding| binding.binding.is_none())
+                {
+                    None
+                } else {
+                    // If some variants are callable, and some are not, return the union of the return types of the callable variants
+                    // combined with `Type::Unknown`
+                    Some(UnionType::from_elements(
+                        db,
+                        callable.iter().map(bind::CallBinding::return_type).chain(
+                            not_callable
+                                .iter()
+                                .map(NotCallableVariant::unwrap_return_type),
+                        ),
+                    ))
+                }
+            }
+            Self::PossiblyUnboundDunderCall { outcome, .. } => Some(outcome.return_type(db)),
+            Self::BindingError { binding } => Some(binding.return_type()),
         }
+    }
+
+    /// Returns the return type of the call or a fallback that
+    /// represents the best guess of the return type (e.g. the actual return type even if the
+    /// dunder is possibly unbound).
+    ///
+    /// If the type is not callable, returns `Type::Unknown`.
+    pub(super) fn unwrap_return_type(&self, db: &'db dyn Db) -> Type<'db> {
+        self.return_type(db).unwrap_or(Type::unknown())
     }
 
     /// The resolved type that was not callable.
@@ -365,16 +185,78 @@ impl<'db> NotCallableError<'db> {
     /// non-callable types.
     pub(super) fn called_type(&self) -> Type<'db> {
         match self {
-            Self::Type {
+            Self::NotCallable {
                 not_callable_ty, ..
             } => *not_callable_ty,
-            Self::UnionElement { called_ty, .. } => *called_ty,
-            Self::UnionElements { called_ty, .. } => *called_ty,
-            Self::PossiblyUnboundDunderCall {
-                callable_ty: called_ty,
-                ..
-            } => *called_ty,
+            Self::NotCallableVariants { called_ty, .. } => Type::Union(*called_ty),
+            Self::PossiblyUnboundDunderCall { called_type, .. } => *called_type,
             Self::BindingError { binding } => binding.callable_type(),
         }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct NotCallableVariant<'db> {
+    /// The resolved binding for that variant or `None` if the variant is not callable.
+    binding: Option<CallBinding<'db>>,
+
+    /// The variant's type that is not callable.
+    not_callable: Type<'db>,
+}
+
+impl<'db> NotCallableVariant<'db> {
+    pub(super) fn new(ty: Type<'db>, binding: Option<CallBinding<'db>>) -> Self {
+        Self {
+            not_callable: ty,
+            binding,
+        }
+    }
+
+    pub(super) fn return_type(&self) -> Option<Type<'db>> {
+        self.binding.as_ref().map(CallBinding::return_type)
+    }
+
+    pub(super) fn unwrap_return_type(&self) -> Type<'db> {
+        self.return_type().unwrap_or(Type::unknown())
+    }
+
+    pub(super) fn not_callable_type(&self) -> Type<'db> {
+        self.not_callable
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) enum CallDunderError<'db> {
+    /// The dunder attribute exists but it can't be called with the given arguments.
+    ///
+    /// This includes non-callable dunder attributes that are possibly unbound.
+    Call(CallError<'db>),
+
+    /// The type has the specified dunder method and it is callable
+    /// with the specified arguments without any binding errors
+    /// but it is possibly unbound.
+    PossiblyUnbound(CallOutcome<'db>),
+
+    /// The dunder method with the specified name is missing.
+    MethodNotAvailable,
+}
+
+impl<'db> CallDunderError<'db> {
+    pub(super) fn return_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
+        match self {
+            Self::Call(error) => error.return_type(db),
+            Self::PossiblyUnbound(_) => None,
+            Self::MethodNotAvailable => None,
+        }
+    }
+
+    pub(super) fn unwrap_return_type(&self, db: &'db dyn Db) -> Type<'db> {
+        self.return_type(db).unwrap_or(Type::unknown())
+    }
+}
+
+impl<'db> From<CallError<'db>> for CallDunderError<'db> {
+    fn from(error: CallError<'db>) -> Self {
+        Self::Call(error)
     }
 }
