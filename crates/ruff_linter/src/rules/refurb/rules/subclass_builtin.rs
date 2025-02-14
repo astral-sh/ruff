@@ -70,11 +70,18 @@ pub(crate) fn subclass_builtin(checker: &Checker, class: &StmtClassDef) {
         return;
     };
 
+    // Expect only one base class else return
     let [base] = &**bases else {
         return;
     };
 
-    let Some(symbol) = checker.semantic().resolve_builtin_symbol(base) else {
+    // Check if the base class is a subscript expression so that only the name expr
+    // is checked and modified.
+    let base_expr = base
+        .as_subscript_expr()
+        .map_or(base, |subscript| &*subscript.value);
+
+    let Some(symbol) = checker.semantic().resolve_builtin_symbol(base_expr) else {
         return;
     };
 
@@ -89,7 +96,7 @@ pub(crate) fn subclass_builtin(checker: &Checker, class: &StmtClassDef) {
             subclass: symbol.to_string(),
             replacement: user_symbol.to_string(),
         },
-        base.range(),
+        base_expr.range(),
     );
     diagnostic.try_set_fix(|| {
         let (import_edit, binding) = checker.importer().get_or_import_symbol(
@@ -97,7 +104,7 @@ pub(crate) fn subclass_builtin(checker: &Checker, class: &StmtClassDef) {
             base.start(),
             checker.semantic(),
         )?;
-        let other_edit = Edit::range_replacement(binding, base.range());
+        let other_edit = Edit::range_replacement(binding, base_expr.range());
         Ok(Fix::unsafe_edits(import_edit, [other_edit]))
     });
     checker.report_diagnostic(diagnostic);
