@@ -373,7 +373,7 @@ linter.ruff.allowed_markup_calls = []
 
 # Formatter Settings
 formatter.exclude = []
-formatter.target_version = Py37
+formatter.target_version = PythonVersion { major: 3, minor: 7 }
 formatter.preview = disabled
 formatter.line_width = 100
 formatter.line_ending = auto
