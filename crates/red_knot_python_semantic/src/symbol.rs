@@ -40,7 +40,7 @@ impl<'db> Symbol<'db> {
 
     /// Constructor that creates a [`Symbol`] with a [`crate::types::TodoType`] type
     /// and boundness [`Boundness::Bound`].
-    #[allow(unused_variables)]
+    #[allow(unused_variables)] // Only unused in release builds
     pub(crate) fn todo(message: &'static str) -> Self {
         Symbol::Type(todo_type!(message), Boundness::Bound)
     }
@@ -67,6 +67,30 @@ impl<'db> Symbol<'db> {
             .expect("Expected a (possibly unbound) type, not an unbound symbol")
     }
 
+    /// Transform the symbol into a [`LookupResult`],
+    /// a [`Result`] type in which the `Ok` variant represents a definitely bound symbol
+    /// and the `Err` variant represents a symbol that is either definitely or possibly unbound.
+    pub(crate) fn into_lookup_result(self) -> LookupResult<'db> {
+        match self {
+            Symbol::Type(ty, Boundness::Bound) => Ok(ty),
+            Symbol::Type(ty, Boundness::PossiblyUnbound) => Err(LookupError::PossiblyUnbound(ty)),
+            Symbol::Unbound => Err(LookupError::Unbound),
+        }
+    }
+
+    /// Safely unwrap the symbol into a [`Type`].
+    ///
+    /// If the symbol is definitely unbound or possibly unbound, it will be transformed into a
+    /// [`LookupError`] and `diagnostic_fn` will be applied to the error value before returning
+    /// the result of `diagnostic_fn` (which will be a [`Type`]). This allows the caller to ensure
+    /// that a diagnostic is emitted if the symbol is possibly or definitely unbound.
+    pub(crate) fn unwrap_with_diagnostic(
+        self,
+        diagnostic_fn: impl FnOnce(LookupError<'db>) -> Type<'db>,
+    ) -> Type<'db> {
+        self.into_lookup_result().unwrap_or_else(diagnostic_fn)
+    }
+
     /// Fallback (partially or fully) to another symbol if `self` is partially or fully unbound.
     ///
     /// 1. If `self` is definitely bound, return `self` without evaluating `fallback_fn()`.
@@ -83,17 +107,9 @@ impl<'db> Symbol<'db> {
         db: &'db dyn Db,
         fallback_fn: impl FnOnce() -> Self,
     ) -> Self {
-        match self {
-            Symbol::Type(_, Boundness::Bound) => self,
-            Symbol::Unbound => fallback_fn(),
-            Symbol::Type(self_ty, Boundness::PossiblyUnbound) => match fallback_fn() {
-                Symbol::Unbound => self,
-                Symbol::Type(fallback_ty, fallback_boundness) => Symbol::Type(
-                    UnionType::from_elements(db, [self_ty, fallback_ty]),
-                    fallback_boundness,
-                ),
-            },
-        }
+        self.into_lookup_result()
+            .or_else(|lookup_error| lookup_error.or_fall_back_to(db, fallback_fn()))
+            .into()
     }
 
     #[must_use]
@@ -104,6 +120,48 @@ impl<'db> Symbol<'db> {
         }
     }
 }
+
+impl<'db> From<LookupResult<'db>> for Symbol<'db> {
+    fn from(value: LookupResult<'db>) -> Self {
+        match value {
+            Ok(ty) => Symbol::Type(ty, Boundness::Bound),
+            Err(LookupError::Unbound) => Symbol::Unbound,
+            Err(LookupError::PossiblyUnbound(ty)) => Symbol::Type(ty, Boundness::PossiblyUnbound),
+        }
+    }
+}
+
+/// Possible ways in which a symbol lookup can (possibly or definitely) fail.
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+pub(crate) enum LookupError<'db> {
+    Unbound,
+    PossiblyUnbound(Type<'db>),
+}
+
+impl<'db> LookupError<'db> {
+    /// Fallback (wholly or partially) to `fallback` to create a new [`LookupResult`].
+    pub(crate) fn or_fall_back_to(
+        self,
+        db: &'db dyn Db,
+        fallback: Symbol<'db>,
+    ) -> LookupResult<'db> {
+        let fallback = fallback.into_lookup_result();
+        match (&self, &fallback) {
+            (LookupError::Unbound, _) => fallback,
+            (LookupError::PossiblyUnbound { .. }, Err(LookupError::Unbound)) => Err(self),
+            (LookupError::PossiblyUnbound(ty), Ok(ty2)) => {
+                Ok(UnionType::from_elements(db, [ty, ty2]))
+            }
+            (LookupError::PossiblyUnbound(ty), Err(LookupError::PossiblyUnbound(ty2))) => Err(
+                LookupError::PossiblyUnbound(UnionType::from_elements(db, [ty, ty2])),
+            ),
+        }
+    }
+}
+
+/// A [`Result`] type in which the `Ok` variant represents a definitely bound symbol
+/// and the `Err` variant represents a symbol that is either definitely or possibly unbound.
+pub(crate) type LookupResult<'db> = Result<Type<'db>, LookupError<'db>>;
 
 #[cfg(test)]
 mod tests {
