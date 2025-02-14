@@ -118,6 +118,7 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
     };
 
     let replacement = match qualified_name.segments() {
+        // ProviderName: for cases that only one name has been moved
         // apache-airflow-providers-amazon
         ["airflow", "hooks", "S3_hook", "S3Hook"] => Replacement::ProviderName{
             name: "airflow.providers.amazon.aws.hooks.s3.S3Hook",
@@ -412,30 +413,6 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             provider: "fab",
             version: "1.0.0"
         },
-        ["airflow", "api", "auth", "backend", "basic_auth", ..] => Replacement::ImportPathMoved{
-                original_path: "airflow.api.auth.backend.basic_auth",
-                new_path: "airflow.providers.fab.auth_manager.api.auth.backend.basic_auth",
-            provider:"fab",
-            version: "1.0.0"
-        },
-        ["airflow", "api", "auth", "backend", "kerberos_auth", ..] => Replacement::ImportPathMoved{
-                original_path:"airflow.api.auth.backend.kerberos_auth",
-                new_path: "airflow.providers.fab.auth_manager.api.auth.backend.kerberos_auth",
-            provider: "fab",
-            version:"1.0.0"
-        },
-        ["airflow", "auth", "managers", "fab", "api", "auth", "backend", "kerberos_auth", ..] => Replacement::ImportPathMoved{
-                original_path: "airflow.auth_manager.api.auth.backend.kerberos_auth",
-                new_path: "airflow.providers.fab.auth_manager.api.auth.backend.kerberos_auth",
-            provider: "fab",
-            version: "1.0.0"
-        },
-        ["airflow", "auth", "managers", "fab", "security_manager", "override", ..] => Replacement::ImportPathMoved{
-                original_path: "airflow.auth.managers.fab.security_manager.override",
-                new_path: "airflow.providers.fab.auth_manager.security_manager.override",
-            provider: "fab",
-            version: "1.0.0"
-        },
 
         // apache-airflow-providers-apache-hdfs
         ["airflow", "hooks", "webhdfs_hook", "WebHDFSHook"] => Replacement::ProviderName{
@@ -514,7 +491,7 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             name: "airflow.providers.apache.hive.hooks.hive.HiveCliHook",
             provider: "apache-hive",
             version: "1.0.0"
-            },
+        },
         ["airflow", "hooks", "hive_hooks", "HiveMetastoreHook"] => Replacement::ProviderName{
             name: "airflow.providers.apache.hive.hooks.hive.HiveMetastoreHook",
             provider: "apache-hive",
@@ -897,6 +874,75 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
         },
 
         // apache-airflow-providers-standard
+        ["airflow", "sensors", "filesystem", "FileSensor"] => Replacement::ProviderName{
+            name: "airflow.providers.standard.sensors.filesystem.FileSensor",
+            provider: "standard",
+            version: "0.0.2"
+        },
+        ["airflow", "operators", "trigger_dagrun", "TriggerDagRunOperator"] => Replacement::ProviderName{
+            name: "airflow.providers.standard.operators.trigger_dagrun.TriggerDagRunOperator",
+            provider: "standard",
+            version: "0.0.2"
+        },
+        ["airflow", "sensors", "external_task", "ExternalTaskMarker"] => Replacement::ProviderName{
+            name: "airflow.providers.standard.sensors.external_task.ExternalTaskMarker",
+            provider: "standard",
+            version: "0.0.3"
+        },
+        ["airflow", "sensors", "external_task", "ExternalTaskSensor"] => Replacement::ProviderName{
+            name: "airflow.providers.standard.sensors.external_task.ExternalTaskSensor",
+            provider: "standard",
+            version: "0.0.3"
+        },
+
+        // apache-airflow-providers-sqlite
+        ["airflow", "hooks", "sqlite_hook", "SqliteHook"] => Replacement::ProviderName{
+            name: "airflow.providers.sqlite.hooks.sqlite.SqliteHook",
+            provider: "sqlite",
+            version: "1.0.0"
+        },
+        ["airflow", "operators", "sqlite_operator", "SqliteOperator"] => Replacement::ProviderName{
+            name: "airflow.providers.sqlite.operators.sqlite.SqliteOperator",
+            provider: "sqlite",
+            version: "1.0.0"
+        },
+
+        // apache-airflow-providers-zendesk
+        ["airflow", "hooks", "zendesk_hook", "ZendeskHook"] =>
+            Replacement::ProviderName{
+            name: "airflow.providers.zendesk.hooks.zendesk.ZendeskHook",
+            provider: "zendesk",
+            version: "1.0.0"
+        },
+
+        // ImportPathMoved: for cases that the whole module has been moved
+        // apache-airflow-providers-fab
+        ["airflow", "api", "auth", "backend", "basic_auth", ..] => Replacement::ImportPathMoved{
+            original_path: "airflow.api.auth.backend.basic_auth",
+            new_path: "airflow.providers.fab.auth_manager.api.auth.backend.basic_auth",
+            provider:"fab",
+            version: "1.0.0"
+        },
+        ["airflow", "api", "auth", "backend", "kerberos_auth", ..] => Replacement::ImportPathMoved{
+            original_path:"airflow.api.auth.backend.kerberos_auth",
+            new_path: "airflow.providers.fab.auth_manager.api.auth.backend.kerberos_auth",
+            provider: "fab",
+            version:"1.0.0"
+        },
+        ["airflow", "auth", "managers", "fab", "api", "auth", "backend", "kerberos_auth", ..] => Replacement::ImportPathMoved{
+            original_path: "airflow.auth_manager.api.auth.backend.kerberos_auth",
+            new_path: "airflow.providers.fab.auth_manager.api.auth.backend.kerberos_auth",
+            provider: "fab",
+            version: "1.0.0"
+        },
+        ["airflow", "auth", "managers", "fab", "security_manager", "override", ..] => Replacement::ImportPathMoved{
+            original_path: "airflow.auth.managers.fab.security_manager.override",
+            new_path: "airflow.providers.fab.auth_manager.security_manager.override",
+            provider: "fab",
+            version: "1.0.0"
+        },
+
+        // apache-airflow-providers-standard
         ["airflow", "operators", "bash", ..] => Replacement::ImportPathMoved{
             original_path: "airflow.operators.bash",
             new_path: "airflow.providers.standard.operators.bash",
@@ -963,7 +1009,6 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             provider: "standard",
             version: "0.0.1"
         },
-
         ["airflow", "triggers", "external_task", ..] => Replacement::ImportPathMoved{
             original_path: "airflow.triggers.external_task",
             new_path: "airflow.providers.standard.triggers.external_task",
@@ -981,46 +1026,6 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             new_path: "airflow.providers.standard.triggers.temporal",
             provider: "standard",
             version: "0.0.3"
-        },
-        ["airflow", "sensors", "filesystem", "FileSensor"] => Replacement::ProviderName{
-            name: "airflow.providers.standard.sensors.filesystem.FileSensor",
-            provider: "standard",
-            version: "0.0.2"
-        },
-        ["airflow", "operators", "trigger_dagrun", "TriggerDagRunOperator"] => Replacement::ProviderName{
-            name: "airflow.providers.standard.operators.trigger_dagrun.TriggerDagRunOperator",
-            provider: "standard",
-            version: "0.0.2"
-        },
-        ["airflow", "sensors", "external_task", "ExternalTaskMarker"] => Replacement::ProviderName{
-            name: "airflow.providers.standard.sensors.external_task.ExternalTaskMarker",
-            provider: "standard",
-            version: "0.0.3"
-        },
-        ["airflow", "sensors", "external_task", "ExternalTaskSensor"] => Replacement::ProviderName{
-            name: "airflow.providers.standard.sensors.external_task.ExternalTaskSensor",
-            provider: "standard",
-            version: "0.0.3"
-        },
-
-        // apache-airflow-providers-sqlite
-        ["airflow", "hooks", "sqlite_hook", "SqliteHook"] => Replacement::ProviderName{
-            name: "airflow.providers.sqlite.hooks.sqlite.SqliteHook",
-            provider: "sqlite",
-            version: "1.0.0"
-        },
-        ["airflow", "operators", "sqlite_operator", "SqliteOperator"] => Replacement::ProviderName{
-            name: "airflow.providers.sqlite.operators.sqlite.SqliteOperator",
-            provider: "sqlite",
-            version: "1.0.0"
-        },
-
-        // apache-airflow-providers-zendesk
-        ["airflow", "hooks", "zendesk_hook", "ZendeskHook"] =>
-            Replacement::ProviderName{
-            name: "airflow.providers.zendesk.hooks.zendesk.ZendeskHook",
-            provider: "zendesk",
-            version: "1.0.0"
         },
         _ => return,
     };
