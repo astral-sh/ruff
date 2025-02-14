@@ -8,7 +8,7 @@ use ruff_python_ast::name::{Name, UnqualifiedName};
 use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
-use crate::settings::types::PythonVersion;
+use ruff_python_ast::python_version::PythonVersion;
 
 /// ## What it does
 /// Checks for uses of exceptions that alias `TimeoutError`.
@@ -62,7 +62,7 @@ fn is_alias(expr: &Expr, semantic: &SemanticModel, target_version: PythonVersion
     semantic
         .resolve_qualified_name(expr)
         .is_some_and(|qualified_name| {
-            if target_version >= PythonVersion::Py311 {
+            if target_version >= PythonVersion::PY311 {
                 matches!(
                     qualified_name.segments(),
                     ["socket", "timeout"] | ["asyncio", "TimeoutError"]
@@ -73,7 +73,7 @@ fn is_alias(expr: &Expr, semantic: &SemanticModel, target_version: PythonVersion
                 // fix in Python <3.10. We add an assert to make this assumption
                 // explicit.
                 assert!(
-                    target_version >= PythonVersion::Py310,
+                    target_version >= PythonVersion::PY310,
                     "lint should only be used for Python 3.10+",
                 );
                 matches!(qualified_name.segments(), ["socket", "timeout"])
