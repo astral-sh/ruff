@@ -48,7 +48,11 @@ impl super::BackgroundDocumentRequestHandler for CodeActions {
 
         if snapshot.client_settings().fix_all() {
             if supported_code_actions.contains(&SupportedCodeAction::SourceFixAll) {
-                response.push(fix_all(&snapshot).with_failure_code(ErrorCode::InternalError)?);
+                if snapshot.is_notebook_cell() {
+                    tracing::debug!("Ignoring `source.fixAll` code action for a notebook cell");
+                } else {
+                    response.push(fix_all(&snapshot).with_failure_code(ErrorCode::InternalError)?);
+                }
             } else if supported_code_actions.contains(&SupportedCodeAction::NotebookSourceFixAll) {
                 response
                     .push(notebook_fix_all(&snapshot).with_failure_code(ErrorCode::InternalError)?);
@@ -57,8 +61,15 @@ impl super::BackgroundDocumentRequestHandler for CodeActions {
 
         if snapshot.client_settings().organize_imports() {
             if supported_code_actions.contains(&SupportedCodeAction::SourceOrganizeImports) {
-                response
-                    .push(organize_imports(&snapshot).with_failure_code(ErrorCode::InternalError)?);
+                if snapshot.is_notebook_cell() {
+                    tracing::debug!(
+                        "Ignoring `source.organizeImports` code action for a notebook cell"
+                    );
+                } else {
+                    response.push(
+                        organize_imports(&snapshot).with_failure_code(ErrorCode::InternalError)?,
+                    );
+                }
             } else if supported_code_actions
                 .contains(&SupportedCodeAction::NotebookSourceOrganizeImports)
             {

@@ -184,4 +184,15 @@ impl DocumentSnapshot {
     pub(crate) fn encoding(&self) -> PositionEncoding {
         self.position_encoding
     }
+
+    /// Returns `true` if this snapshot represents a notebook cell.
+    pub(crate) const fn is_notebook_cell(&self) -> bool {
+        matches!(
+            &self.document_ref,
+            index::DocumentQuery::Notebook {
+                cell_url: Some(_),
+                ..
+            }
+        )
+    }
 }
