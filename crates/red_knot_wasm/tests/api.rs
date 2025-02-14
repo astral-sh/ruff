@@ -2,13 +2,12 @@
 
 use wasm_bindgen_test::wasm_bindgen_test;
 
-use red_knot_wasm::{Settings, Workspace};
-use ruff_python_parser::python_version::PythonVersion;
+use red_knot_wasm::{PythonVersion, Settings, Workspace};
 
 #[wasm_bindgen_test]
 fn check() {
     let settings = Settings {
-        python_version: PythonVersion::PY312,
+        python_version: PythonVersion::Py312,
     };
     let mut workspace = Workspace::new("/", &settings).expect("Workspace to be created");
 

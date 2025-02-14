@@ -15,7 +15,6 @@ use ruff_db::system::{
     SystemPathBuf, SystemVirtualPath,
 };
 use ruff_notebook::Notebook;
-use ruff_python_parser::python_version::PythonVersion;
 
 #[wasm_bindgen(start)]
 pub fn run() {
@@ -50,7 +49,7 @@ impl Workspace {
 
         workspace.apply_cli_options(Options {
             environment: Some(EnvironmentOptions {
-                python_version: Some(RangedValue::cli(settings.python_version)),
+                python_version: Some(RangedValue::cli(settings.python_version.into())),
                 ..EnvironmentOptions::default()
             }),
             ..Options::default()
@@ -186,6 +185,33 @@ impl Settings {
     }
 }
 
+#[wasm_bindgen]
+#[derive(Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Default)]
+pub enum PythonVersion {
+    Py37,
+    Py38,
+    #[default]
+    Py39,
+    Py310,
+    Py311,
+    Py312,
+    Py313,
+}
+
+impl From<PythonVersion> for ruff_python_parser::python_version::PythonVersion {
+    fn from(value: PythonVersion) -> Self {
+        match value {
+            PythonVersion::Py37 => Self::PY37,
+            PythonVersion::Py38 => Self::PY38,
+            PythonVersion::Py39 => Self::PY39,
+            PythonVersion::Py310 => Self::PY310,
+            PythonVersion::Py311 => Self::PY311,
+            PythonVersion::Py312 => Self::PY312,
+            PythonVersion::Py313 => Self::PY313,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 struct WasmSystem {
     fs: MemoryFileSystem,
@@ -273,4 +299,17 @@ impl System for WasmSystem {
 
 fn not_found() -> std::io::Error {
     std::io::Error::new(std::io::ErrorKind::NotFound, "No such file or directory")
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::PythonVersion;
+
+    #[test]
+    fn same_default_as_python_version() {
+        assert_eq!(
+            ruff_python_parser::python_version::PythonVersion::from(PythonVersion::default()),
+            ruff_python_parser::python_version::PythonVersion::default()
+        );
+    }
 }

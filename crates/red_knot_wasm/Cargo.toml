@@ -22,7 +22,7 @@ default = ["console_error_panic_hook"]
 red_knot_project = { workspace = true, default-features = false, features = ["deflate"] }
 
 ruff_db = { workspace = true, default-features = false, features = [] }
-ruff_python_parser = { workspace = true, features = ["wasm-bindgen"] }
+ruff_python_parser = { workspace = true }
 ruff_notebook = { workspace = true }
 
 console_error_panic_hook = { workspace = true, optional = true }
