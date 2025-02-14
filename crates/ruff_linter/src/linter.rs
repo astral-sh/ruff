@@ -6,11 +6,11 @@ use std::path::Path;
 use anyhow::{anyhow, Result};
 use colored::Colorize;
 use itertools::Itertools;
-use ruff_python_parser::version::PythonVersion;
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::Diagnostic;
 use ruff_notebook::Notebook;
+use ruff_python_ast::python_version::PythonVersion;
 use ruff_python_ast::{ModModule, PySourceType};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;

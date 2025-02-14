@@ -75,12 +75,12 @@ pub use crate::token::{Token, TokenKind};
 
 use crate::parser::Parser;
 
+use ruff_python_ast::python_version::PythonVersion;
 use ruff_python_ast::{
     Expr, Mod, ModExpression, ModModule, PySourceType, StringFlags, StringLiteral, Suite,
 };
 use ruff_python_trivia::CommentRanges;
 use ruff_text_size::{Ranged, TextRange, TextSize};
-use version::PythonVersion;
 
 mod error;
 pub mod lexer;
@@ -90,7 +90,6 @@ mod token;
 mod token_set;
 mod token_source;
 pub mod typing;
-pub mod version;
 
 /// Parse a full Python module usually consisting of multiple lines.
 ///
