@@ -2449,7 +2449,6 @@ impl<'db> Type<'db> {
             Type::ClassLiteral(ClassLiteralType { class })
                 if class.is_known(db, KnownClass::Complex) =>
             {
-                eprintln!("HELLO!");
                 Ok(UnionType::from_elements(
                     db,
                     [
