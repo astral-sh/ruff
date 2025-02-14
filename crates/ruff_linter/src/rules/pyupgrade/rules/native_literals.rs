@@ -3,11 +3,10 @@ use std::str::FromStr;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{self as ast, Expr, Int, LiteralExpressionRef, UnaryOp};
+use ruff_python_ast::{self as ast, Expr, Int, LiteralExpressionRef, OperatorPrecedence, UnaryOp};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
-use crate::rules::pylint::rules::OperatorPrecedence;
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 enum LiteralType {
