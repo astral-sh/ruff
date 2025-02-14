@@ -84,3 +84,44 @@ def _match_ignore(line):
 # Not a valid type annotation but this test shouldn't result in a panic.
 # Refer: https://github.com/astral-sh/ruff/issues/11736
 x: '"foo".encode("utf-8")'
+
+
+# https://github.com/astral-sh/ruff/issues/12753
+
+## Errors
+("a" "b").encode()
+
+'''\
+'''.encode()
+
+'\x20\\'.encode()
+'\0\b0'.encode()
+'\01\fc'.encode()
+'\143\\'.encode()
+
+("a" "\b").encode()
+("\a" "b").encode()
+("\a" r"\b").encode()
+(r"\a" "\b").encode()
+
+'\"'.encode()
+"\'".encode()
+
+'\\\\\\\\ '.encode()  # 4 backslashes
+'\\\\\\\  '.encode()  # `\ ` is invalid but only causes a SyntaxWarning
+
+'\\a'.encode()
+'a\\\b'.encode()
+
+'\\ u0000 '.encode()
+
+
+## No errors
+"\N{DIGIT ONE}".encode()
+"\u0031".encode()
+"\U00000031".encode()
+
+'\477'.encode()
+
+"\
+" "\u0001".encode()
