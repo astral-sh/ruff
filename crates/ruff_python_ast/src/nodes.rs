@@ -18,7 +18,8 @@ use crate::{
     name::Name,
     str::{Quote, TripleQuotes},
     str_prefix::{AnyStringPrefix, ByteStringPrefix, FStringPrefix, StringLiteralPrefix},
-    ExceptHandler, Expr, FStringElement, LiteralExpressionRef, Pattern, Stmt, TypeParam,
+    ExceptHandler, Expr, ExprRef, FStringElement, LiteralExpressionRef, OperatorPrecedence,
+    Pattern, Stmt, TypeParam,
 };
 
 /// See also [Module](https://docs.python.org/3/library/ast.html#ast.Module)
@@ -364,6 +365,17 @@ impl Expr {
             Expr::EllipsisLiteral(expr) => Some(LiteralExpressionRef::EllipsisLiteral(expr)),
             _ => None,
         }
+    }
+
+    /// Return the [`OperatorPrecedence`] of this expression
+    pub fn precedence(&self) -> OperatorPrecedence {
+        OperatorPrecedence::from(self)
+    }
+}
+
+impl ExprRef<'_> {
+    pub fn precedence(&self) -> OperatorPrecedence {
+        OperatorPrecedence::from(self)
     }
 }
 

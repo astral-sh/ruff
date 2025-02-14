@@ -1,5 +1,4 @@
-use crate::{BoolOp, Expr, Operator, UnaryOp};
-
+use crate::{BoolOp, Expr, ExprRef, Operator, UnaryOp};
 
 /// Represents the precedence levels for Python expressions.
 /// Variants at the top have lower precedence and variants at the bottom have
@@ -53,83 +52,94 @@ pub enum OperatorPrecedence {
 }
 
 impl OperatorPrecedence {
-    pub fn from_expr(expr: &Expr) -> Self {
+    pub fn from_expr_ref(expr: &ExprRef) -> Self {
         match expr {
             // Binding or parenthesized expression, list display, dictionary display, set display
-            Expr::Tuple(_)
-            | Expr::Dict(_)
-            | Expr::Set(_)
-            | Expr::ListComp(_)
-            | Expr::List(_)
-            | Expr::SetComp(_)
-            | Expr::DictComp(_)
-            | Expr::Generator(_)
-            | Expr::Name(_)
-            | Expr::StringLiteral(_)
-            | Expr::BytesLiteral(_)
-            | Expr::NumberLiteral(_)
-            | Expr::BooleanLiteral(_)
-            | Expr::NoneLiteral(_)
-            | Expr::EllipsisLiteral(_)
-            | Expr::FString(_) => Self::Atomic,
+            ExprRef::Tuple(_)
+            | ExprRef::Dict(_)
+            | ExprRef::Set(_)
+            | ExprRef::ListComp(_)
+            | ExprRef::List(_)
+            | ExprRef::SetComp(_)
+            | ExprRef::DictComp(_)
+            | ExprRef::Generator(_)
+            | ExprRef::Name(_)
+            | ExprRef::StringLiteral(_)
+            | ExprRef::BytesLiteral(_)
+            | ExprRef::NumberLiteral(_)
+            | ExprRef::BooleanLiteral(_)
+            | ExprRef::NoneLiteral(_)
+            | ExprRef::EllipsisLiteral(_)
+            | ExprRef::FString(_) => Self::Atomic,
             // Subscription, slicing, call, attribute reference
-            Expr::Attribute(_) | Expr::Subscript(_) | Expr::Call(_) | Expr::Slice(_) => {
-                Self::CallAttribute
-            }
+            ExprRef::Attribute(_)
+            | ExprRef::Subscript(_)
+            | ExprRef::Call(_)
+            | ExprRef::Slice(_) => Self::CallAttribute,
 
             // Await expression
-            Expr::Await(_) => Self::Await,
+            ExprRef::Await(_) => Self::Await,
 
             // Exponentiation **
             // Handled below along with other binary operators
 
             // Unary operators: +x, -x, ~x (except boolean not)
-            Expr::UnaryOp(operator) => match operator.op {
+            ExprRef::UnaryOp(operator) => match operator.op {
                 UnaryOp::UAdd | UnaryOp::USub | UnaryOp::Invert => Self::PosNegBitNot,
                 UnaryOp::Not => Self::Not,
             },
 
             // Math binary ops
-            Expr::BinOp(binary_operation) => Self::from(binary_operation.op),
+            ExprRef::BinOp(binary_operation) => Self::from(binary_operation.op),
 
             // Comparisons: <, <=, >, >=, ==, !=, in, not in, is, is not
-            Expr::Compare(_) => Self::ComparisonsMembershipIdentity,
+            ExprRef::Compare(_) => Self::ComparisonsMembershipIdentity,
 
             // Boolean not
             // Handled above in unary operators
 
             // Boolean operations: and, or
-            Expr::BoolOp(bool_op) => Self::from(bool_op.op),
+            ExprRef::BoolOp(bool_op) => Self::from(bool_op.op),
 
             // Conditional expressions: x if y else z
-            Expr::If(_) => Self::IfElse,
+            ExprRef::If(_) => Self::IfElse,
 
             // Lambda expressions
-            Expr::Lambda(_) => Self::Lambda,
+            ExprRef::Lambda(_) => Self::Lambda,
 
             // Unpacking also omitted in the docs, but has almost the lowest precedence,
             // except for assignment & yield expressions. E.g. `[*(v := [1,2])]` is valid
             // but `[*v := [1,2]] would fail on incorrect syntax because * will associate
             // `v` before the assignment.
-            Expr::Starred(_) => Self::Starred,
+            ExprRef::Starred(_) => Self::Starred,
 
             // Assignment expressions (aka named)
-            Expr::Named(_) => Self::Assign,
+            ExprRef::Named(_) => Self::Assign,
 
             // Although omitted in docs, yield expressions may be used inside an expression
             // but must be parenthesized. So for our purposes we assume they just have
             // the lowest "real" precedence.
-            Expr::Yield(_) | Expr::YieldFrom(_) => Self::Yield,
+            ExprRef::Yield(_) | ExprRef::YieldFrom(_) => Self::Yield,
 
             // Not a real python expression, so treat as lowest as well
-            Expr::IpyEscapeCommand(_) => Self::None,
+            ExprRef::IpyEscapeCommand(_) => Self::None,
         }
+    }
+
+    pub fn from_expr(expr: &Expr) -> Self {
+        Self::from(&ExprRef::from(expr))
     }
 }
 
 impl From<&Expr> for OperatorPrecedence {
     fn from(expr: &Expr) -> Self {
         Self::from_expr(expr)
+    }
+}
+
+impl<'a> From<&ExprRef<'a>> for OperatorPrecedence {
+    fn from(expr_ref: &ExprRef<'a>) -> Self {
+        Self::from_expr_ref(expr_ref)
     }
 }
 
@@ -164,4 +174,3 @@ impl From<BoolOp> for OperatorPrecedence {
         }
     }
 }
-
