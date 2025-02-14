@@ -13,8 +13,6 @@ license = { workspace = true }
 [lib]
 
 [dependencies]
-ruff_cache = { workspace = true, optional = true }
-ruff_macros = { workspace = true, optional = true }
 ruff_python_ast = { workspace = true }
 ruff_python_trivia = { workspace = true }
 ruff_text_size = { workspace = true }
@@ -22,14 +20,10 @@ ruff_text_size = { workspace = true }
 bitflags = { workspace = true }
 bstr = { workspace = true }
 compact_str = { workspace = true }
-log = { workspace = true }
 memchr = { workspace = true }
-pep440_rs = { workspace = true }
 rustc-hash = { workspace = true }
 schemars = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
-strum = { workspace = true }
-strum_macros = { workspace = true }
 static_assertions = { workspace = true }
 unicode-ident = { workspace = true }
 unicode_names2 = { workspace = true }
@@ -42,14 +36,6 @@ ruff_source_file = { workspace = true }
 anyhow = { workspace = true }
 insta = { workspace = true, features = ["glob"] }
 walkdir = { workspace = true }
-
-[features]
-ruff_macros = ["dep:ruff_cache", "dep:ruff_macros"]
-
-# ruff_cache is required by ruff_macros::CacheKey but cargo-shear doesn't expand
-# macros
-[package.metadata.cargo-shear]
-ignored = ["ruff_cache"]
 
 [lints]
 workspace = true

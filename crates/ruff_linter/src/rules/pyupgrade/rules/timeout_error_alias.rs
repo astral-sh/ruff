@@ -5,10 +5,10 @@ use crate::fix::edits::pad;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::{Name, UnqualifiedName};
-use ruff_python_parser::python_version::PyVersion;
 use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
+use crate::settings::types::PythonVersion;
 
 /// ## What it does
 /// Checks for uses of exceptions that alias `TimeoutError`.
@@ -58,11 +58,11 @@ impl AlwaysFixableViolation for TimeoutErrorAlias {
 }
 
 /// Return `true` if an [`Expr`] is an alias of `TimeoutError`.
-fn is_alias(expr: &Expr, semantic: &SemanticModel, target_version: PyVersion) -> bool {
+fn is_alias(expr: &Expr, semantic: &SemanticModel, target_version: PythonVersion) -> bool {
     semantic
         .resolve_qualified_name(expr)
         .is_some_and(|qualified_name| {
-            if target_version >= PyVersion::Py311 {
+            if target_version >= PythonVersion::Py311 {
                 matches!(
                     qualified_name.segments(),
                     ["socket", "timeout"] | ["asyncio", "TimeoutError"]
@@ -73,7 +73,7 @@ fn is_alias(expr: &Expr, semantic: &SemanticModel, target_version: PyVersion) ->
                 // fix in Python <3.10. We add an assert to make this assumption
                 // explicit.
                 assert!(
-                    target_version >= PyVersion::Py310,
+                    target_version >= PythonVersion::Py310,
                     "lint should only be used for Python 3.10+",
                 );
                 matches!(qualified_name.segments(), ["socket", "timeout"])

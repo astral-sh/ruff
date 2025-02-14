@@ -18,10 +18,9 @@ use ruff_linter::logging::LogLevel;
 use ruff_linter::registry::Rule;
 use ruff_linter::settings::types::{
     ExtensionPair, FilePattern, OutputFormat, PatternPrefixPair, PerFileIgnore, PreviewMode,
-    UnsafeFixes,
+    PythonVersion, UnsafeFixes,
 };
 use ruff_linter::{RuleParser, RuleSelector, RuleSelectorParser};
-use ruff_python_parser::python_version::PyVersion;
 use ruff_source_file::{LineIndex, OneIndexed};
 use ruff_text_size::TextRange;
 use ruff_workspace::configuration::{Configuration, RuleSelection};
@@ -177,7 +176,7 @@ pub struct AnalyzeGraphCommand {
     no_preview: bool,
     /// The minimum Python version that should be supported.
     #[arg(long, value_enum)]
-    target_version: Option<PyVersion>,
+    target_version: Option<PythonVersion>,
 }
 
 // The `Parser` derive is for ruff_dev, for ruff `Args` would be sufficient
@@ -232,7 +231,7 @@ pub struct CheckCommand {
     pub output_file: Option<PathBuf>,
     /// The minimum Python version that should be supported.
     #[arg(long, value_enum)]
-    pub target_version: Option<PyVersion>,
+    pub target_version: Option<PythonVersion>,
     /// Enable preview mode; checks will include unstable rules and fixes.
     /// Use `--no-preview` to disable.
     #[arg(long, overrides_with("no_preview"))]
@@ -506,7 +505,7 @@ pub struct FormatCommand {
     pub extension: Option<Vec<ExtensionPair>>,
     /// The minimum Python version that should be supported.
     #[arg(long, value_enum)]
-    pub target_version: Option<PyVersion>,
+    pub target_version: Option<PythonVersion>,
     /// Enable preview mode; enables unstable formatting.
     /// Use `--no-preview` to disable.
     #[arg(long, overrides_with("no_preview"))]
@@ -1265,7 +1264,7 @@ struct ExplicitConfigOverrides {
     preview: Option<PreviewMode>,
     respect_gitignore: Option<bool>,
     select: Option<Vec<RuleSelector>>,
-    target_version: Option<PyVersion>,
+    target_version: Option<PythonVersion>,
     unfixable: Option<Vec<RuleSelector>>,
     // TODO(charlie): Captured in pyproject.toml as a default, but not part of `Settings`.
     cache_dir: Option<PathBuf>,

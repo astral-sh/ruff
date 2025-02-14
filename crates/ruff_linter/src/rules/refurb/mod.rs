@@ -8,11 +8,10 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
-    use ruff_python_parser::python_version::PyVersion;
     use test_case::test_case;
 
     use crate::registry::Rule;
-    use crate::settings::types::PreviewMode;
+    use crate::settings::types::{PreviewMode, PythonVersion};
     use crate::test::test_path;
     use crate::{assert_messages, settings};
 
@@ -84,7 +83,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("refurb/FURB103.py"),
             &settings::LinterSettings::for_rule(Rule::WriteWholeFile)
-                .with_target_version(PyVersion::Py39),
+                .with_target_version(PythonVersion::Py39),
         )?;
         assert_messages!(diagnostics);
         Ok(())

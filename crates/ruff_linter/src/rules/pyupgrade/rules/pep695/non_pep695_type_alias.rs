@@ -6,10 +6,10 @@ use ruff_python_ast::name::Name;
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{Expr, ExprCall, ExprName, Keyword, StmtAnnAssign, StmtAssign, StmtRef};
-use ruff_python_parser::python_version::PyVersion;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::settings::types::PythonVersion;
 
 use super::{
     expr_name_to_type_var, DisplayTypeVars, TypeParamKind, TypeVar, TypeVarReferenceVisitor,
@@ -111,7 +111,7 @@ impl Violation for NonPEP695TypeAlias {
 
 /// UP040
 pub(crate) fn non_pep695_type_alias_type(checker: &Checker, stmt: &StmtAssign) {
-    if checker.settings.target_version < PyVersion::Py312 {
+    if checker.settings.target_version < PythonVersion::Py312 {
         return;
     }
 
@@ -182,7 +182,7 @@ pub(crate) fn non_pep695_type_alias_type(checker: &Checker, stmt: &StmtAssign) {
 
 /// UP040
 pub(crate) fn non_pep695_type_alias(checker: &Checker, stmt: &StmtAnnAssign) {
-    if checker.settings.target_version < PyVersion::Py312 {
+    if checker.settings.target_version < PythonVersion::Py312 {
         return;
     }
 

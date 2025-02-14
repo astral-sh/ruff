@@ -6,12 +6,11 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
-    use ruff_python_parser::python_version::PyVersion;
     use test_case::test_case;
 
     use crate::registry::Rule;
     use crate::rules::pep8_naming;
-    use crate::settings::types::PreviewMode;
+    use crate::settings::types::{PreviewMode, PythonVersion};
     use crate::test::test_path;
     use crate::{assert_messages, settings};
 
@@ -189,7 +188,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_pyi").join(path).as_path(),
             &settings::LinterSettings {
-                target_version: PyVersion::Py38,
+                target_version: PythonVersion::Py38,
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;

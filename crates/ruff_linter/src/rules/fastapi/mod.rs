@@ -7,7 +7,6 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
-    use ruff_python_parser::python_version::PyVersion;
     use test_case::test_case;
 
     use crate::registry::Rule;
@@ -37,7 +36,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("fastapi").join(path).as_path(),
             &settings::LinterSettings {
-                target_version: PyVersion::Py38,
+                target_version: settings::types::PythonVersion::Py38,
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;

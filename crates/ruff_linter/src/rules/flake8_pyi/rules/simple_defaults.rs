@@ -2,13 +2,13 @@ use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, Violation}
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Expr, Operator, Parameters, Stmt, UnaryOp};
-use ruff_python_parser::python_version::PyVersion;
 use ruff_python_semantic::{analyze::class::is_enumeration, ScopeKind, SemanticModel};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
 use crate::rules::flake8_pyi::rules::TypingModule;
+use crate::settings::types::PythonVersion;
 use crate::Locator;
 
 /// ## What it does
@@ -667,7 +667,7 @@ pub(crate) fn type_alias_without_annotation(checker: &Checker, value: &Expr, tar
         return;
     }
 
-    let module = if checker.settings.target_version >= PyVersion::Py310 {
+    let module = if checker.settings.target_version >= PythonVersion::Py310 {
         TypingModule::Typing
     } else {
         TypingModule::TypingExtensions

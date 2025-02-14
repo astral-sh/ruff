@@ -30,7 +30,7 @@ use ruff_linter::settings::fix_safety_table::FixSafetyTable;
 use ruff_linter::settings::rule_table::RuleTable;
 use ruff_linter::settings::types::{
     CompiledPerFileIgnoreList, ExtensionMapping, FilePattern, FilePatternSet, OutputFormat,
-    PerFileIgnore, PreviewMode, RequiredVersion, UnsafeFixes,
+    PerFileIgnore, PreviewMode, PythonVersion, RequiredVersion, UnsafeFixes,
 };
 use ruff_linter::settings::{LinterSettings, DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX, TASK_TAGS};
 use ruff_linter::{
@@ -40,7 +40,6 @@ use ruff_linter::{
 use ruff_python_formatter::{
     DocstringCode, DocstringCodeLineWidth, MagicTrailingComma, QuoteStyle,
 };
-use ruff_python_parser::python_version::PyVersion;
 
 use crate::options::{
     AnalyzeOptions, Flake8AnnotationsOptions, Flake8BanditOptions, Flake8BooleanTrapOptions,
@@ -137,7 +136,7 @@ pub struct Configuration {
     pub builtins: Option<Vec<String>>,
     pub namespace_packages: Option<Vec<PathBuf>>,
     pub src: Option<Vec<PathBuf>>,
-    pub target_version: Option<PyVersion>,
+    pub target_version: Option<PythonVersion>,
 
     // Global formatting options
     pub line_length: Option<LineLength>,
@@ -178,7 +177,15 @@ impl Configuration {
             exclude: FilePatternSet::try_from_iter(format.exclude.unwrap_or_default())?,
             extension: self.extension.clone().unwrap_or_default(),
             preview: format_preview,
-            target_version,
+            target_version: match target_version {
+                PythonVersion::Py37 => ruff_python_formatter::PythonVersion::Py37,
+                PythonVersion::Py38 => ruff_python_formatter::PythonVersion::Py38,
+                PythonVersion::Py39 => ruff_python_formatter::PythonVersion::Py39,
+                PythonVersion::Py310 => ruff_python_formatter::PythonVersion::Py310,
+                PythonVersion::Py311 => ruff_python_formatter::PythonVersion::Py311,
+                PythonVersion::Py312 => ruff_python_formatter::PythonVersion::Py312,
+                PythonVersion::Py313 => ruff_python_formatter::PythonVersion::Py313,
+            },
             line_width: self
                 .line_length
                 .map_or(format_defaults.line_width, |length| {

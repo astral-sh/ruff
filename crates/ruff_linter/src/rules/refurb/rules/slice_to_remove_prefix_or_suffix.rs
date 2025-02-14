@@ -1,12 +1,11 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
-use ruff_python_parser::python_version::PyVersion;
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
-use crate::checkers::ast::Checker;
 use crate::Locator;
+use crate::{checkers::ast::Checker, settings::types::PythonVersion};
 
 /// ## What it does
 /// Checks for code that could be written more idiomatically using
@@ -70,7 +69,7 @@ impl AlwaysFixableViolation for SliceToRemovePrefixOrSuffix {
 
 /// FURB188
 pub(crate) fn slice_to_remove_affix_expr(checker: &Checker, if_expr: &ast::ExprIf) {
-    if checker.settings.target_version < PyVersion::Py39 {
+    if checker.settings.target_version < PythonVersion::Py39 {
         return;
     }
 
@@ -101,7 +100,7 @@ pub(crate) fn slice_to_remove_affix_expr(checker: &Checker, if_expr: &ast::ExprI
 
 /// FURB188
 pub(crate) fn slice_to_remove_affix_stmt(checker: &Checker, if_stmt: &ast::StmtIf) {
-    if checker.settings.target_version < PyVersion::Py39 {
+    if checker.settings.target_version < PythonVersion::Py39 {
         return;
     }
     if let Some(removal_data) = affix_removal_data_stmt(if_stmt) {

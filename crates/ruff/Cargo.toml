@@ -21,7 +21,6 @@ ruff_linter = { workspace = true, features = ["clap"] }
 ruff_macros = { workspace = true }
 ruff_notebook = { workspace = true }
 ruff_python_ast = { workspace = true }
-ruff_python_parser = { workspace = true }
 ruff_python_formatter = { workspace = true }
 ruff_server = { workspace = true }
 ruff_source_file = { workspace = true }

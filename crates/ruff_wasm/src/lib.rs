@@ -10,6 +10,7 @@ use ruff_linter::directives;
 use ruff_linter::line_width::{IndentWidth, LineLength};
 use ruff_linter::linter::check_path;
 use ruff_linter::registry::AsRule;
+use ruff_linter::settings::types::PythonVersion;
 use ruff_linter::settings::{flags, DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX};
 use ruff_linter::source_kind::SourceKind;
 use ruff_linter::Locator;
@@ -17,7 +18,6 @@ use ruff_python_ast::{Mod, PySourceType};
 use ruff_python_codegen::Stylist;
 use ruff_python_formatter::{format_module_ast, pretty_comments, PyFormatContext, QuoteStyle};
 use ruff_python_index::Indexer;
-use ruff_python_parser::python_version::PyVersion;
 use ruff_python_parser::{parse, parse_unchecked, parse_unchecked_source, Mode, Parsed};
 use ruff_python_trivia::CommentRanges;
 use ruff_source_file::SourceLocation;
@@ -129,7 +129,7 @@ impl Workspace {
             line_length: Some(LineLength::default()),
 
             indent_width: Some(IndentWidth::default()),
-            target_version: Some(PyVersion::default()),
+            target_version: Some(PythonVersion::default()),
 
             lint: Some(LintOptions {
                 common: LintCommonOptions {

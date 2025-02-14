@@ -12,7 +12,6 @@ use normalize::normalize_imports;
 use order::order_imports;
 use ruff_python_ast::PySourceType;
 use ruff_python_codegen::Stylist;
-use ruff_python_parser::python_version::PyVersion;
 use ruff_python_parser::Tokens;
 use settings::Settings;
 use types::EitherImport::{Import, ImportFrom};
@@ -20,6 +19,7 @@ use types::{AliasData, ImportBlock, TrailingComma};
 
 use crate::line_width::{LineLength, LineWidthBuilder};
 use crate::package::PackageRoot;
+use crate::settings::types::PythonVersion;
 use crate::Locator;
 
 mod annotate;
@@ -74,7 +74,7 @@ pub(crate) fn format_imports(
     src: &[PathBuf],
     package: Option<PackageRoot<'_>>,
     source_type: PySourceType,
-    target_version: PyVersion,
+    target_version: PythonVersion,
     settings: &Settings,
     tokens: &Tokens,
 ) -> String {
@@ -157,7 +157,7 @@ fn format_import_block(
     stylist: &Stylist,
     src: &[PathBuf],
     package: Option<PackageRoot<'_>>,
-    target_version: PyVersion,
+    target_version: PythonVersion,
     settings: &Settings,
 ) -> String {
     #[derive(Debug, Copy, Clone, PartialEq, Eq)]

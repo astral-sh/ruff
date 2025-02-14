@@ -5,7 +5,7 @@ use ruff_python_ast::{self as ast, Stmt};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use ruff_python_parser::python_version::PyVersion;
+use crate::settings::types::PythonVersion;
 
 /// ## What it does
 /// Checks for uses of except handling via `try`-`except` within `for` and
@@ -89,7 +89,7 @@ impl Violation for TryExceptInLoop {
 
 /// PERF203
 pub(crate) fn try_except_in_loop(checker: &Checker, body: &[Stmt]) {
-    if checker.settings.target_version >= PyVersion::Py311 {
+    if checker.settings.target_version >= PythonVersion::Py311 {
         return;
     }
 

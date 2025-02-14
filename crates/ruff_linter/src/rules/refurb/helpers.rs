@@ -2,11 +2,11 @@ use ruff_diagnostics::{Applicability, Edit, Fix};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_codegen::Generator;
-use ruff_python_parser::python_version::PyVersion;
 use ruff_python_semantic::{BindingId, ResolvedReference, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::settings::types::PythonVersion;
 
 /// Format a code snippet to call `name.method()`.
 pub(super) fn generate_method_call(name: Name, method: &str, generator: Generator) -> String {
@@ -135,7 +135,7 @@ pub(super) fn find_file_opens<'a>(
     with: &'a ast::StmtWith,
     semantic: &'a SemanticModel<'a>,
     read_mode: bool,
-    python_version: PyVersion,
+    python_version: PythonVersion,
 ) -> Vec<FileOpen<'a>> {
     with.items
         .iter()
@@ -149,7 +149,7 @@ fn find_file_open<'a>(
     with: &'a ast::StmtWith,
     semantic: &'a SemanticModel<'a>,
     read_mode: bool,
-    python_version: PyVersion,
+    python_version: PythonVersion,
 ) -> Option<FileOpen<'a>> {
     // We want to match `open(...) as var`.
     let ast::ExprCall {
@@ -248,7 +248,7 @@ fn match_open_args(args: &[Expr]) -> Option<(&Expr, OpenMode)> {
 fn match_open_keywords(
     keywords: &[ast::Keyword],
     read_mode: bool,
-    target_version: PyVersion,
+    target_version: PythonVersion,
 ) -> Option<(Vec<&ast::Keyword>, Option<OpenMode>)> {
     let mut result: Vec<&ast::Keyword> = vec![];
     let mut mode: Option<OpenMode> = None;
@@ -260,7 +260,7 @@ fn match_open_keywords(
                 if read_mode {
                     // newline is only valid for write_text
                     return None;
-                } else if target_version < PyVersion::Py310 {
+                } else if target_version < PythonVersion::Py310 {
                     // `pathlib` doesn't support `newline` until Python 3.10.
                     return None;
                 }

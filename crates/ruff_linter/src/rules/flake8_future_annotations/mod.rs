@@ -6,10 +6,10 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
-    use ruff_python_parser::python_version::PyVersion;
     use test_case::test_case;
 
     use crate::registry::Rule;
+    use crate::settings::types::PythonVersion;
     use crate::test::test_path;
     use crate::{assert_messages, settings};
 
@@ -30,7 +30,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_future_annotations").join(path).as_path(),
             &settings::LinterSettings {
-                target_version: PyVersion::Py37,
+                target_version: PythonVersion::Py37,
                 ..settings::LinterSettings::for_rule(Rule::FutureRewritableTypeAnnotation)
             },
         )?;
@@ -49,7 +49,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_future_annotations").join(path).as_path(),
             &settings::LinterSettings {
-                target_version: PyVersion::Py37,
+                target_version: PythonVersion::Py37,
                 ..settings::LinterSettings::for_rule(Rule::FutureRequiredTypeAnnotation)
             },
         )?;

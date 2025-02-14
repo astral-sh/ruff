@@ -10,12 +10,11 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
-    use ruff_python_parser::python_version::PyVersion;
     use test_case::test_case;
 
     use crate::registry::Rule;
     use crate::rules::pyupgrade;
-    use crate::settings::types::PreviewMode;
+    use crate::settings::types::{PreviewMode, PythonVersion};
     use crate::test::test_path;
     use crate::{assert_messages, settings};
 
@@ -156,7 +155,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("pyupgrade/UP041.py"),
             &settings::LinterSettings {
-                target_version: PyVersion::Py310,
+                target_version: PythonVersion::Py310,
                 ..settings::LinterSettings::for_rule(Rule::TimeoutErrorAlias)
             },
         )?;
@@ -169,7 +168,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("pyupgrade/UP040.py"),
             &settings::LinterSettings {
-                target_version: PyVersion::Py311,
+                target_version: PythonVersion::Py311,
                 ..settings::LinterSettings::for_rule(Rule::NonPEP695TypeAlias)
             },
         )?;
@@ -185,7 +184,7 @@ mod tests {
                 pyupgrade: pyupgrade::settings::Settings {
                     keep_runtime_typing: true,
                 },
-                target_version: PyVersion::Py37,
+                target_version: PythonVersion::Py37,
                 ..settings::LinterSettings::for_rule(Rule::NonPEP585Annotation)
             },
         )?;
@@ -201,7 +200,7 @@ mod tests {
                 pyupgrade: pyupgrade::settings::Settings {
                     keep_runtime_typing: true,
                 },
-                target_version: PyVersion::Py310,
+                target_version: PythonVersion::Py310,
                 ..settings::LinterSettings::for_rule(Rule::NonPEP585Annotation)
             },
         )?;
@@ -214,7 +213,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("pyupgrade/future_annotations.py"),
             &settings::LinterSettings {
-                target_version: PyVersion::Py37,
+                target_version: PythonVersion::Py37,
                 ..settings::LinterSettings::for_rule(Rule::NonPEP585Annotation)
             },
         )?;
@@ -227,7 +226,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("pyupgrade/future_annotations.py"),
             &settings::LinterSettings {
-                target_version: PyVersion::Py310,
+                target_version: PythonVersion::Py310,
                 ..settings::LinterSettings::for_rule(Rule::NonPEP585Annotation)
             },
         )?;
@@ -240,7 +239,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("pyupgrade/future_annotations.py"),
             &settings::LinterSettings {
-                target_version: PyVersion::Py37,
+                target_version: PythonVersion::Py37,
                 ..settings::LinterSettings::for_rules([
                     Rule::NonPEP604AnnotationUnion,
                     Rule::NonPEP604AnnotationOptional,
@@ -256,7 +255,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("pyupgrade/future_annotations.py"),
             &settings::LinterSettings {
-                target_version: PyVersion::Py310,
+                target_version: PythonVersion::Py310,
                 ..settings::LinterSettings::for_rules([
                     Rule::NonPEP604AnnotationUnion,
                     Rule::NonPEP604AnnotationOptional,
@@ -272,7 +271,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("pyupgrade/UP017.py"),
             &settings::LinterSettings {
-                target_version: PyVersion::Py311,
+                target_version: PythonVersion::Py311,
                 ..settings::LinterSettings::for_rule(Rule::DatetimeTimezoneUTC)
             },
         )?;
@@ -286,7 +285,7 @@ mod tests {
             Path::new("pyupgrade/UP044.py"),
             &settings::LinterSettings {
                 preview: PreviewMode::Enabled,
-                target_version: PyVersion::Py311,
+                target_version: PythonVersion::Py311,
                 ..settings::LinterSettings::for_rule(Rule::NonPEP646Unpack)
             },
         )?;

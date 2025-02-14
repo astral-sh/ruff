@@ -3,10 +3,10 @@ use std::fmt;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
-use ruff_python_parser::python_version::PyVersion::Py311;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::settings::types::PythonVersion::Py311;
 
 /// ## What it does
 /// Checks for uses of `typing.NoReturn` (and `typing_extensions.NoReturn`) for

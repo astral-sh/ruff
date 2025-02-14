@@ -4,7 +4,6 @@ use ruff_python_literal::cformat::{CFormatError, CFormatErrorType};
 use ruff_diagnostics::Diagnostic;
 
 use ruff_python_ast::types::Node;
-use ruff_python_parser::python_version::PyVersion;
 use ruff_python_semantic::analyze::typing;
 use ruff_python_semantic::ScopeKind;
 use ruff_text_size::Ranged;
@@ -19,6 +18,7 @@ use crate::rules::{
     flake8_simplify, flake8_tidy_imports, flake8_type_checking, flake8_use_pathlib, flynt, numpy,
     pandas_vet, pep8_naming, pycodestyle, pyflakes, pylint, pyupgrade, refurb, ruff,
 };
+use crate::settings::types::PythonVersion;
 
 /// Run lint rules over an [`Expr`] syntax node.
 pub(crate) fn expression(expr: &Expr, checker: &Checker) {
@@ -34,8 +34,8 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 {
                     if checker.enabled(Rule::FutureRewritableTypeAnnotation) {
                         if !checker.semantic.future_annotations_or_stub()
-                            && checker.settings.target_version < PyVersion::Py310
-                            && checker.settings.target_version >= PyVersion::Py37
+                            && checker.settings.target_version < PythonVersion::Py310
+                            && checker.settings.target_version >= PythonVersion::Py37
                             && checker.semantic.in_annotation()
                             && !checker.settings.pyupgrade.keep_runtime_typing
                         {
@@ -49,8 +49,8 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                         Rule::NonPEP604AnnotationOptional,
                     ]) {
                         if checker.source_type.is_stub()
-                            || checker.settings.target_version >= PyVersion::Py310
-                            || (checker.settings.target_version >= PyVersion::Py37
+                            || checker.settings.target_version >= PythonVersion::Py310
+                            || (checker.settings.target_version >= PythonVersion::Py37
                                 && checker.semantic.future_annotations_or_stub()
                                 && checker.semantic.in_annotation()
                                 && !checker.settings.pyupgrade.keep_runtime_typing)
@@ -64,7 +64,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             // Ex) list[...]
             if checker.enabled(Rule::FutureRequiredTypeAnnotation) {
                 if !checker.semantic.future_annotations_or_stub()
-                    && checker.settings.target_version < PyVersion::Py39
+                    && checker.settings.target_version < PythonVersion::Py39
                     && checker.semantic.in_annotation()
                     && checker.semantic.in_runtime_evaluated_annotation()
                     && !checker.semantic.in_string_type_definition()
@@ -135,7 +135,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             }
 
             if checker.enabled(Rule::UnnecessaryDefaultTypeArgs) {
-                if checker.settings.target_version >= PyVersion::Py313 {
+                if checker.settings.target_version >= PythonVersion::Py313 {
                     pyupgrade::rules::unnecessary_default_type_args(checker, expr);
                 }
             }
@@ -268,8 +268,8 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                         {
                             if checker.enabled(Rule::FutureRewritableTypeAnnotation) {
                                 if !checker.semantic.future_annotations_or_stub()
-                                    && checker.settings.target_version < PyVersion::Py39
-                                    && checker.settings.target_version >= PyVersion::Py37
+                                    && checker.settings.target_version < PythonVersion::Py39
+                                    && checker.settings.target_version >= PythonVersion::Py37
                                     && checker.semantic.in_annotation()
                                     && !checker.settings.pyupgrade.keep_runtime_typing
                                 {
@@ -278,8 +278,8 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                             }
                             if checker.enabled(Rule::NonPEP585Annotation) {
                                 if checker.source_type.is_stub()
-                                    || checker.settings.target_version >= PyVersion::Py39
-                                    || (checker.settings.target_version >= PyVersion::Py37
+                                    || checker.settings.target_version >= PythonVersion::Py39
+                                    || (checker.settings.target_version >= PythonVersion::Py37
                                         && checker.semantic.future_annotations_or_stub()
                                         && checker.semantic.in_annotation()
                                         && !checker.settings.pyupgrade.keep_runtime_typing)
@@ -378,8 +378,8 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 if let Some(replacement) = typing::to_pep585_generic(expr, &checker.semantic) {
                     if checker.enabled(Rule::FutureRewritableTypeAnnotation) {
                         if !checker.semantic.future_annotations_or_stub()
-                            && checker.settings.target_version < PyVersion::Py39
-                            && checker.settings.target_version >= PyVersion::Py37
+                            && checker.settings.target_version < PythonVersion::Py39
+                            && checker.settings.target_version >= PythonVersion::Py37
                             && checker.semantic.in_annotation()
                             && !checker.settings.pyupgrade.keep_runtime_typing
                         {
@@ -390,8 +390,8 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                     }
                     if checker.enabled(Rule::NonPEP585Annotation) {
                         if checker.source_type.is_stub()
-                            || checker.settings.target_version >= PyVersion::Py39
-                            || (checker.settings.target_version >= PyVersion::Py37
+                            || checker.settings.target_version >= PythonVersion::Py39
+                            || (checker.settings.target_version >= PythonVersion::Py37
                                 && checker.semantic.future_annotations_or_stub()
                                 && checker.semantic.in_annotation()
                                 && !checker.settings.pyupgrade.keep_runtime_typing)
@@ -405,7 +405,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 refurb::rules::regex_flag_alias(checker, expr);
             }
             if checker.enabled(Rule::DatetimeTimezoneUTC) {
-                if checker.settings.target_version >= PyVersion::Py311 {
+                if checker.settings.target_version >= PythonVersion::Py311 {
                     pyupgrade::rules::datetime_utc_alias(checker, expr);
                 }
             }
@@ -610,12 +610,12 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 pyupgrade::rules::os_error_alias_call(checker, func);
             }
             if checker.enabled(Rule::TimeoutErrorAlias) {
-                if checker.settings.target_version >= PyVersion::Py310 {
+                if checker.settings.target_version >= PythonVersion::Py310 {
                     pyupgrade::rules::timeout_error_alias_call(checker, func);
                 }
             }
             if checker.enabled(Rule::NonPEP604Isinstance) {
-                if checker.settings.target_version >= PyVersion::Py310 {
+                if checker.settings.target_version >= PythonVersion::Py310 {
                     pyupgrade::rules::use_pep604_isinstance(checker, expr, func, args);
                 }
             }
@@ -690,7 +690,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 );
             }
             if checker.enabled(Rule::ZipWithoutExplicitStrict) {
-                if checker.settings.target_version >= PyVersion::Py310 {
+                if checker.settings.target_version >= PythonVersion::Py310 {
                     flake8_bugbear::rules::zip_without_explicit_strict(checker, call);
                 }
             }
@@ -963,7 +963,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 flake8_pytest_style::rules::fail_call(checker, call);
             }
             if checker.enabled(Rule::ZipInsteadOfPairwise) {
-                if checker.settings.target_version >= PyVersion::Py310 {
+                if checker.settings.target_version >= PythonVersion::Py310 {
                     ruff::rules::zip_instead_of_pairwise(checker, call);
                 }
             }
@@ -1382,7 +1382,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             // Ex) `str | None`
             if checker.enabled(Rule::FutureRequiredTypeAnnotation) {
                 if !checker.semantic.future_annotations_or_stub()
-                    && checker.settings.target_version < PyVersion::Py310
+                    && checker.settings.target_version < PythonVersion::Py310
                     && checker.semantic.in_annotation()
                     && checker.semantic.in_runtime_evaluated_annotation()
                     && !checker.semantic.in_string_type_definition()

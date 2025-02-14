@@ -3,7 +3,6 @@ use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, FixAvailab
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_python_ast::{Expr, Stmt};
-use ruff_python_parser::python_version::PyVersion;
 use ruff_python_semantic::{Binding, SemanticModel, TypingOnlyBindingsStatus};
 use ruff_python_stdlib::typing::{is_pep_593_generic_type, is_standard_library_literal};
 use ruff_text_size::Ranged;
@@ -11,6 +10,7 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 use crate::rules::flake8_type_checking::helpers::quote_type_expression;
+use crate::settings::types::PythonVersion;
 use crate::settings::LinterSettings;
 
 /// ## What it does
@@ -313,7 +313,7 @@ fn quotes_are_unremovable(
         }) => {
             match op {
                 Operator::BitOr => {
-                    if settings.target_version < PyVersion::Py310 {
+                    if settings.target_version < PythonVersion::Py310 {
                         return true;
                     }
                     quotes_are_unremovable(semantic, left, settings)

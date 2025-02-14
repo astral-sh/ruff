@@ -7,11 +7,12 @@ use ruff_macros::{derive_message_formats, ViolationMetadata};
 
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, Expr, Operator, Parameters};
-use ruff_python_parser::python_version::PyVersion;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
+
+use crate::settings::types::PythonVersion;
 
 use super::super::typing::type_hint_explicitly_allows_none;
 
@@ -109,9 +110,9 @@ impl fmt::Display for ConversionType {
     }
 }
 
-impl From<PyVersion> for ConversionType {
-    fn from(target_version: PyVersion) -> Self {
-        if target_version >= PyVersion::Py310 {
+impl From<PythonVersion> for ConversionType {
+    fn from(target_version: PythonVersion) -> Self {
+        if target_version >= PythonVersion::Py310 {
             Self::BinOpOr
         } else {
             Self::Optional

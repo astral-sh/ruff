@@ -7,11 +7,11 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
-    use ruff_python_parser::python_version::PyVersion;
     use test_case::test_case;
 
     use crate::assert_messages;
     use crate::registry::Rule;
+    use crate::settings::types::PythonVersion;
     use crate::settings::LinterSettings;
     use crate::test::test_path;
 
@@ -44,7 +44,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_async").join(path),
             &LinterSettings {
-                target_version: PyVersion::Py310,
+                target_version: PythonVersion::Py310,
                 ..LinterSettings::for_rule(Rule::AsyncFunctionWithTimeout)
             },
         )?;

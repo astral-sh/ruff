@@ -8,12 +8,12 @@ use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::stmt_if::{if_elif_branches, BranchKind, IfElifBranch};
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_ast::{self as ast, CmpOp, ElifElseClause, Expr, Int, StmtIf};
-use ruff_python_parser::python_version::PyVersion;
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextLen, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::{adjust_indentation, delete_stmt};
+use crate::settings::types::PythonVersion;
 
 /// ## What it does
 /// Checks for conditional blocks gated on `sys.version_info` comparisons
@@ -208,10 +208,10 @@ pub(crate) fn outdated_version_block(checker: &Checker, stmt_if: &StmtIf) {
     }
 }
 
-/// Returns true if the `check_version` is always less than the [`PyVersion`].
+/// Returns true if the `check_version` is always less than the [`PythonVersion`].
 fn version_always_less_than(
     check_version: &[Int],
-    py_version: PyVersion,
+    py_version: PythonVersion,
     or_equal: bool,
 ) -> Result<bool> {
     let mut check_version_iter = check_version.iter();
@@ -456,19 +456,19 @@ mod tests {
 
     use super::*;
 
-    #[test_case(PyVersion::Py37, & [2], true, true; "compare-2.0")]
-    #[test_case(PyVersion::Py37, & [2, 0], true, true; "compare-2.0-whole")]
-    #[test_case(PyVersion::Py37, & [3], true, true; "compare-3.0")]
-    #[test_case(PyVersion::Py37, & [3, 0], true, true; "compare-3.0-whole")]
-    #[test_case(PyVersion::Py37, & [3, 1], true, true; "compare-3.1")]
-    #[test_case(PyVersion::Py37, & [3, 5], true, true; "compare-3.5")]
-    #[test_case(PyVersion::Py37, & [3, 7], true, false; "compare-3.7")]
-    #[test_case(PyVersion::Py37, & [3, 7], false, true; "compare-3.7-not-equal")]
-    #[test_case(PyVersion::Py37, & [3, 8], false, false; "compare-3.8")]
-    #[test_case(PyVersion::Py310, & [3, 9], true, true; "compare-3.9")]
-    #[test_case(PyVersion::Py310, & [3, 11], true, false; "compare-3.11")]
+    #[test_case(PythonVersion::Py37, & [2], true, true; "compare-2.0")]
+    #[test_case(PythonVersion::Py37, & [2, 0], true, true; "compare-2.0-whole")]
+    #[test_case(PythonVersion::Py37, & [3], true, true; "compare-3.0")]
+    #[test_case(PythonVersion::Py37, & [3, 0], true, true; "compare-3.0-whole")]
+    #[test_case(PythonVersion::Py37, & [3, 1], true, true; "compare-3.1")]
+    #[test_case(PythonVersion::Py37, & [3, 5], true, true; "compare-3.5")]
+    #[test_case(PythonVersion::Py37, & [3, 7], true, false; "compare-3.7")]
+    #[test_case(PythonVersion::Py37, & [3, 7], false, true; "compare-3.7-not-equal")]
+    #[test_case(PythonVersion::Py37, & [3, 8], false, false; "compare-3.8")]
+    #[test_case(PythonVersion::Py310, & [3, 9], true, true; "compare-3.9")]
+    #[test_case(PythonVersion::Py310, & [3, 11], true, false; "compare-3.11")]
     fn test_compare_version(
-        version: PyVersion,
+        version: PythonVersion,
         target_versions: &[u8],
         or_equal: bool,
         expected: bool,

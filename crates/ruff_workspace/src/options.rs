@@ -27,12 +27,13 @@ use ruff_linter::rules::{
     flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe, pep8_naming,
     pycodestyle, pydoclint, pydocstyle, pyflakes, pylint, pyupgrade, ruff,
 };
-use ruff_linter::settings::types::{IdentifierPattern, OutputFormat, PreviewMode, RequiredVersion};
+use ruff_linter::settings::types::{
+    IdentifierPattern, OutputFormat, PreviewMode, PythonVersion, RequiredVersion,
+};
 use ruff_linter::{warn_user_once, RuleSelector};
 use ruff_macros::{CombineOptions, OptionsMetadata};
 use ruff_python_ast::name::Name;
 use ruff_python_formatter::{DocstringCodeLineWidth, QuoteStyle};
-use ruff_python_parser::python_version::PyVersion;
 use ruff_python_semantic::NameImports;
 use ruff_python_stdlib::identifiers::is_identifier;
 
@@ -330,7 +331,7 @@ pub struct Options {
             target-version = "py37"
         "#
     )]
-    pub target_version: Option<PyVersion>,
+    pub target_version: Option<PythonVersion>,
 
     /// The directories to consider when resolving first- vs. third-party
     /// imports.
@@ -3847,7 +3848,9 @@ impl From<LintOptionsWire> for LintOptions {
 mod tests {
     use crate::options::Flake8SelfOptions;
     use ruff_linter::rules::flake8_self;
+    use ruff_linter::settings::types::PythonVersion as LinterPythonVersion;
     use ruff_python_ast::name::Name;
+    use ruff_python_formatter::PythonVersion as FormatterPythonVersion;
 
     #[test]
     fn flake8_self_options() {
