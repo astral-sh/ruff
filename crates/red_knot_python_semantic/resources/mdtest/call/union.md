@@ -40,7 +40,7 @@ def _(flag: bool):
         def f() -> int:
             return 1
     x = f()  # error: "Object of type `Literal[1] | Literal[f]` is not callable (due to union element `Literal[1]`)"
-    reveal_type(x)  # revealed: Unknown | int
+    reveal_type(x)  # revealed: int | Unknown
 ```
 
 ## Multiple non-callable elements in a union
@@ -57,7 +57,7 @@ def _(flag: bool, flag2: bool):
         def f() -> int:
             return 1
     # error: "Object of type `Literal[1, "foo"] | Literal[f]` is not callable (due to union elements Literal[1], Literal["foo"])"
-    # revealed: Unknown | int
+    # revealed: int | Unknown
     reveal_type(f())
 ```
 
@@ -76,7 +76,6 @@ def _(flag: bool):
     reveal_type(x)  # revealed: Unknown
 ```
 
-
 ## Mismatching signatures
 
 Calling a union where the arguments don't match the signature of all variants.
@@ -84,30 +83,28 @@ Calling a union where the arguments don't match the signature of all variants.
 ```py
 def f1(a: int): ...
 def f2(a: str): ...
-
 def _(flag: bool):
     if flag:
         f = f1
     else:
         f = f2
 
-    x = f(3)  # error: "Object of type `Literal[1, "foo"]` is not callable"
+    # error: [call-non-callable] "Object of type `Literal[f1, f2]` is not callable (due to union element `Literal[f2]`)"
+    x = f(3)
     reveal_type(x)  # revealed: Unknown
 ```
-
 
 ## Any non callable variant
 
 ```py
 def f1(a: int): ...
-def f2(a: str): ...
-
 def _(flag: bool):
     if flag:
         f = f1
     else:
         f = "str"
 
-    x = f(3)  # error: "Object of type `Literal[1, "foo"]` is not callable"
+    # error: [call-non-callable] "Object of type `Literal[f1] | Literal["str"]` is not callable (due to union element `Literal["str"]`)"
+    x = f(3)
     reveal_type(x)  # revealed: Unknown
 ```

@@ -21,8 +21,9 @@ class A:
 
 reveal_type("hello" in A())  # revealed: bool
 reveal_type("hello" not in A())  # revealed: bool
-# TODO: should emit diagnostic, need to check arg type, will fail
+# error: [unsupported-operator] "Operator `in` is not supported for types `int` and `A`, in comparing `Literal[42]` with `A`"
 reveal_type(42 in A())  # revealed: bool
+# error: [unsupported-operator] "Operator `not in` is not supported for types `int` and `A`, in comparing `Literal[42]` with `A`"
 reveal_type(42 not in A())  # revealed: bool
 ```
 
@@ -126,9 +127,9 @@ class A:
 
 reveal_type(CheckContains() in A())  # revealed: bool
 
-# TODO: should emit diagnostic, need to check arg type,
-# should not fall back to __iter__ or __getitem__
+# error: [unsupported-operator] "Operator `in` is not supported for types `CheckIter` and `A`"
 reveal_type(CheckIter() in A())  # revealed: bool
+# error: [unsupported-operator] "Operator `in` is not supported for types `CheckGetItem` and `A`"
 reveal_type(CheckGetItem() in A())  # revealed: bool
 
 class B:
@@ -154,7 +155,8 @@ class A:
     def __getitem__(self, key: str) -> str:
         return "foo"
 
-# TODO should emit a diagnostic
+# error: [unsupported-operator] "Operator `in` is not supported for types `int` and `A`, in comparing `Literal[42]` with `A`"
 reveal_type(42 in A())  # revealed: bool
+# error: [unsupported-operator] "Operator `in` is not supported for types `str` and `A`, in comparing `Literal["hello"]` with `A`"
 reveal_type("hello" in A())  # revealed: bool
 ```
