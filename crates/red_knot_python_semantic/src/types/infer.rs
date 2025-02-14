@@ -3361,26 +3361,58 @@ impl<'db> TypeInferenceBuilder<'db> {
 
             // Walk up parent scopes looking for a possible enclosing scope that may have a
             // definition of this name visible to us (would be `LOAD_DEREF` at runtime.)
-            for (enclosing_scope_file_id, _) in self.index.ancestor_scopes(file_scope_id) {
+            // Note that we skip the scope containing the use that we are resolving, since we
+            // already looked for the symbol there up above.
+            let mut look_up_eagerly = scope.is_eager(db);
+            for (enclosing_scope_file_id, _) in self.index.ancestor_scopes(file_scope_id).skip(1) {
+                // Lazy scopes are "sticky": once we see a lazy scope we stop doing lookups
+                // eagerly, even if we encounter another eager enclosing scope later on.
+                let enclosing_scope_id = enclosing_scope_file_id.to_scope_id(db, current_file);
+                let look_up_eagerly_inner = look_up_eagerly;
+                look_up_eagerly = look_up_eagerly && enclosing_scope_id.is_eager(db);
+
                 // Class scopes are not visible to nested scopes, and we need to handle global
                 // scope differently (because an unbound name there falls back to builtins), so
                 // check only function-like scopes.
-                let enclosing_scope_id = enclosing_scope_file_id.to_scope_id(db, current_file);
                 if !enclosing_scope_id.is_function_like(db) {
                     continue;
                 }
+
                 let enclosing_symbol_table = self.index.symbol_table(enclosing_scope_file_id);
-                let Some(enclosing_symbol) = enclosing_symbol_table.symbol_by_name(symbol_name)
+                let Some(enclosing_symbol_id) =
+                    enclosing_symbol_table.symbol_id_by_name(symbol_name)
                 else {
                     continue;
                 };
-                if enclosing_symbol.is_bound() {
-                    // We can return early here, because the nearest function-like scope that
-                    // defines a name must be the only source for the nonlocal reference (at
-                    // runtime, it is the scope that creates the cell for our closure.) If the name
-                    // isn't bound in that scope, we should get an unbound name, not continue
-                    // falling back to other scopes / globals / builtins.
-                    return symbol(db, enclosing_scope_id, symbol_name);
+
+                // Are we looking up the symbol eagerly? If so, we need to look for the symbol at
+                // the point where the previous enclosing scope was defined, instead of at the end
+                // of the scope.
+                if look_up_eagerly_inner {
+                    if let Some(eager_scope_id) =
+                        scope.scoped_eager_nested_scope_id(db, enclosing_scope_id)
+                    {
+                        let enclosing_scope_use_def =
+                            self.index.use_def_map(enclosing_scope_file_id);
+                        if let Some(bindings_at_nested_scope_definition) = enclosing_scope_use_def
+                            .bindings_at_eager_nested_scope_definition(
+                                eager_scope_id,
+                                enclosing_symbol_id,
+                            )
+                        {
+                            return symbol_from_bindings(db, bindings_at_nested_scope_definition);
+                        }
+                    }
+                } else {
+                    let enclosing_symbol = enclosing_symbol_table.symbol(enclosing_symbol_id);
+                    if enclosing_symbol.is_bound() {
+                        // We can return early here, because the nearest function-like scope that
+                        // defines a name must be the only source for the nonlocal reference (at
+                        // runtime, it is the scope that creates the cell for our closure.) If the name
+                        // isn't bound in that scope, we should get an unbound name, not continue
+                        // falling back to other scopes / globals / builtins.
+                        return symbol(db, enclosing_scope_id, symbol_name);
+                    }
                 }
             }
 
