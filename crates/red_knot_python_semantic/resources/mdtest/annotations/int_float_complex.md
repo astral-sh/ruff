@@ -40,6 +40,14 @@ def assigns_float_to_int(x: float):
     y: int = x
 ```
 
+Unlike other type checkers, we choose not to obfuscate this special case by displaying `int | float`
+as just `float`; we display the actual type:
+
+```py
+def f(x: float):
+    reveal_type(x)  # revealed: int | float
+```
+
 ## complex
 
 An annotation of `complex` means `int | float | complex`, so `int` and `float` are both assignable
@@ -76,4 +84,7 @@ def assigns_complex(x: complex):
     y: int = x
     # error: [invalid-assignment]
     z: float = x
+
+def f(x: complex):
+    reveal_type(x)  # revealed: int | float | complex
 ```
