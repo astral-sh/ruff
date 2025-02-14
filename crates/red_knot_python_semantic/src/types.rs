@@ -32,7 +32,7 @@ use crate::semantic_index::{
     use_def_map, BindingWithConstraints, BindingWithConstraintsIterator, DeclarationWithConstraint,
     DeclarationsIterator,
 };
-use crate::stdlib::{builtins_symbol, known_module_symbol, typing_extensions_symbol};
+use crate::stdlib::{known_module_symbol, typing_extensions_symbol};
 use crate::suppression::check_suppressions;
 use crate::symbol::{Boundness, Symbol};
 use crate::types::call::{
@@ -280,12 +280,13 @@ pub(crate) fn module_type_symbol<'db>(db: &'db dyn Db, name: &str) -> Symbol<'db
     }
 }
 
-/// Infer the public type of a symbol (its type as seen from outside its scope).
+/// Infer the public type of a symbol (its type as seen from outside its scope) in the given
+/// `scope`.
 fn symbol<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Symbol<'db> {
     symbol_impl(db, scope, name, RequiresExplicitReExport::No)
 }
 
-/// Infers the public type of a symbol as seen from the same file.
+/// Infers the public type of a module-global symbol as seen from within the same file.
 ///
 /// If it's not defined explicitly in the global scope, it will look it up in `types.ModuleType`
 /// with a few very special exceptions.
@@ -302,11 +303,52 @@ pub(crate) fn global_symbol<'db>(db: &'db dyn Db, file: File, name: &str) -> Sym
 }
 
 /// Infers the public type of an imported symbol.
-///
-/// Unlike [`global_symbol`], this does not fall back to looking up the symbol in
-/// `types.ModuleType`. The fallback logic needs to be handled by the caller.
 pub(crate) fn imported_symbol<'db>(db: &'db dyn Db, module: &Module, name: &str) -> Symbol<'db> {
-    let file = module.file();
+    // If it's not found in the global scope, check if it's present as an instance on
+    // `types.ModuleType` or `builtins.object`.
+    //
+    // We do a more limited version of this in `global_symbol`, but there are two crucial
+    // differences here:
+    // - If a member is looked up as an attribute, `__init__` is also available on the module, but
+    //   it isn't available as a global from inside the module
+    // - If a member is looked up as an attribute, members on `builtins.object` are also available
+    //   (because `types.ModuleType` inherits from `object`); these attributes are also not
+    //   available as globals from inside the module.
+    //
+    // The same way as in `global_symbol`, however, we need to be careful to ignore
+    // `__getattr__`. Typeshed has a fake `__getattr__` on `types.ModuleType` to help out with
+    // dynamic imports; we shouldn't use it for `ModuleLiteral` types where we know exactly which
+    // module we're dealing with.
+    external_symbol_impl(db, module.file(), name).or_fall_back_to(db, || {
+        if name == "__getattr__" {
+            Symbol::Unbound
+        } else {
+            KnownClass::ModuleType.to_instance(db).member(db, name)
+        }
+    })
+}
+
+/// Lookup the type of `symbol` in the builtins namespace.
+///
+/// Returns `Symbol::Unbound` if the `builtins` module isn't available for some reason.
+///
+/// Note that this function is only intended for use in the context of the builtins *namespace*
+/// and should not be used when a symbol is being explicitly imported from the `builtins` module
+/// (e.g. `from builtins import int`).
+pub(crate) fn builtins_symbol<'db>(db: &'db dyn Db, symbol: &str) -> Symbol<'db> {
+    resolve_module(db, &KnownModule::Builtins.name())
+        .map(|module| {
+            external_symbol_impl(db, module.file(), symbol).or_fall_back_to(db, || {
+                // We're looking up in the builtins namespace and not the module, so we should
+                // do the normal lookup in `types.ModuleType` and not the special one as in
+                // `imported_symbol`.
+                module_type_symbol(db, symbol)
+            })
+        })
+        .unwrap_or(Symbol::Unbound)
+}
+
+fn external_symbol_impl<'db>(db: &'db dyn Db, file: File, name: &str) -> Symbol<'db> {
     symbol_impl(
         db,
         global_scope(db, file),
@@ -3866,28 +3908,7 @@ impl<'db> ModuleLiteralType<'db> {
             }
         }
 
-        // If it's not found in the global scope, check if it's present as an instance
-        // on `types.ModuleType` or `builtins.object`.
-        //
-        // We do a more limited version of this in `module_type_symbol`,
-        // but there are two crucial differences here:
-        // - If a member is looked up as an attribute, `__init__` is also available
-        //   on the module, but it isn't available as a global from inside the module
-        // - If a member is looked up as an attribute, members on `builtins.object`
-        //   are also available (because `types.ModuleType` inherits from `object`);
-        //   these attributes are also not available as globals from inside the module.
-        //
-        // The same way as in `global_symbol_ty`, however, we need to be careful to
-        // ignore `__getattr__`. Typeshed has a fake `__getattr__` on `types.ModuleType`
-        // to help out with dynamic imports; we shouldn't use it for `ModuleLiteral` types
-        // where we know exactly which module we're dealing with.
-        imported_symbol(db, &self.module(db), name).or_fall_back_to(db, || {
-            if name == "__getattr__" {
-                Symbol::Unbound
-            } else {
-                KnownClass::ModuleType.to_instance(db).member(db, name)
-            }
-        })
+        imported_symbol(db, &self.module(db), name)
     }
 }
 

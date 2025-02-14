@@ -2,7 +2,7 @@ use crate::module_resolver::{resolve_module, KnownModule};
 use crate::semantic_index::global_scope;
 use crate::semantic_index::symbol::ScopeId;
 use crate::symbol::Symbol;
-use crate::types::{imported_symbol, module_type_symbol};
+use crate::types::imported_symbol;
 use crate::Db;
 
 /// Lookup the type of `symbol` in a given known module
@@ -14,19 +14,8 @@ pub(crate) fn known_module_symbol<'db>(
     symbol: &str,
 ) -> Symbol<'db> {
     resolve_module(db, &known_module.name())
-        .map(|module| {
-            imported_symbol(db, &module, symbol)
-                .or_fall_back_to(db, || module_type_symbol(db, symbol))
-        })
+        .map(|module| imported_symbol(db, &module, symbol))
         .unwrap_or(Symbol::Unbound)
-}
-
-/// Lookup the type of `symbol` in the builtins namespace.
-///
-/// Returns `Symbol::Unbound` if the `builtins` module isn't available for some reason.
-#[inline]
-pub(crate) fn builtins_symbol<'db>(db: &'db dyn Db, symbol: &str) -> Symbol<'db> {
-    known_module_symbol(db, KnownModule::Builtins, symbol)
 }
 
 /// Lookup the type of `symbol` in the `typing` module namespace.
