@@ -82,12 +82,12 @@ pub enum Linter {
     /// [flake8-commas](https://pypi.org/project/flake8-commas/)
     #[prefix = "COM"]
     Flake8Commas,
-    /// [flake8-copyright](https://pypi.org/project/flake8-copyright/)
-    #[prefix = "CPY"]
-    Flake8Copyright,
     /// [flake8-comprehensions](https://pypi.org/project/flake8-comprehensions/)
     #[prefix = "C4"]
     Flake8Comprehensions,
+    /// [flake8-copyright](https://pypi.org/project/flake8-copyright/)
+    #[prefix = "CPY"]
+    Flake8Copyright,
     /// [flake8-datetimez](https://pypi.org/project/flake8-datetimez/)
     #[prefix = "DTZ"]
     Flake8Datetimez,
@@ -103,9 +103,15 @@ pub enum Linter {
     /// [flake8-executable](https://pypi.org/project/flake8-executable/)
     #[prefix = "EXE"]
     Flake8Executable,
+    /// [flake8-fixme](https://github.com/tommilligan/flake8-fixme)
+    #[prefix = "FIX"]
+    Flake8Fixme,
     /// [flake8-future-annotations](https://pypi.org/project/flake8-future-annotations/)
     #[prefix = "FA"]
     Flake8FutureAnnotations,
+    /// [flake8-gettext](https://pypi.org/project/flake8-gettext/)
+    #[prefix = "INT"]
+    Flake8GetText,
     /// [flake8-implicit-str-concat](https://pypi.org/project/flake8-implicit-str-concat/)
     #[prefix = "ISC"]
     Flake8ImplicitStrConcat,
@@ -145,33 +151,27 @@ pub enum Linter {
     /// [flake8-self](https://pypi.org/project/flake8-self/)
     #[prefix = "SLF"]
     Flake8Self,
-    /// [flake8-slots](https://pypi.org/project/flake8-slots/)
-    #[prefix = "SLOT"]
-    Flake8Slots,
     /// [flake8-simplify](https://pypi.org/project/flake8-simplify/)
     #[prefix = "SIM"]
     Flake8Simplify,
+    /// [flake8-slots](https://pypi.org/project/flake8-slots/)
+    #[prefix = "SLOT"]
+    Flake8Slots,
     /// [flake8-tidy-imports](https://pypi.org/project/flake8-tidy-imports/)
     #[prefix = "TID"]
     Flake8TidyImports,
+    /// [flake8-todos](https://github.com/orsinium-labs/flake8-todos/)
+    #[prefix = "TD"]
+    Flake8Todos,
     /// [flake8-type-checking](https://pypi.org/project/flake8-type-checking/)
     #[prefix = "TC"]
     Flake8TypeChecking,
-    /// [flake8-gettext](https://pypi.org/project/flake8-gettext/)
-    #[prefix = "INT"]
-    Flake8GetText,
     /// [flake8-unused-arguments](https://pypi.org/project/flake8-unused-arguments/)
     #[prefix = "ARG"]
     Flake8UnusedArguments,
     /// [flake8-use-pathlib](https://pypi.org/project/flake8-use-pathlib/)
     #[prefix = "PTH"]
     Flake8UsePathlib,
-    /// [flake8-todos](https://github.com/orsinium-labs/flake8-todos/)
-    #[prefix = "TD"]
-    Flake8Todos,
-    /// [flake8-fixme](https://github.com/tommilligan/flake8-fixme)
-    #[prefix = "FIX"]
-    Flake8Fixme,
     /// [eradicate](https://pypi.org/project/eradicate/)
     #[prefix = "ERA"]
     Eradicate,
