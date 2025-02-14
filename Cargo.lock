@@ -3337,12 +3337,12 @@ checksum = "6ea1a2d0a644769cc99faa24c3ad26b379b786fe7c36fd3c546254801650e6dd"
 [[package]]
 name = "salsa"
 version = "0.18.0"
-source = "git+https://github.com/davidbarsky/salsa.git?rev=915b0798b76b037c5948b3bc35dbb36b870f89a0#915b0798b76b037c5948b3bc35dbb36b870f89a0"
+source = "git+https://github.com/ibraheemdev/salsa.git?rev=1f91fb4b120bf576057479e751f40c8d05000e19#1f91fb4b120bf576057479e751f40c8d05000e19"
 dependencies = [
  "arc-swap",
  "boxcar",
  "compact_str",
- "crossbeam-queue",
+ "crossbeam",
  "dashmap 6.1.0",
  "hashbrown 0.14.5",
  "hashlink",
@@ -3359,12 +3359,12 @@ dependencies = [
 [[package]]
 name = "salsa-macro-rules"
 version = "0.1.0"
-source = "git+https://github.com/davidbarsky/salsa.git?rev=915b0798b76b037c5948b3bc35dbb36b870f89a0#915b0798b76b037c5948b3bc35dbb36b870f89a0"
+source = "git+https://github.com/ibraheemdev/salsa.git?rev=1f91fb4b120bf576057479e751f40c8d05000e19#1f91fb4b120bf576057479e751f40c8d05000e19"
 
 [[package]]
 name = "salsa-macros"
 version = "0.18.0"
-source = "git+https://github.com/davidbarsky/salsa.git?rev=915b0798b76b037c5948b3bc35dbb36b870f89a0#915b0798b76b037c5948b3bc35dbb36b870f89a0"
+source = "git+https://github.com/ibraheemdev/salsa.git?rev=1f91fb4b120bf576057479e751f40c8d05000e19#1f91fb4b120bf576057479e751f40c8d05000e19"
 dependencies = [
  "heck",
  "proc-macro2",
