@@ -30,13 +30,14 @@ use ruff_linter::settings::fix_safety_table::FixSafetyTable;
 use ruff_linter::settings::rule_table::RuleTable;
 use ruff_linter::settings::types::{
     CompiledPerFileIgnoreList, ExtensionMapping, FilePattern, FilePatternSet, OutputFormat,
-    PerFileIgnore, PreviewMode, PythonVersion, RequiredVersion, UnsafeFixes,
+    PerFileIgnore, PreviewMode, RequiredVersion, UnsafeFixes,
 };
 use ruff_linter::settings::{LinterSettings, DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX, TASK_TAGS};
 use ruff_linter::{
     fs, warn_user_once, warn_user_once_by_id, warn_user_once_by_message, RuleSelector,
     RUFF_PKG_VERSION,
 };
+use ruff_python_ast::python_version::PythonVersion as AstPythonVersion;
 use ruff_python_formatter::{
     DocstringCode, DocstringCodeLineWidth, MagicTrailingComma, QuoteStyle,
 };
@@ -136,7 +137,7 @@ pub struct Configuration {
     pub builtins: Option<Vec<String>>,
     pub namespace_packages: Option<Vec<PathBuf>>,
     pub src: Option<Vec<PathBuf>>,
-    pub target_version: Option<PythonVersion>,
+    pub target_version: Option<AstPythonVersion>,
 
     // Global formatting options
     pub line_length: Option<LineLength>,
@@ -177,15 +178,7 @@ impl Configuration {
             exclude: FilePatternSet::try_from_iter(format.exclude.unwrap_or_default())?,
             extension: self.extension.clone().unwrap_or_default(),
             preview: format_preview,
-            target_version: match target_version {
-                PythonVersion::Py37 => ruff_python_ast::python_version::PythonVersion::PY37,
-                PythonVersion::Py38 => ruff_python_ast::python_version::PythonVersion::PY38,
-                PythonVersion::Py39 => ruff_python_ast::python_version::PythonVersion::PY39,
-                PythonVersion::Py310 => ruff_python_ast::python_version::PythonVersion::PY310,
-                PythonVersion::Py311 => ruff_python_ast::python_version::PythonVersion::PY311,
-                PythonVersion::Py312 => ruff_python_ast::python_version::PythonVersion::PY312,
-                PythonVersion::Py313 => ruff_python_ast::python_version::PythonVersion::PY313,
-            },
+            target_version,
             line_width: self
                 .line_length
                 .map_or(format_defaults.line_width, |length| {

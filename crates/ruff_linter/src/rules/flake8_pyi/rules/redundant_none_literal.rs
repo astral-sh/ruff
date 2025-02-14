@@ -5,6 +5,7 @@ use ruff_python_ast::{
     self as ast,
     helpers::{pep_604_union, typing_optional},
     name::Name,
+    python_version::PythonVersion,
     Expr, ExprBinOp, ExprContext, ExprNoneLiteral, ExprSubscript, Operator,
 };
 use ruff_python_semantic::analyze::typing::{traverse_literal, traverse_union};
@@ -12,7 +13,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use smallvec::SmallVec;
 
-use crate::{checkers::ast::Checker, importer::ImportRequest, settings::types::PythonVersion};
+use crate::{checkers::ast::Checker, importer::ImportRequest};
 
 /// ## What it does
 /// Checks for redundant `Literal[None]` annotations.
@@ -112,7 +113,7 @@ pub(crate) fn redundant_none_literal<'a>(checker: &Checker, literal_expr: &'a Ex
 
     let union_kind = if literal_elements.is_empty() {
         UnionKind::NoUnion
-    } else if (checker.settings.target_version >= PythonVersion::Py310)
+    } else if (checker.settings.target_version >= PythonVersion::PY310)
         || checker.source_type.is_stub()
     {
         UnionKind::BitOr

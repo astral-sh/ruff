@@ -8,8 +8,8 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
 use crate::rules::flake8_pyi::rules::TypingModule;
-use crate::settings::types::PythonVersion;
 use crate::Locator;
+use ruff_python_ast::python_version::PythonVersion;
 
 /// ## What it does
 /// Checks for typed function arguments in stubs with complex default values.
@@ -667,7 +667,7 @@ pub(crate) fn type_alias_without_annotation(checker: &Checker, value: &Expr, tar
         return;
     }
 
-    let module = if checker.settings.target_version >= PythonVersion::Py310 {
+    let module = if checker.settings.target_version >= PythonVersion::PY310 {
         TypingModule::Typing
     } else {
         TypingModule::TypingExtensions

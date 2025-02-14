@@ -7,16 +7,15 @@ use std::string::ToString;
 
 use anyhow::{bail, Result};
 use globset::{Glob, GlobMatcher, GlobSet, GlobSetBuilder};
-use log::debug;
-use pep440_rs::{Operator, Version as Pep440Version, Version, VersionSpecifier, VersionSpecifiers};
+use pep440_rs::{VersionSpecifier, VersionSpecifiers};
 use rustc_hash::FxHashMap;
 use serde::{de, Deserialize, Deserializer, Serialize};
-use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
 use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_diagnostics::Applicability;
 use ruff_macros::CacheKey;
+use ruff_python_ast::python_version as ast;
 use ruff_python_ast::PySourceType;
 
 use crate::registry::RuleSet;
@@ -55,10 +54,34 @@ pub enum PythonVersion {
     // when adding new versions here!
 }
 
-impl From<PythonVersion> for Pep440Version {
-    fn from(version: PythonVersion) -> Self {
-        let (major, minor) = version.as_tuple();
-        Self::new([u64::from(major), u64::from(minor)])
+impl TryFrom<ast::PythonVersion> for PythonVersion {
+    type Error = String;
+
+    fn try_from(value: ast::PythonVersion) -> Result<Self, Self::Error> {
+        match value {
+            ast::PythonVersion::PY37 => Ok(Self::Py37),
+            ast::PythonVersion::PY38 => Ok(Self::Py38),
+            ast::PythonVersion::PY39 => Ok(Self::Py39),
+            ast::PythonVersion::PY310 => Ok(Self::Py310),
+            ast::PythonVersion::PY311 => Ok(Self::Py311),
+            ast::PythonVersion::PY312 => Ok(Self::Py312),
+            ast::PythonVersion::PY313 => Ok(Self::Py313),
+            _ => Err(format!("unrecognized python version {value}")),
+        }
+    }
+}
+
+impl From<PythonVersion> for ast::PythonVersion {
+    fn from(value: PythonVersion) -> Self {
+        match value {
+            PythonVersion::Py37 => Self::PY37,
+            PythonVersion::Py38 => Self::PY38,
+            PythonVersion::Py39 => Self::PY39,
+            PythonVersion::Py310 => Self::PY310,
+            PythonVersion::Py311 => Self::PY311,
+            PythonVersion::Py312 => Self::PY312,
+            PythonVersion::Py313 => Self::PY313,
+        }
     }
 }
 
@@ -90,38 +113,6 @@ impl PythonVersion {
 
     pub const fn minor(&self) -> u8 {
         self.as_tuple().1
-    }
-
-    /// Infer the minimum supported [`PythonVersion`] from a `requires-python` specifier.
-    pub fn get_minimum_supported_version(requires_version: &VersionSpecifiers) -> Option<Self> {
-        /// Truncate a version to its major and minor components.
-        fn major_minor(version: &Version) -> Option<Version> {
-            let major = version.release().first()?;
-            let minor = version.release().get(1)?;
-            Some(Version::new([major, minor]))
-        }
-
-        // Extract the minimum supported version from the specifiers.
-        let minimum_version = requires_version
-            .iter()
-            .filter(|specifier| {
-                matches!(
-                    specifier.operator(),
-                    Operator::Equal
-                        | Operator::EqualStar
-                        | Operator::ExactEqual
-                        | Operator::TildeEqual
-                        | Operator::GreaterThan
-                        | Operator::GreaterThanEqual
-                )
-            })
-            .filter_map(|specifier| major_minor(specifier.version()))
-            .min()?;
-
-        debug!("Detected minimum supported `requires-python` version: {minimum_version}");
-
-        // Find the Python version that matches the minimum supported version.
-        PythonVersion::iter().find(|version| Version::from(*version) == minimum_version)
     }
 
     /// Return `true` if the current version supports [PEP 701].

@@ -189,7 +189,7 @@ linter.rules.should_fix = [
 linter.per_file_ignores = {}
 linter.safety_table.forced_safe = []
 linter.safety_table.forced_unsafe = []
-linter.target_version = Py37
+linter.target_version = PythonVersion { major: 3, minor: 7 }
 linter.preview = disabled
 linter.explicit_preview_rules = false
 linter.extension = ExtensionMapping({})
@@ -387,7 +387,7 @@ formatter.docstring_code_line_width = dynamic
 # Analyze Settings
 analyze.exclude = []
 analyze.preview = disabled
-analyze.target_version = Py37
+analyze.target_version = PythonVersion { major: 3, minor: 7 }
 analyze.detect_string_imports = false
 analyze.extension = ExtensionMapping({})
 analyze.include_dependencies = {}
