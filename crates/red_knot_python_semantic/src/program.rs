@@ -4,7 +4,7 @@ use crate::Db;
 
 use anyhow::Context;
 use ruff_db::system::{SystemPath, SystemPathBuf};
-use ruff_python_parser::python_version::PythonVersion;
+use ruff_python_ast::python_version::PythonVersion;
 use salsa::Durability;
 use salsa::Setter;
 

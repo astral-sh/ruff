@@ -9,7 +9,7 @@ use ruff_db::files::{File, Files};
 use ruff_db::system::{DbWithTestSystem, System, SystemPath, SystemPathBuf, TestSystem};
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_db::{Db as SourceDb, Upcast};
-use ruff_python_parser::python_version::PythonVersion;
+use ruff_python_ast::python_version::PythonVersion;
 
 #[salsa::db]
 #[derive(Clone)]

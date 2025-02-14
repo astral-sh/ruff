@@ -17,7 +17,7 @@ use ruff_db::files::{system_path_to_file, File, Files};
 use ruff_db::system::{DbWithTestSystem, System, SystemPathBuf, TestSystem};
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_db::{Db as SourceDb, Upcast};
-use ruff_python_parser::python_version::PythonVersion;
+use ruff_python_ast::python_version::PythonVersion;
 use ruff_python_parser::{parse_unchecked, Mode};
 
 /// Database that can be used for testing.

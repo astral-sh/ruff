@@ -2414,6 +2414,7 @@ dependencies = [
  "red_knot_server",
  "regex",
  "ruff_db",
+ "ruff_python_ast",
  "ruff_python_parser",
  "ruff_python_trivia",
  "salsa",
@@ -2568,7 +2569,7 @@ dependencies = [
  "red_knot_project",
  "ruff_db",
  "ruff_notebook",
- "ruff_python_parser",
+ "ruff_python_ast",
  "wasm-bindgen",
  "wasm-bindgen-test",
 ]

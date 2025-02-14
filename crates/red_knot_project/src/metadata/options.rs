@@ -6,7 +6,7 @@ use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity, Span};
 use ruff_db::files::system_path_to_file;
 use ruff_db::system::{System, SystemPath};
 use ruff_macros::Combine;
-use ruff_python_parser::python_version::PythonVersion;
+use ruff_python_ast::python_version::PythonVersion;
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;

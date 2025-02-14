@@ -10,7 +10,7 @@ use ruff_db::files::{File, Files};
 use ruff_db::system::{OsSystem, System, SystemPathBuf};
 use ruff_db::vendored::{VendoredFileSystem, VendoredFileSystemBuilder};
 use ruff_db::{Db as SourceDb, Upcast};
-use ruff_python_parser::python_version::PythonVersion;
+use ruff_python_ast::python_version::PythonVersion;
 
 static EMPTY_VENDORED: std::sync::LazyLock<VendoredFileSystem> = std::sync::LazyLock::new(|| {
     let mut builder = VendoredFileSystemBuilder::new(CompressionMethod::Stored);

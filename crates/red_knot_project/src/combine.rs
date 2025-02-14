@@ -2,7 +2,7 @@ use std::{collections::HashMap, hash::BuildHasher};
 
 use red_knot_python_semantic::{PythonPlatform, SitePackages};
 use ruff_db::system::SystemPathBuf;
-use ruff_python_parser::python_version::PythonVersion;
+use ruff_python_ast::python_version::PythonVersion;
 
 /// Combine two values, preferring the values in `self`.
 ///

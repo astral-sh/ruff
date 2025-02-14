@@ -631,7 +631,7 @@ impl PartialEq<SearchPath> for VendoredPathBuf {
 #[cfg(test)]
 mod tests {
     use ruff_db::Db;
-    use ruff_python_parser::python_version::PythonVersion;
+    use ruff_python_ast::python_version::PythonVersion;
 
     use crate::db::tests::TestDb;
     use crate::module_resolver::testing::{FileSpec, MockedTypeshed, TestCase, TestCaseBuilder};

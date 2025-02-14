@@ -1,6 +1,6 @@
 use ruff_db::system::{DbWithTestSystem, SystemPath, SystemPathBuf};
 use ruff_db::vendored::VendoredPathBuf;
-use ruff_python_parser::python_version::PythonVersion;
+use ruff_python_ast::python_version::PythonVersion;
 
 use crate::db::tests::TestDb;
 use crate::program::{Program, SearchPathSettings};

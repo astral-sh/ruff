@@ -310,7 +310,7 @@ mod tests {
     use anyhow::{anyhow, Context};
     use insta::assert_ron_snapshot;
     use ruff_db::system::{SystemPathBuf, TestSystem};
-    use ruff_python_parser::python_version::PythonVersion;
+    use ruff_python_ast::python_version::PythonVersion;
 
     use crate::{ProjectDiscoveryError, ProjectMetadata};
 
