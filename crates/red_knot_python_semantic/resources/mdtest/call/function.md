@@ -278,10 +278,10 @@ proper diagnostics in case of missing or superfluous arguments.
 from typing_extensions import reveal_type
 
 # error: [missing-argument] "No argument provided for required parameter `obj` of function `reveal_type`"
-reveal_type()  # revealed: Unknown
+reveal_type()
 
 # error: [too-many-positional-arguments] "Too many positional arguments to function `reveal_type`: expected 1, got 2"
-reveal_type(1, 2)  # revealed: Literal[1]
+reveal_type(1, 2)
 ```
 
 ### `static_assert`
@@ -290,7 +290,6 @@ reveal_type(1, 2)  # revealed: Literal[1]
 from knot_extensions import static_assert
 
 # error: [missing-argument] "No argument provided for required parameter `condition` of function `static_assert`"
-# error: [static-assert-error]
 static_assert()
 
 # error: [too-many-positional-arguments] "Too many positional arguments to function `static_assert`: expected 2, got 3"

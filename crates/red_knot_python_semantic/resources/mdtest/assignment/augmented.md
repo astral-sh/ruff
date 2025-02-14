@@ -40,7 +40,7 @@ class C:
         return 42
 
 x = C()
-# error: [invalid-argument-type]
+# error: [unsupported-operator]
 x -= 1
 
 reveal_type(x)  # revealed: int
