@@ -2,8 +2,8 @@ use std::fmt;
 
 /// Representation of a Python version.
 ///
-/// Unlike the [`PyVersion`], this does not necessarily represent a Python version that we actually
-/// support.
+/// Unlike the `TargetVersion` enums in the CLI crates,
+/// this does not necessarily represent a Python version that we actually support.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct PythonVersion {
     pub major: u8,
