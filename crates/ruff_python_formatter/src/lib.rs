@@ -15,7 +15,7 @@ use crate::comments::{
 pub use crate::context::PyFormatContext;
 pub use crate::options::{
     DocstringCode, DocstringCodeLineWidth, MagicTrailingComma, PreviewMode, PyFormatOptions,
-    QuoteStyle,
+    PythonVersion, QuoteStyle,
 };
 use crate::range::is_logical_line;
 pub use crate::shared_traits::{AsFormat, FormattedIter, FormattedIterExt, IntoFormat};

@@ -3898,4 +3898,28 @@ mod tests {
             vec![Name::new_static("_foo"), Name::new_static("_bar")]
         );
     }
+
+    #[test]
+    fn formatter_and_linter_target_version_have_same_default() {
+        assert_eq!(
+            FormatterPythonVersion::default().as_tuple(),
+            LinterPythonVersion::default().as_tuple()
+        );
+    }
+
+    #[test]
+    fn formatter_and_linter_target_version_have_same_latest() {
+        assert_eq!(
+            FormatterPythonVersion::latest().as_tuple(),
+            LinterPythonVersion::latest().as_tuple()
+        );
+    }
+
+    #[test]
+    fn formatter_and_linter_target_version_have_same_minimal_supported() {
+        assert_eq!(
+            FormatterPythonVersion::minimal_supported().as_tuple(),
+            LinterPythonVersion::minimal_supported().as_tuple()
+        );
+    }
 }

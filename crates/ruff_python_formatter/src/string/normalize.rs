@@ -45,7 +45,7 @@ impl<'a, 'src> StringNormalizer<'a, 'src> {
         let preferred_quote_style = self
             .preferred_quote_style
             .unwrap_or(self.context.options().quote_style());
-        let supports_pep_701 = self.context.options().target_version().supports_pep701();
+        let supports_pep_701 = self.context.options().target_version().supports_pep_701();
 
         // For f-strings prefer alternating the quotes unless The outer string is triple quoted and the inner isn't.
         if let FStringState::InsideExpressionElement(parent_context) = self.context.f_string_state()

@@ -1,6 +1,5 @@
 use ruff_formatter::{format_args, write, FormatContext, FormatError};
 use ruff_python_ast::{StmtWith, WithItem};
-use ruff_python_parser::python_version::PyVersion;
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -15,6 +14,7 @@ use crate::other::with_item::WithItemLayout;
 use crate::prelude::*;
 use crate::statement::clause::{clause_body, clause_header, ClauseHeader};
 use crate::statement::suite::SuiteKind;
+use crate::PythonVersion;
 
 #[derive(Default)]
 pub struct FormatStmtWith;
@@ -302,7 +302,7 @@ impl<'a> WithItemsLayout<'a> {
             }
         }
 
-        let can_parenthesize = context.options().target_version() >= PyVersion::Py39
+        let can_parenthesize = context.options().target_version() >= PythonVersion::Py39
             || are_with_items_parenthesized(with, context)?;
 
         // If the target version doesn't support parenthesized context managers and they aren't

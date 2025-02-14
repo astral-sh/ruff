@@ -164,7 +164,7 @@ impl<'a> FormatImplicitConcatenatedStringFlat<'a> {
                 }
 
                 if let StringLikePart::FString(fstring) = part {
-                    if context.options().target_version().supports_pep701() {
+                    if context.options().target_version().supports_pep_701() {
                         if is_fstring_with_quoted_format_spec_and_debug(fstring, context) {
                             if preserve_quotes_requirement
                                 .is_some_and(|quote| quote != part.flags().quote_style())
