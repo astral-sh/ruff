@@ -1,9 +1,9 @@
 use crate::module_resolver::SearchPaths;
 use crate::python_platform::PythonPlatform;
-use crate::python_version::PythonVersion;
 use crate::Db;
 
 use anyhow::Context;
+use ruff_db::python_version::PythonVersion;
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use salsa::Durability;
 use salsa::Setter;

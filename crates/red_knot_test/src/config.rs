@@ -9,7 +9,8 @@
 //! ```
 
 use anyhow::Context;
-use red_knot_python_semantic::{PythonPlatform, PythonVersion};
+use red_knot_python_semantic::PythonPlatform;
+use ruff_db::python_version::PythonVersion;
 use serde::Deserialize;
 
 #[derive(Deserialize, Debug, Default, Clone)]

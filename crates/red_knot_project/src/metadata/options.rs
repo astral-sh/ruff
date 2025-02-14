@@ -1,11 +1,10 @@
 use crate::metadata::value::{RangedValue, RelativePathBuf, ValueSource, ValueSourceGuard};
 use crate::Db;
 use red_knot_python_semantic::lint::{GetLintError, Level, LintSource, RuleSelection};
-use red_knot_python_semantic::{
-    ProgramSettings, PythonPlatform, PythonVersion, SearchPathSettings, SitePackages,
-};
+use red_knot_python_semantic::{ProgramSettings, PythonPlatform, SearchPathSettings, SitePackages};
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity, Span};
 use ruff_db::files::system_path_to_file;
+use ruff_db::python_version::PythonVersion;
 use ruff_db::system::{System, SystemPath};
 use ruff_macros::Combine;
 use rustc_hash::FxHashMap;

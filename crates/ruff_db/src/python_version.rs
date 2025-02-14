@@ -84,7 +84,7 @@ impl fmt::Display for PythonVersion {
 
 #[cfg(feature = "serde")]
 mod serde {
-    use crate::PythonVersion;
+    use super::PythonVersion;
 
     impl<'de> serde::Deserialize<'de> for PythonVersion {
         fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
