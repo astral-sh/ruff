@@ -14,7 +14,12 @@ class Child1(Base):
     def __eq__(self, other) -> Literal[True]:
         return True
 
-class Child2(Base): ...
+    def __gt__(self, other) -> bool:
+        return False
+
+class Child2(Base):
+    def __gt__(self, other) -> bool:
+        return False
 
 def _(x: Base):
     c1 = Child1()

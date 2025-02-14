@@ -92,11 +92,14 @@ reveal_type(a == b)  # revealed: bool
 # TODO: should be Literal[True], once we implement (in)equality for mismatched literals
 reveal_type(a != b)  # revealed: bool
 
-# TODO: should be Unknown and add more informative diagnostics
-reveal_type(a < b)  # revealed: bool
-reveal_type(a <= b)  # revealed: bool
-reveal_type(a > b)  # revealed: bool
-reveal_type(a >= b)  # revealed: bool
+# error: [unsupported-operator] "Operator `<` is not supported for types `int` and `str`, in comparing `tuple[Literal[1], Literal[2]]` with `tuple[Literal[1], Literal["hello"]]`"
+reveal_type(a < b)  # revealed: Unknown
+# error: [unsupported-operator] "Operator `<=` is not supported for types `int` and `str`, in comparing `tuple[Literal[1], Literal[2]]` with `tuple[Literal[1], Literal["hello"]]`"
+reveal_type(a <= b)  # revealed: Unknown
+# error: [unsupported-operator] "Operator `>` is not supported for types `int` and `str`, in comparing `tuple[Literal[1], Literal[2]]` with `tuple[Literal[1], Literal["hello"]]`"
+reveal_type(a > b)  # revealed: Unknown
+# error: [unsupported-operator] "Operator `>=` is not supported for types `int` and `str`, in comparing `tuple[Literal[1], Literal[2]]` with `tuple[Literal[1], Literal["hello"]]`"
+reveal_type(a >= b)  # revealed: Unknown
 ```
 
 However, if the lexicographic comparison completes without reaching a point where str and int are

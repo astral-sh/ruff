@@ -12,7 +12,8 @@ reveal_type(5 % 3)  # revealed: Literal[2]
 
 # TODO: We don't currently verify that the actual parameter to int.__add__ matches the declared
 # formal parameter type.
-reveal_type(2 + "f")  # revealed: int
+# TODO: Should this emit an error?
+reveal_type(2 + "f")  # revealed: Unknown
 
 def lhs(x: int):
     reveal_type(x + 1)  # revealed: int

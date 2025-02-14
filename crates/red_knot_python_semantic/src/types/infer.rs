@@ -4001,13 +4001,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                 {
                     class_member
                         .call(self.db(), &CallArguments::positional([left_ty, right_ty]))
-                        .map(|outcome| Some(outcome.return_type(self.db())))
-                        // TODO: We shouldn't use `unwrap_or_else` here because it means we apply the
-                        // dunder method even if it can't be called with the given arguments. However,
-                        // we can't remove the fallback just yet because we don't handle support
-                        // the `int` to `float` assignability in parameters correctly yet (and for other number types).
-                        // See https://github.com/astral-sh/ruff/issues/14932
-                        .unwrap_or_else(|err| err.return_type(self.db()))
+                        .map(|outcome| outcome.return_type(self.db()))
+                        .ok()
                 } else {
                     None
                 };
@@ -4022,13 +4017,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                             // TODO: Use `call_dunder`
                             class_member
                                 .call(self.db(), &CallArguments::positional([right_ty, left_ty]))
-                                .map(|outcome| Some(outcome.return_type(self.db())))
-                                // TODO: We shouldn't use `unwrap_or_else` here because it means we apply the
-                                // dunder method even if it can't be called with the given arguments. However,
-                                // we can't remove the fallback just yet because we don't handle support
-                                // the `int` to `float` assignability in parameters correctly yet (and for other number types).
-                                // See https://github.com/astral-sh/ruff/issues/14932
-                                .unwrap_or_else(|err| err.return_type(self.db()))
+                                .map(|outcome| outcome.return_type(self.db()))
+                                .ok()
                         } else {
                             None
                         }
@@ -6101,12 +6091,6 @@ fn perform_rich_comparison<'db>(
                         &CallArguments::positional([Type::Instance(left), Type::Instance(right)]),
                     )
                     .map(|outcome| outcome.return_type(db))
-                    .or_else(|err| match err {
-                        // TODO: We shouldn't ignore binding errors here but we currently have to not to regress
-                        //  float to int (etc) comparisons. See https://github.com/astral-sh/ruff/issues/14932
-                        CallError::BindingError { binding } => Ok(binding.return_type()),
-                        _ => Err(err),
-                    })
                     .ok(),
                 _ => None,
             }
