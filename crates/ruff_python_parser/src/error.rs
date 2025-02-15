@@ -441,9 +441,6 @@ impl SyntaxError {
                 major = target_version.major,
                 minor = target_version.minor,
             ),
-            SyntaxErrorKind::LateFutureImport => {
-                "__future__ imports must be located at the beginning of a file".to_string()
-            }
         }
     }
 
@@ -451,17 +448,12 @@ impl SyntaxError {
     pub const fn version(&self) -> PythonVersion {
         match self.kind {
             SyntaxErrorKind::MatchBeforePy310 => PythonVersion::PY310,
-            SyntaxErrorKind::LateFutureImport => PythonVersion {
-                major: u8::MAX,
-                minor: u8::MAX,
-            },
         }
     }
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum SyntaxErrorKind {
-    LateFutureImport,
     MatchBeforePy310,
 }
 
@@ -469,7 +461,6 @@ impl SyntaxErrorKind {
     pub const fn as_str(self) -> &'static str {
         match self {
             SyntaxErrorKind::MatchBeforePy310 => "match-before-python-310",
-            SyntaxErrorKind::LateFutureImport => "late-future-import",
         }
     }
 }
