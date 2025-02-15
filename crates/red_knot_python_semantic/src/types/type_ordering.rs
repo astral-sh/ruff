@@ -1,5 +1,7 @@
 use std::cmp::Ordering;
 
+use crate::types::CallableType;
+
 use super::{
     class_base::ClassBase, ClassLiteralType, DynamicType, InstanceType, KnownInstanceType,
     TodoType, Type,
@@ -53,6 +55,20 @@ pub(super) fn union_elements_ordering<'db>(left: &Type<'db>, right: &Type<'db>) 
         (Type::FunctionLiteral(left), Type::FunctionLiteral(right)) => left.cmp(right),
         (Type::FunctionLiteral(_), _) => Ordering::Less,
         (_, Type::FunctionLiteral(_)) => Ordering::Greater,
+
+        (
+            Type::Callable(CallableType::BoundMethod(left)),
+            Type::Callable(CallableType::BoundMethod(right)),
+        ) => left.cmp(right),
+        (Type::Callable(CallableType::BoundMethod(_)), _) => Ordering::Less,
+        (_, Type::Callable(CallableType::BoundMethod(_))) => Ordering::Greater,
+
+        (
+            Type::Callable(CallableType::FunctionTypeDunderGet(left)),
+            Type::Callable(CallableType::FunctionTypeDunderGet(right)),
+        ) => left.cmp(right),
+        (Type::Callable(CallableType::FunctionTypeDunderGet(_)), _) => Ordering::Less,
+        (_, Type::Callable(CallableType::FunctionTypeDunderGet(_))) => Ordering::Greater,
 
         (Type::Tuple(left), Type::Tuple(right)) => left.cmp(right),
         (Type::Tuple(_), _) => Ordering::Less,
