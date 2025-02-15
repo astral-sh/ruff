@@ -36,8 +36,7 @@ pub(crate) struct Parser<'src> {
     /// Stores all the syntax errors found during the parsing.
     errors: Vec<ParseError>,
 
-    /// Stores non-fatal syntax errors found during parsing, such as version-related errors and
-    /// errors detected by the Python compiler.
+    /// Stores non-fatal syntax errors found during parsing, such as version-related errors.
     syntax_errors: Vec<SyntaxError>,
 
     /// Options for how the code will be parsed.

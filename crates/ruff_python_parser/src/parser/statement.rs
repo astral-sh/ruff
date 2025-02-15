@@ -619,13 +619,11 @@ impl<'src> Parser<'src> {
             self.expect(TokenKind::Rpar);
         }
 
-        let range = self.node_range(start);
-
         ast::StmtImportFrom {
             module,
             names,
             level: leading_dots,
-            range,
+            range: self.node_range(start),
         }
     }
 
