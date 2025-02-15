@@ -74,3 +74,8 @@ class C:
     def f(y, z, a, b, c):  # OK
         pass
 
+class Foo:
+    # `__new__` counts args like a classmethod
+    # even though it is an implicit staticmethod
+    def __new__(cls,a,b,c,d,e): # Ok
+        ...
