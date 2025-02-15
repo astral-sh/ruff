@@ -86,6 +86,6 @@ pub(crate) fn implicit_class_var_in_dataclass(checker: &mut Checker, class_def: 
 
         let diagnostic = Diagnostic::new(ImplicitClassVarInDataclass, target.range());
 
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }
