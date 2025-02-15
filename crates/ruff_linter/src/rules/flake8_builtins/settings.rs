@@ -6,17 +6,17 @@ use std::fmt::{Display, Formatter};
 
 #[derive(Debug, Clone, Default, CacheKey)]
 pub struct Settings {
-    pub builtins_ignorelist: Vec<String>,
-    pub builtins_allowed_modules: Vec<String>,
-    pub builtins_strict_checking: bool,
+    pub ignorelist: Vec<String>,
+    pub allowed_modules: Vec<String>,
+    pub strict_checking: bool,
 }
 
 impl Settings {
     pub fn new(preview: PreviewMode) -> Self {
         Self {
-            builtins_ignorelist: Vec::new(),
-            builtins_allowed_modules: Vec::new(),
-            builtins_strict_checking: preview.is_disabled(),
+            ignorelist: Vec::new(),
+            allowed_modules: Vec::new(),
+            strict_checking: preview.is_disabled(),
         }
     }
 }
@@ -27,9 +27,9 @@ impl Display for Settings {
             formatter = f,
             namespace = "linter.flake8_builtins",
             fields = [
-                self.builtins_allowed_modules | array,
-                self.builtins_ignorelist | array,
-                self.builtins_strict_checking,
+                self.allowed_modules | array,
+                self.ignorelist | array,
+                self.strict_checking,
             ]
         }
         Ok(())
