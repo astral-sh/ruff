@@ -10,12 +10,16 @@ use crate::rules::ruff::rules::helpers::{dataclass_kind, DataclassKind};
 /// ## What it does
 /// Checks for implicit class variables in dataclasses.
 ///
+/// Variables matching the [`lint.dummy-variable-rgx`] are excluded
+/// from this rule.
+///
 /// ## Why is this bad?
 /// Class variables are shared between all instances of that class.
 /// In dataclasses, fields with no annotations at all
-/// are implicitly considered class variables.
+/// are implicitly considered class variables, and a `TypeError` is
+/// raised if a user attempts to initialize an instance of the class
+/// with this field.
 ///
-/// This might cause confusing behavior:
 ///
 /// ```python
 /// @dataclass
@@ -44,6 +48,9 @@ use crate::rules::ruff::rules::helpers::{dataclass_kind, DataclassKind};
 /// class C:
 ///     a: ClassVar[int] = 1
 /// ```
+///
+/// ## Options
+/// - [`lint.dummy-variable-rgx`]
 #[derive(ViolationMetadata)]
 pub(crate) struct ImplicitClassVarInDataclass;
 
@@ -79,6 +86,10 @@ pub(crate) fn implicit_class_var_in_dataclass(checker: &mut Checker, class_def: 
         let Expr::Name(ExprName { id, .. }) = target else {
             continue;
         };
+
+        if checker.settings.dummy_variable_rgx.is_match(id.as_str()) {
+            continue;
+        }
 
         if is_dunder(id.as_str()) {
             continue;
