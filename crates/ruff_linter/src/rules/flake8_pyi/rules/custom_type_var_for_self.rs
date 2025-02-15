@@ -203,7 +203,7 @@ pub(crate) fn custom_type_var_instead_of_self(
                 })?
             }
         }
-        FunctionType::StaticMethod if matches!(function_def.name.as_str(), "__new__") => {
+        FunctionType::StaticMethod if function_def.name.as_str() == "__new__" => {
             if checker.settings.preview.is_enabled() {
                 (
                     Method::PreviewClass(PreviewClassMethod {
