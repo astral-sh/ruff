@@ -1,0 +1,133 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+redefined_outer_name.py:18:17: PLW0621 Redefining name `a` from outer scope (line 17)
+   |
+17 | def outer_1(a):
+18 |     def inner_1(a): ...
+   |                 ^ PLW0621
+   |
+   = help: Rename parameter, or remove it if they are the same object
+
+redefined_outer_name.py:23:17: PLW0621 Redefining name `a` from outer scope (line 22)
+   |
+21 | def outer_2():
+22 |     a = 1
+23 |     def inner_2(a): ...
+   |                 ^ PLW0621
+   |
+   = help: Rename parameter, or remove it if they are the same object
+
+redefined_outer_name.py:27:17: PLW0621 Redefining name `a` from outer scope (line 28)
+   |
+26 | def outer_3():
+27 |     def inner_3(a): ...
+   |                 ^ PLW0621
+28 |     a = 1
+   |
+   = help: Rename parameter, or remove it if they are the same object
+
+redefined_outer_name.py:32:17: PLW0621 Redefining name `outer_4` from outer scope (line 31)
+   |
+31 | def outer_4():
+32 |     def inner_4(outer_4): ...
+   |                 ^^^^^^^ PLW0621
+   |
+   = help: Rename parameter, or remove it if they are the same object
+
+redefined_outer_name.py:35:13: PLW0621 Redefining name `global_a` from outer scope (line 15)
+   |
+35 | def outer_5(global_a): ...
+   |             ^^^^^^^^ PLW0621
+   |
+   = help: Rename parameter, or remove it if they are the same object
+
+redefined_outer_name.py:39:17: PLW0621 Redefining name `global_a` from outer scope (line 15)
+   |
+38 | def outer_6():
+39 |     def inner_6(global_a): ...
+   |                 ^^^^^^^^ PLW0621
+   |
+   = help: Rename parameter, or remove it if they are the same object
+
+redefined_outer_name.py:43:17: PLW0621 Redefining name `f` from outer scope (line 7)
+   |
+42 | def outer_7():
+43 |     def inner_7(f): ...
+   |                 ^ PLW0621
+   |
+   = help: Rename parameter, or remove it if they are the same object
+
+redefined_outer_name.py:47:17: PLW0621 Redefining name `yf` from outer scope (line 10)
+   |
+46 | def outer_8():
+47 |     def inner_8(yf): ...
+   |                 ^^ PLW0621
+   |
+   = help: Rename parameter, or remove it if they are the same object
+
+redefined_outer_name.py:50:13: PLW0621 Redefining name `outer_100` from outer scope (line 91)
+   |
+50 | def outer_9(outer_100):
+   |             ^^^^^^^^^ PLW0621
+51 |     ...
+   |
+   = help: Rename parameter, or remove it if they are the same object
+
+redefined_outer_name.py:55:18: PLW0621 Redefining name `outer_100` from outer scope (line 91)
+   |
+54 | def outer_10():
+55 |     def inner_10(outer_100): ...
+   |                  ^^^^^^^^^ PLW0621
+   |
+   = help: Rename parameter, or remove it if they are the same object
+
+redefined_outer_name.py:59:24: PLW0621 Redefining name `T` from outer scope (line 58)
+   |
+58 | class Outer11[T]:
+59 |     def inner_11(self, T): ...
+   |                        ^ PLW0621
+   |
+   = help: Rename parameter, or remove it if they are the same object
+
+redefined_outer_name.py:64:23: PLW0621 Redefining name `a` from outer scope (line 63)
+   |
+62 | def outer_12():
+63 |     a = 0
+64 |     inner_12 = lambda a: a + 1
+   |                       ^ PLW0621
+   |
+   = help: Rename parameter, or remove it if they are the same object
+
+redefined_outer_name.py:68:33: PLW0621 Redefining name `a` from outer scope (line 68)
+   |
+67 | def outer_13():
+68 |     inner_13 = lambda a: lambda a, b: a + b - 1
+   |                                 ^ PLW0621
+   |
+   = help: Rename parameter, or remove it if they are the same object
+
+redefined_outer_name.py:72:24: PLW0621 Redefining name `a` from outer scope (line 72)
+   |
+71 | def outer_14():
+72 |     inner_14 = (lambda a, b: a - b / 2 for a, b in [])
+   |                        ^ PLW0621
+   |
+   = help: Rename parameter, or remove it if they are the same object
+
+redefined_outer_name.py:72:27: PLW0621 Redefining name `b` from outer scope (line 72)
+   |
+71 | def outer_14():
+72 |     inner_14 = (lambda a, b: a - b / 2 for a, b in [])
+   |                           ^ PLW0621
+   |
+   = help: Rename parameter, or remove it if they are the same object
+
+redefined_outer_name.py:79:22: PLW0621 Redefining name `e` from outer scope (line 78)
+   |
+77 |         ...
+78 |     except RuntimeError as e:
+79 |         def inner_15(e): ...
+   |                      ^ PLW0621
+   |
+   = help: Rename parameter, or remove it if they are the same object
