@@ -4224,7 +4224,7 @@ impl<'db> Class<'db> {
         // (1) Use that dynamic type as the type for this attribute,
         //     if no other classes in the MRO define the attribute; or,
         // (2) Intersect that dynamic type with the type of the attribute
-        //     from the non-gradual members of the class's MRO.
+        //     from the non-dynamic members of the class's MRO.
         let mut dynamic_type_to_intersect_with: Option<Type<'db>> = None;
 
         let mut lookup_result: LookupResult<'db> = Err(LookupError::Unbound);
