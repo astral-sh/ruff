@@ -78,9 +78,7 @@ pub(crate) fn unnecessary_list_comprehension_set(checker: &Checker, call: &ast::
     let right_brace_loc = after_arg_tokens
         .iter()
         .find(|token| token.kind() == TokenKind::Comma)
-        .map_or(call.arguments.end() - one, |comma| {
-            comma.end() - TextSize::from(1)
-        });
+        .map_or(call.arguments.end() - one, |comma| comma.end() - one);
 
     let call_end = Edit::replacement(
         pad_end("}", call.range(), checker.locator(), checker.semantic()),
