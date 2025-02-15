@@ -16,7 +16,7 @@ use crate::parser::{
 };
 use crate::token::{TokenKind, TokenValue};
 use crate::token_set::TokenSet;
-use crate::{Mode, ParseErrorType};
+use crate::{Mode, ParseErrorType, SyntaxError, SyntaxErrorKind};
 
 use super::expression::ExpressionContext;
 use super::Parenthesized;
@@ -2262,10 +2262,17 @@ impl<'src> Parser<'src> {
 
         let cases = self.parse_match_body();
 
+        let range = self.node_range(start);
+
+        self.syntax_errors.push(SyntaxError {
+            kind: SyntaxErrorKind::MatchBeforePy310,
+            range,
+        });
+
         ast::StmtMatch {
             subject: Box::new(subject),
             cases,
-            range: self.node_range(start),
+            range,
         }
     }
 

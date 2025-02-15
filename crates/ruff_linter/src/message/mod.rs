@@ -3,6 +3,7 @@ use std::collections::BTreeMap;
 use std::io::Write;
 use std::ops::Deref;
 
+use ruff_python_ast::python_version::PythonVersion;
 use rustc_hash::FxHashMap;
 
 pub use azure::AzureEmitter;
@@ -16,7 +17,7 @@ pub use pylint::PylintEmitter;
 pub use rdjson::RdjsonEmitter;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind, Fix};
 use ruff_notebook::NotebookIndex;
-use ruff_python_parser::ParseError;
+use ruff_python_parser::{ParseError, SyntaxError, SyntaxErrorKind};
 use ruff_source_file::{SourceFile, SourceLocation};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 pub use sarif::SarifEmitter;
@@ -119,6 +120,21 @@ impl Message {
             range: TextRange::at(parse_error.location.start(), len),
             file,
         })
+    }
+
+    /// Create a [`Message`] from the given [`SyntaxError`].
+    pub fn from_syntax_error(
+        syntax_error: &SyntaxError,
+        file: SourceFile,
+        target_version: PythonVersion,
+    ) -> Message {
+        match syntax_error.kind {
+            SyntaxErrorKind::MatchBeforePy310 => Message::SyntaxError(SyntaxErrorMessage {
+                message: format!("SyntaxError: {}", syntax_error.message(target_version)),
+                range: syntax_error.range,
+                file,
+            }),
+        }
     }
 
     pub const fn as_diagnostic_message(&self) -> Option<&DiagnosticMessage> {
