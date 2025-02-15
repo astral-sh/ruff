@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
-snapshot_kind: text
 ---
 RUF045.py:8:5: RUF045 Assignment without annotation found in dataclass body
    |
@@ -29,7 +28,7 @@ RUF045.py:10:5: RUF045 Assignment without annotation found in dataclass body
  9 |     missing = MISSING
 10 |     field = field()
    |     ^^^^^ RUF045
-11 | 
+11 |
 12 |     # No errors
    |
    = help: Use `ClassVar[...]`
