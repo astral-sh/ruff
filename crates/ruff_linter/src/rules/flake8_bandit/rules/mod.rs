@@ -29,6 +29,7 @@ pub(crate) use suspicious_imports::*;
 pub(crate) use tarfile_unsafe_members::*;
 pub(crate) use try_except_continue::*;
 pub(crate) use try_except_pass::*;
+pub(crate) use unsafe_markup_use::*;
 pub(crate) use unsafe_yaml_load::*;
 pub(crate) use weak_cryptographic_key::*;
 
@@ -63,5 +64,6 @@ mod suspicious_imports;
 mod tarfile_unsafe_members;
 mod try_except_continue;
 mod try_except_pass;
+mod unsafe_markup_use;
 mod unsafe_yaml_load;
 mod weak_cryptographic_key;
