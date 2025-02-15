@@ -49,6 +49,7 @@ use crate::semantic_index::semantic_index;
 use crate::semantic_index::symbol::{NodeWithScopeKind, NodeWithScopeRef, ScopeId};
 use crate::semantic_index::SemanticIndex;
 use crate::stdlib::builtins_module_scope;
+use crate::symbol::LookupError;
 use crate::types::call::{Argument, CallArguments};
 use crate::types::diagnostic::{
     report_invalid_arguments_to_annotated, report_invalid_assignment,
@@ -3421,17 +3422,16 @@ impl<'db> TypeInferenceBuilder<'db> {
                 })
         });
 
-        match symbol {
-            Symbol::Type(ty, Boundness::Bound) => ty,
-            Symbol::Type(ty, Boundness::PossiblyUnbound) => {
-                report_possibly_unresolved_reference(&self.context, name_node);
-                ty
-            }
-            Symbol::Unbound => {
+        symbol.unwrap_with_diagnostic(|lookup_error| match lookup_error {
+            LookupError::Unbound => {
                 report_unresolved_reference(&self.context, name_node);
                 Type::unknown()
             }
-        }
+            LookupError::PossiblyUnbound(type_when_bound) => {
+                report_possibly_unresolved_reference(&self.context, name_node);
+                type_when_bound
+            }
+        })
     }
 
     fn infer_name_expression(&mut self, name: &ast::ExprName) -> Type<'db> {
@@ -3451,34 +3451,37 @@ impl<'db> TypeInferenceBuilder<'db> {
             ctx: _,
         } = attribute;
 
-        let value_ty = self.infer_expression(value);
-        match value_ty.member(self.db(), &attr.id) {
-            Symbol::Type(member_ty, Boundness::Bound) => member_ty,
-            Symbol::Type(member_ty, Boundness::PossiblyUnbound) => {
-                self.context.report_lint(
-                    &POSSIBLY_UNBOUND_ATTRIBUTE,
-                    attribute.into(),
-                    format_args!(
-                        "Attribute `{}` on type `{}` is possibly unbound",
-                        attr.id,
-                        value_ty.display(self.db()),
-                    ),
-                );
-                member_ty
-            }
-            Symbol::Unbound => {
-                self.context.report_lint(
-                    &UNRESOLVED_ATTRIBUTE,
-                    attribute.into(),
-                    format_args!(
-                        "Type `{}` has no attribute `{}`",
-                        value_ty.display(self.db()),
-                        attr.id
-                    ),
-                );
-                Type::unknown()
-            }
-        }
+        let value_type = self.infer_expression(value);
+        let db = self.db();
+
+        value_type
+            .member(db, &attr.id)
+            .unwrap_with_diagnostic(|lookup_error| match lookup_error {
+                LookupError::Unbound => {
+                    self.context.report_lint(
+                        &UNRESOLVED_ATTRIBUTE,
+                        attribute.into(),
+                        format_args!(
+                            "Type `{}` has no attribute `{}`",
+                            value_type.display(db),
+                            attr.id
+                        ),
+                    );
+                    Type::unknown()
+                }
+                LookupError::PossiblyUnbound(type_when_bound) => {
+                    self.context.report_lint(
+                        &POSSIBLY_UNBOUND_ATTRIBUTE,
+                        attribute.into(),
+                        format_args!(
+                            "Attribute `{}` on type `{}` is possibly unbound",
+                            attr.id,
+                            value_type.display(db),
+                        ),
+                    );
+                    type_when_bound
+                }
+            })
     }
 
     fn infer_attribute_expression(&mut self, attribute: &ast::ExprAttribute) -> Type<'db> {
@@ -3836,6 +3839,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                 if left_ty != right_ty && right_ty.is_subtype_of(self.db(), left_ty) {
                     let reflected_dunder = op.reflected_dunder();
                     let rhs_reflected = right_class.member(self.db(), reflected_dunder);
+                    // TODO: if `rhs_reflected` is possibly unbound, we should union the two possible
+                    // CallOutcomes together
                     if !rhs_reflected.is_unbound()
                         && rhs_reflected != left_class.member(self.db(), reflected_dunder)
                     {
