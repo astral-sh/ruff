@@ -10,10 +10,11 @@ use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::Diagnostic;
 use ruff_notebook::Notebook;
+use ruff_python_ast::python_version::PythonVersion;
 use ruff_python_ast::{ModModule, PySourceType};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
-use ruff_python_parser::{ParseError, Parsed};
+use ruff_python_parser::{ParseError, Parsed, SyntaxError};
 use ruff_source_file::SourceFileBuilder;
 use ruff_text_size::Ranged;
 
@@ -422,25 +423,31 @@ pub fn lint_only(
         &parsed,
     );
 
+    let target_version = settings.target_version.into();
+
     LinterResult {
         messages: diagnostics_to_messages(
             diagnostics,
             parsed.errors(),
+            parsed.syntax_errors(target_version),
             path,
             &locator,
             &directives,
+            target_version,
         ),
         has_syntax_error: !parsed.is_valid(),
     }
 }
 
 /// Convert from diagnostics to messages.
-fn diagnostics_to_messages(
+fn diagnostics_to_messages<'a>(
     diagnostics: Vec<Diagnostic>,
     parse_errors: &[ParseError],
+    syntax_errors: impl Iterator<Item = &'a SyntaxError>,
     path: &Path,
     locator: &Locator,
     directives: &Directives,
+    target_version: PythonVersion,
 ) -> Vec<Message> {
     let file = LazyCell::new(|| {
         let mut builder =
@@ -456,6 +463,9 @@ fn diagnostics_to_messages(
     parse_errors
         .iter()
         .map(|parse_error| Message::from_parse_error(parse_error, locator, file.deref().clone()))
+        .chain(syntax_errors.map(|syntax_error| {
+            Message::from_syntax_error(syntax_error, file.deref().clone(), target_version)
+        }))
         .chain(diagnostics.into_iter().map(|diagnostic| {
             let noqa_offset = directives.noqa_line_for.resolve(diagnostic.start());
             Message::from_diagnostic(diagnostic, file.deref().clone(), noqa_offset)
@@ -568,14 +578,18 @@ pub fn lint_fix<'a>(
             report_failed_to_converge_error(path, transformed.source_code(), &diagnostics);
         }
 
+        let target_version = settings.target_version.into();
+
         return Ok(FixerResult {
             result: LinterResult {
                 messages: diagnostics_to_messages(
                     diagnostics,
                     parsed.errors(),
+                    parsed.syntax_errors(target_version),
                     path,
                     &locator,
                     &directives,
+                    target_version,
                 ),
                 has_syntax_error: !is_valid_syntax,
             },

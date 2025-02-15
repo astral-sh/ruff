@@ -62,6 +62,13 @@ impl From<PythonVersion> for Pep440Version {
     }
 }
 
+impl From<PythonVersion> for ruff_python_ast::python_version::PythonVersion {
+    fn from(value: PythonVersion) -> Self {
+        let (major, minor) = value.as_tuple();
+        Self { major, minor }
+    }
+}
+
 impl PythonVersion {
     /// Return the latest supported Python version.
     pub const fn latest() -> Self {
