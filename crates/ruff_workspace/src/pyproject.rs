@@ -5,9 +5,8 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result};
 use log::debug;
 use pep440_rs::VersionSpecifiers;
+use ruff_python_ast::python_version::PythonVersion;
 use serde::{Deserialize, Serialize};
-
-use ruff_linter::settings::types::PythonVersion;
 
 use crate::options::Options;
 

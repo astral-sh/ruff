@@ -1,9 +1,13 @@
 use std::fmt;
 
+use log::debug;
+use pep440_rs::{Operator, Version as Pep440Version, Version, VersionSpecifiers};
+use ruff_macros::CacheKey;
+
 /// Representation of a Python version.
 ///
 /// N.B. This does not necessarily represent a Python version that we actually support.
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, CacheKey)]
 pub struct PythonVersion {
     pub major: u8,
     pub minor: u8,
@@ -43,8 +47,55 @@ impl PythonVersion {
         .into_iter()
     }
 
+    pub const fn latest() -> Self {
+        Self::PY313
+    }
+
+    pub const fn as_tuple(self) -> (u8, u8) {
+        (self.major, self.minor)
+    }
+
     pub fn free_threaded_build_available(self) -> bool {
         self >= PythonVersion::PY313
+    }
+
+    /// Return `true` if the current version supports [PEP 701].
+    ///
+    /// [PEP 701]: https://peps.python.org/pep-0701/
+    pub fn supports_pep_701(self) -> bool {
+        self >= Self::PY312
+    }
+
+    /// Infer the minimum supported [`PythonVersion`] from a `requires-python` specifier.
+    pub fn get_minimum_supported_version(requires_version: &VersionSpecifiers) -> Option<Self> {
+        /// Truncate a version to its major and minor components.
+        fn major_minor(version: &Version) -> Option<Version> {
+            let major = version.release().first()?;
+            let minor = version.release().get(1)?;
+            Some(Version::new([major, minor]))
+        }
+
+        // Extract the minimum supported version from the specifiers.
+        let minimum_version = requires_version
+            .iter()
+            .filter(|specifier| {
+                matches!(
+                    specifier.operator(),
+                    Operator::Equal
+                        | Operator::EqualStar
+                        | Operator::ExactEqual
+                        | Operator::TildeEqual
+                        | Operator::GreaterThan
+                        | Operator::GreaterThanEqual
+                )
+            })
+            .filter_map(|specifier| major_minor(specifier.version()))
+            .min()?;
+
+        debug!("Detected minimum supported `requires-python` version: {minimum_version}");
+
+        // Find the Python version that matches the minimum supported version.
+        PythonVersion::iter().find(|version| Version::from(*version) == minimum_version)
     }
 }
 
@@ -66,6 +117,13 @@ impl TryFrom<(&str, &str)> for PythonVersion {
     }
 }
 
+impl From<PythonVersion> for Pep440Version {
+    fn from(version: PythonVersion) -> Self {
+        let (major, minor) = version.as_tuple();
+        Self::new([u64::from(major), u64::from(minor)])
+    }
+}
+
 impl From<(u8, u8)> for PythonVersion {
     fn from(value: (u8, u8)) -> Self {
         let (major, minor) = value;
@@ -81,13 +139,75 @@ impl fmt::Display for PythonVersion {
 }
 
 #[cfg(feature = "serde")]
-mod serde {
+pub mod adapter {
+    //! Module designed for use with the `serde` [`with`](https://serde.rs/field-attrs.html#with)
+    //! field attribute.
+    //!
+    //! The [`serialize`] and [`deserialize`] functions allow any type that implements `Serialize`
+    //! or `Deserialize` and `TryFrom<PythonVersion>` or `Into<PythonVersion>`, respectively, to use
+    //! its own (de)serialization method but still end up as a `PythonVersion`.
+
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
     use super::PythonVersion;
 
-    impl<'de> serde::Deserialize<'de> for PythonVersion {
+    pub fn deserialize<'de, D, T>(deserializer: D) -> Result<PythonVersion, D::Error>
+    where
+        D: Deserializer<'de>,
+        T: Deserialize<'de> + Into<PythonVersion>,
+    {
+        Ok(T::deserialize(deserializer)?.into())
+    }
+
+    pub fn serialize<S, T>(value: &PythonVersion, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+        T: Serialize + TryFrom<PythonVersion>,
+        <T as TryFrom<PythonVersion>>::Error: std::fmt::Display,
+    {
+        let value = T::try_from(*value).map_err(|err| {
+            serde::ser::Error::custom(format!("failed to convert version: {err}"))
+        })?;
+        T::serialize(&value, serializer)
+    }
+
+    pub fn deserialize_option<'de, D, T>(deserializer: D) -> Result<Option<PythonVersion>, D::Error>
+    where
+        D: Deserializer<'de>,
+        T: Deserialize<'de> + Into<PythonVersion>,
+    {
+        Ok(Option::<T>::deserialize(deserializer)?.map(T::into))
+    }
+
+    pub fn serialize_option<S, T>(
+        value: &Option<PythonVersion>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+        T: Serialize + TryFrom<PythonVersion>,
+        <T as TryFrom<PythonVersion>>::Error: std::fmt::Display,
+    {
+        let value = match value {
+            Some(v) => Some(T::try_from(*v).map_err(|err| {
+                serde::ser::Error::custom(format!("failed to convert version: {err}"))
+            })?),
+            None => None,
+        };
+        Option::<T>::serialize(&value, serializer)
+    }
+}
+
+#[cfg(feature = "serde")]
+mod serde {
+    use serde::{Deserialize, Deserializer};
+
+    use super::PythonVersion;
+
+    impl<'de> Deserialize<'de> for PythonVersion {
         fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
         where
-            D: serde::Deserializer<'de>,
+            D: Deserializer<'de>,
         {
             let as_str = String::deserialize(deserializer)?;
 

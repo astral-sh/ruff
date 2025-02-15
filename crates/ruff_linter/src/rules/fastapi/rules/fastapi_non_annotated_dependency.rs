@@ -8,7 +8,7 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
 use crate::rules::fastapi::rules::is_fastapi_route;
-use crate::settings::types::PythonVersion;
+use ruff_python_ast::python_version::PythonVersion;
 
 /// ## What it does
 /// Identifies FastAPI routes with deprecated uses of `Depends` or similar.
@@ -77,7 +77,7 @@ impl Violation for FastApiNonAnnotatedDependency {
     }
 
     fn fix_title(&self) -> Option<String> {
-        let title = if self.py_version >= PythonVersion::Py39 {
+        let title = if self.py_version >= PythonVersion::PY39 {
             "Replace with `typing.Annotated`"
         } else {
             "Replace with `typing_extensions.Annotated`"
@@ -232,7 +232,7 @@ fn create_diagnostic(
     );
 
     let try_generate_fix = || {
-        let module = if checker.settings.target_version >= PythonVersion::Py39 {
+        let module = if checker.settings.target_version >= PythonVersion::PY39 {
             "typing"
         } else {
             "typing_extensions"
