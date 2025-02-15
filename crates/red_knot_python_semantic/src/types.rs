@@ -4232,6 +4232,9 @@ impl<'db> Class<'db> {
         for superclass in self.iter_mro(db) {
             match superclass {
                 ClassBase::Dynamic(_) => {
+                    // Note: calling `Type::from(superclass).member()` would be incorrect here.
+                    // What we'd really want is a `Type::Any.own_class_member()` method,
+                    // but adding such a method wouldn't make much sense -- it would always return `Any`!
                     dynamic_type_to_intersect_with.get_or_insert(Type::from(superclass));
                 }
                 ClassBase::Class(class) => {

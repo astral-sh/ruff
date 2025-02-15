@@ -161,6 +161,9 @@ impl<'db> LookupError<'db> {
 
 /// A [`Result`] type in which the `Ok` variant represents a definitely bound symbol
 /// and the `Err` variant represents a symbol that is either definitely or possibly unbound.
+///
+/// Note that this type is exactly isomorphic to [`Symbol`].
+/// In the future, we could possibly consider removing `Symbol` and using this type everywhere instead.
 pub(crate) type LookupResult<'db> = Result<Type<'db>, LookupError<'db>>;
 
 #[cfg(test)]
