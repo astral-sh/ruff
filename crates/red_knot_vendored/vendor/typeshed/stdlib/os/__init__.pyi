@@ -240,6 +240,7 @@ if sys.platform == "linux" and sys.version_info >= (3, 12):
         "CLONE_VM",
         "setns",
         "unshare",
+        "PIDFD_NONBLOCK",
     ]
 if sys.platform == "linux" and sys.version_info >= (3, 10):
     __all__ += [
@@ -1602,6 +1603,9 @@ if sys.version_info >= (3, 9):
 
     if sys.platform == "linux":
         def pidfd_open(pid: int, flags: int = ...) -> int: ...
+
+if sys.version_info >= (3, 12) and sys.platform == "linux":
+    PIDFD_NONBLOCK: Final = 2048
 
 if sys.version_info >= (3, 12) and sys.platform == "win32":
     def listdrives() -> list[str]: ...
