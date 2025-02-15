@@ -1,5 +1,5 @@
 use std::hash::{Hash, Hasher};
-use std::ops::Range;
+use std::ops::{Deref, Range};
 
 use bitflags::bitflags;
 use hashbrown::hash_map::RawEntryMut;
@@ -14,6 +14,8 @@ use crate::ast_node_ref::AstNodeRef;
 use crate::node_key::NodeKey;
 use crate::semantic_index::{semantic_index, SymbolMap};
 use crate::Db;
+
+use super::ast_ids::{EagerNestedScopeRef, HasScopedEagerNestedScopeId, ScopedEagerNestedScopeId};
 
 #[derive(Eq, PartialEq, Debug)]
 pub struct Symbol {
@@ -131,6 +133,52 @@ impl<'db> ScopeId<'db> {
         semantic_index(db, self.file(db)).scope(self.file_scope_id(db))
     }
 
+    pub(crate) fn is_eager(self, db: &dyn Db) -> bool {
+        match self.node(db) {
+            NodeWithScopeKind::Class(_)
+            | NodeWithScopeKind::ListComprehension(_)
+            | NodeWithScopeKind::GeneratorExpression(_)
+            | NodeWithScopeKind::SetComprehension(_)
+            | NodeWithScopeKind::DictComprehension(_) => true,
+            NodeWithScopeKind::ClassTypeParameters(_)
+            | NodeWithScopeKind::Function(_)
+            | NodeWithScopeKind::FunctionTypeParameters(_)
+            | NodeWithScopeKind::Lambda(_)
+            | NodeWithScopeKind::Module
+            | NodeWithScopeKind::TypeAlias(_)
+            | NodeWithScopeKind::TypeAliasTypeParameters(_) => false,
+        }
+    }
+
+    pub(crate) fn scoped_eager_nested_scope_id(
+        self,
+        db: &'db dyn Db,
+        outer_scope: ScopeId,
+    ) -> Option<ScopedEagerNestedScopeId> {
+        match self.node(db) {
+            NodeWithScopeKind::Class(class) => class.scoped_eager_nested_scope_id(db, outer_scope),
+            NodeWithScopeKind::ListComprehension(list_comp) => {
+                list_comp.scoped_eager_nested_scope_id(db, outer_scope)
+            }
+            NodeWithScopeKind::GeneratorExpression(generator) => {
+                generator.scoped_eager_nested_scope_id(db, outer_scope)
+            }
+            NodeWithScopeKind::SetComprehension(set_comp) => {
+                set_comp.scoped_eager_nested_scope_id(db, outer_scope)
+            }
+            NodeWithScopeKind::DictComprehension(dict_comp) => {
+                dict_comp.scoped_eager_nested_scope_id(db, outer_scope)
+            }
+            NodeWithScopeKind::ClassTypeParameters(_)
+            | NodeWithScopeKind::Function(_)
+            | NodeWithScopeKind::FunctionTypeParameters(_)
+            | NodeWithScopeKind::Lambda(_)
+            | NodeWithScopeKind::Module
+            | NodeWithScopeKind::TypeAlias(_)
+            | NodeWithScopeKind::TypeAliasTypeParameters(_) => None,
+        }
+    }
+
     #[cfg(test)]
     pub(crate) fn name(self, db: &'db dyn Db) -> &'db str {
         match self.node(db) {
@@ -178,13 +226,25 @@ impl FileScopeId {
 
 #[derive(Debug, salsa::Update)]
 pub struct Scope {
-    pub(super) parent: Option<FileScopeId>,
-    pub(super) node: NodeWithScopeKind,
-    pub(super) descendents: Range<FileScopeId>,
+    parent: Option<FileScopeId>,
+    node: NodeWithScopeKind,
+    descendents: Range<FileScopeId>,
 }
 
 impl Scope {
-    pub fn parent(self) -> Option<FileScopeId> {
+    pub(super) fn new(
+        parent: Option<FileScopeId>,
+        node: NodeWithScopeKind,
+        descendents: Range<FileScopeId>,
+    ) -> Self {
+        Scope {
+            parent,
+            node,
+            descendents,
+        }
+    }
+
+    pub fn parent(&self) -> Option<FileScopeId> {
         self.parent
     }
 
@@ -194,6 +254,14 @@ impl Scope {
 
     pub fn kind(&self) -> ScopeKind {
         self.node().scope_kind()
+    }
+
+    pub fn descendents(&self) -> &Range<FileScopeId> {
+        &self.descendents
+    }
+
+    pub(super) fn extend_descendents(&mut self, children_end: FileScopeId) {
+        self.descendents = self.descendents.start..children_end;
     }
 }
 
@@ -206,12 +274,6 @@ pub enum ScopeKind {
     Lambda,
     Comprehension,
     TypeAlias,
-}
-
-impl ScopeKind {
-    pub const fn is_comprehension(self) -> bool {
-        matches!(self, ScopeKind::Comprehension)
-    }
 }
 
 /// Symbol table for a specific [`Scope`].
@@ -319,6 +381,14 @@ impl SymbolTableBuilder {
     pub(super) fn finish(mut self) -> SymbolTable {
         self.table.shrink_to_fit();
         self.table
+    }
+}
+
+impl Deref for SymbolTableBuilder {
+    type Target = SymbolTable;
+
+    fn deref(&self) -> &Self::Target {
+        &self.table
     }
 }
 
@@ -454,6 +524,31 @@ impl NodeWithScopeKind {
             | Self::SetComprehension(_)
             | Self::DictComprehension(_)
             | Self::GeneratorExpression(_) => ScopeKind::Comprehension,
+        }
+    }
+
+    pub(super) fn as_eager_nested_scope(&self) -> Option<EagerNestedScopeRef> {
+        match self {
+            Self::Class(class) => Some(EagerNestedScopeRef::Class(class)),
+            Self::DictComprehension(dict_comp) => {
+                Some(EagerNestedScopeRef::DictComprehension(dict_comp))
+            }
+            Self::GeneratorExpression(generator) => {
+                Some(EagerNestedScopeRef::GeneratorExpression(generator))
+            }
+            Self::ListComprehension(list_comp) => {
+                Some(EagerNestedScopeRef::ListComprehension(list_comp))
+            }
+            Self::SetComprehension(set_comp) => {
+                Some(EagerNestedScopeRef::SetComprehension(set_comp))
+            }
+            Self::Lambda(_)
+            | Self::Module
+            | Self::Function(_)
+            | Self::FunctionTypeParameters(_)
+            | Self::ClassTypeParameters(_)
+            | Self::TypeAlias(_)
+            | Self::TypeAliasTypeParameters(_) => None,
         }
     }
 
