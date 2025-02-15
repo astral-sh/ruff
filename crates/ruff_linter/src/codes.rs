@@ -256,6 +256,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "R1704") => (RuleGroup::Stable, rules::pylint::rules::RedefinedArgumentFromLocal),
         (Pylint, "R1706") => (RuleGroup::Removed, rules::pylint::rules::AndOrTernary),
         (Pylint, "R1711") => (RuleGroup::Stable, rules::pylint::rules::UselessReturn),
+        (Pylint, "R6103") => (RuleGroup::Preview, rules::pylint::rules::UnnecessaryAssignment),
         (Pylint, "R1714") => (RuleGroup::Stable, rules::pylint::rules::RepeatedEqualityComparison),
         (Pylint, "R1722") => (RuleGroup::Stable, rules::pylint::rules::SysExitAlias),
         (Pylint, "R1730") => (RuleGroup::Stable, rules::pylint::rules::IfStmtMinMax),
