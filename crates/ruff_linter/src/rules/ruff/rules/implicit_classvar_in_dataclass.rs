@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::is_dunder;
 use ruff_python_ast::{Expr, ExprName, Stmt, StmtAssign, StmtClassDef};
 use ruff_text_size::Ranged;
@@ -44,8 +44,8 @@ use crate::rules::ruff::rules::helpers::{dataclass_kind, DataclassKind};
 /// class C:
 ///     a: ClassVar[int] = 1
 /// ```
-#[violation]
-pub struct ImplicitClassVarInDataclass;
+#[derive(ViolationMetadata)]
+pub(crate) struct ImplicitClassVarInDataclass;
 
 impl Violation for ImplicitClassVarInDataclass {
     #[derive_message_formats]
