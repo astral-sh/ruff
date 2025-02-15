@@ -127,17 +127,8 @@ impl Message {
         syntax_error: &SyntaxError,
         file: SourceFile,
         target_version: PythonVersion,
-        noqa_offset: TextSize,
     ) -> Message {
         match syntax_error.kind {
-            SyntaxErrorKind::LateFutureImport => Message::from_diagnostic(
-                Diagnostic::new(
-                    crate::rules::pyflakes::rules::LateFutureImport,
-                    syntax_error.range,
-                ),
-                file,
-                noqa_offset,
-            ),
             SyntaxErrorKind::MatchBeforePy310 => Message::SyntaxError(SyntaxErrorMessage {
                 message: format!("SyntaxError: {}", syntax_error.message(target_version)),
                 range: syntax_error.range,

@@ -855,6 +855,14 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     if checker.enabled(Rule::FutureFeatureNotDefined) {
                         pyflakes::rules::future_feature_not_defined(checker, alias);
                     }
+                    if checker.enabled(Rule::LateFutureImport) {
+                        if checker.semantic.seen_futures_boundary() {
+                            checker.report_diagnostic(Diagnostic::new(
+                                pyflakes::rules::LateFutureImport,
+                                stmt.range(),
+                            ));
+                        }
+                    }
                 } else if &alias.name == "*" {
                     if checker.enabled(Rule::UndefinedLocalWithNestedImportStarUsage) {
                         if !matches!(checker.semantic.current_scope().kind, ScopeKind::Module) {
