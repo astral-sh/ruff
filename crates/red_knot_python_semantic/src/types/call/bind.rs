@@ -161,6 +161,10 @@ impl<'db> CallBinding<'db> {
         }
     }
 
+    pub(crate) fn callable_type(&self) -> Type<'db> {
+        self.callable_ty
+    }
+
     pub(crate) fn set_return_type(&mut self, return_ty: Type<'db>) {
         self.return_ty = return_ty;
     }
@@ -195,11 +199,15 @@ impl<'db> CallBinding<'db> {
         }
     }
 
-    pub(super) fn report_diagnostics(&self, context: &InferContext<'db>, node: ast::AnyNodeRef) {
+    pub(crate) fn report_diagnostics(&self, context: &InferContext<'db>, node: ast::AnyNodeRef) {
         let callable_name = self.callable_name(context.db());
         for error in &self.errors {
             error.report_diagnostic(context, node, callable_name);
         }
+    }
+
+    pub(crate) fn has_binding_errors(&self) -> bool {
+        !self.errors.is_empty()
     }
 }
 

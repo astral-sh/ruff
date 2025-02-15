@@ -244,10 +244,7 @@ class B:
     def __rsub__(self, other: A) -> B:
         return B()
 
-# TODO: this should be `B` (the return annotation of `B.__rsub__`),
-# because `A.__sub__` is annotated as only accepting `A`,
-# but `B.__rsub__` will accept `A`.
-reveal_type(A() - B())  # revealed: A
+reveal_type(A() - B())  # revealed: B
 ```
 
 ## Callable instances as dunders
@@ -263,7 +260,10 @@ class B:
     __add__ = A()
 
 # TODO: this could be `int` if we declare `B.__add__` using a `Callable` type
-reveal_type(B() + B())  # revealed: Unknown | int
+# TODO: This should not be an error but we currently fail to bind `self` in `A.__call__` as `B`
+#       and instead bind it to `A` which makes the `__add__` call fail.
+# error: [unsupported-operator] "Operator `+` is unsupported between objects of type `B` and `B`"
+reveal_type(B() + B())  # revealed: Unknown
 ```
 
 ## Integration test: numbers from typeshed
@@ -277,22 +277,14 @@ return annotations from the widening, and preserve a bit more precision here?
 reveal_type(3j + 3.14)  # revealed: int | float | complex
 reveal_type(4.2 + 42)  # revealed: int | float
 reveal_type(3j + 3)  # revealed: int | float | complex
-
-# TODO should be int | float | complex, need to check arg type and fall back to `rhs.__radd__`
-reveal_type(3.14 + 3j)  # revealed: int | float
-
-# TODO should be int | float, need to check arg type and fall back to `rhs.__radd__`
-reveal_type(42 + 4.2)  # revealed: int
-
-# TODO should be int | float | complex, need to check arg type and fall back to `rhs.__radd__`
-reveal_type(3 + 3j)  # revealed: int
+reveal_type(3.14 + 3j)  # revealed: int | float | complex
+reveal_type(42 + 4.2)  # revealed: int | float
+reveal_type(3 + 3j)  # revealed: int | float | complex
 
 def _(x: bool, y: int):
     reveal_type(x + y)  # revealed: int
     reveal_type(4.2 + x)  # revealed: int | float
-
-    # TODO should be float, need to check arg type and fall back to `rhs.__radd__`
-    reveal_type(y + 4.12)  # revealed: int
+    reveal_type(y + 4.12)  # revealed: int | float
 ```
 
 ## With literal types
@@ -309,8 +301,7 @@ class A:
         return self
 
 reveal_type(A() + 1)  # revealed: A
-# TODO should be `A` since `int.__add__` doesn't support `A` instances
-reveal_type(1 + A())  # revealed: int
+reveal_type(1 + A())  # revealed: A
 
 reveal_type(A() + "foo")  # revealed: A
 # TODO should be `A` since `str.__add__` doesn't support `A` instances
