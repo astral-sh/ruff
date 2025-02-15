@@ -12,6 +12,7 @@ class C:
     # No errors
     __slots__ = ("foo", "bar")
     __radd__ = __add__
+    _private_attr = 100
 
     with_annotation: str
     with_annotation_and_default: int = 42
