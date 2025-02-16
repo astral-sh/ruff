@@ -816,6 +816,22 @@
       },
       "additionalProperties": false
     },
+    "ArgsMadeMandatory": {
+      "type": "object",
+      "required": [
+        "args"
+      ],
+      "properties": {
+        "args": {
+          "description": "The args to make mandatory when the API is used.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
     "BannedAliases": {
       "type": "array",
       "items": {
@@ -2855,6 +2871,16 @@
             "type": "string"
           }
         },
+        "optional-made-mandatory": {
+          "description": "A list of mappings from qualified callable path to the arguments on it to make mandatory to supply as keyword arguments.",
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": {
+            "$ref": "#/definitions/ArgsMadeMandatory"
+          }
+        },
         "parenthesize-tuple-in-subscript": {
           "description": "Whether to prefer accessing items keyed by tuples with parentheses around the tuple (see `RUF031`).",
           "type": [
@@ -3961,6 +3987,7 @@
         "RUF056",
         "RUF057",
         "RUF058",
+        "RUF059",
         "RUF1",
         "RUF10",
         "RUF100",

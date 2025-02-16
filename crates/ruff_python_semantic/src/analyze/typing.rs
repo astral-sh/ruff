@@ -1072,7 +1072,7 @@ pub fn is_type_var_like(binding: &Binding, semantic: &SemanticModel) -> bool {
 
 /// Find the [`ParameterWithDefault`] corresponding to the given [`Binding`].
 #[inline]
-fn find_parameter<'a>(
+pub fn find_parameter<'a>(
     parameters: &'a Parameters,
     binding: &Binding,
 ) -> Option<&'a ParameterWithDefault> {
