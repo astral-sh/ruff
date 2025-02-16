@@ -11,8 +11,8 @@ pub enum FunctionType {
     Method,
     ClassMethod,
     StaticMethod,
-    // `__new__` is an implicit static method but
-    // is treated as a class method for some lint rules
+    /// `__new__` is an implicit static method but
+    /// is treated similarly to class methods for several lint rules
     NewMethod,
 }
 
