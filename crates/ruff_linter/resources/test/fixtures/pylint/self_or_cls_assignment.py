@@ -43,7 +43,8 @@ def list_fruits(self, cls) -> None:
     cls = "banana"  # Ok
 
 # `__new__` is implicitly a static method
-# https://github.com/astral-sh/ruff/issues/13154
+# but for the purposes of this check we treat
+# it as a class method.
 class Foo:
     def __new__(cls):
-        cls = "apple" # Ok
+        cls = "apple" # PLW0642
