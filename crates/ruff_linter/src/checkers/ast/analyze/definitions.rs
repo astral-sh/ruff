@@ -1,10 +1,8 @@
-use ruff_python_ast::str::raw_contents_range;
 use ruff_python_semantic::all::DunderAllName;
 use ruff_python_semantic::{
     BindingKind, ContextualizedDefinition, Definition, Export, Member, MemberKind,
 };
-use ruff_source_file::LineRanges;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;
@@ -184,14 +182,9 @@ pub(crate) fn definitions(checker: &mut Checker) {
                 continue;
             };
 
-            let contents = checker.locator().slice(string_literal);
-
-            let indentation = checker.locator().slice(TextRange::new(
-                checker.locator.line_start(string_literal.start()),
-                string_literal.start(),
-            ));
-
-            if string_literal.value.is_implicit_concatenated() {
+            // If the `ExprStringLiteral` has multiple parts, it is implicitly concatenated.
+            // We don't support recognising such strings as docstrings in our model currently.
+            let [sole_string_part] = string_literal.value.as_slice() else {
                 #[allow(deprecated)]
                 let location = checker
                     .locator
@@ -203,16 +196,12 @@ pub(crate) fn definitions(checker: &mut Checker) {
                     location.column
                 );
                 continue;
-            }
+            };
 
-            // SAFETY: Safe for docstrings that pass `should_ignore_docstring`.
-            let body_range = raw_contents_range(contents).unwrap();
             let docstring = Docstring {
                 definition,
-                expr: string_literal,
-                contents,
-                body_range,
-                indentation,
+                expr: sole_string_part,
+                source: checker.source(),
             };
 
             if !pydocstyle::rules::not_empty(checker, &docstring) {
