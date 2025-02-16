@@ -2814,17 +2814,15 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     fn infer_number_literal_expression(&mut self, literal: &ast::ExprNumberLiteral) -> Type<'db> {
         let ast::ExprNumberLiteral { range: _, value } = literal;
+        let db = self.db();
 
         match value {
             ast::Number::Int(n) => n
                 .as_i64()
                 .map(Type::IntLiteral)
-                .unwrap_or_else(|| KnownClass::Int.to_instance(self.db())),
-            ast::Number::Float(_) => KnownClass::Float.to_instance(self.db()),
-            ast::Number::Complex { .. } => builtins_symbol(self.db(), "complex")
-                .ignore_possibly_unbound()
-                .unwrap_or(Type::unknown())
-                .to_instance(self.db()),
+                .unwrap_or_else(|| KnownClass::Int.to_instance(db)),
+            ast::Number::Float(_) => KnownClass::Float.to_instance(db),
+            ast::Number::Complex { .. } => KnownClass::Complex.to_instance(db),
         }
     }
 
@@ -2908,9 +2906,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         &mut self,
         _literal: &ast::ExprEllipsisLiteral,
     ) -> Type<'db> {
-        builtins_symbol(self.db(), "Ellipsis")
-            .ignore_possibly_unbound()
-            .unwrap_or(Type::unknown())
+        KnownClass::EllipsisType.to_instance(self.db())
     }
 
     fn infer_tuple_expression(&mut self, tuple: &ast::ExprTuple) -> Type<'db> {

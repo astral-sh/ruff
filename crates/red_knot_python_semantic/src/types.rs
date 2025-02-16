@@ -1756,6 +1756,7 @@ impl<'db> Type<'db> {
                     KnownClass::NoneType
                     | KnownClass::NoDefaultType
                     | KnownClass::VersionInfo
+                    | KnownClass::EllipsisType
                     | KnownClass::TypeAliasType,
                 ) => true,
                 Some(
@@ -2865,6 +2866,9 @@ pub enum KnownClass {
     OrderedDict,
     // sys
     VersionInfo,
+    // Exposed as `types.EllipsisType` on Python >=3.10;
+    // backported as `builtins.ellipsis` by typeshed on Python <=3.9
+    EllipsisType,
 }
 
 impl<'db> KnownClass {
@@ -2872,7 +2876,7 @@ impl<'db> KnownClass {
         matches!(self, Self::Bool)
     }
 
-    pub const fn as_str(&self) -> &'static str {
+    pub fn as_str(&self, db: &'db dyn Db) -> &'static str {
         match self {
             Self::Bool => "bool",
             Self::Object => "object",
@@ -2912,6 +2916,15 @@ impl<'db> KnownClass {
             // which is impossible to replicate in the stubs since the sole instance of the class
             // also has that name in the `sys` module.)
             Self::VersionInfo => "_version_info",
+            Self::EllipsisType => {
+                // Exposed as `types.EllipsisType` on Python >=3.10;
+                // backported as `builtins.ellipsis` by typeshed on Python <=3.9
+                if Program::get(db).python_version(db) >= PythonVersion::PY310 {
+                    "EllipsisType"
+                } else {
+                    "ellipsis"
+                }
+            }
         }
     }
 
@@ -2920,7 +2933,7 @@ impl<'db> KnownClass {
     }
 
     pub fn to_class_literal(self, db: &'db dyn Db) -> Type<'db> {
-        known_module_symbol(db, self.canonical_module(db), self.as_str())
+        known_module_symbol(db, self.canonical_module(db), self.as_str(db))
             .ignore_possibly_unbound()
             .unwrap_or(Type::unknown())
     }
@@ -2935,7 +2948,7 @@ impl<'db> KnownClass {
     /// Return `true` if this symbol can be resolved to a class definition `class` in typeshed,
     /// *and* `class` is a subclass of `other`.
     pub fn is_subclass_of(self, db: &'db dyn Db, other: Class<'db>) -> bool {
-        known_module_symbol(db, self.canonical_module(db), self.as_str())
+        known_module_symbol(db, self.canonical_module(db), self.as_str(db))
             .ignore_possibly_unbound()
             .and_then(Type::into_class_literal)
             .is_some_and(|ClassLiteralType { class }| class.is_subclass_of(db, other))
@@ -2979,6 +2992,15 @@ impl<'db> KnownClass {
                     KnownModule::TypingExtensions
                 }
             }
+            Self::EllipsisType => {
+                // Exposed as `types.EllipsisType` on Python >=3.10;
+                // backported as `builtins.ellipsis` by typeshed on Python <=3.9
+                if Program::get(db).python_version(db) >= PythonVersion::PY310 {
+                    KnownModule::Types
+                } else {
+                    KnownModule::Builtins
+                }
+            }
             Self::ChainMap
             | Self::Counter
             | Self::DefaultDict
@@ -2991,9 +3013,14 @@ impl<'db> KnownClass {
     ///
     /// A singleton class is a class where it is known that only one instance can ever exist at runtime.
     const fn is_singleton(self) -> bool {
-        // TODO there are other singleton types (EllipsisType, NotImplementedType)
+        // TODO there are other singleton types (NotImplementedType -- any others?)
         match self {
-            Self::NoneType | Self::NoDefaultType | Self::VersionInfo | Self::TypeAliasType => true,
+            Self::NoneType
+            | Self::EllipsisType
+            | Self::NoDefaultType
+            | Self::VersionInfo
+            | Self::TypeAliasType => true,
+
             Self::Bool
             | Self::Object
             | Self::Bytes
@@ -3060,6 +3087,12 @@ impl<'db> KnownClass {
             "_SpecialForm" => Self::SpecialForm,
             "_NoDefaultType" => Self::NoDefaultType,
             "_version_info" => Self::VersionInfo,
+            "ellipsis" if Program::get(db).python_version(db) <= PythonVersion::PY39 => {
+                Self::EllipsisType
+            }
+            "EllipsisType" if Program::get(db).python_version(db) >= PythonVersion::PY310 => {
+                Self::EllipsisType
+            }
             _ => return None,
         };
 
@@ -3096,6 +3129,7 @@ impl<'db> KnownClass {
             | Self::ModuleType
             | Self::VersionInfo
             | Self::BaseException
+            | Self::EllipsisType
             | Self::BaseExceptionGroup
             | Self::FunctionType => module == self.canonical_module(db),
             Self::NoneType => matches!(module, KnownModule::Typeshed | KnownModule::Types),
