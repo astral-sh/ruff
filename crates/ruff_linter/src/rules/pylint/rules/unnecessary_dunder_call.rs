@@ -150,15 +150,16 @@ pub(crate) fn unnecessary_dunder_call(checker: &Checker, call: &ast::ExprCall) {
                         )),
                     };
                 } else {
-                    fixed = match needs_parentheses(value_slice) {
-                        true => Some((
+                    fixed = if needs_parentheses(value_slice) {
+                        Some((
                             format!("({value_slice}) {replacement} ({arg_slice})"),
                             precedence,
-                        )),
-                        _ => Some((
+                        ))
+                    } else {
+                        Some((
                             format!("{value_slice} {replacement} ({arg_slice})"),
                             precedence,
-                        )),
+                        ))
                     };
                 }
 
