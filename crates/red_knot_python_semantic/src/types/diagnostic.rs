@@ -826,41 +826,77 @@ impl Ranged for TypeCheckDiagnostic {
 /// each Salsa-struct comes with an overhead.
 #[derive(Default, Eq, PartialEq)]
 pub struct TypeCheckDiagnostics {
+    inner: Option<Box<TypeCheckDiagnosticsInner>>,
+}
+
+#[derive(Default, Eq, PartialEq)]
+struct TypeCheckDiagnosticsInner {
     diagnostics: Vec<Arc<TypeCheckDiagnostic>>,
     used_suppressions: FxHashSet<FileSuppressionId>,
 }
 
 impl TypeCheckDiagnostics {
     pub(crate) fn push(&mut self, diagnostic: TypeCheckDiagnostic) {
-        self.diagnostics.push(Arc::new(diagnostic));
+        let inner = self.get_mut_inner();
+        inner.diagnostics.push(Arc::new(diagnostic));
     }
 
     pub(super) fn extend(&mut self, other: &TypeCheckDiagnostics) {
-        self.diagnostics.extend_from_slice(&other.diagnostics);
-        self.used_suppressions.extend(&other.used_suppressions);
+        let Some(other_inner) = other.inner.as_ref() else {
+            return;
+        };
+
+        let inner = self.get_mut_inner();
+        inner
+            .diagnostics
+            .extend_from_slice(&other_inner.diagnostics);
+        inner
+            .used_suppressions
+            .extend(&other_inner.used_suppressions);
     }
 
     pub(crate) fn mark_used(&mut self, suppression_id: FileSuppressionId) {
-        self.used_suppressions.insert(suppression_id);
+        let inner = self.get_mut_inner();
+        inner.used_suppressions.insert(suppression_id);
+    }
+
+    pub(crate) fn diagnostics(&self) -> &[Arc<TypeCheckDiagnostic>] {
+        self.get_inner()
+            .map(|inner| &*inner.diagnostics)
+            .unwrap_or_default()
     }
 
     pub(crate) fn is_used(&self, suppression_id: FileSuppressionId) -> bool {
-        self.used_suppressions.contains(&suppression_id)
+        self.get_inner()
+            .is_some_and(|inner| inner.used_suppressions.contains(&suppression_id))
     }
 
     pub(crate) fn used_len(&self) -> usize {
-        self.used_suppressions.len()
+        self.get_inner()
+            .map(|inner| inner.used_suppressions.len())
+            .unwrap_or_default()
     }
 
     pub(crate) fn shrink_to_fit(&mut self) {
-        self.used_suppressions.shrink_to_fit();
-        self.diagnostics.shrink_to_fit();
+        if let Some(inner) = self.inner.as_mut() {
+            inner.used_suppressions.shrink_to_fit();
+            inner.diagnostics.shrink_to_fit();
+        }
+    }
+
+    fn get_mut_inner(&mut self) -> &mut TypeCheckDiagnosticsInner {
+        self.inner
+            .get_or_insert_with(|| Box::new(TypeCheckDiagnosticsInner::default()))
+    }
+
+    fn get_inner(&self) -> Option<&TypeCheckDiagnosticsInner> {
+        self.inner.as_deref()
     }
 }
 
 impl std::fmt::Debug for TypeCheckDiagnostics {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        self.diagnostics.fmt(f)
+        self.diagnostics().fmt(f)
     }
 }
 
@@ -868,7 +904,7 @@ impl Deref for TypeCheckDiagnostics {
     type Target = [std::sync::Arc<TypeCheckDiagnostic>];
 
     fn deref(&self) -> &Self::Target {
-        &self.diagnostics
+        self.diagnostics()
     }
 }
 
@@ -877,7 +913,10 @@ impl IntoIterator for TypeCheckDiagnostics {
     type IntoIter = std::vec::IntoIter<std::sync::Arc<TypeCheckDiagnostic>>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.diagnostics.into_iter()
+        self.inner
+            .map(|inner| inner.diagnostics)
+            .unwrap_or_default()
+            .into_iter()
     }
 }
 
@@ -886,7 +925,7 @@ impl<'a> IntoIterator for &'a TypeCheckDiagnostics {
     type IntoIter = std::slice::Iter<'a, std::sync::Arc<TypeCheckDiagnostic>>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.diagnostics.iter()
+        self.diagnostics().iter()
     }
 }
 
