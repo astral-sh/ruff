@@ -98,5 +98,5 @@ def _(flag: bool):
     if x is ...:
         reveal_type(x)  # revealed: ellipsis
     else:
-        reveal_type(x)  # revealed: int
+        reveal_type(x)  # revealed: Literal[42]
 ```
