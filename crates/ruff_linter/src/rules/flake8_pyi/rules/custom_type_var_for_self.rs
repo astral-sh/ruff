@@ -159,7 +159,7 @@ pub(crate) fn custom_type_var_instead_of_self(
     // to a type variable, and we emit the diagnostic on some methods that do not have return
     // annotations.
     let (method, diagnostic_range) = match function_kind {
-        FunctionType::ClassMethod => {
+        FunctionType::ClassMethod | FunctionType::NewMethod => {
             if checker.settings.preview.is_enabled() {
                 (
                     Method::PreviewClass(PreviewClassMethod {
