@@ -125,37 +125,45 @@ pub(crate) fn runtime_import_in_type_checking_block(checker: &Checker, scope: &S
         if binding.context.is_typing()
             && binding.references().any(|reference_id| {
                 let reference = checker.semantic().reference(reference_id);
-                let submodule_import = import.as_submodule_import();
+                if reference.in_typing_context() {
+                    return false;
+                }
 
-                reference.in_runtime_context()
-                    && !(ignore_dunder_all_references && reference.in_dunder_all_definition())
-                    // for submodule imports we need to check if the reference
-                    // actually refers to this submodule, or a different one
-                    && (submodule_import.is_none() || submodule_import.is_some_and(|import| {
-                        let Some(expression_id) = reference.expression_id() else {
-                            return false;
-                        };
-                        // references should generally point towards an `Expr::Name` node
-                        // so by walking the parent expressions in tandem with the segments
-                        // of the qualified name should give us a `starts_with` check for
-                        // the reference towards the import
-                        for (segment, expr) in std::iter::zip(
-                            import.qualified_name().segments(),
-                            checker.semantic().expressions(expression_id))
-                                // we discard the first pair, since it's guaranteed to match
-                                // this also simplifies the loop logic, since we only have to
-                                // handle `Expr::Attribute` nodes
-                                .skip(1) {
-                            let Expr::Attribute(ast::ExprAttribute{ attr, .. }) = expr else {
-                                // we're past the attribute nodes, so we can stop
-                                break;
-                            };
-                            if *segment != attr.as_str() {
-                                return false;
-                            }
-                        }
-                        true
-                    }))
+                if ignore_dunder_all_references && reference.in_dunder_all_definition() {
+                    return false;
+                }
+
+                // for submodule imports we need to check if the reference
+                // actually refers to this submodule, or a different one
+                let Some(submodule_import) = import.as_submodule_import() else {
+                    return true;
+                };
+
+                let Some(expression_id) = reference.expression_id() else {
+                    return false;
+                };
+                // references should generally point towards an `Expr::Name` node
+                // so by walking the parent expressions in tandem with the segments
+                // of the qualified name should give us a `starts_with` check for
+                // the reference towards the import
+                for (segment, expr) in std::iter::zip(
+                    submodule_import.qualified_name().segments(),
+                    checker.semantic().expressions(expression_id),
+                )
+                // we discard the first pair, since it's guaranteed to match
+                // this also simplifies the loop logic, since we only have to
+                // handle `Expr::Attribute` nodes
+                .skip(1)
+                {
+                    let Expr::Attribute(ast::ExprAttribute { attr, .. }) = expr else {
+                        // we're past the attribute nodes, so we can stop
+                        break;
+                    };
+                    if *segment != attr.as_str() {
+                        return false;
+                    }
+                }
+                true
             })
         {
             let Some(node_id) = binding.source else {
