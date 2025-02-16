@@ -92,7 +92,7 @@ pub(crate) fn newline_after_last_paragraph(checker: &Checker, docstring: &Docstr
                     let content = format!(
                         "{}{}",
                         checker.stylist().line_ending().as_str(),
-                        clean_space(docstring.indentation())
+                        clean_space(docstring.compute_indentation())
                     );
                     diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
                         content,

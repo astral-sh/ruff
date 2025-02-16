@@ -4,7 +4,7 @@ use std::ops::Deref;
 use ruff_python_ast::{self as ast, StringFlags};
 use ruff_python_semantic::Definition;
 use ruff_source_file::LineRanges;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 pub(crate) mod extraction;
 pub(crate) mod google;
@@ -36,8 +36,14 @@ impl<'a> Docstring<'a> {
         DocstringBody { docstring: self }
     }
 
-    pub(crate) fn indentation(&self) -> &'a str {
-        &self.source[TextRange::new(self.source.line_start(self.start()), self.start())]
+    /// Compute the start position of the docstring's opening line
+    pub(crate) fn line_start(&self) -> TextSize {
+        self.source.line_start(self.start())
+    }
+
+    /// Return the slice of source code that represents the indentation of the docstring's opening quotes.
+    pub(crate) fn compute_indentation(&self) -> &'a str {
+        &self.source[TextRange::new(self.line_start(), self.start())]
     }
 
     pub(crate) fn quote_style(&self) -> ast::str::Quote {
@@ -56,7 +62,11 @@ impl<'a> Docstring<'a> {
         self.flags().is_triple_quoted()
     }
 
-    pub(crate) fn prefixes(&self) -> &'a str {
+    /// The docstring's prefixes as they exist in the original source code.
+    pub(crate) fn prefix_str(&self) -> &'a str {
+        // N.B. This will normally be exactly the same as what you might get from
+        // `self.flags().prefix().as_str()`, but doing it this way has a few small advantages.
+        // For example, the casing of the `u` prefix will be preserved if it's a u-string.
         &self.source[TextRange::new(
             self.start(),
             self.start() + self.flags().prefix().text_len(),
@@ -93,10 +103,7 @@ impl<'a> DocstringBody<'a> {
 
 impl Ranged for DocstringBody<'_> {
     fn range(&self) -> TextRange {
-        TextRange::new(
-            self.docstring.start() + self.docstring.flags().opener_len(),
-            self.docstring.end() - self.docstring.flags().closer_len(),
-        )
+        self.docstring.expr.content_range()
     }
 }
 

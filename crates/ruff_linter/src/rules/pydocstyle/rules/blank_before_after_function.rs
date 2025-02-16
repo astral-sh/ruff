@@ -6,7 +6,7 @@ use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_trivia::PythonWhitespace;
 use ruff_source_file::{UniversalNewlineIterator, UniversalNewlines};
 use ruff_text_size::Ranged;
-use ruff_text_size::{TextLen, TextRange};
+use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
@@ -135,7 +135,7 @@ pub(crate) fn blank_before_after_function(checker: &Checker, docstring: &Docstri
             // Delete the blank line before the docstring.
             diagnostic.set_fix(Fix::safe_edit(Edit::deletion(
                 blank_lines_start,
-                docstring.start() - docstring.indentation().text_len(),
+                docstring.line_start(),
             )));
             checker.report_diagnostic(diagnostic);
         }

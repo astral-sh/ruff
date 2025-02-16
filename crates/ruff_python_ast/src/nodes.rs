@@ -1645,6 +1645,16 @@ impl StringLiteral {
             flags: StringLiteralFlags::empty().with_invalid(),
         }
     }
+
+    /// The range of the string literal's contents.
+    ///
+    /// This excludes any prefixes, opening quotes or closing quotes.
+    pub fn content_range(&self) -> TextRange {
+        TextRange::new(
+            self.start() + self.flags.opener_len(),
+            self.end() - self.flags.closer_len(),
+        )
+    }
 }
 
 impl From<StringLiteral> for Expr {

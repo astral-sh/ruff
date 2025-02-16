@@ -3,7 +3,7 @@ use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_trivia::{indentation_at_offset, PythonWhitespace};
 use ruff_source_file::{Line, LineRanges, UniversalNewlineIterator};
 use ruff_text_size::Ranged;
-use ruff_text_size::{TextLen, TextRange};
+use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
@@ -197,7 +197,7 @@ pub(crate) fn blank_before_after_class(checker: &Checker, docstring: &Docstring)
                 // Delete the blank line before the class.
                 diagnostic.set_fix(Fix::safe_edit(Edit::deletion(
                     blank_lines_start,
-                    docstring.start() - docstring.indentation().text_len(),
+                    docstring.line_start(),
                 )));
                 checker.report_diagnostic(diagnostic);
             }
@@ -210,7 +210,7 @@ pub(crate) fn blank_before_after_class(checker: &Checker, docstring: &Docstring)
                 diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
                     checker.stylist().line_ending().to_string(),
                     blank_lines_start,
-                    docstring.start() - docstring.indentation().text_len(),
+                    docstring.line_start(),
                 )));
                 checker.report_diagnostic(diagnostic);
             }

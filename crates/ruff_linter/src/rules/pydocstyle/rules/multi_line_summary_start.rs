@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::str::is_triple_quote;
@@ -179,7 +181,7 @@ pub(crate) fn multi_line_summary_start(checker: &Checker, docstring: &Docstring)
     } else {
         if checker.enabled(Rule::MultiLineSummarySecondLine) {
             let mut diagnostic = Diagnostic::new(MultiLineSummarySecondLine, docstring.range());
-            let mut indentation = String::from(docstring.indentation());
+            let mut indentation = Cow::Borrowed(docstring.compute_indentation());
             let mut fixable = true;
             if !indentation.chars().all(char::is_whitespace) {
                 fixable = false;
@@ -193,6 +195,7 @@ pub(crate) fn multi_line_summary_start(checker: &Checker, docstring: &Docstring)
                         .slice(TextRange::new(stmt_line_start, member.start()));
 
                     if stmt_indentation.chars().all(char::is_whitespace) {
+                        let indentation = indentation.to_mut();
                         indentation.clear();
                         indentation.push_str(stmt_indentation);
                         indentation.push_str(checker.stylist().indentation());

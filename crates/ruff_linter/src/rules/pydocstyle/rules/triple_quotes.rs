@@ -65,7 +65,7 @@ impl Violation for TripleSingleQuotes {
 /// D300
 pub(crate) fn triple_quotes(checker: &Checker, docstring: &Docstring) {
     let opener = docstring.opener();
-    let prefixes = docstring.prefixes();
+    let prefixes = docstring.prefix_str();
 
     let expected_quote = if docstring.body().contains("\"\"\"") {
         if docstring.body().contains("\'\'\'") {
