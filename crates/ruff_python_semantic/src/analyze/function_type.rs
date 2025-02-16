@@ -11,6 +11,9 @@ pub enum FunctionType {
     Method,
     ClassMethod,
     StaticMethod,
+    // `__new__` is an implicit static method but
+    // is treated as a class method for some lint rules
+    NewMethod,
 }
 
 /// Classify a function based on its scope, name, and decorators.
@@ -37,7 +40,7 @@ pub fn classify(
         FunctionType::ClassMethod
     } else {
         match name {
-            "__new__" => FunctionType::StaticMethod, // Implicit static method.
+            "__new__" => FunctionType::NewMethod, // Implicit static method.
             "__init_subclass__" | "__class_getitem__" => FunctionType::ClassMethod, // Implicit class method.
             _ => FunctionType::Method, // Default to instance method.
         }
