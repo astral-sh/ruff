@@ -1022,6 +1022,22 @@ include = ["*.ipy"]
 }
 
 #[test]
+fn warn_invalid_noqa_with_no_diagnostics() {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--isolated"])
+        .arg("--select")
+        .arg("F401")
+        .arg("-")
+        .pass_stdin(
+            r#"
+# ruff: noqa: AAA101
+print("Hello world!")
+"#
+        ));
+}
+
+#[test]
 fn file_noqa_external() -> Result<()> {
     let tempdir = TempDir::new()?;
     let ruff_toml = tempdir.path().join("ruff.toml");
