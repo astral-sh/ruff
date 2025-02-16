@@ -422,7 +422,6 @@ pub(crate) fn unused_arguments(checker: &Checker, scope: &Scope) {
                         && !is_not_implemented_stub_with_variable(function_def, checker.semantic())
                         && (!visibility::is_magic(name)
                             || visibility::is_init(name)
-                            || visibility::is_new(name)
                             || visibility::is_call(name))
                         && !visibility::is_abstract(decorator_list, checker.semantic())
                         && !visibility::is_override(decorator_list, checker.semantic())
@@ -437,7 +436,6 @@ pub(crate) fn unused_arguments(checker: &Checker, scope: &Scope) {
                         && !is_not_implemented_stub_with_variable(function_def, checker.semantic())
                         && (!visibility::is_magic(name)
                             || visibility::is_init(name)
-                            || visibility::is_new(name)
                             || visibility::is_call(name))
                         && !visibility::is_abstract(decorator_list, checker.semantic())
                         && !visibility::is_override(decorator_list, checker.semantic())
@@ -452,18 +450,23 @@ pub(crate) fn unused_arguments(checker: &Checker, scope: &Scope) {
                         && !is_not_implemented_stub_with_variable(function_def, checker.semantic())
                         && (!visibility::is_magic(name)
                             || visibility::is_init(name)
-                            || visibility::is_new(name)
                             || visibility::is_call(name))
                         && !visibility::is_abstract(decorator_list, checker.semantic())
                         && !visibility::is_override(decorator_list, checker.semantic())
                         && !visibility::is_overload(decorator_list, checker.semantic())
                     {
-                        if visibility::is_new(name) {
-                            method(Argumentable::StaticMethod, parameters, scope, checker);
-                            return;
-                        }
-
                         function(Argumentable::StaticMethod, parameters, scope, checker);
+                    }
+                }
+                function_type::FunctionType::NewMethod => {
+                    if checker.enabled(Argumentable::StaticMethod.rule_code())
+                        && !function_type::is_stub(function_def, checker.semantic())
+                        && !is_not_implemented_stub_with_variable(function_def, checker.semantic())
+                        && !visibility::is_abstract(decorator_list, checker.semantic())
+                        && !visibility::is_override(decorator_list, checker.semantic())
+                        && !visibility::is_overload(decorator_list, checker.semantic())
+                    {
+                        method(Argumentable::StaticMethod, parameters, scope, checker);
                     }
                 }
             }
