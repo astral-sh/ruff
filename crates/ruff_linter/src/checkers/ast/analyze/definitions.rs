@@ -182,9 +182,8 @@ pub(crate) fn definitions(checker: &mut Checker) {
                 continue;
             };
 
-            // If the `ExprStringLiteral` has multiple parts, it is implicitly concatenated.
-            // We don't support recognising such strings as docstrings in our model currently.
-            let [sole_string_part] = string_literal.value.as_slice() else {
+            // We don't recognise implicitly concatenated strings as valid docstrings in our model currently.
+            let Some(sole_string_part) = string_literal.as_unconcatenated_literal() else {
                 #[allow(deprecated)]
                 let location = checker
                     .locator
