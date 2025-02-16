@@ -699,7 +699,7 @@ extend = "ruff.toml"
 
     ----- stderr -----
     ruff failed
-      Cause: Circular dependency detected in pyproject.toml: [TMP]/ruff.toml -> [TMP]/ruff2.toml -> [TMP]/ruff3.toml -> [TMP]/ruff.toml
+      Cause: Circular dependency detected: [TMP]/ruff.toml -> [TMP]/ruff2.toml -> [TMP]/ruff3.toml -> [TMP]/ruff.toml
     ");
     });
 

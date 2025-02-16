@@ -310,7 +310,7 @@ pub fn resolve_configuration(
     while let Some(path) = next {
         if seen.contains(&path) {
             bail!(format!(
-                "Circular dependency detected in pyproject.toml: {}",
+                "Circular dependency detected: {}",
                 seen.iter().chain([&path]).map(|p| p.display()).join(" -> "),
             ));
         }
