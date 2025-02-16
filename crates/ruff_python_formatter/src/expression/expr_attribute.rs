@@ -1,7 +1,7 @@
 use ruff_formatter::{write, FormatRuleWithOptions};
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{Expr, ExprAttribute, ExprNumberLiteral, Number};
-use ruff_python_trivia::{find_only_token_in_range, SimpleTokenKind};
+use ruff_python_trivia::{find_only_token_in_range, SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::comments::dangling_comments;
@@ -82,7 +82,7 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
             // (
             //      (
             //          a
-            //      )  # `before_dot`
+            //      )
             //      # `before_dot`
             //      .  # `after_dot`
             //      # `after_dot`
@@ -103,6 +103,30 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
                     dangling.partition_point(|comment| comment.start() < dot_token.start()),
                 )
             };
+
+            // Write a hard line break if the value is parenthesized and there's an
+            // end of line comment on the same line as the closing parenthesis.
+            // ```python
+            // (
+            //      (
+            //          a
+            //      )  # `end_of_line_comment`
+            //      .
+            //      b
+            // )
+            // ```
+            if let Some(right_paren) = SimpleTokenizer::starts_at(value.end(), f.context().source())
+                .skip_trivia()
+                .take_while(|token| token.kind == SimpleTokenKind::RParen)
+                .last()
+            {
+                let trailing_value_comments = comments.trailing(&**value);
+                if trailing_value_comments.iter().any(|comment| {
+                    comment.line_position().is_end_of_line() && comment.start() > right_paren.end()
+                }) {
+                    hard_line_break().fmt(f)?;
+                }
+            }
 
             write!(
                 f,
