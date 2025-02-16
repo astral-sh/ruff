@@ -136,6 +136,9 @@ impl Violation for InvalidFirstArgumentNameForClassMethod {
         ruff_diagnostics::FixAvailability::Sometimes;
 
     #[derive_message_formats]
+    // The first string below is what shows up in the documentation
+    // in the rule table, and it is the more common case.
+    #[allow(clippy::if_not_else)]
     fn message(&self) -> String {
         if !self.is_new {
             "First argument of a class method should be named `cls`".to_string()
