@@ -88,18 +88,24 @@ pub(crate) fn too_many_positional_arguments(
     }
 
     // Check if the function is a method or class method.
-    let num_positional_args = match function_type::classify(
-        &function_def.name,
-        &function_def.decorator_list,
-        semantic.current_scope(),
-        semantic,
-        &checker.settings.pep8_naming.classmethod_decorators,
-        &checker.settings.pep8_naming.staticmethod_decorators,
-    ) {
+    let num_positional_args = if matches!(
+        function_type::classify(
+            &function_def.name,
+            &function_def.decorator_list,
+            semantic.current_scope(),
+            semantic,
+            &checker.settings.pep8_naming.classmethod_decorators,
+            &checker.settings.pep8_naming.staticmethod_decorators,
+        ),
         function_type::FunctionType::Method
-        | function_type::FunctionType::ClassMethod
-        | function_type::FunctionType::NewMethod => num_positional_args.saturating_sub(1),
-        _ => num_positional_args,
+            | function_type::FunctionType::ClassMethod
+            | function_type::FunctionType::NewMethod
+    ) {
+        // If so, we need to subtract one from the number of positional arguments, since the first
+        // argument is always `self` or `cls`.
+        num_positional_args.saturating_sub(1)
+    } else {
+        num_positional_args
     };
 
     if num_positional_args <= checker.settings.pylint.max_positional_args {

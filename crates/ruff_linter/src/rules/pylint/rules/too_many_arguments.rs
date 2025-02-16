@@ -84,18 +84,24 @@ pub(crate) fn too_many_arguments(checker: &Checker, function_def: &ast::StmtFunc
     }
 
     // Check if the function is a method or class method.
-    let num_arguments = match function_type::classify(
-        &function_def.name,
-        &function_def.decorator_list,
-        semantic.current_scope(),
-        semantic,
-        &checker.settings.pep8_naming.classmethod_decorators,
-        &checker.settings.pep8_naming.staticmethod_decorators,
-    ) {
+    let num_arguments = if matches!(
+        function_type::classify(
+            &function_def.name,
+            &function_def.decorator_list,
+            semantic.current_scope(),
+            semantic,
+            &checker.settings.pep8_naming.classmethod_decorators,
+            &checker.settings.pep8_naming.staticmethod_decorators,
+        ),
         function_type::FunctionType::Method
-        | function_type::FunctionType::ClassMethod
-        | function_type::FunctionType::NewMethod => num_arguments.saturating_sub(1),
-        _ => num_arguments,
+            | function_type::FunctionType::ClassMethod
+            | function_type::FunctionType::NewMethod
+    ) {
+        // If so, we need to subtract one from the number of positional arguments, since the first
+        // argument is always `self` or `cls`.
+        num_arguments.saturating_sub(1)
+    } else {
+        num_arguments
     };
 
     if num_arguments <= checker.settings.pylint.max_args {
