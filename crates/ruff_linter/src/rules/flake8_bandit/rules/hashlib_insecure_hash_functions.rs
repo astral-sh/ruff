@@ -43,7 +43,8 @@ use super::super::helpers::string_literal;
 ///     return hash == known_hash
 /// ```
 ///
-/// or add `usedforsecurity=False` to suppress for FIPS build of Python
+/// or add `usedforsecurity=False` if the hashing algorithm is not used in a security context, e.g.
+/// as a non-cryptographic one-way compression function:
 /// ```python
 /// import hashlib
 ///
