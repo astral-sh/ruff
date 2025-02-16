@@ -96,12 +96,9 @@ pub(crate) fn too_many_positional_arguments(
         &checker.settings.pep8_naming.classmethod_decorators,
         &checker.settings.pep8_naming.staticmethod_decorators,
     ) {
-        function_type::FunctionType::Method | function_type::FunctionType::ClassMethod => {
-            num_positional_args.saturating_sub(1)
-        }
-        function_type::FunctionType::StaticMethod if function_def.name.as_str() == "__new__" => {
-            num_positional_args.saturating_sub(1)
-        }
+        function_type::FunctionType::Method
+        | function_type::FunctionType::ClassMethod
+        | function_type::FunctionType::NewMethod => num_positional_args.saturating_sub(1),
         _ => num_positional_args,
     };
 

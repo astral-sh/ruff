@@ -92,12 +92,9 @@ pub(crate) fn too_many_arguments(checker: &Checker, function_def: &ast::StmtFunc
         &checker.settings.pep8_naming.classmethod_decorators,
         &checker.settings.pep8_naming.staticmethod_decorators,
     ) {
-        function_type::FunctionType::Method | function_type::FunctionType::ClassMethod => {
-            num_arguments.saturating_sub(1)
-        }
-        function_type::FunctionType::StaticMethod if function_def.name.as_str() == "__new__" => {
-            num_arguments.saturating_sub(1)
-        }
+        function_type::FunctionType::Method
+        | function_type::FunctionType::ClassMethod
+        | function_type::FunctionType::NewMethod => num_arguments.saturating_sub(1),
         _ => num_arguments,
     };
 
