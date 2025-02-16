@@ -41,3 +41,9 @@ class Fruit:
 def list_fruits(self, cls) -> None:
     self = "apple"  # Ok
     cls = "banana"  # Ok
+
+# `__new__` is implicitly a static method
+# https://github.com/astral-sh/ruff/issues/13154
+class Foo:
+    def __new__(cls):
+        cls = "apple" # Ok
