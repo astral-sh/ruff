@@ -41,7 +41,7 @@ pub fn classify(
     } else {
         match name {
             "__new__" => FunctionType::NewMethod, // Implicit static method.
-            "__init_subclass__" | "__class_getitem__" => FunctionType::ClassMethod, // Implicit class method.
+            "__init_subclass__" | "__class_getitem__" => FunctionType::ClassMethod, // Implicit class methods.
             _ => FunctionType::Method, // Default to instance method.
         }
     }
