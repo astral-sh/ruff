@@ -610,6 +610,103 @@ fn extend_passed_via_config_argument() {
 }
 
 #[test]
+fn nonexistent_extend_file() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    fs::write(
+        tempdir.path().join("ruff.toml"),
+        r#"
+extend = "ruff2.toml"
+"#,
+    )?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
+    }, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["check"]).current_dir(tempdir.path()), @r"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: Failed to load last configuration in chain: [TMP]/ruff.toml -> [TMP]/ruff2.toml
+      Cause: Failed to read [TMP]/ruff2.toml
+      Cause: No such file or directory (os error 2)
+    ");
+    });
+
+    fs::write(
+        tempdir.path().join("ruff2.toml"),
+        r#"
+extend = "ruff3.toml"
+"#,
+    )?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
+    }, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["check"]).current_dir(tempdir.path()), @r"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: Failed to load last configuration in chain: [TMP]/ruff.toml -> [TMP]/ruff2.toml -> [TMP]/ruff3.toml
+      Cause: Failed to read [TMP]/ruff3.toml
+      Cause: No such file or directory (os error 2)
+    ");
+    });
+
+    Ok(())
+}
+
+#[test]
+fn circular_extend() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    fs::write(
+        tempdir.path().join("ruff.toml"),
+        r#"
+extend = "ruff2.toml"
+"#,
+    )?;
+    fs::write(
+        tempdir.path().join("ruff2.toml"),
+        r#"
+extend = "ruff3.toml"
+"#,
+    )?;
+    fs::write(
+        tempdir.path().join("ruff3.toml"),
+        r#"
+extend = "ruff.toml"
+"#,
+    )?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
+    }, {
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args(["check"])
+            .current_dir(tempdir.path()),
+        @r"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: Circular dependency detected in pyproject.toml: [TMP]/ruff.toml -> [TMP]/ruff2.toml -> [TMP]/ruff3.toml -> [TMP]/ruff.toml
+    ");
+    });
+
+    Ok(())
+}
+
+#[test]
 fn config_file_and_isolated() -> Result<()> {
     let tempdir = TempDir::new()?;
     let ruff_dot_toml = tempdir.path().join("ruff.toml");
@@ -2095,6 +2192,7 @@ fn flake8_import_convention_invalid_aliases_config_alias_name() -> Result<()> {
 
         ----- stderr -----
         ruff failed
+          Cause: Failed to load last configuration in chain: [TMP]/ruff.toml
           Cause: Failed to parse [TMP]/ruff.toml
           Cause: TOML parse error at line 3, column 17
           |
@@ -2131,6 +2229,7 @@ fn flake8_import_convention_invalid_aliases_config_extend_alias_name() -> Result
 
         ----- stderr -----
         ruff failed
+          Cause: Failed to load last configuration in chain: [TMP]/ruff.toml
           Cause: Failed to parse [TMP]/ruff.toml
           Cause: TOML parse error at line 3, column 17
           |
@@ -2167,6 +2266,7 @@ fn flake8_import_convention_invalid_aliases_config_module_name() -> Result<()> {
 
         ----- stderr -----
         ruff failed
+          Cause: Failed to load last configuration in chain: [TMP]/ruff.toml
           Cause: Failed to parse [TMP]/ruff.toml
           Cause: TOML parse error at line 3, column 1
           |
