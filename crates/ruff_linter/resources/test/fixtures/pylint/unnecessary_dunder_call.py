@@ -129,3 +129,20 @@ blah = dict[{"a": 1}.__delitem__("a")]  # OK
 
 # https://github.com/astral-sh/ruff/issues/14597
 assert "abc".__str__() == "abc"
+
+# https://github.com/astral-sh/ruff/issues/16053
+print((not 1).__add__(1))  # (not 1) + 1
+try:
+    print(list("x".__add__(y for y in "y")))  # list("x" + (y for y in "y"))
+except TypeError as e:
+    print(e)
+print(type((lambda: 0).__eq__("x")))
+print(("a" and "x").__contains__("x"))  # "x" in ("a" and "x")
+print(("" or "x").__contains__("x"))  # "x" in ("" or "x")
+print(("" if False else "x").__contains__("x"))  # "x" in ("" if False else "x")
+print(3 - (2).__add__(1))  # 3 - (2 + 1)
+print("x".__eq__("y").__eq__(False))
+print(False.__eq__("y".__eq__("z")))
+print((not 1).__add__(not 1))  # (not 1) + (not 1)
+print((x := "x").__contains__("y"))  # "y" in (x := "x")
+print((not 0).__radd__(1))  # 1 + (not 0)

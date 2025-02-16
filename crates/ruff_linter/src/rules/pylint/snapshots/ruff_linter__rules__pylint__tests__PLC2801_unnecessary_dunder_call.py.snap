@@ -1193,6 +1193,8 @@ unnecessary_dunder_call.py:131:8: PLC2801 [*] Unnecessary dunder call to `__str_
 130 | # https://github.com/astral-sh/ruff/issues/14597
 131 | assert "abc".__str__() == "abc"
     |        ^^^^^^^^^^^^^^^ PLC2801
+132 |
+133 | # https://github.com/astral-sh/ruff/issues/16053
     |
     = help: Use `str()` builtin
 
@@ -1202,3 +1204,290 @@ unnecessary_dunder_call.py:131:8: PLC2801 [*] Unnecessary dunder call to `__str_
 130 130 | # https://github.com/astral-sh/ruff/issues/14597
 131     |-assert "abc".__str__() == "abc"
     131 |+assert str("abc") == "abc"
+132 132 | 
+133 133 | # https://github.com/astral-sh/ruff/issues/16053
+134 134 | print((not 1).__add__(1))  # (not 1) + 1
+
+unnecessary_dunder_call.py:134:7: PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
+    |
+133 | # https://github.com/astral-sh/ruff/issues/16053
+134 | print((not 1).__add__(1))  # (not 1) + 1
+    |       ^^^^^^^^^^^^^^^^^^ PLC2801
+135 | try:
+136 |     print(list("x".__add__(y for y in "y")))  # list("x" + (y for y in "y"))
+    |
+    = help: Use `+` operator
+
+ℹ Unsafe fix
+131 131 | assert "abc".__str__() == "abc"
+132 132 | 
+133 133 | # https://github.com/astral-sh/ruff/issues/16053
+134     |-print((not 1).__add__(1))  # (not 1) + 1
+    134 |+print((not 1) + 1)  # (not 1) + 1
+135 135 | try:
+136 136 |     print(list("x".__add__(y for y in "y")))  # list("x" + (y for y in "y"))
+137 137 | except TypeError as e:
+
+unnecessary_dunder_call.py:136:16: PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
+    |
+134 | print((not 1).__add__(1))  # (not 1) + 1
+135 | try:
+136 |     print(list("x".__add__(y for y in "y")))  # list("x" + (y for y in "y"))
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC2801
+137 | except TypeError as e:
+138 |     print(e)
+    |
+    = help: Use `+` operator
+
+ℹ Unsafe fix
+133 133 | # https://github.com/astral-sh/ruff/issues/16053
+134 134 | print((not 1).__add__(1))  # (not 1) + 1
+135 135 | try:
+136     |-    print(list("x".__add__(y for y in "y")))  # list("x" + (y for y in "y"))
+    136 |+    print(list("x" + (y for y in "y")))  # list("x" + (y for y in "y"))
+137 137 | except TypeError as e:
+138 138 |     print(e)
+139 139 | print(type((lambda: 0).__eq__("x")))
+
+unnecessary_dunder_call.py:139:12: PLC2801 [*] Unnecessary dunder call to `__eq__`. Use `==` operator.
+    |
+137 | except TypeError as e:
+138 |     print(e)
+139 | print(type((lambda: 0).__eq__("x")))
+    |            ^^^^^^^^^^^^^^^^^^^^^^^ PLC2801
+140 | print(("a" and "x").__contains__("x"))  # "x" in ("a" and "x")
+141 | print(("" or "x").__contains__("x"))  # "x" in ("" or "x")
+    |
+    = help: Use `==` operator
+
+ℹ Unsafe fix
+136 136 |     print(list("x".__add__(y for y in "y")))  # list("x" + (y for y in "y"))
+137 137 | except TypeError as e:
+138 138 |     print(e)
+139     |-print(type((lambda: 0).__eq__("x")))
+    139 |+print(type(lambda: 0 == "x"))
+140 140 | print(("a" and "x").__contains__("x"))  # "x" in ("a" and "x")
+141 141 | print(("" or "x").__contains__("x"))  # "x" in ("" or "x")
+142 142 | print(("" if False else "x").__contains__("x"))  # "x" in ("" if False else "x")
+
+unnecessary_dunder_call.py:140:7: PLC2801 [*] Unnecessary dunder call to `__contains__`. Use `in` operator.
+    |
+138 |     print(e)
+139 | print(type((lambda: 0).__eq__("x")))
+140 | print(("a" and "x").__contains__("x"))  # "x" in ("a" and "x")
+    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC2801
+141 | print(("" or "x").__contains__("x"))  # "x" in ("" or "x")
+142 | print(("" if False else "x").__contains__("x"))  # "x" in ("" if False else "x")
+    |
+    = help: Use `in` operator
+
+ℹ Unsafe fix
+137 137 | except TypeError as e:
+138 138 |     print(e)
+139 139 | print(type((lambda: 0).__eq__("x")))
+140     |-print(("a" and "x").__contains__("x"))  # "x" in ("a" and "x")
+    140 |+print("x" in ("a" and "x"))  # "x" in ("a" and "x")
+141 141 | print(("" or "x").__contains__("x"))  # "x" in ("" or "x")
+142 142 | print(("" if False else "x").__contains__("x"))  # "x" in ("" if False else "x")
+143 143 | print(3 - (2).__add__(1))  # 3 - (2 + 1)
+
+unnecessary_dunder_call.py:141:7: PLC2801 [*] Unnecessary dunder call to `__contains__`. Use `in` operator.
+    |
+139 | print(type((lambda: 0).__eq__("x")))
+140 | print(("a" and "x").__contains__("x"))  # "x" in ("a" and "x")
+141 | print(("" or "x").__contains__("x"))  # "x" in ("" or "x")
+    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC2801
+142 | print(("" if False else "x").__contains__("x"))  # "x" in ("" if False else "x")
+143 | print(3 - (2).__add__(1))  # 3 - (2 + 1)
+    |
+    = help: Use `in` operator
+
+ℹ Unsafe fix
+138 138 |     print(e)
+139 139 | print(type((lambda: 0).__eq__("x")))
+140 140 | print(("a" and "x").__contains__("x"))  # "x" in ("a" and "x")
+141     |-print(("" or "x").__contains__("x"))  # "x" in ("" or "x")
+    141 |+print("x" in ("" or "x"))  # "x" in ("" or "x")
+142 142 | print(("" if False else "x").__contains__("x"))  # "x" in ("" if False else "x")
+143 143 | print(3 - (2).__add__(1))  # 3 - (2 + 1)
+144 144 | print("x".__eq__("y").__eq__(False))
+
+unnecessary_dunder_call.py:142:7: PLC2801 [*] Unnecessary dunder call to `__contains__`. Use `in` operator.
+    |
+140 | print(("a" and "x").__contains__("x"))  # "x" in ("a" and "x")
+141 | print(("" or "x").__contains__("x"))  # "x" in ("" or "x")
+142 | print(("" if False else "x").__contains__("x"))  # "x" in ("" if False else "x")
+    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC2801
+143 | print(3 - (2).__add__(1))  # 3 - (2 + 1)
+144 | print("x".__eq__("y").__eq__(False))
+    |
+    = help: Use `in` operator
+
+ℹ Unsafe fix
+139 139 | print(type((lambda: 0).__eq__("x")))
+140 140 | print(("a" and "x").__contains__("x"))  # "x" in ("a" and "x")
+141 141 | print(("" or "x").__contains__("x"))  # "x" in ("" or "x")
+142     |-print(("" if False else "x").__contains__("x"))  # "x" in ("" if False else "x")
+    142 |+print("x" in ("" if False else "x"))  # "x" in ("" if False else "x")
+143 143 | print(3 - (2).__add__(1))  # 3 - (2 + 1)
+144 144 | print("x".__eq__("y").__eq__(False))
+145 145 | print(False.__eq__("y".__eq__("z")))
+
+unnecessary_dunder_call.py:143:11: PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
+    |
+141 | print(("" or "x").__contains__("x"))  # "x" in ("" or "x")
+142 | print(("" if False else "x").__contains__("x"))  # "x" in ("" if False else "x")
+143 | print(3 - (2).__add__(1))  # 3 - (2 + 1)
+    |           ^^^^^^^^^^^^^^ PLC2801
+144 | print("x".__eq__("y").__eq__(False))
+145 | print(False.__eq__("y".__eq__("z")))
+    |
+    = help: Use `+` operator
+
+ℹ Unsafe fix
+140 140 | print(("a" and "x").__contains__("x"))  # "x" in ("a" and "x")
+141 141 | print(("" or "x").__contains__("x"))  # "x" in ("" or "x")
+142 142 | print(("" if False else "x").__contains__("x"))  # "x" in ("" if False else "x")
+143     |-print(3 - (2).__add__(1))  # 3 - (2 + 1)
+    143 |+print(3 - 2 + 1)  # 3 - (2 + 1)
+144 144 | print("x".__eq__("y").__eq__(False))
+145 145 | print(False.__eq__("y".__eq__("z")))
+146 146 | print((not 1).__add__(not 1))  # (not 1) + (not 1)
+
+unnecessary_dunder_call.py:144:7: PLC2801 [*] Unnecessary dunder call to `__eq__`. Use `==` operator.
+    |
+142 | print(("" if False else "x").__contains__("x"))  # "x" in ("" if False else "x")
+143 | print(3 - (2).__add__(1))  # 3 - (2 + 1)
+144 | print("x".__eq__("y").__eq__(False))
+    |       ^^^^^^^^^^^^^^^ PLC2801
+145 | print(False.__eq__("y".__eq__("z")))
+146 | print((not 1).__add__(not 1))  # (not 1) + (not 1)
+    |
+    = help: Use `==` operator
+
+ℹ Unsafe fix
+141 141 | print(("" or "x").__contains__("x"))  # "x" in ("" or "x")
+142 142 | print(("" if False else "x").__contains__("x"))  # "x" in ("" if False else "x")
+143 143 | print(3 - (2).__add__(1))  # 3 - (2 + 1)
+144     |-print("x".__eq__("y").__eq__(False))
+    144 |+print(("x" == "y").__eq__(False))
+145 145 | print(False.__eq__("y".__eq__("z")))
+146 146 | print((not 1).__add__(not 1))  # (not 1) + (not 1)
+147 147 | print((x := "x").__contains__("y"))  # "y" in (x := "x")
+
+unnecessary_dunder_call.py:144:7: PLC2801 [*] Unnecessary dunder call to `__eq__`. Use `==` operator.
+    |
+142 | print(("" if False else "x").__contains__("x"))  # "x" in ("" if False else "x")
+143 | print(3 - (2).__add__(1))  # 3 - (2 + 1)
+144 | print("x".__eq__("y").__eq__(False))
+    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC2801
+145 | print(False.__eq__("y".__eq__("z")))
+146 | print((not 1).__add__(not 1))  # (not 1) + (not 1)
+    |
+    = help: Use `==` operator
+
+ℹ Unsafe fix
+141 141 | print(("" or "x").__contains__("x"))  # "x" in ("" or "x")
+142 142 | print(("" if False else "x").__contains__("x"))  # "x" in ("" if False else "x")
+143 143 | print(3 - (2).__add__(1))  # 3 - (2 + 1)
+144     |-print("x".__eq__("y").__eq__(False))
+    144 |+print("x".__eq__("y") == False)
+145 145 | print(False.__eq__("y".__eq__("z")))
+146 146 | print((not 1).__add__(not 1))  # (not 1) + (not 1)
+147 147 | print((x := "x").__contains__("y"))  # "y" in (x := "x")
+
+unnecessary_dunder_call.py:145:7: PLC2801 [*] Unnecessary dunder call to `__eq__`. Use `==` operator.
+    |
+143 | print(3 - (2).__add__(1))  # 3 - (2 + 1)
+144 | print("x".__eq__("y").__eq__(False))
+145 | print(False.__eq__("y".__eq__("z")))
+    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC2801
+146 | print((not 1).__add__(not 1))  # (not 1) + (not 1)
+147 | print((x := "x").__contains__("y"))  # "y" in (x := "x")
+    |
+    = help: Use `==` operator
+
+ℹ Unsafe fix
+142 142 | print(("" if False else "x").__contains__("x"))  # "x" in ("" if False else "x")
+143 143 | print(3 - (2).__add__(1))  # 3 - (2 + 1)
+144 144 | print("x".__eq__("y").__eq__(False))
+145     |-print(False.__eq__("y".__eq__("z")))
+    145 |+print(False == "y".__eq__("z"))
+146 146 | print((not 1).__add__(not 1))  # (not 1) + (not 1)
+147 147 | print((x := "x").__contains__("y"))  # "y" in (x := "x")
+148 148 | print((not 0).__radd__(1))  # 1 + (not 0)
+
+unnecessary_dunder_call.py:145:20: PLC2801 [*] Unnecessary dunder call to `__eq__`. Use `==` operator.
+    |
+143 | print(3 - (2).__add__(1))  # 3 - (2 + 1)
+144 | print("x".__eq__("y").__eq__(False))
+145 | print(False.__eq__("y".__eq__("z")))
+    |                    ^^^^^^^^^^^^^^^ PLC2801
+146 | print((not 1).__add__(not 1))  # (not 1) + (not 1)
+147 | print((x := "x").__contains__("y"))  # "y" in (x := "x")
+    |
+    = help: Use `==` operator
+
+ℹ Unsafe fix
+142 142 | print(("" if False else "x").__contains__("x"))  # "x" in ("" if False else "x")
+143 143 | print(3 - (2).__add__(1))  # 3 - (2 + 1)
+144 144 | print("x".__eq__("y").__eq__(False))
+145     |-print(False.__eq__("y".__eq__("z")))
+    145 |+print(False.__eq__("y" == "z"))
+146 146 | print((not 1).__add__(not 1))  # (not 1) + (not 1)
+147 147 | print((x := "x").__contains__("y"))  # "y" in (x := "x")
+148 148 | print((not 0).__radd__(1))  # 1 + (not 0)
+
+unnecessary_dunder_call.py:146:7: PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
+    |
+144 | print("x".__eq__("y").__eq__(False))
+145 | print(False.__eq__("y".__eq__("z")))
+146 | print((not 1).__add__(not 1))  # (not 1) + (not 1)
+    |       ^^^^^^^^^^^^^^^^^^^^^^ PLC2801
+147 | print((x := "x").__contains__("y"))  # "y" in (x := "x")
+148 | print((not 0).__radd__(1))  # 1 + (not 0)
+    |
+    = help: Use `+` operator
+
+ℹ Unsafe fix
+143 143 | print(3 - (2).__add__(1))  # 3 - (2 + 1)
+144 144 | print("x".__eq__("y").__eq__(False))
+145 145 | print(False.__eq__("y".__eq__("z")))
+146     |-print((not 1).__add__(not 1))  # (not 1) + (not 1)
+    146 |+print((not 1) + (not 1))  # (not 1) + (not 1)
+147 147 | print((x := "x").__contains__("y"))  # "y" in (x := "x")
+148 148 | print((not 0).__radd__(1))  # 1 + (not 0)
+
+unnecessary_dunder_call.py:147:7: PLC2801 [*] Unnecessary dunder call to `__contains__`. Use `in` operator.
+    |
+145 | print(False.__eq__("y".__eq__("z")))
+146 | print((not 1).__add__(not 1))  # (not 1) + (not 1)
+147 | print((x := "x").__contains__("y"))  # "y" in (x := "x")
+    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC2801
+148 | print((not 0).__radd__(1))  # 1 + (not 0)
+    |
+    = help: Use `in` operator
+
+ℹ Unsafe fix
+144 144 | print("x".__eq__("y").__eq__(False))
+145 145 | print(False.__eq__("y".__eq__("z")))
+146 146 | print((not 1).__add__(not 1))  # (not 1) + (not 1)
+147     |-print((x := "x").__contains__("y"))  # "y" in (x := "x")
+    147 |+print("y" in (x := "x"))  # "y" in (x := "x")
+148 148 | print((not 0).__radd__(1))  # 1 + (not 0)
+
+unnecessary_dunder_call.py:148:7: PLC2801 [*] Unnecessary dunder call to `__radd__`. Use `+` operator.
+    |
+146 | print((not 1).__add__(not 1))  # (not 1) + (not 1)
+147 | print((x := "x").__contains__("y"))  # "y" in (x := "x")
+148 | print((not 0).__radd__(1))  # 1 + (not 0)
+    |       ^^^^^^^^^^^^^^^^^^^ PLC2801
+    |
+    = help: Use `+` operator
+
+ℹ Unsafe fix
+145 145 | print(False.__eq__("y".__eq__("z")))
+146 146 | print((not 1).__add__(not 1))  # (not 1) + (not 1)
+147 147 | print((x := "x").__contains__("y"))  # "y" in (x := "x")
+148     |-print((not 0).__radd__(1))  # 1 + (not 0)
+    148 |+print(1 + (not 0))  # 1 + (not 0)
