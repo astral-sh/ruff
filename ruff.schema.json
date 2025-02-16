@@ -1377,6 +1377,16 @@
             "$ref": "#/definitions/ApiBan"
           }
         },
+        "banned-functions": {
+          "description": "A mapping of function names to their associated API ban messages.",
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": {
+            "$ref": "#/definitions/ApiBan"
+          }
+        },
         "banned-module-level-imports": {
           "description": "List of specific modules that may not be imported at module level, and should instead be imported lazily (e.g., within a function definition, or an `if TYPE_CHECKING:` block, or some other nested context).",
           "type": [
@@ -4151,6 +4161,7 @@
         "TID251",
         "TID252",
         "TID253",
+        "TID254",
         "TRY",
         "TRY0",
         "TRY00",
