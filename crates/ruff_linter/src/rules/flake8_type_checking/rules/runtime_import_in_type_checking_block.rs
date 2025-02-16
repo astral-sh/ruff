@@ -125,12 +125,13 @@ pub(crate) fn runtime_import_in_type_checking_block(checker: &Checker, scope: &S
         if binding.context.is_typing()
             && binding.references().any(|reference_id| {
                 let reference = checker.semantic().reference(reference_id);
+                let submodule_import = import.as_submodule_import();
 
                 reference.in_runtime_context()
                     && !(ignore_dunder_all_references && reference.in_dunder_all_definition())
                     // for submodule imports we need to check if the reference
                     // actually refers to this submodule, or a different one
-                    && import.as_submodule_import().is_none_or(|import| {
+                    && (submodule_import.is_none() || submodule_import.is_some_and(|import| {
                         let Some(expression_id) = reference.expression_id() else {
                             return false;
                         };
@@ -154,7 +155,7 @@ pub(crate) fn runtime_import_in_type_checking_block(checker: &Checker, scope: &S
                             }
                         }
                         true
-                    })
+                    }))
             })
         {
             let Some(node_id) = binding.source else {
