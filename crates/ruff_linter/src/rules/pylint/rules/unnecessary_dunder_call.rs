@@ -135,15 +135,31 @@ pub(crate) fn unnecessary_dunder_call(checker: &Checker, call: &ast::ExprCall) {
                 if OperatorPrecedence::from_expr(arg) > precedence {
                     // if it's something that can reasonably be removed from parentheses,
                     // we'll do that.
-                    fixed = Some((
-                        format!("{value_slice} {replacement} {arg_slice}"),
-                        precedence,
-                    ));
+                    fixed = match (needs_parentheses(value_slice), needs_parentheses(arg_slice)) {
+                        (true, false) => Some((
+                            format!("({value_slice}) {replacement} {arg_slice}"),
+                            precedence,
+                        )),
+                        (false, true) => Some((
+                            format!("{value_slice} {replacement} ({arg_slice})"),
+                            precedence,
+                        )),
+                        _ => Some((
+                            format!("{value_slice} {replacement} {arg_slice}"),
+                            precedence,
+                        )),
+                    };
                 } else {
-                    fixed = Some((
-                        format!("{value_slice} {replacement} ({arg_slice})"),
-                        precedence,
-                    ));
+                    fixed = match needs_parentheses(value_slice) {
+                        true => Some((
+                            format!("({value_slice}) {replacement} ({arg_slice})"),
+                            precedence,
+                        )),
+                        _ => Some((
+                            format!("{value_slice} {replacement} ({arg_slice})"),
+                            precedence,
+                        )),
+                    };
                 }
 
                 title = Some(message.to_string());
@@ -155,10 +171,17 @@ pub(crate) fn unnecessary_dunder_call(checker: &Checker, call: &ast::ExprCall) {
                 if OperatorPrecedence::from_expr(arg) > precedence {
                     // if it's something that can reasonably be removed from parentheses,
                     // we'll do that.
-                    fixed = Some((
-                        format!("{arg_slice} {replacement} {value_slice}"),
-                        precedence,
-                    ));
+                    if needs_parentheses(value_slice) {
+                        fixed = Some((
+                            format!("{arg_slice} {replacement} ({value_slice})"),
+                            precedence,
+                        ));
+                    } else {
+                        fixed = Some((
+                            format!("{arg_slice} {replacement} {value_slice}"),
+                            precedence,
+                        ));
+                    }
                 } else {
                     fixed = Some((
                         format!("({arg_slice}) {replacement} {value_slice}"),
@@ -211,6 +234,16 @@ pub(crate) fn unnecessary_dunder_call(checker: &Checker, call: &ast::ExprCall) {
     };
 
     checker.report_diagnostic(diagnostic);
+}
+
+/// Return `True` if we need to add parentheses
+fn needs_parentheses(value: &str) -> bool {
+    value.contains("not")
+        || value.contains("and")
+        || value.contains("or")
+        || value.contains("if")
+        || value.contains("for")
+        || value.contains(":=")
 }
 
 /// Return `true` if this is a dunder method that is allowed to be called explicitly.
