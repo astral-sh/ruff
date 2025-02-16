@@ -304,22 +304,23 @@ pub fn resolve_configuration(
     relativity: Relativity,
     transformer: &dyn ConfigurationTransformer,
 ) -> Result<Configuration> {
-    let mut seen = FxHashSet::default();
+    let mut seen = vec![];
     let mut stack = vec![];
-    let mut next = Some((fs::normalize_path(pyproject), None::<PathBuf>));
-    while let Some((path, inherited_by)) = next {
+    let mut next = Some(fs::normalize_path(pyproject));
+    while let Some(path) = next {
         if seen.contains(&path) {
-            bail!("Circular dependency detected in pyproject.toml");
+            bail!(format!(
+                "Circular dependency detected in pyproject.toml: {}",
+                seen.iter().chain([&path]).map(|p| p.display()).join(" -> "),
+            ));
         }
 
         // Resolve the current path.
-        let options = pyproject::load_options(&path).map_err(|err| match inherited_by {
-            Some(f) => err.context(format!(
-                "Failed to load path {} inherited by {}",
-                path.display(),
-                f.display(),
-            )),
-            None => err,
+        let options = pyproject::load_options(&path).map_err(|err| {
+            err.context(format!(
+                "Failed to load last configuration in chain: {}",
+                seen.iter().chain([&path]).map(|p| p.display()).join(" -> "),
+            ))
         })?;
 
         let project_root = relativity.resolve(&path);
@@ -327,19 +328,16 @@ pub fn resolve_configuration(
 
         // If extending, continue to collect.
         next = configuration.extend.as_ref().map(|extend| {
-            (
-                fs::normalize_path_to(
-                    extend,
-                    path.parent()
-                        .expect("Expected pyproject.toml file to be in parent directory"),
-                ),
-                Some(path.clone()),
+            fs::normalize_path_to(
+                extend,
+                path.parent()
+                    .expect("Expected pyproject.toml file to be in parent directory"),
             )
         });
 
         // Keep track of (1) the paths we've already resolved (to avoid cycles), and (2)
         // the base configuration for every path.
-        seen.insert(path);
+        seen.push(path);
         stack.push(configuration);
     }
 
