@@ -25,6 +25,7 @@ pub(crate) fn bindings(checker: &Checker) {
         Rule::ForLoopWrites,
         Rule::CustomTypeVarForSelf,
         Rule::PrivateTypeParameter,
+        Rule::RedefinedOuterName,
     ]) {
         return;
     }
@@ -126,6 +127,11 @@ pub(crate) fn bindings(checker: &Checker) {
         }
         if checker.enabled(Rule::PrivateTypeParameter) {
             if let Some(diagnostic) = pyupgrade::rules::private_type_parameter(checker, binding) {
+                checker.report_diagnostic(diagnostic);
+            }
+        }
+        if checker.enabled(Rule::RedefinedOuterName) {
+            if let Some(diagnostic) = pylint::rules::redefined_outer_name(checker, binding) {
                 checker.report_diagnostic(diagnostic);
             }
         }

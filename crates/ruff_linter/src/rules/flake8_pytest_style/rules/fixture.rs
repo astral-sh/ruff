@@ -654,7 +654,7 @@ impl<'a> Visitor<'a> for SkipFunctionsVisitor<'a> {
     }
 }
 
-fn fixture_decorator<'a>(
+pub(crate) fn fixture_decorator<'a>(
     decorators: &'a [Decorator],
     semantic: &SemanticModel,
 ) -> Option<&'a Decorator> {
