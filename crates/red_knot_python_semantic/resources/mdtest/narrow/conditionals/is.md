@@ -82,7 +82,7 @@ def _(x: int | EllipsisType):
         reveal_type(x)  # revealed: int
 ```
 
-## `is` for `EllipsisType` (Python <=3.9)
+## `is` for `EllipsisType` (Python \<=3.9)
 
 ```toml
 [environment]
