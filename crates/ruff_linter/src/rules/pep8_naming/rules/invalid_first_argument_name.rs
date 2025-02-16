@@ -82,6 +82,10 @@ impl Violation for InvalidFirstArgumentNameForMethod {
 /// Checks for class methods that use a name other than `cls` for their
 /// first argument.
 ///
+/// With [`preview`] enabled, the method `__new__` is exempted from this
+/// check and the corresponding violation is then caught by
+/// [`bad-staticmethod-argument`][PLW0211].
+///
 /// ## Why is this bad?
 /// [PEP 8] recommends the use of `cls` as the first argument for all class
 /// methods:
@@ -124,6 +128,7 @@ impl Violation for InvalidFirstArgumentNameForMethod {
 /// - `lint.pep8-naming.extend-ignore-names`
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#function-and-method-arguments
+/// [PLW0211]: https://docs.astral.sh/ruff/rules/bad-staticmethod-argument/
 #[derive(ViolationMetadata)]
 pub(crate) struct InvalidFirstArgumentNameForClassMethod {
     argument_name: String,

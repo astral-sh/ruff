@@ -467,7 +467,7 @@ pub(crate) fn unused_arguments(checker: &Checker, scope: &Scope) {
                         && !visibility::is_overload(decorator_list, checker.semantic())
                     {
                         // we use `method()` here rather than `function()`, as although `__new__` is
-                        // an implicit staticmethod, `__new__` methods must always have >= parameter
+                        // an implicit staticmethod, `__new__` methods must always have at least one parameter
                         method(Argumentable::StaticMethod, parameters, scope, checker);
                     }
                 }
