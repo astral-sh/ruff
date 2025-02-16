@@ -5,6 +5,7 @@ use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::{Imported, NodeId, Scope, ScopeId};
 use ruff_text_size::Ranged;
 
@@ -110,7 +111,7 @@ pub(crate) fn runtime_import_in_type_checking_block(checker: &Checker, scope: &S
         .lookup_symbol_in_scope("__getattr__", ScopeId::global(), false)
         .is_some();
 
-    for binding_id in scope.binding_ids() {
+    for (_, binding_id) in scope.all_bindings() {
         let binding = checker.semantic().binding(binding_id);
 
         let Some(import) = binding.as_any_import() else {
@@ -127,6 +128,33 @@ pub(crate) fn runtime_import_in_type_checking_block(checker: &Checker, scope: &S
 
                 reference.in_runtime_context()
                     && !(ignore_dunder_all_references && reference.in_dunder_all_definition())
+                    // for submodule imports we need to check if the reference
+                    // actually refers to this submodule, or a different one
+                    && import.as_submodule_import().is_none_or(|import| {
+                        let Some(expression_id) = reference.expression_id() else {
+                            return false;
+                        };
+                        // references should generally point towards an `Expr::Name` node
+                        // so by walking the parent expressions in tandem with the segments
+                        // of the qualified name should give us a `starts_with` check for
+                        // the reference towards the import
+                        for (segment, expr) in std::iter::zip(
+                            import.qualified_name().segments(),
+                            checker.semantic().expressions(expression_id))
+                                // we discard the first pair, since it's guaranteed to match
+                                // this also simplifies the loop logic, since we only have to
+                                // handle `Expr::Attribute` nodes
+                                .skip(1) {
+                            let Expr::Attribute(ast::ExprAttribute{ attr, .. }) = expr else {
+                                // we're past the attribute nodes, so we can stop
+                                break;
+                            };
+                            if *segment != attr.as_str() {
+                                return false;
+                            }
+                        }
+                        true
+                    })
             })
         {
             let Some(node_id) = binding.source else {
