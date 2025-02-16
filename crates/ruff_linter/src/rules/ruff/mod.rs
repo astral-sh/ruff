@@ -12,7 +12,7 @@ mod tests {
     use anyhow::Result;
     use regex::Regex;
     use ruff_source_file::SourceFileBuilder;
-    use rustc_hash::FxHashSet;
+    use rustc_hash::{FxHashMap, FxHashSet};
     use test_case::test_case;
 
     use crate::pyproject_toml::lint_pyproject_toml;
@@ -112,6 +112,7 @@ mod tests {
                     parenthesize_tuple_in_subscript: true,
                     extend_markup_names: vec![],
                     allowed_markup_calls: vec![],
+                    optional_made_mandatory: FxHashMap::from_iter([]),
                 },
                 ..LinterSettings::for_rule(Rule::IncorrectlyParenthesizedTupleInSubscript)
             },
@@ -129,6 +130,7 @@ mod tests {
                     parenthesize_tuple_in_subscript: false,
                     extend_markup_names: vec![],
                     allowed_markup_calls: vec![],
+                    optional_made_mandatory: FxHashMap::from_iter([]),
                 },
                 target_version: PythonVersion::Py310,
                 ..LinterSettings::for_rule(Rule::IncorrectlyParenthesizedTupleInSubscript)
@@ -469,6 +471,7 @@ mod tests {
                     parenthesize_tuple_in_subscript: true,
                     extend_markup_names: vec!["webhelpers.html.literal".to_string()],
                     allowed_markup_calls: vec![],
+                    optional_made_mandatory: FxHashMap::from_iter([]),
                 },
                 preview: PreviewMode::Enabled,
                 ..LinterSettings::for_rule(rule_code)
@@ -492,6 +495,7 @@ mod tests {
                     parenthesize_tuple_in_subscript: true,
                     extend_markup_names: vec![],
                     allowed_markup_calls: vec!["bleach.clean".to_string()],
+                    optional_made_mandatory: FxHashMap::from_iter([]),
                 },
                 preview: PreviewMode::Enabled,
                 ..LinterSettings::for_rule(rule_code)
@@ -526,6 +530,38 @@ mod tests {
             },
         )?;
         assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn optional_made_mandatory_pandas_validate() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("ruff/RUF059.py"),
+            &LinterSettings {
+                ruff: super::settings::Settings {
+                    parenthesize_tuple_in_subscript: true,
+                    extend_markup_names: vec![],
+                    allowed_markup_calls: vec![],
+                    optional_made_mandatory: FxHashMap::from_iter([
+                        (
+                            "pandas.DataFrame.merge".to_string(),
+                            super::settings::ArgsMadeMandatory {
+                                args: vec!["validate".to_string()],
+                            },
+                        ),
+                        (
+                            "pandas.merge".to_string(),
+                            super::settings::ArgsMadeMandatory {
+                                args: vec!["validate".to_string()],
+                            },
+                        ),
+                    ]),
+                },
+                preview: PreviewMode::Enabled,
+                ..LinterSettings::for_rule(Rule::OptionalMadeMandatory)
+            },
+        )?;
+        assert_messages!(diagnostics);
         Ok(())
     }
 }

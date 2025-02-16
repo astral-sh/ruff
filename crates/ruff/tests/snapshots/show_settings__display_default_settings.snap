@@ -370,6 +370,7 @@ linter.pyupgrade.keep_runtime_typing = false
 linter.ruff.parenthesize_tuple_in_subscript = false
 linter.ruff.extend_markup_names = []
 linter.ruff.allowed_markup_calls = []
+linter.ruff.optional_made_mandatory = {}
 
 # Formatter Settings
 formatter.exclude = []
