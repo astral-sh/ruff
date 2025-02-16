@@ -304,16 +304,24 @@ pub fn resolve_configuration(
     relativity: Relativity,
     transformer: &dyn ConfigurationTransformer,
 ) -> Result<Configuration> {
-    let mut seen = FxHashSet::default();
+    let mut seen = vec![];
     let mut stack = vec![];
     let mut next = Some(fs::normalize_path(pyproject));
     while let Some(path) = next {
         if seen.contains(&path) {
-            bail!("Circular dependency detected in pyproject.toml");
+            bail!(format!(
+                "Circular dependency detected: {}",
+                seen.iter().chain([&path]).map(|p| p.display()).join(" -> "),
+            ));
         }
 
         // Resolve the current path.
-        let options = pyproject::load_options(&path)?;
+        let options = pyproject::load_options(&path).map_err(|err| {
+            err.context(format!(
+                "Failed to load last configuration in chain: {}",
+                seen.iter().chain([&path]).map(|p| p.display()).join(" -> "),
+            ))
+        })?;
 
         let project_root = relativity.resolve(&path);
         let configuration = Configuration::from_options(options, Some(&path), project_root)?;
@@ -329,7 +337,7 @@ pub fn resolve_configuration(
 
         // Keep track of (1) the paths we've already resolved (to avoid cycles), and (2)
         // the base configuration for every path.
-        seen.insert(path);
+        seen.push(path);
         stack.push(configuration);
     }
 
