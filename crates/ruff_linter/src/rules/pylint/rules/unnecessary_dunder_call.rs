@@ -1,7 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 
-use ruff_python_ast::{self as ast, BoolOp, Expr, ExprBinOp, Operator, Stmt, UnaryOp};
+use ruff_python_ast::{self as ast, Expr, ExprBinOp, Operator, OperatorPrecedence, Stmt};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
