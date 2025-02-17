@@ -620,23 +620,6 @@ extend = "ruff2.toml"
 "#,
     )?;
 
-    insta::with_settings!({
-        filters => vec![(tempdir_filter(&project_dir).as_str(), "[TMP]/")]
-    }, {
-        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["check"]).current_dir(&project_dir), @r"
-        success: false
-        exit_code: 2
-        ----- stdout -----
-
-        ----- stderr -----
-        ruff failed
-          Cause: Failed to load extended configuration `[TMP]/ruff2.toml` (`[TMP]/ruff.toml` extends `[TMP]/ruff2.toml`)
-          Cause: Failed to read [TMP]/ruff2.toml
-          Cause: No such file or directory (os error 2)
-        ");
-    });
-
     fs::write(
         project_dir.join("ruff2.toml"),
         r#"
@@ -645,20 +628,23 @@ extend = "ruff3.toml"
     )?;
 
     insta::with_settings!({
-        filters => vec![(tempdir_filter(&project_dir).as_str(), "[TMP]/")]
+        filters => vec![
+            (tempdir_filter(&project_dir).as_str(), "[TMP]/"),
+            ("The system cannot find the file specified.", "No such file or directory")
+        ]
     }, {
         assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(["check"]).current_dir(project_dir), @r"
-    success: false
-    exit_code: 2
-    ----- stdout -----
+        success: false
+        exit_code: 2
+        ----- stdout -----
 
-    ----- stderr -----
-    ruff failed
-      Cause: Failed to load last configuration in chain: [TMP]/ruff.toml -> [TMP]/ruff2.toml -> [TMP]/ruff3.toml
-      Cause: Failed to read [TMP]/ruff3.toml
-      Cause: No such file or directory (os error 2)
-    ");
+        ----- stderr -----
+        ruff failed
+          Cause: Failed to load extended configuration `[TMP]/ruff3.toml` (`[TMP]/ruff.toml` extends `[TMP]/ruff2.toml` extends `[TMP]/ruff3.toml`)
+          Cause: Failed to read [TMP]/ruff3.toml
+          Cause: No such file or directory (os error 2)
+        ");
     });
 
     Ok(())
