@@ -56,15 +56,8 @@ pub enum PythonVersion {
 
 impl From<PythonVersion> for ast::PythonVersion {
     fn from(value: PythonVersion) -> Self {
-        match value {
-            PythonVersion::Py37 => Self::PY37,
-            PythonVersion::Py38 => Self::PY38,
-            PythonVersion::Py39 => Self::PY39,
-            PythonVersion::Py310 => Self::PY310,
-            PythonVersion::Py311 => Self::PY311,
-            PythonVersion::Py312 => Self::PY312,
-            PythonVersion::Py313 => Self::PY313,
-        }
+        let (major, minor) = value.as_tuple();
+        Self { major, minor }
     }
 }
 
