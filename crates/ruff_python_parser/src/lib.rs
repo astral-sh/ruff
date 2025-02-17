@@ -111,7 +111,7 @@ pub mod typing;
 /// assert!(module.is_ok());
 /// ```
 pub fn parse_module(source: &str) -> Result<Parsed<ModModule>, ParseError> {
-    Parser::new(source, Mode::Module)
+    Parser::new(source, ParserOptions::from_mode(Mode::Module))
         .parse()
         .try_into_module()
         .unwrap()
@@ -134,7 +134,7 @@ pub fn parse_module(source: &str) -> Result<Parsed<ModModule>, ParseError> {
 /// assert!(expr.is_ok());
 /// ```
 pub fn parse_expression(source: &str) -> Result<Parsed<ModExpression>, ParseError> {
-    Parser::new(source, Mode::Expression)
+    Parser::new(source, ParserOptions::from_mode(Mode::Expression))
         .parse()
         .try_into_expression()
         .unwrap()
@@ -162,11 +162,15 @@ pub fn parse_expression_range(
     range: TextRange,
 ) -> Result<Parsed<ModExpression>, ParseError> {
     let source = &source[..range.end().to_usize()];
-    Parser::new_starts_at(source, Mode::Expression, range.start())
-        .parse()
-        .try_into_expression()
-        .unwrap()
-        .into_result()
+    Parser::new_starts_at(
+        source,
+        ParserOptions::from_mode(Mode::Expression),
+        range.start(),
+    )
+    .parse()
+    .try_into_expression()
+    .unwrap()
+    .into_result()
 }
 
 /// Parses a Python expression as if it is parenthesized.
@@ -188,8 +192,12 @@ pub fn parse_parenthesized_expression_range(
     range: TextRange,
 ) -> Result<Parsed<ModExpression>, ParseError> {
     let source = &source[..range.end().to_usize()];
-    let parsed =
-        Parser::new_starts_at(source, Mode::ParenthesizedExpression, range.start()).parse();
+    let parsed = Parser::new_starts_at(
+        source,
+        ParserOptions::from_mode(Mode::ParenthesizedExpression),
+        range.start(),
+    )
+    .parse();
     parsed.try_into_expression().unwrap().into_result()
 }
 
@@ -283,13 +291,13 @@ pub fn parse(source: &str, mode: Mode) -> Result<Parsed<Mod>, ParseError> {
 /// This is same as the [`parse`] function except that it doesn't check for any [`ParseError`]
 /// and returns the [`Parsed`] as is.
 pub fn parse_unchecked(source: &str, mode: Mode) -> Parsed<Mod> {
-    Parser::new(source, mode).parse()
+    Parser::new(source, ParserOptions::from_mode(mode)).parse()
 }
 
 /// Parse the given Python source code using the specified [`PySourceType`].
 pub fn parse_unchecked_source(source: &str, source_type: PySourceType) -> Parsed<ModModule> {
     // SAFETY: Safe because `PySourceType` always parses to a `ModModule`
-    Parser::new(source, source_type.as_mode())
+    Parser::new(source, ParserOptions::from_mode(source_type.as_mode()))
         .parse()
         .try_into_module()
         .unwrap()
