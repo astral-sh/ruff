@@ -1,0 +1,44 @@
+name: Bug report
+description: Report an error or unexpected behavior
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for taking the time to report an issue! We're glad to have you involved with Ruff.
+
+  - type: textarea
+    attributes:
+      label: Summary
+      description: |
+        A clear and concise description of the bug, including a minimal reproducible example.
+        
+        Be sure to include the command you invoked (e.g., `ruff /path/to/file.py --fix`), ideally including the `--isolated` flag or
+        the current Ruff settings (e.g., relevant sections from your `pyproject.toml`).
+
+    validations:
+      required: true
+
+  - type: input
+    attributes:
+      label: Platform
+      description: What operating system and architecture are you using? (see `uname -orsm`)
+      placeholder: e.g., macOS 14 arm64, Windows 11 x86_64, Ubuntu 20.04 amd64
+    validations:
+      required: true
+
+  - type: input
+    attributes:
+      label: Version
+      description: What version of ruff are you using? (see `ruff version`)
+      placeholder: e.g., ruff 0.5.0 (244b923f6 2024-06-27)
+    validations:
+      required: true
+
+  - type: input
+    attributes:
+      label: Python version
+      description: What version of Python are you using? (see `uv run python --version`)
+      placeholder: e.g., Python 3.12.6
+    validations:
+      required: false
