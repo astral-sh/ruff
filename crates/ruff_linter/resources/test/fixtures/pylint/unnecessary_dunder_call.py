@@ -146,3 +146,6 @@ print(False.__eq__("y".__eq__("z")))
 print((not 1).__add__(not 1))  # (not 1) + (not 1)
 print((x := "x").__contains__("y"))  # "y" in (x := "x")
 print((not 0).__radd__(1))  # 1 + (not 0)
+print((not "x").__contains__("y"))  # "y" in (not "x")
+print("x".__add__(*"y"))  # no fix possible
+
