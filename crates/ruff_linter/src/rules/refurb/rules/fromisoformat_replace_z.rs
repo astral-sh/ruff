@@ -54,7 +54,7 @@ use crate::settings::types::PythonVersion;
 /// d = "Z2025-01-01T00:00:00Z"
 ///
 /// datetime.fromisoformat(d.strip("Z") + "+00:00")  # Fine
-/// datetime.fromisoformat(d)                        # Runtime error
+/// datetime.fromisoformat(d)  # Runtime error
 /// ```
 ///
 /// ## References
