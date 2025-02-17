@@ -460,7 +460,7 @@ Summary
   159.43 ± 2.48 times faster than 'pycodestyle crates/ruff_linter/resources/test/cpython'
 ```
 
-To benchmark a subset of rules, e.g. `LineTooLong` and `DocLineTooLong`:
+To benchmark a subset of rules, e.g., `LineTooLong` and `DocLineTooLong`:
 
 ```shell
 cargo build --release && hyperfine --warmup 10 \
@@ -526,7 +526,7 @@ cargo benchmark
 #### Benchmark-driven Development
 
 Ruff uses [Criterion.rs](https://bheisler.github.io/criterion.rs/book/) for benchmarks. You can use
-`--save-baseline=<name>` to store an initial baseline benchmark (e.g. on `main`) and then use
+`--save-baseline=<name>` to store an initial baseline benchmark (e.g., on `main`) and then use
 `--benchmark=<name>` to compare against that benchmark. Criterion will print a message telling you
 if the benchmark improved/regressed compared to that baseline.
 
@@ -678,9 +678,9 @@ utils with it:
 23 Newline 24
 ```
 
-- `cargo dev print-cst <file>`: Print the CST of a python file using
+- `cargo dev print-cst <file>`: Print the CST of a Python file using
     [LibCST](https://github.com/Instagram/LibCST), which is used in addition to the RustPython parser
-    in Ruff. E.g. for `if True: pass # comment` everything including the whitespace is represented:
+    in Ruff. E.g., for `if True: pass # comment`, everything, including the whitespace, is represented:
 
 ```text
 Module {
