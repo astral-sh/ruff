@@ -9,6 +9,7 @@ use ruff_python_semantic::{BindingKind, ScopeKind, SemanticModel};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::rules::pylint::helpers::is_dunder_operator_method;
 
 /// ## What it does
 /// Checks for accesses on "private" class members.
@@ -94,7 +95,7 @@ pub(crate) fn private_member_access(checker: &Checker, expr: &Expr) {
 
     // Ignore accesses on instances within special methods (e.g., `__eq__`).
     if let ScopeKind::Function(ast::StmtFunctionDef { name, .. }) = current_scope.kind {
-        if is_dunder_operator(name) {
+        if is_dunder_operator_method(name) {
             return;
         }
     }
@@ -149,59 +150,6 @@ pub(crate) fn private_member_access(checker: &Checker, expr: &Expr) {
         },
         expr.range(),
     ));
-}
-
-fn is_dunder_operator(name: &str) -> bool {
-    matches!(
-        name,
-        "__lt__"
-            | "__le__"
-            | "__eq__"
-            | "__ne__"
-            | "__gt__"
-            | "__ge__"
-            | "__add__"
-            | "__sub__"
-            | "__mul__"
-            | "__matmul__"
-            | "__truediv__"
-            | "__floordiv__"
-            | "__mod__"
-            | "__divmod__"
-            | "__pow__"
-            | "__lshift__"
-            | "__rshift__"
-            | "__and__"
-            | "__xor__"
-            | "__or__"
-            | "__radd__"
-            | "__rsub__"
-            | "__rmul__"
-            | "__rmatmul__"
-            | "__rtruediv__"
-            | "__rfloordiv__"
-            | "__rmod__"
-            | "__rdivmod__"
-            | "__rpow__"
-            | "__rlshift__"
-            | "__rrshift__"
-            | "__rand__"
-            | "__rxor__"
-            | "__ror__"
-            | "__iadd__"
-            | "__isub__"
-            | "__imul__"
-            | "__imatmul__"
-            | "__itruediv__"
-            | "__ifloordiv__"
-            | "__imod__"
-            | "__ipow__"
-            | "__ilshift__"
-            | "__irshift__"
-            | "__iand__"
-            | "__ixor__"
-            | "__ior__"
-    )
 }
 
 /// Check for the following cases:
