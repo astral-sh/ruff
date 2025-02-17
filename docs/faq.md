@@ -643,3 +643,24 @@ force colors on by setting `FORCE_COLOR` to any non-empty value (e.g. `FORCE_COL
 
 [`colored`](https://crates.io/crates/colored) also supports the `CLICOLOR` and `CLICOLOR_FORCE`
 environment variables (see the [spec](https://bixense.com/clicolors/)).
+
+## Ruff behaves unexpectedly when using `source.*` code actions in Notebooks. What's going on? {: #source-code-actions-in-notebooks }
+
+Starting with `0.9.7`, Ruff does not support `source.organizeImports` and `source.fixAll` code
+actions in Jupyter Notebooks (`notebook.codeActionsOnSave` in VS Code). It's recommended to use the
+`notebook` prefixed code actions for the same such as `notebook.source.organizeImports` and
+`notebook.source.fixAll` respectively.
+
+Ruff requires to have a full view of the notebook to provide accurate diagnostics and fixes. For
+example, if you have a cell that imports a module and another cell that uses that module, Ruff
+needs to see both cells to mark the import as used. If Ruff were to only see one cell at a time,
+it would incorrectly mark the import as unused.
+
+When using the `source.*` code actions for a Notebook, Ruff will be asked to fix any issues for each
+cell in parallel, which can lead to unexpected behavior. For example, if a user has configured to
+run `source.organizeImports` code action on save for a Notebook, Ruff will attempt to fix the
+imports for the entire notebook corresponding to each cell. This leads to the client making the same
+changes to the notebook multiple times, which can lead to unexpected behavior
+([astral-sh/ruff-vscode#680](https://github.com/astral-sh/ruff-vscode/issues/680),
+[astral-sh/ruff-vscode#640](https://github.com/astral-sh/ruff-vscode/issues/640),
+[astral-sh/ruff-vscode#391](https://github.com/astral-sh/ruff-vscode/issues/391)).
