@@ -11,18 +11,17 @@ use clap::Parser;
 use colored::Colorize;
 use crossbeam::channel as crossbeam_channel;
 use red_knot_project::metadata::options::Options;
-use red_knot_project::watch;
 use red_knot_project::watch::ProjectWatcher;
+use red_knot_project::{watch, Db};
 use red_knot_project::{ProjectDatabase, ProjectMetadata};
 use red_knot_server::run_server;
-use ruff_db::diagnostic::{Diagnostic, Severity};
+use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig, Severity};
 use ruff_db::system::{OsSystem, System, SystemPath, SystemPathBuf};
 use salsa::plumbing::ZalsaDatabase;
 
 mod args;
 mod logging;
 mod python_version;
-mod verbosity;
 mod version;
 
 #[allow(clippy::print_stdout, clippy::unnecessary_wraps, clippy::print_stderr)]
@@ -97,19 +96,15 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     let system = OsSystem::new(cwd);
     let watch = args.watch;
     let exit_zero = args.exit_zero;
-    let min_error_severity = if args.error_on_warning {
-        Severity::Warning
-    } else {
-        Severity::Error
-    };
 
     let cli_options = args.into_options();
-    let mut workspace_metadata = ProjectMetadata::discover(system.current_directory(), &system)?;
-    workspace_metadata.apply_cli_options(cli_options.clone());
+    let mut project_metadata = ProjectMetadata::discover(system.current_directory(), &system)?;
+    project_metadata.apply_cli_options(cli_options.clone());
+    project_metadata.apply_configuration_files(&system)?;
 
-    let mut db = ProjectDatabase::new(workspace_metadata, system)?;
+    let mut db = ProjectDatabase::new(project_metadata, system)?;
 
-    let (main_loop, main_loop_cancellation_token) = MainLoop::new(cli_options, min_error_severity);
+    let (main_loop, main_loop_cancellation_token) = MainLoop::new(cli_options);
 
     // Listen to Ctrl+C and abort the watch mode.
     let main_loop_cancellation_token = Mutex::new(Some(main_loop_cancellation_token));
@@ -167,18 +162,10 @@ struct MainLoop {
     watcher: Option<ProjectWatcher>,
 
     cli_options: Options,
-
-    /// The minimum severity to consider an error when deciding the exit status.
-    ///
-    /// TODO(micha): Get from the terminal settings.
-    min_error_severity: Severity,
 }
 
 impl MainLoop {
-    fn new(
-        cli_options: Options,
-        min_error_severity: Severity,
-    ) -> (Self, MainLoopCancellationToken) {
+    fn new(cli_options: Options) -> (Self, MainLoopCancellationToken) {
         let (sender, receiver) = crossbeam_channel::bounded(10);
 
         (
@@ -187,7 +174,6 @@ impl MainLoop {
                 receiver,
                 watcher: None,
                 cli_options,
-                min_error_severity,
             },
             MainLoopCancellationToken { sender },
         )
@@ -245,14 +231,24 @@ impl MainLoop {
                     result,
                     revision: check_revision,
                 } => {
+                    let display_config = DisplayDiagnosticConfig::default()
+                        .color(colored::control::SHOULD_COLORIZE.should_colorize());
+
+                    let min_error_severity =
+                        if db.project().settings(db).terminal().error_on_warning {
+                            Severity::Warning
+                        } else {
+                            Severity::Error
+                        };
+
                     let failed = result
                         .iter()
-                        .any(|diagnostic| diagnostic.severity() >= self.min_error_severity);
+                        .any(|diagnostic| diagnostic.severity() >= min_error_severity);
 
                     if check_revision == revision {
                         #[allow(clippy::print_stdout)]
                         for diagnostic in result {
-                            println!("{}", diagnostic.display(db));
+                            println!("{}", diagnostic.display(db, &display_config));
                         }
                     } else {
                         tracing::debug!(

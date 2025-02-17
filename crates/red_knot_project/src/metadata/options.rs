@@ -1,19 +1,19 @@
 use crate::metadata::value::{RangedValue, RelativePathBuf, ValueSource, ValueSourceGuard};
 use crate::Db;
 use red_knot_python_semantic::lint::{GetLintError, Level, LintSource, RuleSelection};
-use red_knot_python_semantic::{
-    ProgramSettings, PythonPlatform, PythonVersion, SearchPathSettings, SitePackages,
-};
-use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
-use ruff_db::files::{system_path_to_file, File};
+use red_knot_python_semantic::{ProgramSettings, PythonPlatform, SearchPathSettings, SitePackages};
+use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity, Span};
+use ruff_db::files::system_path_to_file;
 use ruff_db::system::{System, SystemPath};
 use ruff_macros::Combine;
-use ruff_text_size::TextRange;
+use ruff_python_ast::python_version::PythonVersion;
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::fmt::Debug;
 use thiserror::Error;
+
+use super::settings::{Settings, TerminalSettings};
 
 /// The options for the project.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Combine, Serialize, Deserialize)]
@@ -30,6 +30,9 @@ pub struct Options {
     /// Configures the enabled lints and their severity.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rules: Option<Rules>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub terminal: Option<TerminalOptions>,
 }
 
 impl Options {
@@ -110,7 +113,22 @@ impl Options {
     }
 
     #[must_use]
-    pub(crate) fn to_rule_selection(&self, db: &dyn Db) -> (RuleSelection, Vec<OptionDiagnostic>) {
+    pub(crate) fn to_settings(&self, db: &dyn Db) -> (Settings, Vec<OptionDiagnostic>) {
+        let (rules, diagnostics) = self.to_rule_selection(db);
+
+        let mut settings = Settings::new(rules);
+
+        if let Some(terminal) = self.terminal.as_ref() {
+            settings.set_terminal(TerminalSettings {
+                error_on_warning: terminal.error_on_warning.unwrap_or_default(),
+            });
+        }
+
+        (settings, diagnostics)
+    }
+
+    #[must_use]
+    fn to_rule_selection(&self, db: &dyn Db) -> (RuleSelection, Vec<OptionDiagnostic>) {
         let registry = db.lint_registry();
         let mut diagnostics = Vec::new();
 
@@ -169,7 +187,14 @@ impl Options {
                         ),
                     };
 
-                    diagnostics.push(diagnostic.with_file(file).with_range(rule_name.range()));
+                    let span = file.map(Span::from).map(|span| {
+                        if let Some(range) = rule_name.range() {
+                            span.with_range(range)
+                        } else {
+                            span
+                        }
+                    });
+                    diagnostics.push(diagnostic.with_span(span));
                 }
             }
         }
@@ -242,6 +267,16 @@ impl FromIterator<(RangedValue<String>, RangedValue<Level>)> for Rules {
             inner: iter.into_iter().collect(),
         }
     }
+}
+
+#[derive(Debug, Default, Clone, Eq, PartialEq, Combine, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct TerminalOptions {
+    /// Use exit code 1 if there are any warning-level diagnostics.
+    ///
+    /// Defaults to `false`.
+    pub error_on_warning: Option<bool>,
 }
 
 #[cfg(feature = "schemars")]
@@ -318,8 +353,7 @@ pub struct OptionDiagnostic {
     id: DiagnosticId,
     message: String,
     severity: Severity,
-    file: Option<File>,
-    range: Option<TextRange>,
+    span: Option<Span>,
 }
 
 impl OptionDiagnostic {
@@ -328,21 +362,13 @@ impl OptionDiagnostic {
             id,
             message,
             severity,
-            file: None,
-            range: None,
+            span: None,
         }
     }
 
     #[must_use]
-    fn with_file(mut self, file: Option<File>) -> Self {
-        self.file = file;
-        self
-    }
-
-    #[must_use]
-    fn with_range(mut self, range: Option<TextRange>) -> Self {
-        self.range = range;
-        self
+    fn with_span(self, span: Option<Span>) -> Self {
+        OptionDiagnostic { span, ..self }
     }
 }
 
@@ -355,12 +381,8 @@ impl Diagnostic for OptionDiagnostic {
         Cow::Borrowed(&self.message)
     }
 
-    fn file(&self) -> Option<File> {
-        self.file
-    }
-
-    fn range(&self) -> Option<TextRange> {
-        self.range
+    fn span(&self) -> Option<Span> {
+        self.span.clone()
     }
 
     fn severity(&self) -> Severity {

@@ -1,12 +1,15 @@
+use std::sync::Arc;
+
 use red_knot_python_semantic::lint::{LintRegistry, RuleSelection};
 use red_knot_python_semantic::{
     default_lint_registry, Db as SemanticDb, Program, ProgramSettings, PythonPlatform,
-    PythonVersion, SearchPathSettings,
+    SearchPathSettings,
 };
 use ruff_db::files::{File, Files};
 use ruff_db::system::{DbWithTestSystem, System, SystemPath, SystemPathBuf, TestSystem};
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_db::{Db as SourceDb, Upcast};
+use ruff_python_ast::python_version::PythonVersion;
 
 #[salsa::db]
 #[derive(Clone)]
@@ -16,7 +19,7 @@ pub(crate) struct Db {
     files: Files,
     system: TestSystem,
     vendored: VendoredFileSystem,
-    rule_selection: RuleSelection,
+    rule_selection: Arc<RuleSelection>,
 }
 
 impl Db {
@@ -29,7 +32,7 @@ impl Db {
             system: TestSystem::default(),
             vendored: red_knot_vendored::file_system().clone(),
             files: Files::default(),
-            rule_selection,
+            rule_selection: Arc::new(rule_selection),
         };
 
         db.memory_file_system()
@@ -94,8 +97,8 @@ impl SemanticDb for Db {
         !file.path(self).is_vendored_path()
     }
 
-    fn rule_selection(&self) -> &RuleSelection {
-        &self.rule_selection
+    fn rule_selection(&self) -> Arc<RuleSelection> {
+        self.rule_selection.clone()
     }
 
     fn lint_registry(&self) -> &LintRegistry {

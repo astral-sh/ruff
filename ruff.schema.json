@@ -1026,7 +1026,7 @@
           }
         },
         "builtins-strict-checking": {
-          "description": "Compare module names instead of full module paths.",
+          "description": "Compare module names instead of full module paths.\n\nUsed by [`A005` - `stdlib-module-shadowing`](https://docs.astral.sh/ruff/rules/stdlib-module-shadowing/).\n\nIn preview mode the default value is `false` rather than `true`.",
           "type": [
             "boolean",
             "null"
@@ -3947,6 +3947,7 @@
         "RUF040",
         "RUF041",
         "RUF043",
+        "RUF045",
         "RUF046",
         "RUF047",
         "RUF048",

@@ -1,9 +1,9 @@
 use ruff_db::system::{DbWithTestSystem, SystemPath, SystemPathBuf};
 use ruff_db::vendored::VendoredPathBuf;
+use ruff_python_ast::python_version::PythonVersion;
 
 use crate::db::tests::TestDb;
 use crate::program::{Program, SearchPathSettings};
-use crate::python_version::PythonVersion;
 use crate::{ProgramSettings, PythonPlatform, SitePackages};
 
 /// A test case for the module resolver.

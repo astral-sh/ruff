@@ -14,8 +14,7 @@ use std::num::NonZeroUsize;
 use std::ops::Deref;
 
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
-
-use crate::PythonVersion;
+use ruff_python_ast::python_version::PythonVersion;
 
 type SitePackagesDiscoveryResult<T> = Result<T, SitePackagesDiscoveryError>;
 

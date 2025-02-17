@@ -8,7 +8,7 @@ use crate::types::string_annotation::{
 };
 use crate::types::{ClassLiteralType, KnownInstanceType, Type};
 use crate::{declare_lint, Db};
-use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
+use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity, Span};
 use ruff_db::files::File;
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::{Ranged, TextRange};
@@ -802,12 +802,8 @@ impl Diagnostic for TypeCheckDiagnostic {
         TypeCheckDiagnostic::message(self).into()
     }
 
-    fn file(&self) -> Option<File> {
-        Some(TypeCheckDiagnostic::file(self))
-    }
-
-    fn range(&self) -> Option<TextRange> {
-        Some(Ranged::range(self))
+    fn span(&self) -> Option<Span> {
+        Some(Span::from(self.file).with_range(self.range))
     }
 
     fn severity(&self) -> Severity {

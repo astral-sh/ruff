@@ -48,7 +48,10 @@ use crate::semantic_index::expression::{Expression, ExpressionKind};
 use crate::semantic_index::semantic_index;
 use crate::semantic_index::symbol::{NodeWithScopeKind, NodeWithScopeRef, ScopeId};
 use crate::semantic_index::SemanticIndex;
-use crate::stdlib::builtins_module_scope;
+use crate::symbol::{
+    builtins_module_scope, builtins_symbol, symbol, symbol_from_bindings, symbol_from_declarations,
+    typing_extensions_symbol, LookupError,
+};
 use crate::types::call::{Argument, CallArguments};
 use crate::types::diagnostic::{
     report_invalid_arguments_to_annotated, report_invalid_assignment,
@@ -61,16 +64,14 @@ use crate::types::diagnostic::{
     UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_IMPORT, UNSUPPORTED_OPERATOR,
 };
 use crate::types::mro::MroErrorKind;
-use crate::types::statistics::TypeStatistics;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
-    builtins_symbol, global_symbol, symbol, symbol_from_bindings, symbol_from_declarations,
-    todo_type, typing_extensions_symbol, Boundness, CallDunderResult, Class, ClassLiteralType,
-    DynamicType, FunctionType, InstanceType, IntersectionBuilder, IntersectionType,
-    IterationOutcome, KnownClass, KnownFunction, KnownInstanceType, MetaclassCandidate,
-    MetaclassErrorKind, SliceLiteralType, SubclassOfType, Symbol, SymbolAndQualifiers, Truthiness,
-    TupleType, Type, TypeAliasType, TypeAndQualifiers, TypeArrayDisplay, TypeQualifiers,
-    TypeVarBoundOrConstraints, TypeVarInstance, UnionBuilder, UnionType,
+    todo_type, Boundness, CallDunderResult, Class, ClassLiteralType, DynamicType, FunctionType,
+    InstanceType, IntersectionBuilder, IntersectionType, IterationOutcome, KnownClass,
+    KnownFunction, KnownInstanceType, MetaclassCandidate, MetaclassErrorKind, SliceLiteralType,
+    SubclassOfType, Symbol, SymbolAndQualifiers, Truthiness, TupleType, Type, TypeAliasType,
+    TypeAndQualifiers, TypeArrayDisplay, TypeQualifiers, TypeVarBoundOrConstraints,
+    TypeVarInstance, UnionBuilder, UnionType,
 };
 use crate::unpack::Unpack;
 use crate::util::subscript::{PyIndex, PySlice};
@@ -87,7 +88,7 @@ use super::slots::check_class_slots;
 use super::string_annotation::{
     parse_string_annotation, BYTE_STRING_TYPE_ANNOTATION, FSTRING_TYPE_ANNOTATION,
 };
-use super::{ParameterExpectation, ParameterExpectations};
+use super::{global_symbol, ParameterExpectation, ParameterExpectations};
 
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
 /// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
@@ -117,7 +118,9 @@ fn infer_definition_types_cycle_recovery<'db>(
     let mut inference = TypeInference::empty(input.scope(db));
     let category = input.category(db);
     if category.is_declaration() {
-        inference.declarations.insert(input, Type::unknown().into());
+        inference
+            .declarations
+            .insert(input, TypeAndQualifiers::unknown());
     }
     if category.is_binding() {
         inference.bindings.insert(input, Type::unknown());
@@ -237,7 +240,7 @@ impl<'db> InferenceRegion<'db> {
 }
 
 /// The inferred types for a single region.
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, salsa::Update)]
 pub(crate) struct TypeInference<'db> {
     /// The types of every expression in this region.
     expressions: FxHashMap<ScopedExpressionId, Type<'db>>,
@@ -299,14 +302,6 @@ impl<'db> TypeInference<'db> {
         self.declarations.shrink_to_fit();
         self.diagnostics.shrink_to_fit();
         self.deferred.shrink_to_fit();
-    }
-
-    pub(super) fn statistics(&self) -> TypeStatistics {
-        let mut statistics = TypeStatistics::default();
-        for ty in self.expressions.values() {
-            statistics.increment(*ty);
-        }
-        statistics
     }
 }
 
@@ -742,7 +737,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 self.infer_type_alias_definition(type_alias.node(), definition);
             }
             DefinitionKind::Import(import) => {
-                self.infer_import_definition(import.node(), definition);
+                self.infer_import_definition(import.alias(), definition);
             }
             DefinitionKind::ImportFrom(import_from) => {
                 self.infer_import_from_definition(
@@ -928,7 +923,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     inferred_ty.display(self.db())
                 ),
             );
-            Type::unknown().into()
+            TypeAndQualifiers::unknown()
         };
         self.types.declarations.insert(declaration, ty);
     }
@@ -2816,17 +2811,15 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     fn infer_number_literal_expression(&mut self, literal: &ast::ExprNumberLiteral) -> Type<'db> {
         let ast::ExprNumberLiteral { range: _, value } = literal;
+        let db = self.db();
 
         match value {
             ast::Number::Int(n) => n
                 .as_i64()
                 .map(Type::IntLiteral)
-                .unwrap_or_else(|| KnownClass::Int.to_instance(self.db())),
-            ast::Number::Float(_) => KnownClass::Float.to_instance(self.db()),
-            ast::Number::Complex { .. } => builtins_symbol(self.db(), "complex")
-                .ignore_possibly_unbound()
-                .unwrap_or(Type::unknown())
-                .to_instance(self.db()),
+                .unwrap_or_else(|| KnownClass::Int.to_instance(db)),
+            ast::Number::Float(_) => KnownClass::Float.to_instance(db),
+            ast::Number::Complex { .. } => KnownClass::Complex.to_instance(db),
         }
     }
 
@@ -2910,9 +2903,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         &mut self,
         _literal: &ast::ExprEllipsisLiteral,
     ) -> Type<'db> {
-        builtins_symbol(self.db(), "Ellipsis")
-            .ignore_possibly_unbound()
-            .unwrap_or(Type::unknown())
+        KnownClass::EllipsisType.to_instance(self.db())
     }
 
     fn infer_tuple_expression(&mut self, tuple: &ast::ExprTuple) -> Type<'db> {
@@ -3416,17 +3407,16 @@ impl<'db> TypeInferenceBuilder<'db> {
                 })
         });
 
-        match symbol {
-            Symbol::Type(ty, Boundness::Bound) => ty,
-            Symbol::Type(ty, Boundness::PossiblyUnbound) => {
-                report_possibly_unresolved_reference(&self.context, name_node);
-                ty
-            }
-            Symbol::Unbound => {
+        symbol.unwrap_with_diagnostic(|lookup_error| match lookup_error {
+            LookupError::Unbound => {
                 report_unresolved_reference(&self.context, name_node);
                 Type::unknown()
             }
-        }
+            LookupError::PossiblyUnbound(type_when_bound) => {
+                report_possibly_unresolved_reference(&self.context, name_node);
+                type_when_bound
+            }
+        })
     }
 
     fn infer_name_expression(&mut self, name: &ast::ExprName) -> Type<'db> {
@@ -3446,36 +3436,37 @@ impl<'db> TypeInferenceBuilder<'db> {
             ctx: _,
         } = attribute;
 
-        let value_ty = self.infer_expression(value);
-        match value_ty.member(self.db(), &attr.id) {
-            Symbol::Type(member_ty, boundness) => {
-                if boundness == Boundness::PossiblyUnbound {
+        let value_type = self.infer_expression(value);
+        let db = self.db();
+
+        value_type
+            .member(db, &attr.id)
+            .unwrap_with_diagnostic(|lookup_error| match lookup_error {
+                LookupError::Unbound => {
+                    self.context.report_lint(
+                        &UNRESOLVED_ATTRIBUTE,
+                        attribute.into(),
+                        format_args!(
+                            "Type `{}` has no attribute `{}`",
+                            value_type.display(db),
+                            attr.id
+                        ),
+                    );
+                    Type::unknown()
+                }
+                LookupError::PossiblyUnbound(type_when_bound) => {
                     self.context.report_lint(
                         &POSSIBLY_UNBOUND_ATTRIBUTE,
                         attribute.into(),
                         format_args!(
                             "Attribute `{}` on type `{}` is possibly unbound",
                             attr.id,
-                            value_ty.display(self.db()),
+                            value_type.display(db),
                         ),
                     );
+                    type_when_bound
                 }
-
-                member_ty
-            }
-            Symbol::Unbound => {
-                self.context.report_lint(
-                    &UNRESOLVED_ATTRIBUTE,
-                    attribute.into(),
-                    format_args!(
-                        "Type `{}` has no attribute `{}`",
-                        value_ty.display(self.db()),
-                        attr.id
-                    ),
-                );
-                Type::unknown()
-            }
-        }
+            })
     }
 
     fn infer_attribute_expression(&mut self, attribute: &ast::ExprAttribute) -> Type<'db> {
@@ -3833,6 +3824,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                 if left_ty != right_ty && right_ty.is_subtype_of(self.db(), left_ty) {
                     let reflected_dunder = op.reflected_dunder();
                     let rhs_reflected = right_class.member(self.db(), reflected_dunder);
+                    // TODO: if `rhs_reflected` is possibly unbound, we should union the two possible
+                    // CallOutcomes together
                     if !rhs_reflected.is_unbound()
                         && rhs_reflected != left_class.member(self.db(), reflected_dunder)
                     {
@@ -4854,7 +4847,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     bytes.into(),
                     format_args!("Type expressions cannot use bytes literal"),
                 );
-                Type::unknown().into()
+                TypeAndQualifiers::unknown()
             }
 
             ast::Expr::FString(fstring) => {
@@ -4864,7 +4857,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     format_args!("Type expressions cannot use f-strings"),
                 );
                 self.infer_fstring_expression(fstring);
-                Type::unknown().into()
+                TypeAndQualifiers::unknown()
             }
 
             ast::Expr::Name(name) => match name.ctx {
@@ -4885,7 +4878,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             .into(),
                     }
                 }
-                ast::ExprContext::Invalid => Type::unknown().into(),
+                ast::ExprContext::Invalid => TypeAndQualifiers::unknown(),
                 ast::ExprContext::Store | ast::ExprContext::Del => todo_type!().into(),
             },
 
@@ -4923,7 +4916,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 inner_annotation_ty
                             } else {
                                 self.infer_type_expression(slice);
-                                Type::unknown().into()
+                                TypeAndQualifiers::unknown()
                             }
                         } else {
                             report_invalid_arguments_to_annotated(
@@ -4992,7 +4985,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     DeferredExpressionState::InStringAnnotation,
                 )
             }
-            None => Type::unknown().into(),
+            None => TypeAndQualifiers::unknown(),
         }
     }
 }
@@ -6085,7 +6078,7 @@ mod tests {
         let mut db = setup_db();
         let content = format!(
             r#"
-            from typing_extensions import assert_type
+            from typing_extensions import Literal, assert_type
 
             assert_type(not "{y}", bool)
             assert_type(not 10*"{y}", bool)
@@ -6107,7 +6100,7 @@ mod tests {
         let mut db = setup_db();
         let content = format!(
             r#"
-            from typing_extensions import assert_type
+            from typing_extensions import Literal, LiteralString, assert_type
 
             assert_type(2 * "hello", Literal["hellohello"])
             assert_type("goodbye" * 3, Literal["goodbyegoodbyegoodbye"])
@@ -6132,7 +6125,7 @@ mod tests {
         let mut db = setup_db();
         let content = format!(
             r#"
-            from typing_extensions import assert_type
+            from typing_extensions import Literal, LiteralString, assert_type
 
             assert_type("{y}", LiteralString)
             assert_type(10*"{y}", LiteralString)
@@ -6154,7 +6147,7 @@ mod tests {
         let mut db = setup_db();
         let content = format!(
             r#"
-            from typing_extensions import assert_type
+            from typing_extensions import LiteralString, assert_type
 
             assert_type("{y}", LiteralString)
             assert_type("a" + "{z}", LiteralString)
@@ -6174,7 +6167,7 @@ mod tests {
         let mut db = setup_db();
         let content = format!(
             r#"
-            from typing_extensions import assert_type
+            from typing_extensions import LiteralString, assert_type
 
             assert_type("{y}", LiteralString)
             assert_type("{y}" + "a", LiteralString)
@@ -6433,6 +6426,7 @@ mod tests {
             assert_eq!(attr_ty.display(&db).to_string(), "Unknown | str | None");
             db.take_salsa_events()
         };
+
         assert_function_query_was_not_run(
             &db,
             infer_expression_types,

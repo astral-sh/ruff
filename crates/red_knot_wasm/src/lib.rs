@@ -7,7 +7,7 @@ use red_knot_project::metadata::options::{EnvironmentOptions, Options};
 use red_knot_project::metadata::value::RangedValue;
 use red_knot_project::ProjectMetadata;
 use red_knot_project::{Db, ProjectDatabase};
-use ruff_db::diagnostic::Diagnostic;
+use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig};
 use ruff_db::files::{system_path_to_file, File};
 use ruff_db::system::walk_directory::WalkDirectoryBuilder;
 use ruff_db::system::{
@@ -114,9 +114,10 @@ impl Workspace {
     pub fn check_file(&self, file_id: &FileHandle) -> Result<Vec<String>, Error> {
         let result = self.db.check_file(file_id.file).map_err(into_error)?;
 
+        let display_config = DisplayDiagnosticConfig::default().color(false);
         Ok(result
             .into_iter()
-            .map(|diagnostic| diagnostic.display(&self.db).to_string())
+            .map(|diagnostic| diagnostic.display(&self.db, &display_config).to_string())
             .collect())
     }
 
@@ -124,9 +125,10 @@ impl Workspace {
     pub fn check(&self) -> Result<Vec<String>, Error> {
         let result = self.db.check().map_err(into_error)?;
 
+        let display_config = DisplayDiagnosticConfig::default().color(false);
         Ok(result
             .into_iter()
-            .map(|diagnostic| diagnostic.display(&self.db).to_string())
+            .map(|diagnostic| diagnostic.display(&self.db, &display_config).to_string())
             .collect())
     }
 
@@ -196,7 +198,7 @@ pub enum PythonVersion {
     Py313,
 }
 
-impl From<PythonVersion> for red_knot_python_semantic::PythonVersion {
+impl From<PythonVersion> for ruff_python_ast::python_version::PythonVersion {
     fn from(value: PythonVersion) -> Self {
         match value {
             PythonVersion::Py37 => Self::PY37,
@@ -262,6 +264,10 @@ impl System for WasmSystem {
         self.fs.current_directory()
     }
 
+    fn user_config_directory(&self) -> Option<SystemPathBuf> {
+        None
+    }
+
     fn read_directory<'a>(
         &'a self,
         path: &SystemPath,
@@ -302,8 +308,8 @@ mod tests {
     #[test]
     fn same_default_as_python_version() {
         assert_eq!(
-            red_knot_python_semantic::PythonVersion::from(PythonVersion::default()),
-            red_knot_python_semantic::PythonVersion::default()
+            ruff_python_ast::python_version::PythonVersion::from(PythonVersion::default()),
+            ruff_python_ast::python_version::PythonVersion::default()
         );
     }
 }

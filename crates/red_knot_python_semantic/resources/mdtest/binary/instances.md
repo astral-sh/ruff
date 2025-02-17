@@ -268,23 +268,28 @@ reveal_type(B() + B())  # revealed: Unknown | int
 
 ## Integration test: numbers from typeshed
 
+We get less precise results from binary operations on float/complex literals due to the special case
+for annotations of `float` or `complex`, which applies also to return annotations for typeshed
+dunder methods. Perhaps we could have a special-case on the special-case, to exclude these typeshed
+return annotations from the widening, and preserve a bit more precision here?
+
 ```py
-reveal_type(3j + 3.14)  # revealed: complex
-reveal_type(4.2 + 42)  # revealed: float
-reveal_type(3j + 3)  # revealed: complex
+reveal_type(3j + 3.14)  # revealed: int | float | complex
+reveal_type(4.2 + 42)  # revealed: int | float
+reveal_type(3j + 3)  # revealed: int | float | complex
 
-# TODO should be complex, need to check arg type and fall back to `rhs.__radd__`
-reveal_type(3.14 + 3j)  # revealed: float
+# TODO should be int | float | complex, need to check arg type and fall back to `rhs.__radd__`
+reveal_type(3.14 + 3j)  # revealed: int | float
 
-# TODO should be float, need to check arg type and fall back to `rhs.__radd__`
+# TODO should be int | float, need to check arg type and fall back to `rhs.__radd__`
 reveal_type(42 + 4.2)  # revealed: int
 
-# TODO should be complex, need to check arg type and fall back to `rhs.__radd__`
+# TODO should be int | float | complex, need to check arg type and fall back to `rhs.__radd__`
 reveal_type(3 + 3j)  # revealed: int
 
 def _(x: bool, y: int):
     reveal_type(x + y)  # revealed: int
-    reveal_type(4.2 + x)  # revealed: float
+    reveal_type(4.2 + x)  # revealed: int | float
 
     # TODO should be float, need to check arg type and fall back to `rhs.__radd__`
     reveal_type(y + 4.12)  # revealed: int
