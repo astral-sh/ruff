@@ -39,7 +39,7 @@ impl<S: SourceType> AsParserOptions for ParserOptions<S> {
 pub struct ParserOptions<S: SourceType> {
     /// Specify the mode in which the code will be parsed.
     pub(crate) mode: Mode,
-    pub(crate) _type: PhantomData<S>,
+    _type: PhantomData<S>,
 }
 
 impl ParserOptions<UnknownSource> {
