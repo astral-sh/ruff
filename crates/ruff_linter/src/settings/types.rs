@@ -56,23 +56,6 @@ pub enum PythonVersion {
     // when adding new versions here!
 }
 
-impl TryFrom<ast::PythonVersion> for PythonVersion {
-    type Error = String;
-
-    fn try_from(value: ast::PythonVersion) -> Result<Self, Self::Error> {
-        match value {
-            ast::PythonVersion::PY37 => Ok(Self::Py37),
-            ast::PythonVersion::PY38 => Ok(Self::Py38),
-            ast::PythonVersion::PY39 => Ok(Self::Py39),
-            ast::PythonVersion::PY310 => Ok(Self::Py310),
-            ast::PythonVersion::PY311 => Ok(Self::Py311),
-            ast::PythonVersion::PY312 => Ok(Self::Py312),
-            ast::PythonVersion::PY313 => Ok(Self::Py313),
-            _ => Err(format!("unrecognized python version {value}")),
-        }
-    }
-}
-
 impl From<PythonVersion> for ast::PythonVersion {
     fn from(value: PythonVersion) -> Self {
         match value {
