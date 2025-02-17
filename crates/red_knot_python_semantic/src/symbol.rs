@@ -686,6 +686,19 @@ fn module_type_symbols<'db>(db: &'db dyn Db) -> smallvec::SmallVec<[ast::name::N
 }
 
 /// Return the symbol for a member of `types.ModuleType`.
+///
+/// ## Notes
+///
+/// In general we wouldn't check to see whether a symbol exists on a class before doing the
+/// [`member`] call on the instance type -- we'd just do the [`member`] call on the instance
+/// type, since it has the same end result. The reason to only call [`member`] on [`ModuleType`]
+/// instance when absolutely necessary is that it was a fairly significant performance regression
+/// to fallback to doing that for every name lookup that wasn't found in the module's globals
+/// ([`global_symbol`]). So we use less idiomatic (and much more verbose) code here as a
+/// micro-optimisation because it's used in a very hot path.
+///
+/// [`member`]: Type::member
+/// [`ModuleType`]: KnownClass::ModuleType
 fn module_type_symbol<'db>(db: &'db dyn Db, name: &str) -> Symbol<'db> {
     if module_type_symbols(db)
         .iter()
@@ -697,6 +710,11 @@ fn module_type_symbol<'db>(db: &'db dyn Db, name: &str) -> Symbol<'db> {
     }
 }
 
+/// Implementation of looking up a module-global symbol as seen from outside the file (e.g. via
+/// imports).
+///
+/// This will take into account whether the definition of the symbol is being explicitly
+/// re-exported from a stub file or not.
 fn external_symbol_impl<'db>(db: &'db dyn Db, file: File, name: &str) -> Symbol<'db> {
     symbol_impl(
         db,
