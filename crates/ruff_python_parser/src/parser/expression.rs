@@ -2265,7 +2265,7 @@ impl<'src> Parser<'src> {
             value,
         };
 
-        if self.options.mode != Mode::Ipython {
+        if self.options.mode() != Mode::Ipython {
             self.add_error(ParseErrorType::UnexpectedIpythonEscapeCommand, &command);
         }
 

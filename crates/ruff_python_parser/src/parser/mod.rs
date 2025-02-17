@@ -1,8 +1,10 @@
 use std::cmp::Ordering;
+use std::fmt::Debug;
+use std::marker::PhantomData;
 
 use bitflags::bitflags;
 
-use ruff_python_ast::{Mod, ModExpression, ModModule};
+use ruff_python_ast::{Mod, ModExpression, ModModule, PySourceType};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::parser::expression::ExpressionContext;
@@ -10,7 +12,7 @@ use crate::parser::progress::{ParserProgress, TokenId};
 use crate::token::TokenValue;
 use crate::token_set::TokenSet;
 use crate::token_source::{TokenSource, TokenSourceCheckpoint};
-use crate::{Mode, ParseError, ParseErrorType, TokenKind};
+use crate::{AsMode, Mode, ParseError, ParseErrorType, TokenKind};
 use crate::{Parsed, Tokens};
 
 mod expression;
@@ -22,15 +24,50 @@ mod statement;
 #[cfg(test)]
 mod tests;
 
+pub trait SourceType: std::fmt::Debug {}
+
 #[derive(Debug)]
-pub struct ParserOptions {
-    /// Specify the mode in which the code will be parsed.
-    mode: Mode,
+pub struct UnknownSource;
+
+impl SourceType for UnknownSource {}
+
+#[derive(Debug)]
+pub struct KnownSource;
+
+impl SourceType for KnownSource {}
+
+trait AsParserOptions: std::fmt::Debug {
+    fn mode(&self) -> Mode;
 }
 
-impl ParserOptions {
+impl<S: SourceType> AsParserOptions for ParserOptions<S> {
+    fn mode(&self) -> Mode {
+        self.mode
+    }
+}
+
+#[derive(Debug)]
+pub struct ParserOptions<S: SourceType> {
+    /// Specify the mode in which the code will be parsed.
+    mode: Mode,
+    _type: PhantomData<S>,
+}
+
+impl ParserOptions<UnknownSource> {
     pub fn from_mode(mode: Mode) -> Self {
-        Self { mode }
+        Self {
+            mode,
+            _type: PhantomData,
+        }
+    }
+}
+
+impl ParserOptions<KnownSource> {
+    pub fn from_source_type(source_type: PySourceType) -> Self {
+        Self {
+            mode: source_type.as_mode(),
+            _type: PhantomData,
+        }
     }
 }
 
@@ -44,7 +81,7 @@ pub(crate) struct Parser<'src> {
     /// Stores all the syntax errors found during the parsing.
     errors: Vec<ParseError>,
 
-    options: ParserOptions,
+    options: Box<dyn AsParserOptions>,
 
     /// The ID of the current token. This is used to track the progress of the parser
     /// to avoid infinite loops when the parser is stuck.
@@ -62,20 +99,23 @@ pub(crate) struct Parser<'src> {
 
 impl<'src> Parser<'src> {
     /// Create a new parser for the given source code.
-    pub(crate) fn new(source: &'src str, options: ParserOptions) -> Self {
+    pub(crate) fn new<S: SourceType + 'static>(
+        source: &'src str,
+        options: ParserOptions<S>,
+    ) -> Self {
         Parser::new_starts_at(source, options, TextSize::new(0))
     }
 
     /// Create a new parser for the given source code which starts parsing at the given offset.
-    pub(crate) fn new_starts_at(
+    pub(crate) fn new_starts_at<S: SourceType + 'static>(
         source: &'src str,
-        options: ParserOptions,
+        options: ParserOptions<S>,
         start_offset: TextSize,
     ) -> Self {
         let tokens = TokenSource::from_source(source, options.mode, start_offset);
 
         Parser {
-            options,
+            options: Box::new(options),
             source,
             errors: Vec::new(),
             tokens,
@@ -88,7 +128,7 @@ impl<'src> Parser<'src> {
 
     /// Consumes the [`Parser`] and returns the parsed [`Parsed`].
     pub(crate) fn parse(mut self) -> Parsed<Mod> {
-        let syntax = match self.options.mode {
+        let syntax = match self.options.mode() {
             Mode::Expression | Mode::ParenthesizedExpression => {
                 Mod::Expression(self.parse_single_expression())
             }
