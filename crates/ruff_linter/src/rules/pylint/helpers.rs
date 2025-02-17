@@ -166,7 +166,7 @@ impl Visitor<'_> for SequenceIndexVisitor<'_> {
     }
 }
 
-pub fn is_dunder_operator_method(method: &str) -> bool {
+pub(crate) fn is_dunder_operator_method(method: &str) -> bool {
     matches!(
         method,
         "__lt__"
@@ -221,9 +221,10 @@ pub fn is_dunder_operator_method(method: &str) -> bool {
 
 /// Returns `true` if a method is a known dunder method.
 pub(super) fn is_known_dunder_method(method: &str) -> bool {
-    matches!(
-        method,
-        "__abs__"
+    is_dunder_operator_method(method)
+        || matches!(
+            method,
+            "__abs__"
             | "__aenter__"
             | "__aexit__"
             | "__aiter__"
@@ -312,5 +313,5 @@ pub(super) fn is_known_dunder_method(method: &str) -> bool {
             | "_ignore_"
             | "_order_"
             | "_generate_next_value_"
-    )
+        )
 }
