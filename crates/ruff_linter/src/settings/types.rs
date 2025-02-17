@@ -52,8 +52,6 @@ pub enum PythonVersion {
     Py311,
     Py312,
     Py313,
-    // Remember to update the `latest()` function
-    // when adding new versions here!
 }
 
 impl From<PythonVersion> for ast::PythonVersion {
