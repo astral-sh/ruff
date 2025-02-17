@@ -7,9 +7,11 @@ use std::string::ToString;
 
 use anyhow::{bail, Result};
 use globset::{Glob, GlobMatcher, GlobSet, GlobSetBuilder};
-use pep440_rs::{VersionSpecifier, VersionSpecifiers};
+use log::debug;
+use pep440_rs::{Operator, Version as Pep440Version, Version, VersionSpecifier, VersionSpecifiers};
 use rustc_hash::FxHashMap;
 use serde::{de, Deserialize, Deserializer, Serialize};
+use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
 use ruff_cache::{CacheKey, CacheKeyHasher};
@@ -82,6 +84,59 @@ impl From<PythonVersion> for ast::PythonVersion {
             PythonVersion::Py312 => Self::PY312,
             PythonVersion::Py313 => Self::PY313,
         }
+    }
+}
+
+impl From<PythonVersion> for Pep440Version {
+    fn from(version: PythonVersion) -> Self {
+        let (major, minor) = version.as_tuple();
+        Self::new([u64::from(major), u64::from(minor)])
+    }
+}
+
+impl PythonVersion {
+    pub const fn as_tuple(&self) -> (u8, u8) {
+        match self {
+            Self::Py37 => (3, 7),
+            Self::Py38 => (3, 8),
+            Self::Py39 => (3, 9),
+            Self::Py310 => (3, 10),
+            Self::Py311 => (3, 11),
+            Self::Py312 => (3, 12),
+            Self::Py313 => (3, 13),
+        }
+    }
+
+    /// Infer the minimum supported [`PythonVersion`] from a `requires-python` specifier.
+    pub fn get_minimum_supported_version(requires_version: &VersionSpecifiers) -> Option<Self> {
+        /// Truncate a version to its major and minor components.
+        fn major_minor(version: &Version) -> Option<Version> {
+            let major = version.release().first()?;
+            let minor = version.release().get(1)?;
+            Some(Version::new([major, minor]))
+        }
+
+        // Extract the minimum supported version from the specifiers.
+        let minimum_version = requires_version
+            .iter()
+            .filter(|specifier| {
+                matches!(
+                    specifier.operator(),
+                    Operator::Equal
+                        | Operator::EqualStar
+                        | Operator::ExactEqual
+                        | Operator::TildeEqual
+                        | Operator::GreaterThan
+                        | Operator::GreaterThanEqual
+                )
+            })
+            .filter_map(|specifier| major_minor(specifier.version()))
+            .min()?;
+
+        debug!("Detected minimum supported `requires-python` version: {minimum_version}");
+
+        // Find the Python version that matches the minimum supported version.
+        PythonVersion::iter().find(|version| Version::from(*version) == minimum_version)
     }
 }
 

@@ -532,7 +532,7 @@ impl Configuration {
                 .src
                 .map(|src| resolve_src(&src, project_root))
                 .transpose()?,
-            target_version: options.target_version,
+            target_version: options.target_version.map(AstPythonVersion::from),
             // `--extension` is a hidden command-line argument that isn't supported in configuration
             // files at present.
             extension: None,

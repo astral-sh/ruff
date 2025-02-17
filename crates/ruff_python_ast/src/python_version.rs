@@ -1,7 +1,5 @@
 use std::fmt;
 
-use log::debug;
-use pep440_rs::{Operator, Version as Pep440Version, Version, VersionSpecifiers};
 use ruff_macros::CacheKey;
 
 /// Representation of a Python version.
@@ -65,38 +63,6 @@ impl PythonVersion {
     pub fn supports_pep_701(self) -> bool {
         self >= Self::PY312
     }
-
-    /// Infer the minimum supported [`PythonVersion`] from a `requires-python` specifier.
-    pub fn get_minimum_supported_version(requires_version: &VersionSpecifiers) -> Option<Self> {
-        /// Truncate a version to its major and minor components.
-        fn major_minor(version: &Version) -> Option<Version> {
-            let major = version.release().first()?;
-            let minor = version.release().get(1)?;
-            Some(Version::new([major, minor]))
-        }
-
-        // Extract the minimum supported version from the specifiers.
-        let minimum_version = requires_version
-            .iter()
-            .filter(|specifier| {
-                matches!(
-                    specifier.operator(),
-                    Operator::Equal
-                        | Operator::EqualStar
-                        | Operator::ExactEqual
-                        | Operator::TildeEqual
-                        | Operator::GreaterThan
-                        | Operator::GreaterThanEqual
-                )
-            })
-            .filter_map(|specifier| major_minor(specifier.version()))
-            .min()?;
-
-        debug!("Detected minimum supported `requires-python` version: {minimum_version}");
-
-        // Find the Python version that matches the minimum supported version.
-        PythonVersion::iter().find(|version| Version::from(*version) == minimum_version)
-    }
 }
 
 impl Default for PythonVersion {
@@ -114,13 +80,6 @@ impl TryFrom<(&str, &str)> for PythonVersion {
             major: major.parse()?,
             minor: minor.parse()?,
         })
-    }
-}
-
-impl From<PythonVersion> for Pep440Version {
-    fn from(version: PythonVersion) -> Self {
-        let (major, minor) = version.as_tuple();
-        Self::new([u64::from(major), u64::from(minor)])
     }
 }
 
@@ -169,32 +128,6 @@ pub mod adapter {
             serde::ser::Error::custom(format!("failed to convert version: {err}"))
         })?;
         T::serialize(&value, serializer)
-    }
-
-    pub fn deserialize_option<'de, D, T>(deserializer: D) -> Result<Option<PythonVersion>, D::Error>
-    where
-        D: Deserializer<'de>,
-        T: Deserialize<'de> + Into<PythonVersion>,
-    {
-        Ok(Option::<T>::deserialize(deserializer)?.map(T::into))
-    }
-
-    pub fn serialize_option<S, T>(
-        value: &Option<PythonVersion>,
-        serializer: S,
-    ) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-        T: Serialize + TryFrom<PythonVersion>,
-        <T as TryFrom<PythonVersion>>::Error: std::fmt::Display,
-    {
-        let value = match value {
-            Some(v) => Some(T::try_from(*v).map_err(|err| {
-                serde::ser::Error::custom(format!("failed to convert version: {err}"))
-            })?),
-            None => None,
-        };
-        Option::<T>::serialize(&value, serializer)
     }
 }
 

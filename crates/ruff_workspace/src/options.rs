@@ -33,7 +33,6 @@ use ruff_linter::settings::types::{
 use ruff_linter::{warn_user_once, RuleSelector};
 use ruff_macros::{CombineOptions, OptionsMetadata};
 use ruff_python_ast::name::Name;
-use ruff_python_ast::python_version::{adapter, PythonVersion as AstPythonVersion};
 use ruff_python_formatter::{DocstringCodeLineWidth, QuoteStyle};
 use ruff_python_semantic::NameImports;
 use ruff_python_stdlib::identifiers::is_identifier;
@@ -332,12 +331,7 @@ pub struct Options {
             target-version = "py37"
         "#
     )]
-    #[serde(
-        deserialize_with = "adapter::deserialize_option::<_, PythonVersion>",
-        default
-    )]
-    #[serde(serialize_with = "adapter::serialize_option::<_, PythonVersion>")]
-    pub target_version: Option<AstPythonVersion>,
+    pub target_version: Option<PythonVersion>,
 
     /// The directories to consider when resolving first- vs. third-party
     /// imports.

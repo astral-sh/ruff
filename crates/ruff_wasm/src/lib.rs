@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use js_sys::Error;
+use ruff_linter::settings::types::PythonVersion;
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
@@ -13,7 +14,6 @@ use ruff_linter::registry::AsRule;
 use ruff_linter::settings::{flags, DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX};
 use ruff_linter::source_kind::SourceKind;
 use ruff_linter::Locator;
-use ruff_python_ast::python_version::PythonVersion;
 use ruff_python_ast::{Mod, PySourceType};
 use ruff_python_codegen::Stylist;
 use ruff_python_formatter::{format_module_ast, pretty_comments, PyFormatContext, QuoteStyle};
