@@ -98,43 +98,12 @@ impl fmt::Display for PythonVersion {
 
 #[cfg(feature = "serde")]
 pub mod serde {
-    use serde::{Deserialize, Deserializer, Serialize, Serializer};
-
     use super::PythonVersion;
 
-    /// Deserialize a `T` using its own `Deserialize` implementation and then convert it to a
-    /// [`PythonVersion`].
-    ///
-    /// Intended for use with serde's
-    /// [`deserialize_with`](https://serde.rs/field-attrs.html#deserialize_with) field attribute.
-    pub fn deserialize_into<'de, D, T>(deserializer: D) -> Result<PythonVersion, D::Error>
-    where
-        D: Deserializer<'de>,
-        T: Deserialize<'de> + Into<PythonVersion>,
-    {
-        Ok(T::deserialize(deserializer)?.into())
-    }
-
-    /// Use `TryFrom` to convert a [`PythonVersion`] to a `T` and then serialize it.
-    ///
-    /// Intended for use with serde's
-    /// [`serialize_with`](https://serde.rs/field-attrs.html#serialize_with) field attribute.
-    pub fn try_serialize_from<S, T>(value: &PythonVersion, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-        T: Serialize + TryFrom<PythonVersion>,
-        <T as TryFrom<PythonVersion>>::Error: std::fmt::Display,
-    {
-        let value = T::try_from(*value).map_err(|err| {
-            serde::ser::Error::custom(format!("failed to convert version: {err}"))
-        })?;
-        T::serialize(&value, serializer)
-    }
-
-    impl<'de> Deserialize<'de> for PythonVersion {
+    impl<'de> serde::Deserialize<'de> for PythonVersion {
         fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
         where
-            D: Deserializer<'de>,
+            D: serde::Deserializer<'de>,
         {
             let as_str = String::deserialize(deserializer)?;
 
