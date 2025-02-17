@@ -646,10 +646,10 @@ environment variables (see the [spec](https://bixense.com/clicolors/)).
 
 ## Ruff behaves unexpectedly when using `source.*` code actions in Notebooks. What's going on? {: #source-code-actions-in-notebooks }
 
-Starting with `0.9.7`, Ruff does not support `source.organizeImports` and `source.fixAll` code
-actions in Jupyter Notebooks (`notebook.codeActionsOnSave` in VS Code). It's recommended to use the
-`notebook` prefixed code actions for the same such as `notebook.source.organizeImports` and
-`notebook.source.fixAll` respectively.
+Ruff does not support `source.organizeImports` and `source.fixAll` code actions in Jupyter Notebooks
+(`notebook.codeActionsOnSave` in VS Code). It's recommended to use the `notebook` prefixed code
+actions for the same such as `notebook.source.organizeImports` and `notebook.source.fixAll`
+respectively.
 
 Ruff requires to have a full view of the notebook to provide accurate diagnostics and fixes. For
 example, if you have a cell that imports a module and another cell that uses that module, Ruff
