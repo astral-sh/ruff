@@ -816,7 +816,7 @@ if True:
 
         ----- stderr -----
         ruff failed
-          Cause: Failed to load last configuration in chain: [RUFF-TOML-PATH]
+          Cause: Failed to load configuration `[RUFF-TOML-PATH]`
           Cause: Failed to parse [RUFF-TOML-PATH]
           Cause: TOML parse error at line 1, column 1
           |
@@ -856,7 +856,7 @@ format = "json"
 
         ----- stderr -----
         ruff failed
-          Cause: Failed to load last configuration in chain: [RUFF-TOML-PATH]
+          Cause: Failed to load configuration `[RUFF-TOML-PATH]`
           Cause: Failed to parse [RUFF-TOML-PATH]
           Cause: TOML parse error at line 2, column 10
           |

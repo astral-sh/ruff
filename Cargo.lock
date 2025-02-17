@@ -3237,6 +3237,7 @@ dependencies = [
  "glob",
  "globset",
  "ignore",
+ "indexmap",
  "is-macro",
  "itertools 0.14.0",
  "log",

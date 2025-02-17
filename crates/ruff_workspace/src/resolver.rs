@@ -7,8 +7,8 @@ use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::sync::RwLock;
 
-use anyhow::Result;
 use anyhow::{anyhow, bail};
+use anyhow::{Context, Result};
 use globset::{Candidate, GlobSet};
 use ignore::{DirEntry, Error, ParallelVisitor, WalkBuilder, WalkState};
 use itertools::Itertools;
@@ -304,23 +304,38 @@ pub fn resolve_configuration(
     relativity: Relativity,
     transformer: &dyn ConfigurationTransformer,
 ) -> Result<Configuration> {
-    let mut seen = vec![];
-    let mut stack = vec![];
+    let mut configurations = indexmap::IndexMap::new();
     let mut next = Some(fs::normalize_path(pyproject));
     while let Some(path) = next {
-        if seen.contains(&path) {
+        if configurations.contains_key(&path) {
             bail!(format!(
-                "Circular dependency detected: {}",
-                seen.iter().chain([&path]).map(|p| p.display()).join(" -> "),
+                "Circular configuration detected: {chain}",
+                chain = configurations
+                    .keys()
+                    .chain([&path])
+                    .map(|p| format!("`{}`", p.display()))
+                    .join(" extends "),
             ));
         }
 
         // Resolve the current path.
-        let options = pyproject::load_options(&path).map_err(|err| {
-            err.context(format!(
-                "Failed to load last configuration in chain: {}",
-                seen.iter().chain([&path]).map(|p| p.display()).join(" -> "),
-            ))
+        let options = pyproject::load_options(&path).with_context(|| {
+            if configurations.is_empty() {
+                format!(
+                    "Failed to load configuration `{path}`",
+                    path = path.display()
+                )
+            } else {
+                let chain = configurations
+                    .keys()
+                    .chain([&path])
+                    .map(|p| format!("`{}`", p.display()))
+                    .join(" extends ");
+                format!(
+                    "Failed to load extended configuration `{path}` ({chain})",
+                    path = path.display()
+                )
+            }
         })?;
 
         let project_root = relativity.resolve(&path);
@@ -337,14 +352,13 @@ pub fn resolve_configuration(
 
         // Keep track of (1) the paths we've already resolved (to avoid cycles), and (2)
         // the base configuration for every path.
-        seen.push(path);
-        stack.push(configuration);
+        configurations.insert(path, configuration);
     }
 
     // Merge the configurations, in order.
-    stack.reverse();
-    let mut configuration = stack.pop().unwrap();
-    while let Some(extend) = stack.pop() {
+    let mut configurations = configurations.into_values();
+    let mut configuration = configurations.next().unwrap();
+    for extend in configurations {
         configuration = configuration.combine(extend);
     }
     Ok(transformer.transform(configuration))

@@ -15,8 +15,8 @@ use tempfile::TempDir;
 const BIN_NAME: &str = "ruff";
 const STDIN_BASE_OPTIONS: &[&str] = &["check", "--no-cache", "--output-format", "concise"];
 
-fn tempdir_filter(tempdir: &TempDir) -> String {
-    format!(r"{}\\?/?", escape(tempdir.path().to_str().unwrap()))
+fn tempdir_filter(path: impl AsRef<Path>) -> String {
+    format!(r"{}\\?/?", escape(path.as_ref().to_str().unwrap()))
 }
 
 #[test]
@@ -612,42 +612,43 @@ fn extend_passed_via_config_argument() {
 #[test]
 fn nonexistent_extend_file() -> Result<()> {
     let tempdir = TempDir::new()?;
+    let project_dir = tempdir.path().canonicalize()?;
     fs::write(
-        tempdir.path().join("ruff.toml"),
+        project_dir.join("ruff.toml"),
         r#"
 extend = "ruff2.toml"
 "#,
     )?;
 
     insta::with_settings!({
-        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
+        filters => vec![(tempdir_filter(&project_dir).as_str(), "[TMP]/")]
     }, {
         assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["check"]).current_dir(tempdir.path()), @r"
-    success: false
-    exit_code: 2
-    ----- stdout -----
+        .args(["check"]).current_dir(&project_dir), @r"
+        success: false
+        exit_code: 2
+        ----- stdout -----
 
-    ----- stderr -----
-    ruff failed
-      Cause: Failed to load last configuration in chain: [TMP]/ruff.toml -> [TMP]/ruff2.toml
-      Cause: Failed to read [TMP]/ruff2.toml
-      Cause: No such file or directory (os error 2)
-    ");
+        ----- stderr -----
+        ruff failed
+          Cause: Failed to load extended configuration `[TMP]/ruff2.toml` (`[TMP]/ruff.toml` extends `[TMP]/ruff2.toml`)
+          Cause: Failed to read [TMP]/ruff2.toml
+          Cause: No such file or directory (os error 2)
+        ");
     });
 
     fs::write(
-        tempdir.path().join("ruff2.toml"),
+        project_dir.join("ruff2.toml"),
         r#"
 extend = "ruff3.toml"
 "#,
     )?;
 
     insta::with_settings!({
-        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
+        filters => vec![(tempdir_filter(&project_dir).as_str(), "[TMP]/")]
     }, {
         assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["check"]).current_dir(tempdir.path()), @r"
+        .args(["check"]).current_dir(project_dir), @r"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -666,32 +667,34 @@ extend = "ruff3.toml"
 #[test]
 fn circular_extend() -> Result<()> {
     let tempdir = TempDir::new()?;
+    let project_path = tempdir.path().canonicalize()?;
+
     fs::write(
-        tempdir.path().join("ruff.toml"),
+        project_path.join("ruff.toml"),
         r#"
 extend = "ruff2.toml"
 "#,
     )?;
     fs::write(
-        tempdir.path().join("ruff2.toml"),
+        project_path.join("ruff2.toml"),
         r#"
 extend = "ruff3.toml"
 "#,
     )?;
     fs::write(
-        tempdir.path().join("ruff3.toml"),
+        project_path.join("ruff3.toml"),
         r#"
 extend = "ruff.toml"
 "#,
     )?;
 
     insta::with_settings!({
-        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
+        filters => vec![(tempdir_filter(&project_path).as_str(), "[TMP]/")]
     }, {
     assert_cmd_snapshot!(
         Command::new(get_cargo_bin(BIN_NAME))
             .args(["check"])
-            .current_dir(tempdir.path()),
+            .current_dir(project_path),
         @r"
     success: false
     exit_code: 2
@@ -699,7 +702,54 @@ extend = "ruff.toml"
 
     ----- stderr -----
     ruff failed
-      Cause: Circular dependency detected: [TMP]/ruff.toml -> [TMP]/ruff2.toml -> [TMP]/ruff3.toml -> [TMP]/ruff.toml
+      Cause: Circular configuration detected: `[TMP]/ruff.toml` extends `[TMP]/ruff2.toml` extends `[TMP]/ruff3.toml` extends `[TMP]/ruff.toml`
+    ");
+    });
+
+    Ok(())
+}
+
+#[test]
+fn parse_error_extends() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let project_path = tempdir.path().canonicalize()?;
+
+    fs::write(
+        project_path.join("ruff.toml"),
+        r#"
+extend = "ruff2.toml"
+"#,
+    )?;
+    fs::write(
+        project_path.join("ruff2.toml"),
+        r#"
+[lint]
+select = [E501]
+"#,
+    )?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&project_path).as_str(), "[TMP]/")]
+    }, {
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args(["check"])
+            .current_dir(project_path),
+        @r"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: Failed to load extended configuration `[TMP]/ruff2.toml` (`[TMP]/ruff.toml` extends `[TMP]/ruff2.toml`)
+      Cause: Failed to parse [TMP]/ruff2.toml
+      Cause: TOML parse error at line 3, column 11
+      |
+    3 | select = [E501]
+      |           ^
+    invalid array
+    expected `]`
     ");
     });
 
@@ -2192,7 +2242,7 @@ fn flake8_import_convention_invalid_aliases_config_alias_name() -> Result<()> {
 
         ----- stderr -----
         ruff failed
-          Cause: Failed to load last configuration in chain: [TMP]/ruff.toml
+          Cause: Failed to load configuration `[TMP]/ruff.toml`
           Cause: Failed to parse [TMP]/ruff.toml
           Cause: TOML parse error at line 3, column 17
           |
@@ -2229,7 +2279,7 @@ fn flake8_import_convention_invalid_aliases_config_extend_alias_name() -> Result
 
         ----- stderr -----
         ruff failed
-          Cause: Failed to load last configuration in chain: [TMP]/ruff.toml
+          Cause: Failed to load configuration `[TMP]/ruff.toml`
           Cause: Failed to parse [TMP]/ruff.toml
           Cause: TOML parse error at line 3, column 17
           |
@@ -2266,7 +2316,7 @@ fn flake8_import_convention_invalid_aliases_config_module_name() -> Result<()> {
 
         ----- stderr -----
         ruff failed
-          Cause: Failed to load last configuration in chain: [TMP]/ruff.toml
+          Cause: Failed to load configuration `[TMP]/ruff.toml`
           Cause: Failed to parse [TMP]/ruff.toml
           Cause: TOML parse error at line 3, column 1
           |
@@ -2529,6 +2579,5 @@ fn a005_module_shadowing_strict_default() -> Result<()> {
         ----- stderr -----
         ");
     });
-
     Ok(())
 }
