@@ -182,10 +182,10 @@ fn format() {
         let mut snapshot = format!("## Input\n{}", CodeFrame::new("python", &content));
         let options_path = input_path.with_extension("options.json");
 
-        if let Ok(options_file) = fs::File::open(options_path) {
+        if let Ok(options_file) = fs::File::open(&options_path) {
             let reader = BufReader::new(options_file);
-            let options: Vec<PyFormatOptions> =
-                serde_json::from_reader(reader).expect("Options to be a valid Json file");
+            let options: Vec<PyFormatOptions> = serde_json::from_reader(reader)
+                .unwrap_or_else(|_| panic!("Option file {options_path:?} to be a valid Json file"));
 
             writeln!(snapshot, "## Outputs").unwrap();
 
