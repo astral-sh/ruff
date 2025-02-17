@@ -471,7 +471,7 @@ where
     }
 }
 
-#[derive(CacheKey, Clone, Copy, Debug, PartialOrd, Ord, PartialEq, Eq, Default)]
+#[derive(CacheKey, Clone, Copy, Debug, PartialOrd, Ord, PartialEq, Eq)]
 #[cfg_attr(
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize),
@@ -481,9 +481,6 @@ where
 pub enum PythonVersion {
     Py37,
     Py38,
-    // Make sure to also change the default for `ruff_linter::settings::types::PythonVersion`
-    // when changing the default here.
-    #[default]
     Py39,
     Py310,
     Py311,
