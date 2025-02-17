@@ -44,7 +44,7 @@ use crate::{display_settings, fs};
 pub enum PythonVersion {
     Py37,
     Py38,
-    // Make sure to also change the default for `ruff_python_formatter::PythonVersion`
+    // Make sure to also change the default for `ruff_python_ast::PythonVersion`
     // when changing the default here.
     #[default]
     Py39,
