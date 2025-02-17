@@ -1,6 +1,5 @@
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::helpers::is_dunder;
 use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, Identifier, Keyword, Stmt};
 use ruff_python_codegen::Generator;
 use ruff_python_semantic::SemanticModel;
@@ -185,7 +184,7 @@ fn fields_from_dict_literal(items: &[ast::DictItem]) -> Option<Vec<Stmt>> {
                     if !is_identifier(field.to_str()) {
                         return None;
                     }
-                    if is_dunder(field.to_str()) {
+                    if field.to_str().starts_with("__") {
                         return None;
                     }
                     Some(create_field_assignment_stmt(field.to_str(), value))
