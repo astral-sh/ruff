@@ -2,8 +2,8 @@ use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, 
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{
-    Arguments, Expr, ExprAttribute, ExprBinOp, ExprCall, ExprStringLiteral, ExprSubscript,
-    ExprUnaryOp, Number, Operator, UnaryOp,
+    Expr, ExprAttribute, ExprBinOp, ExprCall, ExprStringLiteral, ExprSubscript, ExprUnaryOp,
+    Number, Operator, UnaryOp,
 };
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextRange};
@@ -88,9 +88,23 @@ pub(crate) fn fromisoformat_replace_z(checker: &Checker, call: &ExprCall) {
         return;
     }
 
-    let Some(range_to_remove) = range_to_remove(argument, checker) else {
+    let Some(replace_time_zone) = ReplaceTimeZone::from_expr(argument) else {
         return;
     };
+
+    if !is_zero_offset_timezone(replace_time_zone.zero_offset.value.to_str()) {
+        return;
+    }
+
+    let value_full_range = parenthesized_range(
+        replace_time_zone.date.into(),
+        replace_time_zone.parent.into(),
+        checker.comment_ranges(),
+        checker.source(),
+    )
+    .unwrap_or(replace_time_zone.date.range());
+
+    let range_to_remove = TextRange::new(value_full_range.end(), argument.end());
 
     let applicability = if checker.comment_ranges().intersects(range_to_remove) {
         Applicability::Unsafe
@@ -98,92 +112,102 @@ pub(crate) fn fromisoformat_replace_z(checker: &Checker, call: &ExprCall) {
         Applicability::Safe
     };
 
-    let edit = Edit::range_deletion(range_to_remove);
-    let fix = Fix::applicable_edit(edit, applicability);
-
     let diagnostic = Diagnostic::new(FromisoformatReplaceZ, argument.range());
 
-    checker.report_diagnostic(diagnostic.with_fix(fix));
+    checker.report_diagnostic(diagnostic.with_fix(Fix::applicable_edit(
+        Edit::range_deletion(range_to_remove),
+        applicability,
+    )));
 }
 
 fn func_is_fromisoformat(func: &Expr, semantic: &SemanticModel) -> bool {
-    let Some(qualified_name) = semantic.resolve_qualified_name(func) else {
-        return false;
-    };
-
-    if !matches!(
-        qualified_name.segments(),
-        ["datetime", "datetime", "fromisoformat"]
-    ) {
-        return false;
-    }
-
-    true
+    semantic
+        .resolve_qualified_name(func)
+        .is_some_and(|qualified_name| {
+            matches!(
+                qualified_name.segments(),
+                ["datetime", "datetime", "fromisoformat"]
+            )
+        })
 }
 
-fn range_to_remove(expr: &Expr, checker: &Checker) -> Option<TextRange> {
-    let (date, parent, zero_offset) = match expr {
-        Expr::Call(ExprCall {
-            func, arguments, ..
-        }) => replace_z_date_parent_and_offset(func, arguments)?,
+/// A `datetime.replace` call that replaces the timezone with a zero offset.
+struct ReplaceTimeZone<'a> {
+    /// The date expression
+    date: &'a Expr,
+    /// The `date` expression's parent.
+    parent: &'a Expr,
+    /// The zero offset string literal
+    zero_offset: &'a ExprStringLiteral,
+}
 
-        Expr::BinOp(ExprBinOp {
-            left, op, right, ..
-        }) => {
-            if *op != Operator::Add {
-                return None;
-            }
+impl<'a> ReplaceTimeZone<'a> {
+    fn from_expr(expr: &'a Expr) -> Option<Self> {
+        match expr {
+            Expr::Call(call) => Self::from_call(call),
+            Expr::BinOp(bin_op) => Self::from_bin_op(bin_op),
+            _ => None,
+        }
+    }
 
-            let (date, parent) = match &**left {
-                Expr::Call(call) => strip_z_date_and_parent(call)?,
-                Expr::Subscript(subscript) => (slice_minus_1_date(subscript)?, &**left),
-                _ => return None,
-            };
+    /// Returns `Some` if the call expression is a call to `str.replace` and matches `date.replace("Z", "+00:00")`
+    fn from_call(call: &'a ExprCall) -> Option<Self> {
+        let arguments = &call.arguments;
 
-            (date, parent, right.as_string_literal_expr()?)
+        if !arguments.keywords.is_empty() {
+            return None;
+        };
+
+        let ExprAttribute { value, attr, .. } = call.func.as_attribute_expr()?;
+
+        if attr != "replace" {
+            return None;
         }
 
-        _ => return None,
-    };
+        let [z, Expr::StringLiteral(zero_offset)] = &*arguments.args else {
+            return None;
+        };
 
-    if !is_zero_offset_timezone(zero_offset.value.to_str()) {
-        return None;
+        if !is_upper_case_z_string(z) {
+            return None;
+        }
+
+        Some(Self {
+            date: &**value,
+            parent: &*call.func,
+            zero_offset,
+        })
     }
 
-    let comment_ranges = checker.comment_ranges();
-    let source = checker.source();
-    let value_full_range = parenthesized_range(date.into(), parent.into(), comment_ranges, source)
-        .unwrap_or(date.range());
+    /// Returns `Some` for binary expressions matching `date[:-1] + "-00"` or
+    /// `date.strip("Z") + "+00"`
+    fn from_bin_op(bin_op: &'a ExprBinOp) -> Option<Self> {
+        let ExprBinOp {
+            left, op, right, ..
+        } = bin_op;
 
-    Some(TextRange::new(value_full_range.end(), expr.end()))
+        if *op != Operator::Add {
+            return None;
+        }
+
+        let (date, parent) = match &**left {
+            Expr::Call(call) => strip_z_date(call)?,
+            Expr::Subscript(subscript) => (slice_minus_1_date(subscript)?, &**left),
+            _ => return None,
+        };
+
+        Some(Self {
+            date,
+            parent,
+            zero_offset: right.as_string_literal_expr()?,
+        })
+    }
 }
 
-fn replace_z_date_parent_and_offset<'a>(
-    func: &'a Expr,
-    arguments: &'a Arguments,
-) -> Option<(&'a Expr, &'a Expr, &'a ExprStringLiteral)> {
-    if !arguments.keywords.is_empty() {
-        return None;
-    };
-
-    let ExprAttribute { value, attr, .. } = func.as_attribute_expr()?;
-
-    if attr != "replace" {
-        return None;
-    }
-
-    let [z, Expr::StringLiteral(zero_offset)] = &*arguments.args else {
-        return None;
-    };
-
-    if !is_upper_case_z_string(z) {
-        return None;
-    }
-
-    Some((&**value, func, zero_offset))
-}
-
-fn strip_z_date_and_parent(call: &ExprCall) -> Option<(&Expr, &Expr)> {
+/// Returns `Some` if `call` is a call to `date.strip("Z")`.
+///
+/// It returns the value of the `date` argument and its parent.
+fn strip_z_date(call: &ExprCall) -> Option<(&Expr, &Expr)> {
     let ExprCall {
         func, arguments, ..
     } = call;
@@ -211,6 +235,7 @@ fn strip_z_date_and_parent(call: &ExprCall) -> Option<(&Expr, &Expr)> {
     Some((value, func))
 }
 
+/// Returns `Some` if this is a subscribt with the form `date[:-1] + "-00"`.
 fn slice_minus_1_date(subscript: &ExprSubscript) -> Option<&Expr> {
     let ExprSubscript { value, slice, .. } = subscript;
     let slice = slice.as_slice_expr()?;
@@ -219,13 +244,20 @@ fn slice_minus_1_date(subscript: &ExprSubscript) -> Option<&Expr> {
         return None;
     }
 
-    let ExprUnaryOp { operand, op, .. } = slice.upper.as_ref()?.as_unary_op_expr()?;
+    let Some(ExprUnaryOp {
+        operand,
+        op: UnaryOp::USub,
+        ..
+    }) = slice.upper.as_ref()?.as_unary_op_expr()
+    else {
+        return None;
+    };
 
     let Number::Int(int) = &operand.as_number_literal_expr()?.value else {
         return None;
     };
 
-    if *op != UnaryOp::USub || !matches!(int.as_u8(), Some(1)) {
+    if *int != 1 {
         return None;
     }
 
@@ -233,11 +265,8 @@ fn slice_minus_1_date(subscript: &ExprSubscript) -> Option<&Expr> {
 }
 
 fn is_upper_case_z_string(expr: &Expr) -> bool {
-    let Expr::StringLiteral(string) = expr else {
-        return false;
-    };
-
-    string.value.to_str() == "Z"
+    expr.as_string_literal_expr()
+        .is_some_and(|string| string.value.to_str() == "Z")
 }
 
 fn is_zero_offset_timezone(value: &str) -> bool {
