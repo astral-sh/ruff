@@ -49,6 +49,10 @@ impl super::BackgroundDocumentRequestHandler for CodeActions {
         if snapshot.client_settings().fix_all() {
             if supported_code_actions.contains(&SupportedCodeAction::SourceFixAll) {
                 if snapshot.is_notebook_cell() {
+                    // This is ignore here because the client requests this code action for each
+                    // cell in parallel and the server would send a workspace edit with the same
+                    // content which would result in applying the same edit multiple times
+                    // resulting in (possibly) duplicate code.
                     tracing::debug!("Ignoring `source.fixAll` code action for a notebook cell");
                 } else {
                     response.push(fix_all(&snapshot).with_failure_code(ErrorCode::InternalError)?);
@@ -62,6 +66,10 @@ impl super::BackgroundDocumentRequestHandler for CodeActions {
         if snapshot.client_settings().organize_imports() {
             if supported_code_actions.contains(&SupportedCodeAction::SourceOrganizeImports) {
                 if snapshot.is_notebook_cell() {
+                    // This is ignore here because the client requests this code action for each
+                    // cell in parallel and the server would send a workspace edit with the same
+                    // content which would result in applying the same edit multiple times
+                    // resulting in (possibly) duplicate code.
                     tracing::debug!(
                         "Ignoring `source.organizeImports` code action for a notebook cell"
                     );
