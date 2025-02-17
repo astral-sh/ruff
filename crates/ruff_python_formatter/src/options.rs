@@ -490,34 +490,3 @@ pub enum PythonVersion {
     Py312,
     Py313,
 }
-
-impl TryFrom<AstPythonVersion> for PythonVersion {
-    type Error = String;
-
-    fn try_from(value: AstPythonVersion) -> Result<Self, Self::Error> {
-        match value {
-            AstPythonVersion::PY37 => Ok(Self::Py37),
-            AstPythonVersion::PY38 => Ok(Self::Py38),
-            AstPythonVersion::PY39 => Ok(Self::Py39),
-            AstPythonVersion::PY310 => Ok(Self::Py310),
-            AstPythonVersion::PY311 => Ok(Self::Py311),
-            AstPythonVersion::PY312 => Ok(Self::Py312),
-            AstPythonVersion::PY313 => Ok(Self::Py313),
-            _ => Err(format!("unrecognized python version {value}")),
-        }
-    }
-}
-
-impl From<PythonVersion> for AstPythonVersion {
-    fn from(value: PythonVersion) -> Self {
-        match value {
-            PythonVersion::Py37 => Self::PY37,
-            PythonVersion::Py38 => Self::PY38,
-            PythonVersion::Py39 => Self::PY39,
-            PythonVersion::Py310 => Self::PY310,
-            PythonVersion::Py311 => Self::PY311,
-            PythonVersion::Py312 => Self::PY312,
-            PythonVersion::Py313 => Self::PY313,
-        }
-    }
-}
