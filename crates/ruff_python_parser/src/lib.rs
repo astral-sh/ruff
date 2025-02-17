@@ -68,6 +68,7 @@ use std::iter::FusedIterator;
 use std::ops::Deref;
 
 pub use crate::error::{FStringErrorType, LexicalErrorType, ParseError, ParseErrorType};
+pub use crate::parser::ParserOptions;
 pub use crate::token::{Token, TokenKind};
 
 use crate::parser::Parser;

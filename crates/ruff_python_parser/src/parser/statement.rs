@@ -304,7 +304,7 @@ impl<'src> Parser<'src> {
                         op,
                         start,
                     ))
-                } else if self.mode == Mode::Ipython && self.at(TokenKind::Question) {
+                } else if self.options.mode == Mode::Ipython && self.at(TokenKind::Question) {
                     Stmt::IpyEscapeCommand(
                         self.parse_ipython_help_end_escape_command_statement(&parsed_expr),
                     )
@@ -932,7 +932,7 @@ impl<'src> Parser<'src> {
         };
 
         let range = self.node_range(start);
-        if self.mode != Mode::Ipython {
+        if self.options.mode != Mode::Ipython {
             self.add_error(ParseErrorType::UnexpectedIpythonEscapeCommand, range);
         }
 

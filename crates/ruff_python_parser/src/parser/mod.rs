@@ -23,6 +23,18 @@ mod statement;
 mod tests;
 
 #[derive(Debug)]
+pub struct ParserOptions {
+    /// Specify the mode in which the code will be parsed.
+    mode: Mode,
+}
+
+impl ParserOptions {
+    pub fn from_mode(mode: Mode) -> Self {
+        Self { mode }
+    }
+}
+
+#[derive(Debug)]
 pub(crate) struct Parser<'src> {
     source: &'src str,
 
@@ -32,8 +44,7 @@ pub(crate) struct Parser<'src> {
     /// Stores all the syntax errors found during the parsing.
     errors: Vec<ParseError>,
 
-    /// Specify the mode in which the code will be parsed.
-    mode: Mode,
+    options: ParserOptions,
 
     /// The ID of the current token. This is used to track the progress of the parser
     /// to avoid infinite loops when the parser is stuck.
@@ -60,7 +71,7 @@ impl<'src> Parser<'src> {
         let tokens = TokenSource::from_source(source, mode, start_offset);
 
         Parser {
-            mode,
+            options: ParserOptions::from_mode(mode),
             source,
             errors: Vec::new(),
             tokens,
@@ -73,7 +84,7 @@ impl<'src> Parser<'src> {
 
     /// Consumes the [`Parser`] and returns the parsed [`Parsed`].
     pub(crate) fn parse(mut self) -> Parsed<Mod> {
-        let syntax = match self.mode {
+        let syntax = match self.options.mode {
             Mode::Expression | Mode::ParenthesizedExpression => {
                 Mod::Expression(self.parse_single_expression())
             }
