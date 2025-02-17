@@ -1,9 +1,9 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
 ---
-FURB162.py:8:24: FURB162 [*] Unnecessary timezone monkeypatching
+FURB162.py:8:24: FURB162 [*] Unnecessary timezone replacement with zero offset
   |
-6 | ## Errors
+6 | ### Errors
 7 |
 8 | datetime.fromisoformat(date.replace("Z", "+00:00"))
   |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB162
@@ -11,9 +11,9 @@ FURB162.py:8:24: FURB162 [*] Unnecessary timezone monkeypatching
   |
   = help: Remove `.replace()` call
 
-ℹ Safe fix
+ℹ Unsafe fix
 5 5 | 
-6 6 | ## Errors
+6 6 | ### Errors
 7 7 | 
 8   |-datetime.fromisoformat(date.replace("Z", "+00:00"))
   8 |+datetime.fromisoformat(date)
@@ -21,7 +21,7 @@ FURB162.py:8:24: FURB162 [*] Unnecessary timezone monkeypatching
 10 10 | 
 11 11 | datetime.fromisoformat(date[:-1] + "-00")
 
-FURB162.py:9:24: FURB162 [*] Unnecessary timezone monkeypatching
+FURB162.py:9:24: FURB162 [*] Unnecessary timezone replacement with zero offset
    |
  8 | datetime.fromisoformat(date.replace("Z", "+00:00"))
  9 | datetime.fromisoformat(date.replace("Z", "-00:" "00"))
@@ -31,8 +31,8 @@ FURB162.py:9:24: FURB162 [*] Unnecessary timezone monkeypatching
    |
    = help: Remove `.replace()` call
 
-ℹ Safe fix
-6  6  | ## Errors
+ℹ Unsafe fix
+6  6  | ### Errors
 7  7  | 
 8  8  | datetime.fromisoformat(date.replace("Z", "+00:00"))
 9     |-datetime.fromisoformat(date.replace("Z", "-00:" "00"))
@@ -41,7 +41,7 @@ FURB162.py:9:24: FURB162 [*] Unnecessary timezone monkeypatching
 11 11 | datetime.fromisoformat(date[:-1] + "-00")
 12 12 | datetime.fromisoformat(date[:-1:] + "-0000")
 
-FURB162.py:11:24: FURB162 [*] Unnecessary timezone monkeypatching
+FURB162.py:11:24: FURB162 [*] Unnecessary timezone replacement with zero offset
    |
  9 | datetime.fromisoformat(date.replace("Z", "-00:" "00"))
 10 |
@@ -51,7 +51,7 @@ FURB162.py:11:24: FURB162 [*] Unnecessary timezone monkeypatching
    |
    = help: Remove `.replace()` call
 
-ℹ Safe fix
+ℹ Unsafe fix
 8  8  | datetime.fromisoformat(date.replace("Z", "+00:00"))
 9  9  | datetime.fromisoformat(date.replace("Z", "-00:" "00"))
 10 10 | 
@@ -61,7 +61,7 @@ FURB162.py:11:24: FURB162 [*] Unnecessary timezone monkeypatching
 13 13 | 
 14 14 | datetime.fromisoformat(date.strip("Z") + """+0"""
 
-FURB162.py:12:24: FURB162 [*] Unnecessary timezone monkeypatching
+FURB162.py:12:24: FURB162 [*] Unnecessary timezone replacement with zero offset
    |
 11 | datetime.fromisoformat(date[:-1] + "-00")
 12 | datetime.fromisoformat(date[:-1:] + "-0000")
@@ -71,7 +71,7 @@ FURB162.py:12:24: FURB162 [*] Unnecessary timezone monkeypatching
    |
    = help: Remove `.replace()` call
 
-ℹ Safe fix
+ℹ Unsafe fix
 9  9  | datetime.fromisoformat(date.replace("Z", "-00:" "00"))
 10 10 | 
 11 11 | datetime.fromisoformat(date[:-1] + "-00")
@@ -81,7 +81,7 @@ FURB162.py:12:24: FURB162 [*] Unnecessary timezone monkeypatching
 14 14 | datetime.fromisoformat(date.strip("Z") + """+0"""
 15 15 |                                          """0""")
 
-FURB162.py:14:24: FURB162 [*] Unnecessary timezone monkeypatching
+FURB162.py:14:24: FURB162 [*] Unnecessary timezone replacement with zero offset
    |
 12 |   datetime.fromisoformat(date[:-1:] + "-0000")
 13 |
@@ -93,7 +93,7 @@ FURB162.py:14:24: FURB162 [*] Unnecessary timezone monkeypatching
    |
    = help: Remove `.replace()` call
 
-ℹ Safe fix
+ℹ Unsafe fix
 11 11 | datetime.fromisoformat(date[:-1] + "-00")
 12 12 | datetime.fromisoformat(date[:-1:] + "-0000")
 13 13 | 
@@ -104,7 +104,7 @@ FURB162.py:14:24: FURB162 [*] Unnecessary timezone monkeypatching
 17 16 | 
 18 17 | datetime.fromisoformat(
 
-FURB162.py:16:24: FURB162 [*] Unnecessary timezone monkeypatching
+FURB162.py:16:24: FURB162 [*] Unnecessary timezone replacement with zero offset
    |
 14 | datetime.fromisoformat(date.strip("Z") + """+0"""
 15 |                                          """0""")
@@ -115,7 +115,7 @@ FURB162.py:16:24: FURB162 [*] Unnecessary timezone monkeypatching
    |
    = help: Remove `.replace()` call
 
-ℹ Safe fix
+ℹ Unsafe fix
 13 13 | 
 14 14 | datetime.fromisoformat(date.strip("Z") + """+0"""
 15 15 |                                          """0""")
@@ -125,7 +125,7 @@ FURB162.py:16:24: FURB162 [*] Unnecessary timezone monkeypatching
 18 18 | datetime.fromisoformat(
 19 19 |     # Preserved
 
-FURB162.py:20:5: FURB162 [*] Unnecessary timezone monkeypatching
+FURB162.py:20:5: FURB162 [*] Unnecessary timezone replacement with zero offset
    |
 18 |   datetime.fromisoformat(
 19 |       # Preserved
@@ -137,7 +137,7 @@ FURB162.py:20:5: FURB162 [*] Unnecessary timezone monkeypatching
    |
    = help: Remove `.replace()` call
 
-ℹ Safe fix
+ℹ Unsafe fix
 19 19 |     # Preserved
 20 20 |     (  # Preserved
 21 21 |         date
@@ -147,7 +147,7 @@ FURB162.py:20:5: FURB162 [*] Unnecessary timezone monkeypatching
 24 24 | 
 25 25 | datetime.fromisoformat(
 
-FURB162.py:26:5: FURB162 [*] Unnecessary timezone monkeypatching
+FURB162.py:26:5: FURB162 [*] Unnecessary timezone replacement with zero offset
    |
 25 |   datetime.fromisoformat(
 26 | /     (date
@@ -176,7 +176,7 @@ FURB162.py:26:5: FURB162 [*] Unnecessary timezone monkeypatching
 34 30 | 
 35 31 | datetime.fromisoformat(
 
-FURB162.py:36:5: FURB162 [*] Unnecessary timezone monkeypatching
+FURB162.py:36:5: FURB162 [*] Unnecessary timezone replacement with zero offset
    |
 35 |   datetime.fromisoformat(
 36 | /     (  # Preserved
@@ -187,7 +187,7 @@ FURB162.py:36:5: FURB162 [*] Unnecessary timezone monkeypatching
    |
    = help: Remove `.replace()` call
 
-ℹ Safe fix
+ℹ Unsafe fix
 35 35 | datetime.fromisoformat(
 36 36 |     (  # Preserved
 37 37 |         date
@@ -197,7 +197,7 @@ FURB162.py:36:5: FURB162 [*] Unnecessary timezone monkeypatching
 40 40 | 
 41 41 | datetime.fromisoformat(
 
-FURB162.py:42:5: FURB162 [*] Unnecessary timezone monkeypatching
+FURB162.py:42:5: FURB162 [*] Unnecessary timezone replacement with zero offset
    |
 41 |   datetime.fromisoformat(
 42 | /     (date
@@ -220,4 +220,22 @@ FURB162.py:42:5: FURB162 [*] Unnecessary timezone monkeypatching
 47    |-    ] + "-00"
 48 45 | )
 49 46 | 
-50 47 |
+50 47 | 
+
+FURB162.py:52:24: FURB162 [*] Unnecessary timezone replacement with zero offset
+   |
+51 | # Edge case
+52 | datetime.fromisoformat("Z2025-01-01T00:00:00Z".strip("Z") + "+00:00")
+   |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB162
+   |
+   = help: Remove `.replace()` call
+
+ℹ Unsafe fix
+49 49 | 
+50 50 | 
+51 51 | # Edge case
+52    |-datetime.fromisoformat("Z2025-01-01T00:00:00Z".strip("Z") + "+00:00")
+   52 |+datetime.fromisoformat("Z2025-01-01T00:00:00Z")
+53 53 | 
+54 54 | 
+55 55 | ### No errors

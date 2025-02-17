@@ -3,7 +3,7 @@ from datetime import datetime
 date = ""
 
 
-## Errors
+### Errors
 
 datetime.fromisoformat(date.replace("Z", "+00:00"))
 datetime.fromisoformat(date.replace("Z", "-00:" "00"))
@@ -48,7 +48,11 @@ datetime.fromisoformat(
 )
 
 
-# No errors
+# Edge case
+datetime.fromisoformat("Z2025-01-01T00:00:00Z".strip("Z") + "+00:00")
+
+
+### No errors
 
 datetime.fromisoformat(date.replace("Z"))
 datetime.fromisoformat(date.replace("Z", "+0000"), foo)

@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{
@@ -17,10 +17,9 @@ use crate::settings::types::PythonVersion;
 /// of `Z` with a zero offset timezone.
 ///
 /// ## Why is this bad?
-/// On Python 3.11 and later, `datetime.fromisoformat()`
-/// can handle most [ISO 8601][iso-8601] formats,
-/// including ones affixed with `Z`,
-/// so such an operation is unnecessary.
+/// On Python 3.11 and later, `datetime.fromisoformat()` can handle most [ISO 8601][iso-8601]
+/// formats (barring only those that support fractional hours and minutes),
+/// including ones affixed with `Z`, so such an operation is unnecessary.
 ///
 /// ## Example
 ///
@@ -48,10 +47,19 @@ use crate::settings::types::PythonVersion;
 /// ```
 ///
 /// ## Fix safety
-/// The fix is marked as unsafe if it might remove comments.
+/// The fix is always marked as unsafe,
+/// as it might change the program's behaviour.
+///
+/// ```python
+/// d = "Z2025-01-01T00:00:00Z"
+///
+/// datetime.fromisoformat(d.strip("Z") + "+00:00")  # Fine
+/// datetime.fromisoformat(d)                        # Runtime error
+/// ```
 ///
 /// ## References
 /// * [What’s New In Python 3.11 &sect; `datetime`](https://docs.python.org/3/whatsnew/3.11.html#datetime)
+/// * [`fromisoformat`](https://docs.python.org/3/library/datetime.html#datetime.date.fromisoformat)
 ///
 /// [iso-8601]: https://www.iso.org/obp/ui/#iso:std:iso:8601
 #[derive(ViolationMetadata)]
@@ -60,7 +68,7 @@ pub(crate) struct FromisoformatReplaceZ;
 impl AlwaysFixableViolation for FromisoformatReplaceZ {
     #[derive_message_formats]
     fn message(&self) -> String {
-        r#"Unnecessary timezone monkeypatching"#.to_string()
+        r#"Unnecessary timezone replacement with zero offset"#.to_string()
     }
 
     fn fix_title(&self) -> String {
@@ -106,18 +114,10 @@ pub(crate) fn fromisoformat_replace_z(checker: &Checker, call: &ExprCall) {
 
     let range_to_remove = TextRange::new(value_full_range.end(), argument.end());
 
-    let applicability = if checker.comment_ranges().intersects(range_to_remove) {
-        Applicability::Unsafe
-    } else {
-        Applicability::Safe
-    };
-
     let diagnostic = Diagnostic::new(FromisoformatReplaceZ, argument.range());
+    let fix = Fix::unsafe_edit(Edit::range_deletion(range_to_remove));
 
-    checker.report_diagnostic(diagnostic.with_fix(Fix::applicable_edit(
-        Edit::range_deletion(range_to_remove),
-        applicability,
-    )));
+    checker.report_diagnostic(diagnostic.with_fix(fix));
 }
 
 fn func_is_fromisoformat(func: &Expr, semantic: &SemanticModel) -> bool {
