@@ -1,75 +1,31 @@
 use std::cmp::Ordering;
 use std::fmt::Debug;
-use std::marker::PhantomData;
 
 use bitflags::bitflags;
 
-use ruff_python_ast::{Mod, ModExpression, ModModule, PySourceType};
+use ruff_python_ast::{Mod, ModExpression, ModModule};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::parser::expression::ExpressionContext;
+use crate::parser::options::{AsParserOptions, SourceType};
 use crate::parser::progress::{ParserProgress, TokenId};
 use crate::token::TokenValue;
 use crate::token_set::TokenSet;
 use crate::token_source::{TokenSource, TokenSourceCheckpoint};
-use crate::{AsMode, Mode, ParseError, ParseErrorType, TokenKind};
+use crate::{Mode, ParseError, ParseErrorType, TokenKind};
 use crate::{Parsed, Tokens};
+
+pub use crate::parser::options::{KnownSource, ParserOptions, UnknownSource};
 
 mod expression;
 mod helpers;
+mod options;
 mod pattern;
 mod progress;
 mod recovery;
 mod statement;
 #[cfg(test)]
 mod tests;
-
-pub trait SourceType: std::fmt::Debug {}
-
-#[derive(Debug)]
-pub struct UnknownSource;
-
-impl SourceType for UnknownSource {}
-
-#[derive(Debug)]
-pub struct KnownSource;
-
-impl SourceType for KnownSource {}
-
-trait AsParserOptions: std::fmt::Debug {
-    fn mode(&self) -> Mode;
-}
-
-impl<S: SourceType> AsParserOptions for ParserOptions<S> {
-    fn mode(&self) -> Mode {
-        self.mode
-    }
-}
-
-#[derive(Debug)]
-pub struct ParserOptions<S: SourceType> {
-    /// Specify the mode in which the code will be parsed.
-    mode: Mode,
-    _type: PhantomData<S>,
-}
-
-impl ParserOptions<UnknownSource> {
-    pub fn from_mode(mode: Mode) -> Self {
-        Self {
-            mode,
-            _type: PhantomData,
-        }
-    }
-}
-
-impl ParserOptions<KnownSource> {
-    pub fn from_source_type(source_type: PySourceType) -> Self {
-        Self {
-            mode: source_type.as_mode(),
-            _type: PhantomData,
-        }
-    }
-}
 
 #[derive(Debug)]
 pub(crate) struct Parser<'src> {
