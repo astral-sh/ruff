@@ -104,7 +104,7 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
             // Allow the `.` on its own line if this is a fluent call chain
             // and the value either requires parenthesizing or is a call or subscript expression
             // (it's a fluent chain but not the first element).
-            else if self.call_chain_layout == CallChainLayout::Fluent {
+            else if call_chain_layout == CallChainLayout::Fluent {
                 if parenthesize_value || value.is_call_expr() || value.is_subscript_expr() {
                     soft_line_break().fmt(f)?;
                 }
