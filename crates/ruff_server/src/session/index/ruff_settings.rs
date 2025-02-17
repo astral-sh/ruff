@@ -20,12 +20,19 @@ use ruff_workspace::{
 
 use crate::session::settings::{ConfigurationPreference, ResolvedEditorSettings};
 
+#[derive(Debug)]
 pub struct RuffSettings {
     /// The path to this configuration file, used for debugging.
     /// The default fallback configuration does not have a file path.
     path: Option<PathBuf>,
     /// The resolved settings.
     settings: Settings,
+}
+
+impl RuffSettings {
+    pub(crate) fn path(&self) -> Option<&Path> {
+        self.path.as_deref()
+    }
 }
 
 impl Deref for RuffSettings {
@@ -298,14 +305,15 @@ impl RuffSettingsIndex {
             .clone()
     }
 
-    pub(crate) fn list_files(&self) -> impl Iterator<Item = &Path> {
+    pub(super) fn fallback(&self) -> Arc<RuffSettings> {
+        self.fallback.clone()
+    }
+
+    /// Returns an iterator over the paths to the configuration files in the index.
+    pub(crate) fn config_file_paths(&self) -> impl Iterator<Item = &Path> {
         self.index
             .values()
             .filter_map(|settings| settings.path.as_deref())
-    }
-
-    pub(super) fn fallback(&self) -> Arc<RuffSettings> {
-        self.fallback.clone()
     }
 }
 
