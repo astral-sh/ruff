@@ -98,19 +98,17 @@ impl fmt::Display for PythonVersion {
 }
 
 #[cfg(feature = "serde")]
-pub mod adapter {
-    //! Module designed for use with the `serde` [`with`](https://serde.rs/field-attrs.html#with)
-    //! field attribute.
-    //!
-    //! The [`serialize`] and [`deserialize`] functions allow any type that implements `Serialize`
-    //! or `Deserialize` and `TryFrom<PythonVersion>` or `Into<PythonVersion>`, respectively, to use
-    //! its own (de)serialization method but still end up as a `PythonVersion`.
-
+pub mod serde {
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
     use super::PythonVersion;
 
-    pub fn deserialize<'de, D, T>(deserializer: D) -> Result<PythonVersion, D::Error>
+    /// Deserialize a `T` using its own `Deserialize` implementation and then convert it to a
+    /// [`PythonVersion`].
+    ///
+    /// Intended for use with serde's
+    /// [`deserialize_with`](https://serde.rs/field-attrs.html#deserialize_with) field attribute.
+    pub fn deserialize_into<'de, D, T>(deserializer: D) -> Result<PythonVersion, D::Error>
     where
         D: Deserializer<'de>,
         T: Deserialize<'de> + Into<PythonVersion>,
@@ -118,7 +116,11 @@ pub mod adapter {
         Ok(T::deserialize(deserializer)?.into())
     }
 
-    pub fn serialize<S, T>(value: &PythonVersion, serializer: S) -> Result<S::Ok, S::Error>
+    /// Use `TryFrom` to convert a [`PythonVersion`] to a `T` and then serialize it.
+    ///
+    /// Intended for use with serde's
+    /// [`serialize_with`](https://serde.rs/field-attrs.html#serialize_with) field attribute.
+    pub fn try_serialize_from<S, T>(value: &PythonVersion, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
         T: Serialize + TryFrom<PythonVersion>,
@@ -129,13 +131,6 @@ pub mod adapter {
         })?;
         T::serialize(&value, serializer)
     }
-}
-
-#[cfg(feature = "serde")]
-mod serde {
-    use serde::{Deserialize, Deserializer};
-
-    use super::PythonVersion;
 
     impl<'de> Deserialize<'de> for PythonVersion {
         fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>

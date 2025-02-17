@@ -7,7 +7,10 @@ use ruff_formatter::{FormatOptions, IndentStyle, IndentWidth, LineWidth};
 use ruff_macros::CacheKey;
 use ruff_python_ast::PySourceType;
 
-use ruff_python_ast::python_version::{self as ast, adapter};
+use ruff_python_ast::python_version::{
+    serde::{deserialize_into, try_serialize_from},
+    PythonVersion as AstPythonVersion,
+};
 
 /// Resolved options for formatting one individual file. The difference to `FormatterSettings`
 /// is that `FormatterSettings` stores the settings for multiple files (the entire project, a subdirectory, ..)
@@ -23,9 +26,9 @@ pub struct PyFormatOptions {
 
     /// The (minimum) Python version used to run the formatted code. This is used
     /// to determine the supported Python syntax.
-    #[serde(deserialize_with = "adapter::deserialize::<_, PythonVersion>")]
-    #[serde(serialize_with = "adapter::serialize::<_, PythonVersion>")]
-    target_version: ast::PythonVersion,
+    #[serde(deserialize_with = "deserialize_into::<_, PythonVersion>")]
+    #[serde(serialize_with = "try_serialize_from::<_, PythonVersion>")]
+    target_version: AstPythonVersion,
 
     /// Specifies the indent style:
     /// * Either a tab
@@ -84,7 +87,7 @@ impl Default for PyFormatOptions {
     fn default() -> Self {
         Self {
             source_type: PySourceType::default(),
-            target_version: ast::PythonVersion::default(),
+            target_version: AstPythonVersion::default(),
             indent_style: default_indent_style(),
             line_width: default_line_width(),
             indent_width: default_indent_width(),
@@ -112,7 +115,7 @@ impl PyFormatOptions {
         }
     }
 
-    pub const fn target_version(&self) -> ast::PythonVersion {
+    pub const fn target_version(&self) -> AstPythonVersion {
         self.target_version
     }
 
@@ -149,7 +152,7 @@ impl PyFormatOptions {
     }
 
     #[must_use]
-    pub fn with_target_version(mut self, target_version: ast::PythonVersion) -> Self {
+    pub fn with_target_version(mut self, target_version: AstPythonVersion) -> Self {
         self.target_version = target_version;
         self
     }
@@ -493,24 +496,24 @@ pub enum PythonVersion {
     Py313,
 }
 
-impl TryFrom<ast::PythonVersion> for PythonVersion {
+impl TryFrom<AstPythonVersion> for PythonVersion {
     type Error = String;
 
-    fn try_from(value: ast::PythonVersion) -> Result<Self, Self::Error> {
+    fn try_from(value: AstPythonVersion) -> Result<Self, Self::Error> {
         match value {
-            ast::PythonVersion::PY37 => Ok(Self::Py37),
-            ast::PythonVersion::PY38 => Ok(Self::Py38),
-            ast::PythonVersion::PY39 => Ok(Self::Py39),
-            ast::PythonVersion::PY310 => Ok(Self::Py310),
-            ast::PythonVersion::PY311 => Ok(Self::Py311),
-            ast::PythonVersion::PY312 => Ok(Self::Py312),
-            ast::PythonVersion::PY313 => Ok(Self::Py313),
+            AstPythonVersion::PY37 => Ok(Self::Py37),
+            AstPythonVersion::PY38 => Ok(Self::Py38),
+            AstPythonVersion::PY39 => Ok(Self::Py39),
+            AstPythonVersion::PY310 => Ok(Self::Py310),
+            AstPythonVersion::PY311 => Ok(Self::Py311),
+            AstPythonVersion::PY312 => Ok(Self::Py312),
+            AstPythonVersion::PY313 => Ok(Self::Py313),
             _ => Err(format!("unrecognized python version {value}")),
         }
     }
 }
 
-impl From<PythonVersion> for ast::PythonVersion {
+impl From<PythonVersion> for AstPythonVersion {
     fn from(value: PythonVersion) -> Self {
         match value {
             PythonVersion::Py37 => Self::PY37,
