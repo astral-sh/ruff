@@ -1,4 +1,5 @@
-from typing import ClassVar, Sequence, Final
+from typing import ClassVar, Sequence, Final, TypeAlias
+from collections.abc import Mapping
 
 
 class A:
@@ -118,3 +119,21 @@ class AWithQuotes:
     final_variable: 'Final[list[int]]' = []
     class_variable_without_subscript: 'ClassVar' = []
     final_variable_without_subscript: 'Final' = []
+
+
+Foo: TypeAlias = Mapping[str, str]
+
+
+class BaseFoo:
+    values: Foo
+
+
+class DerivedFoo(BaseFoo):
+    values: Foo = {"a": "b"}
+
+
+Bar: TypeAlias = dict[str, str]
+
+
+class DerivedBar(BaseFoo):
+    values: Bar = {"a": "b"}

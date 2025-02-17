@@ -1,5 +1,6 @@
 use ruff_python_ast::helpers::{map_callable, map_subscript, Truthiness};
 use ruff_python_ast::{self as ast, Expr, ExprCall};
+use ruff_python_semantic::analyze::typing::find_binding_value;
 use ruff_python_semantic::{analyze, BindingKind, Modules, SemanticModel};
 
 /// Return `true` if the given [`Expr`] is a special class attribute, like `__slots__`.
@@ -199,4 +200,26 @@ pub(super) fn is_descriptor_class(func: &Expr, semantic: &SemanticModel) -> bool
                 .is_some_and(|id| semantic.binding(id).kind.is_function_definition())
         })
     })
+}
+
+/// Returns the inferred value of the given annotation binding of a given [`Expr`].
+///
+/// If an annotation [`Expr`] is bound to a type alias, this function will return the inferred
+/// value of the type alias.
+pub(super) fn map_annotation_binding<'a>(expr: &'a Expr, semantic: &'a SemanticModel) -> &'a Expr {
+    let Some(expr_name) = expr.clone().name_expr() else {
+        return expr;
+    };
+
+    let Some(binding) = semantic
+        .resolve_name(&expr_name)
+        .map(|id| semantic.binding(id))
+    else {
+        return expr;
+    };
+
+    match find_binding_value(binding, semantic) {
+        Some(value) => value,
+        None => expr,
+    }
 }

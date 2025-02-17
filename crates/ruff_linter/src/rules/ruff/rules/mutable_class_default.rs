@@ -8,7 +8,7 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 use crate::rules::ruff::rules::helpers::{
     dataclass_kind, has_default_copy_semantics, is_class_var_annotation, is_final_annotation,
-    is_special_attribute,
+    is_special_attribute, map_annotation_binding,
 };
 
 /// ## What it does
@@ -103,11 +103,12 @@ pub(crate) fn mutable_class_default(checker: &Checker, class_def: &ast::StmtClas
                 value: Some(value),
                 ..
             }) => {
+                let annotation_type = map_annotation_binding(annotation, checker.semantic());
                 if !is_special_attribute(target)
                     && is_mutable_expr(value, checker.semantic())
-                    && !is_class_var_annotation(annotation, checker.semantic())
-                    && !is_final_annotation(annotation, checker.semantic())
-                    && !is_immutable_annotation(annotation, checker.semantic(), &[])
+                    && !is_class_var_annotation(annotation_type, checker.semantic())
+                    && !is_final_annotation(annotation_type, checker.semantic())
+                    && !is_immutable_annotation(annotation_type, checker.semantic(), &[])
                 {
                     if dataclass_kind(class_def, checker.semantic()).is_some() {
                         continue;
