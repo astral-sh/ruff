@@ -1,11 +1,10 @@
 use std::fmt;
 
-use ruff_macros::CacheKey;
-
 /// Representation of a Python version.
 ///
 /// N.B. This does not necessarily represent a Python version that we actually support.
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, CacheKey)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[cfg_attr(feature = "cache", derive(ruff_macros::CacheKey))]
 pub struct PythonVersion {
     pub major: u8,
     pub minor: u8,
