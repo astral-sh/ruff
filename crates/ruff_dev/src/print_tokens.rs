@@ -7,7 +7,7 @@ use anyhow::Result;
 
 use ruff_linter::source_kind::SourceKind;
 use ruff_python_ast::PySourceType;
-use ruff_python_parser::parse_unchecked_source;
+use ruff_python_parser::{parse_unchecked_source, ParserOptions};
 
 #[derive(clap::Args)]
 pub(crate) struct Args {
@@ -24,7 +24,10 @@ pub(crate) fn main(args: &Args) -> Result<()> {
             args.file.display()
         )
     })?;
-    let parsed = parse_unchecked_source(source_kind.source_code(), source_type);
+    let parsed = parse_unchecked_source(
+        source_kind.source_code(),
+        ParserOptions::from_source_type(source_type),
+    );
     for token in parsed.tokens() {
         println!("{token:#?}");
     }

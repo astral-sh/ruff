@@ -16,7 +16,7 @@ use ruff_notebook::NotebookError;
 use ruff_python_ast::PySourceType;
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
-use ruff_python_parser::ParseError;
+use ruff_python_parser::{ParseError, ParserOptions};
 use ruff_python_trivia::textwrap::dedent;
 use ruff_source_file::SourceFileBuilder;
 use ruff_text_size::Ranged;
@@ -110,7 +110,10 @@ pub(crate) fn test_contents<'a>(
     settings: &LinterSettings,
 ) -> (Vec<Message>, Cow<'a, SourceKind>) {
     let source_type = PySourceType::from(path);
-    let parsed = ruff_python_parser::parse_unchecked_source(source_kind.source_code(), source_type);
+    let parsed = ruff_python_parser::parse_unchecked_source(
+        source_kind.source_code(),
+        ParserOptions::from_source_type(source_type),
+    );
     let locator = Locator::new(source_kind.source_code());
     let stylist = Stylist::from_tokens(parsed.tokens(), locator.contents());
     let indexer = Indexer::from_tokens(parsed.tokens(), locator.contents());
@@ -173,8 +176,10 @@ pub(crate) fn test_contents<'a>(
 
             transformed = Cow::Owned(transformed.updated(fixed_contents, &source_map));
 
-            let parsed =
-                ruff_python_parser::parse_unchecked_source(transformed.source_code(), source_type);
+            let parsed = ruff_python_parser::parse_unchecked_source(
+                transformed.source_code(),
+                ParserOptions::from_source_type(source_type),
+            );
             let locator = Locator::new(transformed.source_code());
             let stylist = Stylist::from_tokens(parsed.tokens(), locator.contents());
             let indexer = Indexer::from_tokens(parsed.tokens(), locator.contents());

@@ -136,12 +136,15 @@ mod tests {
     use crate::ast_node_ref::AstNodeRef;
     use ruff_db::parsed::ParsedModule;
     use ruff_python_ast::PySourceType;
-    use ruff_python_parser::parse_unchecked_source;
+    use ruff_python_parser::{parse_unchecked_source, ParserOptions};
 
     #[test]
     #[allow(unsafe_code)]
     fn equality() {
-        let parsed_raw = parse_unchecked_source("1 + 2", PySourceType::Python);
+        let parsed_raw = parse_unchecked_source(
+            "1 + 2",
+            ParserOptions::from_source_type(PySourceType::Python),
+        );
         let parsed = ParsedModule::new(parsed_raw.clone());
 
         let stmt = &parsed.syntax().body[0];
@@ -158,7 +161,10 @@ mod tests {
 
         assert_eq!(node1, cloned_node);
 
-        let other_raw = parse_unchecked_source("2 + 2", PySourceType::Python);
+        let other_raw = parse_unchecked_source(
+            "2 + 2",
+            ParserOptions::from_source_type(PySourceType::Python),
+        );
         let other = ParsedModule::new(other_raw);
 
         let other_stmt = &other.syntax().body[0];
@@ -170,13 +176,19 @@ mod tests {
     #[allow(unsafe_code)]
     #[test]
     fn inequality() {
-        let parsed_raw = parse_unchecked_source("1 + 2", PySourceType::Python);
+        let parsed_raw = parse_unchecked_source(
+            "1 + 2",
+            ParserOptions::from_source_type(PySourceType::Python),
+        );
         let parsed = ParsedModule::new(parsed_raw);
 
         let stmt = &parsed.syntax().body[0];
         let node = unsafe { AstNodeRef::new(parsed.clone(), stmt) };
 
-        let other_raw = parse_unchecked_source("2 + 2", PySourceType::Python);
+        let other_raw = parse_unchecked_source(
+            "2 + 2",
+            ParserOptions::from_source_type(PySourceType::Python),
+        );
         let other = ParsedModule::new(other_raw);
 
         let other_stmt = &other.syntax().body[0];
@@ -188,7 +200,10 @@ mod tests {
     #[test]
     #[allow(unsafe_code)]
     fn debug() {
-        let parsed_raw = parse_unchecked_source("1 + 2", PySourceType::Python);
+        let parsed_raw = parse_unchecked_source(
+            "1 + 2",
+            ParserOptions::from_source_type(PySourceType::Python),
+        );
         let parsed = ParsedModule::new(parsed_raw);
 
         let stmt = &parsed.syntax().body[0];

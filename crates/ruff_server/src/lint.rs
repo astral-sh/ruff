@@ -24,7 +24,7 @@ use ruff_linter::{
 use ruff_notebook::Notebook;
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
-use ruff_python_parser::ParseError;
+use ruff_python_parser::{ParseError, ParserOptions};
 use ruff_source_file::LineIndex;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -95,7 +95,10 @@ pub(crate) fn check(
     let source_type = query.source_type();
 
     // Parse once.
-    let parsed = ruff_python_parser::parse_unchecked_source(source_kind.source_code(), source_type);
+    let parsed = ruff_python_parser::parse_unchecked_source(
+        source_kind.source_code(),
+        ParserOptions::from_source_type(source_type),
+    );
 
     // Map row and column locations to byte slices (lazily).
     let locator = Locator::new(source_kind.source_code());

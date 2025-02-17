@@ -3,7 +3,7 @@ use std::ops::Deref;
 use std::sync::Arc;
 
 use ruff_python_ast::{ModModule, PySourceType};
-use ruff_python_parser::{parse_unchecked_source, Parsed};
+use ruff_python_parser::{parse_unchecked_source, Parsed, ParserOptions};
 
 use crate::files::{File, FilePath};
 use crate::source::source_text;
@@ -37,7 +37,10 @@ pub fn parsed_module(db: &dyn Db, file: File) -> ParsedModule {
             .map_or(PySourceType::Python, PySourceType::from_extension),
     };
 
-    ParsedModule::new(parse_unchecked_source(&source, ty))
+    ParsedModule::new(parse_unchecked_source(
+        &source,
+        ParserOptions::from_source_type(ty),
+    ))
 }
 
 /// Cheap cloneable wrapper around the parsed module.

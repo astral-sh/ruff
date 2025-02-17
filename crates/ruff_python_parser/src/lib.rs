@@ -295,9 +295,12 @@ pub fn parse_unchecked(source: &str, mode: Mode) -> Parsed<Mod> {
 }
 
 /// Parse the given Python source code using the specified [`PySourceType`].
-pub fn parse_unchecked_source(source: &str, source_type: PySourceType) -> Parsed<ModModule> {
+pub fn parse_unchecked_source(
+    source: &str,
+    options: ParserOptions<KnownSource>,
+) -> Parsed<ModModule> {
     // SAFETY: Safe because `PySourceType` always parses to a `ModModule`
-    Parser::new(source, ParserOptions::from_mode(source_type.as_mode()))
+    Parser::new(source, options)
         .parse()
         .try_into_module()
         .unwrap()
