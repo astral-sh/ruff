@@ -23,8 +23,6 @@ pub struct PyFormatOptions {
 
     /// The (minimum) Python version used to run the formatted code. This is used
     /// to determine the supported Python syntax.
-    #[serde(deserialize_with = "deserialize_into")]
-    #[serde(serialize_with = "try_serialize_from")]
     target_version: AstPythonVersion,
 
     /// Specifies the indent style:
@@ -522,36 +520,4 @@ impl From<PythonVersion> for AstPythonVersion {
             PythonVersion::Py313 => Self::PY313,
         }
     }
-}
-
-/// Deserialize a [`PythonVersion`] using its own `Deserialize` implementation and then convert it
-/// to an [`AstPythonVersion`].
-///
-/// Intended for use with serde's
-/// [`deserialize_with`](https://serde.rs/field-attrs.html#deserialize_with) field attribute.
-#[cfg(feature = "serde")]
-fn deserialize_into<'de, D>(deserializer: D) -> Result<AstPythonVersion, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    use serde::Deserialize as _;
-
-    Ok(PythonVersion::deserialize(deserializer)?.into())
-}
-
-/// Use `TryFrom` to convert an [`AstPythonVersion`] to a `PythonVersion` and then serialize it.
-///
-/// Intended for use with serde's
-/// [`serialize_with`](https://serde.rs/field-attrs.html#serialize_with) field attribute.
-#[cfg(feature = "serde")]
-#[allow(clippy::trivially_copy_pass_by_ref)]
-fn try_serialize_from<S>(value: &AstPythonVersion, serializer: S) -> Result<S::Ok, S::Error>
-where
-    S: serde::Serializer,
-{
-    use serde::Serialize as _;
-
-    let value = PythonVersion::try_from(*value)
-        .map_err(|err| serde::ser::Error::custom(format!("failed to convert version: {err}")))?;
-    PythonVersion::serialize(&value, serializer)
 }
