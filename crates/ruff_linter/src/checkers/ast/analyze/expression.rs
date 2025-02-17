@@ -1537,7 +1537,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 }
             }
             if checker.enabled(Rule::MissingFStringSyntax) {
-                for string_literal in value.as_slice() {
+                for string_literal in value {
                     ruff::rules::missing_fstring_syntax(checker, string_literal);
                 }
             }

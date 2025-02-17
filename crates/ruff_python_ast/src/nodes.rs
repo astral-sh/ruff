@@ -1287,6 +1287,17 @@ pub struct ExprStringLiteral {
     pub value: StringLiteralValue,
 }
 
+impl ExprStringLiteral {
+    /// Return `Some(literal)` if the string only consists of a single `StringLiteral` part
+    /// (indicating that it is not implicitly concatenated). Otherwise, return `None`.
+    pub fn as_unconcatenated_literal(&self) -> Option<&StringLiteral> {
+        match &self.value.inner {
+            StringLiteralValueInner::Single(value) => Some(value),
+            StringLiteralValueInner::Concatenated(_) => None,
+        }
+    }
+}
+
 /// The value representing a [`ExprStringLiteral`].
 #[derive(Clone, Debug, PartialEq)]
 pub struct StringLiteralValue {
@@ -1304,7 +1315,7 @@ impl StringLiteralValue {
     /// Returns the [`StringLiteralFlags`] associated with this string literal.
     ///
     /// For an implicitly concatenated string, it returns the flags for the first literal.
-    pub fn flags(&self) -> StringLiteralFlags {
+    pub fn first_literal_flags(&self) -> StringLiteralFlags {
         self.iter()
             .next()
             .expect(
@@ -1485,8 +1496,8 @@ bitflags! {
 ///
 /// If you're using a `Generator` from the `ruff_python_codegen` crate to generate a lint-rule fix
 /// from an existing string literal, consider passing along the [`StringLiteral::flags`] field or
-/// the result of the [`StringLiteralValue::flags`] method. If you don't have an existing string but
-/// have a `Checker` from the `ruff_linter` crate available, consider using
+/// the result of the [`StringLiteralValue::first_literal_flags`] method. If you don't have an
+/// existing string but have a `Checker` from the `ruff_linter` crate available, consider using
 /// `Checker::default_string_flags` to create instances of this struct; this method will properly
 /// handle surrounding f-strings. For usage that doesn't fit into one of these categories, the
 /// public constructor [`StringLiteralFlags::empty`] can be used.
@@ -1791,16 +1802,6 @@ impl BytesLiteralValue {
     pub fn bytes(&self) -> impl Iterator<Item = u8> + '_ {
         self.iter().flat_map(|part| part.as_slice().iter().copied())
     }
-
-    /// Returns the [`BytesLiteralFlags`] associated with this literal.
-    ///
-    /// For an implicitly concatenated literal, it returns the flags for the first literal.
-    pub fn flags(&self) -> BytesLiteralFlags {
-        self.iter()
-            .next()
-            .expect("There should always be at least one literal in an `ExprBytesLiteral` node")
-            .flags
-    }
 }
 
 impl<'a> IntoIterator for &'a BytesLiteralValue {
@@ -1890,12 +1891,11 @@ bitflags! {
 /// ## Notes on usage
 ///
 /// If you're using a `Generator` from the `ruff_python_codegen` crate to generate a lint-rule fix
-/// from an existing bytes literal, consider passing along the [`BytesLiteral::flags`] field or the
-/// result of the [`BytesLiteralValue::flags`] method. If you don't have an existing literal but
-/// have a `Checker` from the `ruff_linter` crate available, consider using
-/// `Checker::default_bytes_flags` to create instances of this struct; this method will properly
-/// handle surrounding f-strings. For usage that doesn't fit into one of these categories, the
-/// public constructor [`BytesLiteralFlags::empty`] can be used.
+/// from an existing bytes literal, consider passing along the [`BytesLiteral::flags`] field. If
+/// you don't have an existing literal but have a `Checker` from the `ruff_linter` crate available,
+/// consider using `Checker::default_bytes_flags` to create instances of this struct; this method
+/// will properly handle surrounding f-strings. For usage that doesn't fit into one of these
+/// categories, the public constructor [`BytesLiteralFlags::empty`] can be used.
 #[derive(Copy, Clone, Eq, PartialEq, Hash)]
 pub struct BytesLiteralFlags(BytesLiteralFlagsInner);
 
