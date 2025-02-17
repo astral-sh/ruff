@@ -219,7 +219,7 @@ pub(super) fn map_annotation_binding<'a>(expr: &'a Expr, semantic: &'a SemanticM
     };
 
     match find_binding_value(binding, semantic) {
-        Some(value) => value,
+        Some(value) => map_annotation_binding(map_subscript(value), semantic),
         None => expr,
     }
 }
