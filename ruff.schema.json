@@ -693,7 +693,6 @@
     },
     "target-version": {
       "description": "The minimum Python version to target, e.g., when considering automatic code upgrades, like rewriting type annotations. Ruff will not propose changes using features that are not available in the given version.\n\nFor example, to represent supporting Python >=3.10 or ==3.10 specify `target-version = \"py310\"`.\n\nIf you're already using a `pyproject.toml` file, we recommend `project.requires-python` instead, as it's based on Python packaging standards, and will be respected by other tools. For example, Ruff treats the following as identical to `target-version = \"py38\"`:\n\n```toml [project] requires-python = \">=3.8\" ```\n\nIf both are specified, `target-version` takes precedence over `requires-python`.\n\nNote that a stub file can [sometimes make use of a typing feature](https://typing.readthedocs.io/en/latest/spec/distributing.html#syntax) before it is available at runtime, as long as the stub does not make use of new *syntax*. For example, a type checker will understand `int | str` in a stub as being a `Union` type annotation, even if the type checker is run using Python 3.9, despite the fact that the `|` operator can only be used to create union types at runtime on Python 3.10+. As such, Ruff will often recommend newer features in a stub file than it would for an equivalent runtime file with the same target version.",
-      "default": null,
       "anyOf": [
         {
           "$ref": "#/definitions/PythonVersion"
@@ -2774,39 +2773,15 @@
       "additionalProperties": false
     },
     "PythonVersion": {
-      "anyOf": [
-        {
-          "type": "string",
-          "pattern": "^\\d+\\.\\d+$"
-        },
-        {
-          "description": "Python 3.7",
-          "const": "3.7"
-        },
-        {
-          "description": "Python 3.8",
-          "const": "3.8"
-        },
-        {
-          "description": "Python 3.9",
-          "const": "3.9"
-        },
-        {
-          "description": "Python 3.10",
-          "const": "3.10"
-        },
-        {
-          "description": "Python 3.11",
-          "const": "3.11"
-        },
-        {
-          "description": "Python 3.12",
-          "const": "3.12"
-        },
-        {
-          "description": "Python 3.13",
-          "const": "3.13"
-        }
+      "type": "string",
+      "enum": [
+        "py37",
+        "py38",
+        "py39",
+        "py310",
+        "py311",
+        "py312",
+        "py313"
       ]
     },
     "Quote": {
