@@ -38,7 +38,7 @@ body:
   - type: input
     attributes:
       label: Python version
-      description: What version of Python are you using? (see `uv run python --version`)
+      description: What version of Python are you using? (see `python --version`)
       placeholder: e.g., Python 3.12.6
     validations:
       required: false
