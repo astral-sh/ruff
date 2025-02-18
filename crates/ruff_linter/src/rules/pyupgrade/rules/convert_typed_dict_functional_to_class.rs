@@ -14,17 +14,21 @@ use crate::checkers::ast::Checker;
 /// Checks for `TypedDict` declarations that use functional syntax.
 ///
 /// ## Why is this bad?
-/// `TypedDict` subclasses can be defined either through a functional syntax
+/// `TypedDict` types can be defined either through a functional syntax
 /// (`Foo = TypedDict(...)`) or a class syntax (`class Foo(TypedDict): ...`).
 ///
 /// The class syntax is more readable and generally preferred over the
 /// functional syntax.
-/// However, there are few exceptions, when functional form is preferred,
-/// when field names contain:
-/// - Invalid python identifiers like `@x`
-/// - Python keywords like `in`
-/// - Private names like `__id` that will be mangled in class-based form in runtime
-/// - Dunder names like `__int__` that can confuse type checkers
+///
+/// Nonetheless, there are some situations in which it is impossible to use
+/// the class-based syntax. This rule will not apply to those cases. Namely,
+/// it is impossible to use the class-based syntax if any `TypedDict` fields are:
+/// - Not valid [python identifiers] (for example, `@x`)
+/// - [Python keywords] such as `in`
+/// - [Private names] such as `__id` that would undergo [name mangling] at runtime
+///   if the class-based syntax was used
+/// - [Dunder names] such as `__int__` that can confuse type checkers if they're used
+///   with the class-based syntax.
 ///
 /// ## Example
 /// ```python
@@ -50,6 +54,12 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: `typing.TypedDict`](https://docs.python.org/3/library/typing.html#typing.TypedDict)
+///
+/// [Private names]: https://docs.python.org/3/tutorial/classes.html#private-variables
+/// [name mangling]: https://docs.python.org/3/reference/expressions.html#private-name-mangling
+/// [python identifiers]: https://docs.python.org/3/reference/lexical_analysis.html#identifiers
+/// [Python keywords]: https://docs.python.org/3/reference/lexical_analysis.html#keywords
+/// [Dunder names]: https://docs.python.org/3/reference/lexical_analysis.html#reserved-classes-of-identifiers
 #[derive(ViolationMetadata)]
 pub(crate) struct ConvertTypedDictFunctionalToClass {
     name: String,
