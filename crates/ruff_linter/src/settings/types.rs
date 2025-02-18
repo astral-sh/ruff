@@ -24,9 +24,7 @@ use crate::registry::RuleSet;
 use crate::rule_selector::RuleSelector;
 use crate::{display_settings, fs};
 
-#[derive(
-    Clone, Copy, Debug, PartialOrd, Ord, PartialEq, Eq, Serialize, Deserialize, CacheKey, EnumIter,
-)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, CacheKey, EnumIter)]
 #[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
 #[serde(rename_all = "lowercase")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
