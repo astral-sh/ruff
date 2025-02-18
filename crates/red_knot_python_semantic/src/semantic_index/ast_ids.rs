@@ -40,7 +40,6 @@ impl AstIds {
         })
     }
 
-    #[track_caller]
     fn use_id(&self, key: impl Into<ExpressionNodeKey>) -> ScopedUseId {
         self.uses_map[&key.into()]
     }
