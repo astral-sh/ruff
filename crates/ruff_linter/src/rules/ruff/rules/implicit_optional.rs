@@ -177,7 +177,7 @@ pub(crate) fn implicit_optional(checker: &Checker, parameters: &Parameters) {
                 let Some(expr) = type_hint_explicitly_allows_none(
                     parsed_annotation.expression(),
                     checker,
-                    checker.settings.target_version.minor,
+                    checker.settings.target_version,
                 ) else {
                     continue;
                 };
@@ -195,7 +195,7 @@ pub(crate) fn implicit_optional(checker: &Checker, parameters: &Parameters) {
             let Some(expr) = type_hint_explicitly_allows_none(
                 annotation,
                 checker,
-                checker.settings.target_version.minor,
+                checker.settings.target_version,
             ) else {
                 continue;
             };
