@@ -3,13 +3,12 @@ use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{
     Expr, ExprAttribute, ExprBinOp, ExprCall, ExprStringLiteral, ExprSubscript, ExprUnaryOp,
-    Number, Operator, UnaryOp,
+    Number, Operator, PythonVersion, UnaryOp,
 };
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
-use crate::settings::types::PythonVersion;
 
 /// ## What it does
 /// Checks for `datetime.fromisoformat()` calls
@@ -83,7 +82,7 @@ impl AlwaysFixableViolation for FromisoformatReplaceZ {
 
 /// FURB162
 pub(crate) fn fromisoformat_replace_z(checker: &Checker, call: &ExprCall) {
-    if checker.settings.target_version < PythonVersion::Py311 {
+    if checker.settings.target_version < PythonVersion::PY311 {
         return;
     }
 

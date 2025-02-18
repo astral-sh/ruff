@@ -15,7 +15,7 @@ use crate::rules::flake8_use_pathlib::violations::{
     OsPathIsfile, OsPathIslink, OsPathJoin, OsPathSamefile, OsPathSplitext, OsReadlink, OsRemove,
     OsRename, OsReplace, OsRmdir, OsStat, OsUnlink, PyPath,
 };
-use crate::settings::types::PythonVersion;
+use ruff_python_ast::PythonVersion;
 
 pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
     if let Some(diagnostic_kind) = checker
@@ -152,7 +152,7 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
             ),
             // PTH115
             // Python 3.9+
-            ["os", "readlink"] if checker.settings.target_version >= PythonVersion::Py39 => {
+            ["os", "readlink"] if checker.settings.target_version >= PythonVersion::PY39 => {
                 Some(OsReadlink.into())
             }
             // PTH208,

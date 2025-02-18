@@ -198,7 +198,7 @@ pub enum PythonVersion {
     Py313,
 }
 
-impl From<PythonVersion> for ruff_python_ast::python_version::PythonVersion {
+impl From<PythonVersion> for ruff_python_ast::PythonVersion {
     fn from(value: PythonVersion) -> Self {
         match value {
             PythonVersion::Py37 => Self::PY37,
@@ -308,8 +308,8 @@ mod tests {
     #[test]
     fn same_default_as_python_version() {
         assert_eq!(
-            ruff_python_ast::python_version::PythonVersion::from(PythonVersion::default()),
-            ruff_python_ast::python_version::PythonVersion::default()
+            ruff_python_ast::PythonVersion::from(PythonVersion::default()),
+            ruff_python_ast::PythonVersion::default()
         );
     }
 }

@@ -2115,7 +2115,7 @@ impl<'a> Checker<'a> {
         };
 
         let standard_builtins = python_builtins(
-            self.settings.target_version.minor(),
+            self.settings.target_version.minor,
             self.source_type.is_ipynb(),
         );
         for builtin in standard_builtins {

@@ -10,8 +10,8 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 use crate::rules::flake8_type_checking::helpers::quote_type_expression;
-use crate::settings::types::PythonVersion;
 use crate::settings::LinterSettings;
+use ruff_python_ast::PythonVersion;
 
 /// ## What it does
 /// Checks if [PEP 613] explicit type aliases contain references to
@@ -313,7 +313,7 @@ fn quotes_are_unremovable(
         }) => {
             match op {
                 Operator::BitOr => {
-                    if settings.target_version < PythonVersion::Py310 {
+                    if settings.target_version < PythonVersion::PY310 {
                         return true;
                     }
                     quotes_are_unremovable(semantic, left, settings)

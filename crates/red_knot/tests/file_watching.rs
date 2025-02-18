@@ -16,7 +16,7 @@ use ruff_db::system::{
     OsSystem, System, SystemPath, SystemPathBuf, UserConfigDirectoryOverrideGuard,
 };
 use ruff_db::Upcast;
-use ruff_python_ast::python_version::PythonVersion;
+use ruff_python_ast::PythonVersion;
 
 struct TestCase {
     db: ProjectDatabase,

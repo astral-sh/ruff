@@ -4,6 +4,7 @@ use std::fmt;
 ///
 /// N.B. This does not necessarily represent a Python version that we actually support.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[cfg_attr(feature = "cache", derive(ruff_macros::CacheKey))]
 pub struct PythonVersion {
     pub major: u8,
     pub minor: u8,
@@ -43,8 +44,23 @@ impl PythonVersion {
         .into_iter()
     }
 
+    pub const fn latest() -> Self {
+        Self::PY313
+    }
+
+    pub const fn as_tuple(self) -> (u8, u8) {
+        (self.major, self.minor)
+    }
+
     pub fn free_threaded_build_available(self) -> bool {
         self >= PythonVersion::PY313
+    }
+
+    /// Return `true` if the current version supports [PEP 701].
+    ///
+    /// [PEP 701]: https://peps.python.org/pep-0701/
+    pub fn supports_pep_701(self) -> bool {
+        self >= Self::PY312
     }
 }
 
