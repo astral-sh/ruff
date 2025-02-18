@@ -25,7 +25,9 @@ use crate::semantic_index::symbol::{
     FileScopeId, NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopeKind, ScopedSymbolId,
     SymbolTableBuilder,
 };
-use crate::semantic_index::use_def::{FlowSnapshot, ScopedConstraintId, UseDefMapBuilder};
+use crate::semantic_index::use_def::{
+    EagerBindingsKey, FlowSnapshot, ScopedConstraintId, ScopedEagerBindingsId, UseDefMapBuilder,
+};
 use crate::semantic_index::SemanticIndex;
 use crate::unpack::{Unpack, UnpackValue};
 use crate::visibility_constraints::{ScopedVisibilityConstraintId, VisibilityConstraintsBuilder};
@@ -92,6 +94,7 @@ pub(super) struct SemanticIndexBuilder<'db> {
     expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
     imported_modules: FxHashSet<ModuleName>,
     attribute_assignments: FxHashMap<FileScopeId, AttributeAssignments<'db>>,
+    eager_bindings: FxHashMap<EagerBindingsKey, ScopedEagerBindingsId>,
 }
 
 impl<'db> SemanticIndexBuilder<'db> {
@@ -123,6 +126,8 @@ impl<'db> SemanticIndexBuilder<'db> {
             imported_modules: FxHashSet::default(),
 
             attribute_assignments: FxHashMap::default(),
+
+            eager_bindings: FxHashMap::default(),
         };
 
         builder.push_scope_with_parent(NodeWithScopeRef::Module, None);
@@ -223,27 +228,35 @@ impl<'db> SemanticIndexBuilder<'db> {
 
         // If the scope that we just popped off is an eager scope, we need to "lock" our view of
         // which bindings and/or declarations reach each of the uses in the scope.
-        if let Some(eager_nested_scope) = popped_scope.node().as_eager_nested_scope() {
+        if popped_scope.is_eager() {
             for nested_symbol in self.symbol_tables[popped_scope_id].symbols() {
-                // Loop through each enclosing scope, looking for the innermost one that binds or
-                // declares the symbol.
+                // Loop through each enclosing scope, looking for any that bind or declare the
+                // symbol.
                 for enclosing_scope_info in self.scope_stack.iter().rev() {
+                    // Skip this enclosing scope if it doesn't contain any bindings or declarations
+                    // for the symbol.
                     let enclosing_scope_id = enclosing_scope_info.file_scope_id;
                     let enclosing_symbol_table = &self.symbol_tables[enclosing_scope_id];
-                    if let Some(enclosing_symbol_id) =
+                    let Some(enclosing_symbol_id) =
                         enclosing_symbol_table.symbol_id_by_name(nested_symbol.name())
-                    {
-                        let enclosing_symbol = enclosing_symbol_table.symbol(enclosing_symbol_id);
-                        if enclosing_symbol.is_bound() || enclosing_symbol.is_declared() {
-                            let eager_nested_scope_id = self.ast_ids[enclosing_scope_id]
-                                .record_eager_nested_scope(eager_nested_scope);
-                            let enclosing_use_def_map = &mut self.use_def_maps[enclosing_scope_id];
-                            enclosing_use_def_map.snapshot_symbol_state_for_eager_nested_scope(
-                                eager_nested_scope_id,
-                                enclosing_symbol_id,
-                            );
-                        }
+                    else {
+                        continue;
+                    };
+                    let enclosing_symbol = enclosing_symbol_table.symbol(enclosing_symbol_id);
+                    if !enclosing_symbol.is_bound() && !enclosing_symbol.is_declared() {
+                        continue;
                     }
+
+                    // Snapshot the bindings of this symbol that are visible at this point in the
+                    // enclosing scope.
+                    let key = EagerBindingsKey {
+                        enclosing_scope: enclosing_scope_id,
+                        enclosing_symbol: enclosing_symbol_id,
+                        nested_scope: popped_scope_id,
+                    };
+                    let eager_bindings = self.use_def_maps[enclosing_scope_id]
+                        .snapshot_eager_bindings(enclosing_symbol_id);
+                    self.eager_bindings.insert(key, eager_bindings);
                 }
             }
         }
@@ -767,6 +780,7 @@ impl<'db> SemanticIndexBuilder<'db> {
 
         self.scope_ids_by_scope.shrink_to_fit();
         self.scopes_by_node.shrink_to_fit();
+        self.eager_bindings.shrink_to_fit();
 
         SemanticIndex {
             symbol_tables,
@@ -785,6 +799,7 @@ impl<'db> SemanticIndexBuilder<'db> {
                 .into_iter()
                 .map(|(k, v)| (k, Arc::new(v)))
                 .collect(),
+            eager_bindings: self.eager_bindings,
         }
     }
 }

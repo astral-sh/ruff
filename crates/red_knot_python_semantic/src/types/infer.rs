@@ -50,8 +50,8 @@ use crate::semantic_index::semantic_index;
 use crate::semantic_index::symbol::{NodeWithScopeKind, NodeWithScopeRef, ScopeId};
 use crate::semantic_index::SemanticIndex;
 use crate::symbol::{
-    builtins_module_scope, builtins_symbol, eager_symbol_for_nested_scope, symbol,
-    symbol_from_bindings, symbol_from_declarations, typing_extensions_symbol, LookupError,
+    builtins_module_scope, builtins_symbol, symbol, symbol_from_bindings, symbol_from_declarations,
+    typing_extensions_symbol, LookupError,
 };
 use crate::types::call::{Argument, CallArguments};
 use crate::types::diagnostic::{
@@ -3526,13 +3526,12 @@ impl<'db> TypeInferenceBuilder<'db> {
                 // the point where the previous enclosing scope was defined, instead of at the end
                 // of the scope.
                 if look_up_eagerly_inner {
-                    if let Some(symbol) = eager_symbol_for_nested_scope(
-                        db,
-                        enclosing_scope_id,
-                        scope,
+                    if let Some(bindings) = self.index.eager_bindings(
+                        enclosing_scope_file_id,
                         enclosing_symbol_id,
+                        file_scope_id,
                     ) {
-                        return symbol;
+                        return symbol_from_bindings(db, bindings);
                     }
                 } else {
                     let enclosing_symbol = enclosing_symbol_table.symbol(enclosing_symbol_id);

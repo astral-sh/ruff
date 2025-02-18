@@ -4,7 +4,6 @@ use ruff_index::newtype_index;
 use ruff_python_ast as ast;
 use ruff_python_ast::ExprRef;
 
-use crate::node_key::NodeKey;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::semantic_index;
 use crate::semantic_index::symbol::ScopeId;
@@ -31,8 +30,6 @@ pub(crate) struct AstIds {
     expressions: FxHashMap<ExpressionNodeKey, ScopedExpressionId>,
     /// Maps expressions which "use" a symbol (that is, [`ast::ExprName`]) to a use id.
     uses: FxHashMap<ExpressionNodeKey, ScopedUseId>,
-    /// Maps nodes that represent nested scopes to unique IDs representing those scopes.
-    eager_nested_scopes: FxHashMap<EagerNestedScopeNodeKey, ScopedEagerNestedScopeId>,
 }
 
 impl AstIds {
@@ -46,14 +43,6 @@ impl AstIds {
     #[track_caller]
     fn use_id(&self, key: impl Into<ExpressionNodeKey>) -> ScopedUseId {
         self.uses[&key.into()]
-    }
-
-    #[track_caller]
-    fn eager_nested_scope_id(
-        &self,
-        key: EagerNestedScopeNodeKey,
-    ) -> Option<ScopedEagerNestedScopeId> {
-        self.eager_nested_scopes.get(&key).copied()
     }
 }
 
@@ -81,146 +70,6 @@ impl HasScopedUseId for ast::ExprRef<'_> {
     fn scoped_use_id(&self, db: &dyn Db, scope: ScopeId) -> ScopedUseId {
         let ast_ids = ast_ids(db, scope);
         ast_ids.use_id(*self)
-    }
-}
-
-/// Uniquely identifies a nested "eager scope".
-///
-/// An eager scope has its entire body executed immediately at the location where it is defined.
-/// This is required to store a record of snapshots that provide information on the definition
-/// states of symbols in the parent scope at the point where the nested scope is defined.
-#[newtype_index]
-pub(crate) struct ScopedEagerNestedScopeId;
-
-pub(super) trait HasScopedEagerNestedScopeId {
-    fn scoped_eager_nested_scope_id(
-        &self,
-        db: &dyn Db,
-        outer_scope: ScopeId,
-    ) -> Option<ScopedEagerNestedScopeId>;
-}
-
-// A list comprehension executes its nested scope eagerly;
-// it may use symbols from its parent scope at the point where the comprehension
-// is *defined* rather than symbols from the end of the parent scope
-impl HasScopedEagerNestedScopeId for ast::ExprListComp {
-    fn scoped_eager_nested_scope_id(
-        &self,
-        db: &dyn Db,
-        outer_scope: ScopeId,
-    ) -> Option<ScopedEagerNestedScopeId> {
-        ast_ids(db, outer_scope).eager_nested_scope_id(self.into())
-    }
-}
-
-// A dict comprehension executes its nested scope eagerly;
-// it may use symbols from its parent scope at the point where the comprehension
-// is *defined* rather than symbols from the end of the parent scope
-impl HasScopedEagerNestedScopeId for ast::ExprDictComp {
-    fn scoped_eager_nested_scope_id(
-        &self,
-        db: &dyn Db,
-        outer_scope: ScopeId,
-    ) -> Option<ScopedEagerNestedScopeId> {
-        ast_ids(db, outer_scope).eager_nested_scope_id(self.into())
-    }
-}
-
-// A set comprehension executes its nested scope eagerly;
-// it may use symbols from its parent scope at the point where the comprehension
-// is *defined* rather than symbols from the end of the parent scope
-impl HasScopedEagerNestedScopeId for ast::ExprSetComp {
-    fn scoped_eager_nested_scope_id(
-        &self,
-        db: &dyn Db,
-        outer_scope: ScopeId,
-    ) -> Option<ScopedEagerNestedScopeId> {
-        ast_ids(db, outer_scope).eager_nested_scope_id(self.into())
-    }
-}
-
-// Generator expressions are interesting!
-//
-// One of the key benefits of a generator expression is that it *can* run lazily,
-// as opposed to a list comprehension. However, in real-world uses, a majority of
-// generator expressions are executed eagerly, passed to functions such as `any()` and `all()`.
-// As such (and matching the behaviour of other type checkers such as mypy/pyright),
-// we model generator expressions as always executing their nested scopes eagerly,
-// even though this isn't always *strictly* accurate.
-//
-// Practicality beats purity!
-impl HasScopedEagerNestedScopeId for ast::ExprGenerator {
-    fn scoped_eager_nested_scope_id(
-        &self,
-        db: &dyn Db,
-        outer_scope: ScopeId,
-    ) -> Option<ScopedEagerNestedScopeId> {
-        ast_ids(db, outer_scope).eager_nested_scope_id(self.into())
-    }
-}
-
-// Class bodies are also eager.
-impl HasScopedEagerNestedScopeId for ast::StmtClassDef {
-    fn scoped_eager_nested_scope_id(
-        &self,
-        db: &dyn Db,
-        outer_scope: ScopeId,
-    ) -> Option<ScopedEagerNestedScopeId> {
-        ast_ids(db, outer_scope).eager_nested_scope_id(self.into())
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub(super) struct EagerNestedScopeNodeKey(NodeKey);
-
-impl From<&ast::StmtClassDef> for EagerNestedScopeNodeKey {
-    fn from(value: &ast::StmtClassDef) -> Self {
-        Self(NodeKey::from_node(value))
-    }
-}
-
-impl From<&ast::ExprListComp> for EagerNestedScopeNodeKey {
-    fn from(value: &ast::ExprListComp) -> Self {
-        Self(NodeKey::from_node(value))
-    }
-}
-
-impl From<&ast::ExprSetComp> for EagerNestedScopeNodeKey {
-    fn from(value: &ast::ExprSetComp) -> Self {
-        Self(NodeKey::from_node(value))
-    }
-}
-
-impl From<&ast::ExprDictComp> for EagerNestedScopeNodeKey {
-    fn from(value: &ast::ExprDictComp) -> Self {
-        Self(NodeKey::from_node(value))
-    }
-}
-
-impl From<&ast::ExprGenerator> for EagerNestedScopeNodeKey {
-    fn from(value: &ast::ExprGenerator) -> Self {
-        Self(NodeKey::from_node(value))
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub(super) enum EagerNestedScopeRef<'a> {
-    Class(&'a ast::StmtClassDef),
-    ListComprehension(&'a ast::ExprListComp),
-    SetComprehension(&'a ast::ExprSetComp),
-    DictComprehension(&'a ast::ExprDictComp),
-    GeneratorExpression(&'a ast::ExprGenerator),
-}
-
-impl From<EagerNestedScopeRef<'_>> for EagerNestedScopeNodeKey {
-    fn from(value: EagerNestedScopeRef) -> Self {
-        match value {
-            EagerNestedScopeRef::Class(class) => class.into(),
-            EagerNestedScopeRef::DictComprehension(dict_comprehension) => dict_comprehension.into(),
-            EagerNestedScopeRef::GeneratorExpression(generator) => generator.into(),
-            EagerNestedScopeRef::ListComprehension(list_comprehension) => list_comprehension.into(),
-            EagerNestedScopeRef::SetComprehension(set_comprehension) => set_comprehension.into(),
-        }
     }
 }
 
@@ -296,7 +145,6 @@ impl HasScopedExpressionId for ast::ExprRef<'_> {
 pub(super) struct AstIdsBuilder {
     expressions: FxHashMap<ExpressionNodeKey, ScopedExpressionId>,
     uses: FxHashMap<ExpressionNodeKey, ScopedUseId>,
-    eager_nested_scopes: FxHashMap<EagerNestedScopeNodeKey, ScopedEagerNestedScopeId>,
 }
 
 impl AstIdsBuilder {
@@ -318,26 +166,13 @@ impl AstIdsBuilder {
         use_id
     }
 
-    pub(super) fn record_eager_nested_scope(
-        &mut self,
-        node: impl Into<EagerNestedScopeNodeKey>,
-    ) -> ScopedEagerNestedScopeId {
-        let nested_scope_id = self.eager_nested_scopes.len().into();
-        *self
-            .eager_nested_scopes
-            .entry(node.into())
-            .or_insert(nested_scope_id)
-    }
-
     pub(super) fn finish(mut self) -> AstIds {
         self.expressions.shrink_to_fit();
         self.uses.shrink_to_fit();
-        self.eager_nested_scopes.shrink_to_fit();
 
         AstIds {
             expressions: self.expressions,
             uses: self.uses,
-            eager_nested_scopes: self.eager_nested_scopes,
         }
     }
 }

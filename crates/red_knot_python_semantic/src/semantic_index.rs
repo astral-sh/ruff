@@ -19,7 +19,7 @@ use crate::semantic_index::expression::Expression;
 use crate::semantic_index::symbol::{
     FileScopeId, NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopedSymbolId, SymbolTable,
 };
-use crate::semantic_index::use_def::UseDefMap;
+use crate::semantic_index::use_def::{EagerBindingsKey, ScopedEagerBindingsId, UseDefMap};
 use crate::Db;
 
 pub mod ast_ids;
@@ -165,6 +165,9 @@ pub(crate) struct SemanticIndex<'db> {
     /// Maps from class body scopes to attribute assignments that were found
     /// in methods of that class.
     attribute_assignments: FxHashMap<FileScopeId, Arc<AttributeAssignments<'db>>>,
+
+    /// Map of all of the eager bindings that appear in this file.
+    eager_bindings: FxHashMap<EagerBindingsKey, ScopedEagerBindingsId>,
 }
 
 impl<'db> SemanticIndex<'db> {
@@ -289,6 +292,22 @@ impl<'db> SemanticIndex<'db> {
     /// the logic for type inference.
     pub(super) fn has_future_annotations(&self) -> bool {
         self.has_future_annotations
+    }
+
+    /// Returns an iterator of bindings for a particular nested eager scope reference.
+    pub(crate) fn eager_bindings(
+        &self,
+        enclosing_scope: FileScopeId,
+        enclosing_symbol: ScopedSymbolId,
+        nested_scope: FileScopeId,
+    ) -> Option<BindingWithConstraintsIterator<'_, 'db>> {
+        let key = EagerBindingsKey {
+            enclosing_scope,
+            enclosing_symbol,
+            nested_scope,
+        };
+        let id = self.eager_bindings.get(&key)?;
+        self.use_def_maps[enclosing_scope].eager_bindings(*id)
     }
 }
 

@@ -300,26 +300,6 @@ pub(crate) fn symbol_from_bindings<'db>(
     symbol_from_bindings_impl(db, bindings_with_constraints, RequiresExplicitReExport::No)
 }
 
-/// Resolves a symbol that appears in an eager nested scope, looking for bindings in an enclosing
-/// scope. Since the nested scope is eager, we use the bindings that are visible at the point where
-/// the nested scope is defined, instead of using the public type of the symbol. Returns None if
-/// this enclosing scope does not contain any visible bindings for the symbol.
-pub(crate) fn eager_symbol_for_nested_scope<'db>(
-    db: &'db dyn Db,
-    enclosing_scope: ScopeId<'db>,
-    nested_scope: ScopeId<'db>,
-    symbol: ScopedSymbolId,
-) -> Option<Symbol<'db>> {
-    let eager_scope_id = nested_scope.scoped_eager_nested_scope_id(db, enclosing_scope)?;
-    let enclosing_scope_use_def = use_def_map(db, enclosing_scope);
-    let bindings_at_nested_scope_definition = enclosing_scope_use_def
-        .bindings_at_eager_nested_scope_definition(eager_scope_id, symbol)?;
-    Some(symbol_from_bindings(
-        db,
-        bindings_at_nested_scope_definition,
-    ))
-}
-
 /// Build a declared type from a [`DeclarationsIterator`].
 ///
 /// If there is only one declaration, or all declarations declare the same type, returns

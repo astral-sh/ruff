@@ -15,8 +15,6 @@ use crate::node_key::NodeKey;
 use crate::semantic_index::{semantic_index, SymbolMap};
 use crate::Db;
 
-use super::ast_ids::{EagerNestedScopeRef, HasScopedEagerNestedScopeId, ScopedEagerNestedScopeId};
-
 #[derive(Eq, PartialEq, Debug)]
 pub struct Symbol {
     name: Name,
@@ -134,49 +132,7 @@ impl<'db> ScopeId<'db> {
     }
 
     pub(crate) fn is_eager(self, db: &dyn Db) -> bool {
-        match self.node(db) {
-            NodeWithScopeKind::Class(_)
-            | NodeWithScopeKind::ListComprehension(_)
-            | NodeWithScopeKind::GeneratorExpression(_)
-            | NodeWithScopeKind::SetComprehension(_)
-            | NodeWithScopeKind::DictComprehension(_) => true,
-            NodeWithScopeKind::ClassTypeParameters(_)
-            | NodeWithScopeKind::Function(_)
-            | NodeWithScopeKind::FunctionTypeParameters(_)
-            | NodeWithScopeKind::Lambda(_)
-            | NodeWithScopeKind::Module
-            | NodeWithScopeKind::TypeAlias(_)
-            | NodeWithScopeKind::TypeAliasTypeParameters(_) => false,
-        }
-    }
-
-    pub(crate) fn scoped_eager_nested_scope_id(
-        self,
-        db: &'db dyn Db,
-        outer_scope: ScopeId,
-    ) -> Option<ScopedEagerNestedScopeId> {
-        match self.node(db) {
-            NodeWithScopeKind::Class(class) => class.scoped_eager_nested_scope_id(db, outer_scope),
-            NodeWithScopeKind::ListComprehension(list_comp) => {
-                list_comp.scoped_eager_nested_scope_id(db, outer_scope)
-            }
-            NodeWithScopeKind::GeneratorExpression(generator) => {
-                generator.scoped_eager_nested_scope_id(db, outer_scope)
-            }
-            NodeWithScopeKind::SetComprehension(set_comp) => {
-                set_comp.scoped_eager_nested_scope_id(db, outer_scope)
-            }
-            NodeWithScopeKind::DictComprehension(dict_comp) => {
-                dict_comp.scoped_eager_nested_scope_id(db, outer_scope)
-            }
-            NodeWithScopeKind::ClassTypeParameters(_)
-            | NodeWithScopeKind::Function(_)
-            | NodeWithScopeKind::FunctionTypeParameters(_)
-            | NodeWithScopeKind::Lambda(_)
-            | NodeWithScopeKind::Module
-            | NodeWithScopeKind::TypeAlias(_)
-            | NodeWithScopeKind::TypeAliasTypeParameters(_) => None,
-        }
+        self.node(db).scope_kind().is_eager()
     }
 
     #[cfg(test)]
@@ -263,6 +219,10 @@ impl Scope {
     pub(super) fn extend_descendents(&mut self, children_end: FileScopeId) {
         self.descendents = self.descendents.start..children_end;
     }
+
+    pub(crate) fn is_eager(&self) -> bool {
+        self.kind().is_eager()
+    }
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -274,6 +234,19 @@ pub enum ScopeKind {
     Lambda,
     Comprehension,
     TypeAlias,
+}
+
+impl ScopeKind {
+    pub(crate) fn is_eager(self) -> bool {
+        match self {
+            ScopeKind::Class | ScopeKind::Comprehension => true,
+            ScopeKind::Module
+            | ScopeKind::Annotation
+            | ScopeKind::Function
+            | ScopeKind::Lambda
+            | ScopeKind::TypeAlias => false,
+        }
+    }
 }
 
 /// Symbol table for a specific [`Scope`].
@@ -528,31 +501,6 @@ impl NodeWithScopeKind {
             | Self::SetComprehension(_)
             | Self::DictComprehension(_)
             | Self::GeneratorExpression(_) => ScopeKind::Comprehension,
-        }
-    }
-
-    pub(super) fn as_eager_nested_scope(&self) -> Option<EagerNestedScopeRef> {
-        match self {
-            Self::Class(class) => Some(EagerNestedScopeRef::Class(class)),
-            Self::DictComprehension(dict_comp) => {
-                Some(EagerNestedScopeRef::DictComprehension(dict_comp))
-            }
-            Self::GeneratorExpression(generator) => {
-                Some(EagerNestedScopeRef::GeneratorExpression(generator))
-            }
-            Self::ListComprehension(list_comp) => {
-                Some(EagerNestedScopeRef::ListComprehension(list_comp))
-            }
-            Self::SetComprehension(set_comp) => {
-                Some(EagerNestedScopeRef::SetComprehension(set_comp))
-            }
-            Self::Lambda(_)
-            | Self::Module
-            | Self::Function(_)
-            | Self::FunctionTypeParameters(_)
-            | Self::ClassTypeParameters(_)
-            | Self::TypeAlias(_)
-            | Self::TypeAliasTypeParameters(_) => None,
         }
     }
 
