@@ -330,7 +330,6 @@ impl<'db> UseDefMap<'db> {
         self.bindings_iterator(self.public_symbols[symbol].bindings())
     }
 
-    #[track_caller]
     pub(crate) fn eager_bindings(
         &self,
         eager_bindings: ScopedEagerBindingsId,
