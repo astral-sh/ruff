@@ -237,7 +237,10 @@ impl<'db> SemanticIndexBuilder<'db> {
             let enclosing_symbol_table = &self.symbol_tables[enclosing_scope_id];
             for nested_symbol in self.symbol_tables[popped_scope_id].symbols() {
                 // Skip this symbol if this enclosing scope doesn't contain any bindings for
-                // it.
+                // it, or if the nested scope _does_.
+                if nested_symbol.is_bound() {
+                    continue;
+                }
                 let Some(enclosing_symbol_id) =
                     enclosing_symbol_table.symbol_id_by_name(nested_symbol.name())
                 else {
