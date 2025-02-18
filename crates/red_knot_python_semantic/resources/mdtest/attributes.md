@@ -30,7 +30,11 @@ reveal_type(c_instance.inferred_from_value)  # revealed: Unknown | Literal[1, "a
 # TODO: Same here. This should be `Unknown | Literal[1, "a"]`
 reveal_type(c_instance.inferred_from_other_attribute)  # revealed: Unknown
 
-# TODO: should be `int | None`
+# There is no special handling of attributes that are (directly) assigned to a declared parameter,
+# which means we union with `Unknown` here, since the attribute itself is not declared. This is
+# something that we might want to change in the future.
+#
+# See https://github.com/astral-sh/ruff/issues/15960 for a related discussion.
 reveal_type(c_instance.inferred_from_param)  # revealed: Unknown | int | None
 
 reveal_type(c_instance.declared_only)  # revealed: bytes
@@ -45,10 +49,10 @@ reveal_type(c_instance.possibly_undeclared_unbound)  # revealed: str
 c_instance.inferred_from_value = "value set on instance"
 
 # This assignment is also fine:
-c_instance.inferred_from_param = None
+c_instance.declared_and_bound = False
 
-# TODO: this should be an error (incompatible types in assignment)
-c_instance.inferred_from_param = "incompatible"
+# error: [invalid-assignment] "Object of type `Literal["incompatible"]` is not assignable to attribute `declared_and_bound` of type `bool`"
+c_instance.declared_and_bound = "incompatible"
 
 # TODO: we already show an error here but the message might be improved?
 # mypy shows no error here, but pyright raises "reportAttributeAccessIssue"
@@ -181,7 +185,6 @@ reveal_type(c_instance.inferred_from_value)  # revealed: Unknown | Literal[1, "a
 # TODO: Should be `Unknown | Literal[1, "a"]`
 reveal_type(c_instance.inferred_from_other_attribute)  # revealed: Unknown
 
-# TODO: Should be `int | None`
 reveal_type(c_instance.inferred_from_param)  # revealed: Unknown | int | None
 
 reveal_type(c_instance.declared_only)  # revealed: bytes
