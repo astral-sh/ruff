@@ -27,22 +27,22 @@ use crate::Db;
 #[derive(Debug, salsa::Update)]
 pub(crate) struct AstIds {
     /// Maps expressions to their expression id.
-    expressions: FxHashMap<ExpressionNodeKey, ScopedExpressionId>,
+    expressions_map: FxHashMap<ExpressionNodeKey, ScopedExpressionId>,
     /// Maps expressions which "use" a symbol (that is, [`ast::ExprName`]) to a use id.
-    uses: FxHashMap<ExpressionNodeKey, ScopedUseId>,
+    uses_map: FxHashMap<ExpressionNodeKey, ScopedUseId>,
 }
 
 impl AstIds {
     fn expression_id(&self, key: impl Into<ExpressionNodeKey>) -> ScopedExpressionId {
         let key = &key.into();
-        *self.expressions.get(key).unwrap_or_else(|| {
+        *self.expressions_map.get(key).unwrap_or_else(|| {
             panic!("Could not find expression ID for {key:?}");
         })
     }
 
     #[track_caller]
     fn use_id(&self, key: impl Into<ExpressionNodeKey>) -> ScopedUseId {
-        self.uses[&key.into()]
+        self.uses_map[&key.into()]
     }
 }
 
@@ -143,36 +143,36 @@ impl HasScopedExpressionId for ast::ExprRef<'_> {
 
 #[derive(Debug, Default)]
 pub(super) struct AstIdsBuilder {
-    expressions: FxHashMap<ExpressionNodeKey, ScopedExpressionId>,
-    uses: FxHashMap<ExpressionNodeKey, ScopedUseId>,
+    expressions_map: FxHashMap<ExpressionNodeKey, ScopedExpressionId>,
+    uses_map: FxHashMap<ExpressionNodeKey, ScopedUseId>,
 }
 
 impl AstIdsBuilder {
     /// Adds `expr` to the expression ids map and returns its id.
     pub(super) fn record_expression(&mut self, expr: &ast::Expr) -> ScopedExpressionId {
-        let expression_id = self.expressions.len().into();
+        let expression_id = self.expressions_map.len().into();
 
-        self.expressions.insert(expr.into(), expression_id);
+        self.expressions_map.insert(expr.into(), expression_id);
 
         expression_id
     }
 
     /// Adds `expr` to the use ids map and returns its id.
     pub(super) fn record_use(&mut self, expr: &ast::Expr) -> ScopedUseId {
-        let use_id = self.uses.len().into();
+        let use_id = self.uses_map.len().into();
 
-        self.uses.insert(expr.into(), use_id);
+        self.uses_map.insert(expr.into(), use_id);
 
         use_id
     }
 
     pub(super) fn finish(mut self) -> AstIds {
-        self.expressions.shrink_to_fit();
-        self.uses.shrink_to_fit();
+        self.expressions_map.shrink_to_fit();
+        self.uses_map.shrink_to_fit();
 
         AstIds {
-            expressions: self.expressions,
-            uses: self.uses,
+            expressions_map: self.expressions_map,
+            uses_map: self.uses_map,
         }
     }
 }
