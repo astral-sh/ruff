@@ -37,6 +37,7 @@ pub enum PythonVersion {
 
 impl Default for PythonVersion {
     fn default() -> Self {
+        // SAFETY: the unit test `default_python_version_works()` checks that this doesn't panic
         Self::try_from(ast::PythonVersion::default()).unwrap()
     }
 }
