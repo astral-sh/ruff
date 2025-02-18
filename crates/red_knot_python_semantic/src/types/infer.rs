@@ -50,8 +50,8 @@ use crate::semantic_index::semantic_index;
 use crate::semantic_index::symbol::{NodeWithScopeKind, NodeWithScopeRef, ScopeId};
 use crate::semantic_index::SemanticIndex;
 use crate::symbol::{
-    builtins_module_scope, builtins_symbol, symbol, symbol_from_bindings, symbol_from_declarations,
-    typing_extensions_symbol, LookupError,
+    builtins_module_scope, builtins_symbol, eager_symbol_for_nested_scope, symbol,
+    symbol_from_bindings, symbol_from_declarations, typing_extensions_symbol, LookupError,
 };
 use crate::types::call::{Argument, CallArguments};
 use crate::types::diagnostic::{
@@ -3526,17 +3526,13 @@ impl<'db> TypeInferenceBuilder<'db> {
                 // the point where the previous enclosing scope was defined, instead of at the end
                 // of the scope.
                 if look_up_eagerly_inner {
-                    let eager_scope_id = scope
-                        .scoped_eager_nested_scope_id(db, enclosing_scope_id)
-                        .expect("Expected all eager scopes to have an `EagerNestedScopeId`");
-                    let enclosing_scope_use_def = self.index.use_def_map(enclosing_scope_file_id);
-                    if let Some(bindings_at_nested_scope_definition) = enclosing_scope_use_def
-                        .bindings_at_eager_nested_scope_definition(
-                            eager_scope_id,
-                            enclosing_symbol_id,
-                        )
-                    {
-                        return symbol_from_bindings(db, bindings_at_nested_scope_definition);
+                    if let Some(symbol) = eager_symbol_for_nested_scope(
+                        db,
+                        enclosing_scope_id,
+                        scope,
+                        enclosing_symbol_id,
+                    ) {
+                        return symbol;
                     }
                 } else {
                     let enclosing_symbol = enclosing_symbol_table.symbol(enclosing_symbol_id);
