@@ -670,3 +670,11 @@ impl Deref for CompiledPerFileIgnoreList {
         &self.ignores
     }
 }
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn default_python_version_works() {
+        super::PythonVersion::default();
+    }
+}
