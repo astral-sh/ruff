@@ -18,8 +18,10 @@ use crate::settings::types::PythonVersion;
 ///
 /// ## Why is this bad?
 /// On Python 3.11 and later, `datetime.fromisoformat()` can handle most [ISO 8601][iso-8601]
-/// formats (barring only those that support fractional hours and minutes),
-/// including ones affixed with `Z`, so such an operation is unnecessary.
+/// formats including ones affixed with `Z`, so such an operation is unnecessary.
+///
+/// More information on unsupported formats
+/// can be found in [the official documentation][fromisoformat].
 ///
 /// ## Example
 ///
@@ -64,6 +66,7 @@ use crate::settings::types::PythonVersion;
 /// * [`fromisoformat`](https://docs.python.org/3/library/datetime.html#datetime.date.fromisoformat)
 ///
 /// [iso-8601]: https://www.iso.org/obp/ui/#iso:std:iso:8601
+/// [fromisoformat]: https://docs.python.org/3/library/datetime.html#datetime.date.fromisoformat
 #[derive(ViolationMetadata)]
 pub(crate) struct FromisoformatReplaceZ;
 
