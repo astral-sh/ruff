@@ -164,8 +164,8 @@ pub fn parse_expression_range(
     let source = &source[..range.end().to_usize()];
     Parser::new_starts_at(
         source,
-        ParserOptions::from_mode(Mode::Expression),
         range.start(),
+        ParserOptions::from_mode(Mode::Expression),
     )
     .parse()
     .try_into_expression()
@@ -194,8 +194,8 @@ pub fn parse_parenthesized_expression_range(
     let source = &source[..range.end().to_usize()];
     let parsed = Parser::new_starts_at(
         source,
-        ParserOptions::from_mode(Mode::ParenthesizedExpression),
         range.start(),
+        ParserOptions::from_mode(Mode::ParenthesizedExpression),
     )
     .parse();
     parsed.try_into_expression().unwrap().into_result()

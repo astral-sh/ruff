@@ -55,14 +55,14 @@ pub(crate) struct Parser<'src> {
 impl<'src> Parser<'src> {
     /// Create a new parser for the given source code.
     pub(crate) fn new(source: &'src str, options: ParserOptions) -> Self {
-        Parser::new_starts_at(source, options, TextSize::new(0))
+        Parser::new_starts_at(source, TextSize::new(0), options)
     }
 
     /// Create a new parser for the given source code which starts parsing at the given offset.
     pub(crate) fn new_starts_at(
         source: &'src str,
-        options: ParserOptions,
         start_offset: TextSize,
+        options: ParserOptions,
     ) -> Self {
         let tokens = TokenSource::from_source(source, options.mode, start_offset);
 
