@@ -298,12 +298,13 @@ impl<'db> SemanticIndex<'db> {
     pub(crate) fn eager_bindings(
         &self,
         enclosing_scope: FileScopeId,
-        enclosing_symbol: ScopedSymbolId,
+        symbol: &str,
         nested_scope: FileScopeId,
     ) -> Option<BindingWithConstraintsIterator<'_, 'db>> {
+        let symbol_id = self.symbol_tables[enclosing_scope].symbol_id_by_name(symbol)?;
         let key = EagerBindingsKey {
             enclosing_scope,
-            enclosing_symbol,
+            enclosing_symbol: symbol_id,
             nested_scope,
         };
         let id = self.eager_bindings.get(&key)?;

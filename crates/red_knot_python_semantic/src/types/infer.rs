@@ -47,7 +47,7 @@ use crate::semantic_index::definition::{
 };
 use crate::semantic_index::expression::{Expression, ExpressionKind};
 use crate::semantic_index::semantic_index;
-use crate::semantic_index::symbol::{NodeWithScopeKind, NodeWithScopeRef, ScopeId};
+use crate::semantic_index::symbol::{FileScopeId, NodeWithScopeKind, NodeWithScopeRef, ScopeId};
 use crate::semantic_index::SemanticIndex;
 use crate::symbol::{
     builtins_module_scope, builtins_symbol, symbol, symbol_from_bindings, symbol_from_declarations,
@@ -3509,28 +3509,24 @@ impl<'db> TypeInferenceBuilder<'db> {
                     continue;
                 }
 
-                let enclosing_symbol_table = self.index.symbol_table(enclosing_scope_file_id);
-                let Some(enclosing_symbol_id) =
-                    enclosing_symbol_table.symbol_id_by_name(symbol_name)
-                else {
-                    continue;
-                };
-
                 // If the reference is in a nested eager scope, we need to look for the symbol at
                 // the point where the previous enclosing scope was defined, instead of at the end
                 // of the scope. (Note that the semantic index builder takes care of only
                 // registering eager bindings for nested scopes that are actually eager, and for
                 // enclosing scopes that actually contain bindings that we should use when
                 // resolving the reference.)
-                if let Some(bindings) = self.index.eager_bindings(
-                    enclosing_scope_file_id,
-                    enclosing_symbol_id,
-                    file_scope_id,
-                ) {
+                if let Some(bindings) =
+                    self.index
+                        .eager_bindings(enclosing_scope_file_id, symbol_name, file_scope_id)
+                {
                     return symbol_from_bindings(db, bindings);
                 }
 
-                let enclosing_symbol = enclosing_symbol_table.symbol(enclosing_symbol_id);
+                let enclosing_symbol_table = self.index.symbol_table(enclosing_scope_file_id);
+                let Some(enclosing_symbol) = enclosing_symbol_table.symbol_by_name(symbol_name)
+                else {
+                    continue;
+                };
                 if enclosing_symbol.is_bound() {
                     // We can return early here, because the nearest function-like scope that
                     // defines a name must be the only source for the nonlocal reference (at
@@ -3546,10 +3542,17 @@ impl<'db> TypeInferenceBuilder<'db> {
                 // Avoid infinite recursion if `self.scope` already is the module's global scope.
                 .or_fall_back_to(db, || {
                     if file_scope_id.is_global() {
-                        Symbol::Unbound
-                    } else {
-                        global_symbol(db, self.file(), symbol_name)
+                        return Symbol::Unbound;
                     }
+
+                    if let Some(bindings) =
+                        self.index
+                            .eager_bindings(FileScopeId::global(), symbol_name, file_scope_id)
+                    {
+                        return symbol_from_bindings(db, bindings);
+                    }
+
+                    global_symbol(db, self.file(), symbol_name)
                 })
                 // Not found in globals? Fallback to builtins
                 // (without infinite recursion if we're already in builtins.)

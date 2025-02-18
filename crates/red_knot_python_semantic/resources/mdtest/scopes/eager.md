@@ -99,8 +99,7 @@ nested in the global scope.
 x = 1
 
 class A:
-    # TODO: Literal[1]
-    reveal_type(x)  # revealed: Unknown | Literal[2]
+    reveal_type(x)  # revealed: Literal[1]
 
 x = 2
 ```
@@ -110,8 +109,7 @@ x = 2
 ```py
 x = 1
 
-# TODO: Literal[1]
-# revealed: Unknown | Literal[2]
+# revealed: Literal[1]
 [reveal_type(x) for a in range(0)]
 
 x = 2
@@ -122,8 +120,7 @@ x = 2
 ```py
 x = 1
 
-# TODO: Literal[1]
-# revealed: Unknown | Literal[2]
+# revealed: Literal[1]
 {reveal_type(x) for a in range(0)}
 
 x = 2
@@ -134,8 +131,7 @@ x = 2
 ```py
 x = 1
 
-# TODO: Literal[1]
-# revealed: Unknown | Literal[2]
+# revealed: Literal[1]
 {a: reveal_type(x) for a in range(0)}
 
 x = 2
@@ -146,8 +142,7 @@ x = 2
 ```py
 x = 1
 
-# TODO: Literal[1]
-# revealed: Unknown | Literal[2]
+# revealed: Literal[1]
 list(reveal_type(x) for a in range(0))
 
 x = 2
@@ -280,8 +275,7 @@ x = int
 class C:
     var: x
 
-# TODO: int
-reveal_type(C.var)  # revealed: Unknown | str
+reveal_type(C.var)  # revealed: int
 
 x = str
 ```
@@ -296,7 +290,8 @@ x = int
 class C:
     var: x
 
-reveal_type(C.var)  # revealed: Unknown | str
+# TODO: Unknown | str
+reveal_type(C.var)  # revealed: int
 
 x = str
 ```
@@ -309,7 +304,8 @@ x = int
 class C:
     var: x
 
-reveal_type(C.var)  # revealed: Unknown | str
+# TODO: Unknown | str
+reveal_type(C.var)  # revealed: int
 
 x = str
 ```
