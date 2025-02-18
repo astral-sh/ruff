@@ -90,8 +90,8 @@ def _():
 
 ## Top-level eager scopes
 
-All of the above examples (TODO: should) behave identically when the eager scopes are directly
-nested in the global scope.
+All of the above examples behave identically when the eager scopes are directly nested in the global
+scope.
 
 ### Class definitions
 
