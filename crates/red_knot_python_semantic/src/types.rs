@@ -1,11 +1,11 @@
 use std::hash::Hash;
 
 use bitflags::bitflags;
+use call::{CallDunderError, CallError};
 use context::InferContext;
 use diagnostic::{report_not_iterable, report_not_iterable_possibly_unbound};
 use indexmap::IndexSet;
 use itertools::Itertools;
-use ruff_db::diagnostic::Severity;
 use ruff_db::files::File;
 use ruff_python_ast as ast;
 use ruff_python_ast::PythonVersion;
@@ -27,23 +27,21 @@ use crate::semantic_index::ast_ids::HasScopedExpressionId;
 use crate::semantic_index::attribute_assignment::AttributeAssignment;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::expression::Expression;
-use crate::semantic_index::symbol::{self as symbol, ScopeId, ScopedSymbolId};
+use crate::semantic_index::symbol::ScopeId;
 use crate::semantic_index::{
-    attribute_assignments, global_scope, imported_modules, semantic_index, symbol_table,
-    use_def_map, BindingWithConstraints, BindingWithConstraintsIterator, DeclarationWithConstraint,
-    DeclarationsIterator,
+    attribute_assignments, imported_modules, semantic_index, symbol_table, use_def_map,
 };
-use crate::stdlib::{known_module_symbol, typing_extensions_symbol};
 use crate::suppression::check_suppressions;
-use crate::symbol::{Boundness, Symbol};
-use crate::types::call::{
-    bind_call, CallArguments, CallBinding, CallDunderResult, CallOutcome, StaticAssertionErrorKind,
+use crate::symbol::{
+    global_symbol, imported_symbol, known_module_symbol, symbol, symbol_from_bindings,
+    symbol_from_declarations, Boundness, LookupError, LookupResult, Symbol, SymbolAndQualifiers,
 };
+use crate::types::call::{bind_call, CallArguments, CallBinding, CallOutcome};
 use crate::types::class_base::ClassBase;
 use crate::types::diagnostic::INVALID_TYPE_FORM;
 use crate::types::infer::infer_unpack_types;
 use crate::types::mro::{Mro, MroError, MroIterator};
-use crate::types::narrow::narrowing_constraint;
+pub(crate) use crate::types::narrow::narrowing_constraint;
 use crate::{Db, FxOrderSet, Module, Program};
 
 mod builder;
@@ -84,284 +82,6 @@ pub fn check_types(db: &dyn Db, file: File) -> TypeCheckDiagnostics {
     diagnostics
 }
 
-/// Computes a possibly-widened type `Unknown | T_inferred` from the inferred type `T_inferred`
-/// of a symbol, unless the type is a known-instance type (e.g. `typing.Any`) or the symbol is
-/// considered non-modifiable (e.g. when the symbol is `@Final`). We need this for public uses
-/// of symbols that have no declared type.
-fn widen_type_for_undeclared_public_symbol<'db>(
-    db: &'db dyn Db,
-    inferred: Symbol<'db>,
-    is_considered_non_modifiable: bool,
-) -> Symbol<'db> {
-    // We special-case known-instance types here since symbols like `typing.Any` are typically
-    // not declared in the stubs (e.g. `Any = object()`), but we still want to treat them as
-    // such.
-    let is_known_instance = inferred
-        .ignore_possibly_unbound()
-        .is_some_and(|ty| matches!(ty, Type::KnownInstance(_)));
-
-    if is_considered_non_modifiable || is_known_instance {
-        inferred
-    } else {
-        inferred.map_type(|ty| UnionType::from_elements(db, [Type::unknown(), ty]))
-    }
-}
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-enum RequiresExplicitReExport {
-    Yes,
-    No,
-}
-
-impl RequiresExplicitReExport {
-    const fn is_yes(self) -> bool {
-        matches!(self, RequiresExplicitReExport::Yes)
-    }
-}
-
-fn symbol_impl<'db>(
-    db: &'db dyn Db,
-    scope: ScopeId<'db>,
-    name: &str,
-    requires_explicit_reexport: RequiresExplicitReExport,
-) -> Symbol<'db> {
-    #[salsa::tracked]
-    fn symbol_by_id<'db>(
-        db: &'db dyn Db,
-        scope: ScopeId<'db>,
-        symbol_id: ScopedSymbolId,
-        requires_explicit_reexport: RequiresExplicitReExport,
-    ) -> Symbol<'db> {
-        let use_def = use_def_map(db, scope);
-
-        // If the symbol is declared, the public type is based on declarations; otherwise, it's based
-        // on inference from bindings.
-
-        let declarations = use_def.public_declarations(symbol_id);
-        let declared = symbol_from_declarations(db, declarations, requires_explicit_reexport);
-        let is_final = declared.as_ref().is_ok_and(SymbolAndQualifiers::is_final);
-        let declared = declared.map(|SymbolAndQualifiers(symbol, _)| symbol);
-
-        match declared {
-            // Symbol is declared, trust the declared type
-            Ok(symbol @ Symbol::Type(_, Boundness::Bound)) => symbol,
-            // Symbol is possibly declared
-            Ok(Symbol::Type(declared_ty, Boundness::PossiblyUnbound)) => {
-                let bindings = use_def.public_bindings(symbol_id);
-                let inferred = symbol_from_bindings(db, bindings, requires_explicit_reexport);
-
-                match inferred {
-                    // Symbol is possibly undeclared and definitely unbound
-                    Symbol::Unbound => {
-                        // TODO: We probably don't want to report `Bound` here. This requires a bit of
-                        // design work though as we might want a different behavior for stubs and for
-                        // normal modules.
-                        Symbol::Type(declared_ty, Boundness::Bound)
-                    }
-                    // Symbol is possibly undeclared and (possibly) bound
-                    Symbol::Type(inferred_ty, boundness) => Symbol::Type(
-                        UnionType::from_elements(db, [inferred_ty, declared_ty]),
-                        boundness,
-                    ),
-                }
-            }
-            // Symbol is undeclared, return the union of `Unknown` with the inferred type
-            Ok(Symbol::Unbound) => {
-                let bindings = use_def.public_bindings(symbol_id);
-                let inferred = symbol_from_bindings(db, bindings, requires_explicit_reexport);
-
-                // `__slots__` is a symbol with special behavior in Python's runtime. It can be
-                // modified externally, but those changes do not take effect. We therefore issue
-                // a diagnostic if we see it being modified externally. In type inference, we
-                // can assign a "narrow" type to it even if it is not *declared*. This means, we
-                // do not have to call [`widen_type_for_undeclared_public_symbol`].
-                let is_considered_non_modifiable =
-                    is_final || symbol_table(db, scope).symbol(symbol_id).name() == "__slots__";
-
-                widen_type_for_undeclared_public_symbol(db, inferred, is_considered_non_modifiable)
-            }
-            // Symbol has conflicting declared types
-            Err((declared_ty, _)) => {
-                // Intentionally ignore conflicting declared types; that's not our problem,
-                // it's the problem of the module we are importing from.
-                Symbol::bound(declared_ty.inner_type())
-            }
-        }
-
-        // TODO (ticket: https://github.com/astral-sh/ruff/issues/14297) Our handling of boundness
-        // currently only depends on bindings, and ignores declarations. This is inconsistent, since
-        // we only look at bindings if the symbol may be undeclared. Consider the following example:
-        // ```py
-        // x: int
-        //
-        // if flag:
-        //     y: int
-        // else
-        //     y = 3
-        // ```
-        // If we import from this module, we will currently report `x` as a definitely-bound symbol
-        // (even though it has no bindings at all!) but report `y` as possibly-unbound (even though
-        // every path has either a binding or a declaration for it.)
-    }
-
-    let _span = tracing::trace_span!("symbol", ?name).entered();
-
-    // We don't need to check for `typing_extensions` here, because `typing_extensions.TYPE_CHECKING`
-    // is just a re-export of `typing.TYPE_CHECKING`.
-    if name == "TYPE_CHECKING"
-        && file_to_module(db, scope.file(db))
-            .is_some_and(|module| module.is_known(KnownModule::Typing))
-    {
-        return Symbol::bound(Type::BooleanLiteral(true));
-    }
-    if name == "platform"
-        && file_to_module(db, scope.file(db))
-            .is_some_and(|module| module.is_known(KnownModule::Sys))
-    {
-        match Program::get(db).python_platform(db) {
-            crate::PythonPlatform::Identifier(platform) => {
-                return Symbol::bound(Type::string_literal(db, platform.as_str()));
-            }
-            crate::PythonPlatform::All => {
-                // Fall through to the looked up type
-            }
-        }
-    }
-
-    symbol_table(db, scope)
-        .symbol_id_by_name(name)
-        .map(|symbol| symbol_by_id(db, scope, symbol, requires_explicit_reexport))
-        .unwrap_or(Symbol::Unbound)
-}
-
-/// Return a list of the symbols that typeshed declares in the body scope of
-/// the stub for the class `types.ModuleType`.
-///
-/// Conceptually this could be a `Set` rather than a list,
-/// but the number of symbols declared in this scope is likely to be very small,
-/// so the cost of hashing the names is likely to be more expensive than it's worth.
-#[salsa::tracked(return_ref)]
-fn module_type_symbols<'db>(db: &'db dyn Db) -> smallvec::SmallVec<[ast::name::Name; 8]> {
-    let Some(module_type) = KnownClass::ModuleType
-        .to_class_literal(db)
-        .into_class_literal()
-    else {
-        // The most likely way we get here is if a user specified a `--custom-typeshed-dir`
-        // without a `types.pyi` stub in the `stdlib/` directory
-        return smallvec::SmallVec::default();
-    };
-
-    let module_type_scope = module_type.class.body_scope(db);
-    let module_type_symbol_table = symbol_table(db, module_type_scope);
-
-    // `__dict__` and `__init__` are very special members that can be accessed as attributes
-    // on the module when imported, but cannot be accessed as globals *inside* the module.
-    //
-    // `__getattr__` is even more special: it doesn't exist at runtime, but typeshed includes it
-    // to reduce false positives associated with functions that dynamically import modules
-    // and return `Instance(types.ModuleType)`. We should ignore it for any known module-literal type.
-    module_type_symbol_table
-        .symbols()
-        .filter(|symbol| symbol.is_declared())
-        .map(symbol::Symbol::name)
-        .filter(|symbol_name| !matches!(&***symbol_name, "__dict__" | "__getattr__" | "__init__"))
-        .cloned()
-        .collect()
-}
-
-/// Return the symbol for a member of `types.ModuleType`.
-pub(crate) fn module_type_symbol<'db>(db: &'db dyn Db, name: &str) -> Symbol<'db> {
-    if module_type_symbols(db)
-        .iter()
-        .any(|module_type_member| &**module_type_member == name)
-    {
-        KnownClass::ModuleType.to_instance(db).member(db, name)
-    } else {
-        Symbol::Unbound
-    }
-}
-
-/// Infer the public type of a symbol (its type as seen from outside its scope) in the given
-/// `scope`.
-fn symbol<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Symbol<'db> {
-    symbol_impl(db, scope, name, RequiresExplicitReExport::No)
-}
-
-/// Infers the public type of a module-global symbol as seen from within the same file.
-///
-/// If it's not defined explicitly in the global scope, it will look it up in `types.ModuleType`
-/// with a few very special exceptions.
-///
-/// Use [`imported_symbol`] to perform the lookup as seen from outside the file (e.g. via imports).
-pub(crate) fn global_symbol<'db>(db: &'db dyn Db, file: File, name: &str) -> Symbol<'db> {
-    symbol_impl(
-        db,
-        global_scope(db, file),
-        name,
-        RequiresExplicitReExport::No,
-    )
-    .or_fall_back_to(db, || module_type_symbol(db, name))
-}
-
-/// Infers the public type of an imported symbol.
-pub(crate) fn imported_symbol<'db>(db: &'db dyn Db, module: &Module, name: &str) -> Symbol<'db> {
-    // If it's not found in the global scope, check if it's present as an instance on
-    // `types.ModuleType` or `builtins.object`.
-    //
-    // We do a more limited version of this in `global_symbol`, but there are two crucial
-    // differences here:
-    // - If a member is looked up as an attribute, `__init__` is also available on the module, but
-    //   it isn't available as a global from inside the module
-    // - If a member is looked up as an attribute, members on `builtins.object` are also available
-    //   (because `types.ModuleType` inherits from `object`); these attributes are also not
-    //   available as globals from inside the module.
-    //
-    // The same way as in `global_symbol`, however, we need to be careful to ignore
-    // `__getattr__`. Typeshed has a fake `__getattr__` on `types.ModuleType` to help out with
-    // dynamic imports; we shouldn't use it for `ModuleLiteral` types where we know exactly which
-    // module we're dealing with.
-    external_symbol_impl(db, module.file(), name).or_fall_back_to(db, || {
-        if name == "__getattr__" {
-            Symbol::Unbound
-        } else {
-            KnownClass::ModuleType.to_instance(db).member(db, name)
-        }
-    })
-}
-
-/// Lookup the type of `symbol` in the builtins namespace.
-///
-/// Returns `Symbol::Unbound` if the `builtins` module isn't available for some reason.
-///
-/// Note that this function is only intended for use in the context of the builtins *namespace*
-/// and should not be used when a symbol is being explicitly imported from the `builtins` module
-/// (e.g. `from builtins import int`).
-pub(crate) fn builtins_symbol<'db>(db: &'db dyn Db, symbol: &str) -> Symbol<'db> {
-    resolve_module(db, &KnownModule::Builtins.name())
-        .map(|module| {
-            external_symbol_impl(db, module.file(), symbol).or_fall_back_to(db, || {
-                // We're looking up in the builtins namespace and not the module, so we should
-                // do the normal lookup in `types.ModuleType` and not the special one as in
-                // `imported_symbol`.
-                module_type_symbol(db, symbol)
-            })
-        })
-        .unwrap_or(Symbol::Unbound)
-}
-
-fn external_symbol_impl<'db>(db: &'db dyn Db, file: File, name: &str) -> Symbol<'db> {
-    symbol_impl(
-        db,
-        global_scope(db, file),
-        name,
-        if file.is_stub(db.upcast()) {
-            RequiresExplicitReExport::Yes
-        } else {
-            RequiresExplicitReExport::No
-        },
-    )
-}
-
 /// Infer the type of a binding.
 pub(crate) fn binding_type<'db>(db: &'db dyn Db, definition: Definition<'db>) -> Type<'db> {
     let inference = infer_definition_types(db, definition);
@@ -369,7 +89,10 @@ pub(crate) fn binding_type<'db>(db: &'db dyn Db, definition: Definition<'db>) ->
 }
 
 /// Infer the type of a declaration.
-fn declaration_type<'db>(db: &'db dyn Db, definition: Definition<'db>) -> TypeAndQualifiers<'db> {
+pub(crate) fn declaration_type<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> TypeAndQualifiers<'db> {
     let inference = infer_definition_types(db, definition);
     inference.declaration_type(definition)
 }
@@ -401,229 +124,6 @@ fn definition_expression_type<'db>(
     } else {
         // expression is in a type-params sub-scope
         infer_scope_types(db, scope).expression_type(expr_id)
-    }
-}
-
-/// Infer the combined type from an iterator of bindings, and return it
-/// together with boundness information in a [`Symbol`].
-///
-/// The type will be a union if there are multiple bindings with different types.
-fn symbol_from_bindings<'db>(
-    db: &'db dyn Db,
-    bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
-    requires_explicit_reexport: RequiresExplicitReExport,
-) -> Symbol<'db> {
-    let visibility_constraints = bindings_with_constraints.visibility_constraints;
-    let mut bindings_with_constraints = bindings_with_constraints.peekable();
-
-    let is_non_exported = |binding: Definition<'db>| {
-        requires_explicit_reexport.is_yes() && !binding.is_reexported(db)
-    };
-
-    let unbound_visibility = match bindings_with_constraints.peek() {
-        Some(BindingWithConstraints {
-            binding,
-            visibility_constraint,
-            constraints: _,
-        }) if binding.map_or(true, is_non_exported) => {
-            visibility_constraints.evaluate(db, *visibility_constraint)
-        }
-        _ => Truthiness::AlwaysFalse,
-    };
-
-    let mut types = bindings_with_constraints.filter_map(
-        |BindingWithConstraints {
-             binding,
-             constraints,
-             visibility_constraint,
-         }| {
-            let binding = binding?;
-
-            if is_non_exported(binding) {
-                return None;
-            }
-
-            let static_visibility = visibility_constraints.evaluate(db, visibility_constraint);
-
-            if static_visibility.is_always_false() {
-                return None;
-            }
-
-            let mut constraint_tys = constraints
-                .filter_map(|constraint| narrowing_constraint(db, constraint, binding))
-                .peekable();
-
-            let binding_ty = binding_type(db, binding);
-            if constraint_tys.peek().is_some() {
-                let intersection_ty = constraint_tys
-                    .fold(
-                        IntersectionBuilder::new(db).add_positive(binding_ty),
-                        IntersectionBuilder::add_positive,
-                    )
-                    .build();
-                Some(intersection_ty)
-            } else {
-                Some(binding_ty)
-            }
-        },
-    );
-
-    if let Some(first) = types.next() {
-        let boundness = match unbound_visibility {
-            Truthiness::AlwaysTrue => {
-                unreachable!("If we have at least one binding, the scope-start should not be definitely visible")
-            }
-            Truthiness::AlwaysFalse => Boundness::Bound,
-            Truthiness::Ambiguous => Boundness::PossiblyUnbound,
-        };
-
-        if let Some(second) = types.next() {
-            Symbol::Type(
-                UnionType::from_elements(db, [first, second].into_iter().chain(types)),
-                boundness,
-            )
-        } else {
-            Symbol::Type(first, boundness)
-        }
-    } else {
-        Symbol::Unbound
-    }
-}
-
-/// A type with declaredness information, and a set of type qualifiers.
-///
-/// This is used to represent the result of looking up the declared type. Consider this
-/// example:
-/// ```py
-/// class C:
-///     if flag:
-///         variable: ClassVar[int]
-/// ```
-/// If we look up the declared type of `variable` in the scope of class `C`, we will get
-/// the type `int`, a "declaredness" of [`Boundness::PossiblyUnbound`], and the information
-/// that this comes with a [`TypeQualifiers::CLASS_VAR`] type qualifier.
-#[derive(Debug)]
-pub(crate) struct SymbolAndQualifiers<'db>(Symbol<'db>, TypeQualifiers);
-
-impl SymbolAndQualifiers<'_> {
-    /// Constructor that creates a [`SymbolAndQualifiers`] instance with a [`TodoType`] type
-    /// and no qualifiers.
-    fn todo(message: &'static str) -> Self {
-        Self(Symbol::todo(message), TypeQualifiers::empty())
-    }
-
-    fn is_class_var(&self) -> bool {
-        self.1.contains(TypeQualifiers::CLASS_VAR)
-    }
-
-    fn is_final(&self) -> bool {
-        self.1.contains(TypeQualifiers::FINAL)
-    }
-}
-
-impl<'db> From<Symbol<'db>> for SymbolAndQualifiers<'db> {
-    fn from(symbol: Symbol<'db>) -> Self {
-        SymbolAndQualifiers(symbol, TypeQualifiers::empty())
-    }
-}
-
-/// The result of looking up a declared type from declarations; see [`symbol_from_declarations`].
-type SymbolFromDeclarationsResult<'db> =
-    Result<SymbolAndQualifiers<'db>, (TypeAndQualifiers<'db>, Box<[Type<'db>]>)>;
-
-/// Build a declared type from a [`DeclarationsIterator`].
-///
-/// If there is only one declaration, or all declarations declare the same type, returns
-/// `Ok(..)`. If there are conflicting declarations, returns an `Err(..)` variant with
-/// a union of the declared types as well as a list of all conflicting types.
-///
-/// This function also returns declaredness information (see [`Symbol`]) and a set of
-/// [`TypeQualifiers`] that have been specified on the declaration(s).
-fn symbol_from_declarations<'db>(
-    db: &'db dyn Db,
-    declarations: DeclarationsIterator<'_, 'db>,
-    requires_explicit_reexport: RequiresExplicitReExport,
-) -> SymbolFromDeclarationsResult<'db> {
-    let visibility_constraints = declarations.visibility_constraints;
-    let mut declarations = declarations.peekable();
-
-    let is_non_exported = |declaration: Definition<'db>| {
-        requires_explicit_reexport.is_yes() && !declaration.is_reexported(db)
-    };
-
-    let undeclared_visibility = match declarations.peek() {
-        Some(DeclarationWithConstraint {
-            declaration,
-            visibility_constraint,
-        }) if declaration.map_or(true, is_non_exported) => {
-            visibility_constraints.evaluate(db, *visibility_constraint)
-        }
-        _ => Truthiness::AlwaysFalse,
-    };
-
-    let mut types = declarations.filter_map(
-        |DeclarationWithConstraint {
-             declaration,
-             visibility_constraint,
-         }| {
-            let declaration = declaration?;
-
-            if is_non_exported(declaration) {
-                return None;
-            }
-
-            let static_visibility = visibility_constraints.evaluate(db, visibility_constraint);
-
-            if static_visibility.is_always_false() {
-                None
-            } else {
-                Some(declaration_type(db, declaration))
-            }
-        },
-    );
-
-    if let Some(first) = types.next() {
-        let mut conflicting: Vec<Type<'db>> = vec![];
-        let declared_ty = if let Some(second) = types.next() {
-            let ty_first = first.inner_type();
-            let mut qualifiers = first.qualifiers();
-
-            let mut builder = UnionBuilder::new(db).add(ty_first);
-            for other in std::iter::once(second).chain(types) {
-                let other_ty = other.inner_type();
-                if !ty_first.is_equivalent_to(db, other_ty) {
-                    conflicting.push(other_ty);
-                }
-                builder = builder.add(other_ty);
-                qualifiers = qualifiers.union(other.qualifiers());
-            }
-            TypeAndQualifiers::new(builder.build(), qualifiers)
-        } else {
-            first
-        };
-        if conflicting.is_empty() {
-            let boundness = match undeclared_visibility {
-                Truthiness::AlwaysTrue => {
-                    unreachable!("If we have at least one declaration, the scope-start should not be definitely visible")
-                }
-                Truthiness::AlwaysFalse => Boundness::Bound,
-                Truthiness::Ambiguous => Boundness::PossiblyUnbound,
-            };
-
-            Ok(SymbolAndQualifiers(
-                Symbol::Type(declared_ty.inner_type(), boundness),
-                declared_ty.qualifiers(),
-            ))
-        } else {
-            Err((
-                declared_ty,
-                std::iter::once(first.inner_type())
-                    .chain(conflicting)
-                    .collect(),
-            ))
-        }
-    } else {
-        Ok(Symbol::Unbound.into())
     }
 }
 
@@ -1756,6 +1256,7 @@ impl<'db> Type<'db> {
                     KnownClass::NoneType
                     | KnownClass::NoDefaultType
                     | KnownClass::VersionInfo
+                    | KnownClass::EllipsisType
                     | KnownClass::TypeAliasType,
                 ) => true,
                 Some(
@@ -1765,6 +1266,7 @@ impl<'db> Type<'db> {
                     | KnownClass::Type
                     | KnownClass::Int
                     | KnownClass::Float
+                    | KnownClass::Complex
                     | KnownClass::Str
                     | KnownClass::List
                     | KnownClass::Tuple
@@ -1965,9 +1467,9 @@ impl<'db> Type<'db> {
                         return Truthiness::Ambiguous;
                     };
 
-                    if let Some(Type::BooleanLiteral(bool_val)) = bool_method
+                    if let Ok(Type::BooleanLiteral(bool_val)) = bool_method
                         .call_bound(db, instance_ty, &CallArguments::positional([]))
-                        .return_type(db)
+                        .map(|outcome| outcome.return_type(db))
                     {
                         bool_val.into()
                     } else {
@@ -2040,72 +1542,39 @@ impl<'db> Type<'db> {
         }
 
         let return_ty = match self.call_dunder(db, "__len__", &CallArguments::positional([*self])) {
-            // TODO: emit a diagnostic
-            CallDunderResult::MethodNotAvailable => return None,
+            Ok(outcome) | Err(CallDunderError::PossiblyUnbound(outcome)) => outcome.return_type(db),
 
-            CallDunderResult::CallOutcome(outcome) | CallDunderResult::PossiblyUnbound(outcome) => {
-                outcome.return_type(db)?
-            }
+            // TODO: emit a diagnostic
+            Err(err) => err.return_type(db)?,
         };
 
         non_negative_int_literal(db, return_ty)
     }
 
-    /// Return the outcome of calling an object of this type.
-    #[must_use]
-    fn call(self, db: &'db dyn Db, arguments: &CallArguments<'_, 'db>) -> CallOutcome<'db> {
+    /// Calls `self`
+    ///
+    /// Returns `Ok` if the call with the given arguments is successful and `Err` otherwise.
+    fn call(
+        self,
+        db: &'db dyn Db,
+        arguments: &CallArguments<'_, 'db>,
+    ) -> Result<CallOutcome<'db>, CallError<'db>> {
         match self {
             Type::FunctionLiteral(function_type) => {
                 let mut binding = bind_call(db, arguments, function_type.signature(db), self);
                 match function_type.known(db) {
-                    Some(KnownFunction::RevealType) => {
-                        let revealed_ty = binding.one_parameter_type().unwrap_or(Type::unknown());
-                        CallOutcome::revealed(binding, revealed_ty)
-                    }
-                    Some(KnownFunction::StaticAssert) => {
-                        if let Some((parameter_ty, message)) = binding.two_parameter_types() {
-                            let truthiness = parameter_ty.bool(db);
-
-                            if truthiness.is_always_true() {
-                                CallOutcome::callable(binding)
-                            } else {
-                                let error_kind = if let Some(message) =
-                                    message.into_string_literal().map(|s| &**s.value(db))
-                                {
-                                    StaticAssertionErrorKind::CustomError(message)
-                                } else if parameter_ty == Type::BooleanLiteral(false) {
-                                    StaticAssertionErrorKind::ArgumentIsFalse
-                                } else if truthiness.is_always_false() {
-                                    StaticAssertionErrorKind::ArgumentIsFalsy(parameter_ty)
-                                } else {
-                                    StaticAssertionErrorKind::ArgumentTruthinessIsAmbiguous(
-                                        parameter_ty,
-                                    )
-                                };
-
-                                CallOutcome::StaticAssertionError {
-                                    binding,
-                                    error_kind,
-                                }
-                            }
-                        } else {
-                            CallOutcome::callable(binding)
-                        }
-                    }
                     Some(KnownFunction::IsEquivalentTo) => {
                         let (ty_a, ty_b) = binding
                             .two_parameter_types()
                             .unwrap_or((Type::unknown(), Type::unknown()));
                         binding
                             .set_return_type(Type::BooleanLiteral(ty_a.is_equivalent_to(db, ty_b)));
-                        CallOutcome::callable(binding)
                     }
                     Some(KnownFunction::IsSubtypeOf) => {
                         let (ty_a, ty_b) = binding
                             .two_parameter_types()
                             .unwrap_or((Type::unknown(), Type::unknown()));
                         binding.set_return_type(Type::BooleanLiteral(ty_a.is_subtype_of(db, ty_b)));
-                        CallOutcome::callable(binding)
                     }
                     Some(KnownFunction::IsAssignableTo) => {
                         let (ty_a, ty_b) = binding
@@ -2113,7 +1582,6 @@ impl<'db> Type<'db> {
                             .unwrap_or((Type::unknown(), Type::unknown()));
                         binding
                             .set_return_type(Type::BooleanLiteral(ty_a.is_assignable_to(db, ty_b)));
-                        CallOutcome::callable(binding)
                     }
                     Some(KnownFunction::IsDisjointFrom) => {
                         let (ty_a, ty_b) = binding
@@ -2121,7 +1589,6 @@ impl<'db> Type<'db> {
                             .unwrap_or((Type::unknown(), Type::unknown()));
                         binding
                             .set_return_type(Type::BooleanLiteral(ty_a.is_disjoint_from(db, ty_b)));
-                        CallOutcome::callable(binding)
                     }
                     Some(KnownFunction::IsGradualEquivalentTo) => {
                         let (ty_a, ty_b) = binding
@@ -2130,22 +1597,18 @@ impl<'db> Type<'db> {
                         binding.set_return_type(Type::BooleanLiteral(
                             ty_a.is_gradual_equivalent_to(db, ty_b),
                         ));
-                        CallOutcome::callable(binding)
                     }
                     Some(KnownFunction::IsFullyStatic) => {
                         let ty = binding.one_parameter_type().unwrap_or(Type::unknown());
                         binding.set_return_type(Type::BooleanLiteral(ty.is_fully_static(db)));
-                        CallOutcome::callable(binding)
                     }
                     Some(KnownFunction::IsSingleton) => {
                         let ty = binding.one_parameter_type().unwrap_or(Type::unknown());
                         binding.set_return_type(Type::BooleanLiteral(ty.is_singleton(db)));
-                        CallOutcome::callable(binding)
                     }
                     Some(KnownFunction::IsSingleValued) => {
                         let ty = binding.one_parameter_type().unwrap_or(Type::unknown());
                         binding.set_return_type(Type::BooleanLiteral(ty.is_single_valued(db)));
-                        CallOutcome::callable(binding)
                     }
 
                     Some(KnownFunction::Len) => {
@@ -2154,108 +1617,111 @@ impl<'db> Type<'db> {
                                 binding.set_return_type(len_ty);
                             }
                         };
-
-                        CallOutcome::callable(binding)
                     }
 
                     Some(KnownFunction::Repr) => {
                         if let Some(first_arg) = binding.one_parameter_type() {
                             binding.set_return_type(first_arg.repr(db));
                         };
-
-                        CallOutcome::callable(binding)
-                    }
-
-                    Some(KnownFunction::AssertType) => {
-                        let Some((_, asserted_ty)) = binding.two_parameter_types() else {
-                            return CallOutcome::callable(binding);
-                        };
-
-                        CallOutcome::asserted(binding, asserted_ty)
                     }
 
                     Some(KnownFunction::Cast) => {
                         // TODO: Use `.two_parameter_tys()` exclusively
                         // when overloads are supported.
-                        if binding.two_parameter_types().is_none() {
-                            return CallOutcome::callable(binding);
-                        };
-
                         if let Some(casted_ty) = arguments.first_argument() {
-                            binding.set_return_type(casted_ty);
+                            if binding.two_parameter_types().is_some() {
+                                binding.set_return_type(casted_ty);
+                            }
                         };
-
-                        CallOutcome::callable(binding)
                     }
 
-                    _ => CallOutcome::callable(binding),
+                    _ => {}
+                };
+
+                if binding.has_binding_errors() {
+                    Err(CallError::BindingError { binding })
+                } else {
+                    Ok(CallOutcome::Single(binding))
                 }
             }
 
             // TODO annotated return type on `__new__` or metaclass `__call__`
             // TODO check call vs signatures of `__new__` and/or `__init__`
             Type::ClassLiteral(ClassLiteralType { class }) => {
-                CallOutcome::callable(CallBinding::from_return_type(match class.known(db) {
-                    // If the class is the builtin-bool class (for example `bool(1)`), we try to
-                    // return the specific truthiness value of the input arg, `Literal[True]` for
-                    // the example above.
-                    Some(KnownClass::Bool) => arguments
-                        .first_argument()
-                        .map(|arg| arg.bool(db).into_type(db))
-                        .unwrap_or(Type::BooleanLiteral(false)),
+                Ok(CallOutcome::Single(CallBinding::from_return_type(
+                    match class.known(db) {
+                        // If the class is the builtin-bool class (for example `bool(1)`), we try to
+                        // return the specific truthiness value of the input arg, `Literal[True]` for
+                        // the example above.
+                        Some(KnownClass::Bool) => arguments
+                            .first_argument()
+                            .map(|arg| arg.bool(db).into_type(db))
+                            .unwrap_or(Type::BooleanLiteral(false)),
 
-                    Some(KnownClass::Str) => arguments
-                        .first_argument()
-                        .map(|arg| arg.str(db))
-                        .unwrap_or(Type::string_literal(db, "")),
+                        // TODO: Don't ignore the second and third arguments to `str`
+                        //   https://github.com/astral-sh/ruff/pull/16161#discussion_r1958425568
+                        Some(KnownClass::Str) => arguments
+                            .first_argument()
+                            .map(|arg| arg.str(db))
+                            .unwrap_or(Type::string_literal(db, "")),
 
-                    _ => Type::Instance(InstanceType { class }),
-                }))
+                        _ => Type::Instance(InstanceType { class }),
+                    },
+                )))
             }
 
             instance_ty @ Type::Instance(_) => {
-                match instance_ty.call_dunder(db, "__call__", &arguments.with_self(instance_ty)) {
-                    CallDunderResult::CallOutcome(CallOutcome::NotCallable { .. }) => {
-                        // Turn "`<type of illegal '__call__'>` not callable" into
-                        // "`X` not callable"
-                        CallOutcome::NotCallable {
-                            not_callable_ty: self,
+                instance_ty
+                    .call_dunder(db, "__call__", &arguments.with_self(instance_ty))
+                    .map_err(|err| match err {
+                        CallDunderError::Call(CallError::NotCallable { .. }) => {
+                            // Turn "`<type of illegal '__call__'>` not callable" into
+                            // "`X` not callable"
+                            CallError::NotCallable {
+                                not_callable_ty: self,
+                            }
                         }
-                    }
-                    CallDunderResult::CallOutcome(outcome) => outcome,
-                    CallDunderResult::PossiblyUnbound(call_outcome) => {
+                        CallDunderError::Call(CallError::Union {
+                            called_ty: _,
+                            bindings,
+                            errors,
+                        }) => CallError::Union {
+                            called_ty: self,
+                            bindings,
+                            errors,
+                        },
+                        CallDunderError::Call(error) => error,
                         // Turn "possibly unbound object of type `Literal['__call__']`"
                         // into "`X` not callable (possibly unbound `__call__` method)"
-                        CallOutcome::PossiblyUnboundDunderCall {
-                            called_ty: self,
-                            call_outcome: Box::new(call_outcome),
+                        CallDunderError::PossiblyUnbound(outcome) => {
+                            CallError::PossiblyUnboundDunderCall {
+                                called_type: self,
+                                outcome: Box::new(outcome),
+                            }
                         }
-                    }
-                    CallDunderResult::MethodNotAvailable => {
-                        // Turn "`X.__call__` unbound" into "`X` not callable"
-                        CallOutcome::NotCallable {
-                            not_callable_ty: self,
+                        CallDunderError::MethodNotAvailable => {
+                            // Turn "`X.__call__` unbound" into "`X` not callable"
+                            CallError::NotCallable {
+                                not_callable_ty: self,
+                            }
                         }
-                    }
-                }
+                    })
             }
 
             // Dynamic types are callable, and the return type is the same dynamic type
-            Type::Dynamic(_) => CallOutcome::callable(CallBinding::from_return_type(self)),
+            Type::Dynamic(_) => Ok(CallOutcome::Single(CallBinding::from_return_type(self))),
 
-            Type::Union(union) => CallOutcome::union(
-                self,
-                union
-                    .elements(db)
-                    .iter()
-                    .map(|elem| elem.call(db, arguments)),
-            ),
+            Type::Union(union) => {
+                CallOutcome::try_call_union(db, union, |element| element.call(db, arguments))
+            }
 
-            Type::Intersection(_) => CallOutcome::callable(CallBinding::from_return_type(
+            Type::Intersection(_) => Ok(CallOutcome::Single(CallBinding::from_return_type(
                 todo_type!("Type::Intersection.call()"),
-            )),
+            ))),
 
-            _ => CallOutcome::not_callable(self),
+            _ => Err(CallError::NotCallable {
+                not_callable_ty: self,
+            }),
         }
     }
 
@@ -2265,13 +1731,12 @@ impl<'db> Type<'db> {
     /// `receiver_ty` must be `Type::Instance(_)` or `Type::ClassLiteral`.
     ///
     /// TODO: handle `super()` objects properly
-    #[must_use]
     fn call_bound(
         self,
         db: &'db dyn Db,
         receiver_ty: &Type<'db>,
         arguments: &CallArguments<'_, 'db>,
-    ) -> CallOutcome<'db> {
+    ) -> Result<CallOutcome<'db>, CallError<'db>> {
         debug_assert!(receiver_ty.is_instance() || receiver_ty.is_class_literal());
 
         match self {
@@ -2286,22 +1751,20 @@ impl<'db> Type<'db> {
                 self.call(db, arguments)
             }
 
-            Type::Union(union) => CallOutcome::union(
-                self,
-                union
-                    .elements(db)
-                    .iter()
-                    .map(|elem| elem.call_bound(db, receiver_ty, arguments)),
-            ),
+            Type::Union(union) => CallOutcome::try_call_union(db, union, |element| {
+                element.call_bound(db, receiver_ty, arguments)
+            }),
 
-            Type::Intersection(_) => CallOutcome::callable(CallBinding::from_return_type(
+            Type::Intersection(_) => Ok(CallOutcome::Single(CallBinding::from_return_type(
                 todo_type!("Type::Intersection.call_bound()"),
-            )),
+            ))),
 
             // Cases that duplicate, and thus must be kept in sync with, `Type::call()`
-            Type::Dynamic(_) => CallOutcome::callable(CallBinding::from_return_type(self)),
+            Type::Dynamic(_) => Ok(CallOutcome::Single(CallBinding::from_return_type(self))),
 
-            _ => CallOutcome::not_callable(self),
+            _ => Err(CallError::NotCallable {
+                not_callable_ty: self,
+            }),
         }
     }
 
@@ -2311,15 +1774,14 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         name: &str,
         arguments: &CallArguments<'_, 'db>,
-    ) -> CallDunderResult<'db> {
+    ) -> Result<CallOutcome<'db>, CallDunderError<'db>> {
         match self.to_meta_type(db).member(db, name) {
-            Symbol::Type(callable_ty, Boundness::Bound) => {
-                CallDunderResult::CallOutcome(callable_ty.call(db, arguments))
-            }
+            Symbol::Type(callable_ty, Boundness::Bound) => Ok(callable_ty.call(db, arguments)?),
             Symbol::Type(callable_ty, Boundness::PossiblyUnbound) => {
-                CallDunderResult::PossiblyUnbound(callable_ty.call(db, arguments))
+                let call = callable_ty.call(db, arguments)?;
+                Err(CallDunderError::PossiblyUnbound(call))
             }
-            Symbol::Unbound => CallDunderResult::MethodNotAvailable,
+            Symbol::Unbound => Err(CallDunderError::MethodNotAvailable),
         }
     }
 
@@ -2340,34 +1802,51 @@ impl<'db> Type<'db> {
 
         let dunder_iter_result =
             self.call_dunder(db, "__iter__", &CallArguments::positional([self]));
-        match dunder_iter_result {
-            CallDunderResult::CallOutcome(ref call_outcome)
-            | CallDunderResult::PossiblyUnbound(ref call_outcome) => {
-                let Some(iterator_ty) = call_outcome.return_type(db) else {
-                    return IterationOutcome::NotIterable {
-                        not_iterable_ty: self,
-                    };
-                };
+        match &dunder_iter_result {
+            Ok(outcome) | Err(CallDunderError::PossiblyUnbound(outcome)) => {
+                let iterator_ty = outcome.return_type(db);
 
-                return if let Some(element_ty) = iterator_ty
-                    .call_dunder(db, "__next__", &CallArguments::positional([iterator_ty]))
-                    .return_type(db)
-                {
-                    if matches!(dunder_iter_result, CallDunderResult::PossiblyUnbound(..)) {
+                return match iterator_ty.call_dunder(
+                    db,
+                    "__next__",
+                    &CallArguments::positional([iterator_ty]),
+                ) {
+                    Ok(outcome) => {
+                        if matches!(
+                            dunder_iter_result,
+                            Err(CallDunderError::PossiblyUnbound { .. })
+                        ) {
+                            IterationOutcome::PossiblyUnboundDunderIter {
+                                iterable_ty: self,
+                                element_ty: outcome.return_type(db),
+                            }
+                        } else {
+                            IterationOutcome::Iterable {
+                                element_ty: outcome.return_type(db),
+                            }
+                        }
+                    }
+                    Err(CallDunderError::PossiblyUnbound(outcome)) => {
                         IterationOutcome::PossiblyUnboundDunderIter {
                             iterable_ty: self,
-                            element_ty,
+                            element_ty: outcome.return_type(db),
                         }
-                    } else {
-                        IterationOutcome::Iterable { element_ty }
                     }
-                } else {
-                    IterationOutcome::NotIterable {
+                    Err(_) => IterationOutcome::NotIterable {
                         not_iterable_ty: self,
-                    }
+                    },
                 };
             }
-            CallDunderResult::MethodNotAvailable => {}
+            // If `__iter__` exists but can't be called or doesn't have the expected signature,
+            // return not iterable over falling back to `__getitem__`.
+            Err(CallDunderError::Call(_)) => {
+                return IterationOutcome::NotIterable {
+                    not_iterable_ty: self,
+                }
+            }
+            Err(CallDunderError::MethodNotAvailable) => {
+                // No `__iter__` attribute, try `__getitem__` next.
+            }
         }
 
         // Although it's not considered great practice,
@@ -2376,19 +1855,23 @@ impl<'db> Type<'db> {
         //
         // TODO(Alex) this is only valid if the `__getitem__` method is annotated as
         // accepting `int` or `SupportsIndex`
-        if let Some(element_ty) = self
-            .call_dunder(
-                db,
-                "__getitem__",
-                &CallArguments::positional([self, KnownClass::Int.to_instance(db)]),
-            )
-            .return_type(db)
-        {
-            IterationOutcome::Iterable { element_ty }
-        } else {
-            IterationOutcome::NotIterable {
-                not_iterable_ty: self,
+        match self.call_dunder(
+            db,
+            "__getitem__",
+            &CallArguments::positional([self, KnownClass::Int.to_instance(db)]),
+        ) {
+            Ok(outcome) => IterationOutcome::Iterable {
+                element_ty: outcome.return_type(db),
+            },
+            Err(CallDunderError::PossiblyUnbound(outcome)) => {
+                IterationOutcome::PossiblyUnboundDunderIter {
+                    iterable_ty: self,
+                    element_ty: outcome.return_type(db),
+                }
             }
+            Err(_) => IterationOutcome::NotIterable {
+                not_iterable_ty: self,
+            },
         }
     }
 
@@ -2433,6 +1916,31 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
     ) -> Result<Type<'db>, InvalidTypeExpressionError<'db>> {
         match self {
+            // Special cases for `float` and `complex`
+            // https://typing.readthedocs.io/en/latest/spec/special-types.html#special-cases-for-float-and-complex
+            Type::ClassLiteral(ClassLiteralType { class })
+                if class.is_known(db, KnownClass::Float) =>
+            {
+                Ok(UnionType::from_elements(
+                    db,
+                    [
+                        KnownClass::Int.to_instance(db),
+                        KnownClass::Float.to_instance(db),
+                    ],
+                ))
+            }
+            Type::ClassLiteral(ClassLiteralType { class })
+                if class.is_known(db, KnownClass::Complex) =>
+            {
+                Ok(UnionType::from_elements(
+                    db,
+                    [
+                        KnownClass::Int.to_instance(db),
+                        KnownClass::Float.to_instance(db),
+                        KnownClass::Complex.to_instance(db),
+                    ],
+                ))
+            }
             // In a type expression, a bare `type` is interpreted as "instance of `type`", which is
             // equivalent to `type[object]`.
             Type::ClassLiteral(_) | Type::SubclassOf(_) => Ok(self.to_instance(db)),
@@ -2808,6 +2316,7 @@ pub enum KnownClass {
     Type,
     Int,
     Float,
+    Complex,
     Str,
     List,
     Tuple,
@@ -2838,6 +2347,9 @@ pub enum KnownClass {
     OrderedDict,
     // sys
     VersionInfo,
+    // Exposed as `types.EllipsisType` on Python >=3.10;
+    // backported as `builtins.ellipsis` by typeshed on Python <=3.9
+    EllipsisType,
 }
 
 impl<'db> KnownClass {
@@ -2845,7 +2357,7 @@ impl<'db> KnownClass {
         matches!(self, Self::Bool)
     }
 
-    pub const fn as_str(&self) -> &'static str {
+    pub fn as_str(&self, db: &'db dyn Db) -> &'static str {
         match self {
             Self::Bool => "bool",
             Self::Object => "object",
@@ -2853,6 +2365,7 @@ impl<'db> KnownClass {
             Self::Tuple => "tuple",
             Self::Int => "int",
             Self::Float => "float",
+            Self::Complex => "complex",
             Self::FrozenSet => "frozenset",
             Self::Str => "str",
             Self::Set => "set",
@@ -2884,6 +2397,15 @@ impl<'db> KnownClass {
             // which is impossible to replicate in the stubs since the sole instance of the class
             // also has that name in the `sys` module.)
             Self::VersionInfo => "_version_info",
+            Self::EllipsisType => {
+                // Exposed as `types.EllipsisType` on Python >=3.10;
+                // backported as `builtins.ellipsis` by typeshed on Python <=3.9
+                if Program::get(db).python_version(db) >= PythonVersion::PY310 {
+                    "EllipsisType"
+                } else {
+                    "ellipsis"
+                }
+            }
         }
     }
 
@@ -2892,7 +2414,7 @@ impl<'db> KnownClass {
     }
 
     pub fn to_class_literal(self, db: &'db dyn Db) -> Type<'db> {
-        known_module_symbol(db, self.canonical_module(db), self.as_str())
+        known_module_symbol(db, self.canonical_module(db), self.as_str(db))
             .ignore_possibly_unbound()
             .unwrap_or(Type::unknown())
     }
@@ -2907,7 +2429,7 @@ impl<'db> KnownClass {
     /// Return `true` if this symbol can be resolved to a class definition `class` in typeshed,
     /// *and* `class` is a subclass of `other`.
     pub fn is_subclass_of(self, db: &'db dyn Db, other: Class<'db>) -> bool {
-        known_module_symbol(db, self.canonical_module(db), self.as_str())
+        known_module_symbol(db, self.canonical_module(db), self.as_str(db))
             .ignore_possibly_unbound()
             .and_then(Type::into_class_literal)
             .is_some_and(|ClassLiteralType { class }| class.is_subclass_of(db, other))
@@ -2922,6 +2444,7 @@ impl<'db> KnownClass {
             | Self::Type
             | Self::Int
             | Self::Float
+            | Self::Complex
             | Self::Str
             | Self::List
             | Self::Tuple
@@ -2950,6 +2473,15 @@ impl<'db> KnownClass {
                     KnownModule::TypingExtensions
                 }
             }
+            Self::EllipsisType => {
+                // Exposed as `types.EllipsisType` on Python >=3.10;
+                // backported as `builtins.ellipsis` by typeshed on Python <=3.9
+                if Program::get(db).python_version(db) >= PythonVersion::PY310 {
+                    KnownModule::Types
+                } else {
+                    KnownModule::Builtins
+                }
+            }
             Self::ChainMap
             | Self::Counter
             | Self::DefaultDict
@@ -2962,15 +2494,21 @@ impl<'db> KnownClass {
     ///
     /// A singleton class is a class where it is known that only one instance can ever exist at runtime.
     const fn is_singleton(self) -> bool {
-        // TODO there are other singleton types (EllipsisType, NotImplementedType)
+        // TODO there are other singleton types (NotImplementedType -- any others?)
         match self {
-            Self::NoneType | Self::NoDefaultType | Self::VersionInfo | Self::TypeAliasType => true,
+            Self::NoneType
+            | Self::EllipsisType
+            | Self::NoDefaultType
+            | Self::VersionInfo
+            | Self::TypeAliasType => true,
+
             Self::Bool
             | Self::Object
             | Self::Bytes
             | Self::Tuple
             | Self::Int
             | Self::Float
+            | Self::Complex
             | Self::Str
             | Self::Set
             | Self::FrozenSet
@@ -3007,6 +2545,7 @@ impl<'db> KnownClass {
             "type" => Self::Type,
             "int" => Self::Int,
             "float" => Self::Float,
+            "complex" => Self::Complex,
             "str" => Self::Str,
             "set" => Self::Set,
             "frozenset" => Self::FrozenSet,
@@ -3029,6 +2568,12 @@ impl<'db> KnownClass {
             "_SpecialForm" => Self::SpecialForm,
             "_NoDefaultType" => Self::NoDefaultType,
             "_version_info" => Self::VersionInfo,
+            "ellipsis" if Program::get(db).python_version(db) <= PythonVersion::PY39 => {
+                Self::EllipsisType
+            }
+            "EllipsisType" if Program::get(db).python_version(db) >= PythonVersion::PY310 => {
+                Self::EllipsisType
+            }
             _ => return None,
         };
 
@@ -3046,6 +2591,7 @@ impl<'db> KnownClass {
             | Self::Type
             | Self::Int
             | Self::Float
+            | Self::Complex
             | Self::Str
             | Self::List
             | Self::Tuple
@@ -3064,6 +2610,7 @@ impl<'db> KnownClass {
             | Self::ModuleType
             | Self::VersionInfo
             | Self::BaseException
+            | Self::EllipsisType
             | Self::BaseExceptionGroup
             | Self::FunctionType => module == self.canonical_module(db),
             Self::NoneType => matches!(module, KnownModule::Typeshed | KnownModule::Types),
@@ -4126,20 +3673,23 @@ impl<'db> Class<'db> {
             let arguments = CallArguments::positional([name, bases, namespace]);
 
             let return_ty_result = match metaclass.call(db, &arguments) {
-                CallOutcome::NotCallable { not_callable_ty } => Err(MetaclassError {
+                Ok(outcome) => Ok(outcome.return_type(db)),
+
+                Err(CallError::NotCallable { not_callable_ty }) => Err(MetaclassError {
                     kind: MetaclassErrorKind::NotCallable(not_callable_ty),
                 }),
 
-                CallOutcome::Union {
-                    outcomes,
+                Err(CallError::Union {
                     called_ty,
-                } => {
+                    errors,
+                    bindings,
+                }) => {
                     let mut partly_not_callable = false;
 
-                    let return_ty = outcomes
+                    let return_ty = errors
                         .iter()
-                        .fold(None, |acc, outcome| {
-                            let ty = outcome.return_type(db);
+                        .fold(None, |acc, error| {
+                            let ty = error.return_type(db);
 
                             match (acc, ty) {
                                 (acc, None) => {
@@ -4150,7 +3700,13 @@ impl<'db> Class<'db> {
                                 (Some(builder), Some(ty)) => Some(builder.add(ty)),
                             }
                         })
-                        .map(UnionBuilder::build);
+                        .map(|mut builder| {
+                            for binding in bindings {
+                                builder = builder.add(binding.return_type());
+                            }
+
+                            builder.build()
+                        });
 
                     if partly_not_callable {
                         Err(MetaclassError {
@@ -4161,16 +3717,13 @@ impl<'db> Class<'db> {
                     }
                 }
 
-                CallOutcome::PossiblyUnboundDunderCall { called_ty, .. } => Err(MetaclassError {
-                    kind: MetaclassErrorKind::PartlyNotCallable(called_ty),
+                Err(CallError::PossiblyUnboundDunderCall { .. }) => Err(MetaclassError {
+                    kind: MetaclassErrorKind::PartlyNotCallable(metaclass),
                 }),
 
                 // TODO we should also check for binding errors that would indicate the metaclass
                 // does not accept the right arguments
-                CallOutcome::Callable { binding }
-                | CallOutcome::RevealType { binding, .. }
-                | CallOutcome::StaticAssertionError { binding, .. }
-                | CallOutcome::AssertType { binding, .. } => Ok(binding.return_type()),
+                Err(CallError::BindingError { binding }) => Ok(binding.return_type()),
             };
 
             return return_ty_result.map(|ty| ty.to_meta_type(db));
@@ -4220,21 +3773,45 @@ impl<'db> Class<'db> {
             return Symbol::bound(TupleType::from_elements(db, tuple_elements));
         }
 
+        // If we encounter a dynamic type in this class's MRO, we'll save that dynamic type
+        // in this variable. After we've traversed the MRO, we'll either:
+        // (1) Use that dynamic type as the type for this attribute,
+        //     if no other classes in the MRO define the attribute; or,
+        // (2) Intersect that dynamic type with the type of the attribute
+        //     from the non-dynamic members of the class's MRO.
+        let mut dynamic_type_to_intersect_with: Option<Type<'db>> = None;
+
+        let mut lookup_result: LookupResult<'db> = Err(LookupError::Unbound);
+
         for superclass in self.iter_mro(db) {
             match superclass {
-                // TODO we may instead want to record the fact that we encountered dynamic, and intersect it with
-                // the type found on the next "real" class.
-                ClassBase::Dynamic(_) => return Type::from(superclass).member(db, name),
-                ClassBase::Class(class) => {
-                    let member = class.own_class_member(db, name);
-                    if !member.is_unbound() {
-                        return member;
-                    }
+                ClassBase::Dynamic(_) => {
+                    // Note: calling `Type::from(superclass).member()` would be incorrect here.
+                    // What we'd really want is a `Type::Any.own_class_member()` method,
+                    // but adding such a method wouldn't make much sense -- it would always return `Any`!
+                    dynamic_type_to_intersect_with.get_or_insert(Type::from(superclass));
                 }
+                ClassBase::Class(class) => {
+                    lookup_result = lookup_result.or_else(|lookup_error| {
+                        lookup_error.or_fall_back_to(db, class.own_class_member(db, name))
+                    });
+                }
+            }
+            if lookup_result.is_ok() {
+                break;
             }
         }
 
-        Symbol::Unbound
+        match (Symbol::from(lookup_result), dynamic_type_to_intersect_with) {
+            (symbol, None) => symbol,
+            (Symbol::Type(ty, _), Some(dynamic_type)) => Symbol::bound(
+                IntersectionBuilder::new(db)
+                    .add_positive(ty)
+                    .add_positive(dynamic_type)
+                    .build(),
+            ),
+            (Symbol::Unbound, Some(dynamic_type)) => Symbol::bound(dynamic_type),
+        }
     }
 
     /// Returns the inferred type of the class member named `name`.
@@ -4386,7 +3963,7 @@ impl<'db> Class<'db> {
 
             let declarations = use_def.public_declarations(symbol_id);
 
-            match symbol_from_declarations(db, declarations, RequiresExplicitReExport::No) {
+            match symbol_from_declarations(db, declarations) {
                 Ok(SymbolAndQualifiers(Symbol::Type(declared_ty, _), qualifiers)) => {
                     // The attribute is declared in the class body.
 
@@ -4408,7 +3985,7 @@ impl<'db> Class<'db> {
                     // in a method, and it could also be *bound* in the class body (and/or in a method).
 
                     let bindings = use_def.public_bindings(symbol_id);
-                    let inferred = symbol_from_bindings(db, bindings, RequiresExplicitReExport::No);
+                    let inferred = symbol_from_bindings(db, bindings);
                     let inferred_ty = inferred.ignore_possibly_unbound();
 
                     Self::implicit_instance_attribute(db, body_scope, name, inferred_ty).into()
@@ -4511,6 +4088,10 @@ pub struct ClassLiteralType<'db> {
 }
 
 impl<'db> ClassLiteralType<'db> {
+    pub(crate) fn body_scope(self, db: &'db dyn Db) -> ScopeId<'db> {
+        self.class.body_scope(db)
+    }
+
     fn member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
         self.class.class_member(db, name)
     }
@@ -4949,13 +4530,12 @@ static_assertions::assert_eq_size!(Type, [u8; 16]);
 pub(crate) mod tests {
     use super::*;
     use crate::db::tests::{setup_db, TestDbBuilder};
-    use crate::stdlib::typing_symbol;
+    use crate::symbol::{typing_extensions_symbol, typing_symbol};
     use ruff_db::files::system_path_to_file;
     use ruff_db::parsed::parsed_module;
     use ruff_db::system::DbWithTestSystem;
     use ruff_db::testing::assert_function_query_was_not_run;
-    use ruff_python_ast as ast;
-    use ruff_python_ast::PythonVersion;
+    use ruff_python_ast::{self as ast, PythonVersion};
     use test_case::test_case;
 
     /// Explicitly test for Python version <3.13 and >=3.13, to ensure that
@@ -4989,18 +4569,6 @@ pub(crate) mod tests {
             typing_extensions_no_default.display(&db).to_string(),
             "NoDefault"
         );
-    }
-
-    #[test]
-    fn module_type_symbols_includes_declared_types_but_not_referenced_types() {
-        let db = setup_db();
-        let symbol_names = module_type_symbols(&db);
-
-        let dunder_name_symbol_name = ast::name::Name::new_static("__name__");
-        assert!(symbol_names.contains(&dunder_name_symbol_name));
-
-        let property_symbol_name = ast::name::Name::new_static("property");
-        assert!(!symbol_names.contains(&property_symbol_name));
     }
 
     /// Inferring the result of a call-expression shouldn't need to re-run after

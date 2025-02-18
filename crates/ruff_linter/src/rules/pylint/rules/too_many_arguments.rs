@@ -93,7 +93,9 @@ pub(crate) fn too_many_arguments(checker: &Checker, function_def: &ast::StmtFunc
             &checker.settings.pep8_naming.classmethod_decorators,
             &checker.settings.pep8_naming.staticmethod_decorators,
         ),
-        function_type::FunctionType::Method | function_type::FunctionType::ClassMethod
+        function_type::FunctionType::Method
+            | function_type::FunctionType::ClassMethod
+            | function_type::FunctionType::NewMethod
     ) {
         // If so, we need to subtract one from the number of positional arguments, since the first
         // argument is always `self` or `cls`.

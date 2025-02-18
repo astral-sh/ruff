@@ -60,7 +60,7 @@ repos:
           - black==25.1.0
 
   - repo: https://github.com/crate-ci/typos
-    rev: v1.29.5
+    rev: v1.29.7
     hooks:
       - id: typos
 
@@ -74,7 +74,7 @@ repos:
         pass_filenames: false # This makes it a lot faster
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.9.5
+    rev: v0.9.6
     hooks:
       - id: ruff-format
       - id: ruff
@@ -84,7 +84,7 @@ repos:
 
   # Prettier
   - repo: https://github.com/rbubley/mirrors-prettier
-    rev: v3.4.2
+    rev: v3.5.1
     hooks:
       - id: prettier
         types: [yaml]

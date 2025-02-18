@@ -20,8 +20,8 @@ class A:
     def __eq__(self, other: A) -> int:
         return 42
 
-    def __ne__(self, other: A) -> float:
-        return 42.0
+    def __ne__(self, other: A) -> bytearray:
+        return bytearray()
 
     def __lt__(self, other: A) -> str:
         return "42"
@@ -36,7 +36,7 @@ class A:
         return {42}
 
 reveal_type(A() == A())  # revealed: int
-reveal_type(A() != A())  # revealed: float
+reveal_type(A() != A())  # revealed: bytearray
 reveal_type(A() < A())  # revealed: str
 reveal_type(A() <= A())  # revealed: bytes
 reveal_type(A() > A())  # revealed: list
@@ -55,8 +55,8 @@ class A:
     def __eq__(self, other: B) -> int:
         return 42
 
-    def __ne__(self, other: B) -> float:
-        return 42.0
+    def __ne__(self, other: B) -> bytearray:
+        return bytearray()
 
     def __lt__(self, other: B) -> str:
         return "42"
@@ -73,7 +73,7 @@ class A:
 class B: ...
 
 reveal_type(A() == B())  # revealed: int
-reveal_type(A() != B())  # revealed: float
+reveal_type(A() != B())  # revealed: bytearray
 reveal_type(A() < B())  # revealed: str
 reveal_type(A() <= B())  # revealed: bytes
 reveal_type(A() > B())  # revealed: list
@@ -93,8 +93,8 @@ class A:
     def __eq__(self, other: B) -> int:
         return 42
 
-    def __ne__(self, other: B) -> float:
-        return 42.0
+    def __ne__(self, other: B) -> bytearray:
+        return bytearray()
 
     def __lt__(self, other: B) -> str:
         return "42"
@@ -117,14 +117,11 @@ class B:
     def __ne__(self, other: str) -> B:
         return B()
 
-# TODO: should be `int` and `float`.
-# Need to check arg type and fall back to `rhs.__eq__` and `rhs.__ne__`.
-#
 # Because `object.__eq__` and `object.__ne__` accept `object` in typeshed,
 # this can only happen with an invalid override of these methods,
 # but we still support it.
-reveal_type(B() == A())  # revealed: B
-reveal_type(B() != A())  # revealed: B
+reveal_type(B() == A())  # revealed: int
+reveal_type(B() != A())  # revealed: bytearray
 
 reveal_type(B() < A())  # revealed: list
 reveal_type(B() <= A())  # revealed: set
@@ -136,11 +133,11 @@ class C:
     def __gt__(self, other: C) -> int:
         return 42
 
-    def __ge__(self, other: C) -> float:
-        return 42.0
+    def __ge__(self, other: C) -> bytearray:
+        return bytearray()
 
 reveal_type(C() < C())  # revealed: int
-reveal_type(C() <= C())  # revealed: float
+reveal_type(C() <= C())  # revealed: bytearray
 ```
 
 ## Reflected Comparisons with Subclasses
@@ -175,8 +172,8 @@ class B(A):
     def __eq__(self, other: A) -> int:
         return 42
 
-    def __ne__(self, other: A) -> float:
-        return 42.0
+    def __ne__(self, other: A) -> bytearray:
+        return bytearray()
 
     def __lt__(self, other: A) -> str:
         return "42"
@@ -191,7 +188,7 @@ class B(A):
         return {42}
 
 reveal_type(A() == B())  # revealed: int
-reveal_type(A() != B())  # revealed: float
+reveal_type(A() != B())  # revealed: bytearray
 
 reveal_type(A() < B())  # revealed: list
 reveal_type(A() <= B())  # revealed: set
@@ -222,9 +219,8 @@ class B(A):
     def __gt__(self, other: int) -> B:
         return B()
 
-# TODO: should be `A`, need to check argument type and fall back to LHS method
-reveal_type(A() < B())  # revealed: B
-reveal_type(A() > B())  # revealed: B
+reveal_type(A() < B())  # revealed: A
+reveal_type(A() > B())  # revealed: A
 ```
 
 ## Operations involving instances of classes inheriting from `Any`
@@ -272,9 +268,8 @@ class A:
     def __ne__(self, other: int) -> A:
         return A()
 
-# TODO: it should be `bool`, need to check arg type and fall back to `is` and `is not`
-reveal_type(A() == A())  # revealed: A
-reveal_type(A() != A())  # revealed: A
+reveal_type(A() == A())  # revealed: bool
+reveal_type(A() != A())  # revealed: bool
 ```
 
 ## Object Comparisons with Typeshed
@@ -305,12 +300,14 @@ reveal_type(1 >= 1.0)  # revealed: bool
 reveal_type(1 == 2j)  # revealed: bool
 reveal_type(1 != 2j)  # revealed: bool
 
-# TODO: should be Unknown and emit diagnostic,
-# need to check arg type and should be failed
-reveal_type(1 < 2j)  # revealed: bool
-reveal_type(1 <= 2j)  # revealed: bool
-reveal_type(1 > 2j)  # revealed: bool
-reveal_type(1 >= 2j)  # revealed: bool
+# error: [unsupported-operator] "Operator `<` is not supported for types `int` and `complex`, in comparing `Literal[1]` with `complex`"
+reveal_type(1 < 2j)  # revealed: Unknown
+# error: [unsupported-operator] "Operator `<=` is not supported for types `int` and `complex`, in comparing `Literal[1]` with `complex`"
+reveal_type(1 <= 2j)  # revealed: Unknown
+# error: [unsupported-operator] "Operator `>` is not supported for types `int` and `complex`, in comparing `Literal[1]` with `complex`"
+reveal_type(1 > 2j)  # revealed: Unknown
+# error: [unsupported-operator] "Operator `>=` is not supported for types `int` and `complex`, in comparing `Literal[1]` with `complex`"
+reveal_type(1 >= 2j)  # revealed: Unknown
 
 def f(x: bool, y: int):
     reveal_type(x < y)  # revealed: bool

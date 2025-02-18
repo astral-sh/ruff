@@ -54,3 +54,41 @@ from knot_extensions import is_singleton, static_assert
 
 static_assert(is_singleton(_NoDefaultType))
 ```
+
+## `builtins.ellipsis`/`types.EllipsisType`
+
+### All Python versions
+
+The type of the builtin symbol `Ellipsis` is the same as the type of an ellipsis literal (`...`).
+The type is not actually exposed from the standard library on Python \<3.10, but we still recognise
+the type as a singleton on any Python version.
+
+```toml
+[environment]
+python-version = "3.9"
+```
+
+```py
+import sys
+from knot_extensions import is_singleton, static_assert
+
+static_assert(is_singleton(Ellipsis.__class__))
+static_assert(is_singleton((...).__class__))
+```
+
+### Python 3.10+
+
+On Python 3.10+, the standard library exposes the type of `...` as `types.EllipsisType`, and we also
+recognise this as a singleton type when it is referenced directly:
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```py
+import types
+from knot_extensions import static_assert, is_singleton
+
+static_assert(is_singleton(types.EllipsisType))
+```

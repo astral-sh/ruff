@@ -9,7 +9,7 @@ reveal_type(x)  # revealed: Literal[2]
 
 x = 1.0
 x /= 2
-reveal_type(x)  # revealed: float
+reveal_type(x)  # revealed: int | float
 ```
 
 ## Dunder methods
@@ -24,12 +24,12 @@ x -= 1
 reveal_type(x)  # revealed: str
 
 class C:
-    def __iadd__(self, other: str) -> float:
-        return 1.0
+    def __iadd__(self, other: str) -> int:
+        return 1
 
 x = C()
 x += "Hello"
-reveal_type(x)  # revealed: float
+reveal_type(x)  # revealed: int
 ```
 
 ## Unsupported types
@@ -40,7 +40,7 @@ class C:
         return 42
 
 x = C()
-# error: [invalid-argument-type]
+# error: [unsupported-operator] "Operator `-=` is unsupported between objects of type `C` and `Literal[1]`"
 x -= 1
 
 reveal_type(x)  # revealed: int
@@ -130,10 +130,10 @@ def _(flag: bool):
     if flag:
         f = Foo()
     else:
-        f = 42.0
+        f = 42
     f += 12
 
-    reveal_type(f)  # revealed: str | float
+    reveal_type(f)  # revealed: str | Literal[54]
 ```
 
 ## Partially bound target union with `__add__`

@@ -83,7 +83,7 @@ class _RmtreeType(Protocol):
             self,
             path: StrOrBytesPath,
             ignore_errors: bool,
-            onerror: _OnErrorCallback,
+            onerror: _OnErrorCallback | None,
             *,
             onexc: None = None,
             dir_fd: int | None = None,
@@ -95,7 +95,7 @@ class _RmtreeType(Protocol):
             path: StrOrBytesPath,
             ignore_errors: bool = False,
             *,
-            onerror: _OnErrorCallback,
+            onerror: _OnErrorCallback | None,
             onexc: None = None,
             dir_fd: int | None = None,
         ) -> None: ...
