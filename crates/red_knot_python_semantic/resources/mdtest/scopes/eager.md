@@ -201,3 +201,50 @@ def _():
 
     x = 2
 ```
+
+## Annotations
+
+Type annotations are sometimes deferred. When they are, the types that are referenced in an
+annotation are looked up lazily, even if they occur in an eager scope.
+
+### Eager annotations in a Python file
+
+```py
+x = int
+
+class C:
+    var: x
+
+# TODO: int
+reveal_type(C.var)  # revealed: Unknown | str
+
+x = str
+```
+
+### Deferred annotations in a Python file
+
+```py
+from __future__ import annotations
+
+x = int
+
+class C:
+    var: x
+
+reveal_type(C.var)  # revealed: Unknown | str
+
+x = str
+```
+
+### Deferred annotations in a stub file
+
+```pyi
+x = int
+
+class C:
+    var: x
+
+reveal_type(C.var)  # revealed: Unknown | str
+
+x = str
+```
