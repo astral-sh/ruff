@@ -468,20 +468,3 @@ where
         )),
     }
 }
-
-#[derive(CacheKey, Clone, Copy, Debug, PartialOrd, Ord, PartialEq, Eq)]
-#[cfg_attr(
-    feature = "serde",
-    derive(serde::Serialize, serde::Deserialize),
-    serde(rename_all = "lowercase")
-)]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
-pub enum PythonVersion {
-    Py37,
-    Py38,
-    Py39,
-    Py310,
-    Py311,
-    Py312,
-    Py313,
-}
