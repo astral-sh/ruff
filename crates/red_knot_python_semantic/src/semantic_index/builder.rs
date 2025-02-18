@@ -226,22 +226,22 @@ impl<'db> SemanticIndexBuilder<'db> {
         popped_scope.extend_descendents(children_end);
 
         // If the scope that we just popped off is an eager scope, we need to "lock" our view of
-        // which bindings and/or declarations reach each of the uses in the scope.
+        // which bindings reach each of the uses in the scope.
         if popped_scope.is_eager() {
-            // Loop through each enclosing scope, looking for any that bind or declare each symbol.
+            // Loop through each enclosing scope, looking for any that bind each symbol.
             for enclosing_scope_info in self.scope_stack.iter().rev() {
                 let enclosing_scope_id = enclosing_scope_info.file_scope_id;
                 let enclosing_symbol_table = &self.symbol_tables[enclosing_scope_id];
                 for nested_symbol in self.symbol_tables[popped_scope_id].symbols() {
-                    // Skip this symbol if this enclosing scope doesn't contain any bindings or
-                    // declarations for it.
+                    // Skip this symbol if this enclosing scope doesn't contain any bindings for
+                    // it.
                     let Some(enclosing_symbol_id) =
                         enclosing_symbol_table.symbol_id_by_name(nested_symbol.name())
                     else {
                         continue;
                     };
                     let enclosing_symbol = enclosing_symbol_table.symbol(enclosing_symbol_id);
-                    if !enclosing_symbol.is_bound() && !enclosing_symbol.is_declared() {
+                    if !enclosing_symbol.is_bound() {
                         continue;
                     }
 
