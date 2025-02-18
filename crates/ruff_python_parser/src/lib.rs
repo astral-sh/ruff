@@ -248,16 +248,16 @@ pub fn parse_string_annotation(
 /// parsing:
 ///
 /// ```
-/// use ruff_python_parser::{Mode, parse};
+/// use ruff_python_parser::{parse, Mode, ParserOptions};
 ///
-/// let parsed = parse("1 + 2", Mode::Expression);
+/// let parsed = parse("1 + 2", ParserOptions::from_mode(Mode::Expression));
 /// assert!(parsed.is_ok());
 /// ```
 ///
 /// Alternatively, we can parse a full Python program consisting of multiple lines:
 ///
 /// ```
-/// use ruff_python_parser::{Mode, parse};
+/// use ruff_python_parser::{parse, Mode, ParserOptions};
 ///
 /// let source = r#"
 /// class Greeter:
@@ -265,21 +265,21 @@ pub fn parse_string_annotation(
 ///   def greet(self):
 ///    print("Hello, world!")
 /// "#;
-/// let parsed = parse(source, Mode::Module);
+/// let parsed = parse(source, ParserOptions::from_mode(Mode::Module));
 /// assert!(parsed.is_ok());
 /// ```
 ///
 /// Additionally, we can parse a Python program containing IPython escapes:
 ///
 /// ```
-/// use ruff_python_parser::{Mode, parse};
+/// use ruff_python_parser::{parse, Mode, ParserOptions};
 ///
 /// let source = r#"
 /// %timeit 1 + 2
 /// ?str.replace
 /// !ls
 /// "#;
-/// let parsed = parse(source, Mode::Ipython);
+/// let parsed = parse(source, ParserOptions::from_mode(Mode::Ipython));
 /// assert!(parsed.is_ok());
 /// ```
 pub fn parse(source: &str, options: ParserOptions) -> Result<Parsed<Mod>, ParseError> {
