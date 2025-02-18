@@ -1,5 +1,5 @@
 use std::hash::{Hash, Hasher};
-use std::ops::{Deref, Range};
+use std::ops::Range;
 
 use bitflags::bitflags;
 use hashbrown::hash_map::RawEntryMut;
@@ -378,17 +378,21 @@ impl SymbolTableBuilder {
         self.table.symbols[id].insert_flags(SymbolFlags::IS_USED);
     }
 
+    pub(super) fn symbols(&self) -> impl Iterator<Item = &Symbol> {
+        self.table.symbols()
+    }
+
+    pub(super) fn symbol_id_by_name(&self, name: &str) -> Option<ScopedSymbolId> {
+        self.table.symbol_id_by_name(name)
+    }
+
+    pub(super) fn symbol(&self, symbol_id: impl Into<ScopedSymbolId>) -> &Symbol {
+        self.table.symbol(symbol_id)
+    }
+
     pub(super) fn finish(mut self) -> SymbolTable {
         self.table.shrink_to_fit();
         self.table
-    }
-}
-
-impl Deref for SymbolTableBuilder {
-    type Target = SymbolTable;
-
-    fn deref(&self) -> &Self::Target {
-        &self.table
     }
 }
 
