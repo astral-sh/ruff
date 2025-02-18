@@ -97,7 +97,7 @@ impl fmt::Display for PythonVersion {
 }
 
 #[cfg(feature = "serde")]
-pub mod serde {
+mod serde {
     use super::PythonVersion;
 
     impl<'de> serde::Deserialize<'de> for PythonVersion {
