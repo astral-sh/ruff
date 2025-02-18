@@ -110,6 +110,29 @@ def _():
     x = 2
 ```
 
+### Class definition bindings are not visible in nested scopes
+
+Class definitions are eager scopes, but any bindings in them are explicitly not visible to any
+nested scopes. (Those nested scopes are typically (lazy) function definitions, but the rule also
+applies to nested eager scopes like comprehensions and other class definitions.)
+
+```py
+def _():
+    x = 1
+
+    class A:
+        x = 4
+
+        # revealed: Literal[1]
+        [reveal_type(x) for a in range(0)]
+
+        class B:
+            # revealed: Literal[1]
+            [reveal_type(x) for a in range(0)]
+
+    x = 2
+```
+
 ### Eager scope within a lazy scope
 
 The list comprehension is an eager scope, and it is enclosed within a function definition, which is
