@@ -40,7 +40,7 @@ class C:
         return 42
 
 x = C()
-# error: [unsupported-operator]
+# error: [unsupported-operator] "Operator `-=` is unsupported between objects of type `C` and `Literal[1]`"
 x -= 1
 
 reveal_type(x)  # revealed: int

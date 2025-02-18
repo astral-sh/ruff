@@ -99,3 +99,27 @@ c = C()
 # error: 13 [invalid-argument-type] "Object of type `C` cannot be assigned to parameter 1 (`self`) of function `__call__`; expected type `int`"
 reveal_type(c())  # revealed: int
 ```
+
+## Union over callables
+
+### Possibly unbound `__call__`
+
+```py
+def outer(cond1: bool):
+	class Test:
+		if cond1:
+			def __call__(self): ...
+	
+	class Other:
+		def __call__(self): ...
+	
+	def inner(cond2: bool): 
+		if cond2:
+			a = Test()
+		else:
+			a = Other()
+	
+        # TODO: Improve the error message to a) be more specific what `__call__` is and b) mention that it is possibly unbound.
+        # error: [call-non-callable] "Object of type `Test | Other` is not callable (due to union element `Literal[__call__]`)"
+		a()
+```

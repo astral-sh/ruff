@@ -10,6 +10,8 @@ pub(super) use arguments::{Argument, CallArguments};
 pub(super) use bind::{bind_call, CallBinding};
 
 /// A successfully bound call where all arguments are valid.
+///
+/// It's guaranteed that the wrapped bindings have no errors.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) enum CallOutcome<'db> {
     /// The call resolves to exactly one binding.
@@ -20,10 +22,10 @@ pub(super) enum CallOutcome<'db> {
 }
 
 impl<'db> CallOutcome<'db> {
-    /// Tries calling each union element using the provided `call` function.
+    /// Calls each union element using the provided `call` function.
     ///
-    /// Returns `Ok` if all variants are callable according to the callback and `Err` otherwise.
-    pub(super) fn try_call<F>(
+    /// Returns `Ok` if all variants can be called without error according to the callback and `Err` otherwise.
+    pub(super) fn try_call_union<F>(
         db: &'db dyn Db,
         union: UnionType<'db>,
         call: F,
@@ -48,20 +50,25 @@ impl<'db> CallOutcome<'db> {
                     CallError::NotCallableVariants {
                         called_ty: _,
                         callable: inner_callable,
-                        not_callable: inner_not_callable,
+                        call_errors: inner_not_callable,
                     } => {
                         not_callable.extend(inner_not_callable);
                         bindings.extend(inner_callable);
                     }
-                    // Should this be OK, or an error? We can't make it not_callable
-                    // because calling it would actually work because it ignores the
-                    // possibly unboundness.
                     CallError::PossiblyUnboundDunderCall { outcome, .. } => match *outcome {
                         CallOutcome::Union(inner_bindings) => {
-                            bindings.extend(inner_bindings);
+                            // TODO: Remove the `Vec::from` conversion after upgrading to Rust Edition 2024 (when `Box<[T]>::into_iter)` becomes stable.
+                            not_callable.extend(Vec::from(inner_bindings).into_iter().map(
+                                |binding| {
+                                    NotCallableVariant::new(binding.callable_type(), Some(binding))
+                                },
+                            ));
                         }
                         CallOutcome::Single(binding) => {
-                            bindings.push(binding);
+                            not_callable.push(NotCallableVariant::new(
+                                binding.callable_type(),
+                                Some(binding),
+                            ));
                         }
                     },
                     CallError::BindingError { binding } => {
@@ -78,7 +85,7 @@ impl<'db> CallOutcome<'db> {
             Ok(CallOutcome::Union(bindings.into()))
         } else {
             Err(CallError::NotCallableVariants {
-                not_callable: not_callable.into(),
+                call_errors: not_callable.into(),
                 callable: bindings.into(),
                 called_ty: union,
             })
@@ -116,7 +123,7 @@ pub(super) enum CallError<'db> {
     /// can't be called with the given arguments or isn't callable at all.
     NotCallableVariants {
         /// The variants that can't be called with the given arguments.
-        not_callable: Box<[NotCallableVariant<'db>]>,
+        call_errors: Box<[NotCallableVariant<'db>]>,
 
         /// The variants that can be called with the given arguments.
         callable: Box<[CallBinding<'db>]>,
@@ -143,7 +150,7 @@ impl<'db> CallError<'db> {
         match self {
             CallError::NotCallable { .. } => None,
             CallError::NotCallableVariants {
-                not_callable,
+                call_errors: not_callable,
                 callable,
                 ..
             } => {
@@ -175,7 +182,7 @@ impl<'db> CallError<'db> {
     /// dunder is possibly unbound).
     ///
     /// If the type is not callable, returns `Type::Unknown`.
-    pub(super) fn unwrap_return_type(&self, db: &'db dyn Db) -> Type<'db> {
+    pub(super) fn fallback_return_type(&self, db: &'db dyn Db) -> Type<'db> {
         self.return_type(db).unwrap_or(Type::unknown())
     }
 
@@ -250,7 +257,7 @@ impl<'db> CallDunderError<'db> {
         }
     }
 
-    pub(super) fn unwrap_return_type(&self, db: &'db dyn Db) -> Type<'db> {
+    pub(super) fn fallback_return_type(&self, db: &'db dyn Db) -> Type<'db> {
         self.return_type(db).unwrap_or(Type::unknown())
     }
 }

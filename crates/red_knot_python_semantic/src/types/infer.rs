@@ -54,7 +54,7 @@ use crate::symbol::{
     builtins_module_scope, builtins_symbol, symbol, symbol_from_bindings, symbol_from_declarations,
     typing_extensions_symbol, LookupError,
 };
-use crate::types::call::{Argument, CallArguments, CallOutcome};
+use crate::types::call::{Argument, CallArguments};
 use crate::types::diagnostic::{
     report_invalid_arguments_to_annotated, report_invalid_assignment,
     report_invalid_attribute_assignment, report_unresolved_module, TypeCheckDiagnostics,
@@ -68,11 +68,11 @@ use crate::types::diagnostic::{
 use crate::types::mro::MroErrorKind;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
-    todo_type, Boundness, Class, ClassLiteralType, DynamicType, FunctionType,
-    InstanceType, IntersectionBuilder, IntersectionType, IterationOutcome, KnownClass,
-    KnownFunction, KnownInstanceType, MetaclassCandidate, MetaclassErrorKind, NotCallableVariant, SliceLiteralType,
-    SubclassOfType, Symbol, SymbolAndQualifiers, Truthiness, TupleType, Type, TypeAliasType,
-    TypeAndQualifiers, TypeArrayDisplay, TypeQualifiers, TypeVarBoundOrConstraints,
+    todo_type, Boundness, Class, ClassLiteralType, DynamicType, FunctionType, InstanceType,
+    IntersectionBuilder, IntersectionType, IterationOutcome, KnownClass, KnownFunction,
+    KnownInstanceType, MetaclassCandidate, MetaclassErrorKind, NotCallableVariant,
+    SliceLiteralType, SubclassOfType, Symbol, SymbolAndQualifiers, Truthiness, TupleType, Type,
+    TypeAliasType, TypeAndQualifiers, TypeArrayDisplay, TypeQualifiers, TypeVarBoundOrConstraints,
     TypeVarInstance, UnionBuilder, UnionType,
 };
 use crate::unpack::Unpack;
@@ -1620,15 +1620,19 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let target_ty = enter_ty
                     .call(self.db(), &CallArguments::positional([context_expression_ty]))
                     .map(|outcome| outcome.return_type(self.db()))
-                    .unwrap_or_else(|err| {
+                    .unwrap_or_else(|err|  {
+                        // TODO: Use more specific error messages for the different error cases.
+                        //  E.g. hint toward the union variant that doesn't correctly implement enter,
+                        //  distinguish between a not callable `__enter__` attribute and a wrong signature.
                         self.context.report_lint(
                             &INVALID_CONTEXT_MANAGER,
                             context_expression.into(),
                             format_args!("
-                                Object of type `{context_expression}` cannot be used with `with` because the method `__enter__` of type `{enter_ty}` is not callable", context_expression = context_expression_ty.display(self.db()), enter_ty = enter_ty.display(self.db())
+                                Object of type `{context_expression}` cannot be used with `with` because it does not correctly implement `__enter__`",
+                                context_expression = context_expression_ty.display(self.db()),
                             ),
                         );
-                        err.unwrap_return_type(self.db())
+                        err.fallback_return_type(self.db())
                     });
 
                 match exit {
@@ -1668,13 +1672,15 @@ impl<'db> TypeInferenceBuilder<'db> {
                             )
                             .is_err()
                         {
+                            // TODO: Use more specific error messages for the different error cases.
+                            //  E.g. hint toward the union variant that doesn't correctly implement enter,
+                            //  distinguish between a not callable `__exit__` attribute and a wrong signature.
                             self.context.report_lint(
                                 &INVALID_CONTEXT_MANAGER,
                                 context_expression.into(),
                                 format_args!(
-                                    "Object of type `{context_expression}` cannot be used with `with` because the method `__exit__` of type `{exit_ty}` is not callable",
+                                    "Object of type `{context_expression}` cannot be used with `with` because it does not correctly implement `__exit__`",
                                     context_expression = context_expression_ty.display(self.db()),
-                                    exit_ty = exit_ty.display(self.db()),
                                 ),
                             );
                         }
@@ -2221,7 +2227,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                     value_type.display(self.db())
                                 ),
                             );
-                            e.unwrap_return_type(self.db())
+                            e.fallback_return_type(self.db())
                         }
                     };
 
@@ -3348,7 +3354,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     CallError::NotCallableVariants {
                         called_ty,
                         callable: _callable,
-                        not_callable,
+                        call_errors: not_callable,
                     } => {
                         if let [variant] = &**not_callable {
                             self.context.report_lint(
@@ -3403,7 +3409,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     }
                 }
 
-                err.unwrap_return_type(self.db())
+                err.fallback_return_type(self.db())
             }
         }
     }
@@ -3742,7 +3748,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 operand_type.display(self.db()),
                             ),
                         );
-                        e.unwrap_return_type(self.db())
+                        e.fallback_return_type(self.db())
                     }
                 }
             }
@@ -4796,7 +4802,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             ),
                         );
 
-                        return err.unwrap_return_type(self.db());
+                        return err.fallback_return_type(self.db());
                     }
                     Err(CallDunderError::Call(err)) => {
                         self.context.report_lint(
@@ -4809,7 +4815,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 ),
                             );
 
-                        return err.unwrap_return_type(self.db());
+                        return err.fallback_return_type(self.db());
                     }
                     Err(CallDunderError::MethodNotAvailable) => {
                         // try `__class_getitem__`
@@ -4856,7 +4862,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                             value_ty.display(self.db()),
                                         ),
                                     );
-                                    err.unwrap_return_type(self.db())
+                                    err.fallback_return_type(self.db())
                                 });
                         }
                     }
@@ -6138,12 +6144,6 @@ fn perform_membership_test_comparison<'db>(
                     db,
                     &CallArguments::positional([Type::Instance(right), Type::Instance(left)]),
                 )
-                // TODO: We shouldn't ignore binding errors here but we have to because we
-                // currently don't support assigning ints to floats.
-                .map_err(|err| match err {
-                    CallError::BindingError { binding } => Ok(CallOutcome::Single(binding)),
-                    err => Err(err),
-                })
                 .map(|outcome| outcome.return_type(db))
                 .ok()
         }

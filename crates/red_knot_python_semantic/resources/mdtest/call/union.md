@@ -81,8 +81,8 @@ def _(flag: bool):
 Calling a union where the arguments don't match the signature of all variants.
 
 ```py
-def f1(a: int): ...
-def f2(a: str): ...
+def f1(a: int) -> int: ...
+def f2(a: str) -> str: ...
 def _(flag: bool):
     if flag:
         f = f1
@@ -91,10 +91,10 @@ def _(flag: bool):
 
     # error: [call-non-callable] "Object of type `Literal[f1, f2]` is not callable (due to union element `Literal[f2]`)"
     x = f(3)
-    reveal_type(x)  # revealed: Unknown
+    reveal_type(x)  # revealed: int | str
 ```
 
-## Any non callable variant
+## Any non-callable variant
 
 ```py
 def f1(a: int): ...
@@ -102,9 +102,9 @@ def _(flag: bool):
     if flag:
         f = f1
     else:
-        f = "str"
+        f = "This is a string literal"
 
-    # error: [call-non-callable] "Object of type `Literal[f1] | Literal["str"]` is not callable (due to union element `Literal["str"]`)"
+    # error: [call-non-callable] "Object of type `Literal[f1] | Literal["This is a string literal"]` is not callable (due to union element `Literal["This is a string literal"]`)"
     x = f(3)
     reveal_type(x)  # revealed: Unknown
 ```

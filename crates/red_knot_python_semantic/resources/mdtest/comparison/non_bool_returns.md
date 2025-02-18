@@ -23,7 +23,7 @@ from __future__ import annotations
 
 class A:
     def __lt__(self, other) -> A: ...
-    def __gt__(self, other) -> A: ...
+    def __gt__(self, other) -> bool: ...
 
 class B:
     def __lt__(self, other) -> B: ...
@@ -35,7 +35,7 @@ x = A() < B() < C()
 reveal_type(x)  # revealed: A & ~AlwaysTruthy | B
 
 y = 0 < 1 < A() < 3
-reveal_type(y)  # revealed: A
+reveal_type(y)  # revealed: Literal[False] | A
 
 z = 10 < 0 < A() < B() < C()
 reveal_type(z)  # revealed: Literal[False]

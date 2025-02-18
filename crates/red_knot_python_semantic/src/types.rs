@@ -1658,6 +1658,8 @@ impl<'db> Type<'db> {
                             .map(|arg| arg.bool(db).into_type(db))
                             .unwrap_or(Type::BooleanLiteral(false)),
 
+                        // TODO: Don't ignore the second and third arguments to `str`
+                        //   https://github.com/astral-sh/ruff/pull/16161#discussion_r1958425568
                         Some(KnownClass::Str) => arguments
                             .first_argument()
                             .map(|arg| arg.str(db))
@@ -1701,7 +1703,7 @@ impl<'db> Type<'db> {
             Type::Dynamic(_) => Ok(CallOutcome::Single(CallBinding::from_return_type(self))),
 
             Type::Union(union) => {
-                CallOutcome::try_call(db, union, |element| element.call(db, arguments))
+                CallOutcome::try_call_union(db, union, |element| element.call(db, arguments))
             }
 
             Type::Intersection(_) => Ok(CallOutcome::Single(CallBinding::from_return_type(
@@ -1740,7 +1742,7 @@ impl<'db> Type<'db> {
                 self.call(db, arguments)
             }
 
-            Type::Union(union) => CallOutcome::try_call(db, union, |element| {
+            Type::Union(union) => CallOutcome::try_call_union(db, union, |element| {
                 element.call_bound(db, receiver_ty, arguments)
             }),
 
@@ -1826,7 +1828,8 @@ impl<'db> Type<'db> {
                     },
                 };
             }
-            // If the attribute exists but can't be called, return not iterable over falling back to `__get__item`.
+            // If `__iter__` exists but can't be called or doesn't have the expected signature,
+            // return not iterable over falling back to `__getitem__`.
             Err(CallDunderError::Call(_)) => {
                 return IterationOutcome::NotIterable {
                     not_iterable_ty: self,
@@ -3669,7 +3672,7 @@ impl<'db> Class<'db> {
 
                 Err(CallError::NotCallableVariants {
                     called_ty,
-                    not_callable,
+                    call_errors: not_callable,
                     callable,
                 }) => {
                     let mut partly_not_callable = false;
