@@ -13,7 +13,7 @@ use ruff_notebook::Notebook;
 use ruff_python_ast::{ModModule, PySourceType};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
-use ruff_python_parser::{ParseError, Parsed, ParserOptions};
+use ruff_python_parser::{ParseError, Parsed};
 use ruff_source_file::SourceFileBuilder;
 use ruff_text_size::Ranged;
 
@@ -330,10 +330,7 @@ pub fn add_noqa_to_path(
     settings: &LinterSettings,
 ) -> Result<usize> {
     // Parse once.
-    let parsed = ruff_python_parser::parse_unchecked_source(
-        source_kind.source_code(),
-        ParserOptions::from_source_type(source_type),
-    );
+    let parsed = ruff_python_parser::parse_unchecked_source(source_kind.source_code(), source_type);
 
     // Map row and column locations to byte slices (lazily).
     let locator = Locator::new(source_kind.source_code());
@@ -492,10 +489,8 @@ pub fn lint_fix<'a>(
     // Continuously fix until the source code stabilizes.
     loop {
         // Parse once.
-        let parsed = ruff_python_parser::parse_unchecked_source(
-            transformed.source_code(),
-            ParserOptions::from_source_type(source_type),
-        );
+        let parsed =
+            ruff_python_parser::parse_unchecked_source(transformed.source_code(), source_type);
 
         // Map row and column locations to byte slices (lazily).
         let locator = Locator::new(transformed.source_code());
@@ -682,10 +677,9 @@ impl ParseSource {
     /// necessary.
     fn into_parsed(self, source_kind: &SourceKind, source_type: PySourceType) -> Parsed<ModModule> {
         match self {
-            ParseSource::None => ruff_python_parser::parse_unchecked_source(
-                source_kind.source_code(),
-                ParserOptions::from_source_type(source_type),
-            ),
+            ParseSource::None => {
+                ruff_python_parser::parse_unchecked_source(source_kind.source_code(), source_type)
+            }
             ParseSource::Precomputed(parsed) => parsed,
         }
     }

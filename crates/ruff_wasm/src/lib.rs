@@ -18,9 +18,7 @@ use ruff_python_ast::{Mod, PySourceType};
 use ruff_python_codegen::Stylist;
 use ruff_python_formatter::{format_module_ast, pretty_comments, PyFormatContext, QuoteStyle};
 use ruff_python_index::Indexer;
-use ruff_python_parser::{
-    parse, parse_unchecked, parse_unchecked_source, Mode, Parsed, ParserOptions,
-};
+use ruff_python_parser::{parse, parse_unchecked, parse_unchecked_source, Mode, Parsed};
 use ruff_python_trivia::CommentRanges;
 use ruff_source_file::SourceLocation;
 use ruff_text_size::Ranged;
@@ -164,10 +162,7 @@ impl Workspace {
         let source_kind = SourceKind::Python(contents.to_string());
 
         // Parse once.
-        let parsed = parse_unchecked_source(
-            source_kind.source_code(),
-            ParserOptions::from_source_type(source_type),
-        );
+        let parsed = parse_unchecked_source(source_kind.source_code(), source_type);
 
         // Map row and column locations to byte slices (lazily).
         let locator = Locator::new(contents);

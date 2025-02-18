@@ -7,7 +7,6 @@ use ruff_python_ast::{Mod, ModExpression, ModModule};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::parser::expression::ExpressionContext;
-use crate::parser::options::{AsParserOptions, SourceType};
 use crate::parser::progress::{ParserProgress, TokenId};
 use crate::token::TokenValue;
 use crate::token_set::TokenSet;
@@ -15,7 +14,7 @@ use crate::token_source::{TokenSource, TokenSourceCheckpoint};
 use crate::{Mode, ParseError, ParseErrorType, TokenKind};
 use crate::{Parsed, Tokens};
 
-pub use crate::parser::options::{KnownSource, ParserOptions, UnknownSource};
+pub use crate::parser::options::ParserOptions;
 
 mod expression;
 mod helpers;
@@ -37,7 +36,7 @@ pub(crate) struct Parser<'src> {
     /// Stores all the syntax errors found during the parsing.
     errors: Vec<ParseError>,
 
-    options: Box<dyn AsParserOptions>,
+    options: ParserOptions,
 
     /// The ID of the current token. This is used to track the progress of the parser
     /// to avoid infinite loops when the parser is stuck.
@@ -55,23 +54,20 @@ pub(crate) struct Parser<'src> {
 
 impl<'src> Parser<'src> {
     /// Create a new parser for the given source code.
-    pub(crate) fn new<S: SourceType + 'static>(
-        source: &'src str,
-        options: ParserOptions<S>,
-    ) -> Self {
+    pub(crate) fn new(source: &'src str, options: ParserOptions) -> Self {
         Parser::new_starts_at(source, options, TextSize::new(0))
     }
 
     /// Create a new parser for the given source code which starts parsing at the given offset.
-    pub(crate) fn new_starts_at<S: SourceType + 'static>(
+    pub(crate) fn new_starts_at(
         source: &'src str,
-        options: ParserOptions<S>,
+        options: ParserOptions,
         start_offset: TextSize,
     ) -> Self {
         let tokens = TokenSource::from_source(source, options.mode, start_offset);
 
         Parser {
-            options: Box::new(options),
+            options,
             source,
             errors: Vec::new(),
             tokens,
@@ -84,7 +80,7 @@ impl<'src> Parser<'src> {
 
     /// Consumes the [`Parser`] and returns the parsed [`Parsed`].
     pub(crate) fn parse(mut self) -> Parsed<Mod> {
-        let syntax = match self.options.mode() {
+        let syntax = match self.options.mode {
             Mode::Expression | Mode::ParenthesizedExpression => {
                 Mod::Expression(self.parse_single_expression())
             }
