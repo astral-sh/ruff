@@ -5,8 +5,11 @@ Currently, it is a work-in-progress and not ready for user testing.
 
 Red Knot is designed to prioritize good type inference, even in unannotated code,
 and aims to avoid false positives.
-It will have its own design choices and thus not be
-a drop-in replacement for either Mypy or Pyright.
+
+While Red Knot will produce similar results to mypy and pyright on many codebases,
+100% compatibility with these tools is a non-goal.
+On some codebases, Red Knot's design decisions lead to different outcomes
+than you would get from running one of these more established tools.
 
 ## Contributing
 
