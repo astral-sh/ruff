@@ -35,6 +35,7 @@ pub(crate) struct Parser<'src> {
     /// Stores all the syntax errors found during the parsing.
     errors: Vec<ParseError>,
 
+    /// Options for how the code will be parsed.
     options: ParseOptions,
 
     /// The ID of the current token. This is used to track the progress of the parser
