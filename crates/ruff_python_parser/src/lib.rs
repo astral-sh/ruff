@@ -236,11 +236,11 @@ pub fn parse_string_annotation(
     }
 }
 
-/// Parse the given Python source code using the specified [`Mode`].
+/// Parse the given Python source code using the specified [`ParserOptions`].
 ///
-/// This function is the most general function to parse Python code. Based on the [`Mode`] supplied,
-/// it can be used to parse a single expression, a full Python program, an interactive expression
-/// or a Python program containing IPython escape commands.
+/// This function is the most general function to parse Python code. Based on the [`Mode`] supplied
+/// via the [`ParserOptions`], it can be used to parse a single expression, a full Python program,
+/// an interactive expression or a Python program containing IPython escape commands.
 ///
 /// # Example
 ///
@@ -286,7 +286,7 @@ pub fn parse(source: &str, options: ParserOptions) -> Result<Parsed<Mod>, ParseE
     parse_unchecked(source, options).into_result()
 }
 
-/// Parse the given Python source code using the specified [`Mode`].
+/// Parse the given Python source code using the specified [`ParserOptions`].
 ///
 /// This is same as the [`parse`] function except that it doesn't check for any [`ParseError`]
 /// and returns the [`Parsed`] as is.
