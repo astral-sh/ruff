@@ -4186,11 +4186,11 @@ impl<'db> UnionType<'db> {
             return first;
         };
 
-        let (lower, _) = elements.size_hint();
-        let mut builder = UnionBuilder::new(db);
-        builder.reserve(lower + 2);
-
-        builder.add(first).add(second).extend(elements).build()
+        UnionBuilder::new(db)
+            .add(first)
+            .add(second)
+            .extend(elements)
+            .build()
     }
 
     /// Apply a transformation function to all elements of the union,

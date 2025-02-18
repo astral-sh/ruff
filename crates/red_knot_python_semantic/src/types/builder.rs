@@ -43,11 +43,6 @@ impl<'db> UnionBuilder<'db> {
         }
     }
 
-    #[inline]
-    pub(crate) fn reserve(&mut self, additional: usize) {
-        self.elements.reserve(additional);
-    }
-
     /// Collapse the union to a single type: `object`.
     fn collapse_to_object(mut self) -> Self {
         self.elements.clear();
@@ -58,10 +53,6 @@ impl<'db> UnionBuilder<'db> {
     #[inline]
     pub(crate) fn extend(mut self, elements: impl IntoIterator<Item = Type<'db>>) -> Self {
         let elements = elements.into_iter();
-        let (lower, _) = elements.size_hint();
-
-        // Assume that most types will be unique
-        self.reserve(lower);
 
         for element in elements {
             self = self.add(element);
