@@ -52,7 +52,7 @@ class NonCallable:
     __call__ = 1
 
 a = NonCallable()
-# error: "Object of type `Unknown | Literal[1]` is not callable (due to union element `Literal[1]`)"
+# error: [call-non-callable] "Object of type `Literal[1]` is not callable"
 reveal_type(a())  # revealed: Unknown
 ```
 
@@ -67,7 +67,7 @@ def _(flag: bool):
             def __call__(self) -> int: ...
 
     a = NonCallable()
-    # error: "Object of type `Literal[1] | Literal[__call__]` is not callable (due to union element `Literal[1]`)"
+    # error: [call-non-callable] "Object of type `Literal[1]` is not callable"
     reveal_type(a())  # revealed: int | Unknown
 ```
 
@@ -106,20 +106,19 @@ reveal_type(c())  # revealed: int
 
 ```py
 def outer(cond1: bool):
-	class Test:
-		if cond1:
-			def __call__(self): ...
-	
-	class Other:
-		def __call__(self): ...
-	
-	def inner(cond2: bool): 
-		if cond2:
-			a = Test()
-		else:
-			a = Other()
-	
-        # TODO: Improve the error message to a) be more specific what `__call__` is and b) mention that it is possibly unbound.
-        # error: [call-non-callable] "Object of type `Test | Other` is not callable (due to union element `Literal[__call__]`)"
-		a()
+    class Test:
+        if cond1:
+            def __call__(self): ...
+
+    class Other:
+        def __call__(self): ...
+
+    def inner(cond2: bool):
+        if cond2:
+            a = Test()
+        else:
+            a = Other()
+
+            # error: [call-non-callable] "Object of type `Test` is not callable (possibly unbound `__call__` method)"
+        a()
 ```

@@ -1,7 +1,7 @@
 use std::hash::Hash;
 
 use bitflags::bitflags;
-use call::{CallDunderError, CallError, NotCallableVariant};
+use call::{CallDunderError, CallError};
 use context::InferContext;
 use diagnostic::{report_not_iterable, report_not_iterable_possibly_unbound};
 use indexmap::IndexSet;
@@ -1681,6 +1681,15 @@ impl<'db> Type<'db> {
                                 not_callable_ty: self,
                             }
                         }
+                        CallDunderError::Call(CallError::Union {
+                            called_ty: _,
+                            bindings,
+                            errors,
+                        }) => CallError::Union {
+                            called_ty: self,
+                            bindings,
+                            errors,
+                        },
                         CallDunderError::Call(error) => error,
                         // Turn "possibly unbound object of type `Literal['__call__']`"
                         // into "`X` not callable (possibly unbound `__call__` method)"
@@ -3670,17 +3679,17 @@ impl<'db> Class<'db> {
                     kind: MetaclassErrorKind::NotCallable(not_callable_ty),
                 }),
 
-                Err(CallError::NotCallableVariants {
+                Err(CallError::Union {
                     called_ty,
-                    call_errors: not_callable,
-                    callable,
+                    errors,
+                    bindings,
                 }) => {
                     let mut partly_not_callable = false;
 
-                    let return_ty = not_callable
+                    let return_ty = errors
                         .iter()
-                        .fold(None, |acc, not_callable| {
-                            let ty = not_callable.return_type();
+                        .fold(None, |acc, error| {
+                            let ty = error.return_type(db);
 
                             match (acc, ty) {
                                 (acc, None) => {
@@ -3692,8 +3701,8 @@ impl<'db> Class<'db> {
                             }
                         })
                         .map(|mut builder| {
-                            for callable in callable {
-                                builder = builder.add(callable.return_type());
+                            for binding in bindings {
+                                builder = builder.add(binding.return_type());
                             }
 
                             builder.build()
@@ -3701,7 +3710,7 @@ impl<'db> Class<'db> {
 
                     if partly_not_callable {
                         Err(MetaclassError {
-                            kind: MetaclassErrorKind::PartlyNotCallable(Type::Union(called_ty)),
+                            kind: MetaclassErrorKind::PartlyNotCallable(called_ty),
                         })
                     } else {
                         Ok(return_ty.unwrap_or(Type::unknown()))

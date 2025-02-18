@@ -10,7 +10,7 @@ reveal_type(-3 // 3)  # revealed: Literal[-1]
 reveal_type(-3 / 3)  # revealed: float
 reveal_type(5 % 3)  # revealed: Literal[2]
 
-# TODO: This should emit an unsupported-operator error but we don't currently 
+# TODO: This should emit an unsupported-operator error but we don't currently
 #  verify that the actual parameter to `int.__add__` matches the declared
 #  formal parameter type.
 reveal_type(2 + "f")  # revealed: Unknown

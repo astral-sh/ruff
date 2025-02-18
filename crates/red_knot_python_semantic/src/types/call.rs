@@ -5,7 +5,6 @@ use crate::Db;
 
 mod arguments;
 mod bind;
-
 pub(super) use arguments::{Argument, CallArguments};
 pub(super) use bind::{bind_call, CallBinding};
 
@@ -35,7 +34,8 @@ impl<'db> CallOutcome<'db> {
     {
         let elements = union.elements(db);
         let mut bindings = Vec::with_capacity(elements.len());
-        let mut not_callable = Vec::new();
+        let mut errors = Vec::new();
+        let mut not_callable = true;
 
         for element in elements {
             match call(*element) {
@@ -43,51 +43,24 @@ impl<'db> CallOutcome<'db> {
                 Ok(CallOutcome::Union(inner_bindings)) => {
                     bindings.extend(inner_bindings);
                 }
-                Err(error) => match error {
-                    CallError::NotCallable { not_callable_ty } => {
-                        not_callable.push(NotCallableVariant::new(not_callable_ty, None));
-                    }
-                    CallError::NotCallableVariants {
-                        called_ty: _,
-                        callable: inner_callable,
-                        call_errors: inner_not_callable,
-                    } => {
-                        not_callable.extend(inner_not_callable);
-                        bindings.extend(inner_callable);
-                    }
-                    CallError::PossiblyUnboundDunderCall { outcome, .. } => match *outcome {
-                        CallOutcome::Union(inner_bindings) => {
-                            // TODO: Remove the `Vec::from` conversion after upgrading to Rust Edition 2024 (when `Box<[T]>::into_iter)` becomes stable.
-                            not_callable.extend(Vec::from(inner_bindings).into_iter().map(
-                                |binding| {
-                                    NotCallableVariant::new(binding.callable_type(), Some(binding))
-                                },
-                            ));
-                        }
-                        CallOutcome::Single(binding) => {
-                            not_callable.push(NotCallableVariant::new(
-                                binding.callable_type(),
-                                Some(binding),
-                            ));
-                        }
-                    },
-                    CallError::BindingError { binding } => {
-                        not_callable.push(NotCallableVariant::new(
-                            binding.callable_type(),
-                            Some(binding),
-                        ));
-                    }
-                },
+                Err(error) => {
+                    not_callable |= error.is_not_callable();
+                    errors.push(error);
+                }
             }
         }
 
-        if not_callable.is_empty() {
+        if errors.is_empty() {
             Ok(CallOutcome::Union(bindings.into()))
+        } else if bindings.is_empty() && not_callable {
+            Err(CallError::NotCallable {
+                not_callable_ty: Type::Union(union),
+            })
         } else {
-            Err(CallError::NotCallableVariants {
-                call_errors: not_callable.into(),
-                callable: bindings.into(),
-                called_ty: union,
+            Err(CallError::Union {
+                errors: errors.into(),
+                bindings: bindings.into(),
+                called_ty: Type::Union(union),
             })
         }
     }
@@ -120,16 +93,18 @@ pub(super) enum CallError<'db> {
     },
 
     /// A call to a union failed because at least one variant
-    /// can't be called with the given arguments or isn't callable at all.
-    NotCallableVariants {
+    /// can't be called with the given arguments.
+    ///
+    /// A union where all variants are not callable is represented as a `NotCallable` error.
+    Union {
         /// The variants that can't be called with the given arguments.
-        call_errors: Box<[NotCallableVariant<'db>]>,
+        errors: Box<[CallError<'db>]>,
 
-        /// The variants that can be called with the given arguments.
-        callable: Box<[CallBinding<'db>]>,
+        /// The bindings for the callable variants (that have no binding errors).
+        bindings: Box<[CallBinding<'db>]>,
 
         /// The union type that we tried calling.
-        called_ty: UnionType<'db>,
+        called_ty: Type<'db>,
     },
 
     /// The type has a `__call__` method but it isn't always bound.
@@ -149,29 +124,17 @@ impl<'db> CallError<'db> {
     pub(super) fn return_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
         match self {
             CallError::NotCallable { .. } => None,
-            CallError::NotCallableVariants {
-                call_errors: not_callable,
-                callable,
-                ..
-            } => {
-                // If all variants are not callable, return `None`
-                if callable.is_empty()
-                    && not_callable.iter().all(|binding| binding.binding.is_none())
-                {
-                    None
-                } else {
-                    // If some variants are callable, and some are not, return the union of the return types of the callable variants
-                    // combined with `Type::Unknown`
-                    Some(UnionType::from_elements(
-                        db,
-                        callable.iter().map(bind::CallBinding::return_type).chain(
-                            not_callable
-                                .iter()
-                                .map(NotCallableVariant::unwrap_return_type),
-                        ),
-                    ))
-                }
-            }
+            // If some variants are callable, and some are not, return the union of the return types of the callable variants
+            // combined with `Type::Unknown`
+            CallError::Union {
+                errors, bindings, ..
+            } => Some(UnionType::from_elements(
+                db,
+                bindings
+                    .iter()
+                    .map(CallBinding::return_type)
+                    .chain(errors.iter().map(|err| err.fallback_return_type(db))),
+            )),
             Self::PossiblyUnboundDunderCall { outcome, .. } => Some(outcome.return_type(db)),
             Self::BindingError { binding } => Some(binding.return_type()),
         }
@@ -195,40 +158,14 @@ impl<'db> CallError<'db> {
             Self::NotCallable {
                 not_callable_ty, ..
             } => *not_callable_ty,
-            Self::NotCallableVariants { called_ty, .. } => Type::Union(*called_ty),
+            Self::Union { called_ty, .. } => *called_ty,
             Self::PossiblyUnboundDunderCall { called_type, .. } => *called_type,
             Self::BindingError { binding } => binding.callable_type(),
         }
     }
-}
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct NotCallableVariant<'db> {
-    /// The resolved binding for that variant or `None` if the variant is not callable.
-    binding: Option<CallBinding<'db>>,
-
-    /// The variant's type that is not callable.
-    not_callable: Type<'db>,
-}
-
-impl<'db> NotCallableVariant<'db> {
-    pub(super) fn new(ty: Type<'db>, binding: Option<CallBinding<'db>>) -> Self {
-        Self {
-            not_callable: ty,
-            binding,
-        }
-    }
-
-    pub(super) fn return_type(&self) -> Option<Type<'db>> {
-        self.binding.as_ref().map(CallBinding::return_type)
-    }
-
-    pub(super) fn unwrap_return_type(&self) -> Type<'db> {
-        self.return_type().unwrap_or(Type::unknown())
-    }
-
-    pub(super) fn not_callable_type(&self) -> Type<'db> {
-        self.not_callable
+    pub(super) const fn is_not_callable(&self) -> bool {
+        matches!(self, Self::NotCallable { .. })
     }
 }
 

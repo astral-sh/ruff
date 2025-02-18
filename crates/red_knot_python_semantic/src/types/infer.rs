@@ -30,7 +30,6 @@ use std::num::NonZeroU32;
 
 use itertools::{Either, Itertools};
 use ruff_db::diagnostic::{DiagnosticId, Severity};
-use ruff_db::display::FormatterJoinExtension;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::{self as ast, AnyNodeRef, ExprContext};
@@ -70,10 +69,10 @@ use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     todo_type, Boundness, Class, ClassLiteralType, DynamicType, FunctionType, InstanceType,
     IntersectionBuilder, IntersectionType, IterationOutcome, KnownClass, KnownFunction,
-    KnownInstanceType, MetaclassCandidate, MetaclassErrorKind, NotCallableVariant,
-    SliceLiteralType, SubclassOfType, Symbol, SymbolAndQualifiers, Truthiness, TupleType, Type,
-    TypeAliasType, TypeAndQualifiers, TypeArrayDisplay, TypeQualifiers, TypeVarBoundOrConstraints,
-    TypeVarInstance, UnionBuilder, UnionType,
+    KnownInstanceType, MetaclassCandidate, MetaclassErrorKind, SliceLiteralType, SubclassOfType,
+    Symbol, SymbolAndQualifiers, Truthiness, TupleType, Type, TypeAliasType, TypeAndQualifiers,
+    TypeArrayDisplay, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarInstance, UnionBuilder,
+    UnionType,
 };
 use crate::unpack::Unpack;
 use crate::util::subscript::{PyIndex, PySlice};
@@ -3339,77 +3338,63 @@ impl<'db> TypeInferenceBuilder<'db> {
                 outcome.return_type(self.db())
             }
             Err(err) => {
-                match &err {
-                    CallError::NotCallable { not_callable_ty } => {
-                        self.context.report_lint(
-                            &CALL_NON_CALLABLE,
-                            call_expression.into(),
-                            format_args!(
-                                "Object of type `{}` is not callable",
-                                not_callable_ty.display(self.db())
-                            ),
-                        );
-                    }
-
-                    CallError::NotCallableVariants {
-                        called_ty,
-                        callable: _callable,
-                        call_errors: not_callable,
-                    } => {
-                        if let [variant] = &**not_callable {
-                            self.context.report_lint(
+                // TODO: We currently only report the first error. Ideally, we'd report
+                //  an error saying that the union type can't be called, followed by a sub
+                //  diagnostic explaining why.
+                fn report_call_error(
+                    context: &InferContext,
+                    err: CallError,
+                    call_expression: &ast::ExprCall,
+                ) {
+                    match err {
+                        CallError::NotCallable { not_callable_ty } => {
+                            context.report_lint(
                                 &CALL_NON_CALLABLE,
                                 call_expression.into(),
                                 format_args!(
-                                    "Object of type `{}` is not callable (due to union element `{}`)",
-                                    Type::Union(*called_ty).display(self.db()),
-                                    variant.not_callable_type().display(self.db()),
-                                ),
-                            );
-                        } else {
-                            struct DisplayNotCallables<'db> {
-                                db: &'db dyn Db,
-                                not_callable: &'db [NotCallableVariant<'db>],
-                            }
-
-                            impl std::fmt::Display for DisplayNotCallables<'_> {
-                                fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                                    let mut f = f.join(", ");
-                                    for item in self.not_callable {
-                                        f.entry(&item.not_callable_type().display(self.db));
-                                    }
-                                    f.finish()
-                                }
-                            }
-
-                            self.context.report_lint(
-                                &CALL_NON_CALLABLE,
-                                call_expression.into(),
-                                format_args!(
-                                    "Object of type `{}` is not callable (due to union elements {})",
-                                    Type::Union(*called_ty).display(self.db()),
-                                    DisplayNotCallables { not_callable, db: self.db()}
+                                    "Object of type `{}` is not callable",
+                                    not_callable_ty.display(context.db())
                                 ),
                             );
                         }
-                    }
 
-                    CallError::PossiblyUnboundDunderCall { called_type, .. } => {
-                        self.context.report_lint(
-                            &CALL_NON_CALLABLE,
-                            call_expression.into(),
-                            format_args!(
-                                "Object of type `{}` is not callable (possibly unbound `__call__` method)",
-                                called_type.display(self.db())
-                            ),
-                        );
-                    }
-                    CallError::BindingError { binding, .. } => {
-                        binding.report_diagnostics(&self.context, call_expression.into());
+                        CallError::Union {
+                            called_ty: _,
+                            bindings: _,
+                            errors,
+                        } => {
+                            // TODO: Remove the `Vec::from` call once we use the Rust 2024 edition
+                            //  which adds `Box<[T]>::into_iter`
+                            if let Some(first) = Vec::from(errors).into_iter().next() {
+                                report_call_error(context, first, call_expression);
+                            } else {
+                                debug_assert!(
+                                    false,
+                                    "Expected `CalLError::Union` to at least have one error"
+                                );
+                            }
+                        }
+
+                        CallError::PossiblyUnboundDunderCall { called_type, .. } => {
+                            context.report_lint(
+                                &CALL_NON_CALLABLE,
+                                call_expression.into(),
+                                format_args!(
+                                    "Object of type `{}` is not callable (possibly unbound `__call__` method)",
+                                    called_type.display(context.db())
+                                ),
+                            );
+                        }
+                        CallError::BindingError { binding, .. } => {
+                            binding.report_diagnostics(context, call_expression.into());
+                        }
                     }
                 }
 
-                err.fallback_return_type(self.db())
+                let return_type = err.fallback_return_type(self.db());
+                report_call_error(&self.context, err, call_expression);
+
+                return_type
             }
         }
     }

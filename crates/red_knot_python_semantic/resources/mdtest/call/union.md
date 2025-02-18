@@ -39,7 +39,7 @@ def _(flag: bool):
     else:
         def f() -> int:
             return 1
-    x = f()  # error: "Object of type `Literal[1] | Literal[f]` is not callable (due to union element `Literal[1]`)"
+    x = f()  # error: [call-non-callable] "Object of type `Literal[1]` is not callable"
     reveal_type(x)  # revealed: int | Unknown
 ```
 
@@ -56,7 +56,7 @@ def _(flag: bool, flag2: bool):
     else:
         def f() -> int:
             return 1
-    # error: "Object of type `Literal[1, "foo"] | Literal[f]` is not callable (due to union elements Literal[1], Literal["foo"])"
+    # error: [call-non-callable] "Object of type `Literal[1]` is not callable"
     # revealed: int | Unknown
     reveal_type(f())
 ```
@@ -72,7 +72,7 @@ def _(flag: bool):
     else:
         f = "foo"
 
-    x = f()  # error: "Object of type `Literal[1, "foo"]` is not callable"
+    x = f()  # error: [call-non-callable] "Object of type `Literal[1, "foo"]` is not callable"
     reveal_type(x)  # revealed: Unknown
 ```
 
@@ -89,7 +89,7 @@ def _(flag: bool):
     else:
         f = f2
 
-    # error: [call-non-callable] "Object of type `Literal[f1, f2]` is not callable (due to union element `Literal[f2]`)"
+    # error: [invalid-argument-type] "Object of type `Literal[3]` cannot be assigned to parameter 1 (`a`) of function `f2`; expected type `str`"
     x = f(3)
     reveal_type(x)  # revealed: int | str
 ```
@@ -104,7 +104,7 @@ def _(flag: bool):
     else:
         f = "This is a string literal"
 
-    # error: [call-non-callable] "Object of type `Literal[f1] | Literal["This is a string literal"]` is not callable (due to union element `Literal["This is a string literal"]`)"
+    # error: [call-non-callable] "Object of type `Literal["This is a string literal"]` is not callable"
     x = f(3)
     reveal_type(x)  # revealed: Unknown
 ```
