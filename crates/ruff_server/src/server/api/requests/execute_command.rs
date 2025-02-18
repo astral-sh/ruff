@@ -160,14 +160,14 @@ version = {version}
 position_encoding = {encoding:?}
 workspace_root_folders = {workspace_folders:#?}
 indexed_configuration_files = {config_files:#?}
-open_documents = {open_documents}
+open_documents_len = {open_documents_len}
 client_capabilities = {client_capabilities:#?}
 ",
         version = crate::version(),
         encoding = session.encoding(),
         workspace_folders = session.workspace_root_folders().collect::<Vec<_>>(),
         config_files = session.config_file_paths().collect::<Vec<_>>(),
-        open_documents = session.open_documents(),
+        open_documents_len = session.open_documents_len(),
         client_capabilities = session.resolved_client_capabilities(),
     )?;
 
@@ -176,10 +176,11 @@ client_capabilities = {client_capabilities:#?}
             writeln!(buffer, "Unable to take a snapshot of the document at {uri}")?;
             return Ok(buffer);
         };
+        let query = snapshot.query();
 
         writeln!(
             buffer,
-            "Document:
+            "Open document:
 uri = {uri}
 kind = {kind}
 version = {version}
@@ -193,10 +194,10 @@ config_path = {config_path:?}
                 DocumentKey::NotebookCell(_) => "NotebookCell",
                 DocumentKey::Text(_) => "Text",
             },
-            version = snapshot.query().version(),
+            version = query.version(),
             client_settings = snapshot.client_settings(),
-            config_path = snapshot.query().settings().path(),
-            settings = snapshot.query().settings(),
+            config_path = query.settings().path(),
+            settings = query.settings(),
         )?;
     } else {
         writeln!(

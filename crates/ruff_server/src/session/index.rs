@@ -396,7 +396,7 @@ impl Index {
     }
 
     /// Returns the number of open documents.
-    pub(super) fn open_documents(&self) -> usize {
+    pub(super) fn open_documents_len(&self) -> usize {
         self.documents.len()
     }
 

@@ -168,8 +168,8 @@ impl Session {
     }
 
     /// Returns the number of open documents in the session.
-    pub(crate) fn open_documents(&self) -> usize {
-        self.index.open_documents()
+    pub(crate) fn open_documents_len(&self) -> usize {
+        self.index.open_documents_len()
     }
 
     /// Returns an iterator over the workspace root folders in the session.
