@@ -21,7 +21,7 @@ use ruff_linter::settings::types::{
     PythonVersion, UnsafeFixes,
 };
 use ruff_linter::{RuleParser, RuleSelector, RuleSelectorParser};
-use ruff_python_ast::python_version::PythonVersion as AstPythonVersion;
+use ruff_python_ast as ast;
 use ruff_source_file::{LineIndex, OneIndexed};
 use ruff_text_size::TextRange;
 use ruff_workspace::configuration::{Configuration, RuleSelection};
@@ -729,7 +729,7 @@ impl CheckCommand {
             preview: resolve_bool_arg(self.preview, self.no_preview).map(PreviewMode::from),
             respect_gitignore: resolve_bool_arg(self.respect_gitignore, self.no_respect_gitignore),
             select: self.select,
-            target_version: self.target_version.map(AstPythonVersion::from),
+            target_version: self.target_version.map(ast::PythonVersion::from),
             unfixable: self.unfixable,
             // TODO(charlie): Included in `pyproject.toml`, but not inherited.
             cache_dir: self.cache_dir,
@@ -771,7 +771,7 @@ impl FormatCommand {
             exclude: self.exclude,
             preview: resolve_bool_arg(self.preview, self.no_preview).map(PreviewMode::from),
             force_exclude: resolve_bool_arg(self.force_exclude, self.no_force_exclude),
-            target_version: self.target_version.map(AstPythonVersion::from),
+            target_version: self.target_version.map(ast::PythonVersion::from),
             cache_dir: self.cache_dir,
             extension: self.extension,
             ..ExplicitConfigOverrides::default()
@@ -801,7 +801,7 @@ impl AnalyzeGraphCommand {
                 None
             },
             preview: resolve_bool_arg(self.preview, self.no_preview).map(PreviewMode::from),
-            target_version: self.target_version.map(AstPythonVersion::from),
+            target_version: self.target_version.map(ast::PythonVersion::from),
             ..ExplicitConfigOverrides::default()
         };
 
@@ -1265,7 +1265,7 @@ struct ExplicitConfigOverrides {
     preview: Option<PreviewMode>,
     respect_gitignore: Option<bool>,
     select: Option<Vec<RuleSelector>>,
-    target_version: Option<AstPythonVersion>,
+    target_version: Option<ast::PythonVersion>,
     unfixable: Option<Vec<RuleSelector>>,
     // TODO(charlie): Captured in pyproject.toml as a default, but not part of `Settings`.
     cache_dir: Option<PathBuf>,

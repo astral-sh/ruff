@@ -5,9 +5,7 @@ use std::str::FromStr;
 use ruff_formatter::printer::{LineEnding, PrinterOptions, SourceMapGeneration};
 use ruff_formatter::{FormatOptions, IndentStyle, IndentWidth, LineWidth};
 use ruff_macros::CacheKey;
-use ruff_python_ast::PySourceType;
-
-use ruff_python_ast::python_version::PythonVersion as AstPythonVersion;
+use ruff_python_ast::{self as ast, PySourceType};
 
 /// Resolved options for formatting one individual file. The difference to `FormatterSettings`
 /// is that `FormatterSettings` stores the settings for multiple files (the entire project, a subdirectory, ..)
@@ -23,7 +21,7 @@ pub struct PyFormatOptions {
 
     /// The (minimum) Python version used to run the formatted code. This is used
     /// to determine the supported Python syntax.
-    target_version: AstPythonVersion,
+    target_version: ast::PythonVersion,
 
     /// Specifies the indent style:
     /// * Either a tab
@@ -82,7 +80,7 @@ impl Default for PyFormatOptions {
     fn default() -> Self {
         Self {
             source_type: PySourceType::default(),
-            target_version: AstPythonVersion::default(),
+            target_version: ast::PythonVersion::default(),
             indent_style: default_indent_style(),
             line_width: default_line_width(),
             indent_width: default_indent_width(),
@@ -110,7 +108,7 @@ impl PyFormatOptions {
         }
     }
 
-    pub const fn target_version(&self) -> AstPythonVersion {
+    pub const fn target_version(&self) -> ast::PythonVersion {
         self.target_version
     }
 
@@ -147,7 +145,7 @@ impl PyFormatOptions {
     }
 
     #[must_use]
-    pub fn with_target_version(mut self, target_version: AstPythonVersion) -> Self {
+    pub fn with_target_version(mut self, target_version: ast::PythonVersion) -> Self {
         self.target_version = target_version;
         self
     }

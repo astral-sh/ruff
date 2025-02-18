@@ -37,7 +37,7 @@ use ruff_linter::{
     fs, warn_user_once, warn_user_once_by_id, warn_user_once_by_message, RuleSelector,
     RUFF_PKG_VERSION,
 };
-use ruff_python_ast::python_version::PythonVersion as AstPythonVersion;
+use ruff_python_ast as ast;
 use ruff_python_formatter::{
     DocstringCode, DocstringCodeLineWidth, MagicTrailingComma, QuoteStyle,
 };
@@ -137,7 +137,7 @@ pub struct Configuration {
     pub builtins: Option<Vec<String>>,
     pub namespace_packages: Option<Vec<PathBuf>>,
     pub src: Option<Vec<PathBuf>>,
-    pub target_version: Option<AstPythonVersion>,
+    pub target_version: Option<ast::PythonVersion>,
 
     // Global formatting options
     pub line_length: Option<LineLength>,
@@ -532,7 +532,7 @@ impl Configuration {
                 .src
                 .map(|src| resolve_src(&src, project_root))
                 .transpose()?,
-            target_version: options.target_version.map(AstPythonVersion::from),
+            target_version: options.target_version.map(ast::PythonVersion::from),
             // `--extension` is a hidden command-line argument that isn't supported in configuration
             // files at present.
             extension: None,

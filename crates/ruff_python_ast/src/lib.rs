@@ -6,6 +6,7 @@ pub use generated::*;
 pub use int::*;
 pub use nodes::*;
 pub use operator_precedence::*;
+pub use python_version::*;
 
 pub mod comparable;
 pub mod docstrings;
