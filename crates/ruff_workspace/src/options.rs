@@ -1,4 +1,5 @@
 use regex::Regex;
+use ruff_linter::rules::ruff::settings::ArgsMadeMandatory;
 use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 use serde::de::{self};
 use serde::{Deserialize, Deserializer, Serialize};
@@ -3289,6 +3290,21 @@ pub struct RuffOptions {
         example = "allowed-markup-calls = [\"bleach.clean\", \"my_package.sanitize\"]"
     )]
     pub allowed_markup_calls: Option<Vec<String>>,
+
+    /// A list of mappings from qualified callable path to the arguments on it to
+    /// make mandatory to supply as keyword arguments.
+    #[option(
+        default = "{}",
+        value_type = r#"dict[str, { "args": list[str] }]"#,
+        scope = "optional-made-mandatory",
+        example = r#"
+            # Force a parameter to be explicitly included on a method
+            "pandas.DataFrame.merge" = ["validate"]
+            # Force a parameter to be explicitly included on a function
+            "pandas.merge" = ["validate"]
+        "#
+    )]
+    pub optional_made_mandatory: Option<FxHashMap<String, ArgsMadeMandatory>>,
 }
 
 impl RuffOptions {
@@ -3299,6 +3315,7 @@ impl RuffOptions {
                 .unwrap_or_default(),
             extend_markup_names: self.extend_markup_names.unwrap_or_default(),
             allowed_markup_calls: self.allowed_markup_calls.unwrap_or_default(),
+            optional_made_mandatory: self.optional_made_mandatory.unwrap_or_default(),
         }
     }
 }

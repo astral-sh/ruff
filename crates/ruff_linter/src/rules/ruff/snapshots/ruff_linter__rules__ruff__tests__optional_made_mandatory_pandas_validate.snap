@@ -1,0 +1,107 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF059.py:7:1: RUF059 Optional argument has been specified to be mandatory
+  |
+5 | y = pd.DataFrame()
+6 |
+7 | x.merge(y)
+  | ^^^^^^^^^^ RUF059
+8 |
+9 | pandas.merge(x, y)
+  |
+
+RUF059.py:9:1: RUF059 Optional argument has been specified to be mandatory
+   |
+ 7 | x.merge(y)
+ 8 |
+ 9 | pandas.merge(x, y)
+   | ^^^^^^^^^^^^^^^^^^ RUF059
+10 |
+11 | z = x.merge(y)
+   |
+
+RUF059.py:11:5: RUF059 Optional argument has been specified to be mandatory
+   |
+ 9 | pandas.merge(x, y)
+10 |
+11 | z = x.merge(y)
+   |     ^^^^^^^^^^ RUF059
+12 |
+13 | x.merge(y, validate="one_to_one")
+   |
+
+RUF059.py:15:1: RUF059 Optional argument has been specified to be mandatory
+   |
+13 | x.merge(y, validate="one_to_one")
+14 |
+15 | pd.merge(x, y)
+   | ^^^^^^^^^^^^^^ RUF059
+16 |
+17 | pd.merge(x, y, validate="one_to_one")
+   |
+
+RUF059.py:20:5: RUF059 Optional argument has been specified to be mandatory
+   |
+19 | if True:
+20 |     pd.merge(x, y)
+   |     ^^^^^^^^^^^^^^ RUF059
+21 |     a = x.merge(y)
+   |
+
+RUF059.py:21:9: RUF059 Optional argument has been specified to be mandatory
+   |
+19 | if True:
+20 |     pd.merge(x, y)
+21 |     a = x.merge(y)
+   |         ^^^^^^^^^^ RUF059
+22 |
+23 | (x.merge(y))
+   |
+
+RUF059.py:23:2: RUF059 Optional argument has been specified to be mandatory
+   |
+21 |     a = x.merge(y)
+22 |
+23 | (x.merge(y))
+   |  ^^^^^^^^^^ RUF059
+24 |
+25 | x.merge(y, **kwargs, validate="one_to_one")
+   |
+
+RUF059.py:27:1: RUF059 Optional argument has been specified to be mandatory
+   |
+25 | x.merge(y, **kwargs, validate="one_to_one")
+26 | x.merge(y, validate="one_to_one", **kwargs)
+27 | x.merge(y, **kwargs)
+   | ^^^^^^^^^^^^^^^^^^^^ RUF059
+28 |
+29 | merge(x, y)
+   |
+
+RUF059.py:33:1: RUF059 Optional argument has been specified to be mandatory
+   |
+31 | from pandas import merge
+32 |
+33 | merge(x, y)
+   | ^^^^^^^^^^^ RUF059
+34 |
+35 | from pandas import merge as mer
+   |
+
+RUF059.py:37:1: RUF059 Optional argument has been specified to be mandatory
+   |
+35 | from pandas import merge as mer
+36 |
+37 | mer(x, y)
+   | ^^^^^^^^^ RUF059
+   |
+
+RUF059.py:41:5: RUF059 Optional argument has been specified to be mandatory
+   |
+40 | def f(df: pd.DataFrame):
+41 |     df.merge(y)
+   |     ^^^^^^^^^^^ RUF059
+42 |
+43 | x.join(y)
+   |
