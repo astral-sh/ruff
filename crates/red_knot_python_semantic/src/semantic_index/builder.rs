@@ -134,7 +134,6 @@ impl<'db> SemanticIndexBuilder<'db> {
         builder
     }
 
-    #[track_caller]
     fn current_scope(&self) -> FileScopeId {
         *self
             .scope_stack
