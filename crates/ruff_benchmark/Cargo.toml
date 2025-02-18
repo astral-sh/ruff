@@ -2,7 +2,7 @@
 name = "ruff_benchmark"
 version.workspace = true
 description = "Ruff Micro-benchmarks"
-publish = false
+publish.workspace = true
 authors = { workspace = true }
 edition = { workspace = true }
 rust-version = { workspace = true }

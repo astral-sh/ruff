@@ -2,7 +2,7 @@
 name = "ruff_python_resolver"
 version.workspace = true
 description = "A Python module resolver for Ruff"
-publish = false
+publish.workspace = true
 authors = { workspace = true }
 edition = { workspace = true }
 rust-version = { workspace = true }

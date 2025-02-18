@@ -1,7 +1,7 @@
 [package]
 name = "ruff_python_literal"
 version.workspace = true
-publish = false
+publish.workspace = true
 description = "Common literal handling utilities mostly useful for unparse and repr."
 authors = ["Charlie Marsh <charlie.r.marsh@gmail.com>", "RustPython Team"]
 edition = { workspace = true }

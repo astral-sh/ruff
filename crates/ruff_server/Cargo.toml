@@ -1,7 +1,7 @@
 [package]
 name = "ruff_server"
 version = "0.2.2"
-publish = false
+publish.workspace = true
 authors = { workspace = true }
 edition = { workspace = true }
 rust-version = { workspace = true }

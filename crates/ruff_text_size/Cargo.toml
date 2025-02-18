@@ -1,7 +1,7 @@
 [package]
 name = "ruff_text_size"
 version.workspace = true
-publish = false
+publish.workspace = true
 edition = "2021"
 rust-version = "1.67.1"
 
