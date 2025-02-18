@@ -228,14 +228,13 @@ impl<'db> SemanticIndexBuilder<'db> {
         // If the scope that we just popped off is an eager scope, we need to "lock" our view of
         // which bindings and/or declarations reach each of the uses in the scope.
         if popped_scope.is_eager() {
-            for nested_symbol in self.symbol_tables[popped_scope_id].symbols() {
-                // Loop through each enclosing scope, looking for any that bind or declare the
-                // symbol.
-                for enclosing_scope_info in self.scope_stack.iter().rev() {
-                    // Skip this enclosing scope if it doesn't contain any bindings or declarations
-                    // for the symbol.
-                    let enclosing_scope_id = enclosing_scope_info.file_scope_id;
-                    let enclosing_symbol_table = &self.symbol_tables[enclosing_scope_id];
+            // Loop through each enclosing scope, looking for any that bind or declare each symbol.
+            for enclosing_scope_info in self.scope_stack.iter().rev() {
+                let enclosing_scope_id = enclosing_scope_info.file_scope_id;
+                let enclosing_symbol_table = &self.symbol_tables[enclosing_scope_id];
+                for nested_symbol in self.symbol_tables[popped_scope_id].symbols() {
+                    // Skip this symbol if this enclosing scope doesn't contain any bindings or
+                    // declarations for it.
                     let Some(enclosing_symbol_id) =
                         enclosing_symbol_table.symbol_id_by_name(nested_symbol.name())
                     else {
@@ -246,7 +245,7 @@ impl<'db> SemanticIndexBuilder<'db> {
                         continue;
                     }
 
-                    // Snapshot the bindings of this symbol that are visible at this point in the
+                    // Snapshot the bindings of this symbol that are visible at this point in this
                     // enclosing scope.
                     let key = EagerBindingsKey {
                         enclosing_scope: enclosing_scope_id,
@@ -256,6 +255,12 @@ impl<'db> SemanticIndexBuilder<'db> {
                     let eager_bindings = self.use_def_maps[enclosing_scope_id]
                         .snapshot_eager_bindings(enclosing_symbol_id);
                     self.eager_bindings.insert(key, eager_bindings);
+                }
+
+                // Lazy scopes are "sticky": once we see a lazy scope we stop doing lookups
+                // eagerly, even if we would encounter another eager enclosing scope later on.
+                if !self.scopes[enclosing_scope_id].is_eager() {
+                    break;
                 }
             }
         }

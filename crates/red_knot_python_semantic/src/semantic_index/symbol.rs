@@ -131,10 +131,6 @@ impl<'db> ScopeId<'db> {
         semantic_index(db, self.file(db)).scope(self.file_scope_id(db))
     }
 
-    pub(crate) fn is_eager(self, db: &dyn Db) -> bool {
-        self.node(db).scope_kind().is_eager()
-    }
-
     #[cfg(test)]
     pub(crate) fn name(self, db: &'db dyn Db) -> &'db str {
         match self.node(db) {
