@@ -334,11 +334,11 @@ impl<'db> UseDefMap<'db> {
     #[track_caller]
     pub(crate) fn bindings_at_eager_nested_scope_definition(
         &self,
-        scope: ScopedEagerNestedScopeId,
+        eager_nested_scope: ScopedEagerNestedScopeId,
         symbol: ScopedSymbolId,
     ) -> Option<BindingWithConstraintsIterator<'_, 'db>> {
         self.bindings_by_eager_nested_scope
-            .get(&(scope, symbol))
+            .get(&(eager_nested_scope, symbol))
             .map(|symbol_bindings| self.bindings_iterator(symbol_bindings))
     }
 
