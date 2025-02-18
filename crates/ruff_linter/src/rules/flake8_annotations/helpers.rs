@@ -15,7 +15,7 @@ use ruff_python_semantic::{Definition, SemanticModel};
 use ruff_text_size::{TextRange, TextSize};
 
 use crate::importer::{ImportRequest, Importer};
-use ruff_python_ast::python_version::PythonVersion;
+use ruff_python_ast::PythonVersion;
 
 /// Return the name of the function, if it's overloaded.
 pub(crate) fn overloaded_name<'a>(

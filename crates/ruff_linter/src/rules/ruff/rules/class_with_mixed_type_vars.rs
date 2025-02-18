@@ -13,7 +13,7 @@ use crate::fix::edits::{remove_argument, Parentheses};
 use crate::rules::pyupgrade::rules::pep695::{
     expr_name_to_type_var, find_generic, DisplayTypeVars, TypeParamKind, TypeVar,
 };
-use ruff_python_ast::python_version::PythonVersion;
+use ruff_python_ast::PythonVersion;
 
 /// ## What it does
 /// Checks for classes that have [PEP 695] [type parameter lists]

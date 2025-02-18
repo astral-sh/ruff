@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{python_version::PythonVersion, Expr, ExprSubscript};
+use ruff_python_ast::{Expr, ExprSubscript, PythonVersion};
 use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;

@@ -5,7 +5,7 @@ use ruff_python_ast::StmtFunctionDef;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
-use ruff_python_ast::python_version::PythonVersion;
+use ruff_python_ast::PythonVersion;
 
 use super::{check_type_vars, in_nested_context, DisplayTypeVars, TypeVarReferenceVisitor};
 

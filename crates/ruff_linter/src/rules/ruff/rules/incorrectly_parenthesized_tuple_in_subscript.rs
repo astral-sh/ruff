@@ -1,6 +1,6 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{python_version::PythonVersion, Expr, ExprSubscript};
+use ruff_python_ast::{Expr, ExprSubscript, PythonVersion};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;

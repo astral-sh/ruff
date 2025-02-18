@@ -8,7 +8,7 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
 use crate::rules::fastapi::rules::is_fastapi_route;
-use ruff_python_ast::python_version::PythonVersion;
+use ruff_python_ast::PythonVersion;
 
 /// ## What it does
 /// Identifies FastAPI routes with deprecated uses of `Depends` or similar.

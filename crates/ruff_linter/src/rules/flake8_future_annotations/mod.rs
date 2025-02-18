@@ -11,7 +11,7 @@ mod tests {
     use crate::registry::Rule;
     use crate::test::test_path;
     use crate::{assert_messages, settings};
-    use ruff_python_ast::python_version::PythonVersion;
+    use ruff_python_ast::PythonVersion;
 
     #[test_case(Path::new("edge_case.py"))]
     #[test_case(Path::new("from_typing_import.py"))]

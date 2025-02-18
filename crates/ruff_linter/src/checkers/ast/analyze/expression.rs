@@ -18,7 +18,7 @@ use crate::rules::{
     flake8_simplify, flake8_tidy_imports, flake8_type_checking, flake8_use_pathlib, flynt, numpy,
     pandas_vet, pep8_naming, pycodestyle, pyflakes, pylint, pyupgrade, refurb, ruff,
 };
-use ruff_python_ast::python_version::PythonVersion;
+use ruff_python_ast::PythonVersion;
 
 /// Run lint rules over an [`Expr`] syntax node.
 pub(crate) fn expression(expr: &Expr, checker: &Checker) {

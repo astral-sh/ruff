@@ -13,7 +13,7 @@ use ruff_text_size::{Ranged, TextLen, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::{adjust_indentation, delete_stmt};
-use ruff_python_ast::python_version::PythonVersion;
+use ruff_python_ast::PythonVersion;
 
 /// ## What it does
 /// Checks for conditional blocks gated on `sys.version_info` comparisons

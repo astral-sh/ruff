@@ -16,7 +16,7 @@ mod tests {
     use crate::settings::LinterSettings;
     use crate::test::test_path;
 
-    use ruff_python_ast::python_version::PythonVersion;
+    use ruff_python_ast::PythonVersion;
 
     #[test_case(Rule::AbstractBaseClassWithoutAbstractMethod, Path::new("B024.py"))]
     #[test_case(Rule::AssertFalse, Path::new("B011.py"))]

@@ -2,8 +2,8 @@ use crate::checkers::ast::Checker;
 use crate::rules::flake8_bugbear::rules::is_infinite_iterable;
 use ruff_diagnostics::{Diagnostic, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::python_version::PythonVersion;
 use ruff_python_ast::ExprCall;
+use ruff_python_ast::PythonVersion;
 
 /// ## What it does
 /// Checks for `itertools.batched` calls without an explicit `strict` parameter.

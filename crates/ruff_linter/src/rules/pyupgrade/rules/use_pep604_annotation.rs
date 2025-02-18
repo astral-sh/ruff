@@ -3,7 +3,7 @@ use ruff_diagnostics::{
 };
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::{pep_604_optional, pep_604_union};
-use ruff_python_ast::python_version::PythonVersion;
+use ruff_python_ast::PythonVersion;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::analyze::typing::Pep604Operator;
 use ruff_text_size::Ranged;

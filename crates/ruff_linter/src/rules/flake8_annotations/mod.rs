@@ -13,7 +13,7 @@ mod tests {
     use crate::registry::Rule;
     use crate::settings::LinterSettings;
     use crate::test::test_path;
-    use ruff_python_ast::python_version::PythonVersion;
+    use ruff_python_ast::PythonVersion;
 
     #[test]
     fn defaults() -> Result<()> {

@@ -5,8 +5,7 @@ use ruff_python_ast::{
     self as ast,
     helpers::{pep_604_union, typing_optional},
     name::Name,
-    python_version::PythonVersion,
-    Expr, ExprBinOp, ExprContext, ExprNoneLiteral, ExprSubscript, Operator,
+    Expr, ExprBinOp, ExprContext, ExprNoneLiteral, ExprSubscript, Operator, PythonVersion,
 };
 use ruff_python_semantic::analyze::typing::{traverse_literal, traverse_union};
 use ruff_text_size::{Ranged, TextRange};

@@ -1,7 +1,7 @@
 use ruff_linter::display_settings;
 use ruff_linter::settings::types::{ExtensionMapping, FilePatternSet, PreviewMode};
 use ruff_macros::CacheKey;
-use ruff_python_ast::python_version::PythonVersion;
+use ruff_python_ast::PythonVersion;
 use std::collections::BTreeMap;
 use std::fmt;
 use std::path::PathBuf;

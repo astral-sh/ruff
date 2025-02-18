@@ -164,7 +164,7 @@ pub struct FormatterSettings {
     pub exclude: FilePatternSet,
     pub extension: ExtensionMapping,
     pub preview: PreviewMode,
-    pub target_version: ruff_python_ast::python_version::PythonVersion,
+    pub target_version: ruff_python_ast::PythonVersion,
 
     pub line_width: LineWidth,
 

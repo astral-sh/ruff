@@ -9,7 +9,7 @@ mod tests {
 
     use anyhow::Result;
     use regex::Regex;
-    use ruff_python_ast::python_version::PythonVersion;
+    use ruff_python_ast::PythonVersion;
     use rustc_hash::FxHashSet;
     use test_case::test_case;
 

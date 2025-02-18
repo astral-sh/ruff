@@ -5,7 +5,7 @@ use ruff_python_ast::{self as ast, ParameterWithDefault};
 use ruff_python_semantic::analyze::function_type;
 
 use crate::checkers::ast::Checker;
-use ruff_python_ast::python_version::PythonVersion;
+use ruff_python_ast::PythonVersion;
 
 /// ## What it does
 /// Checks for the presence of [PEP 484]-style positional-only parameters.

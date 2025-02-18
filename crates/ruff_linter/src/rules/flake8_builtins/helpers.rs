@@ -1,5 +1,5 @@
-use ruff_python_ast::python_version::PythonVersion;
 use ruff_python_ast::PySourceType;
+use ruff_python_ast::PythonVersion;
 use ruff_python_stdlib::builtins::is_python_builtin;
 
 pub(super) fn shadows_builtin(

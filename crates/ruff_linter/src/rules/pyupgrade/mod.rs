@@ -10,7 +10,7 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
-    use ruff_python_ast::python_version::PythonVersion;
+    use ruff_python_ast::PythonVersion;
     use test_case::test_case;
 
     use crate::registry::Rule;

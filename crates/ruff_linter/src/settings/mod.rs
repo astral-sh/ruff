@@ -11,7 +11,7 @@ use std::sync::LazyLock;
 
 use crate::codes::RuleCodePrefix;
 use ruff_macros::CacheKey;
-use ruff_python_ast::python_version::PythonVersion;
+use ruff_python_ast::PythonVersion;
 
 use crate::line_width::LineLength;
 use crate::registry::{Linter, Rule};

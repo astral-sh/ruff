@@ -11,7 +11,7 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 use crate::rules::pyupgrade::fixes;
 use crate::Locator;
-use ruff_python_ast::python_version::PythonVersion;
+use ruff_python_ast::PythonVersion;
 
 /// An import was moved and renamed as part of a deprecation.
 /// For example, `typing.AbstractSet` was moved to `collections.abc.Set`.

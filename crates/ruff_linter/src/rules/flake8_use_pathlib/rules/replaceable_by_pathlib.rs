@@ -15,7 +15,7 @@ use crate::rules::flake8_use_pathlib::violations::{
     OsPathIsfile, OsPathIslink, OsPathJoin, OsPathSamefile, OsPathSplitext, OsReadlink, OsRemove,
     OsRename, OsReplace, OsRmdir, OsStat, OsUnlink, PyPath,
 };
-use ruff_python_ast::python_version::PythonVersion;
+use ruff_python_ast::PythonVersion;
 
 pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
     if let Some(diagnostic_kind) = checker

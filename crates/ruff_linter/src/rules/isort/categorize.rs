@@ -11,7 +11,7 @@ use strum_macros::EnumIter;
 use crate::package::PackageRoot;
 use crate::warn_user_once;
 use ruff_macros::CacheKey;
-use ruff_python_ast::python_version::PythonVersion;
+use ruff_python_ast::PythonVersion;
 use ruff_python_stdlib::sys::is_known_standard_library;
 
 use super::types::{ImportBlock, Importable};

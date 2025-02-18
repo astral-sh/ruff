@@ -15,8 +15,7 @@ use strum_macros::EnumIter;
 use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_diagnostics::Applicability;
 use ruff_macros::CacheKey;
-use ruff_python_ast::python_version as ast;
-use ruff_python_ast::PySourceType;
+use ruff_python_ast::{self as ast, PySourceType};
 
 use crate::registry::RuleSet;
 use crate::rule_selector::RuleSelector;

@@ -9,7 +9,7 @@ use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
 use crate::rules::flake8_pyi::rules::TypingModule;
 use crate::Locator;
-use ruff_python_ast::python_version::PythonVersion;
+use ruff_python_ast::PythonVersion;
 
 /// ## What it does
 /// Checks for typed function arguments in stubs with complex default values.

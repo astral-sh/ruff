@@ -1,5 +1,5 @@
 use ruff_formatter::{format_args, write, FormatContext, FormatError};
-use ruff_python_ast::python_version::PythonVersion;
+use ruff_python_ast::PythonVersion;
 use ruff_python_ast::{StmtWith, WithItem};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange};

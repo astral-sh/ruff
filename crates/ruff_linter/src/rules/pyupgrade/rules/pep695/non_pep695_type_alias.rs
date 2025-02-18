@@ -9,7 +9,7 @@ use ruff_python_ast::{Expr, ExprCall, ExprName, Keyword, StmtAnnAssign, StmtAssi
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
-use ruff_python_ast::python_version::PythonVersion;
+use ruff_python_ast::PythonVersion;
 
 use super::{
     expr_name_to_type_var, DisplayTypeVars, TypeParamKind, TypeVar, TypeVarReferenceVisitor,
