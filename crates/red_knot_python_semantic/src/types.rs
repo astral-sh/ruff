@@ -1796,7 +1796,7 @@ impl<'db> Type<'db> {
     fn iterate(self, db: &'db dyn Db) -> IterationOutcome<'db> {
         if let Type::Tuple(tuple_type) = self {
             return IterationOutcome::Iterable {
-                element_ty: UnionType::from_elements(db, tuple_type.elements(db)),
+                element_ty: UnionType::from_elements(db, tuple_type.elements(db).iter().copied()),
             };
         }
 
@@ -3700,12 +3700,13 @@ impl<'db> Class<'db> {
                                 (Some(builder), Some(ty)) => Some(builder.add(ty)),
                             }
                         })
-                        .map(|mut builder| {
-                            for binding in bindings {
-                                builder = builder.add(binding.return_type());
-                            }
-
-                            builder.build()
+                        .map(|builder| {
+                            builder
+                                .extend(
+                                    IntoIterator::into_iter(bindings)
+                                        .map(|binding| binding.return_type()),
+                                )
+                                .build()
                         });
 
                     if partly_not_callable {
@@ -4172,10 +4173,9 @@ impl<'db> UnionType<'db> {
 
     /// Create a union from a list of elements
     /// (which may be eagerly simplified into a different variant of [`Type`] altogether).
-    pub fn from_elements<I, T>(db: &'db dyn Db, elements: I) -> Type<'db>
+    pub fn from_elements<I>(db: &'db dyn Db, elements: I) -> Type<'db>
     where
-        I: IntoIterator<Item = T>,
-        T: Into<Type<'db>>,
+        I: IntoIterator<Item = Type<'db>>,
     {
         let mut elements = elements.into_iter();
         let Some(first) = elements.next() else {
@@ -4183,16 +4183,14 @@ impl<'db> UnionType<'db> {
         };
 
         let Some(second) = elements.next() else {
-            return first.into();
+            return first;
         };
 
-        let mut builder = UnionBuilder::new(db).add(first.into()).add(second.into());
+        let (lower, _) = elements.size_hint();
+        let mut builder = UnionBuilder::new(db);
+        builder.reserve(lower + 2);
 
-        for element in elements {
-            builder = builder.add(element.into());
-        }
-
-        builder.build()
+        builder.add(first).add(second).extend(elements).build()
     }
 
     /// Apply a transformation function to all elements of the union,

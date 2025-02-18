@@ -1707,18 +1707,17 @@ impl<'db> TypeInferenceBuilder<'db> {
         let symbol_ty = if let Type::Tuple(tuple) = node_ty {
             let type_base_exception = KnownClass::BaseException.to_subclass_of(self.db());
             let mut builder = UnionBuilder::new(self.db());
-            for element in tuple.elements(self.db()).iter().copied() {
-                builder = builder.add(
-                    if element.is_assignable_to(self.db(), type_base_exception) {
-                        element.to_instance(self.db())
-                    } else {
-                        if let Some(node) = node {
-                            report_invalid_exception_caught(&self.context, node, element);
-                        }
-                        Type::unknown()
-                    },
-                );
-            }
+            builder = builder.extend(tuple.elements(self.db()).iter().map(|element| {
+                if element.is_assignable_to(self.db(), type_base_exception) {
+                    element.to_instance(self.db())
+                } else {
+                    if let Some(node) = node {
+                        report_invalid_exception_caught(&self.context, node, *element);
+                    }
+                    Type::unknown()
+                }
+            }));
+
             builder.build()
         } else if node_ty.is_subtype_of(self.db(), KnownClass::Tuple.to_instance(self.db())) {
             todo_type!("Homogeneous tuple in exception handler")
@@ -3363,9 +3362,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             bindings: _,
                             errors,
                         } => {
-                            // TODO: Remove the `Vec::from` call once we use the Rust 2024 edition
-                            //  which adds `Box<[T]>::into_iter`
-                            if let Some(first) = Vec::from(errors).into_iter().next() {
+                            if let Some(first) = IntoIterator::into_iter(errors).next() {
                                 report_call_error(context, first, call_expression);
                             } else {
                                 debug_assert!(

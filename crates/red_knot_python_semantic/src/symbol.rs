@@ -157,7 +157,7 @@ impl<'db> LookupError<'db> {
         fallback: Symbol<'db>,
     ) -> LookupResult<'db> {
         let fallback = fallback.into_lookup_result();
-        match (&self, &fallback) {
+        match (self, fallback) {
             (LookupError::Unbound, _) => fallback,
             (LookupError::PossiblyUnbound { .. }, Err(LookupError::Unbound)) => Err(self),
             (LookupError::PossiblyUnbound(ty), Ok(ty2)) => {
@@ -611,15 +611,17 @@ fn symbol_from_declarations_impl<'db>(
             let ty_first = first.inner_type();
             let mut qualifiers = first.qualifiers();
 
-            let mut builder = UnionBuilder::new(db).add(ty_first);
-            for other in std::iter::once(second).chain(types) {
-                let other_ty = other.inner_type();
-                if !ty_first.is_equivalent_to(db, other_ty) {
-                    conflicting.push(other_ty);
-                }
-                builder = builder.add(other_ty);
-                qualifiers = qualifiers.union(other.qualifiers());
-            }
+            let builder = UnionBuilder::new(db).add(ty_first).extend(
+                std::iter::once(second).chain(types).map(|other| {
+                    let other_ty = other.inner_type();
+                    if !ty_first.is_equivalent_to(db, other_ty) {
+                        conflicting.push(other_ty);
+                    }
+
+                    qualifiers = qualifiers.union(other.qualifiers());
+                    other_ty
+                }),
+            );
             TypeAndQualifiers::new(builder.build(), qualifiers)
         } else {
             first
