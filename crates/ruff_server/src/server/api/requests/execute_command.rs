@@ -37,11 +37,11 @@ impl super::SyncRequestHandler for ExecuteCommand {
             let output = debug_information(session);
             notifier
                 .notify::<types::notification::LogMessage>(types::LogMessageParams {
-                    message: output,
+                    message: output.clone(),
                     typ: types::MessageType::INFO,
                 })
                 .with_failure_code(ErrorCode::InternalError)?;
-            return Ok(None);
+            return Ok(Some(serde_json::Value::String(output)));
         }
 
         // check if we can apply a workspace edit
