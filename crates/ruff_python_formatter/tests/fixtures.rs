@@ -26,8 +26,9 @@ fn black_compatibility() {
 
         let options: PyFormatOptions = if let Ok(options_file) = fs::File::open(&options_path) {
             let reader = BufReader::new(options_file);
-            serde_json::from_reader(reader)
-                .unwrap_or_else(|_| panic!("Option file {options_path:?} to be a valid Json file"))
+            serde_json::from_reader(reader).unwrap_or_else(|_| {
+                panic!("Expected option file {options_path:?} to be a valid Json file")
+            })
         } else {
             PyFormatOptions::from_extension(input_path)
         };
@@ -182,8 +183,10 @@ fn format() {
 
         if let Ok(options_file) = fs::File::open(&options_path) {
             let reader = BufReader::new(options_file);
-            let options: Vec<PyFormatOptions> = serde_json::from_reader(reader)
-                .unwrap_or_else(|_| panic!("Option file {options_path:?} to be a valid Json file"));
+            let options: Vec<PyFormatOptions> =
+                serde_json::from_reader(reader).unwrap_or_else(|_| {
+                    panic!("Expected option file {options_path:?} to be a valid Json file")
+                });
 
             writeln!(snapshot, "## Outputs").unwrap();
 
