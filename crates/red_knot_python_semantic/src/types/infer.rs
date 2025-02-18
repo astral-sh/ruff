@@ -3526,19 +3526,17 @@ impl<'db> TypeInferenceBuilder<'db> {
                 // the point where the previous enclosing scope was defined, instead of at the end
                 // of the scope.
                 if look_up_eagerly_inner {
-                    if let Some(eager_scope_id) =
-                        scope.scoped_eager_nested_scope_id(db, enclosing_scope_id)
+                    let eager_scope_id = scope
+                        .scoped_eager_nested_scope_id(db, enclosing_scope_id)
+                        .expect("Expected all eager scopes to have an `EagerNestedScopeId`");
+                    let enclosing_scope_use_def = self.index.use_def_map(enclosing_scope_file_id);
+                    if let Some(bindings_at_nested_scope_definition) = enclosing_scope_use_def
+                        .bindings_at_eager_nested_scope_definition(
+                            eager_scope_id,
+                            enclosing_symbol_id,
+                        )
                     {
-                        let enclosing_scope_use_def =
-                            self.index.use_def_map(enclosing_scope_file_id);
-                        if let Some(bindings_at_nested_scope_definition) = enclosing_scope_use_def
-                            .bindings_at_eager_nested_scope_definition(
-                                eager_scope_id,
-                                enclosing_symbol_id,
-                            )
-                        {
-                            return symbol_from_bindings(db, bindings_at_nested_scope_definition);
-                        }
+                        return symbol_from_bindings(db, bindings_at_nested_scope_definition);
                     }
                 } else {
                     let enclosing_symbol = enclosing_symbol_table.symbol(enclosing_symbol_id);
