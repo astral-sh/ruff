@@ -19,7 +19,7 @@ use ruff_python_codegen::Stylist;
 use ruff_python_formatter::{format_module_ast, pretty_comments, PyFormatContext, QuoteStyle};
 use ruff_python_index::Indexer;
 use ruff_python_parser::{
-    parse, parse_unchecked, parse_unchecked_source, Mode, Parsed, ParserOptions,
+    parse, parse_unchecked, parse_unchecked_source, Mode, ParseOptions, Parsed,
 };
 use ruff_python_trivia::CommentRanges;
 use ruff_source_file::SourceLocation;
@@ -266,13 +266,13 @@ impl Workspace {
 
     /// Parses the content and returns its AST
     pub fn parse(&self, contents: &str) -> Result<String, Error> {
-        let parsed = parse_unchecked(contents, ParserOptions::from_mode(Mode::Module));
+        let parsed = parse_unchecked(contents, ParseOptions::from_mode(Mode::Module));
 
         Ok(format!("{:#?}", parsed.into_syntax()))
     }
 
     pub fn tokens(&self, contents: &str) -> Result<String, Error> {
-        let parsed = parse_unchecked(contents, ParserOptions::from_mode(Mode::Module));
+        let parsed = parse_unchecked(contents, ParseOptions::from_mode(Mode::Module));
 
         Ok(format!("{:#?}", parsed.tokens().as_ref()))
     }
@@ -291,7 +291,7 @@ struct ParsedModule<'a> {
 impl<'a> ParsedModule<'a> {
     fn from_source(source_code: &'a str) -> Result<Self, Error> {
         let parsed =
-            parse(source_code, ParserOptions::from_mode(Mode::Module)).map_err(into_error)?;
+            parse(source_code, ParseOptions::from_mode(Mode::Module)).map_err(into_error)?;
         let comment_ranges = CommentRanges::from(parsed.tokens());
         Ok(Self {
             source_code,

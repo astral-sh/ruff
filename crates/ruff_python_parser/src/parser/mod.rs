@@ -14,7 +14,7 @@ use crate::token_source::{TokenSource, TokenSourceCheckpoint};
 use crate::{Mode, ParseError, ParseErrorType, TokenKind};
 use crate::{Parsed, Tokens};
 
-pub use crate::parser::options::ParserOptions;
+pub use crate::parser::options::ParseOptions;
 
 mod expression;
 mod helpers;
@@ -36,7 +36,7 @@ pub(crate) struct Parser<'src> {
     /// Stores all the syntax errors found during the parsing.
     errors: Vec<ParseError>,
 
-    options: ParserOptions,
+    options: ParseOptions,
 
     /// The ID of the current token. This is used to track the progress of the parser
     /// to avoid infinite loops when the parser is stuck.
@@ -54,7 +54,7 @@ pub(crate) struct Parser<'src> {
 
 impl<'src> Parser<'src> {
     /// Create a new parser for the given source code.
-    pub(crate) fn new(source: &'src str, options: ParserOptions) -> Self {
+    pub(crate) fn new(source: &'src str, options: ParseOptions) -> Self {
         Parser::new_starts_at(source, TextSize::new(0), options)
     }
 
@@ -62,7 +62,7 @@ impl<'src> Parser<'src> {
     pub(crate) fn new_starts_at(
         source: &'src str,
         start_offset: TextSize,
-        options: ParserOptions,
+        options: ParseOptions,
     ) -> Self {
         let tokens = TokenSource::from_source(source, options.mode, start_offset);
 

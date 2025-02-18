@@ -309,7 +309,7 @@ mod tests {
 
     use ruff_diagnostics::{Diagnostic, DiagnosticKind, Edit, Fix};
     use ruff_notebook::NotebookIndex;
-    use ruff_python_parser::{parse_unchecked, Mode, ParserOptions};
+    use ruff_python_parser::{parse_unchecked, Mode, ParseOptions};
     use ruff_source_file::{OneIndexed, SourceFileBuilder};
     use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -325,7 +325,7 @@ if call(foo
 ";
         let locator = Locator::new(source);
         let source_file = SourceFileBuilder::new("syntax_errors.py", source).finish();
-        parse_unchecked(source, ParserOptions::from_mode(Mode::Module))
+        parse_unchecked(source, ParseOptions::from_mode(Mode::Module))
             .errors()
             .iter()
             .map(|parse_error| {

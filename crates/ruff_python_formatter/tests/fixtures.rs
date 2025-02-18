@@ -11,7 +11,7 @@ use crate::normalizer::Normalizer;
 use ruff_formatter::FormatOptions;
 use ruff_python_ast::comparable::ComparableMod;
 use ruff_python_formatter::{format_module_source, format_range, PreviewMode, PyFormatOptions};
-use ruff_python_parser::{parse, AsMode, ParserOptions};
+use ruff_python_parser::{parse, AsMode, ParseOptions};
 use ruff_source_file::{LineIndex, OneIndexed};
 use ruff_text_size::{TextRange, TextSize};
 
@@ -395,7 +395,7 @@ fn ensure_unchanged_ast(
     // Parse the unformatted code.
     let mut unformatted_ast = parse(
         unformatted_code,
-        ParserOptions::from_mode(source_type.as_mode()),
+        ParseOptions::from_mode(source_type.as_mode()),
     )
     .expect("Unformatted code to be valid syntax")
     .into_syntax();
@@ -405,7 +405,7 @@ fn ensure_unchanged_ast(
     // Parse the formatted code.
     let mut formatted_ast = parse(
         formatted_code,
-        ParserOptions::from_mode(source_type.as_mode()),
+        ParseOptions::from_mode(source_type.as_mode()),
     )
     .expect("Formatted code to be valid syntax")
     .into_syntax();

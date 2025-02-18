@@ -8,7 +8,7 @@ use ruff_benchmark::{
     TestCase, LARGE_DATASET, NUMPY_CTYPESLIB, NUMPY_GLOBALS, PYDANTIC_TYPES, UNICODE_PYPINYIN,
 };
 use ruff_python_formatter::{format_module_ast, PreviewMode, PyFormatOptions};
-use ruff_python_parser::{parse, Mode, ParserOptions};
+use ruff_python_parser::{parse, Mode, ParseOptions};
 use ruff_python_trivia::CommentRanges;
 
 #[cfg(target_os = "windows")]
@@ -48,7 +48,7 @@ fn benchmark_formatter(criterion: &mut Criterion) {
             &case,
             |b, case| {
                 // Parse the source.
-                let parsed = parse(case.code(), ParserOptions::from_mode(Mode::Module))
+                let parsed = parse(case.code(), ParseOptions::from_mode(Mode::Module))
                     .expect("Input should be a valid Python code");
 
                 let comment_ranges = CommentRanges::from(parsed.tokens());

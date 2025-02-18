@@ -11,7 +11,7 @@ use regex::Regex;
 
 use ruff_formatter::printer::SourceMapGeneration;
 use ruff_python_ast::{str::Quote, AnyStringFlags, StringFlags};
-use ruff_python_parser::ParserOptions;
+use ruff_python_parser::ParseOptions;
 use ruff_python_trivia::CommentRanges;
 use {
     ruff_formatter::{write, FormatOptions, IndentStyle, LineWidth, Printed},
@@ -573,7 +573,7 @@ impl<'src> DocstringLinePrinter<'_, '_, '_, 'src> {
         };
         let result = ruff_python_parser::parse(
             &wrapped,
-            ParserOptions::from_mode(self.f.options().source_type().as_mode()),
+            ParseOptions::from_mode(self.f.options().source_type().as_mode()),
         );
         // If the resulting code is not valid, then reset and pass through
         // the docstring lines as-is.
@@ -1587,8 +1587,7 @@ fn docstring_format_source(
     use ruff_python_parser::AsMode;
 
     let source_type = options.source_type();
-    let parsed =
-        ruff_python_parser::parse(source, ParserOptions::from_mode(source_type.as_mode()))?;
+    let parsed = ruff_python_parser::parse(source, ParseOptions::from_mode(source_type.as_mode()))?;
     let comment_ranges = CommentRanges::from(parsed.tokens());
     let source_code = ruff_formatter::SourceCode::new(source);
     let comments = crate::Comments::from_ast(parsed.syntax(), source_code, &comment_ranges);
