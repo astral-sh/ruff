@@ -25,18 +25,7 @@ use crate::rule_selector::RuleSelector;
 use crate::{display_settings, fs};
 
 #[derive(
-    Clone,
-    Copy,
-    Debug,
-    PartialOrd,
-    Ord,
-    PartialEq,
-    Eq,
-    Default,
-    Serialize,
-    Deserialize,
-    CacheKey,
-    EnumIter,
+    Clone, Copy, Debug, PartialOrd, Ord, PartialEq, Eq, Serialize, Deserialize, CacheKey, EnumIter,
 )]
 #[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
 #[serde(rename_all = "lowercase")]
@@ -44,14 +33,34 @@ use crate::{display_settings, fs};
 pub enum PythonVersion {
     Py37,
     Py38,
-    // Make sure to also change the default for `ruff_python_ast::PythonVersion`
-    // when changing the default here.
-    #[default]
     Py39,
     Py310,
     Py311,
     Py312,
     Py313,
+}
+
+impl Default for PythonVersion {
+    fn default() -> Self {
+        Self::try_from(ast::PythonVersion::default()).unwrap()
+    }
+}
+
+impl TryFrom<ast::PythonVersion> for PythonVersion {
+    type Error = String;
+
+    fn try_from(value: ast::PythonVersion) -> Result<Self, Self::Error> {
+        match value {
+            ast::PythonVersion::PY37 => Ok(Self::Py37),
+            ast::PythonVersion::PY38 => Ok(Self::Py38),
+            ast::PythonVersion::PY39 => Ok(Self::Py39),
+            ast::PythonVersion::PY310 => Ok(Self::Py310),
+            ast::PythonVersion::PY311 => Ok(Self::Py311),
+            ast::PythonVersion::PY312 => Ok(Self::Py312),
+            ast::PythonVersion::PY313 => Ok(Self::Py313),
+            _ => Err(format!("unrecognized python version {value}")),
+        }
+    }
 }
 
 impl From<PythonVersion> for ast::PythonVersion {
