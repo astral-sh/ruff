@@ -4177,11 +4177,19 @@ impl<'db> UnionType<'db> {
         I: IntoIterator<Item = T>,
         T: Into<Type<'db>>,
     {
-        elements
-            .into_iter()
-            .fold(UnionBuilder::new(db), |builder, element| {
-                builder.add(element.into())
-            })
+        let mut elements = elements.into_iter();
+        let (_, upper) = elements.size_hint();
+        let Some(first) = elements.next() else {
+            return Type::Never;
+        };
+        let Some(second) = elements.next() else {
+            return first.into();
+        };
+        upper
+            .map(|upper| UnionBuilder::with_capacity(db, upper))
+            .unwrap_or_else(|| UnionBuilder::new(db))
+            .extend([first, second])
+            .extend(elements)
             .build()
     }
 

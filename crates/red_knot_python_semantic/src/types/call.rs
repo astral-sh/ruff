@@ -135,6 +135,7 @@ impl<'db> CallError<'db> {
                     .map(CallBinding::return_type)
                     .chain(errors.iter().map(|err| err.fallback_return_type(db))),
             )),
+
             Self::PossiblyUnboundDunderCall { outcome, .. } => Some(outcome.return_type(db)),
             Self::BindingError { binding } => Some(binding.return_type()),
         }

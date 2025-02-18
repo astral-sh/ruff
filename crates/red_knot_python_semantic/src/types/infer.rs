@@ -4079,7 +4079,9 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
         });
 
-        UnionType::from_elements(db, elements)
+        UnionBuilder::with_capacity(db, n_values)
+            .extend(elements)
+            .build()
     }
 
     fn infer_compare_expression(&mut self, compare: &ast::ExprCompare) -> Type<'db> {
