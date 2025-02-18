@@ -54,7 +54,6 @@ impl LoopState {
     }
 }
 
-#[derive(Clone, Copy)]
 struct ScopeInfo {
     file_scope_id: FileScopeId,
     loop_state: LoopState,
