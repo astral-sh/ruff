@@ -3904,11 +3904,10 @@ impl<'db> Class<'db> {
                         let use_def = use_def_map(db, class_body_scope);
                         let declarations = use_def.public_declarations(symbol_id);
 
-                        match symbol_from_declarations(db, declarations) {
-                            Err((_, _conflicting_declarations)) => {
-                                // There are conflicting declarations for this attribute in the class body.
-                            }
-                            _ => {} // Ignore success cases
+                        if let Err((_, _conflicting_declarations)) =
+                            symbol_from_declarations(db, declarations)
+                        {
+                            // There are conflicting declarations for this attribute in the class body.
                         }
                     }
 
