@@ -43,6 +43,7 @@ impl<'db> UnionBuilder<'db> {
         }
     }
 
+    #[inline]
     pub(crate) fn reserve(&mut self, additional: usize) {
         self.elements.reserve(additional);
     }
