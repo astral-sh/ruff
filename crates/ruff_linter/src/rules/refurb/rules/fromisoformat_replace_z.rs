@@ -50,8 +50,10 @@ use crate::settings::types::PythonVersion;
 /// The fix is always marked as unsafe,
 /// as it might change the program's behaviour.
 ///
+/// For example, working code might become non-working:
+///
 /// ```python
-/// d = "Z2025-01-01T00:00:00Z"
+/// d = "Z2025-01-01T00:00:00Z"  # Note the leading `Z`
 ///
 /// datetime.fromisoformat(d.strip("Z") + "+00:00")  # Fine
 /// datetime.fromisoformat(d)  # Runtime error
