@@ -4177,12 +4177,7 @@ impl<'db> UnionType<'db> {
         I: IntoIterator<Item = T>,
         T: Into<Type<'db>>,
     {
-        elements
-            .into_iter()
-            .fold(UnionBuilder::new(db), |builder, element| {
-                builder.add(element.into())
-            })
-            .build()
+        UnionBuilder::new(db).extend(elements).build()
     }
 
     /// Apply a transformation function to all elements of the union,

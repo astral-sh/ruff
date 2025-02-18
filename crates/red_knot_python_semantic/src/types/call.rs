@@ -1,5 +1,5 @@
 use super::context::InferContext;
-use super::{Signature, Type};
+use super::{Signature, Type, UnionBuilder};
 use crate::types::UnionType;
 use crate::Db;
 
@@ -128,13 +128,13 @@ impl<'db> CallError<'db> {
             // combined with `Type::Unknown`
             CallError::Union {
                 errors, bindings, ..
-            } => Some(UnionType::from_elements(
-                db,
-                bindings
-                    .iter()
-                    .map(CallBinding::return_type)
-                    .chain(errors.iter().map(|err| err.fallback_return_type(db))),
-            )),
+            } => Some(
+                UnionBuilder::new(db)
+                    .extend(bindings.iter().map(CallBinding::return_type))
+                    .extend(errors.iter().map(|err| err.fallback_return_type(db)))
+                    .build(),
+            ),
+
             Self::PossiblyUnboundDunderCall { outcome, .. } => Some(outcome.return_type(db)),
             Self::BindingError { binding } => Some(binding.return_type()),
         }

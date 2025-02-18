@@ -43,6 +43,27 @@ impl<'db> UnionBuilder<'db> {
         }
     }
 
+    pub(crate) fn with_capacity(db: &'db dyn Db, capacity: usize) -> Self {
+        Self {
+            db,
+            elements: Vec::with_capacity(capacity),
+        }
+    }
+
+    pub(crate) fn extend<I, T>(mut self, types: I) -> Self
+    where
+        I: IntoIterator<Item = T>,
+        T: Into<Type<'db>>,
+    {
+        let types = types.into_iter();
+        let (lower, upper) = types.size_hint();
+        self.elements.reserve(upper.unwrap_or(lower));
+        for ty in types {
+            self = self.add(ty.into());
+        }
+        self
+    }
+
     /// Collapse the union to a single type: `object`.
     fn collapse_to_object(mut self) -> Self {
         self.elements.clear();

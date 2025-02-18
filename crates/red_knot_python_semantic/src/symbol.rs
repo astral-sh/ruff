@@ -549,10 +549,11 @@ fn symbol_from_bindings_impl<'db>(
         };
 
         if let Some(second) = types.next() {
-            Symbol::Type(
-                UnionType::from_elements(db, [first, second].into_iter().chain(types)),
-                boundness,
-            )
+            let ty = UnionBuilder::new(db)
+                .extend([first, second])
+                .extend(types)
+                .build();
+            Symbol::Type(ty, boundness)
         } else {
             Symbol::Type(first, boundness)
         }
