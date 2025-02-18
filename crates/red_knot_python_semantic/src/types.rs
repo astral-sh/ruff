@@ -4535,7 +4535,7 @@ pub(crate) mod tests {
     use ruff_db::parsed::parsed_module;
     use ruff_db::system::DbWithTestSystem;
     use ruff_db::testing::assert_function_query_was_not_run;
-    use ruff_python_ast::{self as ast, PythonVersion};
+    use ruff_python_ast::PythonVersion;
     use test_case::test_case;
 
     /// Explicitly test for Python version <3.13 and >=3.13, to ensure that
