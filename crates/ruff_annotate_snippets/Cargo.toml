@@ -1,6 +1,6 @@
 [package]
 name = "ruff_annotate_snippets"
-version = "0.1.0"
+version.workspace = true
 publish.workspace = true
 authors = { workspace = true }
 edition = { workspace = true }
