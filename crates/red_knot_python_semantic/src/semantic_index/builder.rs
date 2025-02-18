@@ -221,9 +221,8 @@ impl<'db> SemanticIndexBuilder<'db> {
             .pop()
             .expect("Root scope should be present");
 
-        let mut scopes = std::mem::take(&mut self.scopes);
-        let children_end = scopes.next_index();
-        let popped_scope = &mut scopes[popped_scope_id];
+        let children_end = self.scopes.next_index();
+        let popped_scope = &mut self.scopes[popped_scope_id];
         popped_scope.extend_descendents(children_end);
 
         // If the scope that we just popped off is an eager scope, we need to "lock" our view of
@@ -260,8 +259,6 @@ impl<'db> SemanticIndexBuilder<'db> {
                 }
             }
         }
-
-        self.scopes = scopes;
 
         popped_scope_id
     }
