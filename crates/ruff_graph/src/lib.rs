@@ -30,7 +30,7 @@ impl ModuleImports {
     ) -> Result<Self> {
         // Read and parse the source code.
         let source = std::fs::read_to_string(path)?;
-        let parsed = parse(&source, ParseOptions::from_mode(Mode::Module))?;
+        let parsed = parse(&source, ParseOptions::from(Mode::Module))?;
 
         let module_path =
             package.and_then(|package| to_module_path(package.as_std_path(), path.as_std_path()));

@@ -48,7 +48,7 @@ fn benchmark_formatter(criterion: &mut Criterion) {
             &case,
             |b, case| {
                 // Parse the source.
-                let parsed = parse(case.code(), ParseOptions::from_mode(Mode::Module))
+                let parsed = parse(case.code(), ParseOptions::from(Mode::Module))
                     .expect("Input should be a valid Python code");
 
                 let comment_ranges = CommentRanges::from(parsed.tokens());

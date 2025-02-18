@@ -266,13 +266,13 @@ impl Workspace {
 
     /// Parses the content and returns its AST
     pub fn parse(&self, contents: &str) -> Result<String, Error> {
-        let parsed = parse_unchecked(contents, ParseOptions::from_mode(Mode::Module));
+        let parsed = parse_unchecked(contents, ParseOptions::from(Mode::Module));
 
         Ok(format!("{:#?}", parsed.into_syntax()))
     }
 
     pub fn tokens(&self, contents: &str) -> Result<String, Error> {
-        let parsed = parse_unchecked(contents, ParseOptions::from_mode(Mode::Module));
+        let parsed = parse_unchecked(contents, ParseOptions::from(Mode::Module));
 
         Ok(format!("{:#?}", parsed.tokens().as_ref()))
     }
@@ -290,8 +290,7 @@ struct ParsedModule<'a> {
 
 impl<'a> ParsedModule<'a> {
     fn from_source(source_code: &'a str) -> Result<Self, Error> {
-        let parsed =
-            parse(source_code, ParseOptions::from_mode(Mode::Module)).map_err(into_error)?;
+        let parsed = parse(source_code, ParseOptions::from(Mode::Module)).map_err(into_error)?;
         let comment_ranges = CommentRanges::from(parsed.tokens());
         Ok(Self {
             source_code,

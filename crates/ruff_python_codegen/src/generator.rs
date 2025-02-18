@@ -1468,7 +1468,7 @@ mod tests {
         let indentation = Indentation::default();
         let line_ending = LineEnding::default();
         let parsed =
-            ruff_python_parser::parse(contents, ParseOptions::from_mode(Mode::Ipython)).unwrap();
+            ruff_python_parser::parse(contents, ParseOptions::from(Mode::Ipython)).unwrap();
         let Mod::Module(ModModule { body, .. }) = parsed.into_syntax() else {
             panic!("Source code didn't return ModModule")
         };

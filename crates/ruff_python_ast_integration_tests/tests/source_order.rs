@@ -147,7 +147,7 @@ fn f_strings() {
 }
 
 fn trace_source_order_visitation(source: &str) -> String {
-    let parsed = parse(source, ParseOptions::from_mode(Mode::Module)).unwrap();
+    let parsed = parse(source, ParseOptions::from(Mode::Module)).unwrap();
 
     let mut visitor = RecordVisitor::default();
     visitor.visit_mod(parsed.syntax());

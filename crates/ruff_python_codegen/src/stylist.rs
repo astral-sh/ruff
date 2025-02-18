@@ -215,7 +215,7 @@ x = (
  3,
 )
 ";
-        let parsed = parse_unchecked(contents, ParseOptions::from_mode(Mode::Module));
+        let parsed = parse_unchecked(contents, ParseOptions::from(Mode::Module));
         assert_eq!(
             Stylist::from_tokens(parsed.tokens(), contents).indentation(),
             &Indentation(" ".to_string())

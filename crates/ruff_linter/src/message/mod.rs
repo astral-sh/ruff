@@ -325,7 +325,7 @@ if call(foo
 ";
         let locator = Locator::new(source);
         let source_file = SourceFileBuilder::new("syntax_errors.py", source).finish();
-        parse_unchecked(source, ParseOptions::from_mode(Mode::Module))
+        parse_unchecked(source, ParseOptions::from(Mode::Module))
             .errors()
             .iter()
             .map(|parse_error| {

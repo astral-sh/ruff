@@ -111,7 +111,7 @@ pub mod typing;
 /// assert!(module.is_ok());
 /// ```
 pub fn parse_module(source: &str) -> Result<Parsed<ModModule>, ParseError> {
-    Parser::new(source, ParseOptions::from_mode(Mode::Module))
+    Parser::new(source, ParseOptions::from(Mode::Module))
         .parse()
         .try_into_module()
         .unwrap()
@@ -134,7 +134,7 @@ pub fn parse_module(source: &str) -> Result<Parsed<ModModule>, ParseError> {
 /// assert!(expr.is_ok());
 /// ```
 pub fn parse_expression(source: &str) -> Result<Parsed<ModExpression>, ParseError> {
-    Parser::new(source, ParseOptions::from_mode(Mode::Expression))
+    Parser::new(source, ParseOptions::from(Mode::Expression))
         .parse()
         .try_into_expression()
         .unwrap()
@@ -162,15 +162,11 @@ pub fn parse_expression_range(
     range: TextRange,
 ) -> Result<Parsed<ModExpression>, ParseError> {
     let source = &source[..range.end().to_usize()];
-    Parser::new_starts_at(
-        source,
-        range.start(),
-        ParseOptions::from_mode(Mode::Expression),
-    )
-    .parse()
-    .try_into_expression()
-    .unwrap()
-    .into_result()
+    Parser::new_starts_at(source, range.start(), ParseOptions::from(Mode::Expression))
+        .parse()
+        .try_into_expression()
+        .unwrap()
+        .into_result()
 }
 
 /// Parses a Python expression as if it is parenthesized.
@@ -195,7 +191,7 @@ pub fn parse_parenthesized_expression_range(
     let parsed = Parser::new_starts_at(
         source,
         range.start(),
-        ParseOptions::from_mode(Mode::ParenthesizedExpression),
+        ParseOptions::from(Mode::ParenthesizedExpression),
     )
     .parse();
     parsed.try_into_expression().unwrap().into_result()
@@ -250,7 +246,7 @@ pub fn parse_string_annotation(
 /// ```
 /// use ruff_python_parser::{parse, Mode, ParseOptions};
 ///
-/// let parsed = parse("1 + 2", ParseOptions::from_mode(Mode::Expression));
+/// let parsed = parse("1 + 2", ParseOptions::from(Mode::Expression));
 /// assert!(parsed.is_ok());
 /// ```
 ///
@@ -265,7 +261,7 @@ pub fn parse_string_annotation(
 ///   def greet(self):
 ///    print("Hello, world!")
 /// "#;
-/// let parsed = parse(source, ParseOptions::from_mode(Mode::Module));
+/// let parsed = parse(source, ParseOptions::from(Mode::Module));
 /// assert!(parsed.is_ok());
 /// ```
 ///
@@ -279,7 +275,7 @@ pub fn parse_string_annotation(
 /// ?str.replace
 /// !ls
 /// "#;
-/// let parsed = parse(source, ParseOptions::from_mode(Mode::Ipython));
+/// let parsed = parse(source, ParseOptions::from(Mode::Ipython));
 /// assert!(parsed.is_ok());
 /// ```
 pub fn parse(source: &str, options: ParseOptions) -> Result<Parsed<Mod>, ParseError> {
@@ -297,7 +293,7 @@ pub fn parse_unchecked(source: &str, options: ParseOptions) -> Parsed<Mod> {
 /// Parse the given Python source code using the specified [`PySourceType`].
 pub fn parse_unchecked_source(source: &str, source_type: PySourceType) -> Parsed<ModModule> {
     // SAFETY: Safe because `PySourceType` always parses to a `ModModule`
-    Parser::new(source, ParseOptions::from_mode(source_type.as_mode()))
+    Parser::new(source, ParseOptions::from(source_type))
         .parse()
         .try_into_module()
         .unwrap()
