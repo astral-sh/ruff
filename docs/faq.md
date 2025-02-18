@@ -639,7 +639,7 @@ making changes to code, even for seemingly trivial fixes. If a "safe" fix breaks
 Ruff's color output is powered by the [`colored`](https://crates.io/crates/colored) crate, which
 attempts to automatically detect whether the output stream supports color. However, you can force
 colors off by setting the `NO_COLOR` environment variable to any value (e.g., `NO_COLOR=1`), or
-force colors on by setting `FORCE_COLOR` to any non-empty value (e.g. `FORCE_COLOR=1`).
+force colors on by setting `FORCE_COLOR` to any non-empty value (e.g., `FORCE_COLOR=1`).
 
 [`colored`](https://crates.io/crates/colored) also supports the `CLICOLOR` and `CLICOLOR_FORCE`
 environment variables (see the [spec](https://bixense.com/clicolors/)).
