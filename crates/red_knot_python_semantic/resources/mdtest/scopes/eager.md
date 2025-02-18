@@ -290,8 +290,7 @@ x = int
 class C:
     var: x
 
-# TODO: Unknown | str
-reveal_type(C.var)  # revealed: int
+reveal_type(C.var)  # revealed: Unknown | str
 
 x = str
 ```
@@ -304,8 +303,7 @@ x = int
 class C:
     var: x
 
-# TODO: Unknown | str
-reveal_type(C.var)  # revealed: int
+reveal_type(C.var)  # revealed: Unknown | str
 
 x = str
 ```

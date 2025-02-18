@@ -3515,11 +3515,14 @@ impl<'db> TypeInferenceBuilder<'db> {
                 // registering eager bindings for nested scopes that are actually eager, and for
                 // enclosing scopes that actually contain bindings that we should use when
                 // resolving the reference.)
-                if let Some(bindings) =
-                    self.index
-                        .eager_bindings(enclosing_scope_file_id, symbol_name, file_scope_id)
-                {
-                    return symbol_from_bindings(db, bindings);
+                if !self.is_deferred() {
+                    if let Some(bindings) = self.index.eager_bindings(
+                        enclosing_scope_file_id,
+                        symbol_name,
+                        file_scope_id,
+                    ) {
+                        return symbol_from_bindings(db, bindings);
+                    }
                 }
 
                 let enclosing_symbol_table = self.index.symbol_table(enclosing_scope_file_id);
@@ -3545,11 +3548,14 @@ impl<'db> TypeInferenceBuilder<'db> {
                         return Symbol::Unbound;
                     }
 
-                    if let Some(bindings) =
-                        self.index
-                            .eager_bindings(FileScopeId::global(), symbol_name, file_scope_id)
-                    {
-                        return symbol_from_bindings(db, bindings);
+                    if !self.is_deferred() {
+                        if let Some(bindings) = self.index.eager_bindings(
+                            FileScopeId::global(),
+                            symbol_name,
+                            file_scope_id,
+                        ) {
+                            return symbol_from_bindings(db, bindings);
+                        }
                     }
 
                     global_symbol(db, self.file(), symbol_name)
