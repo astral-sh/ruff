@@ -208,8 +208,8 @@ impl Scope {
         self.node().scope_kind()
     }
 
-    pub fn descendents(&self) -> &Range<FileScopeId> {
-        &self.descendents
+    pub fn descendents(&self) -> Range<FileScopeId> {
+        self.descendents.clone()
     }
 
     pub(super) fn extend_descendents(&mut self, children_end: FileScopeId) {

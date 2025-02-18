@@ -347,7 +347,7 @@ pub struct DescendentsIter<'a> {
 impl<'a> DescendentsIter<'a> {
     fn new(symbol_table: &'a SemanticIndex, scope_id: FileScopeId) -> Self {
         let scope = &symbol_table.scopes[scope_id];
-        let scopes = &symbol_table.scopes[scope.descendents().clone()];
+        let scopes = &symbol_table.scopes[scope.descendents()];
 
         Self {
             next_id: scope_id + 1,
