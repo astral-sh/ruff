@@ -7,7 +7,7 @@ use clap::{command, Parser, ValueEnum};
 
 use ruff_formatter::SourceCode;
 use ruff_python_ast::PySourceType;
-use ruff_python_parser::{parse, AsMode};
+use ruff_python_parser::{parse, AsMode, ParserOptions};
 use ruff_python_trivia::CommentRanges;
 use ruff_text_size::Ranged;
 
@@ -48,7 +48,8 @@ pub fn format_and_debug_print(source: &str, cli: &Cli, source_path: &Path) -> Re
     let source_type = PySourceType::from(source_path);
 
     // Parse the AST.
-    let parsed = parse(source, source_type.as_mode()).context("Syntax error in input")?;
+    let parsed = parse(source, ParserOptions::from_mode(source_type.as_mode()))
+        .context("Syntax error in input")?;
 
     let options = PyFormatOptions::from_extension(source_path)
         .with_preview(if cli.preview {

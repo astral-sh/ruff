@@ -282,16 +282,16 @@ pub fn parse_string_annotation(
 /// let parsed = parse(source, Mode::Ipython);
 /// assert!(parsed.is_ok());
 /// ```
-pub fn parse(source: &str, mode: Mode) -> Result<Parsed<Mod>, ParseError> {
-    parse_unchecked(source, mode).into_result()
+pub fn parse(source: &str, options: ParserOptions) -> Result<Parsed<Mod>, ParseError> {
+    parse_unchecked(source, options).into_result()
 }
 
 /// Parse the given Python source code using the specified [`Mode`].
 ///
 /// This is same as the [`parse`] function except that it doesn't check for any [`ParseError`]
 /// and returns the [`Parsed`] as is.
-pub fn parse_unchecked(source: &str, mode: Mode) -> Parsed<Mod> {
-    Parser::new(source, ParserOptions::from_mode(mode)).parse()
+pub fn parse_unchecked(source: &str, options: ParserOptions) -> Parsed<Mod> {
+    Parser::new(source, options).parse()
 }
 
 /// Parse the given Python source code using the specified [`PySourceType`].

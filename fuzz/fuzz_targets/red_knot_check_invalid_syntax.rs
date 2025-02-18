@@ -18,7 +18,7 @@ use ruff_db::system::{DbWithTestSystem, System, SystemPathBuf, TestSystem};
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_db::{Db as SourceDb, Upcast};
 use ruff_python_ast::PythonVersion;
-use ruff_python_parser::{parse_unchecked, Mode};
+use ruff_python_parser::{parse_unchecked, Mode, ParserOptions};
 
 /// Database that can be used for testing.
 ///
@@ -134,7 +134,7 @@ fn do_fuzz(case: &[u8]) -> Corpus {
         return Corpus::Reject;
     };
 
-    let parsed = parse_unchecked(code, Mode::Module);
+    let parsed = parse_unchecked(code, ParserOptions::from_mode(Mode::Module));
     if parsed.is_valid() {
         return Corpus::Reject;
     }

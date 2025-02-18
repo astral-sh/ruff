@@ -6,7 +6,7 @@ use std::path::Path;
 use ruff_annotate_snippets::{Level, Renderer, Snippet};
 use ruff_python_ast::visitor::source_order::{walk_module, SourceOrderVisitor, TraversalSignal};
 use ruff_python_ast::{AnyNodeRef, Mod};
-use ruff_python_parser::{parse_unchecked, Mode, ParseErrorType, Token};
+use ruff_python_parser::{parse_unchecked, Mode, ParseErrorType, ParserOptions, Token};
 use ruff_source_file::{LineIndex, OneIndexed, SourceCode};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
@@ -34,7 +34,7 @@ fn inline_err() {
 /// Snapshots the AST.
 fn test_valid_syntax(input_path: &Path) {
     let source = fs::read_to_string(input_path).expect("Expected test file to exist");
-    let parsed = parse_unchecked(&source, Mode::Module);
+    let parsed = parse_unchecked(&source, ParserOptions::from_mode(Mode::Module));
 
     if !parsed.is_valid() {
         let line_index = LineIndex::from_source_text(&source);
@@ -78,7 +78,7 @@ fn test_valid_syntax(input_path: &Path) {
 /// Snapshots the AST and the error messages.
 fn test_invalid_syntax(input_path: &Path) {
     let source = fs::read_to_string(input_path).expect("Expected test file to exist");
-    let parsed = parse_unchecked(&source, Mode::Module);
+    let parsed = parse_unchecked(&source, ParserOptions::from_mode(Mode::Module));
 
     assert!(
         !parsed.is_valid(),
@@ -130,7 +130,7 @@ f'{'
 f'{foo!r'
 ";
 
-    let parsed = parse_unchecked(source, Mode::Module);
+    let parsed = parse_unchecked(source, ParserOptions::from_mode(Mode::Module));
 
     println!("AST:\n----\n{:#?}", parsed.syntax());
     println!("Tokens:\n-------\n{:#?}", parsed.tokens());

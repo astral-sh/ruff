@@ -1435,7 +1435,7 @@ impl<'a> Generator<'a> {
 #[cfg(test)]
 mod tests {
     use ruff_python_ast::{Mod, ModModule};
-    use ruff_python_parser::{self, parse_module, Mode};
+    use ruff_python_parser::{self, parse_module, Mode, ParserOptions};
     use ruff_source_file::LineEnding;
 
     use crate::stylist::Indentation;
@@ -1467,7 +1467,8 @@ mod tests {
     fn jupyter_round_trip(contents: &str) -> String {
         let indentation = Indentation::default();
         let line_ending = LineEnding::default();
-        let parsed = ruff_python_parser::parse(contents, Mode::Ipython).unwrap();
+        let parsed =
+            ruff_python_parser::parse(contents, ParserOptions::from_mode(Mode::Ipython)).unwrap();
         let Mod::Module(ModModule { body, .. }) = parsed.into_syntax() else {
             panic!("Source code didn't return ModModule")
         };
