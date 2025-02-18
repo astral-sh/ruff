@@ -19,6 +19,12 @@ use crate::checkers::ast::Checker;
 ///
 /// The class syntax is more readable and generally preferred over the
 /// functional syntax.
+/// However, there are few exceptions, when functional form is preferred,
+/// when field names contain:
+/// - Invalid python identifiers like `@x`
+/// - Python keywords like `in`
+/// - Private names like `__id` that will be mangled in class-based form in runtime
+/// - Dunder names like `__int__` that can confuse type checkers
 ///
 /// ## Example
 /// ```python
@@ -184,6 +190,9 @@ fn fields_from_dict_literal(items: &[ast::DictItem]) -> Option<Vec<Stmt>> {
                     if !is_identifier(field.to_str()) {
                         return None;
                     }
+                    // Converting TypedDict to class-based syntax is not safe if fields contain
+                    // private or dunder names, because private names will be mangled and dunder
+                    // names can confuse type checkers.
                     if field.to_str().starts_with("__") {
                         return None;
                     }
