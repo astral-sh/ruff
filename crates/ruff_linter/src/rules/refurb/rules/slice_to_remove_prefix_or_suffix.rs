@@ -365,7 +365,7 @@ fn affix_matches_slice_bound(data: &RemoveAffixData, semantic: &SemanticModel) -
                 range: _,
                 value: string_val,
             }),
-        ) => operand.as_number_literal_expr().is_some_and(
+        ) if operand.is_number_literal_expr() => operand.as_number_literal_expr().is_some_and(
             |ast::ExprNumberLiteral { value, .. }| {
                 // Only support prefix removal for size at most `u32::MAX`
                 value
