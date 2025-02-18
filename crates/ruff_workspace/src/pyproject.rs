@@ -5,9 +5,10 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result};
 use log::debug;
 use pep440_rs::{Operator, Version, VersionSpecifiers};
-use ruff_linter::settings::types::PythonVersion;
 use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
+
+use ruff_linter::settings::types::PythonVersion;
 
 use crate::options::Options;
 
