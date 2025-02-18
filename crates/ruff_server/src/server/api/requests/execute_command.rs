@@ -9,7 +9,7 @@ use crate::session::Session;
 use crate::{edit::DocumentVersion, server};
 use crate::{DocumentKey, DIAGNOSTIC_NAME};
 use lsp_server::ErrorCode;
-use lsp_types::{self as types, request as req};
+use lsp_types::{self as types, request as req, TextDocumentIdentifier};
 use serde::Deserialize;
 
 pub(crate) struct ExecuteCommand;
@@ -20,9 +20,15 @@ struct Argument {
     version: DocumentVersion,
 }
 
+/// The argument schema for the `ruff.printDebugInformation` command.
 #[derive(Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct DebugCommandArgument {
-    uri: Option<types::Url>,
+    /// The URI of the document to print debug information for.
+    ///
+    /// When provided, both document-specific debug information and global information are printed.
+    /// If not provided ([None]), only global debug information is printed.
+    text_document: Option<TextDocumentIdentifier>,
 }
 
 impl super::RequestHandler for ExecuteCommand {
@@ -44,7 +50,7 @@ impl super::SyncRequestHandler for ExecuteCommand {
                 || Ok(DebugCommandArgument::default()),
                 |value| serde_json::from_value(value).with_failure_code(ErrorCode::InvalidParams),
             )?;
-            let output = debug_information(session, argument.uri)
+            let output = debug_information(session, argument.text_document)
                 .with_failure_code(ErrorCode::InternalError)?;
             notifier
                 .notify::<types::notification::LogMessage>(types::LogMessageParams {
@@ -145,7 +151,11 @@ fn apply_edit(
     )
 }
 
-fn debug_information(session: &Session, uri: Option<types::Url>) -> crate::Result<String> {
+/// Returns a string with debug information about the session and the document at the given URI.
+fn debug_information(
+    session: &Session,
+    text_document: Option<TextDocumentIdentifier>,
+) -> crate::Result<String> {
     let executable = std::env::current_exe()
         .map(|path| format!("{}", path.display()))
         .unwrap_or_else(|_| "<unavailable>".to_string());
@@ -171,7 +181,7 @@ client_capabilities = {client_capabilities:#?}
         client_capabilities = session.resolved_client_capabilities(),
     )?;
 
-    if let Some(uri) = uri {
+    if let Some(TextDocumentIdentifier { uri }) = text_document {
         let Some(snapshot) = session.take_snapshot(uri.clone()) else {
             writeln!(buffer, "Unable to take a snapshot of the document at {uri}")?;
             return Ok(buffer);
