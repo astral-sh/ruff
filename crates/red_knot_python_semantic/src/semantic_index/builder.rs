@@ -141,13 +141,13 @@ impl<'db> SemanticIndexBuilder<'db> {
             .scope_stack
             .last()
             .map(|ScopeInfo { file_scope_id, .. }| file_scope_id)
-            .expect("Should always have a root scope")
+            .expect("SemanticIndexBuilder should have created a root scope")
     }
 
     fn loop_state(&self) -> LoopState {
         self.scope_stack
             .last()
-            .expect("Always to have a root scope")
+            .expect("SemanticIndexBuilder should have created a root scope")
             .loop_state
     }
 
@@ -225,43 +225,45 @@ impl<'db> SemanticIndexBuilder<'db> {
         let popped_scope = &mut self.scopes[popped_scope_id];
         popped_scope.extend_descendents(children_end);
 
+        if !popped_scope.is_eager() {
+            return popped_scope_id;
+        }
+
         // If the scope that we just popped off is an eager scope, we need to "lock" our view of
-        // which bindings reach each of the uses in the scope.
-        if popped_scope.is_eager() {
-            // Loop through each enclosing scope, looking for any that bind each symbol.
-            for enclosing_scope_info in self.scope_stack.iter().rev() {
-                let enclosing_scope_id = enclosing_scope_info.file_scope_id;
-                let enclosing_symbol_table = &self.symbol_tables[enclosing_scope_id];
-                for nested_symbol in self.symbol_tables[popped_scope_id].symbols() {
-                    // Skip this symbol if this enclosing scope doesn't contain any bindings for
-                    // it.
-                    let Some(enclosing_symbol_id) =
-                        enclosing_symbol_table.symbol_id_by_name(nested_symbol.name())
-                    else {
-                        continue;
-                    };
-                    let enclosing_symbol = enclosing_symbol_table.symbol(enclosing_symbol_id);
-                    if !enclosing_symbol.is_bound() {
-                        continue;
-                    }
-
-                    // Snapshot the bindings of this symbol that are visible at this point in this
-                    // enclosing scope.
-                    let key = EagerBindingsKey {
-                        enclosing_scope: enclosing_scope_id,
-                        enclosing_symbol: enclosing_symbol_id,
-                        nested_scope: popped_scope_id,
-                    };
-                    let eager_bindings = self.use_def_maps[enclosing_scope_id]
-                        .snapshot_eager_bindings(enclosing_symbol_id);
-                    self.eager_bindings.insert(key, eager_bindings);
+        // which bindings reach each of the uses in the scope. Loop through each enclosing scope,
+        // looking for any that bind each symbol.
+        for enclosing_scope_info in self.scope_stack.iter().rev() {
+            let enclosing_scope_id = enclosing_scope_info.file_scope_id;
+            let enclosing_symbol_table = &self.symbol_tables[enclosing_scope_id];
+            for nested_symbol in self.symbol_tables[popped_scope_id].symbols() {
+                // Skip this symbol if this enclosing scope doesn't contain any bindings for
+                // it.
+                let Some(enclosing_symbol_id) =
+                    enclosing_symbol_table.symbol_id_by_name(nested_symbol.name())
+                else {
+                    continue;
+                };
+                let enclosing_symbol = enclosing_symbol_table.symbol(enclosing_symbol_id);
+                if !enclosing_symbol.is_bound() {
+                    continue;
                 }
 
-                // Lazy scopes are "sticky": once we see a lazy scope we stop doing lookups
-                // eagerly, even if we would encounter another eager enclosing scope later on.
-                if !self.scopes[enclosing_scope_id].is_eager() {
-                    break;
-                }
+                // Snapshot the bindings of this symbol that are visible at this point in this
+                // enclosing scope.
+                let key = EagerBindingsKey {
+                    enclosing_scope: enclosing_scope_id,
+                    enclosing_symbol: enclosing_symbol_id,
+                    nested_scope: popped_scope_id,
+                };
+                let eager_bindings = self.use_def_maps[enclosing_scope_id]
+                    .snapshot_eager_bindings(enclosing_symbol_id);
+                self.eager_bindings.insert(key, eager_bindings);
+            }
+
+            // Lazy scopes are "sticky": once we see a lazy scope we stop doing lookups
+            // eagerly, even if we would encounter another eager enclosing scope later on.
+            if !self.scopes[enclosing_scope_id].is_eager() {
+                break;
             }
         }
 
