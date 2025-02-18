@@ -210,6 +210,9 @@ def f(a, b):
 # Unused arguments on magic methods.
 ###
 class C:
+    def __new__(cls, x):
+        print("Hello, world!")
+
     def __init__(self, x) -> None:
         print("Hello, world!")
 
@@ -217,6 +220,12 @@ class C:
         return "Hello, world!"
 
     def __exit__(self, exc_type, exc_value, traceback) -> None:
+        print("Hello, world!")
+
+    def __init_subclass__(cls, x) -> None:
+        print("Hello, world!")
+
+    def __class_getitem__(cls, x):
         print("Hello, world!")
 
 

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from airflow.api.auth.backend import basic_auth, kerberos_auth
 from airflow.api.auth.backend.basic_auth import auth_current_user
 from airflow.auth.managers.fab.api.auth.backend import (
@@ -41,7 +43,11 @@ from airflow.hooks.subprocess import SubprocessHook
 from airflow.hooks.webhdfs_hook import WebHDFSHook
 from airflow.hooks.zendesk_hook import ZendeskHook
 from airflow.kubernetes.k8s_model import K8SModel, append_to_pod
-from airflow.kubernetes.kube_client import _disable_verify_ssl, _enable_tcp_keepalive, get_kube_client
+from airflow.kubernetes.kube_client import (
+    _disable_verify_ssl,
+    _enable_tcp_keepalive,
+    get_kube_client,
+)
 from airflow.kubernetes.kubernetes_helper_functions import (
     add_pod_suffix,
     annotations_for_logging_task_metadata,
@@ -55,24 +61,38 @@ from airflow.kubernetes.pod_generator import (
     PodDefaults,
     PodGenerator,
     PodGeneratorDeprecated,
-    add_pod_suffix as add_pod_suffix2,
     datetime_to_label_safe_datestring,
     extend_object_field,
     label_safe_datestring_to_datetime,
     make_safe_label_value,
     merge_objects,
+)
+from airflow.kubernetes.pod_generator import (
+    add_pod_suffix as add_pod_suffix2,
+)
+from airflow.kubernetes.pod_generator import (
     rand_str as rand_str2,
 )
 from airflow.kubernetes.pod_generator_deprecated import (
     PodDefaults as PodDefaults3,
+)
+from airflow.kubernetes.pod_generator_deprecated import (
     PodGenerator as PodGenerator2,
+)
+from airflow.kubernetes.pod_generator_deprecated import (
     make_safe_label_value as make_safe_label_value2,
 )
 from airflow.kubernetes.pod_launcher import PodLauncher, PodStatus
 from airflow.kubernetes.pod_launcher_deprecated import (
     PodDefaults as PodDefaults2,
+)
+from airflow.kubernetes.pod_launcher_deprecated import (
     PodLauncher as PodLauncher2,
+)
+from airflow.kubernetes.pod_launcher_deprecated import (
     PodStatus as PodStatus2,
+)
+from airflow.kubernetes.pod_launcher_deprecated import (
     get_kube_client as get_kube_client2,
 )
 from airflow.kubernetes.pod_runtime_info_env import PodRuntimeInfoEnv
@@ -80,6 +100,8 @@ from airflow.kubernetes.secret import K8SModel2, Secret
 from airflow.kubernetes.volume import Volume
 from airflow.kubernetes.volume_mount import VolumeMount
 from airflow.macros.hive import closest_ds_partition, max_partition
+from airflow.operators.bash import BashOperator
+from airflow.operators.bash_operator import BashOperator as LegacyBashOperator
 from airflow.operators.check_operator import (
     CheckOperator,
     IntervalCheckOperator,
@@ -117,8 +139,14 @@ from airflow.operators.presto_check_operator import (
     PrestoCheckOperator,
     PrestoIntervalCheckOperator,
     PrestoValueCheckOperator,
+)
+from airflow.operators.presto_check_operator import (
     SQLCheckOperator as SQLCheckOperator2,
+)
+from airflow.operators.presto_check_operator import (
     SQLIntervalCheckOperator as SQLIntervalCheckOperator2,
+)
+from airflow.operators.presto_check_operator import (
     SQLValueCheckOperator as SQLValueCheckOperator2,
 )
 from airflow.operators.presto_to_mysql import (
@@ -139,14 +167,24 @@ from airflow.operators.slack_operator import SlackAPIOperator, SlackAPIPostOpera
 from airflow.operators.sql import (
     BaseSQLOperator,
     BranchSQLOperator,
-    SQLCheckOperator as SQLCheckOperator3,
-    SQLColumnCheckOperator as SQLColumnCheckOperator2,
-    SQLIntervalCheckOperator as SQLIntervalCheckOperator3,
     SQLTableCheckOperator,
-    SQLThresholdCheckOperator as SQLThresholdCheckOperator2,
-    SQLValueCheckOperator as SQLValueCheckOperator3,
     _convert_to_float_if_possible,
     parse_boolean,
+)
+from airflow.operators.sql import (
+    SQLCheckOperator as SQLCheckOperator3,
+)
+from airflow.operators.sql import (
+    SQLColumnCheckOperator as SQLColumnCheckOperator2,
+)
+from airflow.operators.sql import (
+    SQLIntervalCheckOperator as SQLIntervalCheckOperator3,
+)
+from airflow.operators.sql import (
+    SQLThresholdCheckOperator as SQLThresholdCheckOperator2,
+)
+from airflow.operators.sql import (
+    SQLValueCheckOperator as SQLValueCheckOperator3,
 )
 from airflow.operators.sqlite_operator import SqliteOperator
 from airflow.operators.trigger_dagrun import TriggerDagRunOperator
@@ -193,6 +231,8 @@ CeleryKubernetesExecutor()
 _convert_to_float_if_possible()
 parse_boolean()
 BaseSQLOperator()
+BashOperator()
+LegacyBashOperator()
 BranchSQLOperator()
 CheckOperator()
 ConnectorProtocol()

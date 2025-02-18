@@ -1,10 +1,10 @@
 use crate::module_resolver::SearchPaths;
 use crate::python_platform::PythonPlatform;
-use crate::python_version::PythonVersion;
 use crate::Db;
 
 use anyhow::Context;
 use ruff_db::system::{SystemPath, SystemPathBuf};
+use ruff_python_ast::python_version::PythonVersion;
 use salsa::Durability;
 use salsa::Setter;
 

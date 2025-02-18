@@ -15,7 +15,7 @@ use red_knot_project::watch::ProjectWatcher;
 use red_knot_project::{watch, Db};
 use red_knot_project::{ProjectDatabase, ProjectMetadata};
 use red_knot_server::run_server;
-use ruff_db::diagnostic::{Diagnostic, Severity};
+use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig, Severity};
 use ruff_db::system::{OsSystem, System, SystemPath, SystemPathBuf};
 use salsa::plumbing::ZalsaDatabase;
 
@@ -231,6 +231,9 @@ impl MainLoop {
                     result,
                     revision: check_revision,
                 } => {
+                    let display_config = DisplayDiagnosticConfig::default()
+                        .color(colored::control::SHOULD_COLORIZE.should_colorize());
+
                     let min_error_severity =
                         if db.project().settings(db).terminal().error_on_warning {
                             Severity::Warning
@@ -245,7 +248,7 @@ impl MainLoop {
                     if check_revision == revision {
                         #[allow(clippy::print_stdout)]
                         for diagnostic in result {
-                            println!("{}", diagnostic.display(db));
+                            println!("{}", diagnostic.display(db, &display_config));
                         }
                     } else {
                         tracing::debug!(

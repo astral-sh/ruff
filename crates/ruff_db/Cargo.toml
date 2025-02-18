@@ -21,7 +21,6 @@ ruff_source_file = { workspace = true }
 ruff_text_size = { workspace = true }
 
 camino = { workspace = true }
-colored = { workspace = true }
 countme = { workspace = true }
 dashmap = { workspace = true }
 dunce = { workspace = true }

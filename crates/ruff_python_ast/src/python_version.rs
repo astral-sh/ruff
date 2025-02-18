@@ -2,8 +2,7 @@ use std::fmt;
 
 /// Representation of a Python version.
 ///
-/// Unlike the `TargetVersion` enums in the CLI crates,
-/// this does not necessarily represent a Python version that we actually support.
+/// N.B. This does not necessarily represent a Python version that we actually support.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct PythonVersion {
     pub major: u8,
@@ -41,8 +40,7 @@ impl PythonVersion {
             PythonVersion::PY312,
             PythonVersion::PY313,
         ]
-        .iter()
-        .copied()
+        .into_iter()
     }
 
     pub fn free_threaded_build_available(self) -> bool {
@@ -84,7 +82,7 @@ impl fmt::Display for PythonVersion {
 
 #[cfg(feature = "serde")]
 mod serde {
-    use crate::PythonVersion;
+    use super::PythonVersion;
 
     impl<'de> serde::Deserialize<'de> for PythonVersion {
         fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>

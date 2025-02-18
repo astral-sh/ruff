@@ -118,6 +118,15 @@ impl<T> RangedValue<T> {
         self
     }
 
+    #[must_use]
+    pub fn map_value<R>(self, f: impl FnOnce(T) -> R) -> RangedValue<R> {
+        RangedValue {
+            value: f(self.value),
+            source: self.source,
+            range: self.range,
+        }
+    }
+
     pub fn into_inner(self) -> T {
         self.value
     }

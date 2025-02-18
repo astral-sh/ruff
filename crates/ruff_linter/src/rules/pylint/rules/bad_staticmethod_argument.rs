@@ -11,6 +11,9 @@ use crate::checkers::ast::Checker;
 /// ## What it does
 /// Checks for static methods that use `self` or `cls` as their first argument.
 ///
+/// If [`preview`] mode is enabled, this rule also applies to
+/// `__new__` methods, which are implicitly static.
+///
 /// ## Why is this bad?
 /// [PEP 8] recommends the use of `self` and `cls` as the first arguments for
 /// instance methods and class methods, respectively. Naming the first argument
@@ -72,9 +75,14 @@ pub(crate) fn bad_staticmethod_argument(checker: &Checker, scope: &Scope) {
         &checker.settings.pep8_naming.classmethod_decorators,
         &checker.settings.pep8_naming.staticmethod_decorators,
     );
-    if !matches!(type_, function_type::FunctionType::StaticMethod) {
-        return;
-    }
+
+    match type_ {
+        function_type::FunctionType::StaticMethod => {}
+        function_type::FunctionType::NewMethod if checker.settings.preview.is_enabled() => {}
+        _ => {
+            return;
+        }
+    };
 
     let Some(ParameterWithDefault {
         parameter: self_or_cls,

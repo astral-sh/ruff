@@ -33,8 +33,8 @@ use crate::Db;
 
 use super::constraint::{Constraint, ConstraintNode, PatternConstraint};
 use super::definition::{
-    DefinitionCategory, ExceptHandlerDefinitionNodeRef, MatchPatternDefinitionNodeRef,
-    WithItemDefinitionNodeRef,
+    DefinitionCategory, ExceptHandlerDefinitionNodeRef, ImportDefinitionNodeRef,
+    MatchPatternDefinitionNodeRef, WithItemDefinitionNodeRef,
 };
 
 mod except_handlers;
@@ -924,22 +924,28 @@ where
                         self.imported_modules.extend(module_name.ancestors());
                     }
 
-                    let symbol_name = if let Some(asname) = &alias.asname {
-                        asname.id.clone()
+                    let (symbol_name, is_reexported) = if let Some(asname) = &alias.asname {
+                        (asname.id.clone(), asname.id == alias.name.id)
                     } else {
-                        Name::new(alias.name.id.split('.').next().unwrap())
+                        (Name::new(alias.name.id.split('.').next().unwrap()), false)
                     };
 
                     let symbol = self.add_symbol(symbol_name);
-                    self.add_definition(symbol, alias);
+                    self.add_definition(
+                        symbol,
+                        ImportDefinitionNodeRef {
+                            alias,
+                            is_reexported,
+                        },
+                    );
                 }
             }
             ast::Stmt::ImportFrom(node) => {
                 for (alias_index, alias) in node.names.iter().enumerate() {
-                    let symbol_name = if let Some(asname) = &alias.asname {
-                        &asname.id
+                    let (symbol_name, is_reexported) = if let Some(asname) = &alias.asname {
+                        (&asname.id, asname.id == alias.name.id)
                     } else {
-                        &alias.name.id
+                        (&alias.name.id, false)
                     };
 
                     // Look for imports `from __future__ import annotations`, ignore `as ...`
@@ -952,7 +958,14 @@ where
 
                     let symbol = self.add_symbol(symbol_name.clone());
 
-                    self.add_definition(symbol, ImportFromDefinitionNodeRef { node, alias_index });
+                    self.add_definition(
+                        symbol,
+                        ImportFromDefinitionNodeRef {
+                            node,
+                            alias_index,
+                            is_reexported,
+                        },
+                    );
                 }
             }
             ast::Stmt::Assign(node) => {

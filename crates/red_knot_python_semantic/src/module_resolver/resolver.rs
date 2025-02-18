@@ -6,12 +6,13 @@ use rustc_hash::{FxBuildHasher, FxHashSet};
 use ruff_db::files::{File, FilePath, FileRootKind};
 use ruff_db::system::{DirectoryEntry, System, SystemPath, SystemPathBuf};
 use ruff_db::vendored::{VendoredFileSystem, VendoredPath};
+use ruff_python_ast::python_version::PythonVersion;
 
 use crate::db::Db;
 use crate::module_name::ModuleName;
 use crate::module_resolver::typeshed::{vendored_typeshed_versions, TypeshedVersions};
 use crate::site_packages::VirtualEnvironment;
-use crate::{Program, PythonVersion, SearchPathSettings, SitePackages};
+use crate::{Program, SearchPathSettings, SitePackages};
 
 use super::module::{Module, ModuleKind};
 use super::path::{ModulePath, SearchPath, SearchPathValidationError};
@@ -724,12 +725,12 @@ mod tests {
         assert_const_function_query_was_not_run, assert_function_query_was_not_run,
     };
     use ruff_db::Db;
+    use ruff_python_ast::python_version::PythonVersion;
 
     use crate::db::tests::TestDb;
     use crate::module_name::ModuleName;
     use crate::module_resolver::module::ModuleKind;
     use crate::module_resolver::testing::{FileSpec, MockedTypeshed, TestCase, TestCaseBuilder};
-    use crate::PythonVersion;
     use crate::{ProgramSettings, PythonPlatform};
 
     use super::*;

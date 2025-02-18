@@ -17,13 +17,14 @@ html,
 }
 
 .shadow-copied {
-  --tw-shadow: 0 0 0 1px theme("colors.white"),
-    inset 0 0 0 1px theme("colors.white");
-  --tw-shadow-colored: 0 0 0 1px var(--tw-shadow-color),
-    inset 0 0 0 1px var(--tw-shadow-color);
+  --tw-shadow:
+    0 0 0 1px theme("colors.white"), inset 0 0 0 1px theme("colors.white");
+  --tw-shadow-colored:
+    0 0 0 1px var(--tw-shadow-color), inset 0 0 0 1px var(--tw-shadow-color);
 
-  box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000),
-    var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
+  box-shadow:
+    var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000),
+    var(--tw-shadow);
 }
 
 @font-face {

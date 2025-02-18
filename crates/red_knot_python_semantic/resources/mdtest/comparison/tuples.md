@@ -92,11 +92,14 @@ reveal_type(a == b)  # revealed: bool
 # TODO: should be Literal[True], once we implement (in)equality for mismatched literals
 reveal_type(a != b)  # revealed: bool
 
-# TODO: should be Unknown and add more informative diagnostics
-reveal_type(a < b)  # revealed: bool
-reveal_type(a <= b)  # revealed: bool
-reveal_type(a > b)  # revealed: bool
-reveal_type(a >= b)  # revealed: bool
+# error: [unsupported-operator] "Operator `<` is not supported for types `int` and `str`, in comparing `tuple[Literal[1], Literal[2]]` with `tuple[Literal[1], Literal["hello"]]`"
+reveal_type(a < b)  # revealed: Unknown
+# error: [unsupported-operator] "Operator `<=` is not supported for types `int` and `str`, in comparing `tuple[Literal[1], Literal[2]]` with `tuple[Literal[1], Literal["hello"]]`"
+reveal_type(a <= b)  # revealed: Unknown
+# error: [unsupported-operator] "Operator `>` is not supported for types `int` and `str`, in comparing `tuple[Literal[1], Literal[2]]` with `tuple[Literal[1], Literal["hello"]]`"
+reveal_type(a > b)  # revealed: Unknown
+# error: [unsupported-operator] "Operator `>=` is not supported for types `int` and `str`, in comparing `tuple[Literal[1], Literal[2]]` with `tuple[Literal[1], Literal["hello"]]`"
+reveal_type(a >= b)  # revealed: Unknown
 ```
 
 However, if the lexicographic comparison completes without reaching a point where str and int are
@@ -151,11 +154,11 @@ class A:
     def __ne__(self, o: object) -> bytes:
         return b"world"
 
-    def __lt__(self, o: A) -> float:
-        return 3.14
+    def __lt__(self, o: A) -> bytearray:
+        return bytearray()
 
-    def __le__(self, o: A) -> complex:
-        return complex(0.5, -0.5)
+    def __le__(self, o: A) -> memoryview:
+        return memoryview(b"")
 
     def __gt__(self, o: A) -> tuple:
         return (1, 2, 3)
@@ -167,8 +170,8 @@ a = (A(), A())
 
 reveal_type(a == a)  # revealed: bool
 reveal_type(a != a)  # revealed: bool
-reveal_type(a < a)  # revealed: float | Literal[False]
-reveal_type(a <= a)  # revealed: complex | Literal[True]
+reveal_type(a < a)  # revealed: bytearray | Literal[False]
+reveal_type(a <= a)  # revealed: memoryview | Literal[True]
 reveal_type(a > a)  # revealed: tuple | Literal[False]
 reveal_type(a >= a)  # revealed: list | Literal[True]
 
@@ -187,7 +190,7 @@ class B:
     def __lt__(self, o: B) -> set:
         return set()
 
-reveal_type((A(), B()) < (A(), B()))  # revealed: float | set | Literal[False]
+reveal_type((A(), B()) < (A(), B()))  # revealed: bytearray | set | Literal[False]
 ```
 
 #### Special Handling of Eq and NotEq in Lexicographic Comparisons
