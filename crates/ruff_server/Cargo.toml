@@ -1,6 +1,6 @@
 [package]
 name = "ruff_server"
-version = "0.2.2"
+version.workspace = true
 publish.workspace = true
 authors = { workspace = true }
 edition = { workspace = true }
