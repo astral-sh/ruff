@@ -1,6 +1,6 @@
 [package]
 name = "ruff_python_codegen"
-version = "0.0.0"
+version.workspace = true
 publish = false
 authors = { workspace = true }
 edition = { workspace = true }
@@ -25,4 +25,3 @@ test-case = { workspace = true }
 
 [lints]
 workspace = true
-

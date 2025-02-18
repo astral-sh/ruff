@@ -1,6 +1,6 @@
 [package]
 name = "ruff_python_resolver"
-version = "0.0.0"
+version.workspace = true
 description = "A Python module resolver for Ruff"
 publish = false
 authors = { workspace = true }

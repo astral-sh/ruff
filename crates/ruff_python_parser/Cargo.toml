@@ -1,6 +1,6 @@
 [package]
 name = "ruff_python_parser"
-version = "0.0.0"
+version.workspace = true
 publish = false
 authors = ["Charlie Marsh <charlie.r.marsh@gmail.com>", "RustPython Team"]
 edition = { workspace = true }

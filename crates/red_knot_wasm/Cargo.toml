@@ -1,6 +1,6 @@
 [package]
 name = "red_knot_wasm"
-version = "0.0.0"
+version.workspace = true
 publish = false
 authors = { workspace = true }
 edition = { workspace = true }
@@ -40,4 +40,3 @@ wasm-bindgen-test = { workspace = true }
 
 [lints]
 workspace = true
-

@@ -1,6 +1,6 @@
 [package]
 name = "ruff_python_ast_integration_tests"
-version = "0.0.0"
+version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 homepage.workspace = true

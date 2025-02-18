@@ -1,6 +1,6 @@
 [package]
 name = "ruff_benchmark"
-version = "0.0.0"
+version.workspace = true
 description = "Ruff Micro-benchmarks"
 publish = false
 authors = { workspace = true }

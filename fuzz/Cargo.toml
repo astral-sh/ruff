@@ -1,6 +1,6 @@
 [package]
 name = "ruff-fuzz"
-version = "0.0.0"
+version.workspace = true
 authors = [
     "Charlie Marsh <charlie.r.marsh@gmail.com>",
     "Addison Crump <research@addisoncrump.info>",
