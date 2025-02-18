@@ -88,6 +88,71 @@ def _():
     x = 2
 ```
 
+## Top-level eager scopes
+
+All of the above examples (TODO: should) behave identically when the eager scopes are directly
+nested in the global scope.
+
+### Class definitions
+
+```py
+x = 1
+
+class A:
+    # TODO: Literal[1]
+    reveal_type(x)  # revealed: Unknown | Literal[2]
+
+x = 2
+```
+
+### List comprehensions
+
+```py
+x = 1
+
+# TODO: Literal[1]
+# revealed: Unknown | Literal[2]
+[reveal_type(x) for a in range(0)]
+
+x = 2
+```
+
+### Set comprehensions
+
+```py
+x = 1
+
+# TODO: Literal[1]
+# revealed: Unknown | Literal[2]
+{reveal_type(x) for a in range(0)}
+
+x = 2
+```
+
+### Dict comprehensions
+
+```py
+x = 1
+
+# TODO: Literal[1]
+# revealed: Unknown | Literal[2]
+{a: reveal_type(x) for a in range(0)}
+
+x = 2
+```
+
+### Generator expressions
+
+```py
+x = 1
+
+# TODO: Literal[1]
+# revealed: Unknown | Literal[2]
+list(reveal_type(x) for a in range(0))
+
+x = 2
+```
+
 ## Lazy scopes are "sticky"
 
 As we look through each enclosing scope when resolving a reference, lookups become lazy as soon as
