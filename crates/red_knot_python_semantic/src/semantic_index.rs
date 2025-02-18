@@ -19,6 +19,7 @@ use crate::semantic_index::expression::Expression;
 use crate::semantic_index::symbol::{
     FileScopeId, NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopedSymbolId, SymbolTable,
 };
+use crate::semantic_index::use_def::UseDefMap;
 use crate::Db;
 
 pub mod ast_ids;
@@ -32,7 +33,7 @@ mod use_def;
 
 pub(crate) use self::use_def::{
     BindingWithConstraints, BindingWithConstraintsIterator, DeclarationWithConstraint,
-    DeclarationsIterator, UseDefMap,
+    DeclarationsIterator,
 };
 
 type SymbolMap = hashbrown::HashMap<ScopedSymbolId, (), FxBuildHasher>;
