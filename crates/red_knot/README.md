@@ -15,11 +15,11 @@ than you would get from running one of these more established tools.
 
 Core type checking tests are written as Markdown code blocks.
 They can be found in [`red_knot_python_semantic/resources/mdtest`][resources-mdtest].
-See [`red_knot_test/README.md`][mdtest-readme] for more information on
-the test framework itself.
+See [`red_knot_test/README.md`][mdtest-readme] for more information
+on the test framework itself.
 
 The list of open issues can be found [here][open-issues].
 
-[resources-mdtest]: ../red_knot_python_semantic/resources/mdtest
 [mdtest-readme]: ../red_knot_test/README.md
 [open-issues]: https://github.com/astral-sh/ruff/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20label%3Ared-knot
+[resources-mdtest]: ../red_knot_python_semantic/resources/mdtest
