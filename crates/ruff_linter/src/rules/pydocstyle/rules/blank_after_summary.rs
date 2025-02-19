@@ -69,7 +69,7 @@ impl Violation for MissingBlankLineAfterSummary {
 pub(crate) fn blank_after_summary(checker: &Checker, docstring: &Docstring) {
     let body = docstring.body();
 
-    if !docstring.triple_quoted() {
+    if !docstring.is_triple_quoted() {
         return;
     }
 

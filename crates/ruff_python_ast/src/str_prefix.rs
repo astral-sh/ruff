@@ -1,3 +1,5 @@
+use ruff_text_size::TextSize;
+
 use std::fmt;
 
 /// Enumerations of the valid prefixes a string literal can have.
@@ -31,6 +33,13 @@ impl StringLiteralPrefix {
             Self::Unicode => "u",
             Self::Raw { uppercase: true } => "R",
             Self::Raw { uppercase: false } => "r",
+        }
+    }
+
+    pub const fn text_len(self) -> TextSize {
+        match self {
+            Self::Empty => TextSize::new(0),
+            Self::Unicode | Self::Raw { .. } => TextSize::new(1),
         }
     }
 }

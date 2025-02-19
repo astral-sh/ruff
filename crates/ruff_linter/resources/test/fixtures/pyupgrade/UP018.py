@@ -59,3 +59,28 @@ int(+1)
 int(-1)
 float(+1.0)
 float(-1.0)
+
+
+# https://github.com/astral-sh/ruff/issues/15859
+int(-1) ** 0                 # (-1) ** 0
+2 ** int(-1)                 # 2 ** -1
+
+int(-1)[0]                   # (-1)[0]
+2[int(-1)]                   # 2[-1]
+
+int(-1)(0)                   # (-1)(0)
+2(int(-1))                   # 2(-1)
+
+float(-1.0).foo              # (-1.0).foo
+
+await int(-1)                # await (-1)
+
+
+int(+1) ** 0
+float(+1.0)()
+
+
+str(
+    '''Lorem
+    ipsum'''  # Comment
+).foo

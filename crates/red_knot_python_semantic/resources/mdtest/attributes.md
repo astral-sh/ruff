@@ -30,7 +30,11 @@ reveal_type(c_instance.inferred_from_value)  # revealed: Unknown | Literal[1, "a
 # TODO: Same here. This should be `Unknown | Literal[1, "a"]`
 reveal_type(c_instance.inferred_from_other_attribute)  # revealed: Unknown
 
-# TODO: should be `int | None`
+# There is no special handling of attributes that are (directly) assigned to a declared parameter,
+# which means we union with `Unknown` here, since the attribute itself is not declared. This is
+# something that we might want to change in the future.
+#
+# See https://github.com/astral-sh/ruff/issues/15960 for a related discussion.
 reveal_type(c_instance.inferred_from_param)  # revealed: Unknown | int | None
 
 reveal_type(c_instance.declared_only)  # revealed: bytes
@@ -45,13 +49,13 @@ reveal_type(c_instance.possibly_undeclared_unbound)  # revealed: str
 c_instance.inferred_from_value = "value set on instance"
 
 # This assignment is also fine:
-c_instance.inferred_from_param = None
+c_instance.declared_and_bound = False
 
-# TODO: this should be an error (incompatible types in assignment)
-c_instance.inferred_from_param = "incompatible"
+# error: [invalid-assignment] "Object of type `Literal["incompatible"]` is not assignable to attribute `declared_and_bound` of type `bool`"
+c_instance.declared_and_bound = "incompatible"
 
 # mypy shows no error here, but pyright raises "reportAttributeAccessIssue"
-# error: [unresolved-attribute] "Attribute `inferred_from_value` can only be accessed on instances of type `Literal[C]`, not on the class object itself."
+# error: [unresolved-attribute] "Attribute `inferred_from_value` can only be accessed on instances, not on the class object `Literal[C]` itself."
 reveal_type(C.inferred_from_value)  # revealed: Unknown
 
 # mypy shows no error here, but pyright raises "reportAttributeAccessIssue"
@@ -85,7 +89,7 @@ c_instance = C()
 
 reveal_type(c_instance.declared_and_bound)  # revealed: str | None
 
-# error: [unresolved-attribute] "Attribute `declared_and_bound` can only be accessed on instances of type `Literal[C]`, not on the class object itself."
+# error: [unresolved-attribute] "Attribute `declared_and_bound` can only be accessed on instances, not on the class object `Literal[C]` itself."
 reveal_type(C.declared_and_bound)  # revealed: Unknown
 
 # error: [invalid-attribute-access] "Cannot assign to instance attribute `declared_and_bound` from the class object `Literal[C]`"
@@ -108,7 +112,7 @@ c_instance = C()
 
 reveal_type(c_instance.only_declared)  # revealed: str
 
-# error: [unresolved-attribute] "Attribute `only_declared` can only be accessed on instances of type `Literal[C]`, not on the class object itself."
+# error: [unresolved-attribute] "Attribute `only_declared` can only be accessed on instances, not on the class object `Literal[C]` itself."
 reveal_type(C.only_declared)  # revealed: Unknown
 
 # error: [invalid-attribute-access] "Cannot assign to instance attribute `only_declared` from the class object `Literal[C]`"
@@ -176,14 +180,13 @@ reveal_type(c_instance.inferred_from_value)  # revealed: Unknown | Literal[1, "a
 # TODO: Should be `Unknown | Literal[1, "a"]`
 reveal_type(c_instance.inferred_from_other_attribute)  # revealed: Unknown
 
-# TODO: Should be `int | None`
 reveal_type(c_instance.inferred_from_param)  # revealed: Unknown | int | None
 
 reveal_type(c_instance.declared_only)  # revealed: bytes
 
 reveal_type(c_instance.declared_and_bound)  # revealed: bool
 
-# error: [unresolved-attribute] "Attribute `inferred_from_value` can only be accessed on instances of type `Literal[C]`, not on the class object itself."
+# error: [unresolved-attribute] "Attribute `inferred_from_value` can only be accessed on instances, not on the class object `Literal[C]` itself."
 reveal_type(C.inferred_from_value)  # revealed: Unknown
 
 # error: [invalid-attribute-access] "Cannot assign to instance attribute `inferred_from_value` from the class object `Literal[C]`"
@@ -799,6 +802,67 @@ def _(flag: bool, flag1: bool, flag2: bool):
 
     # error: [possibly-unbound-attribute] "Attribute `x` on type `Literal[C1, C2, C3]` is possibly unbound"
     reveal_type(C.x)  # revealed: Unknown | Literal[1, 2, 3]
+```
+
+### Attribute possibly unbound on a subclass but not on a superclass
+
+```py
+def _(flag: bool):
+    class Foo:
+        x = 1
+
+    class Bar(Foo):
+        if flag:
+            x = 2
+
+    reveal_type(Bar.x)  # revealed: Unknown | Literal[2, 1]
+```
+
+### Attribute possibly unbound on a subclass and on a superclass
+
+```py
+def _(flag: bool):
+    class Foo:
+        if flag:
+            x = 1
+
+    class Bar(Foo):
+        if flag:
+            x = 2
+
+    # error: [possibly-unbound-attribute]
+    reveal_type(Bar.x)  # revealed: Unknown | Literal[2, 1]
+```
+
+### Attribute access on `Any`
+
+The union of the set of types that `Any` could materialise to is equivalent to `object`. It follows
+from this that attribute access on `Any` resolves to `Any` if the attribute does not exist on
+`object` -- but if the attribute *does* exist on `object`, the type of the attribute is
+`<type as it exists on object> & Any`.
+
+```py
+from typing import Any
+
+class Foo(Any): ...
+
+reveal_type(Foo.bar)  # revealed: Any
+reveal_type(Foo.__repr__)  # revealed: Literal[__repr__] & Any
+```
+
+Similar principles apply if `Any` appears in the middle of an inheritance hierarchy:
+
+```py
+from typing import ClassVar, Literal
+
+class A:
+    x: ClassVar[Literal[1]] = 1
+
+class B(Any): ...
+class C(B, A): ...
+
+reveal_type(C.__mro__)  # revealed: tuple[Literal[C], Literal[B], Any, Literal[A], Literal[object]]
+reveal_type(C.x)  # revealed: Literal[1] & Any
 ```
 
 ### Unions with all paths unbound

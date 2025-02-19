@@ -3848,9 +3848,7 @@ impl From<LintOptionsWire> for LintOptions {
 mod tests {
     use crate::options::Flake8SelfOptions;
     use ruff_linter::rules::flake8_self;
-    use ruff_linter::settings::types::PythonVersion as LinterPythonVersion;
     use ruff_python_ast::name::Name;
-    use ruff_python_formatter::PythonVersion as FormatterPythonVersion;
 
     #[test]
     fn flake8_self_options() {
@@ -3896,30 +3894,6 @@ mod tests {
         assert_eq!(
             settings.ignore_names,
             vec![Name::new_static("_foo"), Name::new_static("_bar")]
-        );
-    }
-
-    #[test]
-    fn formatter_and_linter_target_version_have_same_default() {
-        assert_eq!(
-            FormatterPythonVersion::default().as_tuple(),
-            LinterPythonVersion::default().as_tuple()
-        );
-    }
-
-    #[test]
-    fn formatter_and_linter_target_version_have_same_latest() {
-        assert_eq!(
-            FormatterPythonVersion::latest().as_tuple(),
-            LinterPythonVersion::latest().as_tuple()
-        );
-    }
-
-    #[test]
-    fn formatter_and_linter_target_version_have_same_minimal_supported() {
-        assert_eq!(
-            FormatterPythonVersion::minimal_supported().as_tuple(),
-            LinterPythonVersion::minimal_supported().as_tuple()
         );
     }
 }

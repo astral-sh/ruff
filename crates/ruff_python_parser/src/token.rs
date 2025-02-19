@@ -14,7 +14,7 @@ use ruff_python_ast::str::{Quote, TripleQuotes};
 use ruff_python_ast::str_prefix::{
     AnyStringPrefix, ByteStringPrefix, FStringPrefix, StringLiteralPrefix,
 };
-use ruff_python_ast::{BoolOp, Int, IpyEscapeKind, Operator, StringFlags, UnaryOp};
+use ruff_python_ast::{AnyStringFlags, BoolOp, Int, IpyEscapeKind, Operator, StringFlags, UnaryOp};
 use ruff_text_size::{Ranged, TextRange};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -50,8 +50,7 @@ impl Token {
     ///
     /// If it isn't a string or any f-string tokens.
     pub fn is_triple_quoted_string(self) -> bool {
-        assert!(self.is_any_string());
-        self.flags.is_triple_quoted()
+        self.unwrap_string_flags().is_triple_quoted()
     }
 
     /// Returns the [`Quote`] style for the current string token of any kind.
@@ -60,8 +59,26 @@ impl Token {
     ///
     /// If it isn't a string or any f-string tokens.
     pub fn string_quote_style(self) -> Quote {
-        assert!(self.is_any_string());
-        self.flags.quote_style()
+        self.unwrap_string_flags().quote_style()
+    }
+
+    /// Returns the [`AnyStringFlags`] style for the current string token of any kind.
+    ///
+    /// # Panics
+    ///
+    /// If it isn't a string or any f-string tokens.
+    pub fn unwrap_string_flags(self) -> AnyStringFlags {
+        self.string_flags()
+            .unwrap_or_else(|| panic!("token to be a string"))
+    }
+
+    /// Returns true if the current token is a string and it is raw.
+    pub fn string_flags(self) -> Option<AnyStringFlags> {
+        if self.is_any_string() {
+            Some(self.flags.as_any_string_flags())
+        } else {
+            None
+        }
     }
 
     /// Returns `true` if this is any kind of string token.

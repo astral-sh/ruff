@@ -1391,10 +1391,8 @@ fn handle_attribute_comment<'a>(
         .take_while(|token| token.kind == SimpleTokenKind::RParen)
         .last()
     {
-        return if comment.start() < right_paren.start() {
-            CommentPlacement::trailing(attribute.value.as_ref(), comment)
-        } else {
-            CommentPlacement::dangling(comment.enclosing_node(), comment)
+        if comment.start() < right_paren.start() {
+            return CommentPlacement::trailing(attribute.value.as_ref(), comment);
         };
     }
 

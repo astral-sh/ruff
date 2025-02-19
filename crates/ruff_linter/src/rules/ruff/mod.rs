@@ -11,15 +11,14 @@ mod tests {
 
     use anyhow::Result;
     use regex::Regex;
+    use ruff_python_ast::PythonVersion;
     use ruff_source_file::SourceFileBuilder;
     use rustc_hash::FxHashSet;
     use test_case::test_case;
 
     use crate::pyproject_toml::lint_pyproject_toml;
     use crate::registry::Rule;
-    use crate::settings::types::{
-        CompiledPerFileIgnoreList, PerFileIgnore, PreviewMode, PythonVersion,
-    };
+    use crate::settings::types::{CompiledPerFileIgnoreList, PerFileIgnore, PreviewMode};
     use crate::settings::LinterSettings;
     use crate::test::{test_path, test_resource_path};
     use crate::{assert_messages, settings};
@@ -130,7 +129,7 @@ mod tests {
                     extend_markup_names: vec![],
                     allowed_markup_calls: vec![],
                 },
-                target_version: PythonVersion::Py310,
+                target_version: PythonVersion::PY310,
                 ..LinterSettings::for_rule(Rule::IncorrectlyParenthesizedTupleInSubscript)
             },
         )?;
@@ -149,7 +148,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("ruff").join(path).as_path(),
             &settings::LinterSettings::for_rule(Rule::ImplicitOptional)
-                .with_target_version(PythonVersion::Py39),
+                .with_target_version(PythonVersion::PY39),
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
@@ -436,6 +435,7 @@ mod tests {
     #[test_case(Rule::StarmapZip, Path::new("RUF058_1.py"))]
     #[test_case(Rule::ClassWithMixedTypeVars, Path::new("RUF053.py"))]
     #[test_case(Rule::IndentedFormFeed, Path::new("RUF054.py"))]
+    #[test_case(Rule::ImplicitClassVarInDataclass, Path::new("RUF045.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",

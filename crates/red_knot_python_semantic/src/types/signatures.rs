@@ -357,6 +357,8 @@ mod tests {
         db.write_dedented(
             "/src/a.py",
             "
+            from typing import Literal
+
             def f(a, b: int, c = 1, d: int = 2, /,
                   e = 3, f: Literal[4] = 4, *args: object,
                   g = 5, h: Literal[6] = 6, **kwargs: str) -> bytes: ...

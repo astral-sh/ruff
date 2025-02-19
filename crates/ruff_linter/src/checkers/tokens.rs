@@ -8,7 +8,6 @@ use ruff_python_ast::PySourceType;
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_parser::Tokens;
-use ruff_text_size::Ranged;
 
 use crate::directives::TodoComment;
 use crate::registry::{AsRule, Rule};
@@ -88,12 +87,7 @@ pub(crate) fn check_tokens(
         Rule::InvalidCharacterZeroWidthSpace,
     ]) {
         for token in tokens {
-            pylint::rules::invalid_string_characters(
-                &mut diagnostics,
-                token.kind(),
-                token.range(),
-                locator,
-            );
+            pylint::rules::invalid_string_characters(&mut diagnostics, token, locator);
         }
     }
 

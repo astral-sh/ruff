@@ -145,5 +145,5 @@ fn is_allowed_module(settings: &LinterSettings, module: &str) -> bool {
         return true;
     }
 
-    !is_known_standard_library(settings.target_version.minor(), module)
+    !is_known_standard_library(settings.target_version.minor, module)
 }

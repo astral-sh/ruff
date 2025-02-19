@@ -245,9 +245,10 @@ class Test2:
         return 42
 
 def _(flag: bool):
+    # TODO: Improve error message to state which union variant isn't iterable (https://github.com/astral-sh/ruff/issues/13989)
     # error: "Object of type `Test | Test2` is not iterable"
     for x in Test() if flag else Test2():
-        reveal_type(x)  # revealed: Unknown
+        reveal_type(x)  # revealed: int
 ```
 
 ## Union type as iterator where one union element has no `__next__` method
@@ -263,5 +264,5 @@ class Test:
 
 # error: [not-iterable] "Object of type `Test` is not iterable"
 for x in Test():
-    reveal_type(x)  # revealed: Unknown
+    reveal_type(x)  # revealed: int
 ```

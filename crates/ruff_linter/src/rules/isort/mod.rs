@@ -19,8 +19,8 @@ use types::{AliasData, ImportBlock, TrailingComma};
 
 use crate::line_width::{LineLength, LineWidthBuilder};
 use crate::package::PackageRoot;
-use crate::settings::types::PythonVersion;
 use crate::Locator;
+use ruff_python_ast::PythonVersion;
 
 mod annotate;
 pub(crate) mod block;

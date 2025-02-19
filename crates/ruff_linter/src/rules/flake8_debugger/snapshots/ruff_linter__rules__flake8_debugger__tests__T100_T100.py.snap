@@ -183,3 +183,57 @@ T100.py:25:1: T100 Trace found: `ptvsd.wait_for_attach` used
 25 | wait_for_attach()
    | ^^^^^^^^^^^^^^^^^ T100
    |
+
+T100.py:33:5: T100 Import for `sys.breakpointhook` found
+   |
+32 | def scope():
+33 |     from sys import breakpointhook # error
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ T100
+34 |
+35 |     breakpointhook() # error
+   |
+
+T100.py:35:5: T100 Trace found: `sys.breakpointhook` used
+   |
+33 |     from sys import breakpointhook # error
+34 |
+35 |     breakpointhook() # error
+   |     ^^^^^^^^^^^^^^^^ T100
+36 |
+37 | def scope():
+   |
+
+T100.py:38:5: T100 Import for `sys.__breakpointhook__` found
+   |
+37 | def scope():
+38 |     from sys import __breakpointhook__ # error
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ T100
+39 |
+40 |     __breakpointhook__() # error
+   |
+
+T100.py:40:5: T100 Trace found: `sys.__breakpointhook__` used
+   |
+38 |     from sys import __breakpointhook__ # error
+39 |
+40 |     __breakpointhook__() # error
+   |     ^^^^^^^^^^^^^^^^^^^^ T100
+41 |
+42 | sys.breakpointhook() # error
+   |
+
+T100.py:42:1: T100 Trace found: `sys.breakpointhook` used
+   |
+40 |     __breakpointhook__() # error
+41 |
+42 | sys.breakpointhook() # error
+   | ^^^^^^^^^^^^^^^^^^^^ T100
+43 | sys.__breakpointhook__() # error
+   |
+
+T100.py:43:1: T100 Trace found: `sys.__breakpointhook__` used
+   |
+42 | sys.breakpointhook() # error
+43 | sys.__breakpointhook__() # error
+   | ^^^^^^^^^^^^^^^^^^^^^^^^ T100
+   |

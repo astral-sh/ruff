@@ -2,7 +2,7 @@ import sys
 from _typeshed import SupportsWrite, sentinel
 from collections.abc import Callable, Generator, Iterable, Sequence
 from re import Pattern
-from typing import IO, Any, ClassVar, Final, Generic, NewType, NoReturn, Protocol, TypeVar, overload
+from typing import IO, Any, ClassVar, Final, Generic, NoReturn, Protocol, TypeVar, overload
 from typing_extensions import Self, TypeAlias, deprecated
 
 __all__ = [
@@ -33,25 +33,14 @@ _ActionT = TypeVar("_ActionT", bound=Action)
 _ArgumentParserT = TypeVar("_ArgumentParserT", bound=ArgumentParser)
 _N = TypeVar("_N")
 _ActionType: TypeAlias = Callable[[str], Any] | FileType | str
-# more precisely, Literal["store", "store_const", "store_true",
-# "store_false", "append", "append_const", "count", "help", "version",
-# "extend"], but using this would make it hard to annotate callers
-# that don't use a literal argument
-_ActionStr: TypeAlias = str
-# more precisely, Literal["?", "*", "+", "...", "A...",
-# "==SUPPRESS=="], but using this would make it hard to annotate
-# callers that don't use a literal argument
-_NArgsStr: TypeAlias = str
 
 ONE_OR_MORE: Final = "+"
 OPTIONAL: Final = "?"
 PARSER: Final = "A..."
 REMAINDER: Final = "..."
-_SUPPRESS_T = NewType("_SUPPRESS_T", str)
-SUPPRESS: _SUPPRESS_T | str  # not using Literal because argparse sometimes compares SUPPRESS with is
-# the | str is there so that foo = argparse.SUPPRESS; foo = "test" checks out in mypy
+SUPPRESS: Final = "==SUPPRESS=="
 ZERO_OR_MORE: Final = "*"
-_UNRECOGNIZED_ARGS_ATTR: Final[str]  # undocumented
+_UNRECOGNIZED_ARGS_ATTR: Final = "_unrecognized_args"  # undocumented
 
 class ArgumentError(Exception):
     argument_name: str | None
@@ -86,8 +75,13 @@ class _ActionsContainer:
     def add_argument(
         self,
         *name_or_flags: str,
-        action: _ActionStr | type[Action] = ...,
-        nargs: int | _NArgsStr | _SUPPRESS_T | None = None,
+        # str covers predefined actions ("store_true", "count", etc.)
+        # and user registered actions via the `register` method.
+        action: str | type[Action] = ...,
+        # more precisely, Literal["?", "*", "+", "...", "A...", "==SUPPRESS=="],
+        # but using this would make it hard to annotate callers that don't use a
+        # literal argument and for subclasses to override this method.
+        nargs: int | str | None = None,
         const: Any = ...,
         default: Any = ...,
         type: _ActionType = ...,

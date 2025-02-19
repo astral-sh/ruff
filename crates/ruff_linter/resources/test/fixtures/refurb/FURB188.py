@@ -197,4 +197,11 @@ def handle_surrogates():
     text = "\ud800\udc00heythere"
     if text.startswith("\ud800\udc00"):
         text = text[1:]
-    
+
+# Regression test for
+# https://github.com/astral-sh/ruff/issues/16231
+def func():
+    a = "sjdfaskldjfakljklfoo"
+    if a.endswith("foo"):
+        a = a[: -len("foo")]
+    print(a)

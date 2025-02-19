@@ -26,8 +26,9 @@ fn black_compatibility() {
 
         let options: PyFormatOptions = if let Ok(options_file) = fs::File::open(&options_path) {
             let reader = BufReader::new(options_file);
-            serde_json::from_reader(reader)
-                .unwrap_or_else(|_| panic!("Option file {options_path:?} to be a valid Json file"))
+            serde_json::from_reader(reader).unwrap_or_else(|_| {
+                panic!("Expected option file {options_path:?} to be a valid Json file")
+            })
         } else {
             PyFormatOptions::from_extension(input_path)
         };
@@ -180,10 +181,12 @@ fn format() {
         let mut snapshot = format!("## Input\n{}", CodeFrame::new("python", &content));
         let options_path = input_path.with_extension("options.json");
 
-        if let Ok(options_file) = fs::File::open(options_path) {
+        if let Ok(options_file) = fs::File::open(&options_path) {
             let reader = BufReader::new(options_file);
             let options: Vec<PyFormatOptions> =
-                serde_json::from_reader(reader).expect("Options to be a valid Json file");
+                serde_json::from_reader(reader).unwrap_or_else(|_| {
+                    panic!("Expected option file {options_path:?} to be a valid Json file")
+                });
 
             writeln!(snapshot, "## Outputs").unwrap();
 
@@ -473,7 +476,7 @@ magic-trailing-comma       = {magic_trailing_comma:?}
 docstring-code             = {docstring_code:?}
 docstring-code-line-width  = {docstring_code_line_width:?}
 preview                    = {preview:?}
-target_version             = {target_version:?}
+target_version             = {target_version}
 source_type                = {source_type:?}"#,
             indent_style = self.0.indent_style(),
             indent_width = self.0.indent_width().value(),
