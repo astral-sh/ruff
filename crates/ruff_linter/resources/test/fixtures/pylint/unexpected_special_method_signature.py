@@ -68,8 +68,8 @@ class TestClass:
     def __eq__(self, **kwargs):  # ignore **kwargs
         ...
 
-    def __eq__(self, /, other=42):  # ignore positional-only args
+    def __eq__(self, /, other=42):  # support positional-only args
         ...
 
-    def __eq__(self, *, other=42):  # ignore positional-only args
+    def __eq__(self, *, other=42):  # support positional-only args
         ...
