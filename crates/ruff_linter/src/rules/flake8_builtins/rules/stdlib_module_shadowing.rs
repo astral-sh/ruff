@@ -98,7 +98,11 @@ pub(crate) fn stdlib_module_shadowing(
 
     let module_name = components.next()?;
 
-    if is_allowed_module(settings, &module_name) {
+    if is_allowed_module(
+        settings,
+        settings.resolve_target_version(&path).minor,
+        &module_name,
+    ) {
         return None;
     }
 
@@ -129,7 +133,7 @@ fn get_prefix<'a>(settings: &'a LinterSettings, path: &Path) -> Option<&'a PathB
     prefix
 }
 
-fn is_allowed_module(settings: &LinterSettings, module: &str) -> bool {
+fn is_allowed_module(settings: &LinterSettings, minor_version: u8, module: &str) -> bool {
     // Shadowing private stdlib modules is okay.
     // https://github.com/astral-sh/ruff/issues/12949
     if module.starts_with('_') && !module.starts_with("__") {
@@ -145,5 +149,5 @@ fn is_allowed_module(settings: &LinterSettings, module: &str) -> bool {
         return true;
     }
 
-    !is_known_standard_library(settings.target_version.minor, module)
+    !is_known_standard_library(minor_version, module)
 }

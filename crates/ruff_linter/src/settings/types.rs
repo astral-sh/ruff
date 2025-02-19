@@ -662,6 +662,12 @@ impl CompiledPerFileVersionList {
             versions: versions?,
         })
     }
+
+    pub fn is_match(&self, path: &Path) -> Option<ast::PythonVersion> {
+        self.versions
+            .iter()
+            .find_map(|v| v.matcher.is_match(path).then_some(v.version))
+    }
 }
 
 impl Deref for CompiledPerFileVersionList {

@@ -667,7 +667,7 @@ pub(crate) fn type_alias_without_annotation(checker: &Checker, value: &Expr, tar
         return;
     }
 
-    let module = if checker.settings.target_version >= PythonVersion::PY310 {
+    let module = if checker.target_version() >= PythonVersion::PY310 {
         TypingModule::Typing
     } else {
         TypingModule::TypingExtensions

@@ -8,7 +8,7 @@ use rustc_hash::FxHashSet;
 use std::fmt::{Display, Formatter};
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
-use types::{CompiledPerFileVersion, CompiledPerFileVersionList};
+use types::CompiledPerFileVersionList;
 
 use crate::codes::RuleCodePrefix;
 use ruff_macros::CacheKey;
@@ -452,12 +452,9 @@ impl LinterSettings {
     /// [`LinterSettings::per_file_target_version`] and falls back on
     /// [`LinterSettings::unresolved_target_version`] if none of the override patterns match.
     pub fn resolve_target_version(&self, path: &Path) -> PythonVersion {
-        for CompiledPerFileVersion { matcher, version } in &*self.per_file_target_version {
-            if matcher.is_match(path) {
-                return *version;
-            }
-        }
-        self.target_version
+        self.per_file_target_version
+            .is_match(path)
+            .unwrap_or(self.target_version)
     }
 }
 

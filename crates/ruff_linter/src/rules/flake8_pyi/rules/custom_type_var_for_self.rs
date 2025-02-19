@@ -560,7 +560,7 @@ fn replace_custom_typevar_with_self(
 /// This is because it was added to the `typing` module on Python 3.11,
 /// but is available from the backport package `typing_extensions` on all versions.
 fn import_self(checker: &Checker, position: TextSize) -> Result<(Edit, String), ResolutionError> {
-    let source_module = if checker.settings.target_version >= PythonVersion::PY311 {
+    let source_module = if checker.target_version() >= PythonVersion::PY311 {
         "typing"
     } else {
         "typing_extensions"
