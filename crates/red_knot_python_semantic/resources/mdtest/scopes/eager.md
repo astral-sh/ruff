@@ -40,7 +40,7 @@ def _():
     x = 1
 
     # revealed: Literal[1]
-    [reveal_type(x) for a in range(0)]
+    [reveal_type(x) for a in range(1)]
 
     x = 2
 ```
@@ -54,7 +54,7 @@ def _():
     x = 1
 
     # revealed: Literal[1]
-    {reveal_type(x) for a in range(0)}
+    {reveal_type(x) for a in range(1)}
 
     x = 2
 ```
@@ -68,7 +68,7 @@ def _():
     x = 1
 
     # revealed: Literal[1]
-    {a: reveal_type(x) for a in range(0)}
+    {a: reveal_type(x) for a in range(1)}
 
     x = 2
 ```
@@ -83,7 +83,7 @@ def _():
     x = 1
 
     # revealed: Literal[1]
-    list(reveal_type(x) for a in range(0))
+    list(reveal_type(x) for a in range(1))
 
     x = 2
 ```
@@ -110,7 +110,7 @@ x = 2
 x = 1
 
 # revealed: Literal[1]
-[reveal_type(x) for a in range(0)]
+[reveal_type(x) for a in range(1)]
 
 x = 2
 ```
@@ -121,7 +121,7 @@ x = 2
 x = 1
 
 # revealed: Literal[1]
-{reveal_type(x) for a in range(0)}
+{reveal_type(x) for a in range(1)}
 
 x = 2
 ```
@@ -132,7 +132,7 @@ x = 2
 x = 1
 
 # revealed: Literal[1]
-{a: reveal_type(x) for a in range(0)}
+{a: reveal_type(x) for a in range(1)}
 
 x = 2
 ```
@@ -143,7 +143,7 @@ x = 2
 x = 1
 
 # revealed: Literal[1]
-list(reveal_type(x) for a in range(0))
+list(reveal_type(x) for a in range(1))
 
 x = 2
 ```
@@ -165,7 +165,7 @@ def _():
 
     class A:
         # revealed: Literal[1]
-        [reveal_type(x) for a in range(0)]
+        [reveal_type(x) for a in range(1)]
 
     x = 2
 ```
@@ -184,11 +184,11 @@ def _():
         x = 4
 
         # revealed: Literal[1]
-        [reveal_type(x) for a in range(0)]
+        [reveal_type(x) for a in range(1)]
 
         class B:
             # revealed: Literal[1]
-            [reveal_type(x) for a in range(0)]
+            [reveal_type(x) for a in range(1)]
 
     x = 2
 ```
@@ -205,7 +205,7 @@ def _():
 
     def f():
         # revealed: Unknown | Literal[2]
-        [reveal_type(x) for a in range(0)]
+        [reveal_type(x) for a in range(1)]
     x = 2
 ```
 
@@ -257,7 +257,7 @@ def _():
     class A:
         def f():
             # revealed: Unknown | Literal[2]
-            [reveal_type(x) for a in range(0)]
+            [reveal_type(x) for a in range(1)]
 
     x = 2
 ```
