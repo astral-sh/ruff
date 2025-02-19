@@ -20,7 +20,7 @@ use crate::{AsMode, Mode};
 ///
 /// let options = ParseOptions::from(PySourceType::Python);
 /// ```
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct ParseOptions {
     /// Specify the mode in which the code will be parsed.
     pub(crate) mode: Mode,
