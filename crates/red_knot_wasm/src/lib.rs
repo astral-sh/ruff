@@ -1,6 +1,7 @@
 use std::any::Any;
 
 use js_sys::Error;
+use red_knot_python_semantic::python_version;
 use wasm_bindgen::prelude::*;
 
 use red_knot_project::metadata::options::{EnvironmentOptions, Options};
@@ -134,14 +135,16 @@ impl Workspace {
 
     /// Returns the parsed AST for `path`
     pub fn parsed(&self, file_id: &FileHandle) -> Result<String, Error> {
-        let parsed = ruff_db::parsed::parsed_module(&self.db, file_id.file);
+        let parsed =
+            ruff_db::parsed::parsed_module(&self.db, file_id.file, python_version(&self.db));
 
         Ok(format!("{:#?}", parsed.syntax()))
     }
 
     /// Returns the token stream for `path` serialized as a string.
     pub fn tokens(&self, file_id: &FileHandle) -> Result<String, Error> {
-        let parsed = ruff_db::parsed::parsed_module(&self.db, file_id.file);
+        let parsed =
+            ruff_db::parsed::parsed_module(&self.db, file_id.file, python_version(&self.db));
 
         Ok(format!("{:#?}", parsed.tokens()))
     }

@@ -2,8 +2,8 @@ use std::fmt::Formatter;
 use std::ops::Deref;
 use std::sync::Arc;
 
-use ruff_python_ast::{ModModule, PySourceType};
-use ruff_python_parser::{parse_unchecked_source, Parsed};
+use ruff_python_ast::{ModModule, PySourceType, PythonVersion};
+use ruff_python_parser::{parse_unchecked, ParseOptions, Parsed};
 
 use crate::files::{File, FilePath};
 use crate::source::source_text;
@@ -21,7 +21,7 @@ use crate::Db;
 /// The other reason is that Ruff's AST doesn't implement `Eq` which Sala requires
 /// for determining if a query result is unchanged.
 #[salsa::tracked(return_ref, no_eq)]
-pub fn parsed_module(db: &dyn Db, file: File) -> ParsedModule {
+pub fn parsed_module(db: &dyn Db, file: File, target_version: PythonVersion) -> ParsedModule {
     let _span = tracing::trace_span!("parsed_module", file = %file.path(db)).entered();
 
     let source = source_text(db, file);
@@ -37,7 +37,12 @@ pub fn parsed_module(db: &dyn Db, file: File) -> ParsedModule {
             .map_or(PySourceType::Python, PySourceType::from_extension),
     };
 
-    ParsedModule::new(parse_unchecked_source(&source, ty))
+    let options = ParseOptions::from(ty).with_target_version(target_version);
+    let parsed = parse_unchecked(&source, options)
+        .try_into_module()
+        .expect("PySourceType always parses into a module");
+
+    ParsedModule::new(parsed)
 }
 
 /// Cheap cloneable wrapper around the parsed module.
@@ -89,6 +94,7 @@ mod tests {
     use crate::tests::TestDb;
     use crate::vendored::{VendoredFileSystemBuilder, VendoredPath};
     use crate::Db;
+    use ruff_python_ast::PythonVersion;
     use zip::CompressionMethod;
 
     #[test]
@@ -100,7 +106,7 @@ mod tests {
 
         let file = system_path_to_file(&db, path).unwrap();
 
-        let parsed = parsed_module(&db, file);
+        let parsed = parsed_module(&db, file, PythonVersion::default());
 
         assert!(parsed.is_valid());
 
@@ -116,7 +122,7 @@ mod tests {
 
         let file = system_path_to_file(&db, path).unwrap();
 
-        let parsed = parsed_module(&db, file);
+        let parsed = parsed_module(&db, file, PythonVersion::default());
 
         assert!(parsed.is_valid());
 
@@ -132,7 +138,7 @@ mod tests {
 
         let virtual_file = db.files().virtual_file(&db, path);
 
-        let parsed = parsed_module(&db, virtual_file.file());
+        let parsed = parsed_module(&db, virtual_file.file(), PythonVersion::default());
 
         assert!(parsed.is_valid());
 
@@ -148,7 +154,7 @@ mod tests {
 
         let virtual_file = db.files().virtual_file(&db, path);
 
-        let parsed = parsed_module(&db, virtual_file.file());
+        let parsed = parsed_module(&db, virtual_file.file(), PythonVersion::default());
 
         assert!(parsed.is_valid());
 
@@ -179,7 +185,7 @@ else:
 
         let file = vendored_path_to_file(&db, VendoredPath::new("path.pyi")).unwrap();
 
-        let parsed = parsed_module(&db, file);
+        let parsed = parsed_module(&db, file, PythonVersion::default());
 
         assert!(parsed.is_valid());
     }
