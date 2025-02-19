@@ -2264,11 +2264,7 @@ impl<'db> InvalidTypeExpressionError<'db> {
             invalid_expressions,
         } = self;
         for error in invalid_expressions {
-            context.report_lint(
-                &INVALID_TYPE_FORM,
-                node.into(),
-                format_args!("{}", error.reason()),
-            );
+            context.report_lint(&INVALID_TYPE_FORM, node, format_args!("{}", error.reason()));
         }
         fallback_type
     }

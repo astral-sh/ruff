@@ -589,7 +589,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 if inheritance_cycle.is_participant() {
                     self.context.report_lint(
                         &CYCLIC_CLASS_DEFINITION,
-                        class_node.into(),
+                        class_node,
                         format_args!(
                             "Cyclic definition of `{}` (class cannot inherit from itself)",
                             class.name(self.db())
@@ -613,7 +613,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
                 self.context.report_lint(
                     &SUBCLASS_OF_FINAL_CLASS,
-                    (&class_node.bases()[i]).into(),
+                    &class_node.bases()[i],
                     format_args!(
                         "Class `{}` cannot inherit from final class `{}`",
                         class.name(self.db()),
@@ -631,7 +631,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             for (index, duplicate) in duplicates {
                                 self.context.report_lint(
                                     &DUPLICATE_BASE,
-                                    (&base_nodes[*index]).into(),
+                                    &base_nodes[*index],
                                     format_args!("Duplicate base class `{}`", duplicate.name(self.db())),
                                 );
                             }
@@ -641,7 +641,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             for (index, base_ty) in bases {
                                 self.context.report_lint(
                                     &INVALID_BASE,
-                                    (&base_nodes[*index]).into(),
+                                    &base_nodes[*index],
                                     format_args!(
                                         "Invalid class base with type `{}` (all bases must be a class, `Any`, `Unknown` or `Todo`)",
                                         base_ty.display(self.db())
@@ -651,7 +651,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         }
                         MroErrorKind::UnresolvableMro { bases_list } => self.context.report_lint(
                             &INCONSISTENT_MRO,
-                            class_node.into(),
+                            class_node,
                             format_args!(
                                 "Cannot create a consistent method resolution order (MRO) for class `{}` with bases list `[{}]`",
                                 class.name(self.db()),
@@ -668,12 +668,12 @@ impl<'db> TypeInferenceBuilder<'db> {
                 match metaclass_error.reason() {
                     MetaclassErrorKind::NotCallable(ty) => self.context.report_lint(
                         &INVALID_METACLASS,
-                        class_node.into(),
+                        class_node,
                         format_args!("Metaclass type `{}` is not callable", ty.display(self.db())),
                     ),
                     MetaclassErrorKind::PartlyNotCallable(ty) => self.context.report_lint(
                         &INVALID_METACLASS,
-                        class_node.into(),
+                        class_node,
                         format_args!(
                             "Metaclass type `{}` is partly not callable",
                             ty.display(self.db())
@@ -692,11 +692,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                             },
                         candidate1_is_base_class,
                     } => {
-                        let node = class_node.into();
                         if *candidate1_is_base_class {
                             self.context.report_lint(
                                 &CONFLICTING_METACLASS,
-                                node,
+                                class_node,
                                 format_args!(
                                     "The metaclass of a derived class (`{class}`) must be a subclass of the metaclasses of all its bases, \
                                     but `{metaclass1}` (metaclass of base class `{base1}`) and `{metaclass2}` (metaclass of base class `{base2}`) \
@@ -711,7 +710,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         } else {
                             self.context.report_lint(
                                 &CONFLICTING_METACLASS,
-                                node,
+                                class_node,
                                 format_args!(
                                     "The metaclass of a derived class (`{class}`) must be a subclass of the metaclasses of all its bases, \
                                     but `{metaclass_of_class}` (metaclass of `{class}`) and `{metaclass_of_base}` (metaclass of base class `{base}`) \
@@ -862,7 +861,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         self.context.report_lint(
             &DIVISION_BY_ZERO,
-            expr.into(),
+            expr,
             format_args!(
                 "Cannot {op} object of type `{}` {by_zero}",
                 left.display(self.db())
@@ -1263,7 +1262,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 } else {
                     self.context.report_lint(
                         &INVALID_PARAMETER_DEFAULT,
-                        parameter_with_default.into(),
+                        parameter_with_default,
                         format_args!(
                             "Default value of type `{}` is not assignable to annotated parameter type `{}`",
                             default_ty.display(self.db()), declared_ty.display(self.db())),
@@ -1585,7 +1584,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             (Symbol::Unbound, Symbol::Unbound) => {
                 self.context.report_lint(
                     &INVALID_CONTEXT_MANAGER,
-                    context_expression.into(),
+                    context_expression,
                     format_args!(
                         "Object of type `{}` cannot be used with `with` because it doesn't implement `__enter__` and `__exit__`",
                         context_expression_ty.display(self.db())
@@ -1596,7 +1595,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             (Symbol::Unbound, _) => {
                 self.context.report_lint(
                     &INVALID_CONTEXT_MANAGER,
-                    context_expression.into(),
+                    context_expression,
                     format_args!(
                         "Object of type `{}` cannot be used with `with` because it doesn't implement `__enter__`",
                         context_expression_ty.display(self.db())
@@ -1608,7 +1607,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 if enter_boundness == Boundness::PossiblyUnbound {
                     self.context.report_lint(
                         &INVALID_CONTEXT_MANAGER,
-                        context_expression.into(),
+                        context_expression,
                         format_args!(
                             "Object of type `{context_expression}` cannot be used with `with` because the method `__enter__` is possibly unbound",
                             context_expression = context_expression_ty.display(self.db()),
@@ -1625,7 +1624,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         //  distinguish between a not callable `__enter__` attribute and a wrong signature.
                         self.context.report_lint(
                             &INVALID_CONTEXT_MANAGER,
-                            context_expression.into(),
+                            context_expression,
                             format_args!("
                                 Object of type `{context_expression}` cannot be used with `with` because it does not correctly implement `__enter__`",
                                 context_expression = context_expression_ty.display(self.db()),
@@ -1638,7 +1637,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     Symbol::Unbound => {
                         self.context.report_lint(
                             &INVALID_CONTEXT_MANAGER,
-                            context_expression.into(),
+                            context_expression,
                             format_args!(
                                 "Object of type `{}` cannot be used with `with` because it doesn't implement `__exit__`",
                                 context_expression_ty.display(self.db())
@@ -1651,7 +1650,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         if exit_boundness == Boundness::PossiblyUnbound {
                             self.context.report_lint(
                                 &INVALID_CONTEXT_MANAGER,
-                                context_expression.into(),
+                                context_expression,
                                 format_args!(
                                     "Object of type `{context_expression}` cannot be used with `with` because the method `__exit__` is possibly unbound",
                                     context_expression = context_expression_ty.display(self.db()),
@@ -1676,7 +1675,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             //  distinguish between a not callable `__exit__` attribute and a wrong signature.
                             self.context.report_lint(
                                 &INVALID_CONTEXT_MANAGER,
-                                context_expression.into(),
+                                context_expression,
                                 format_args!(
                                     "Object of type `{context_expression}` cannot be used with `with` because it does not correctly implement `__exit__`",
                                     context_expression = context_expression_ty.display(self.db()),
@@ -1767,7 +1766,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 if elts.len() < 2 {
                     self.context.report_lint(
                         &INVALID_TYPE_VARIABLE_CONSTRAINTS,
-                        expr.into(),
+                        expr,
                         format_args!("TypeVar must have at least two constrained types"),
                     );
                     self.infer_expression(expr);
@@ -2219,7 +2218,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         Err(e) => {
                             self.context.report_lint(
                                 &UNSUPPORTED_OPERATOR,
-                                assignment.into(),
+                                assignment,
                                 format_args!(
                                     "Operator `{op}=` is unsupported between objects of type `{}` and `{}`",
                                     target_type.display(self.db()),
@@ -2240,7 +2239,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 .unwrap_or_else(|| {
                                     self.context.report_lint(
                                         &UNSUPPORTED_OPERATOR,
-                                        assignment.into(),
+                                        assignment,
                                         format_args!(
                                             "Operator `{op}=` is unsupported between objects of type `{}` and `{}`",
                                             left_ty.display(self.db()),
@@ -2269,7 +2268,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             .unwrap_or_else(|| {
                 self.context.report_lint(
                     &UNSUPPORTED_OPERATOR,
-                    assignment.into(),
+                    assignment,
                     format_args!(
                         "Operator `{op}=` is unsupported between objects of type `{}` and `{}`",
                         left_ty.display(self.db()),
@@ -3265,7 +3264,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         KnownFunction::RevealType => {
                             if let Some(revealed_type) = binding.one_parameter_type() {
                                 self.context.report_diagnostic(
-                                    call_expression.into(),
+                                    call_expression,
                                     DiagnosticId::RevealedType,
                                     Severity::Info,
                                     format_args!(
@@ -3281,7 +3280,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 if !actual_ty.is_gradual_equivalent_to(self.db(), *asserted_ty) {
                                     self.context.report_lint(
                                             &TYPE_ASSERTION_FAILURE,
-                                            call_expression.into(),
+                                            call_expression,
                                             format_args!(
                                                 "Actual type `{}` is not the same as asserted type `{}`",
                                                 actual_ty.display(self.db()),
@@ -3301,33 +3300,33 @@ impl<'db> TypeInferenceBuilder<'db> {
                                     {
                                         self.context.report_lint(
                                             &STATIC_ASSERT_ERROR,
-                                            call_expression.into(),
+                                            call_expression,
                                             format_args!("Static assertion error: {message}"),
                                         );
                                     } else if parameter_ty == Type::BooleanLiteral(false) {
                                         self.context.report_lint(
-                                                &STATIC_ASSERT_ERROR,
-                                                call_expression.into(),
-                                                format_args!("Static assertion error: argument evaluates to `False`"),
-                                            );
+                                            &STATIC_ASSERT_ERROR,
+                                            call_expression,
+                                            format_args!("Static assertion error: argument evaluates to `False`"),
+                                        );
                                     } else if truthiness.is_always_false() {
                                         self.context.report_lint(
-                                                &STATIC_ASSERT_ERROR,
-                                                call_expression.into(),
-                                                format_args!(
-                                                    "Static assertion error: argument of type `{parameter_ty}` is statically known to be falsy",
-                                                    parameter_ty=parameter_ty.display(self.db())
-                                                ),
-                                            );
+                                            &STATIC_ASSERT_ERROR,
+                                            call_expression,
+                                            format_args!(
+                                                "Static assertion error: argument of type `{parameter_ty}` is statically known to be falsy",
+                                                parameter_ty=parameter_ty.display(self.db())
+                                            ),
+                                        );
                                     } else {
                                         self.context.report_lint(
-                                                &STATIC_ASSERT_ERROR,
-                                                call_expression.into(),
-                                                format_args!(
-                                                    "Static assertion error: argument of type `{parameter_ty}` has an ambiguous static truthiness",
-                                                    parameter_ty=parameter_ty.display(self.db())
-                                                ),
-                                            );
+                                            &STATIC_ASSERT_ERROR,
+                                            call_expression,
+                                            format_args!(
+                                                "Static assertion error: argument of type `{parameter_ty}` has an ambiguous static truthiness",
+                                                parameter_ty=parameter_ty.display(self.db())
+                                            ),
+                                        );
                                     };
                                 }
                             }
@@ -3351,7 +3350,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         CallError::NotCallable { not_callable_ty } => {
                             context.report_lint(
                                 &CALL_NON_CALLABLE,
-                                call_expression.into(),
+                                call_expression,
                                 format_args!(
                                     "Object of type `{}` is not callable",
                                     not_callable_ty.display(context.db())
@@ -3379,7 +3378,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         CallError::PossiblyUnboundDunderCall { called_type, .. } => {
                             context.report_lint(
                                 &CALL_NON_CALLABLE,
-                                call_expression.into(),
+                                call_expression,
                                 format_args!(
                                     "Object of type `{}` is not callable (possibly unbound `__call__` method)",
                                     called_type.display(context.db())
@@ -3546,7 +3545,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     if symbol_name == "reveal_type" {
                         self.context.report_lint(
                             &UNDEFINED_REVEAL,
-                            name_node.into(),
+                            name_node,
                             format_args!(
                                 "`reveal_type` used without importing it; \
                             this is allowed for debugging convenience but will fail at runtime"
@@ -3597,7 +3596,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 LookupError::Unbound => {
                     self.context.report_lint(
                         &UNRESOLVED_ATTRIBUTE,
-                        attribute.into(),
+                        attribute,
                         format_args!(
                             "Type `{}` has no attribute `{}`",
                             value_type.display(db),
@@ -3609,7 +3608,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 LookupError::PossiblyUnbound(type_when_bound) => {
                     self.context.report_lint(
                         &POSSIBLY_UNBOUND_ATTRIBUTE,
-                        attribute.into(),
+                        attribute,
                         format_args!(
                             "Attribute `{}` on type `{}` is possibly unbound",
                             attr.id,
@@ -3639,7 +3638,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     if instance_member.is_class_var() {
                         self.context.report_lint(
                             &INVALID_ATTRIBUTE_ACCESS,
-                            attribute.into(),
+                            attribute,
                             format_args!(
                                 "Cannot assign to ClassVar `{attr}` from an instance of type `{ty}`",
                                 ty = value_ty.display(self.db()),
@@ -3728,7 +3727,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     Err(e) => {
                         self.context.report_lint(
                             &UNSUPPORTED_OPERATOR,
-                            unary.into(),
+                            unary,
                             format_args!(
                                 "Unary operator `{op}` is unsupported for type `{}`",
                                 operand_type.display(self.db()),
@@ -3768,7 +3767,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             .unwrap_or_else(|| {
                 self.context.report_lint(
                     &UNSUPPORTED_OPERATOR,
-                    binary.into(),
+                    binary,
                     format_args!(
                         "Operator `{op}` is unsupported between objects of type `{}` and `{}`",
                         left_ty.display(self.db()),
@@ -4518,10 +4517,9 @@ impl<'db> TypeInferenceBuilder<'db> {
             // Lookup the rich comparison `__dunder__` methods on instances
             (Type::Instance(left_instance), Type::Instance(right_instance)) => {
                 let rich_comparison =
-                    |op| perform_rich_comparison(self.db(), left_instance, right_instance, op);
-                let membership_test_comparison = |op| {
-                    perform_membership_test_comparison(self.db(), left_instance, right_instance, op)
-                };
+                    |op| self.infer_rich_comparison(left_instance, right_instance, op);
+                let membership_test_comparison =
+                    |op| self.infer_membership_test_comparison(left_instance, right_instance, op);
                 match op {
                     ast::CmpOp::Eq => rich_comparison(RichCompareOperator::Eq),
                     ast::CmpOp::NotEq => rich_comparison(RichCompareOperator::Ne),
@@ -4562,6 +4560,112 @@ impl<'db> TypeInferenceBuilder<'db> {
                 _ => Ok(todo_type!("Binary comparisons between more types")),
             },
         }
+    }
+
+    /// Rich comparison in Python are the operators `==`, `!=`, `<`, `<=`, `>`, and `>=`. Their
+    /// behaviour can be edited for classes by implementing corresponding dunder methods.
+    /// This function performs rich comparison between two instances and returns the resulting type.
+    /// see `<https://docs.python.org/3/reference/datamodel.html#object.__lt__>`
+    fn infer_rich_comparison(
+        &self,
+        left: InstanceType<'db>,
+        right: InstanceType<'db>,
+        op: RichCompareOperator,
+    ) -> Result<Type<'db>, CompareUnsupportedError<'db>> {
+        let db = self.db();
+        // The following resource has details about the rich comparison algorithm:
+        // https://snarky.ca/unravelling-rich-comparison-operators/
+        let call_dunder = |op: RichCompareOperator,
+                           left: InstanceType<'db>,
+                           right: InstanceType<'db>| {
+            // TODO: How do we want to handle possibly unbound dunder methods?
+            match left.class.class_member(db, op.dunder()) {
+                Symbol::Type(class_member_dunder, Boundness::Bound) => class_member_dunder
+                    .call(
+                        db,
+                        &CallArguments::positional([Type::Instance(left), Type::Instance(right)]),
+                    )
+                    .map(|outcome| outcome.return_type(db))
+                    .ok(),
+                _ => None,
+            }
+        };
+
+        // The reflected dunder has priority if the right-hand side is a strict subclass of the left-hand side.
+        if left != right && right.is_subtype_of(db, left) {
+            call_dunder(op.reflect(), right, left).or_else(|| call_dunder(op, left, right))
+        } else {
+            call_dunder(op, left, right).or_else(|| call_dunder(op.reflect(), right, left))
+        }
+        .or_else(|| {
+            // When no appropriate method returns any value other than NotImplemented,
+            // the `==` and `!=` operators will fall back to `is` and `is not`, respectively.
+            // refer to `<https://docs.python.org/3/reference/datamodel.html#object.__eq__>`
+            if matches!(op, RichCompareOperator::Eq | RichCompareOperator::Ne) {
+                Some(KnownClass::Bool.to_instance(db))
+            } else {
+                None
+            }
+        })
+        .ok_or_else(|| CompareUnsupportedError {
+            op: op.into(),
+            left_ty: left.into(),
+            right_ty: right.into(),
+        })
+    }
+
+    /// Performs a membership test (`in` and `not in`) between two instances and returns the resulting type, or `None` if the test is unsupported.
+    /// The behavior can be customized in Python by implementing `__contains__`, `__iter__`, or `__getitem__` methods.
+    /// See `<https://docs.python.org/3/reference/datamodel.html#object.__contains__>`
+    /// and `<https://docs.python.org/3/reference/expressions.html#membership-test-details>`
+    fn infer_membership_test_comparison(
+        &self,
+        left: InstanceType<'db>,
+        right: InstanceType<'db>,
+        op: MembershipTestCompareOperator,
+    ) -> Result<Type<'db>, CompareUnsupportedError<'db>> {
+        let db = self.db();
+
+        let contains_dunder = right.class.class_member(db, "__contains__");
+        let compare_result_opt = match contains_dunder {
+            Symbol::Type(contains_dunder, Boundness::Bound) => {
+                // If `__contains__` is available, it is used directly for the membership test.
+                contains_dunder
+                    .call(
+                        db,
+                        &CallArguments::positional([Type::Instance(right), Type::Instance(left)]),
+                    )
+                    .map(|outcome| outcome.return_type(db))
+                    .ok()
+            }
+            _ => {
+                // iteration-based membership test
+                match Type::Instance(right).iterate(db) {
+                    IterationOutcome::Iterable { .. } => Some(KnownClass::Bool.to_instance(db)),
+                    IterationOutcome::NotIterable { .. }
+                    | IterationOutcome::PossiblyUnboundDunderIter { .. } => None,
+                }
+            }
+        };
+
+        compare_result_opt
+            .map(|ty| {
+                if matches!(ty, Type::Dynamic(DynamicType::Todo(_))) {
+                    return ty;
+                }
+
+                let truthiness = ty.bool(db);
+
+                match op {
+                    MembershipTestCompareOperator::In => truthiness.into_type(db),
+                    MembershipTestCompareOperator::NotIn => truthiness.negate().into_type(db),
+                }
+            })
+            .ok_or_else(|| CompareUnsupportedError {
+                op: op.into(),
+                left_ty: left.into(),
+                right_ty: right.into(),
+            })
     }
 
     /// Simulates rich comparison between tuples and returns the inferred result.
@@ -4793,7 +4897,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     Err(err @ CallDunderError::PossiblyUnbound { .. }) => {
                         self.context.report_lint(
                             &CALL_POSSIBLY_UNBOUND_METHOD,
-                            value_node.into(),
+                            value_node,
                             format_args!(
                                 "Method `__getitem__` of type `{}` is possibly unbound",
                                 value_ty.display(self.db()),
@@ -4805,7 +4909,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     Err(CallDunderError::Call(err)) => {
                         self.context.report_lint(
                                 &CALL_NON_CALLABLE,
-                                value_node.into(),
+                                value_node,
                                 format_args!(
                                     "Method `__getitem__` of type `{}` is not callable on object of type `{}`",
                                     err.called_type().display(self.db()),
@@ -4839,7 +4943,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             if boundness == Boundness::PossiblyUnbound {
                                 self.context.report_lint(
                                     &CALL_POSSIBLY_UNBOUND_METHOD,
-                                    value_node.into(),
+                                    value_node,
                                     format_args!(
                                         "Method `__class_getitem__` of type `{}` is possibly unbound",
                                         value_ty.display(self.db()),
@@ -4853,7 +4957,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 .unwrap_or_else(|err| {
                                     self.context.report_lint(
                                         &CALL_NON_CALLABLE,
-                                        value_node.into(),
+                                        value_node,
                                         format_args!(
                                             "Method `__class_getitem__` of type `{}` is not callable on object of type `{}`",
                                             err.called_type().display(self.db()),
@@ -5000,7 +5104,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             ast::Expr::BytesLiteral(bytes) => {
                 self.context.report_lint(
                     &BYTE_STRING_TYPE_ANNOTATION,
-                    bytes.into(),
+                    bytes,
                     format_args!("Type expressions cannot use bytes literal"),
                 );
                 TypeAndQualifiers::unknown()
@@ -5009,7 +5113,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             ast::Expr::FString(fstring) => {
                 self.context.report_lint(
                     &FSTRING_TYPE_ANNOTATION,
-                    fstring.into(),
+                    fstring,
                     format_args!("Type expressions cannot use f-strings"),
                 );
                 self.infer_fstring_expression(fstring);
@@ -5089,7 +5193,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         ast::Expr::Tuple(..) => {
                             self.context.report_lint(
                                 &INVALID_TYPE_FORM,
-                                subscript.into(),
+                                subscript,
                                 format_args!(
                                     "Type qualifier `{type_qualifier}` expects exactly one type parameter",
                                     type_qualifier = known_instance.repr(self.db()),
@@ -5468,7 +5572,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 self.infer_type_expression(slice);
                 self.context.report_lint(
                     &INVALID_TYPE_FORM,
-                    slice.into(),
+                    slice,
                     format_args!("type[...] must have exactly one type argument"),
                 );
                 Type::unknown()
@@ -5580,7 +5684,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         for node in nodes {
                             self.context.report_lint(
                                 &INVALID_TYPE_FORM,
-                                node.into(),
+                                node,
                                 format_args!(
                                     "Type arguments for `Literal` must be `None`, \
                                     a literal value (int, bool, str, or bytes), or an enum value"
@@ -5624,7 +5728,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 ast::Expr::Tuple(_) => {
                     self.context.report_lint(
                         &INVALID_TYPE_FORM,
-                        subscript.into(),
+                        subscript,
                         format_args!(
                             "Special form `{}` expected exactly one type parameter",
                             known_instance.repr(self.db())
@@ -5653,7 +5757,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 ast::Expr::Tuple(_) => {
                     self.context.report_lint(
                         &INVALID_TYPE_FORM,
-                        subscript.into(),
+                        subscript,
                         format_args!(
                             "Special form `{}` expected exactly one type parameter",
                             known_instance.repr(self.db())
@@ -5717,7 +5821,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             KnownInstanceType::ClassVar | KnownInstanceType::Final => {
                 self.context.report_lint(
                     &INVALID_TYPE_FORM,
-                    subscript.into(),
+                    subscript,
                     format_args!(
                         "Type qualifier `{}` is not allowed in type expressions (only in annotation expressions)",
                         known_instance.repr(self.db())
@@ -5752,7 +5856,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             | KnownInstanceType::AlwaysFalsy => {
                 self.context.report_lint(
                     &INVALID_TYPE_FORM,
-                    subscript.into(),
+                    subscript,
                     format_args!(
                         "Type `{}` expected no type parameter",
                         known_instance.repr(self.db())
@@ -5765,7 +5869,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             | KnownInstanceType::Unknown => {
                 self.context.report_lint(
                     &INVALID_TYPE_FORM,
-                    subscript.into(),
+                    subscript,
                     format_args!(
                         "Special form `{}` expected no type parameter",
                         known_instance.repr(self.db())
@@ -5776,7 +5880,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             KnownInstanceType::LiteralString => {
                 self.context.report_lint(
                     &INVALID_TYPE_FORM,
-                    subscript.into(),
+                    subscript,
                     format_args!(
                         "Type `{}` expected no type parameter. Did you mean to use `Literal[...]` instead?",
                         known_instance.repr(self.db())
@@ -6071,106 +6175,6 @@ impl StringPartsCollector {
             Type::LiteralString
         }
     }
-}
-
-/// Rich comparison in Python are the operators `==`, `!=`, `<`, `<=`, `>`, and `>=`. Their
-/// behaviour can be edited for classes by implementing corresponding dunder methods.
-/// This function performs rich comparison between two instances and returns the resulting type.
-/// see `<https://docs.python.org/3/reference/datamodel.html#object.__lt__>`
-fn perform_rich_comparison<'db>(
-    db: &'db dyn Db,
-    left: InstanceType<'db>,
-    right: InstanceType<'db>,
-    op: RichCompareOperator,
-) -> Result<Type<'db>, CompareUnsupportedError<'db>> {
-    // The following resource has details about the rich comparison algorithm:
-    // https://snarky.ca/unravelling-rich-comparison-operators/
-    let call_dunder =
-        |op: RichCompareOperator, left: InstanceType<'db>, right: InstanceType<'db>| {
-            // TODO: How do we want to handle possibly unbound dunder methods?
-            match left.class.class_member(db, op.dunder()) {
-                Symbol::Type(class_member_dunder, Boundness::Bound) => class_member_dunder
-                    .call(
-                        db,
-                        &CallArguments::positional([Type::Instance(left), Type::Instance(right)]),
-                    )
-                    .map(|outcome| outcome.return_type(db))
-                    .ok(),
-                _ => None,
-            }
-        };
-
-    // The reflected dunder has priority if the right-hand side is a strict subclass of the left-hand side.
-    if left != right && right.is_subtype_of(db, left) {
-        call_dunder(op.reflect(), right, left).or_else(|| call_dunder(op, left, right))
-    } else {
-        call_dunder(op, left, right).or_else(|| call_dunder(op.reflect(), right, left))
-    }
-    .or_else(|| {
-        // When no appropriate method returns any value other than NotImplemented,
-        // the `==` and `!=` operators will fall back to `is` and `is not`, respectively.
-        // refer to `<https://docs.python.org/3/reference/datamodel.html#object.__eq__>`
-        if matches!(op, RichCompareOperator::Eq | RichCompareOperator::Ne) {
-            Some(KnownClass::Bool.to_instance(db))
-        } else {
-            None
-        }
-    })
-    .ok_or_else(|| CompareUnsupportedError {
-        op: op.into(),
-        left_ty: left.into(),
-        right_ty: right.into(),
-    })
-}
-
-/// Performs a membership test (`in` and `not in`) between two instances and returns the resulting type, or `None` if the test is unsupported.
-/// The behavior can be customized in Python by implementing `__contains__`, `__iter__`, or `__getitem__` methods.
-/// See `<https://docs.python.org/3/reference/datamodel.html#object.__contains__>`
-/// and `<https://docs.python.org/3/reference/expressions.html#membership-test-details>`
-fn perform_membership_test_comparison<'db>(
-    db: &'db dyn Db,
-    left: InstanceType<'db>,
-    right: InstanceType<'db>,
-    op: MembershipTestCompareOperator,
-) -> Result<Type<'db>, CompareUnsupportedError<'db>> {
-    let contains_dunder = right.class.class_member(db, "__contains__");
-    let compare_result_opt = match contains_dunder {
-        Symbol::Type(contains_dunder, Boundness::Bound) => {
-            // If `__contains__` is available, it is used directly for the membership test.
-            contains_dunder
-                .call(
-                    db,
-                    &CallArguments::positional([Type::Instance(right), Type::Instance(left)]),
-                )
-                .map(|outcome| outcome.return_type(db))
-                .ok()
-        }
-        _ => {
-            // iteration-based membership test
-            match Type::Instance(right).iterate(db) {
-                IterationOutcome::Iterable { .. } => Some(KnownClass::Bool.to_instance(db)),
-                IterationOutcome::NotIterable { .. }
-                | IterationOutcome::PossiblyUnboundDunderIter { .. } => None,
-            }
-        }
-    };
-
-    compare_result_opt
-        .map(|ty| {
-            if matches!(ty, Type::Dynamic(DynamicType::Todo(_))) {
-                return ty;
-            }
-
-            match op {
-                MembershipTestCompareOperator::In => ty.bool(db).into_type(db),
-                MembershipTestCompareOperator::NotIn => ty.bool(db).negate().into_type(db),
-            }
-        })
-        .ok_or_else(|| CompareUnsupportedError {
-            op: op.into(),
-            left_ty: left.into(),
-            right_ty: right.into(),
-        })
 }
 
 #[cfg(test)]

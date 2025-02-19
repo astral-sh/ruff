@@ -1047,7 +1047,7 @@ pub(super) fn report_possibly_unresolved_reference(
 
     context.report_lint(
         &POSSIBLY_UNRESOLVED_REFERENCE,
-        expr_name_node.into(),
+        expr_name_node,
         format_args!("Name `{id}` used when possibly not defined"),
     );
 }
@@ -1057,7 +1057,7 @@ pub(super) fn report_unresolved_reference(context: &InferContext, expr_name_node
 
     context.report_lint(
         &UNRESOLVED_REFERENCE,
-        expr_name_node.into(),
+        expr_name_node,
         format_args!("Name `{id}` used when not defined"),
     );
 }
@@ -1065,7 +1065,7 @@ pub(super) fn report_unresolved_reference(context: &InferContext, expr_name_node
 pub(super) fn report_invalid_exception_caught(context: &InferContext, node: &ast::Expr, ty: Type) {
     context.report_lint(
         &INVALID_EXCEPTION_CAUGHT,
-        node.into(),
+        node,
         format_args!(
             "Cannot catch object of type `{}` in an exception handler \
             (must be a `BaseException` subclass or a tuple of `BaseException` subclasses)",
@@ -1077,7 +1077,7 @@ pub(super) fn report_invalid_exception_caught(context: &InferContext, node: &ast
 pub(crate) fn report_invalid_exception_raised(context: &InferContext, node: &ast::Expr, ty: Type) {
     context.report_lint(
         &INVALID_RAISE,
-        node.into(),
+        node,
         format_args!(
             "Cannot raise object of type `{}` (must be a `BaseException` subclass or instance)",
             ty.display(context.db())
@@ -1088,7 +1088,7 @@ pub(crate) fn report_invalid_exception_raised(context: &InferContext, node: &ast
 pub(crate) fn report_invalid_exception_cause(context: &InferContext, node: &ast::Expr, ty: Type) {
     context.report_lint(
         &INVALID_RAISE,
-        node.into(),
+        node,
         format_args!(
             "Cannot use object of type `{}` as exception cause \
             (must be a `BaseException` subclass or instance or `None`)",
@@ -1100,7 +1100,7 @@ pub(crate) fn report_invalid_exception_cause(context: &InferContext, node: &ast:
 pub(crate) fn report_base_with_incompatible_slots(context: &InferContext, node: &ast::Expr) {
     context.report_lint(
         &INCOMPATIBLE_SLOTS,
-        node.into(),
+        node,
         format_args!("Class base has incompatible `__slots__`"),
     );
 }
@@ -1112,7 +1112,7 @@ pub(crate) fn report_invalid_arguments_to_annotated<'db>(
 ) {
     context.report_lint(
         &INVALID_TYPE_FORM,
-        subscript.into(),
+        subscript,
         format_args!(
             "Special form `{}` expected at least 2 arguments (one type and at least one metadata element)",
             KnownInstanceType::Annotated.repr(db)
