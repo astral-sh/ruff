@@ -15,7 +15,7 @@ use crate::module_name::ModuleName;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::ast_ids::AstIdsBuilder;
 use crate::semantic_index::attribute_assignment::{AttributeAssignment, AttributeAssignments};
-use crate::semantic_index::constraint::PatternConstraintKind;
+use crate::semantic_index::constraint::{PatternConstraintKind, ScopedConstraintId};
 use crate::semantic_index::definition::{
     AssignmentDefinitionNodeRef, ComprehensionDefinitionNodeRef, Definition, DefinitionNodeKey,
     DefinitionNodeRef, ForStmtDefinitionNodeRef, ImportFromDefinitionNodeRef,
@@ -26,7 +26,7 @@ use crate::semantic_index::symbol::{
     SymbolTableBuilder,
 };
 use crate::semantic_index::use_def::{
-    EagerBindingsKey, FlowSnapshot, ScopedConstraintId, ScopedEagerBindingsId, UseDefMapBuilder,
+    EagerBindingsKey, FlowSnapshot, ScopedEagerBindingsId, UseDefMapBuilder,
 };
 use crate::semantic_index::SemanticIndex;
 use crate::unpack::{Unpack, UnpackValue};
@@ -294,7 +294,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         &self.use_def_maps[scope_id]
     }
 
-    fn current_visibility_constraints_mut(&mut self) -> &mut VisibilityConstraintsBuilder<'db> {
+    fn current_visibility_constraints_mut(&mut self) -> &mut VisibilityConstraintsBuilder {
         let scope_id = self.current_scope();
         &mut self.use_def_maps[scope_id].visibility_constraints
     }
@@ -404,16 +404,12 @@ impl<'db> SemanticIndexBuilder<'db> {
     }
 
     /// Negates a constraint and adds it to the list of all constraints, does not record it.
-    fn add_negated_constraint(
-        &mut self,
-        constraint: Constraint<'db>,
-    ) -> (Constraint<'db>, ScopedConstraintId) {
+    fn add_negated_constraint(&mut self, constraint: Constraint<'db>) -> ScopedConstraintId {
         let negated = Constraint {
             node: constraint.node,
             is_positive: false,
         };
-        let id = self.current_use_def_map_mut().add_constraint(negated);
-        (negated, id)
+        self.current_use_def_map_mut().add_constraint(negated)
     }
 
     /// Records a previously added constraint by adding it to all live bindings.
@@ -429,7 +425,7 @@ impl<'db> SemanticIndexBuilder<'db> {
 
     /// Negates the given constraint and then adds it to all live bindings.
     fn record_negated_constraint(&mut self, constraint: Constraint<'db>) -> ScopedConstraintId {
-        let (_, id) = self.add_negated_constraint(constraint);
+        let id = self.add_negated_constraint(constraint);
         self.record_constraint_id(id);
         id
     }
@@ -458,9 +454,10 @@ impl<'db> SemanticIndexBuilder<'db> {
         &mut self,
         constraint: Constraint<'db>,
     ) -> ScopedVisibilityConstraintId {
+        let constraint_id = self.current_use_def_map_mut().add_constraint(constraint);
         let id = self
             .current_visibility_constraints_mut()
-            .add_atom(constraint, 0);
+            .add_atom(constraint_id, 0);
         self.record_visibility_constraint_id(id);
         id
     }
@@ -1190,12 +1187,13 @@ where
                 // We need multiple copies of the visibility constraint for the while condition,
                 // since we need to model situations where the first evaluation of the condition
                 // returns True, but a later evaluation returns False.
+                let constraint_id = self.current_use_def_map_mut().add_constraint(constraint);
                 let first_vis_constraint_id = self
                     .current_visibility_constraints_mut()
-                    .add_atom(constraint, 0);
+                    .add_atom(constraint_id, 0);
                 let later_vis_constraint_id = self
                     .current_visibility_constraints_mut()
-                    .add_atom(constraint, 1);
+                    .add_atom(constraint_id, 1);
 
                 // Save aside any break states from an outer loop
                 let saved_break_states = std::mem::take(&mut self.loop_break_states);
@@ -1776,13 +1774,13 @@ where
                     // anymore.
                     if index < values.len() - 1 {
                         let constraint = self.build_constraint(value);
-                        let (constraint, constraint_id) = match op {
-                            ast::BoolOp::And => (constraint, self.add_constraint(constraint)),
+                        let constraint_id = match op {
+                            ast::BoolOp::And => self.add_constraint(constraint),
                             ast::BoolOp::Or => self.add_negated_constraint(constraint),
                         };
                         let visibility_constraint = self
                             .current_visibility_constraints_mut()
-                            .add_atom(constraint, 0);
+                            .add_atom(constraint_id, 0);
 
                         let after_expr = self.flow_snapshot();
 

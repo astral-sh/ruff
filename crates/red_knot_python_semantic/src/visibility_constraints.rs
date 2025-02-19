@@ -180,7 +180,9 @@ use rustc_hash::FxHashMap;
 
 use crate::semantic_index::{
     ast_ids::HasScopedExpressionId,
-    constraint::{Constraint, ConstraintNode, PatternConstraintKind},
+    constraint::{
+        Constraint, ConstraintNode, Constraints, PatternConstraintKind, ScopedConstraintId,
+    },
 };
 use crate::types::{infer_expression_types, Truthiness};
 use crate::Db;
@@ -257,10 +259,10 @@ struct Atom(u32);
 impl Atom {
     /// Deconstruct an atom into a constraint index and a copy number.
     #[inline]
-    fn into_index_and_copy(self) -> (u32, u8) {
+    fn into_index_and_copy(self) -> (ScopedConstraintId, u8) {
         let copy = self.0 >> 24;
         let index = self.0 & 0x00ff_ffff;
-        (index, copy as u8)
+        (index.into(), copy as u8)
     }
 
     #[inline]
@@ -273,27 +275,18 @@ impl Atom {
     }
 }
 
+impl From<ScopedConstraintId> for Atom {
+    fn from(constraint: ScopedConstraintId) -> Atom {
+        Atom(constraint.as_u32())
+    }
+}
+
 // A custom Debug implementation that prints out the constraint index and copy number as distinct
 // fields.
 impl std::fmt::Debug for Atom {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let (index, copy) = self.into_index_and_copy();
         f.debug_tuple("Atom").field(&index).field(&copy).finish()
-    }
-}
-
-impl Idx for Atom {
-    #[inline]
-    fn new(value: usize) -> Self {
-        assert!(value <= 0x00ff_ffff);
-        #[allow(clippy::cast_possible_truncation)]
-        Self(value as u32)
-    }
-
-    #[inline]
-    fn index(self) -> usize {
-        let (index, _) = self.into_index_and_copy();
-        index as usize
     }
 }
 
@@ -339,16 +332,13 @@ const SMALLEST_TERMINAL: ScopedVisibilityConstraintId = ALWAYS_FALSE;
 /// A collection of visibility constraints. This is currently stored in `UseDefMap`, which means we
 /// maintain a separate set of visibility constraints for each scope in file.
 #[derive(Debug, PartialEq, Eq, salsa::Update)]
-pub(crate) struct VisibilityConstraints<'db> {
-    constraints: IndexVec<Atom, Constraint<'db>>,
+pub(crate) struct VisibilityConstraints {
     interiors: IndexVec<ScopedVisibilityConstraintId, InteriorNode>,
 }
 
 #[derive(Debug, Default, PartialEq, Eq)]
-pub(crate) struct VisibilityConstraintsBuilder<'db> {
-    constraints: IndexVec<Atom, Constraint<'db>>,
+pub(crate) struct VisibilityConstraintsBuilder {
     interiors: IndexVec<ScopedVisibilityConstraintId, InteriorNode>,
-    constraint_cache: FxHashMap<Constraint<'db>, Atom>,
     interior_cache: FxHashMap<InteriorNode, ScopedVisibilityConstraintId>,
     not_cache: FxHashMap<ScopedVisibilityConstraintId, ScopedVisibilityConstraintId>,
     and_cache: FxHashMap<
@@ -361,10 +351,9 @@ pub(crate) struct VisibilityConstraintsBuilder<'db> {
     >,
 }
 
-impl<'db> VisibilityConstraintsBuilder<'db> {
-    pub(crate) fn build(self) -> VisibilityConstraints<'db> {
+impl VisibilityConstraintsBuilder {
+    pub(crate) fn build(self) -> VisibilityConstraints {
         VisibilityConstraints {
-            constraints: self.constraints,
             interiors: self.interiors,
         }
     }
@@ -389,11 +378,8 @@ impl<'db> VisibilityConstraintsBuilder<'db> {
     }
 
     /// Adds a constraint, ensuring that we only store any particular constraint once.
-    fn add_constraint(&mut self, constraint: Constraint<'db>, copy: u8) -> Atom {
-        self.constraint_cache
-            .entry(constraint)
-            .or_insert_with(|| self.constraints.push(constraint))
-            .copy_of(copy)
+    fn add_constraint(&mut self, constraint: ScopedConstraintId, copy: u8) -> Atom {
+        Atom::from(constraint).copy_of(copy)
     }
 
     /// Adds an interior node, ensuring that we always use the same visibility constraint ID for
@@ -416,7 +402,7 @@ impl<'db> VisibilityConstraintsBuilder<'db> {
     /// results at different points in the execution of the program being modeled.
     pub(crate) fn add_atom(
         &mut self,
-        constraint: Constraint<'db>,
+        constraint: ScopedConstraintId,
         copy: u8,
     ) -> ScopedVisibilityConstraintId {
         let atom = self.add_constraint(constraint, copy);
@@ -591,11 +577,12 @@ impl<'db> VisibilityConstraintsBuilder<'db> {
     }
 }
 
-impl<'db> VisibilityConstraints<'db> {
+impl VisibilityConstraints {
     /// Analyze the statically known visibility for a given visibility constraint.
-    pub(crate) fn evaluate(
+    pub(crate) fn evaluate<'db>(
         &self,
         db: &'db dyn Db,
+        constraints: &Constraints<'db>,
         mut id: ScopedVisibilityConstraintId,
     ) -> Truthiness {
         loop {
@@ -605,7 +592,8 @@ impl<'db> VisibilityConstraints<'db> {
                 ALWAYS_FALSE => return Truthiness::AlwaysFalse,
                 _ => self.interiors[id],
             };
-            let constraint = &self.constraints[node.atom];
+            let (constraint_id, _) = node.atom.into_index_and_copy();
+            let constraint = &constraints[constraint_id];
             match Self::analyze_single(db, constraint) {
                 Truthiness::AlwaysTrue => id = node.if_true,
                 Truthiness::Ambiguous => id = node.if_ambiguous,
