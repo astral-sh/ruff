@@ -8,7 +8,7 @@ use indexmap::IndexSet;
 use itertools::Itertools;
 use ruff_db::files::File;
 use ruff_python_ast as ast;
-use ruff_python_ast::python_version::PythonVersion;
+use ruff_python_ast::PythonVersion;
 use type_ordering::union_elements_ordering;
 
 pub(crate) use self::builder::{IntersectionBuilder, UnionBuilder};
@@ -2264,11 +2264,7 @@ impl<'db> InvalidTypeExpressionError<'db> {
             invalid_expressions,
         } = self;
         for error in invalid_expressions {
-            context.report_lint(
-                &INVALID_TYPE_FORM,
-                node.into(),
-                format_args!("{}", error.reason()),
-            );
+            context.report_lint(&INVALID_TYPE_FORM, node, format_args!("{}", error.reason()));
         }
         fallback_type
     }
@@ -4535,7 +4531,7 @@ pub(crate) mod tests {
     use ruff_db::parsed::parsed_module;
     use ruff_db::system::DbWithTestSystem;
     use ruff_db::testing::assert_function_query_was_not_run;
-    use ruff_python_ast::python_version::PythonVersion;
+    use ruff_python_ast::PythonVersion;
     use test_case::test_case;
 
     /// Explicitly test for Python version <3.13 and >=3.13, to ensure that

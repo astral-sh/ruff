@@ -9,9 +9,9 @@ use serde::{Deserialize, Serialize};
 use strum_macros::EnumIter;
 
 use crate::package::PackageRoot;
-use crate::settings::types::PythonVersion;
 use crate::warn_user_once;
 use ruff_macros::CacheKey;
+use ruff_python_ast::PythonVersion;
 use ruff_python_stdlib::sys::is_known_standard_library;
 
 use super::types::{ImportBlock, Importable};
@@ -117,7 +117,7 @@ pub(crate) fn categorize<'a>(
             )
         } else if let Some((import_type, reason)) = known_modules.categorize(module_name) {
             (import_type, reason)
-        } else if is_known_standard_library(target_version.minor(), module_base) {
+        } else if is_known_standard_library(target_version.minor, module_base) {
             (
                 &ImportSection::Known(ImportType::StandardLibrary),
                 Reason::KnownStandardLibrary,

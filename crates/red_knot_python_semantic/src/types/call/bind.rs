@@ -6,7 +6,9 @@ use crate::types::diagnostic::{
 };
 use crate::types::signatures::Parameter;
 use crate::types::{todo_type, UnionType};
+use ruff_db::diagnostic::{SecondaryDiagnosticMessage, Span};
 use ruff_python_ast as ast;
+use ruff_text_size::Ranged;
 
 /// Bind a [`CallArguments`] against a callable [`Signature`].
 ///
@@ -76,6 +78,7 @@ pub(crate) fn bind_call<'db>(
         if let Some(expected_ty) = parameter.annotated_type() {
             if !argument_ty.is_assignable_to(db, expected_ty) {
                 errors.push(CallBindingError::InvalidArgumentType {
+                    callable_ty,
                     parameter: ParameterContext::new(parameter, index, positional),
                     argument_index: get_argument_index(argument_index, num_synthetic_args),
                     expected_ty,
@@ -269,6 +272,7 @@ pub(crate) enum CallBindingError<'db> {
     /// The type of an argument is not assignable to the annotated type of its corresponding
     /// parameter.
     InvalidArgumentType {
+        callable_ty: Type<'db>,
         parameter: ParameterContext,
         argument_index: Option<usize>,
         expected_ty: Type<'db>,
@@ -303,14 +307,35 @@ impl<'db> CallBindingError<'db> {
     ) {
         match self {
             Self::InvalidArgumentType {
+                callable_ty,
                 parameter,
                 argument_index,
                 expected_ty,
                 provided_ty,
             } => {
+                let mut messages = vec![];
+                if let Some(func_lit) = callable_ty.into_function_literal() {
+                    let func_lit_scope = func_lit.body_scope(context.db());
+                    let mut span = Span::from(func_lit_scope.file(context.db()));
+                    let node = func_lit_scope.node(context.db());
+                    if let Some(func_def) = node.as_function() {
+                        let range = func_def
+                            .parameters
+                            .iter()
+                            .nth(parameter.index)
+                            .map(|param| param.range())
+                            .unwrap_or(func_def.parameters.range);
+                        span = span.with_range(range);
+                        messages.push(SecondaryDiagnosticMessage::new(
+                            span,
+                            "parameter declared in function definition here",
+                        ));
+                    }
+                }
+
                 let provided_ty_display = provided_ty.display(context.db());
                 let expected_ty_display = expected_ty.display(context.db());
-                context.report_lint(
+                context.report_lint_with_secondary_messages(
                     &INVALID_ARGUMENT_TYPE,
                     Self::get_node(node, *argument_index),
                     format_args!(
@@ -322,6 +347,7 @@ impl<'db> CallBindingError<'db> {
                             String::new()
                         }
                     ),
+                    messages,
                 );
             }
 

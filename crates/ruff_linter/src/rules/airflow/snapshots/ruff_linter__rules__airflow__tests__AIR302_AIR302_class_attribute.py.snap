@@ -1,227 +1,369 @@
 ---
 source: crates/ruff_linter/src/rules/airflow/mod.rs
+snapshot_kind: text
 ---
-AIR302_class_attribute.py:13:4: AIR302 `register_dataset_change` is removed in Airflow 3.0
+AIR302_class_attribute.py:24:21: AIR302 `airflow.Dataset` is removed in Airflow 3.0
    |
-12 | dm = DatasetManager()
-13 | dm.register_dataset_change()
+23 | # airflow.Dataset
+24 | dataset_from_root = DatasetFromRoot()
+   |                     ^^^^^^^^^^^^^^^ AIR302
+25 | dataset_from_root.iter_datasets()
+26 | dataset_from_root.iter_dataset_aliases()
+   |
+   = help: Use `airflow.sdk.definitions.asset.Asset` instead
+
+AIR302_class_attribute.py:25:19: AIR302 `iter_datasets` is removed in Airflow 3.0
+   |
+23 | # airflow.Dataset
+24 | dataset_from_root = DatasetFromRoot()
+25 | dataset_from_root.iter_datasets()
+   |                   ^^^^^^^^^^^^^ AIR302
+26 | dataset_from_root.iter_dataset_aliases()
+   |
+   = help: Use `iter_assets` instead
+
+AIR302_class_attribute.py:26:19: AIR302 `iter_dataset_aliases` is removed in Airflow 3.0
+   |
+24 | dataset_from_root = DatasetFromRoot()
+25 | dataset_from_root.iter_datasets()
+26 | dataset_from_root.iter_dataset_aliases()
+   |                   ^^^^^^^^^^^^^^^^^^^^ AIR302
+27 |
+28 | # airflow.datasets
+   |
+   = help: Use `iter_asset_aliases` instead
+
+AIR302_class_attribute.py:29:31: AIR302 `airflow.datasets.Dataset` is removed in Airflow 3.0
+   |
+28 | # airflow.datasets
+29 | dataset_to_test_method_call = Dataset()
+   |                               ^^^^^^^ AIR302
+30 | dataset_to_test_method_call.iter_datasets()
+31 | dataset_to_test_method_call.iter_dataset_aliases()
+   |
+   = help: Use `airflow.sdk.definitions.asset.Asset` instead
+
+AIR302_class_attribute.py:30:29: AIR302 `iter_datasets` is removed in Airflow 3.0
+   |
+28 | # airflow.datasets
+29 | dataset_to_test_method_call = Dataset()
+30 | dataset_to_test_method_call.iter_datasets()
+   |                             ^^^^^^^^^^^^^ AIR302
+31 | dataset_to_test_method_call.iter_dataset_aliases()
+   |
+   = help: Use `iter_assets` instead
+
+AIR302_class_attribute.py:31:29: AIR302 `iter_dataset_aliases` is removed in Airflow 3.0
+   |
+29 | dataset_to_test_method_call = Dataset()
+30 | dataset_to_test_method_call.iter_datasets()
+31 | dataset_to_test_method_call.iter_dataset_aliases()
+   |                             ^^^^^^^^^^^^^^^^^^^^ AIR302
+32 |
+33 | alias_to_test_method_call = DatasetAlias()
+   |
+   = help: Use `iter_asset_aliases` instead
+
+AIR302_class_attribute.py:33:29: AIR302 `airflow.datasets.DatasetAlias` is removed in Airflow 3.0
+   |
+31 | dataset_to_test_method_call.iter_dataset_aliases()
+32 |
+33 | alias_to_test_method_call = DatasetAlias()
+   |                             ^^^^^^^^^^^^ AIR302
+34 | alias_to_test_method_call.iter_datasets()
+35 | alias_to_test_method_call.iter_dataset_aliases()
+   |
+   = help: Use `airflow.sdk.definitions.asset.AssetAlias` instead
+
+AIR302_class_attribute.py:34:27: AIR302 `iter_datasets` is removed in Airflow 3.0
+   |
+33 | alias_to_test_method_call = DatasetAlias()
+34 | alias_to_test_method_call.iter_datasets()
+   |                           ^^^^^^^^^^^^^ AIR302
+35 | alias_to_test_method_call.iter_dataset_aliases()
+   |
+   = help: Use `iter_assets` instead
+
+AIR302_class_attribute.py:35:27: AIR302 `iter_dataset_aliases` is removed in Airflow 3.0
+   |
+33 | alias_to_test_method_call = DatasetAlias()
+34 | alias_to_test_method_call.iter_datasets()
+35 | alias_to_test_method_call.iter_dataset_aliases()
+   |                           ^^^^^^^^^^^^^^^^^^^^ AIR302
+36 |
+37 | any_to_test_method_call = DatasetAny()
+   |
+   = help: Use `iter_asset_aliases` instead
+
+AIR302_class_attribute.py:37:27: AIR302 `airflow.datasets.DatasetAny` is removed in Airflow 3.0
+   |
+35 | alias_to_test_method_call.iter_dataset_aliases()
+36 |
+37 | any_to_test_method_call = DatasetAny()
+   |                           ^^^^^^^^^^ AIR302
+38 | any_to_test_method_call.iter_datasets()
+39 | any_to_test_method_call.iter_dataset_aliases()
+   |
+   = help: Use `airflow.sdk.definitions.asset.AssetAny` instead
+
+AIR302_class_attribute.py:38:25: AIR302 `iter_datasets` is removed in Airflow 3.0
+   |
+37 | any_to_test_method_call = DatasetAny()
+38 | any_to_test_method_call.iter_datasets()
+   |                         ^^^^^^^^^^^^^ AIR302
+39 | any_to_test_method_call.iter_dataset_aliases()
+   |
+   = help: Use `iter_assets` instead
+
+AIR302_class_attribute.py:39:25: AIR302 `iter_dataset_aliases` is removed in Airflow 3.0
+   |
+37 | any_to_test_method_call = DatasetAny()
+38 | any_to_test_method_call.iter_datasets()
+39 | any_to_test_method_call.iter_dataset_aliases()
+   |                         ^^^^^^^^^^^^^^^^^^^^ AIR302
+40 |
+41 | # airflow.datasets.manager
+   |
+   = help: Use `iter_asset_aliases` instead
+
+AIR302_class_attribute.py:43:4: AIR302 `register_dataset_change` is removed in Airflow 3.0
+   |
+41 | # airflow.datasets.manager
+42 | dm = DatasetManager()
+43 | dm.register_dataset_change()
    |    ^^^^^^^^^^^^^^^^^^^^^^^ AIR302
-14 | dm.create_datasets()
-15 | dm.notify_dataset_created()
+44 | dm.create_datasets()
+45 | dm.notify_dataset_created()
    |
    = help: Use `register_asset_change` instead
 
-AIR302_class_attribute.py:14:4: AIR302 `create_datasets` is removed in Airflow 3.0
+AIR302_class_attribute.py:44:4: AIR302 `create_datasets` is removed in Airflow 3.0
    |
-12 | dm = DatasetManager()
-13 | dm.register_dataset_change()
-14 | dm.create_datasets()
+42 | dm = DatasetManager()
+43 | dm.register_dataset_change()
+44 | dm.create_datasets()
    |    ^^^^^^^^^^^^^^^ AIR302
-15 | dm.notify_dataset_created()
-16 | dm.notify_dataset_changed()
+45 | dm.notify_dataset_created()
+46 | dm.notify_dataset_changed()
    |
    = help: Use `create_assets` instead
 
-AIR302_class_attribute.py:15:4: AIR302 `notify_dataset_created` is removed in Airflow 3.0
+AIR302_class_attribute.py:45:4: AIR302 `notify_dataset_created` is removed in Airflow 3.0
    |
-13 | dm.register_dataset_change()
-14 | dm.create_datasets()
-15 | dm.notify_dataset_created()
+43 | dm.register_dataset_change()
+44 | dm.create_datasets()
+45 | dm.notify_dataset_created()
    |    ^^^^^^^^^^^^^^^^^^^^^^ AIR302
-16 | dm.notify_dataset_changed()
-17 | dm.notify_dataset_alias_created()
+46 | dm.notify_dataset_changed()
+47 | dm.notify_dataset_alias_created()
    |
    = help: Use `notify_asset_created` instead
 
-AIR302_class_attribute.py:16:4: AIR302 `notify_dataset_changed` is removed in Airflow 3.0
+AIR302_class_attribute.py:46:4: AIR302 `notify_dataset_changed` is removed in Airflow 3.0
    |
-14 | dm.create_datasets()
-15 | dm.notify_dataset_created()
-16 | dm.notify_dataset_changed()
+44 | dm.create_datasets()
+45 | dm.notify_dataset_created()
+46 | dm.notify_dataset_changed()
    |    ^^^^^^^^^^^^^^^^^^^^^^ AIR302
-17 | dm.notify_dataset_alias_created()
+47 | dm.notify_dataset_alias_created()
    |
    = help: Use `notify_asset_changed` instead
 
-AIR302_class_attribute.py:17:4: AIR302 `notify_dataset_alias_created` is removed in Airflow 3.0
+AIR302_class_attribute.py:47:4: AIR302 `notify_dataset_alias_created` is removed in Airflow 3.0
    |
-15 | dm.notify_dataset_created()
-16 | dm.notify_dataset_changed()
-17 | dm.notify_dataset_alias_created()
+45 | dm.notify_dataset_created()
+46 | dm.notify_dataset_changed()
+47 | dm.notify_dataset_alias_created()
    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ AIR302
-18 |
-19 | hlc = HookLineageCollector()
+48 |
+49 | # airflow.lineage.hook
    |
    = help: Use `notify_asset_alias_created` instead
 
-AIR302_class_attribute.py:20:5: AIR302 `create_dataset` is removed in Airflow 3.0
+AIR302_class_attribute.py:50:11: AIR302 `airflow.lineage.hook.DatasetLineageInfo` is removed in Airflow 3.0
    |
-19 | hlc = HookLineageCollector()
-20 | hlc.create_dataset()
-   |     ^^^^^^^^^^^^^^ AIR302
-21 | hlc.add_input_dataset()
-22 | hlc.add_output_dataset()
-   |
-   = help: Use `create_asset` instead
-
-AIR302_class_attribute.py:21:5: AIR302 `add_input_dataset` is removed in Airflow 3.0
-   |
-19 | hlc = HookLineageCollector()
-20 | hlc.create_dataset()
-21 | hlc.add_input_dataset()
-   |     ^^^^^^^^^^^^^^^^^ AIR302
-22 | hlc.add_output_dataset()
-23 | hlc.collected_datasets()
-   |
-   = help: Use `add_input_asset` instead
-
-AIR302_class_attribute.py:22:5: AIR302 `add_output_dataset` is removed in Airflow 3.0
-   |
-20 | hlc.create_dataset()
-21 | hlc.add_input_dataset()
-22 | hlc.add_output_dataset()
-   |     ^^^^^^^^^^^^^^^^^^ AIR302
-23 | hlc.collected_datasets()
-   |
-   = help: Use `add_output_asset` instead
-
-AIR302_class_attribute.py:23:5: AIR302 `collected_datasets` is removed in Airflow 3.0
-   |
-21 | hlc.add_input_dataset()
-22 | hlc.add_output_dataset()
-23 | hlc.collected_datasets()
-   |     ^^^^^^^^^^^^^^^^^^ AIR302
-24 |
-25 | aam = AwsAuthManager()
-   |
-   = help: Use `collected_assets` instead
-
-AIR302_class_attribute.py:26:5: AIR302 `is_authorized_dataset` is removed in Airflow 3.0
-   |
-25 | aam = AwsAuthManager()
-26 | aam.is_authorized_dataset()
-   |     ^^^^^^^^^^^^^^^^^^^^^ AIR302
-27 |
-28 | pm = ProvidersManager()
-   |
-   = help: Use `is_authorized_asset` instead
-
-AIR302_class_attribute.py:30:4: AIR302 `dataset_factories` is removed in Airflow 3.0
-   |
-28 | pm = ProvidersManager()
-29 | pm.initialize_providers_asset_uri_resources()
-30 | pm.dataset_factories
-   |    ^^^^^^^^^^^^^^^^^ AIR302
-31 |
-32 | base_secret_backend = BaseSecretsBackend()
-   |
-   = help: Use `asset_factories` instead
-
-AIR302_class_attribute.py:33:21: AIR302 `get_conn_uri` is removed in Airflow 3.0
-   |
-32 | base_secret_backend = BaseSecretsBackend()
-33 | base_secret_backend.get_conn_uri()
-   |                     ^^^^^^^^^^^^ AIR302
-34 | base_secret_backend.get_connections()
-   |
-   = help: Use `get_conn_value` instead
-
-AIR302_class_attribute.py:34:21: AIR302 `get_connections` is removed in Airflow 3.0
-   |
-32 | base_secret_backend = BaseSecretsBackend()
-33 | base_secret_backend.get_conn_uri()
-34 | base_secret_backend.get_connections()
-   |                     ^^^^^^^^^^^^^^^ AIR302
-35 |
-36 | csm_backend = CloudSecretManagerBackend()
-   |
-   = help: Use `get_connection` instead
-
-AIR302_class_attribute.py:37:13: AIR302 `get_conn_uri` is removed in Airflow 3.0
-   |
-36 | csm_backend = CloudSecretManagerBackend()
-37 | csm_backend.get_conn_uri()
-   |             ^^^^^^^^^^^^ AIR302
-38 | csm_backend.get_connections()
-   |
-   = help: Use `get_conn_value` instead
-
-AIR302_class_attribute.py:38:13: AIR302 `get_connections` is removed in Airflow 3.0
-   |
-36 | csm_backend = CloudSecretManagerBackend()
-37 | csm_backend.get_conn_uri()
-38 | csm_backend.get_connections()
-   |             ^^^^^^^^^^^^^^^ AIR302
-39 |
-40 | vault_backend = VaultBackend()
-   |
-   = help: Use `get_connection` instead
-
-AIR302_class_attribute.py:41:15: AIR302 `get_conn_uri` is removed in Airflow 3.0
-   |
-40 | vault_backend = VaultBackend()
-41 | vault_backend.get_conn_uri()
-   |               ^^^^^^^^^^^^ AIR302
-42 | vault_backend.get_connections()
-   |
-   = help: Use `get_conn_value` instead
-
-AIR302_class_attribute.py:42:15: AIR302 `get_connections` is removed in Airflow 3.0
-   |
-40 | vault_backend = VaultBackend()
-41 | vault_backend.get_conn_uri()
-42 | vault_backend.get_connections()
-   |               ^^^^^^^^^^^^^^^ AIR302
-43 |
-44 | not_an_error = NotAir302SecretError()
-   |
-   = help: Use `get_connection` instead
-
-AIR302_class_attribute.py:54:18: AIR302 `dataset_factories` is removed in Airflow 3.0
-   |
-53 | provider_manager = ProvidersManager()
-54 | provider_manager.dataset_factories
-   |                  ^^^^^^^^^^^^^^^^^ AIR302
-55 | provider_manager.dataset_uri_handlers
-56 | provider_manager.dataset_to_openlineage_converters
-   |
-   = help: Use `asset_factories` instead
-
-AIR302_class_attribute.py:55:18: AIR302 `dataset_uri_handlers` is removed in Airflow 3.0
-   |
-53 | provider_manager = ProvidersManager()
-54 | provider_manager.dataset_factories
-55 | provider_manager.dataset_uri_handlers
-   |                  ^^^^^^^^^^^^^^^^^^^^ AIR302
-56 | provider_manager.dataset_to_openlineage_converters
-   |
-   = help: Use `asset_uri_handlers` instead
-
-AIR302_class_attribute.py:56:18: AIR302 `dataset_to_openlineage_converters` is removed in Airflow 3.0
-   |
-54 | provider_manager.dataset_factories
-55 | provider_manager.dataset_uri_handlers
-56 | provider_manager.dataset_to_openlineage_converters
-   |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ AIR302
-57 |
-58 | dl_info = DatasetLineageInfo()
-   |
-   = help: Use `asset_to_openlineage_converters` instead
-
-AIR302_class_attribute.py:58:11: AIR302 `airflow.lineage.hook.DatasetLineageInfo` is removed in Airflow 3.0
-   |
-56 | provider_manager.dataset_to_openlineage_converters
-57 |
-58 | dl_info = DatasetLineageInfo()
+49 | # airflow.lineage.hook
+50 | dl_info = DatasetLineageInfo()
    |           ^^^^^^^^^^^^^^^^^^ AIR302
-59 | dl_info.dataset
+51 | dl_info.dataset
    |
    = help: Use `airflow.lineage.hook.AssetLineageInfo` instead
 
-AIR302_class_attribute.py:59:9: AIR302 `dataset` is removed in Airflow 3.0
+AIR302_class_attribute.py:51:9: AIR302 `dataset` is removed in Airflow 3.0
    |
-58 | dl_info = DatasetLineageInfo()
-59 | dl_info.dataset
+49 | # airflow.lineage.hook
+50 | dl_info = DatasetLineageInfo()
+51 | dl_info.dataset
    |         ^^^^^^^ AIR302
+52 |
+53 | hlc = HookLineageCollector()
    |
    = help: Use `asset` instead
+
+AIR302_class_attribute.py:54:5: AIR302 `create_dataset` is removed in Airflow 3.0
+   |
+53 | hlc = HookLineageCollector()
+54 | hlc.create_dataset()
+   |     ^^^^^^^^^^^^^^ AIR302
+55 | hlc.add_input_dataset()
+56 | hlc.add_output_dataset()
+   |
+   = help: Use `create_asset` instead
+
+AIR302_class_attribute.py:55:5: AIR302 `add_input_dataset` is removed in Airflow 3.0
+   |
+53 | hlc = HookLineageCollector()
+54 | hlc.create_dataset()
+55 | hlc.add_input_dataset()
+   |     ^^^^^^^^^^^^^^^^^ AIR302
+56 | hlc.add_output_dataset()
+57 | hlc.collected_datasets()
+   |
+   = help: Use `add_input_asset` instead
+
+AIR302_class_attribute.py:56:5: AIR302 `add_output_dataset` is removed in Airflow 3.0
+   |
+54 | hlc.create_dataset()
+55 | hlc.add_input_dataset()
+56 | hlc.add_output_dataset()
+   |     ^^^^^^^^^^^^^^^^^^ AIR302
+57 | hlc.collected_datasets()
+   |
+   = help: Use `add_output_asset` instead
+
+AIR302_class_attribute.py:57:5: AIR302 `collected_datasets` is removed in Airflow 3.0
+   |
+55 | hlc.add_input_dataset()
+56 | hlc.add_output_dataset()
+57 | hlc.collected_datasets()
+   |     ^^^^^^^^^^^^^^^^^^ AIR302
+58 |
+59 | # airflow.providers.amazon.auth_manager.aws_auth_manager
+   |
+   = help: Use `collected_assets` instead
+
+AIR302_class_attribute.py:61:5: AIR302 `is_authorized_dataset` is removed in Airflow 3.0
+   |
+59 | # airflow.providers.amazon.auth_manager.aws_auth_manager
+60 | aam = AwsAuthManager()
+61 | aam.is_authorized_dataset()
+   |     ^^^^^^^^^^^^^^^^^^^^^ AIR302
+62 |
+63 | # airflow.providers.apache.beam.hooks
+   |
+   = help: Use `is_authorized_asset` instead
+
+AIR302_class_attribute.py:73:13: AIR302 `get_conn_uri` is removed in Airflow 3.0
+   |
+71 | # airflow.providers.google.cloud.secrets.secret_manager
+72 | csm_backend = CloudSecretManagerBackend()
+73 | csm_backend.get_conn_uri()
+   |             ^^^^^^^^^^^^ AIR302
+74 | csm_backend.get_connections()
+   |
+   = help: Use `get_conn_value` instead
+
+AIR302_class_attribute.py:74:13: AIR302 `get_connections` is removed in Airflow 3.0
+   |
+72 | csm_backend = CloudSecretManagerBackend()
+73 | csm_backend.get_conn_uri()
+74 | csm_backend.get_connections()
+   |             ^^^^^^^^^^^^^^^ AIR302
+75 |
+76 | # airflow.providers.hashicorp.secrets.vault
+   |
+   = help: Use `get_connection` instead
+
+AIR302_class_attribute.py:78:15: AIR302 `get_conn_uri` is removed in Airflow 3.0
+   |
+76 | # airflow.providers.hashicorp.secrets.vault
+77 | vault_backend = VaultBackend()
+78 | vault_backend.get_conn_uri()
+   |               ^^^^^^^^^^^^ AIR302
+79 | vault_backend.get_connections()
+   |
+   = help: Use `get_conn_value` instead
+
+AIR302_class_attribute.py:79:15: AIR302 `get_connections` is removed in Airflow 3.0
+   |
+77 | vault_backend = VaultBackend()
+78 | vault_backend.get_conn_uri()
+79 | vault_backend.get_connections()
+   |               ^^^^^^^^^^^^^^^ AIR302
+80 |
+81 | not_an_error = NotAir302SecretError()
+   |
+   = help: Use `get_connection` instead
+
+AIR302_class_attribute.py:87:4: AIR302 `dataset_factories` is removed in Airflow 3.0
+   |
+85 | pm = ProvidersManager()
+86 | pm.initialize_providers_asset_uri_resources()
+87 | pm.dataset_factories
+   |    ^^^^^^^^^^^^^^^^^ AIR302
+88 | pm.dataset_factories
+89 | pm.dataset_uri_handlers
+   |
+   = help: Use `asset_factories` instead
+
+AIR302_class_attribute.py:88:4: AIR302 `dataset_factories` is removed in Airflow 3.0
+   |
+86 | pm.initialize_providers_asset_uri_resources()
+87 | pm.dataset_factories
+88 | pm.dataset_factories
+   |    ^^^^^^^^^^^^^^^^^ AIR302
+89 | pm.dataset_uri_handlers
+90 | pm.dataset_to_openlineage_converters
+   |
+   = help: Use `asset_factories` instead
+
+AIR302_class_attribute.py:89:4: AIR302 `dataset_uri_handlers` is removed in Airflow 3.0
+   |
+87 | pm.dataset_factories
+88 | pm.dataset_factories
+89 | pm.dataset_uri_handlers
+   |    ^^^^^^^^^^^^^^^^^^^^ AIR302
+90 | pm.dataset_to_openlineage_converters
+   |
+   = help: Use `asset_uri_handlers` instead
+
+AIR302_class_attribute.py:90:4: AIR302 `dataset_to_openlineage_converters` is removed in Airflow 3.0
+   |
+88 | pm.dataset_factories
+89 | pm.dataset_uri_handlers
+90 | pm.dataset_to_openlineage_converters
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ AIR302
+91 |
+92 | # airflow.secrets.base_secrets
+   |
+   = help: Use `asset_to_openlineage_converters` instead
+
+AIR302_class_attribute.py:94:21: AIR302 `get_conn_uri` is removed in Airflow 3.0
+   |
+92 | # airflow.secrets.base_secrets
+93 | base_secret_backend = BaseSecretsBackend()
+94 | base_secret_backend.get_conn_uri()
+   |                     ^^^^^^^^^^^^ AIR302
+95 | base_secret_backend.get_connections()
+   |
+   = help: Use `get_conn_value` instead
+
+AIR302_class_attribute.py:95:21: AIR302 `get_connections` is removed in Airflow 3.0
+   |
+93 | base_secret_backend = BaseSecretsBackend()
+94 | base_secret_backend.get_conn_uri()
+95 | base_secret_backend.get_connections()
+   |                     ^^^^^^^^^^^^^^^ AIR302
+96 |
+97 | # airflow.secrets.local_filesystem
+   |
+   = help: Use `get_connection` instead
+
+AIR302_class_attribute.py:99:5: AIR302 `get_connections` is removed in Airflow 3.0
+   |
+97 | # airflow.secrets.local_filesystem
+98 | lfb = LocalFilesystemBackend()
+99 | lfb.get_connections()
+   |     ^^^^^^^^^^^^^^^ AIR302
+   |
+   = help: Use `get_connection` instead
