@@ -1029,7 +1029,7 @@ pub trait StringFlags: Copy {
     /// i.e., the length of the prefixes plus the length
     /// of the quotes used to open the string.
     fn opener_len(self) -> TextSize {
-        self.prefix().as_str().text_len() + self.quote_len()
+        self.prefix().text_len() + self.quote_len()
     }
 
     /// The total length of the string's closer.
