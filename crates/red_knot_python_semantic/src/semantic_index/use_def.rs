@@ -269,7 +269,7 @@ use crate::semantic_index::constraint::{
 };
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::symbol::{FileScopeId, ScopedSymbolId};
-use crate::visibility_constraints::{
+use crate::semantic_index::visibility_constraints::{
     ScopedVisibilityConstraintId, VisibilityConstraints, VisibilityConstraintsBuilder,
 };
 

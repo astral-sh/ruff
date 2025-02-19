@@ -51,7 +51,7 @@ use smallvec::{smallvec, SmallVec};
 use crate::semantic_index::constraint::ScopedConstraintId;
 use crate::semantic_index::use_def::bitset::{BitSet, BitSetIterator};
 use crate::semantic_index::use_def::VisibilityConstraintsBuilder;
-use crate::visibility_constraints::ScopedVisibilityConstraintId;
+use crate::semantic_index::visibility_constraints::ScopedVisibilityConstraintId;
 
 /// A newtype-index for a definition in a particular scope.
 #[newtype_index]

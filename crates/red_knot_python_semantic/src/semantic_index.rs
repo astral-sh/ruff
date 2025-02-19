@@ -30,6 +30,7 @@ pub mod definition;
 pub mod expression;
 pub mod symbol;
 mod use_def;
+mod visibility_constraints;
 
 pub(crate) use self::use_def::{
     BindingWithConstraints, BindingWithConstraintsIterator, DeclarationWithConstraint,
