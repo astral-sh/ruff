@@ -7,14 +7,18 @@ body:
       value: |
         Thank you for taking the time to report an issue! We're glad to have you involved with Ruff.
 
+        **Before reporting, please make sure to search through [existing issues](https://github.com/astral-sh/ruff/issues?q=is:issue+is:open+label:bug) (including [closed](https://github.com/astral-sh/ruff/issues?q=is:issue%20state:closed%20label:bug)).**
+
   - type: textarea
     attributes:
       label: Summary
       description: |
         A clear and concise description of the bug, including a minimal reproducible example.
 
-        Be sure to include the command you invoked (e.g., `ruff /path/to/file.py --fix`), ideally including the `--isolated` flag or
+        Be sure to include the command you invoked (e.g., `ruff check /path/to/file.py --fix`), ideally including the `--isolated` flag and
         the current Ruff settings (e.g., relevant sections from your `pyproject.toml`).
+
+        If possible, try to include the [playground](https://play.ruff.rs) link that reproduces this issue.
 
     validations:
       required: true
@@ -26,11 +30,3 @@ body:
       placeholder: e.g., ruff 0.5.0 (244b923f6 2024-06-27)
     validations:
       required: true
-
-  - type: input
-    attributes:
-      label: Python version
-      description: What version of Python are you using? (see `python --version`)
-      placeholder: e.g., Python 3.12.6
-    validations:
-      required: false
