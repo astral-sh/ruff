@@ -635,6 +635,43 @@ impl Deref for CompiledPerFileIgnoreList {
     }
 }
 
+#[derive(Debug, Clone, CacheKey)]
+pub struct CompiledPerFileVersion {
+    pub matcher: GlobMatcher,
+    pub version: ast::PythonVersion,
+}
+
+#[derive(CacheKey, Clone, Debug, Default)]
+pub struct CompiledPerFileVersionList {
+    versions: Vec<CompiledPerFileVersion>,
+}
+
+impl CompiledPerFileVersionList {
+    /// Given a list of patterns, create a `GlobSet`.
+    pub fn resolve(per_file_ignores: FxHashMap<String, ast::PythonVersion>) -> Result<Self> {
+        let versions: Result<Vec<_>> = per_file_ignores
+            .into_iter()
+            .map(|(pattern, version)| {
+                Ok(CompiledPerFileVersion {
+                    matcher: Glob::new(&pattern)?.compile_matcher(),
+                    version,
+                })
+            })
+            .collect();
+        Ok(Self {
+            versions: versions?,
+        })
+    }
+}
+
+impl Deref for CompiledPerFileVersionList {
+    type Target = Vec<CompiledPerFileVersion>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.versions
+    }
+}
+
 #[cfg(test)]
 mod tests {
     #[test]

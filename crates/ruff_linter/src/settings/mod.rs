@@ -4,10 +4,11 @@
 
 use path_absolutize::path_dedot;
 use regex::Regex;
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashSet;
 use std::fmt::{Display, Formatter};
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
+use types::{CompiledPerFileVersion, CompiledPerFileVersionList};
 
 use crate::codes::RuleCodePrefix;
 use ruff_macros::CacheKey;
@@ -220,7 +221,7 @@ pub struct LinterSettings {
     pub fix_safety: FixSafetyTable,
 
     pub target_version: PythonVersion,
-    pub per_file_target_version: FxHashMap<String, PythonVersion>,
+    pub per_file_target_version: CompiledPerFileVersionList,
     pub preview: PreviewMode,
     pub explicit_preview_rules: bool,
 
@@ -379,7 +380,7 @@ impl LinterSettings {
         Self {
             exclude: FilePatternSet::default(),
             target_version: PythonVersion::default(),
-            per_file_target_version: FxHashMap::default(),
+            per_file_target_version: CompiledPerFileVersionList::default(),
             project_root: project_root.to_path_buf(),
             rules: DEFAULT_SELECTORS
                 .iter()
@@ -443,6 +444,20 @@ impl LinterSettings {
     pub fn with_target_version(mut self, target_version: PythonVersion) -> Self {
         self.target_version = target_version;
         self
+    }
+
+    /// Resolve the [`PythonVersion`] to use for linting.
+    ///
+    /// This method respects the per-file version overrides in
+    /// [`LinterSettings::per_file_target_version`] and falls back on
+    /// [`LinterSettings::unresolved_target_version`] if none of the override patterns match.
+    pub fn resolve_target_version(&self, path: &Path) -> PythonVersion {
+        for CompiledPerFileVersion { matcher, version } in &*self.per_file_target_version {
+            if matcher.is_match(path) {
+                return *version;
+            }
+        }
+        self.target_version
     }
 }
 

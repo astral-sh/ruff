@@ -29,8 +29,8 @@ use ruff_linter::rules::{flake8_import_conventions, isort, pycodestyle};
 use ruff_linter::settings::fix_safety_table::FixSafetyTable;
 use ruff_linter::settings::rule_table::RuleTable;
 use ruff_linter::settings::types::{
-    CompiledPerFileIgnoreList, ExtensionMapping, FilePattern, FilePatternSet, OutputFormat,
-    PerFileIgnore, PreviewMode, RequiredVersion, UnsafeFixes,
+    CompiledPerFileIgnoreList, CompiledPerFileVersionList, ExtensionMapping, FilePattern,
+    FilePatternSet, OutputFormat, PerFileIgnore, PreviewMode, RequiredVersion, UnsafeFixes,
 };
 use ruff_linter::settings::{LinterSettings, DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX, TASK_TAGS};
 use ruff_linter::{
@@ -280,7 +280,9 @@ impl Configuration {
                 extension: self.extension.unwrap_or_default(),
                 preview: lint_preview,
                 target_version,
-                per_file_target_version: self.per_file_target_version.unwrap_or_default(),
+                per_file_target_version: CompiledPerFileVersionList::resolve(
+                    self.per_file_target_version.unwrap_or_default(),
+                )?,
                 project_root: project_root.to_path_buf(),
                 allowed_confusables: lint
                     .allowed_confusables
