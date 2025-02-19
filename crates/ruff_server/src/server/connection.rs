@@ -91,19 +91,37 @@ impl Connection {
                 self.sender
                     .send(lsp::Response::new_ok(id.clone(), ()).into())?;
                 tracing::info!("Shutdown request received. Waiting for an exit notification...");
-                match self.receiver.recv_timeout(std::time::Duration::from_secs(30))? {
-                    lsp::Message::Notification(lsp::Notification { method, .. }) if method == lsp_types::notification::Exit::METHOD => {
-                        tracing::info!("Exit notification received. Server shutting down...");
-                        Ok(true)
-                    },
-                    message => anyhow::bail!("Server received unexpected message {message:?} while waiting for exit notification")
+
+                loop {
+                    match &self
+                        .receiver
+                        .recv_timeout(std::time::Duration::from_secs(30))?
+                    {
+                        lsp::Message::Notification(lsp::Notification { method, .. })
+                            if method == lsp_types::notification::Exit::METHOD =>
+                        {
+                            tracing::info!("Exit notification received. Server shutting down...");
+                            return Ok(true);
+                        }
+                        lsp::Message::Request(lsp::Request { id, .. }) => {
+                            self.sender.send(lsp::Message::Response(lsp::Response::new_err(
+                                id.clone(),
+                                lsp::ErrorCode::InvalidRequest as i32,
+                                "Server received unexpected request while waiting for exit notification".to_string(),
+                            )))?;
+                        }
+                        message => {
+                            anyhow::bail!(
+                                "Server received unexpected message {message:?} while waiting for exit notification"
+                            )
+                        }
+                    }
                 }
             }
             lsp::Message::Notification(lsp::Notification { method, .. })
                 if method == lsp_types::notification::Exit::METHOD =>
             {
-                tracing::error!("Server received an exit notification before a shutdown request was sent. Exiting...");
-                Ok(true)
+                anyhow::bail!("Server received an exit notification before a shutdown request was sent. Exiting...");
             }
             _ => Ok(false),
         }
