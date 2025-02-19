@@ -4,11 +4,12 @@ use ruff_formatter::{FormatOptions, IndentStyle, IndentWidth, LineWidth};
 use ruff_graph::AnalyzeSettings;
 use ruff_linter::display_settings;
 use ruff_linter::settings::types::{
-    ExtensionMapping, FilePattern, FilePatternSet, OutputFormat, UnsafeFixes,
+    CompiledPerFileVersionList, ExtensionMapping, FilePattern, FilePatternSet, OutputFormat,
+    UnsafeFixes,
 };
 use ruff_linter::settings::LinterSettings;
 use ruff_macros::CacheKey;
-use ruff_python_ast::PySourceType;
+use ruff_python_ast::{PySourceType, PythonVersion};
 use ruff_python_formatter::{
     DocstringCode, DocstringCodeLineWidth, MagicTrailingComma, PreviewMode, PyFormatOptions,
     QuoteStyle,
@@ -164,7 +165,8 @@ pub struct FormatterSettings {
     pub exclude: FilePatternSet,
     pub extension: ExtensionMapping,
     pub preview: PreviewMode,
-    pub target_version: ruff_python_ast::PythonVersion,
+    pub target_version: PythonVersion,
+    pub per_file_target_version: CompiledPerFileVersionList,
 
     pub line_width: LineWidth,
 
@@ -216,6 +218,17 @@ impl FormatterSettings {
             .with_docstring_code(self.docstring_code_format)
             .with_docstring_code_line_width(self.docstring_code_line_width)
     }
+
+    /// Resolve the [`PythonVersion`] to use for formatting.
+    ///
+    /// This method respects the per-file version overrides in
+    /// [`FormatterSettings::per_file_target_version`] and falls back on
+    /// [`FormatterSettings::unresolved_target_version`] if none of the override patterns match.
+    pub fn resolve_target_version(&self, path: &Path) -> PythonVersion {
+        self.per_file_target_version
+            .is_match(path)
+            .unwrap_or(self.target_version)
+    }
 }
 
 impl Default for FormatterSettings {
@@ -226,6 +239,7 @@ impl Default for FormatterSettings {
             exclude: FilePatternSet::default(),
             extension: ExtensionMapping::default(),
             target_version: default_options.target_version(),
+            per_file_target_version: CompiledPerFileVersionList::default(),
             preview: PreviewMode::Disabled,
             line_width: default_options.line_width(),
             line_ending: LineEnding::Auto,

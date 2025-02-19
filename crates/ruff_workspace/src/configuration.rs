@@ -175,11 +175,15 @@ impl Configuration {
             PreviewMode::Enabled => ruff_python_formatter::PreviewMode::Enabled,
         };
 
+        let per_file_target_version =
+            CompiledPerFileVersionList::resolve(self.per_file_target_version.unwrap_or_default())?;
+
         let formatter = FormatterSettings {
             exclude: FilePatternSet::try_from_iter(format.exclude.unwrap_or_default())?,
             extension: self.extension.clone().unwrap_or_default(),
             preview: format_preview,
             target_version,
+            per_file_target_version: per_file_target_version.clone(),
             line_width: self
                 .line_length
                 .map_or(format_defaults.line_width, |length| {
@@ -280,9 +284,7 @@ impl Configuration {
                 extension: self.extension.unwrap_or_default(),
                 preview: lint_preview,
                 target_version,
-                per_file_target_version: CompiledPerFileVersionList::resolve(
-                    self.per_file_target_version.unwrap_or_default(),
-                )?,
+                per_file_target_version,
                 project_root: project_root.to_path_buf(),
                 allowed_confusables: lint
                     .allowed_confusables
