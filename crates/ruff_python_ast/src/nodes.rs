@@ -824,6 +824,17 @@ pub struct ExprFString {
     pub value: FStringValue,
 }
 
+impl ExprFString {
+    /// Returns the single [`FString`] if the f-string isn't implicitly concatenated, [`None`]
+    /// otherwise.
+    pub const fn as_single_part_fstring(&self) -> Option<&FString> {
+        match &self.value.inner {
+            FStringValueInner::Single(FStringPart::FString(fstring)) => Some(fstring),
+            _ => None,
+        }
+    }
+}
+
 /// The value representing an [`ExprFString`].
 #[derive(Clone, Debug, PartialEq)]
 pub struct FStringValue {
@@ -854,15 +865,6 @@ impl FStringValue {
     /// Returns `true` if the f-string is implicitly concatenated, `false` otherwise.
     pub fn is_implicit_concatenated(&self) -> bool {
         matches!(self.inner, FStringValueInner::Concatenated(_))
-    }
-
-    /// Returns the single [`FString`] if the f-string isn't implicitly concatenated, [`None`]
-    /// otherwise.
-    pub fn as_single(&self) -> Option<&FString> {
-        match &self.inner {
-            FStringValueInner::Single(FStringPart::FString(fstring)) => Some(fstring),
-            _ => None,
-        }
     }
 
     /// Returns a slice of all the [`FStringPart`]s contained in this value.
@@ -1290,7 +1292,7 @@ pub struct ExprStringLiteral {
 impl ExprStringLiteral {
     /// Return `Some(literal)` if the string only consists of a single `StringLiteral` part
     /// (indicating that it is not implicitly concatenated). Otherwise, return `None`.
-    pub fn as_unconcatenated_literal(&self) -> Option<&StringLiteral> {
+    pub fn as_single_part_string(&self) -> Option<&StringLiteral> {
         match &self.value.inner {
             StringLiteralValueInner::Single(value) => Some(value),
             StringLiteralValueInner::Concatenated(_) => None,
@@ -1726,6 +1728,17 @@ impl Debug for ConcatenatedStringLiteral {
 pub struct ExprBytesLiteral {
     pub range: TextRange,
     pub value: BytesLiteralValue,
+}
+
+impl ExprBytesLiteral {
+    /// Return `Some(literal)` if the bytestring only consists of a single `BytesLiteral` part
+    /// (indicating that it is not implicitly concatenated). Otherwise, return `None`.
+    pub const fn as_single_part_bytestring(&self) -> Option<&BytesLiteral> {
+        match &self.value.inner {
+            BytesLiteralValueInner::Single(value) => Some(value),
+            BytesLiteralValueInner::Concatenated(_) => None,
+        }
+    }
 }
 
 /// The value representing a [`ExprBytesLiteral`].

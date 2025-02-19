@@ -138,7 +138,7 @@ pub(crate) fn parse_string_annotation(
 
     let source = source_text(db.upcast(), file);
 
-    if let Some(string_literal) = string_expr.as_unconcatenated_literal() {
+    if let Some(string_literal) = string_expr.as_single_part_string() {
         let prefix = string_literal.flags.prefix();
         if prefix.is_raw() {
             context.report_lint(
