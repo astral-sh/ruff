@@ -10,10 +10,10 @@ use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::Diagnostic;
 use ruff_notebook::Notebook;
-use ruff_python_ast::{ModModule, PySourceType};
+use ruff_python_ast::{ModModule, PySourceType, PythonVersion};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
-use ruff_python_parser::{ParseError, Parsed, SyntaxError};
+use ruff_python_parser::{ParseError, ParseOptions, Parsed, SyntaxError};
 use ruff_source_file::SourceFileBuilder;
 use ruff_text_size::Ranged;
 
@@ -335,7 +335,8 @@ pub fn add_noqa_to_path(
     settings: &LinterSettings,
 ) -> Result<usize> {
     // Parse once.
-    let parsed = ruff_python_parser::parse_unchecked_source(source_kind.source_code(), source_type);
+    // TODO(brent) resolve_target_version(path) here
+    let parsed = parse_unchecked_source(source_kind, source_type, settings.target_version);
 
     // Map row and column locations to byte slices (lazily).
     let locator = Locator::new(source_kind.source_code());
@@ -393,7 +394,8 @@ pub fn lint_only(
     source_type: PySourceType,
     source: ParseSource,
 ) -> LinterResult {
-    let parsed = source.into_parsed(source_kind, source_type);
+    // TODO(brent) resolve_target_version(path) here
+    let parsed = source.into_parsed(source_kind, source_type, settings.target_version);
 
     // Map row and column locations to byte slices (lazily).
     let locator = Locator::new(source_kind.source_code());
@@ -501,8 +503,8 @@ pub fn lint_fix<'a>(
     // Continuously fix until the source code stabilizes.
     loop {
         // Parse once.
-        let parsed =
-            ruff_python_parser::parse_unchecked_source(transformed.source_code(), source_type);
+        // TODO(brent) resolve_target_version(path) here
+        let parsed = parse_unchecked_source(&transformed, source_type, settings.target_version);
 
         // Map row and column locations to byte slices (lazily).
         let locator = Locator::new(transformed.source_code());
@@ -688,14 +690,33 @@ pub enum ParseSource {
 impl ParseSource {
     /// Consumes the [`ParseSource`] and returns the parsed [`Parsed`], parsing the source code if
     /// necessary.
-    fn into_parsed(self, source_kind: &SourceKind, source_type: PySourceType) -> Parsed<ModModule> {
+    fn into_parsed(
+        self,
+        source_kind: &SourceKind,
+        source_type: PySourceType,
+        target_version: PythonVersion,
+    ) -> Parsed<ModModule> {
         match self {
-            ParseSource::None => {
-                ruff_python_parser::parse_unchecked_source(source_kind.source_code(), source_type)
-            }
+            ParseSource::None => parse_unchecked_source(source_kind, source_type, target_version),
             ParseSource::Precomputed(parsed) => parsed,
         }
     }
+}
+
+/// Like [`ruff_python_parser::parse_unchecked_source`] but with an additional [`PythonVersion`]
+/// argument.
+fn parse_unchecked_source(
+    source_kind: &SourceKind,
+    source_type: PySourceType,
+    target_version: PythonVersion,
+) -> Parsed<ModModule> {
+    let options = ParseOptions::from(source_type).with_target_version(target_version);
+    // SAFETY: Safe because `PySourceType` always parses to a `ModModule`. See
+    // `ruff_python_parser::parse_unchecked_source`. We use `parse_unchecked` (and thus
+    // have to unwrap) in order to pass the `PythonVersion` via `ParseOptions`.
+    ruff_python_parser::parse_unchecked(source_kind.source_code(), options)
+        .try_into_module()
+        .expect("PySourceType always parses into a module")
 }
 
 #[cfg(test)]
