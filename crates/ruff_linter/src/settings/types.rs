@@ -707,14 +707,6 @@ impl CompiledPerFileVersionList {
     }
 }
 
-impl Deref for CompiledPerFileVersionList {
-    type Target = Vec<CompiledPerFileVersion>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.versions
-    }
-}
-
 #[cfg(test)]
 mod tests {
     #[test]
