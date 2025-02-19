@@ -4100,7 +4100,9 @@ pub(crate) mod tests {
         );
         let events = db.take_salsa_events();
 
-        let call = &*parsed_module(&db, bar).syntax().body[1]
+        let call = &*parsed_module(&db, bar, PythonVersion::default())
+            .syntax()
+            .body[1]
             .as_assign_stmt()
             .unwrap()
             .value;

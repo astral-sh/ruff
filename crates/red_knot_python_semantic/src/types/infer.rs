@@ -32,7 +32,7 @@ use itertools::{Either, Itertools};
 use ruff_db::diagnostic::{DiagnosticId, Severity};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
-use ruff_python_ast::{self as ast, AnyNodeRef, ExprContext};
+use ruff_python_ast::{self as ast, AnyNodeRef, ExprContext, PythonVersion};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxHashMap, FxHashSet};
 use salsa;
@@ -541,7 +541,14 @@ impl<'db> TypeInferenceBuilder<'db> {
         let node = scope.node(self.db());
         match node {
             NodeWithScopeKind::Module => {
-                let parsed = parsed_module(self.db().upcast(), self.file());
+                // TODO(brent) need to pass the real PythonVersion here, but tests fail when I
+                // change it from PythonVersion::default()
+                //
+                // I've tried my hacky `python_version` helper function and also
+                // `Program::get(db).python_version(db)`, and many tests fail in both cases (18 with
+                // `python_version`, 19 with `Program::get`)
+                let parsed =
+                    parsed_module(self.db().upcast(), self.file(), PythonVersion::default());
                 self.infer_module(parsed.syntax());
             }
             NodeWithScopeKind::Function(function) => self.infer_function_body(function.node()),
@@ -6740,7 +6747,7 @@ mod tests {
     fn dependency_implicit_instance_attribute() -> anyhow::Result<()> {
         fn x_rhs_expression(db: &TestDb) -> Expression<'_> {
             let file_main = system_path_to_file(db, "/src/main.py").unwrap();
-            let ast = parsed_module(db, file_main);
+            let ast = parsed_module(db, file_main, PythonVersion::default());
             // Get the second statement in `main.py` (x = …) and extract the expression
             // node on the right-hand side:
             let x_rhs_node = &ast.syntax().body[1].as_assign_stmt().unwrap().value;

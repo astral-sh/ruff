@@ -4,7 +4,9 @@ use camino::Utf8Path;
 use colored::Colorize;
 use parser as test_parser;
 use red_knot_python_semantic::types::check_types;
-use red_knot_python_semantic::{Program, ProgramSettings, SearchPathSettings, SitePackages};
+use red_knot_python_semantic::{
+    python_version, Program, ProgramSettings, SearchPathSettings, SitePackages,
+};
 use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig, ParseDiagnostic};
 use ruff_db::files::{system_path_to_file, File, Files};
 use ruff_db::panic::catch_unwind;
@@ -193,7 +195,7 @@ fn run_test(
     let failures: Failures = test_files
         .into_iter()
         .filter_map(|test_file| {
-            let parsed = parsed_module(db, test_file.file);
+            let parsed = parsed_module(db, test_file.file, python_version(db));
 
             let mut diagnostics: Vec<Box<_>> = parsed
                 .errors()
