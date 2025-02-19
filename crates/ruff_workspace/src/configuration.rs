@@ -139,7 +139,7 @@ pub struct Configuration {
     pub namespace_packages: Option<Vec<PathBuf>>,
     pub src: Option<Vec<PathBuf>>,
     pub target_version: Option<ast::PythonVersion>,
-    pub per_file_target_version: Option<FxHashMap<String, ast::PythonVersion>>,
+    pub per_file_target_version: Option<Vec<PerFileVersion>>,
 
     // Global formatting options
     pub line_length: Option<LineLength>,
@@ -176,17 +176,8 @@ impl Configuration {
             PreviewMode::Enabled => ruff_python_formatter::PreviewMode::Enabled,
         };
 
-        let per_file_target_version = match self.per_file_target_version {
-            Some(versions) => CompiledPerFileVersionList::resolve(
-                versions
-                    .into_iter()
-                    .map(|(pattern, version)| {
-                        PerFileVersion::new(pattern, version, Some(project_root))
-                    })
-                    .collect(),
-            )?,
-            None => CompiledPerFileVersionList::default(),
-        };
+        let per_file_target_version =
+            CompiledPerFileVersionList::resolve(self.per_file_target_version.unwrap_or_default())?;
 
         let formatter = FormatterSettings {
             exclude: FilePatternSet::try_from_iter(format.exclude.unwrap_or_default())?,
@@ -468,13 +459,6 @@ impl Configuration {
             }
         };
 
-        let per_file_target_version = options.per_file_target_version.map(|versions| {
-            versions
-                .into_iter()
-                .map(|(glob, version)| (glob, ast::PythonVersion::from(version)))
-                .collect()
-        });
-
         Ok(Self {
             builtins: options.builtins,
             cache_dir: options
@@ -556,7 +540,18 @@ impl Configuration {
                 .map(|src| resolve_src(&src, project_root))
                 .transpose()?,
             target_version: options.target_version.map(ast::PythonVersion::from),
-            per_file_target_version,
+            per_file_target_version: options.per_file_target_version.map(|versions| {
+                versions
+                    .into_iter()
+                    .map(|(pattern, version)| {
+                        PerFileVersion::new(
+                            pattern,
+                            ast::PythonVersion::from(version),
+                            Some(project_root),
+                        )
+                    })
+                    .collect()
+            }),
             // `--extension` is a hidden command-line argument that isn't supported in configuration
             // files at present.
             extension: None,
