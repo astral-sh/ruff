@@ -27,7 +27,7 @@ use crate::semantic_index::ast_ids::HasScopedExpressionId;
 use crate::semantic_index::attribute_assignment::AttributeAssignment;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::expression::Expression;
-use crate::semantic_index::symbol::ScopeId;
+use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId};
 use crate::semantic_index::{
     attribute_assignments, imported_modules, semantic_index, symbol_table, use_def_map,
 };
@@ -3945,21 +3945,17 @@ impl<'db> Class<'db> {
     /// A helper function for `instance_member` that looks up the `name` attribute only on
     /// this class, not on its superclasses.
     fn own_instance_member(self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
-        // TODO: There are many things that are not yet implemented here:
-        // - `typing.Final`
-        // - Proper diagnostics
-        // - Handling of possibly-undeclared/possibly-unbound attributes
-        // - The descriptor protocol
-
-        let body_scope = self.body_scope(db);
-        let table = symbol_table(db, body_scope);
-
-        if let Some(symbol_id) = table.symbol_id_by_name(name) {
-            let use_def = use_def_map(db, body_scope);
+        #[salsa::tracked]
+        fn symbol_ty<'db>(
+            db: &'db dyn Db,
+            class: Class<'db>,
+            symbol_id: ScopedSymbolId,
+        ) -> Result<SymbolAndQualifiers<'db>, Option<Type<'db>>> {
+            let use_def = use_def_map(db, class.body_scope(db));
 
             let declarations = use_def.public_declarations(symbol_id);
 
-            match symbol_from_declarations(db, declarations) {
+            Ok(match symbol_from_declarations(db, declarations) {
                 Ok(SymbolAndQualifiers(Symbol::Type(declared_ty, _), qualifiers)) => {
                     // The attribute is declared in the class body.
 
@@ -3984,7 +3980,7 @@ impl<'db> Class<'db> {
                     let inferred = symbol_from_bindings(db, bindings);
                     let inferred_ty = inferred.ignore_possibly_unbound();
 
-                    Self::implicit_instance_attribute(db, body_scope, name, inferred_ty).into()
+                    return Err(inferred_ty);
                 }
                 Err((declared_ty, _conflicting_declarations)) => {
                     // There are conflicting declarations for this attribute in the class body.
@@ -3992,6 +3988,23 @@ impl<'db> Class<'db> {
                         Symbol::bound(declared_ty.inner_type()),
                         declared_ty.qualifiers(),
                     )
+                }
+            })
+        }
+        // TODO: There are many things that are not yet implemented here:
+        // - `typing.Final`
+        // - Proper diagnostics
+        // - Handling of possibly-undeclared/possibly-unbound attributes
+        // - The descriptor protocol
+
+        let body_scope = self.body_scope(db);
+        let table = symbol_table(db, body_scope);
+
+        if let Some(symbol_id) = table.symbol_id_by_name(name) {
+            match symbol_ty(db, self, symbol_id) {
+                Ok(symbol) => symbol,
+                Err(inferred_ty) => {
+                    Self::implicit_instance_attribute(db, body_scope, name, inferred_ty).into()
                 }
             }
         } else {
