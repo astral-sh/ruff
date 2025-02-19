@@ -2568,14 +2568,25 @@ fn a005_module_shadowing_strict_default() -> Result<()> {
     Ok(())
 }
 
+/// Test that the linter respects per-file-target-version.
 #[test]
-fn per_file_target_version_exists() {
+fn per_file_target_version_linter() {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
+        .args(["--target-version", "py312"])
         .args(["--config", r#"per-file-target-version = {"test.py" = "py311"}"#])
-        .args(["--select", "A005"]) // something that won't trigger
+        .args(["--select", "UP046"]) // only triggers on 3.12+
+        .args(["--stdin-filename", "test.py"])
+        .arg("--preview")
         .arg("-")
-        .pass_stdin("1"),
+        .pass_stdin(r#"
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class A(Generic[T]):
+    var: T
+"#),
         @r"
     success: true
     exit_code: 0
