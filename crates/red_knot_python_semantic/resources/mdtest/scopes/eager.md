@@ -108,7 +108,10 @@ def evaluated_later():
     print(next(y))
 ```
 
-Though note that “the iterable expression in the leftmost for clause is immediately evaluated”:
+Though note that “the iterable expression in the leftmost `for` clause is immediately evaluated”
+[[spec][generators]]:
+
+[generators]: https://docs.python.org/3/reference/expressions.html#generator-expressions
 
 ```py
 def iterable_evaluated_eagerly():
