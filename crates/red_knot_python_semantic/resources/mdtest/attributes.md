@@ -593,7 +593,7 @@ C.class_method()
 reveal_type(C.pure_class_variable)  # revealed: Unknown
 
 # TODO: should be no error when descriptor protocol is supported
-# and the assignment is properly attrbiuted to the class method.
+# and the assignment is properly attributed to the class method.
 # error: [invalid-attribute-access] "Cannot assign to instance attribute `pure_class_variable` from the class object `Literal[C]`"
 C.pure_class_variable = "overwritten on class"
 
