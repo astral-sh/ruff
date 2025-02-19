@@ -812,6 +812,25 @@ impl<'db> Type<'db> {
                 true
             }
 
+            // TODO: This is a workaround to avoid false positives (e.g. when checking function calls
+            // with `SupportsIndex` parameters), which should be removed when we understand protocols.
+            (lhs, Type::Instance(InstanceType { class }))
+                if class.is_known(db, KnownClass::SupportsIndex) =>
+            {
+                match lhs {
+                    Type::Instance(InstanceType { class })
+                        if matches!(
+                            class.known(db),
+                            Some(KnownClass::Int | KnownClass::SupportsIndex)
+                        ) =>
+                    {
+                        true
+                    }
+                    Type::IntLiteral(_) => true,
+                    _ => false,
+                }
+            }
+
             // TODO other types containing gradual forms (e.g. generics containing Any/Unknown)
             _ => self.is_subtype_of(db, target),
         }
@@ -1370,6 +1389,7 @@ impl<'db> Type<'db> {
                     | KnownClass::DefaultDict
                     | KnownClass::Deque
                     | KnownClass::OrderedDict
+                    | KnownClass::SupportsIndex
                     | KnownClass::StdlibAlias
                     | KnownClass::TypeVar,
                 ) => false,
@@ -2604,6 +2624,8 @@ pub enum KnownClass {
     TypeVar,
     TypeAliasType,
     NoDefaultType,
+    // TODO: This can probably be removed when we have support for protocols
+    SupportsIndex,
     // Collections
     ChainMap,
     Counter,
@@ -2654,6 +2676,7 @@ impl<'db> KnownClass {
             Self::TypeVar => "TypeVar",
             Self::TypeAliasType => "TypeAliasType",
             Self::NoDefaultType => "_NoDefaultType",
+            Self::SupportsIndex => "SupportsIndex",
             Self::ChainMap => "ChainMap",
             Self::Counter => "Counter",
             Self::DefaultDict => "defaultdict",
@@ -2735,9 +2758,11 @@ impl<'db> KnownClass {
             | Self::MethodWrapperType
             | Self::WrapperDescriptorType => KnownModule::Types,
             Self::NoneType => KnownModule::Typeshed,
-            Self::SpecialForm | Self::TypeVar | Self::TypeAliasType | Self::StdlibAlias => {
-                KnownModule::Typing
-            }
+            Self::SpecialForm
+            | Self::TypeVar
+            | Self::TypeAliasType
+            | Self::StdlibAlias
+            | Self::SupportsIndex => KnownModule::Typing,
             Self::NoDefaultType => {
                 let python_version = Program::get(db).python_version(db);
 
@@ -2809,6 +2834,7 @@ impl<'db> KnownClass {
             | Self::Deque
             | Self::OrderedDict
             | Self::StdlibAlias
+            | Self::SupportsIndex
             | Self::BaseException
             | Self::BaseExceptionGroup
             | Self::TypeVar => false,
@@ -2854,6 +2880,7 @@ impl<'db> KnownClass {
             "_Alias" => Self::StdlibAlias,
             "_SpecialForm" => Self::SpecialForm,
             "_NoDefaultType" => Self::NoDefaultType,
+            "SupportsIndex" => Self::SupportsIndex,
             "_version_info" => Self::VersionInfo,
             "ellipsis" if Program::get(db).python_version(db) <= PythonVersion::PY39 => {
                 Self::EllipsisType
@@ -2906,7 +2933,7 @@ impl<'db> KnownClass {
             | Self::MethodWrapperType
             | Self::WrapperDescriptorType => module == self.canonical_module(db),
             Self::NoneType => matches!(module, KnownModule::Typeshed | KnownModule::Types),
-            Self::SpecialForm | Self::TypeVar | Self::TypeAliasType | Self::NoDefaultType => {
+            Self::SpecialForm | Self::TypeVar | Self::TypeAliasType | Self::NoDefaultType | Self::SupportsIndex => {
                 matches!(module, KnownModule::Typing | KnownModule::TypingExtensions)
             }
         }
