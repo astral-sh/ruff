@@ -4,8 +4,6 @@ use crate::{AsMode, Mode};
 
 /// Options for controlling how a source file is parsed.
 ///
-/// This currently only includes the [`Mode`].
-///
 /// You can construct a [`ParseOptions`] directly from a [`Mode`]:
 ///
 /// ```
