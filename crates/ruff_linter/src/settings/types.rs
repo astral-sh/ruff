@@ -635,9 +635,34 @@ impl Deref for CompiledPerFileIgnoreList {
     }
 }
 
+// This struct and its `new` implementation are adapted directly from `PerFileIgnore`, minus the
+// `negated` field
+#[derive(Debug, Clone)]
+pub struct PerFileVersion {
+    pub(crate) basename: String,
+    pub(crate) absolute: PathBuf,
+    pub(crate) version: ast::PythonVersion,
+}
+
+impl PerFileVersion {
+    pub fn new(pattern: String, version: ast::PythonVersion, project_root: Option<&Path>) -> Self {
+        let absolute = match project_root {
+            Some(project_root) => fs::normalize_path_to(&pattern, project_root),
+            None => fs::normalize_path(&pattern),
+        };
+
+        Self {
+            basename: pattern,
+            absolute,
+            version,
+        }
+    }
+}
+
 #[derive(Debug, Clone, CacheKey)]
 pub struct CompiledPerFileVersion {
-    pub matcher: GlobMatcher,
+    pub absolute_matcher: GlobMatcher,
+    pub basename_matcher: GlobMatcher,
     pub version: ast::PythonVersion,
 }
 
@@ -648,13 +673,21 @@ pub struct CompiledPerFileVersionList {
 
 impl CompiledPerFileVersionList {
     /// Given a list of patterns, create a `GlobSet`.
-    pub fn resolve(per_file_ignores: FxHashMap<String, ast::PythonVersion>) -> Result<Self> {
+    pub fn resolve(per_file_ignores: Vec<PerFileVersion>) -> Result<Self> {
         let versions: Result<Vec<_>> = per_file_ignores
             .into_iter()
-            .map(|(pattern, version)| {
+            .map(|per_file_version| {
+                // Construct absolute path matcher.
+                let absolute_matcher =
+                    Glob::new(&per_file_version.absolute.to_string_lossy())?.compile_matcher();
+
+                // Construct basename matcher.
+                let basename_matcher = Glob::new(&per_file_version.basename)?.compile_matcher();
+
                 Ok(CompiledPerFileVersion {
-                    matcher: Glob::new(&pattern)?.compile_matcher(),
-                    version,
+                    absolute_matcher,
+                    basename_matcher,
+                    version: per_file_version.version,
                 })
             })
             .collect();
@@ -664,9 +697,13 @@ impl CompiledPerFileVersionList {
     }
 
     pub fn is_match(&self, path: &Path) -> Option<ast::PythonVersion> {
-        self.versions
-            .iter()
-            .find_map(|v| v.matcher.is_match(path).then_some(v.version))
+        self.versions.iter().find_map(|v| {
+            if v.absolute_matcher.is_match(path) || v.basename_matcher.is_match(path) {
+                Some(v.version)
+            } else {
+                None
+            }
+        })
     }
 }
 

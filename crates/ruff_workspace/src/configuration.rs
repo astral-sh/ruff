@@ -30,7 +30,8 @@ use ruff_linter::settings::fix_safety_table::FixSafetyTable;
 use ruff_linter::settings::rule_table::RuleTable;
 use ruff_linter::settings::types::{
     CompiledPerFileIgnoreList, CompiledPerFileVersionList, ExtensionMapping, FilePattern,
-    FilePatternSet, OutputFormat, PerFileIgnore, PreviewMode, RequiredVersion, UnsafeFixes,
+    FilePatternSet, OutputFormat, PerFileIgnore, PerFileVersion, PreviewMode, RequiredVersion,
+    UnsafeFixes,
 };
 use ruff_linter::settings::{LinterSettings, DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX, TASK_TAGS};
 use ruff_linter::{
@@ -175,8 +176,17 @@ impl Configuration {
             PreviewMode::Enabled => ruff_python_formatter::PreviewMode::Enabled,
         };
 
-        let per_file_target_version =
-            CompiledPerFileVersionList::resolve(self.per_file_target_version.unwrap_or_default())?;
+        let per_file_target_version = match self.per_file_target_version {
+            Some(versions) => CompiledPerFileVersionList::resolve(
+                versions
+                    .into_iter()
+                    .map(|(pattern, version)| {
+                        PerFileVersion::new(pattern, version, Some(project_root))
+                    })
+                    .collect(),
+            )?,
+            None => CompiledPerFileVersionList::default(),
+        };
 
         let formatter = FormatterSettings {
             exclude: FilePatternSet::try_from_iter(format.exclude.unwrap_or_default())?,
