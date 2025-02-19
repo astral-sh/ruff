@@ -109,9 +109,7 @@ def evaluated_later():
 ```
 
 Though note that “the iterable expression in the leftmost `for` clause is immediately evaluated”
-[[spec][generators]]:
-
-[generators]: https://docs.python.org/3/reference/expressions.html#generator-expressions
+\[[spec][generators]\]:
 
 ```py
 def iterable_evaluated_eagerly():
@@ -380,3 +378,5 @@ reveal_type(C.var)  # revealed: Unknown | str
 
 x = str
 ```
+
+[generators]: https://docs.python.org/3/reference/expressions.html#generator-expressions
