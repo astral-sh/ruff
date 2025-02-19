@@ -3445,7 +3445,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             bindings: _,
                             errors,
                         } => {
-                            if let Some(first) = Vec::from(errors).into_iter().next() {
+                            if let Some(first) = IntoIterator::into_iter(errors).next() {
                                 report_call_error(context, first, call_expression);
                             } else {
                                 debug_assert!(
