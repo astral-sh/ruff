@@ -10,7 +10,6 @@ use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::Diagnostic;
 use ruff_notebook::Notebook;
-use ruff_python_ast::PythonVersion;
 use ruff_python_ast::{ModModule, PySourceType};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
@@ -432,25 +431,23 @@ pub fn lint_only(
         messages: diagnostics_to_messages(
             diagnostics,
             parsed.errors(),
-            parsed.syntax_errors(settings.target_version),
+            parsed.syntax_errors(),
             path,
             &locator,
             &directives,
-            settings.target_version,
         ),
         has_syntax_error: !parsed.is_valid(),
     }
 }
 
 /// Convert from diagnostics to messages.
-fn diagnostics_to_messages<'a>(
+fn diagnostics_to_messages(
     diagnostics: Vec<Diagnostic>,
     parse_errors: &[ParseError],
-    syntax_errors: impl Iterator<Item = &'a SyntaxError>,
+    syntax_errors: &[SyntaxError],
     path: &Path,
     locator: &Locator,
     directives: &Directives,
-    target_version: PythonVersion,
 ) -> Vec<Message> {
     let file = LazyCell::new(|| {
         let mut builder =
@@ -466,9 +463,11 @@ fn diagnostics_to_messages<'a>(
     parse_errors
         .iter()
         .map(|parse_error| Message::from_parse_error(parse_error, locator, file.deref().clone()))
-        .chain(syntax_errors.map(|syntax_error| {
-            Message::from_syntax_error(syntax_error, file.deref().clone(), target_version)
-        }))
+        .chain(
+            syntax_errors
+                .iter()
+                .map(|syntax_error| Message::from_syntax_error(syntax_error, file.deref().clone())),
+        )
         .chain(diagnostics.into_iter().map(|diagnostic| {
             let noqa_offset = directives.noqa_line_for.resolve(diagnostic.start());
             Message::from_diagnostic(diagnostic, file.deref().clone(), noqa_offset)
@@ -586,11 +585,10 @@ pub fn lint_fix<'a>(
                 messages: diagnostics_to_messages(
                     diagnostics,
                     parsed.errors(),
-                    parsed.syntax_errors(settings.target_version),
+                    parsed.syntax_errors(),
                     path,
                     &locator,
                     &directives,
-                    settings.target_version,
                 ),
                 has_syntax_error: !is_valid_syntax,
             },

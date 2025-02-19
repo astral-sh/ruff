@@ -3,7 +3,6 @@ use std::collections::BTreeMap;
 use std::io::Write;
 use std::ops::Deref;
 
-use ruff_python_ast::PythonVersion;
 use rustc_hash::FxHashMap;
 
 pub use azure::AzureEmitter;
@@ -123,14 +122,10 @@ impl Message {
     }
 
     /// Create a [`Message`] from the given [`SyntaxError`].
-    pub fn from_syntax_error(
-        syntax_error: &SyntaxError,
-        file: SourceFile,
-        target_version: PythonVersion,
-    ) -> Message {
+    pub fn from_syntax_error(syntax_error: &SyntaxError, file: SourceFile) -> Message {
         match syntax_error.kind {
             SyntaxErrorKind::MatchBeforePy310 => Message::SyntaxError(SyntaxErrorMessage {
-                message: format!("SyntaxError: {}", syntax_error.message(target_version)),
+                message: format!("SyntaxError: {}", syntax_error.message()),
                 range: syntax_error.range,
                 file,
             }),
