@@ -73,3 +73,6 @@ class TestClass:
 
     def __eq__(self, *, other=42):  # support positional-only args
         ...
+
+    def __setitem__(self, key, /, value, extra_value): # too many args with positional-only args
+        ...

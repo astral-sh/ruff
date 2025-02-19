@@ -71,3 +71,12 @@ unexpected_special_method_signature.py:65:9: PLE0302 The special method `__round
    |         ^^^^^^^^^ PLE0302
 66 |         ...
    |
+
+unexpected_special_method_signature.py:77:9: PLE0302 The special method `__setitem__` expects 3 parameters, 4 were given
+   |
+75 |         ...
+76 |
+77 |     def __setitem__(self, key, /, value, extra_value): # too many args with positional-only args
+   |         ^^^^^^^^^^^ PLE0302
+78 |         ...
+   |
