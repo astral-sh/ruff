@@ -13,18 +13,13 @@ than you would get from running one of these more established tools.
 
 ## Contributing
 
-The crate structure is as follow:
-
-- `red_knot`: Command line interface
-- `red_knot_project`: Project discovering
-- `red_knot_python_semantic`: Core type checking
-- `red_knot_server`: Language server implementation
-- `red_knot_test`: Type inference test framework
-- `red_knot_vendored`: Public Red-Knot-specific Python APIs
-- `ruff_db`: File-related infrastructure and rule registry
-
-See their corresponding `README.md`, if any, for more information.
+Core type checking tests are written as Markdown code blocks.
+They can be found in [`red_knot_python_semantic/resources/mdtest`][resources-mdtest].
+See [`red_knot_test/README.md`][mdtest-readme] for more information on
+the test framework itself.
 
 The list of open issues can be found [here][open-issues].
 
+[resources-mdtest]: ../red_knot_python_semantic/resources/mdtest
+[mdtest-readme]: ../red_knot_test/README.md
 [open-issues]: https://github.com/astral-sh/ruff/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20label%3Ared-knot
