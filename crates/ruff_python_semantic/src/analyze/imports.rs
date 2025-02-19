@@ -135,7 +135,7 @@ pub fn is_pytest_importorskip(stmt: &Stmt, semantic: &SemanticModel) -> bool {
 ///
 /// site.addsitedir(...)
 /// ```
-pub fn is_module_search_path_modification(stmt: &Stmt, semantic: &SemanticModel) -> bool {
+pub fn is_site_sys_path_modification(stmt: &Stmt, semantic: &SemanticModel) -> bool {
     if let Stmt::Expr(ast::StmtExpr { value, .. }) = stmt {
         if let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() {
             return semantic
