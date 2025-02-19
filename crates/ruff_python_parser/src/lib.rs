@@ -76,8 +76,7 @@ pub use crate::token::{Token, TokenKind};
 use crate::parser::Parser;
 
 use ruff_python_ast::{
-    Expr, Mod, ModExpression, ModModule, PySourceType, PythonVersion, StringFlags, StringLiteral,
-    Suite,
+    Expr, Mod, ModExpression, ModModule, PySourceType, StringFlags, StringLiteral, Suite,
 };
 use ruff_python_trivia::CommentRanges;
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -327,14 +326,9 @@ impl<T> Parsed<T> {
         &self.errors
     }
 
-    /// Returns the syntax errors for `target_version`.
-    pub fn syntax_errors(
-        &self,
-        target_version: PythonVersion,
-    ) -> impl Iterator<Item = &SyntaxError> {
-        self.syntax_errors
-            .iter()
-            .filter(move |error| target_version < error.version())
+    /// Returns a list of version-related syntax errors found during parsing.
+    pub fn syntax_errors(&self) -> &[SyntaxError] {
+        &self.syntax_errors
     }
 
     /// Consumes the [`Parsed`] output and returns the contained syntax node.

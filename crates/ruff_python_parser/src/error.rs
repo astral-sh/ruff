@@ -431,15 +431,16 @@ impl std::fmt::Display for LexicalErrorType {
 pub struct SyntaxError {
     pub kind: SyntaxErrorKind,
     pub range: TextRange,
+    pub target_version: PythonVersion,
 }
 
 impl SyntaxError {
-    pub fn message(&self, target_version: PythonVersion) -> String {
+    pub fn message(&self) -> String {
         match self.kind {
             SyntaxErrorKind::MatchBeforePy310 => format!(
                 "Cannot use `match` statement on Python {major}.{minor} (syntax was new in Python 3.10)",
-                major = target_version.major,
-                minor = target_version.minor,
+                major = self.target_version.major,
+                minor = self.target_version.minor,
             ),
         }
     }

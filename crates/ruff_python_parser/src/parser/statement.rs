@@ -5,7 +5,8 @@ use rustc_hash::{FxBuildHasher, FxHashSet};
 
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{
-    self as ast, ExceptHandler, Expr, ExprContext, IpyEscapeKind, Operator, Stmt, WithItem,
+    self as ast, ExceptHandler, Expr, ExprContext, IpyEscapeKind, Operator, PythonVersion, Stmt,
+    WithItem,
 };
 use ruff_text_size::{Ranged, TextSize};
 
@@ -2264,10 +2265,13 @@ impl<'src> Parser<'src> {
 
         let range = self.node_range(start);
 
-        self.syntax_errors.push(SyntaxError {
-            kind: SyntaxErrorKind::MatchBeforePy310,
-            range,
-        });
+        if self.options.target_version < PythonVersion::PY310 {
+            self.syntax_errors.push(SyntaxError {
+                kind: SyntaxErrorKind::MatchBeforePy310,
+                range,
+                target_version: self.options.target_version,
+            });
+        }
 
         ast::StmtMatch {
             subject: Box::new(subject),
