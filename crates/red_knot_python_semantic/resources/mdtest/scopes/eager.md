@@ -314,7 +314,7 @@ def _():
     x = 2
 ```
 
-## Eager scope within a lazy scope within another eager scope
+### Eager scope within a lazy scope within another eager scope
 
 We have a list comprehension (eager scope), enclosed within a function definition (lazy scope),
 enclosed within a class definition (eager scope), all of which we must pass through before
