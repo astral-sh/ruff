@@ -223,6 +223,8 @@ pub(crate) struct Checker<'a> {
     last_stmt_end: TextSize,
     /// A state describing if a docstring is expected or not.
     docstring_state: DocstringState,
+    /// The target [`PythonVersion`] for version-dependent checks
+    target_version: PythonVersion,
 }
 
 impl<'a> Checker<'a> {
@@ -273,6 +275,7 @@ impl<'a> Checker<'a> {
             notebook_index,
             last_stmt_end: TextSize::default(),
             docstring_state: DocstringState::default(),
+            target_version,
         }
     }
 }
@@ -502,8 +505,9 @@ impl<'a> Checker<'a> {
         }
     }
 
-    pub(crate) fn target_version(&self) -> PythonVersion {
-        self.settings.resolve_target_version(self.path)
+    /// Return the [`PythonVersion`] to use for version-related checks.
+    pub(crate) const fn target_version(&self) -> PythonVersion {
+        self.target_version
     }
 }
 
