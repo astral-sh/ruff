@@ -92,6 +92,38 @@ def _():
     x = 2
 ```
 
+But that does lead to incorrect results when the generator expression isn't run immediately:
+
+```py
+def evaluated_later():
+    x = 1
+
+    # revealed: Literal[1]
+    y = (reveal_type(x) for a in range(1))
+
+    x = 2
+
+    # The generator isn't evaluated until here, so at runtime, `x` will evaluate to 2, contradicting
+    # our inferred type.
+    print(next(y))
+```
+
+Though note that “the iterable expression in the leftmost for clause is immediately evaluated”:
+
+```py
+def iterable_evaluated_eagerly():
+    x = 1
+
+    # revealed: Literal[1]
+    y = (a for a in [reveal_type(x)])
+
+    x = 2
+
+    # Even though the generator isn't evaluated until here, the first iterable was evaluated
+    # immediately, so our inferred type is correct.
+    print(next(y))
+```
+
 ## Top-level eager scopes
 
 All of the above examples behave identically when the eager scopes are directly nested in the global
@@ -154,6 +186,36 @@ x = 1
 list(reveal_type(x) for a in range(1))
 
 x = 2
+```
+
+`evaluated_later.py`:
+
+```py
+x = 1
+
+# revealed: Literal[1]
+y = (reveal_type(x) for a in range(1))
+
+x = 2
+
+# The generator isn't evaluated until here, so at runtime, `x` will evaluate to 2, contradicting
+# our inferred type.
+print(next(y))
+```
+
+`iterable_evaluated_eagerly.py`:
+
+```py
+x = 1
+
+# revealed: Literal[1]
+y = (a for a in [reveal_type(x)])
+
+x = 2
+
+# Even though the generator isn't evaluated until here, the first iterable was evaluated
+# immediately, so our inferred type is correct.
+print(next(y))
 ```
 
 ## Lazy scopes are "sticky"
