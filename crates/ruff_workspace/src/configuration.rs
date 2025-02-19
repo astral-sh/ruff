@@ -138,6 +138,7 @@ pub struct Configuration {
     pub namespace_packages: Option<Vec<PathBuf>>,
     pub src: Option<Vec<PathBuf>>,
     pub target_version: Option<ast::PythonVersion>,
+    pub per_file_target_version: Option<FxHashMap<String, ast::PythonVersion>>,
 
     // Global formatting options
     pub line_length: Option<LineLength>,
@@ -279,6 +280,7 @@ impl Configuration {
                 extension: self.extension.unwrap_or_default(),
                 preview: lint_preview,
                 target_version,
+                per_file_target_version: self.per_file_target_version.unwrap_or_default(),
                 project_root: project_root.to_path_buf(),
                 allowed_confusables: lint
                     .allowed_confusables
@@ -452,6 +454,13 @@ impl Configuration {
             }
         };
 
+        let per_file_target_version = options.per_file_target_version.map(|versions| {
+            versions
+                .into_iter()
+                .map(|(glob, version)| (glob, ast::PythonVersion::from(version)))
+                .collect()
+        });
+
         Ok(Self {
             builtins: options.builtins,
             cache_dir: options
@@ -533,6 +542,7 @@ impl Configuration {
                 .map(|src| resolve_src(&src, project_root))
                 .transpose()?,
             target_version: options.target_version.map(ast::PythonVersion::from),
+            per_file_target_version,
             // `--extension` is a hidden command-line argument that isn't supported in configuration
             // files at present.
             extension: None,
@@ -580,6 +590,9 @@ impl Configuration {
             show_fixes: self.show_fixes.or(config.show_fixes),
             src: self.src.or(config.src),
             target_version: self.target_version.or(config.target_version),
+            per_file_target_version: self
+                .per_file_target_version
+                .or(config.per_file_target_version),
             preview: self.preview.or(config.preview),
             extension: self.extension.or(config.extension),
 

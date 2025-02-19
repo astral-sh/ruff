@@ -2567,3 +2567,22 @@ fn a005_module_shadowing_strict_default() -> Result<()> {
     });
     Ok(())
 }
+
+#[test]
+fn per_file_target_version_exists() {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--config", r#"per-file-target-version = {"test.py" = "py311"}"#])
+        .args(["--select", "A005"]) // something that won't trigger
+        .arg("-")
+        .pass_stdin("1"),
+        @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    "
+    );
+}

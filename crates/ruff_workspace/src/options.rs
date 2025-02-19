@@ -333,6 +333,19 @@ pub struct Options {
     )]
     pub target_version: Option<PythonVersion>,
 
+    /// A list of mappings from file pattern to Python version to use when checking the
+    /// corresponding file(s).
+    #[option(
+        default = "{}",
+        value_type = "dict[str, PythonVersion]",
+        scope = "per-file-target-version",
+        example = r#"
+            # Override the project-wide Python version for a developer scripts directory:
+            "scripts/**.py" = "py312"
+        "#
+    )]
+    pub per_file_target_version: Option<FxHashMap<String, PythonVersion>>,
+
     /// The directories to consider when resolving first- vs. third-party
     /// imports.
     ///

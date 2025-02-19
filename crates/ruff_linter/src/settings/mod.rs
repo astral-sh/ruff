@@ -4,7 +4,7 @@
 
 use path_absolutize::path_dedot;
 use regex::Regex;
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashMap, FxHashSet};
 use std::fmt::{Display, Formatter};
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
@@ -220,6 +220,7 @@ pub struct LinterSettings {
     pub fix_safety: FixSafetyTable,
 
     pub target_version: PythonVersion,
+    pub per_file_target_version: FxHashMap<String, PythonVersion>,
     pub preview: PreviewMode,
     pub explicit_preview_rules: bool,
 
@@ -378,6 +379,7 @@ impl LinterSettings {
         Self {
             exclude: FilePatternSet::default(),
             target_version: PythonVersion::default(),
+            per_file_target_version: FxHashMap::default(),
             project_root: project_root.to_path_buf(),
             rules: DEFAULT_SELECTORS
                 .iter()
