@@ -25,7 +25,9 @@ use crate::semantic_index::symbol::{
     FileScopeId, NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopeKind, ScopedSymbolId,
     SymbolTableBuilder,
 };
-use crate::semantic_index::use_def::{FlowSnapshot, ScopedConstraintId, UseDefMapBuilder};
+use crate::semantic_index::use_def::{
+    EagerBindingsKey, FlowSnapshot, ScopedConstraintId, ScopedEagerBindingsId, UseDefMapBuilder,
+};
 use crate::semantic_index::SemanticIndex;
 use crate::unpack::{Unpack, UnpackValue};
 use crate::visibility_constraints::{ScopedVisibilityConstraintId, VisibilityConstraintsBuilder};
@@ -91,6 +93,7 @@ pub(super) struct SemanticIndexBuilder<'db> {
     expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
     imported_modules: FxHashSet<ModuleName>,
     attribute_assignments: FxHashMap<FileScopeId, AttributeAssignments<'db>>,
+    eager_bindings: FxHashMap<EagerBindingsKey, ScopedEagerBindingsId>,
 }
 
 impl<'db> SemanticIndexBuilder<'db> {
@@ -122,6 +125,8 @@ impl<'db> SemanticIndexBuilder<'db> {
             imported_modules: FxHashSet::default(),
 
             attribute_assignments: FxHashMap::default(),
+
+            eager_bindings: FxHashMap::default(),
         };
 
         builder.push_scope_with_parent(NodeWithScopeRef::Module, None);
@@ -134,13 +139,13 @@ impl<'db> SemanticIndexBuilder<'db> {
             .scope_stack
             .last()
             .map(|ScopeInfo { file_scope_id, .. }| file_scope_id)
-            .expect("Always to have a root scope")
+            .expect("SemanticIndexBuilder should have created a root scope")
     }
 
     fn loop_state(&self) -> LoopState {
         self.scope_stack
             .last()
-            .expect("Always to have a root scope")
+            .expect("SemanticIndexBuilder should have created a root scope")
             .loop_state
     }
 
@@ -177,13 +182,11 @@ impl<'db> SemanticIndexBuilder<'db> {
     fn push_scope_with_parent(&mut self, node: NodeWithScopeRef, parent: Option<FileScopeId>) {
         let children_start = self.scopes.next_index() + 1;
 
+        // SAFETY: `node` is guaranteed to be a child of `self.module`
         #[allow(unsafe_code)]
-        let scope = Scope {
-            parent,
-            // SAFETY: `node` is guaranteed to be a child of `self.module`
-            node: unsafe { node.to_kind(self.module.clone()) },
-            descendents: children_start..children_start,
-        };
+        let node_with_kind = unsafe { node.to_kind(self.module.clone()) };
+
+        let scope = Scope::new(parent, node_with_kind, children_start..children_start);
         self.try_node_context_stack_manager.enter_nested_scope();
 
         let file_scope_id = self.scopes.push(scope);
@@ -206,13 +209,74 @@ impl<'db> SemanticIndexBuilder<'db> {
     }
 
     fn pop_scope(&mut self) -> FileScopeId {
-        let ScopeInfo { file_scope_id, .. } =
-            self.scope_stack.pop().expect("Root scope to be present");
-        let children_end = self.scopes.next_index();
-        let scope = &mut self.scopes[file_scope_id];
-        scope.descendents = scope.descendents.start..children_end;
         self.try_node_context_stack_manager.exit_scope();
-        file_scope_id
+
+        let ScopeInfo {
+            file_scope_id: popped_scope_id,
+            ..
+        } = self
+            .scope_stack
+            .pop()
+            .expect("Root scope should be present");
+
+        let children_end = self.scopes.next_index();
+        let popped_scope = &mut self.scopes[popped_scope_id];
+        popped_scope.extend_descendents(children_end);
+
+        if !popped_scope.is_eager() {
+            return popped_scope_id;
+        }
+
+        // If the scope that we just popped off is an eager scope, we need to "lock" our view of
+        // which bindings reach each of the uses in the scope. Loop through each enclosing scope,
+        // looking for any that bind each symbol.
+        for enclosing_scope_info in self.scope_stack.iter().rev() {
+            let enclosing_scope_id = enclosing_scope_info.file_scope_id;
+            let enclosing_scope_kind = self.scopes[enclosing_scope_id].kind();
+            let enclosing_symbol_table = &self.symbol_tables[enclosing_scope_id];
+
+            // Names bound in class scopes are never visible to nested scopes, so we never need to
+            // save eager scope bindings in a class scope.
+            if enclosing_scope_kind.is_class() {
+                continue;
+            }
+
+            for nested_symbol in self.symbol_tables[popped_scope_id].symbols() {
+                // Skip this symbol if this enclosing scope doesn't contain any bindings for
+                // it, or if the nested scope _does_.
+                if nested_symbol.is_bound() {
+                    continue;
+                }
+                let Some(enclosing_symbol_id) =
+                    enclosing_symbol_table.symbol_id_by_name(nested_symbol.name())
+                else {
+                    continue;
+                };
+                let enclosing_symbol = enclosing_symbol_table.symbol(enclosing_symbol_id);
+                if !enclosing_symbol.is_bound() {
+                    continue;
+                }
+
+                // Snapshot the bindings of this symbol that are visible at this point in this
+                // enclosing scope.
+                let key = EagerBindingsKey {
+                    enclosing_scope: enclosing_scope_id,
+                    enclosing_symbol: enclosing_symbol_id,
+                    nested_scope: popped_scope_id,
+                };
+                let eager_bindings = self.use_def_maps[enclosing_scope_id]
+                    .snapshot_eager_bindings(enclosing_symbol_id);
+                self.eager_bindings.insert(key, eager_bindings);
+            }
+
+            // Lazy scopes are "sticky": once we see a lazy scope we stop doing lookups
+            // eagerly, even if we would encounter another eager enclosing scope later on.
+            if !enclosing_scope_kind.is_eager() {
+                break;
+            }
+        }
+
+        popped_scope_id
     }
 
     fn current_symbol_table(&mut self) -> &mut SymbolTableBuilder {
@@ -729,6 +793,7 @@ impl<'db> SemanticIndexBuilder<'db> {
 
         self.scope_ids_by_scope.shrink_to_fit();
         self.scopes_by_node.shrink_to_fit();
+        self.eager_bindings.shrink_to_fit();
 
         SemanticIndex {
             symbol_tables,
@@ -747,6 +812,7 @@ impl<'db> SemanticIndexBuilder<'db> {
                 .into_iter()
                 .map(|(k, v)| (k, Arc::new(v)))
                 .collect(),
+            eager_bindings: self.eager_bindings,
         }
     }
 }

@@ -47,7 +47,7 @@ use crate::semantic_index::definition::{
 };
 use crate::semantic_index::expression::{Expression, ExpressionKind};
 use crate::semantic_index::semantic_index;
-use crate::semantic_index::symbol::{NodeWithScopeKind, NodeWithScopeRef, ScopeId};
+use crate::semantic_index::symbol::{FileScopeId, NodeWithScopeKind, NodeWithScopeRef, ScopeId};
 use crate::semantic_index::SemanticIndex;
 use crate::symbol::{
     builtins_module_scope, builtins_symbol, symbol, symbol_from_bindings, symbol_from_declarations,
@@ -3498,7 +3498,9 @@ impl<'db> TypeInferenceBuilder<'db> {
 
             // Walk up parent scopes looking for a possible enclosing scope that may have a
             // definition of this name visible to us (would be `LOAD_DEREF` at runtime.)
-            for (enclosing_scope_file_id, _) in self.index.ancestor_scopes(file_scope_id) {
+            // Note that we skip the scope containing the use that we are resolving, since we
+            // already looked for the symbol there up above.
+            for (enclosing_scope_file_id, _) in self.index.ancestor_scopes(file_scope_id).skip(1) {
                 // Class scopes are not visible to nested scopes, and we need to handle global
                 // scope differently (because an unbound name there falls back to builtins), so
                 // check only function-like scopes.
@@ -3506,6 +3508,23 @@ impl<'db> TypeInferenceBuilder<'db> {
                 if !enclosing_scope_id.is_function_like(db) {
                     continue;
                 }
+
+                // If the reference is in a nested eager scope, we need to look for the symbol at
+                // the point where the previous enclosing scope was defined, instead of at the end
+                // of the scope. (Note that the semantic index builder takes care of only
+                // registering eager bindings for nested scopes that are actually eager, and for
+                // enclosing scopes that actually contain bindings that we should use when
+                // resolving the reference.)
+                if !self.is_deferred() {
+                    if let Some(bindings) = self.index.eager_bindings(
+                        enclosing_scope_file_id,
+                        symbol_name,
+                        file_scope_id,
+                    ) {
+                        return symbol_from_bindings(db, bindings);
+                    }
+                }
+
                 let enclosing_symbol_table = self.index.symbol_table(enclosing_scope_file_id);
                 let Some(enclosing_symbol) = enclosing_symbol_table.symbol_by_name(symbol_name)
                 else {
@@ -3526,10 +3545,20 @@ impl<'db> TypeInferenceBuilder<'db> {
                 // Avoid infinite recursion if `self.scope` already is the module's global scope.
                 .or_fall_back_to(db, || {
                     if file_scope_id.is_global() {
-                        Symbol::Unbound
-                    } else {
-                        global_symbol(db, self.file(), symbol_name)
+                        return Symbol::Unbound;
                     }
+
+                    if !self.is_deferred() {
+                        if let Some(bindings) = self.index.eager_bindings(
+                            FileScopeId::global(),
+                            symbol_name,
+                            file_scope_id,
+                        ) {
+                            return symbol_from_bindings(db, bindings);
+                        }
+                    }
+
+                    global_symbol(db, self.file(), symbol_name)
                 })
                 // Not found in globals? Fallback to builtins
                 // (without infinite recursion if we're already in builtins.)

@@ -262,12 +262,12 @@ use self::symbol_state::{
 };
 use crate::semantic_index::ast_ids::ScopedUseId;
 use crate::semantic_index::definition::Definition;
-use crate::semantic_index::symbol::ScopedSymbolId;
+use crate::semantic_index::symbol::{FileScopeId, ScopedSymbolId};
 use crate::semantic_index::use_def::symbol_state::DeclarationIdWithConstraint;
 use crate::visibility_constraints::{
     ScopedVisibilityConstraintId, VisibilityConstraints, VisibilityConstraintsBuilder,
 };
-use ruff_index::IndexVec;
+use ruff_index::{newtype_index, IndexVec};
 use rustc_hash::FxHashMap;
 
 use super::constraint::Constraint;
@@ -309,6 +309,10 @@ pub(crate) struct UseDefMap<'db> {
 
     /// [`SymbolState`] visible at end of scope for each symbol.
     public_symbols: IndexVec<ScopedSymbolId, SymbolState>,
+
+    /// Snapshot of bindings in this scope that can be used to resolve a reference in a nested
+    /// eager scope.
+    eager_bindings: EagerBindings,
 }
 
 impl<'db> UseDefMap<'db> {
@@ -324,6 +328,15 @@ impl<'db> UseDefMap<'db> {
         symbol: ScopedSymbolId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
         self.bindings_iterator(self.public_symbols[symbol].bindings())
+    }
+
+    pub(crate) fn eager_bindings(
+        &self,
+        eager_bindings: ScopedEagerBindingsId,
+    ) -> Option<BindingWithConstraintsIterator<'_, 'db>> {
+        self.eager_bindings
+            .get(eager_bindings)
+            .map(|symbol_bindings| self.bindings_iterator(symbol_bindings))
     }
 
     pub(crate) fn bindings_at_declaration(
@@ -382,6 +395,30 @@ impl<'db> UseDefMap<'db> {
         }
     }
 }
+
+/// Uniquely identifies a snapshot of bindings that can be used to resolve a reference in a nested
+/// eager scope.
+///
+/// An eager scope has its entire body executed immediately at the location where it is defined.
+/// For any free references in the nested scope, we use the bindings that are visible at the point
+/// where the nested scope is defined, instead of using the public type of the symbol.
+///
+/// There is a unique ID for each distinct [`EagerBindingsKey`] in the file.
+#[newtype_index]
+pub(crate) struct ScopedEagerBindingsId;
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub(crate) struct EagerBindingsKey {
+    /// The enclosing scope containing the bindings
+    pub(crate) enclosing_scope: FileScopeId,
+    /// The referenced symbol (in the enclosing scope)
+    pub(crate) enclosing_symbol: ScopedSymbolId,
+    /// The nested eager scope containing the reference
+    pub(crate) nested_scope: FileScopeId,
+}
+
+/// A snapshot of bindings that can be used to resolve a reference in a nested eager scope.
+type EagerBindings = IndexVec<ScopedEagerBindingsId, SymbolBindings>;
 
 /// Either live bindings or live declarations for a symbol.
 #[derive(Debug, PartialEq, Eq, salsa::Update)]
@@ -505,6 +542,10 @@ pub(super) struct UseDefMapBuilder<'db> {
 
     /// Currently live bindings and declarations for each symbol.
     symbol_states: IndexVec<ScopedSymbolId, SymbolState>,
+
+    /// Snapshot of bindings in this scope that can be used to resolve a reference in a nested
+    /// eager scope.
+    eager_bindings: EagerBindings,
 }
 
 impl Default for UseDefMapBuilder<'_> {
@@ -517,6 +558,7 @@ impl Default for UseDefMapBuilder<'_> {
             bindings_by_use: IndexVec::new(),
             definitions_by_definition: FxHashMap::default(),
             symbol_states: IndexVec::new(),
+            eager_bindings: EagerBindings::default(),
         }
     }
 }
@@ -644,6 +686,14 @@ impl<'db> UseDefMapBuilder<'db> {
         debug_assert_eq!(use_id, new_use);
     }
 
+    pub(super) fn snapshot_eager_bindings(
+        &mut self,
+        enclosing_symbol: ScopedSymbolId,
+    ) -> ScopedEagerBindingsId {
+        self.eager_bindings
+            .push(self.symbol_states[enclosing_symbol].bindings().clone())
+    }
+
     /// Take a snapshot of the current visible-symbols state.
     pub(super) fn snapshot(&self) -> FlowSnapshot {
         FlowSnapshot {
@@ -721,6 +771,7 @@ impl<'db> UseDefMapBuilder<'db> {
         self.symbol_states.shrink_to_fit();
         self.bindings_by_use.shrink_to_fit();
         self.definitions_by_definition.shrink_to_fit();
+        self.eager_bindings.shrink_to_fit();
 
         UseDefMap {
             all_definitions: self.all_definitions,
@@ -729,6 +780,7 @@ impl<'db> UseDefMapBuilder<'db> {
             bindings_by_use: self.bindings_by_use,
             public_symbols: self.symbol_states,
             definitions_by_definition: self.definitions_by_definition,
+            eager_bindings: self.eager_bindings,
         }
     }
 }
