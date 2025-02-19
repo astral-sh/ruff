@@ -392,6 +392,7 @@ impl ConfigurationTransformer for EditorConfigurationTransformer<'_> {
                 filesystem_configuration.combine(editor_configuration)
             }
             ConfigurationPreference::EditorOnly => editor_configuration,
+            ConfigurationPreference::FilesystemOnly => filesystem_configuration,
         }
     }
 }

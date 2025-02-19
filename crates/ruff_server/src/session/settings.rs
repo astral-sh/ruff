@@ -55,6 +55,8 @@ pub(crate) enum ConfigurationPreference {
     FilesystemFirst,
     /// `.toml` files are ignored completely, and only the editor configuration is used.
     EditorOnly,
+    /// The editor configuration is ignored completely, and only `.toml` files are used.
+    FilesystemOnly,
 }
 
 /// This is a direct representation of the settings schema sent by the client.
