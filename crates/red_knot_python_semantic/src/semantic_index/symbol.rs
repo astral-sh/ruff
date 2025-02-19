@@ -111,16 +111,7 @@ pub struct ScopeId<'db> {
 
 impl<'db> ScopeId<'db> {
     pub(crate) fn is_function_like(self, db: &'db dyn Db) -> bool {
-        // Type parameter scopes behave like function scopes in terms of name resolution; CPython
-        // symbol table also uses the term "function-like" for these scopes.
-        matches!(
-            self.node(db).scope_kind(),
-            ScopeKind::Annotation
-                | ScopeKind::Function
-                | ScopeKind::Lambda
-                | ScopeKind::TypeAlias
-                | ScopeKind::Comprehension
-        )
+        self.node(db).scope_kind().is_function_like()
     }
 
     pub(crate) fn node(self, db: &dyn Db) -> &NodeWithScopeKind {
@@ -242,6 +233,23 @@ impl ScopeKind {
             | ScopeKind::Lambda
             | ScopeKind::TypeAlias => false,
         }
+    }
+
+    pub(crate) fn is_function_like(self) -> bool {
+        // Type parameter scopes behave like function scopes in terms of name resolution; CPython
+        // symbol table also uses the term "function-like" for these scopes.
+        matches!(
+            self,
+            ScopeKind::Annotation
+                | ScopeKind::Function
+                | ScopeKind::Lambda
+                | ScopeKind::TypeAlias
+                | ScopeKind::Comprehension
+        )
+    }
+
+    pub(crate) fn is_class(self) -> bool {
+        matches!(self, ScopeKind::Class)
     }
 }
 

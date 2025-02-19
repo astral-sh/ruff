@@ -232,7 +232,15 @@ impl<'db> SemanticIndexBuilder<'db> {
         // looking for any that bind each symbol.
         for enclosing_scope_info in self.scope_stack.iter().rev() {
             let enclosing_scope_id = enclosing_scope_info.file_scope_id;
+            let enclosing_scope_kind = self.scopes[enclosing_scope_id].kind();
             let enclosing_symbol_table = &self.symbol_tables[enclosing_scope_id];
+
+            // Names bound in class scopes are never visible to nested scopes, so we never need to
+            // save eager scope bindings in a class scope.
+            if enclosing_scope_kind.is_class() {
+                continue;
+            }
+
             for nested_symbol in self.symbol_tables[popped_scope_id].symbols() {
                 // Skip this symbol if this enclosing scope doesn't contain any bindings for
                 // it, or if the nested scope _does_.
@@ -263,7 +271,7 @@ impl<'db> SemanticIndexBuilder<'db> {
 
             // Lazy scopes are "sticky": once we see a lazy scope we stop doing lookups
             // eagerly, even if we would encounter another eager enclosing scope later on.
-            if !self.scopes[enclosing_scope_id].is_eager() {
+            if !enclosing_scope_kind.is_eager() {
                 break;
             }
         }
