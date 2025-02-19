@@ -75,9 +75,9 @@ pub use crate::token::{Token, TokenKind};
 
 use crate::parser::Parser;
 
-use ruff_python_ast::python_version::PythonVersion;
 use ruff_python_ast::{
-    Expr, Mod, ModExpression, ModModule, PySourceType, StringFlags, StringLiteral, Suite,
+    Expr, Mod, ModExpression, ModModule, PySourceType, PythonVersion, StringFlags, StringLiteral,
+    Suite,
 };
 use ruff_python_trivia::CommentRanges;
 use ruff_text_size::{Ranged, TextRange, TextSize};

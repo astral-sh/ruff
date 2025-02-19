@@ -10,7 +10,7 @@ use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::Diagnostic;
 use ruff_notebook::Notebook;
-use ruff_python_ast::python_version::PythonVersion;
+use ruff_python_ast::PythonVersion;
 use ruff_python_ast::{ModModule, PySourceType};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
@@ -428,17 +428,15 @@ pub fn lint_only(
         &parsed,
     );
 
-    let target_version = settings.target_version.into();
-
     LinterResult {
         messages: diagnostics_to_messages(
             diagnostics,
             parsed.errors(),
-            parsed.syntax_errors(target_version),
+            parsed.syntax_errors(settings.target_version),
             path,
             &locator,
             &directives,
-            target_version,
+            settings.target_version,
         ),
         has_syntax_error: !parsed.is_valid(),
     }
@@ -583,18 +581,16 @@ pub fn lint_fix<'a>(
             report_failed_to_converge_error(path, transformed.source_code(), &diagnostics);
         }
 
-        let target_version = settings.target_version.into();
-
         return Ok(FixerResult {
             result: LinterResult {
                 messages: diagnostics_to_messages(
                     diagnostics,
                     parsed.errors(),
-                    parsed.syntax_errors(target_version),
+                    parsed.syntax_errors(settings.target_version),
                     path,
                     &locator,
                     &directives,
-                    target_version,
+                    settings.target_version,
                 ),
                 has_syntax_error: !is_valid_syntax,
             },

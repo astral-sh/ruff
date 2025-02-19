@@ -1,6 +1,6 @@
 use std::fmt;
 
-use ruff_python_ast::python_version::PythonVersion;
+use ruff_python_ast::PythonVersion;
 use ruff_text_size::TextRange;
 
 use crate::TokenKind;

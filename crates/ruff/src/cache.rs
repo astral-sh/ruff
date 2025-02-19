@@ -586,7 +586,6 @@ mod tests {
     use anyhow::Result;
     use filetime::{set_file_mtime, FileTime};
     use itertools::Itertools;
-    use ruff_linter::settings::types::PythonVersion;
     use ruff_linter::settings::LinterSettings;
     use test_case::test_case;
 
@@ -595,7 +594,7 @@ mod tests {
     use ruff_linter::package::PackageRoot;
     use ruff_linter::settings::flags;
     use ruff_linter::settings::types::UnsafeFixes;
-    use ruff_python_ast::PySourceType;
+    use ruff_python_ast::{PySourceType, PythonVersion};
     use ruff_workspace::Settings;
 
     use crate::cache::{self, FileCache, FileCacheData, FileCacheKey};
@@ -614,7 +613,7 @@ mod tests {
         let settings = Settings {
             cache_dir,
             linter: LinterSettings {
-                target_version: PythonVersion::Py310,
+                target_version: PythonVersion::PY310,
                 ..Default::default()
             },
             ..Settings::default()

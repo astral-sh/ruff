@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity, Span};
 use ruff_db::files::File;
-use ruff_python_ast::python_version::PythonVersion;
+use ruff_python_ast::PythonVersion;
 use ruff_python_parser::SyntaxError;
 use ruff_text_size::TextRange;
 
