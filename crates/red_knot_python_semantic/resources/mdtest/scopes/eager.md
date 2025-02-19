@@ -28,7 +28,11 @@ def _():
     class A:
         reveal_type(x)  # revealed: Literal[1]
 
+        y = x
+
     x = 2
+
+    reveal_type(A.y)  # revealed: Unknown | Literal[1]
 ```
 
 ## List comprehensions
@@ -101,7 +105,11 @@ x = 1
 class A:
     reveal_type(x)  # revealed: Literal[1]
 
+    y = x
+
 x = 2
+
+reveal_type(A.y)  # revealed: Unknown | Literal[1]
 ```
 
 ### List comprehensions
