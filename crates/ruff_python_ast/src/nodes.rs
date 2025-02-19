@@ -886,18 +886,18 @@ impl FStringValue {
         }
     }
 
-    /// Iterates over all the [`FStringPart`]s contained in this value.
+    /// Returns an iterator over all the [`FStringPart`]s contained in this value.
     pub fn iter(&self) -> Iter<FStringPart> {
         self.as_slice().iter()
     }
 
-    /// Iterates over all the [`FStringPart`]s contained in this value
+    /// Returns an iterator over all the [`FStringPart`]s contained in this value
     /// that allows modification.
     pub fn iter_mut(&mut self) -> IterMut<FStringPart> {
         self.as_mut_slice().iter_mut()
     }
 
-    /// Iterates over the [`StringLiteral`] parts contained in this value.
+    /// Returns an iterator over the [`StringLiteral`] parts contained in this value.
     ///
     /// Note that this doesn't recurse into the f-string parts. For example,
     ///
@@ -910,7 +910,7 @@ impl FStringValue {
         self.iter().filter_map(|part| part.as_literal())
     }
 
-    /// Iterates over the [`FString`] parts contained in this value.
+    /// Returns an iterator over the [`FString`] parts contained in this value.
     ///
     /// Note that this doesn't recurse into the f-string parts. For example,
     ///
@@ -923,7 +923,7 @@ impl FStringValue {
         self.iter().filter_map(|part| part.as_f_string())
     }
 
-    /// Iterates over all the [`FStringElement`] contained in this value.
+    /// Returns an iterator over all the [`FStringElement`] contained in this value.
     ///
     /// An f-string element is what makes up an [`FString`] i.e., it is either a
     /// string literal or an expression. In the following example,
@@ -1384,12 +1384,12 @@ impl StringLiteralValue {
         }
     }
 
-    /// Iterates over all the [`StringLiteral`] parts contained in this value.
+    /// Returns an iterator over all the [`StringLiteral`] parts contained in this value.
     pub fn iter(&self) -> Iter<StringLiteral> {
         self.as_slice().iter()
     }
 
-    /// Iterates over all the [`StringLiteral`] parts contained in this value
+    /// Returns an iterator over all the [`StringLiteral`] parts contained in this value
     /// that allows modification.
     pub fn iter_mut(&mut self) -> IterMut<StringLiteral> {
         self.as_mut_slice().iter_mut()
@@ -1410,7 +1410,7 @@ impl StringLiteralValue {
         self.iter().fold(0, |acc, part| acc + part.value.len())
     }
 
-    /// Iterates over the [`char`]s of each string literal part.
+    /// Returns an iterator over the [`char`]s of each string literal part.
     pub fn chars(&self) -> impl Iterator<Item = char> + Clone + '_ {
         self.iter().flat_map(|part| part.value.chars())
     }
@@ -1796,12 +1796,12 @@ impl BytesLiteralValue {
         }
     }
 
-    /// Iterates over all the [`BytesLiteral`] parts contained in this value.
+    /// Returns an iterator over all the [`BytesLiteral`] parts contained in this value.
     pub fn iter(&self) -> Iter<BytesLiteral> {
         self.as_slice().iter()
     }
 
-    /// Iterates over all the [`BytesLiteral`] parts contained in this value
+    /// Returns an iterator over all the [`BytesLiteral`] parts contained in this value
     /// that allows modification.
     pub fn iter_mut(&mut self) -> IterMut<BytesLiteral> {
         self.as_mut_slice().iter_mut()
@@ -1821,7 +1821,7 @@ impl BytesLiteralValue {
         self.iter().map(|part| part.len()).sum()
     }
 
-    /// Iterates over the bytes of the concatenated bytestring.
+    /// Returns an iterator over the bytes of the concatenated bytestring.
     pub fn bytes(&self) -> impl Iterator<Item = u8> + '_ {
         self.iter().flat_map(|part| part.as_slice().iter().copied())
     }
