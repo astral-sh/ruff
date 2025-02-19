@@ -3456,46 +3456,33 @@ impl<'db> TypeInferenceBuilder<'db> {
                 member_ty
             }
             Symbol::Unbound => {
-                match value_ty {
-                    Type::ClassLiteral(_) | Type::SubclassOf(_) => {
-                        let bound_on_instance = match value_ty {
-                            Type::ClassLiteral(ClassLiteralType { class }) => {
+                let bound_on_instance = match value_ty {
+                    Type::ClassLiteral(ClassLiteralType { class }) => {
+                        !class.instance_member(self.db(), attr).0.is_unbound()
+                    }
+                    Type::SubclassOf(subclass_of @ SubclassOfType { .. }) => {
+                        match subclass_of.subclass_of() {
+                            ClassBase::Class(class) => {
                                 !class.instance_member(self.db(), attr).0.is_unbound()
                             }
-                            Type::SubclassOf(subclass_of @ SubclassOfType { .. }) => {
-                                match subclass_of.subclass_of() {
-                                    ClassBase::Class(class) => {
-                                        !class.instance_member(self.db(), attr).0.is_unbound()
-                                    }
-                                    ClassBase::Dynamic(_) => false,
-                                }
-                            }
-                            _ => false,
-                        };
-
-                        if bound_on_instance {
-                            self.context.report_lint(
-                                    &UNRESOLVED_ATTRIBUTE,
-                                    attribute.into(),
-                                    format_args!(
-                                        "Attribute `{}` can only be accessed on instances of type `{}`, not on the class object itself.",
-                                        attr.id,
-                                        value_ty.display(self.db())
-                                    ),
-                                );
-                        } else {
-                            self.context.report_lint(
-                                &UNRESOLVED_ATTRIBUTE,
-                                attribute.into(),
-                                format_args!(
-                                    "Type `{}` has no attribute `{}`",
-                                    value_ty.display(self.db()),
-                                    attr.id
-                                ),
-                            );
+                            ClassBase::Dynamic(_) => false,
                         }
                     }
-                    _ => self.context.report_lint(
+                    _ => false,
+                };
+
+                if bound_on_instance {
+                    self.context.report_lint(
+                            &UNRESOLVED_ATTRIBUTE,
+                            attribute.into(),
+                            format_args!(
+                                "Attribute `{}` can only be accessed on instances of type `{}`, not on the class object itself.",
+                                attr.id,
+                                value_ty.display(self.db())
+                            ),
+                        );
+                } else {
+                    self.context.report_lint(
                         &UNRESOLVED_ATTRIBUTE,
                         attribute.into(),
                         format_args!(
@@ -3503,8 +3490,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                             value_ty.display(self.db()),
                             attr.id
                         ),
-                    ),
-                };
+                    );
+                }
 
                 Type::unknown()
             }
