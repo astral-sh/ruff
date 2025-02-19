@@ -315,7 +315,7 @@ jobs:
         name: Test wheel
         with:
           arch: ${{ matrix.platform.arch == 'arm' && 'armv6' || matrix.platform.arch }}
-          distro: ${{ matrix.platform.arch == 'arm' && 'bullseye' || 'ubuntu24.04' }}
+          distro: ${{ matrix.platform.arch == 'arm' && 'bullseye' || 'ubuntu22.04' }}
           githubToken: ${{ github.token }}
           install: |
             apt-get update
