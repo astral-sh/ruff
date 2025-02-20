@@ -104,4 +104,30 @@ inspect.getattr_static(C(), 1)
 inspect.getattr_static(C(), "x", "default-arg", "one too many")
 ```
 
+## Possibly unbound attributes
+
+```py
+import inspect
+
+def _(flag: bool):
+    class C:
+        if flag:
+            x: int = 1
+
+    reveal_type(inspect.getattr_static(C, "x", "default"))  # revealed: int | Literal["default"]
+```
+
+## Gradual types
+
+```py
+import inspect
+from typing import Any
+
+def _(a: Any, tuple_of_any: tuple[Any]):
+    reveal_type(inspect.getattr_static(a, "x", "default"))  # revealed: Any | Literal["default"]
+
+    # TODO: Ideally, this would just be `Literal[index]`
+    reveal_type(inspect.getattr_static(tuple_of_any, "index", "default"))  # revealed: Literal[index] | Literal["default"]
+```
+
 [official documentation]: https://docs.python.org/3/library/inspect.html#inspect.getattr_static
