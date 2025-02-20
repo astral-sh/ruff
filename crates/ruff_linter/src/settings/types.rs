@@ -766,9 +766,9 @@ impl Display for CompiledPerFileIgnoreList {
 ///
 /// See [`PerFile`] for details of the representation.
 #[derive(Debug, Clone)]
-pub struct PerFileVersion(PerFile<ast::PythonVersion>);
+pub struct PerFileTargetVersion(PerFile<ast::PythonVersion>);
 
-impl PerFileVersion {
+impl PerFileTargetVersion {
     pub fn new(pattern: String, version: ast::PythonVersion, project_root: Option<&Path>) -> Self {
         Self(PerFile::new(pattern, project_root, version))
     }
@@ -778,8 +778,10 @@ impl PerFileVersion {
 pub struct CompiledPerFileVersionList(CompiledPerFileList<ast::PythonVersion>);
 
 impl CompiledPerFileVersionList {
-    /// Given a list of patterns, create a `GlobSet`.
-    pub fn resolve(per_file_ignores: Vec<PerFileVersion>) -> Result<Self> {
+    /// Given a list of [`PerFileTargetVersion`] patterns, create a compiled set of globs.
+    ///
+    /// Returns an error if either of the glob patterns cannot be parsed.
+    pub fn resolve(per_file_ignores: Vec<PerFileTargetVersion>) -> Result<Self> {
         Ok(Self(CompiledPerFileList::resolve(
             per_file_ignores.into_iter().map(|version| version.0),
         )?))

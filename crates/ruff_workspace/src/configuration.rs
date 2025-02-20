@@ -30,8 +30,8 @@ use ruff_linter::settings::fix_safety_table::FixSafetyTable;
 use ruff_linter::settings::rule_table::RuleTable;
 use ruff_linter::settings::types::{
     CompiledPerFileIgnoreList, CompiledPerFileVersionList, ExtensionMapping, FilePattern,
-    FilePatternSet, OutputFormat, PerFileIgnore, PerFileVersion, PreviewMode, RequiredVersion,
-    UnsafeFixes,
+    FilePatternSet, OutputFormat, PerFileIgnore, PerFileTargetVersion, PreviewMode,
+    RequiredVersion, UnsafeFixes,
 };
 use ruff_linter::settings::{LinterSettings, DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX, TASK_TAGS};
 use ruff_linter::{
@@ -139,7 +139,7 @@ pub struct Configuration {
     pub namespace_packages: Option<Vec<PathBuf>>,
     pub src: Option<Vec<PathBuf>>,
     pub target_version: Option<ast::PythonVersion>,
-    pub per_file_target_version: Option<Vec<PerFileVersion>>,
+    pub per_file_target_version: Option<Vec<PerFileTargetVersion>>,
 
     // Global formatting options
     pub line_length: Option<LineLength>,
@@ -544,7 +544,7 @@ impl Configuration {
                 versions
                     .into_iter()
                     .map(|(pattern, version)| {
-                        PerFileVersion::new(
+                        PerFileTargetVersion::new(
                             pattern,
                             ast::PythonVersion::from(version),
                             Some(project_root),
