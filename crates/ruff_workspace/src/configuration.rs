@@ -9,7 +9,7 @@ use std::num::{NonZeroU16, NonZeroU8};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use glob::{glob, GlobError, Paths, PatternError};
 use itertools::Itertools;
 use regex::Regex;
@@ -177,7 +177,8 @@ impl Configuration {
         };
 
         let per_file_target_version =
-            CompiledPerFileVersionList::resolve(self.per_file_target_version.unwrap_or_default())?;
+            CompiledPerFileVersionList::resolve(self.per_file_target_version.unwrap_or_default())
+                .context("failed to resolve `per-file-target-version` table")?;
 
         let formatter = FormatterSettings {
             exclude: FilePatternSet::try_from_iter(format.exclude.unwrap_or_default())?,
