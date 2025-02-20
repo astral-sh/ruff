@@ -112,7 +112,7 @@ type VisibilityConstraintsIterator<'a> = std::slice::Iter<'a, ScopedVisibilityCo
 
 /// Live declarations for a single symbol at some point in control flow, with their
 /// corresponding visibility constraints.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, salsa::Update)]
 pub(super) struct SymbolDeclarations {
     /// [`BitSet`]: which declarations (as [`ScopedDefinitionId`]) can reach the current location?
     ///
@@ -200,7 +200,7 @@ impl SymbolDeclarations {
 
 /// Live bindings for a single symbol at some point in control flow. Each live binding comes
 /// with a set of narrowing constraints and a visibility constraint.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, salsa::Update)]
 pub(super) struct SymbolBindings {
     /// [`BitSet`]: which bindings (as [`ScopedDefinitionId`]) can reach the current location?
     ///

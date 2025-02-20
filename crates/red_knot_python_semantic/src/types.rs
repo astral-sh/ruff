@@ -16,7 +16,8 @@ pub(crate) use self::diagnostic::register_lints;
 pub use self::diagnostic::{TypeCheckDiagnostic, TypeCheckDiagnostics};
 pub(crate) use self::display::TypeArrayDisplay;
 pub(crate) use self::infer::{
-    infer_deferred_types, infer_definition_types, infer_expression_types, infer_scope_types,
+    infer_deferred_types, infer_definition_types, infer_expression_type, infer_expression_types,
+    infer_scope_types,
 };
 pub use self::narrow::KnownConstraintFunction;
 pub(crate) use self::signatures::Signature;
@@ -26,7 +27,6 @@ use crate::module_resolver::{file_to_module, resolve_module, KnownModule};
 use crate::semantic_index::ast_ids::HasScopedExpressionId;
 use crate::semantic_index::attribute_assignment::AttributeAssignment;
 use crate::semantic_index::definition::Definition;
-use crate::semantic_index::expression::Expression;
 use crate::semantic_index::symbol::ScopeId;
 use crate::semantic_index::{
     attribute_assignments, imported_modules, semantic_index, symbol_table, use_def_map,
@@ -3818,16 +3818,6 @@ impl<'db> Class<'db> {
         name: &str,
         inferred_type_from_class_body: Option<Type<'db>>,
     ) -> Symbol<'db> {
-        // We use a separate salsa query here to prevent unrelated changes in the AST of an external
-        // file from triggering re-evaluations of downstream queries.
-        // See the `dependency_implicit_instance_attribute` test for more information.
-        #[salsa::tracked]
-        fn infer_expression_type<'db>(db: &'db dyn Db, expression: Expression<'db>) -> Type<'db> {
-            let inference = infer_expression_types(db, expression);
-            let expr_scope = expression.scope(db);
-            inference.expression_type(expression.node_ref(db).scoped_expression_id(db, expr_scope))
-        }
-
         // If we do not see any declarations of an attribute, neither in the class body nor in
         // any method, we build a union of `Unknown` with the inferred types of all bindings of
         // that attribute. We include `Unknown` in that union to account for the fact that the
