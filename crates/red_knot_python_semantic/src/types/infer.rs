@@ -4196,37 +4196,40 @@ impl<'db> TypeInferenceBuilder<'db> {
                     itertools::Position::Last | itertools::Position::Only
                 );
 
-                let truthiness = ty.try_bool(self.db()).unwrap_or_else(|err| {
-                    if !is_last {
-                        err.report_diagnostic(&self.context, range);
-                    }
-
-                    err.fallback_truthiness()
-                });
-
-                if done {
-                    return Type::Never;
-                }
-
-                match (truthiness, is_last, op) {
-                    (Truthiness::AlwaysTrue, false, ast::BoolOp::And) => Type::Never,
-                    (Truthiness::AlwaysFalse, false, ast::BoolOp::Or) => Type::Never,
-
-                    (Truthiness::AlwaysFalse, _, ast::BoolOp::And)
-                    | (Truthiness::AlwaysTrue, _, ast::BoolOp::Or) => {
-                        done = true;
+                if is_last {
+                    if done {
+                        Type::Never
+                    } else {
                         ty
                     }
+                } else {
+                    let truthiness = ty.try_bool(self.db()).unwrap_or_else(|err| {
+                        err.report_diagnostic(&self.context, range);
+                        err.fallback_truthiness()
+                    });
 
-                    (Truthiness::Ambiguous, false, _) => IntersectionBuilder::new(db)
-                        .add_positive(ty)
-                        .add_negative(match op {
-                            ast::BoolOp::And => Type::AlwaysTruthy,
-                            ast::BoolOp::Or => Type::AlwaysFalsy,
-                        })
-                        .build(),
+                    if done {
+                        return Type::Never;
+                    };
 
-                    (_, true, _) => ty,
+                    match (truthiness, op) {
+                        (Truthiness::AlwaysTrue, ast::BoolOp::And) => Type::Never,
+                        (Truthiness::AlwaysFalse, ast::BoolOp::Or) => Type::Never,
+
+                        (Truthiness::AlwaysFalse, ast::BoolOp::And)
+                        | (Truthiness::AlwaysTrue, ast::BoolOp::Or) => {
+                            done = true;
+                            ty
+                        }
+
+                        (Truthiness::Ambiguous, _) => IntersectionBuilder::new(db)
+                            .add_positive(ty)
+                            .add_negative(match op {
+                                ast::BoolOp::And => Type::AlwaysTruthy,
+                                ast::BoolOp::Or => Type::AlwaysFalsy,
+                            })
+                            .build(),
+                    }
                 }
             });
 
