@@ -6,6 +6,7 @@ use crate::semantic_index::definition::Definition;
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId, SymbolTable};
 use crate::semantic_index::symbol_table;
+use crate::types::infer::infer_same_file_expression_type;
 use crate::types::{
     infer_expression_types, ClassLiteralType, IntersectionBuilder, KnownClass, KnownFunction,
     SubclassOfType, Truthiness, Type, UnionBuilder,
@@ -497,11 +498,8 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         if let Some(ast::ExprName { id, .. }) = subject.node_ref(self.db).as_name_expr() {
             // SAFETY: we should always have a symbol for every Name node.
             let symbol = self.symbols().symbol_id_by_name(id).unwrap();
-            let scope = self.scope();
-            let inference = infer_expression_types(self.db, cls);
-            let ty = inference
-                .expression_type(cls.node_ref(self.db).scoped_expression_id(self.db, scope))
-                .to_instance(self.db);
+            let ty = infer_same_file_expression_type(self.db, cls).to_instance(self.db);
+
             let mut constraints = NarrowingConstraints::default();
             constraints.insert(symbol, ty);
             Some(constraints)
