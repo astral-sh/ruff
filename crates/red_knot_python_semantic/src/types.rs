@@ -1529,55 +1529,54 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         instance: Option<Type<'db>>,
         owner: Type<'db>,
-    ) -> Option<Type<'db>> {
+    ) -> Result<Option<Type<'db>>, CallError> {
         // TODO: Handle possible-unboundness and errors from `__get__` calls.
 
         match self {
             Type::Union(union) => {
                 let mut builder = UnionBuilder::new(db);
                 for elem in union.elements(db) {
-                    let ty = if let Some(result) = elem.try_call_dunder_get(db, instance, owner) {
+                    let ty = if let Some(result) = elem.try_call_dunder_get(db, instance, owner)? {
                         result
                     } else {
                         *elem
                     };
                     builder = builder.add(ty);
                 }
-                Some(builder.build())
+                Ok(Some(builder.build()))
             }
             Type::Intersection(intersection) => {
                 if !intersection.negative(db).is_empty() {
-                    return Some(todo_type!(
+                    return Ok(Some(todo_type!(
                         "try_call_dunder_get: intersections with negative contributions"
-                    ));
+                    )));
                 }
 
                 let mut builder = IntersectionBuilder::new(db);
                 for elem in intersection.positive(db) {
-                    let ty = if let Some(result) = elem.try_call_dunder_get(db, instance, owner) {
+                    let ty = if let Some(result) = elem.try_call_dunder_get(db, instance, owner)? {
                         result
                     } else {
                         *elem
                     };
                     builder = builder.add_positive(ty);
                 }
-                Some(builder.build())
+                Ok(Some(builder.build()))
             }
             _ => {
-                // TODO:
-                // - Handle possible-unboundness of `__get__` method
-                // - Handle errors while calling `__get__`
-                //
-                // There are existing tests for both cases in `descriptor_protocol.md`.
+                // TODO: Handle possible-unboundness of `__get__` method
+                // There is an existing test case for this in `descriptor_protocol.md`.
 
-                self.member(db, "__get__")
-                    .ignore_possibly_unbound()?
+                let Some(dunder_get) = self.member(db, "__get__").ignore_possibly_unbound() else {
+                    return Ok(None);
+                };
+
+                dunder_get
                     .try_call(
                         db,
                         &CallArguments::positional([instance.unwrap_or(Type::none(db)), owner]),
                     )
                     .map(|outcome| Some(outcome.return_type(db)))
-                    .unwrap_or(None)
             }
         }
     }
@@ -1628,7 +1627,13 @@ impl<'db> Type<'db> {
                 let instance = Some(*self);
                 let owner = self.to_meta_type(db);
 
-                member.map_type(|ty| ty.try_call_dunder_get(db, instance, owner).unwrap_or(ty))
+                // TODO: Handle `__get__` call errors instead of using `.unwrap_or(None)`.
+                // There is an existing test case for this in `descriptor_protocol.md`.
+                member.map_type(|ty| {
+                    ty.try_call_dunder_get(db, instance, owner)
+                        .unwrap_or(None)
+                        .unwrap_or(ty)
+                })
             }
             Type::ClassLiteral(..) | Type::SubclassOf(..) => {
                 let member = self.static_member(db, name);
@@ -1636,7 +1641,12 @@ impl<'db> Type<'db> {
                 let instance = None;
                 let owner = self.to_meta_type(db);
 
-                member.map_type(|ty| ty.try_call_dunder_get(db, instance, owner).unwrap_or(ty))
+                // TODO: Handle `__get__` call errors (see above).
+                member.map_type(|ty| {
+                    ty.try_call_dunder_get(db, instance, owner)
+                        .unwrap_or(None)
+                        .unwrap_or(ty)
+                })
             }
             Type::Union(union) => union.map_with_boundness(db, |elem| elem.member(db, name)),
             Type::Intersection(intersection) => {
