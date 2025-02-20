@@ -397,55 +397,55 @@ pub struct ExprIpyEscapeCommand {
     pub value: Box<str>,
 }
 
-/// See also [BoolOp](https://docs.python.org/3/library/ast.html#ast.BoolOp)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprBoolOp {
-    pub range: TextRange,
-    pub op: BoolOp,
-    pub values: Vec<Expr>,
-}
+// /// See also [BoolOp](https://docs.python.org/3/library/ast.html#ast.BoolOp)
+// #[derive(Clone, Debug, PartialEq)]
+// pub struct ExprBoolOp {
+//     pub range: TextRange,
+//     pub op: BoolOp,
+//     pub values: Vec<Expr>,
+// }
 
-/// See also [NamedExpr](https://docs.python.org/3/library/ast.html#ast.NamedExpr)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprNamed {
-    pub range: TextRange,
-    pub target: Box<Expr>,
-    pub value: Box<Expr>,
-}
+// /// See also [NamedExpr](https://docs.python.org/3/library/ast.html#ast.NamedExpr)
+// #[derive(Clone, Debug, PartialEq)]
+// pub struct ExprNamed {
+//     pub range: TextRange,
+//     pub target: Box<Expr>,
+//     pub value: Box<Expr>,
+// }
 
-/// See also [BinOp](https://docs.python.org/3/library/ast.html#ast.BinOp)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprBinOp {
-    pub range: TextRange,
-    pub left: Box<Expr>,
-    pub op: Operator,
-    pub right: Box<Expr>,
-}
+// /// See also [BinOp](https://docs.python.org/3/library/ast.html#ast.BinOp)
+// #[derive(Clone, Debug, PartialEq)]
+// pub struct ExprBinOp {
+//     pub range: TextRange,
+//     pub left: Box<Expr>,
+//     pub op: Operator,
+//     pub right: Box<Expr>,
+// }
 
-/// See also [UnaryOp](https://docs.python.org/3/library/ast.html#ast.UnaryOp)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprUnaryOp {
-    pub range: TextRange,
-    pub op: UnaryOp,
-    pub operand: Box<Expr>,
-}
+// /// See also [UnaryOp](https://docs.python.org/3/library/ast.html#ast.UnaryOp)
+// #[derive(Clone, Debug, PartialEq)]
+// pub struct ExprUnaryOp {
+//     pub range: TextRange,
+//     pub op: UnaryOp,
+//     pub operand: Box<Expr>,
+// }
 
-/// See also [Lambda](https://docs.python.org/3/library/ast.html#ast.Lambda)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprLambda {
-    pub range: TextRange,
-    pub parameters: Option<Box<Parameters>>,
-    pub body: Box<Expr>,
-}
+// /// See also [Lambda](https://docs.python.org/3/library/ast.html#ast.Lambda)
+// #[derive(Clone, Debug, PartialEq)]
+// pub struct ExprLambda {
+//     pub range: TextRange,
+//     pub parameters: Option<Box<Parameters>>,
+//     pub body: Box<Expr>,
+// }
 
-/// See also [IfExp](https://docs.python.org/3/library/ast.html#ast.IfExp)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprIf {
-    pub range: TextRange,
-    pub test: Box<Expr>,
-    pub body: Box<Expr>,
-    pub orelse: Box<Expr>,
-}
+// /// See also [IfExp](https://docs.python.org/3/library/ast.html#ast.IfExp)
+// #[derive(Clone, Debug, PartialEq)]
+// pub struct ExprIf {
+//     pub range: TextRange,
+//     pub test: Box<Expr>,
+//     pub body: Box<Expr>,
+//     pub orelse: Box<Expr>,
+// }
 
 /// Represents an item in a [dictionary literal display][1].
 ///
@@ -495,14 +495,14 @@ impl Ranged for DictItem {
     }
 }
 
-/// See also [Dict](https://docs.python.org/3/library/ast.html#ast.Dict)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprDict {
-    pub range: TextRange,
-    pub items: Vec<DictItem>,
-}
+// /// See also [Dict](https://docs.python.org/3/library/ast.html#ast.Dict)
+// #[derive(Clone, Debug, PartialEq)]
+// pub struct ExprDict {
+//     pub range: TextRange,
+//     pub items: Vec<DictItem>,
+// }
 
-impl ExprDict {
+impl crate::ExprDict {
     /// Returns an `Iterator` over the AST nodes representing the
     /// dictionary's keys.
     pub fn iter_keys(&self) -> DictKeyIterator {
@@ -544,7 +544,7 @@ impl ExprDict {
     }
 }
 
-impl<'a> IntoIterator for &'a ExprDict {
+impl<'a> IntoIterator for &'a crate::ExprDict {
     type IntoIter = std::slice::Iter<'a, DictItem>;
     type Item = &'a DictItem;
 
@@ -3641,25 +3641,25 @@ mod tests {
         assert_eq!(std::mem::size_of::<Expr>(), 64);
         assert_eq!(std::mem::size_of::<ExprAttribute>(), 56);
         assert_eq!(std::mem::size_of::<ExprAwait>(), 16);
-        assert_eq!(std::mem::size_of::<ExprBinOp>(), 32);
-        assert_eq!(std::mem::size_of::<ExprBoolOp>(), 40);
+        assert_eq!(std::mem::size_of::<crate::ExprBinOp>(), 32);
+        assert_eq!(std::mem::size_of::<crate::ExprBoolOp>(), 40);
         assert_eq!(std::mem::size_of::<ExprBooleanLiteral>(), 12);
         assert_eq!(std::mem::size_of::<ExprBytesLiteral>(), 40);
         assert_eq!(std::mem::size_of::<ExprCall>(), 56);
         assert_eq!(std::mem::size_of::<ExprCompare>(), 48);
-        assert_eq!(std::mem::size_of::<ExprDict>(), 32);
+        assert_eq!(std::mem::size_of::<crate::ExprDict>(), 32);
         assert_eq!(std::mem::size_of::<ExprDictComp>(), 48);
         assert_eq!(std::mem::size_of::<ExprEllipsisLiteral>(), 8);
         // 56 for Rustc < 1.76
         assert!(matches!(std::mem::size_of::<ExprFString>(), 48 | 56));
         assert_eq!(std::mem::size_of::<ExprGenerator>(), 48);
-        assert_eq!(std::mem::size_of::<ExprIf>(), 32);
+        assert_eq!(std::mem::size_of::<crate::ExprIf>(), 32);
         assert_eq!(std::mem::size_of::<ExprIpyEscapeCommand>(), 32);
-        assert_eq!(std::mem::size_of::<ExprLambda>(), 24);
+        assert_eq!(std::mem::size_of::<crate::ExprLambda>(), 24);
         assert_eq!(std::mem::size_of::<ExprList>(), 40);
         assert_eq!(std::mem::size_of::<ExprListComp>(), 40);
         assert_eq!(std::mem::size_of::<ExprName>(), 40);
-        assert_eq!(std::mem::size_of::<ExprNamed>(), 24);
+        assert_eq!(std::mem::size_of::<crate::ExprNamed>(), 24);
         assert_eq!(std::mem::size_of::<ExprNoneLiteral>(), 8);
         assert_eq!(std::mem::size_of::<ExprNumberLiteral>(), 32);
         assert_eq!(std::mem::size_of::<ExprSet>(), 32);
@@ -3669,7 +3669,7 @@ mod tests {
         assert_eq!(std::mem::size_of::<ExprStringLiteral>(), 56);
         assert_eq!(std::mem::size_of::<ExprSubscript>(), 32);
         assert_eq!(std::mem::size_of::<ExprTuple>(), 40);
-        assert_eq!(std::mem::size_of::<ExprUnaryOp>(), 24);
+        assert_eq!(std::mem::size_of::<crate::ExprUnaryOp>(), 24);
         assert_eq!(std::mem::size_of::<ExprYield>(), 16);
         assert_eq!(std::mem::size_of::<ExprYieldFrom>(), 16);
     }
