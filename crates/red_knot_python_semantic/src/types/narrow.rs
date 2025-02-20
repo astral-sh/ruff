@@ -248,6 +248,9 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         symbol_table(self.db, self.scope())
     }
 
+    /// Returns the `constraint`'s scope.
+    ///
+    /// This is also the scope of the enclosing salsa query.
     fn scope(&self) -> ScopeId<'db> {
         match self.constraint {
             ConstraintNode::Expression(expression) => expression.scope(self.db),
