@@ -103,7 +103,10 @@ impl Connection {
                             tracing::info!("Exit notification received. Server shutting down...");
                             return Ok(true);
                         }
-                        lsp::Message::Request(lsp::Request { id, .. }) => {
+                        lsp::Message::Request(lsp::Request { id, method, .. }) => {
+                            tracing::warn!(
+                                "Server received unexpected request {method} ({id}) while waiting for exit notification",
+                            );
                             self.sender.send(lsp::Message::Response(lsp::Response::new_err(
                                 id.clone(),
                                 lsp::ErrorCode::InvalidRequest as i32,
@@ -111,9 +114,9 @@ impl Connection {
                             )))?;
                         }
                         message => {
-                            anyhow::bail!(
-                                "Server received unexpected message {message:?} while waiting for exit notification"
-                            )
+                            tracing::warn!(
+                                "Server received unexpected message while waiting for exit notification: {message:?}"
+                            );
                         }
                     }
                 }
