@@ -257,13 +257,12 @@
 //! visits a `StmtIf` node.
 pub(crate) use self::symbol_state::ScopedConstraintId;
 use self::symbol_state::{
-    BindingIdWithConstraintsIterator, ConstraintIdIterator, DeclarationIdIterator,
+    ConstraintIndexIterator, LiveBindingsIterator, LiveDeclaration, LiveDeclarationsIterator,
     ScopedDefinitionId, SymbolBindings, SymbolDeclarations, SymbolState,
 };
 use crate::semantic_index::ast_ids::ScopedUseId;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::symbol::{FileScopeId, ScopedSymbolId};
-use crate::semantic_index::use_def::symbol_state::DeclarationIdWithConstraint;
 use crate::visibility_constraints::{
     ScopedVisibilityConstraintId, VisibilityConstraints, VisibilityConstraintsBuilder,
 };
@@ -417,7 +416,7 @@ pub(crate) struct BindingWithConstraintsIterator<'map, 'db> {
     all_definitions: &'map IndexVec<ScopedDefinitionId, Option<Definition<'db>>>,
     all_constraints: &'map AllConstraints<'db>,
     pub(crate) visibility_constraints: &'map VisibilityConstraints<'db>,
-    inner: BindingIdWithConstraintsIterator<'map>,
+    inner: LiveBindingsIterator<'map>,
 }
 
 impl<'map, 'db> Iterator for BindingWithConstraintsIterator<'map, 'db> {
@@ -428,13 +427,13 @@ impl<'map, 'db> Iterator for BindingWithConstraintsIterator<'map, 'db> {
 
         self.inner
             .next()
-            .map(|binding_id_with_constraints| BindingWithConstraints {
-                binding: self.all_definitions[binding_id_with_constraints.definition],
+            .map(|live_binding| BindingWithConstraints {
+                binding: self.all_definitions[live_binding.binding],
                 constraints: ConstraintsIterator {
                     all_constraints,
-                    constraint_ids: binding_id_with_constraints.constraint_ids,
+                    constraint_ids: live_binding.narrowing_constraints.iter(),
                 },
-                visibility_constraint: binding_id_with_constraints.visibility_constraint,
+                visibility_constraint: live_binding.visibility_constraint,
             })
     }
 }
@@ -449,7 +448,7 @@ pub(crate) struct BindingWithConstraints<'map, 'db> {
 
 pub(crate) struct ConstraintsIterator<'map, 'db> {
     all_constraints: &'map AllConstraints<'db>,
-    constraint_ids: ConstraintIdIterator<'map>,
+    constraint_ids: ConstraintIndexIterator<'map>,
 }
 
 impl<'db> Iterator for ConstraintsIterator<'_, 'db> {
@@ -458,7 +457,7 @@ impl<'db> Iterator for ConstraintsIterator<'_, 'db> {
     fn next(&mut self) -> Option<Self::Item> {
         self.constraint_ids
             .next()
-            .map(|constraint_id| self.all_constraints[constraint_id])
+            .map(|constraint_id| self.all_constraints[ScopedConstraintId::from_u32(constraint_id)])
     }
 }
 
@@ -467,7 +466,7 @@ impl std::iter::FusedIterator for ConstraintsIterator<'_, '_> {}
 pub(crate) struct DeclarationsIterator<'map, 'db> {
     all_definitions: &'map IndexVec<ScopedDefinitionId, Option<Definition<'db>>>,
     pub(crate) visibility_constraints: &'map VisibilityConstraints<'db>,
-    inner: DeclarationIdIterator<'map>,
+    inner: LiveDeclarationsIterator<'map>,
 }
 
 pub(crate) struct DeclarationWithConstraint<'db> {
@@ -480,13 +479,13 @@ impl<'db> Iterator for DeclarationsIterator<'_, 'db> {
 
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next().map(
-            |DeclarationIdWithConstraint {
-                 definition,
+            |LiveDeclaration {
+                 declaration,
                  visibility_constraint,
              }| {
                 DeclarationWithConstraint {
-                    declaration: self.all_definitions[definition],
-                    visibility_constraint,
+                    declaration: self.all_definitions[*declaration],
+                    visibility_constraint: *visibility_constraint,
                 }
             },
         )
