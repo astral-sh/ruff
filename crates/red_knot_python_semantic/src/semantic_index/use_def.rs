@@ -655,6 +655,8 @@ impl<'db> UseDefMapBuilder<'db> {
         symbol: ScopedSymbolId,
         definition: Definition<'db>,
     ) {
+        // We don't need to store anything in self.bindings_by_declaration or
+        // self.declarations_by_binding.
         let def_id = self.all_definitions.push(Some(definition));
         let symbol_state = &mut self.symbol_states[symbol];
         symbol_state.record_declaration(def_id);
