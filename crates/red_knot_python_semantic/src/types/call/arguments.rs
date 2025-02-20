@@ -5,7 +5,7 @@ use crate::Db;
 use super::Type;
 
 /// Typed arguments for a single call, in source order.
-#[salsa::tracked]
+#[salsa::interned]
 pub(crate) struct CallArguments<'db> {
     args: Vec<Argument<'db>>,
 }
@@ -26,7 +26,7 @@ impl<'a, 'db> CallArguments<'db> {
             positional_tys
                 .into_iter()
                 .map(Argument::Positional)
-                .collect(),
+                .collect::<Vec<_>>(),
         )
     }
 

@@ -2770,7 +2770,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         }
                     }
                 })
-                .collect(),
+                .collect::<Vec<_>>(),
         )
     }
 
