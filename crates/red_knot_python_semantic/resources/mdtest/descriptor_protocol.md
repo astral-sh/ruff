@@ -35,11 +35,12 @@ reveal_type(C.ten)  # revealed: Literal[10]
 c.ten = 10  # error: [invalid-assignment]
 C.ten = 10
 
-# TODO: This should be an error, but the message needs to be improved.
+# TODO: This should be an error (as the wrong type is being implicitly passed to `Ten.__set__`),
+# but the error message is misleading.
 # error: [invalid-assignment] "Object of type `Literal[11]` is not assignable to attribute `ten` of type `Ten`"
 c.ten = 11
 
-# TODO: This should be an error, but the message needs to be improved.
+# TODO: same as above
 # error: [invalid-assignment] "Object of type `Literal[11]` is not assignable to attribute `ten` of type `Literal[10]`"
 C.ten = 11
 ```
@@ -264,7 +265,7 @@ reveal_type(C().d)  # revealed: LiteralString
 ## Undeclared descriptor arguments
 
 If a descriptor attribute is not declared, we union with `Unknown`, just like for regular
-attributes, since that attribute could be overwritten externally. Even data-descriptors with a
+attributes, since that attribute could be overwritten externally. Even a data descriptor with a
 `__set__` method can be overwritten when accessed through a class object.
 
 ```py
@@ -280,6 +281,7 @@ class C:
 
 C.descriptor = "something else"
 
+# This could also be `Literal["something else"]` if we support narrowing of attribute types based on assignments
 reveal_type(C.descriptor)  # revealed: Unknown | int
 ```
 
