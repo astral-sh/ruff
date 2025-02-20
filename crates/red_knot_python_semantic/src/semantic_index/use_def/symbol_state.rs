@@ -80,7 +80,7 @@ const INLINE_DEFINITIONS_PER_SYMBOL: usize = 4;
 /// Which constraints apply to a given binding?
 type Constraints = BitSet<INLINE_CONSTRAINT_BLOCKS>;
 
-pub(super) type ConstraintIterator<'a> = BitSetIterator<'a, INLINE_CONSTRAINT_BLOCKS>;
+pub(super) type ConstraintIndexIterator<'a> = BitSetIterator<'a, INLINE_CONSTRAINT_BLOCKS>;
 
 /// Live declarations for a single symbol at some point in control flow, with their
 /// corresponding visibility constraints.
@@ -97,7 +97,7 @@ pub(super) struct LiveDeclaration {
     pub(super) visibility_constraint: ScopedVisibilityConstraintId,
 }
 
-pub(super) type LiveDeclarationIter<'a> = std::slice::Iter<'a, LiveDeclaration>;
+pub(super) type LiveDeclarationsIterator<'a> = std::slice::Iter<'a, LiveDeclaration>;
 
 impl SymbolDeclarations {
     fn undeclared(scope_start_visibility: ScopedVisibilityConstraintId) -> Self {
@@ -133,7 +133,7 @@ impl SymbolDeclarations {
     }
 
     /// Return an iterator over live declarations for this symbol.
-    pub(super) fn iter(&self) -> LiveDeclarationIter<'_> {
+    pub(super) fn iter(&self) -> LiveDeclarationsIterator<'_> {
         self.live_declarations.iter()
     }
 
@@ -204,7 +204,7 @@ pub(super) struct LiveBinding {
     pub(super) visibility_constraint: ScopedVisibilityConstraintId,
 }
 
-pub(super) type LiveBindingIter<'a> = std::slice::Iter<'a, LiveBinding>;
+pub(super) type LiveBindingsIterator<'a> = std::slice::Iter<'a, LiveBinding>;
 
 impl SymbolBindings {
     fn unbound(scope_start_visibility: ScopedVisibilityConstraintId) -> Self {
@@ -254,7 +254,7 @@ impl SymbolBindings {
     }
 
     /// Iterate over currently live bindings for this symbol
-    pub(super) fn iter(&self) -> LiveBindingIter<'_> {
+    pub(super) fn iter(&self) -> LiveBindingsIterator<'_> {
         self.live_bindings.iter()
     }
 

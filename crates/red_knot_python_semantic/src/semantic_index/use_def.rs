@@ -257,8 +257,8 @@
 //! visits a `StmtIf` node.
 pub(crate) use self::symbol_state::ScopedConstraintId;
 use self::symbol_state::{
-    ConstraintIterator, LiveBindingIter, LiveDeclaration, LiveDeclarationIter, ScopedDefinitionId,
-    SymbolBindings, SymbolDeclarations, SymbolState,
+    ConstraintIndexIterator, LiveBindingsIterator, LiveDeclaration, LiveDeclarationsIterator,
+    ScopedDefinitionId, SymbolBindings, SymbolDeclarations, SymbolState,
 };
 use crate::semantic_index::ast_ids::ScopedUseId;
 use crate::semantic_index::definition::Definition;
@@ -416,7 +416,7 @@ pub(crate) struct BindingWithConstraintsIterator<'map, 'db> {
     all_definitions: &'map IndexVec<ScopedDefinitionId, Option<Definition<'db>>>,
     all_constraints: &'map AllConstraints<'db>,
     pub(crate) visibility_constraints: &'map VisibilityConstraints<'db>,
-    inner: LiveBindingIter<'map>,
+    inner: LiveBindingsIterator<'map>,
 }
 
 impl<'map, 'db> Iterator for BindingWithConstraintsIterator<'map, 'db> {
@@ -448,7 +448,7 @@ pub(crate) struct BindingWithConstraints<'map, 'db> {
 
 pub(crate) struct ConstraintsIterator<'map, 'db> {
     all_constraints: &'map AllConstraints<'db>,
-    constraint_ids: ConstraintIterator<'map>,
+    constraint_ids: ConstraintIndexIterator<'map>,
 }
 
 impl<'db> Iterator for ConstraintsIterator<'_, 'db> {
@@ -466,7 +466,7 @@ impl std::iter::FusedIterator for ConstraintsIterator<'_, '_> {}
 pub(crate) struct DeclarationsIterator<'map, 'db> {
     all_definitions: &'map IndexVec<ScopedDefinitionId, Option<Definition<'db>>>,
     pub(crate) visibility_constraints: &'map VisibilityConstraints<'db>,
-    inner: LiveDeclarationIter<'map>,
+    inner: LiveDeclarationsIterator<'map>,
 }
 
 pub(crate) struct DeclarationWithConstraint<'db> {
