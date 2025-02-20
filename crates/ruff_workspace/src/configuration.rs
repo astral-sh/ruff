@@ -29,7 +29,7 @@ use ruff_linter::rules::{flake8_import_conventions, isort, pycodestyle};
 use ruff_linter::settings::fix_safety_table::FixSafetyTable;
 use ruff_linter::settings::rule_table::RuleTable;
 use ruff_linter::settings::types::{
-    CompiledPerFileIgnoreList, CompiledPerFileVersionList, ExtensionMapping, FilePattern,
+    CompiledPerFileIgnoreList, CompiledPerFileTargetVersionList, ExtensionMapping, FilePattern,
     FilePatternSet, OutputFormat, PerFileIgnore, PerFileTargetVersion, PreviewMode,
     RequiredVersion, UnsafeFixes,
 };
@@ -176,9 +176,10 @@ impl Configuration {
             PreviewMode::Enabled => ruff_python_formatter::PreviewMode::Enabled,
         };
 
-        let per_file_target_version =
-            CompiledPerFileVersionList::resolve(self.per_file_target_version.unwrap_or_default())
-                .context("failed to resolve `per-file-target-version` table")?;
+        let per_file_target_version = CompiledPerFileTargetVersionList::resolve(
+            self.per_file_target_version.unwrap_or_default(),
+        )
+        .context("failed to resolve `per-file-target-version` table")?;
 
         let formatter = FormatterSettings {
             exclude: FilePatternSet::try_from_iter(format.exclude.unwrap_or_default())?,

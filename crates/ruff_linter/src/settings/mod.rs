@@ -8,7 +8,7 @@ use rustc_hash::FxHashSet;
 use std::fmt::{Display, Formatter};
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
-use types::CompiledPerFileVersionList;
+use types::CompiledPerFileTargetVersionList;
 
 use crate::codes::RuleCodePrefix;
 use ruff_macros::CacheKey;
@@ -230,7 +230,7 @@ pub struct LinterSettings {
     /// See [`LinterSettings::resolve_target_version`] for a way to check a given [`Path`]
     /// against these patterns, while falling back to `unresolved_target_version` if none of them
     /// match.
-    pub per_file_target_version: CompiledPerFileVersionList,
+    pub per_file_target_version: CompiledPerFileTargetVersionList,
     pub preview: PreviewMode,
     pub explicit_preview_rules: bool,
 
@@ -390,7 +390,7 @@ impl LinterSettings {
         Self {
             exclude: FilePatternSet::default(),
             unresolved_target_version: PythonVersion::default(),
-            per_file_target_version: CompiledPerFileVersionList::default(),
+            per_file_target_version: CompiledPerFileTargetVersionList::default(),
             project_root: project_root.to_path_buf(),
             rules: DEFAULT_SELECTORS
                 .iter()

@@ -314,6 +314,8 @@ impl<T> PerFile<T> {
 }
 
 /// Per-file ignored linting rules.
+///
+/// See [`PerFile`] for details of the representation.
 #[derive(Debug, Clone)]
 pub struct PerFileIgnore(PerFile<RuleSet>);
 
@@ -780,15 +782,15 @@ impl PerFileTargetVersion {
 }
 
 #[derive(CacheKey, Clone, Debug, Default)]
-pub struct CompiledPerFileVersionList(CompiledPerFileList<ast::PythonVersion>);
+pub struct CompiledPerFileTargetVersionList(CompiledPerFileList<ast::PythonVersion>);
 
-impl CompiledPerFileVersionList {
+impl CompiledPerFileTargetVersionList {
     /// Given a list of [`PerFileTargetVersion`] patterns, create a compiled set of globs.
     ///
     /// Returns an error if either of the glob patterns cannot be parsed.
-    pub fn resolve(per_file_ignores: Vec<PerFileTargetVersion>) -> Result<Self> {
+    pub fn resolve(per_file_versions: Vec<PerFileTargetVersion>) -> Result<Self> {
         Ok(Self(CompiledPerFileList::resolve(
-            per_file_ignores.into_iter().map(|version| version.0),
+            per_file_versions.into_iter().map(|version| version.0),
         )?))
     }
 
@@ -797,7 +799,7 @@ impl CompiledPerFileVersionList {
     }
 }
 
-impl Display for CompiledPerFileVersionList {
+impl Display for CompiledPerFileTargetVersionList {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         self.0.fmt(f)
     }

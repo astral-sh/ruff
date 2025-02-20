@@ -4,7 +4,7 @@ use ruff_formatter::{FormatOptions, IndentStyle, IndentWidth, LineWidth};
 use ruff_graph::AnalyzeSettings;
 use ruff_linter::display_settings;
 use ruff_linter::settings::types::{
-    CompiledPerFileVersionList, ExtensionMapping, FilePattern, FilePatternSet, OutputFormat,
+    CompiledPerFileTargetVersionList, ExtensionMapping, FilePattern, FilePatternSet, OutputFormat,
     UnsafeFixes,
 };
 use ruff_linter::settings::LinterSettings;
@@ -175,7 +175,7 @@ pub struct FormatterSettings {
     /// See [`FormatterSettings::resolve_target_version`] for a way to check a given [`Path`]
     /// against these patterns, while falling back to `unresolved_target_version` if none of them
     /// match.
-    pub per_file_target_version: CompiledPerFileVersionList,
+    pub per_file_target_version: CompiledPerFileTargetVersionList,
 
     pub line_width: LineWidth,
 
@@ -257,7 +257,7 @@ impl Default for FormatterSettings {
             exclude: FilePatternSet::default(),
             extension: ExtensionMapping::default(),
             unresolved_target_version: default_options.target_version(),
-            per_file_target_version: CompiledPerFileVersionList::default(),
+            per_file_target_version: CompiledPerFileTargetVersionList::default(),
             preview: PreviewMode::Disabled,
             line_width: default_options.line_width(),
             line_ending: LineEnding::Auto,
