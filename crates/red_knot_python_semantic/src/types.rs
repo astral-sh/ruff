@@ -1511,7 +1511,12 @@ impl<'db> Type<'db> {
             // where we infer `SliceLiteral` types.
             Type::SliceLiteral(_) => KnownClass::Slice.to_instance(db).static_member(db, name),
 
-            Type::Tuple(_) => KnownClass::Tuple.to_instance(db).static_member(db, name),
+            Type::Tuple(_) => {
+                // TODO: We might want to special case some attributes here, as the stubs
+                // for `builtins.tuple` assume that `self` is a homogeneous tuple, while
+                // we're explicitly modeling heterogeneous tuples using `Type::Tuple`.
+                KnownClass::Tuple.to_instance(db).static_member(db, name)
+            }
 
             Type::AlwaysTruthy | Type::AlwaysFalsy => match name {
                 "__bool__" => {
