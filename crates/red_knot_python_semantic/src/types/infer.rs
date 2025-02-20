@@ -1646,7 +1646,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
 
                 let target_ty = enter_ty
-                    .try_call(self.db(), &CallArguments::positional([context_expression_ty]))
+                    .try_call(self.db(), CallArguments::positional(self.db(), [context_expression_ty]))
                     .map(|outcome| outcome.return_type(self.db()))
                     .unwrap_or_else(|err|  {
                         // TODO: Use more specific error messages for the different error cases.
@@ -1691,12 +1691,15 @@ impl<'db> TypeInferenceBuilder<'db> {
                         if exit_ty
                             .try_call(
                                 self.db(),
-                                &CallArguments::positional([
-                                    context_manager_ty,
-                                    Type::none(self.db()),
-                                    Type::none(self.db()),
-                                    Type::none(self.db()),
-                                ]),
+                                CallArguments::positional(
+                                    self.db(),
+                                    [
+                                        context_manager_ty,
+                                        Type::none(self.db()),
+                                        Type::none(self.db()),
+                                        Type::none(self.db()),
+                                    ],
+                                ),
                             )
                             .is_err()
                         {
@@ -2241,7 +2244,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 {
                     let call = class_member.try_call(
                         self.db(),
-                        &CallArguments::positional([target_type, value_type]),
+                        CallArguments::positional(self.db(), [target_type, value_type]),
                     );
                     let augmented_return_ty = match call {
                         Ok(t) => t.return_type(self.db()),
@@ -2722,46 +2725,53 @@ impl<'db> TypeInferenceBuilder<'db> {
         &mut self,
         arguments: &'a ast::Arguments,
         parameter_expectations: ParameterExpectations,
-    ) -> CallArguments<'a, 'db> {
-        arguments
-            .arguments_source_order()
-            .enumerate()
-            .map(|(index, arg_or_keyword)| {
-                let infer_argument_type = match parameter_expectations.expectation_at_index(index) {
-                    ParameterExpectation::TypeExpression => Self::infer_type_expression,
-                    ParameterExpectation::ValueExpression => Self::infer_expression,
-                };
+    ) -> CallArguments<'db> {
+        CallArguments::new(
+            self.db(),
+            arguments
+                .arguments_source_order()
+                .enumerate()
+                .map(|(index, arg_or_keyword)| {
+                    let infer_argument_type =
+                        match parameter_expectations.expectation_at_index(index) {
+                            ParameterExpectation::TypeExpression => Self::infer_type_expression,
+                            ParameterExpectation::ValueExpression => Self::infer_expression,
+                        };
 
-                match arg_or_keyword {
-                    ast::ArgOrKeyword::Arg(arg) => match arg {
-                        ast::Expr::Starred(ast::ExprStarred {
+                    match arg_or_keyword {
+                        ast::ArgOrKeyword::Arg(arg) => match arg {
+                            ast::Expr::Starred(ast::ExprStarred {
+                                value,
+                                range: _,
+                                ctx: _,
+                            }) => {
+                                let ty = infer_argument_type(self, value);
+                                self.store_expression_type(arg, ty);
+                                Argument::Variadic(ty)
+                            }
+                            // TODO diagnostic if after a keyword argument
+                            _ => Argument::Positional(infer_argument_type(self, arg)),
+                        },
+                        ast::ArgOrKeyword::Keyword(ast::Keyword {
+                            arg,
                             value,
                             range: _,
-                            ctx: _,
                         }) => {
                             let ty = infer_argument_type(self, value);
-                            self.store_expression_type(arg, ty);
-                            Argument::Variadic(ty)
-                        }
-                        // TODO diagnostic if after a keyword argument
-                        _ => Argument::Positional(infer_argument_type(self, arg)),
-                    },
-                    ast::ArgOrKeyword::Keyword(ast::Keyword {
-                        arg,
-                        value,
-                        range: _,
-                    }) => {
-                        let ty = infer_argument_type(self, value);
-                        if let Some(arg) = arg {
-                            Argument::Keyword { name: &arg.id, ty }
-                        } else {
-                            // TODO diagnostic if not last
-                            Argument::Keywords(ty)
+                            if let Some(arg) = arg {
+                                Argument::Keyword {
+                                    name: arg.id.clone(),
+                                    ty,
+                                }
+                            } else {
+                                // TODO diagnostic if not last
+                                Argument::Keywords(ty)
+                            }
                         }
                     }
-                }
-            })
-            .collect()
+                })
+                .collect(),
+        )
     }
 
     fn infer_optional_expression(&mut self, expression: Option<&ast::Expr>) -> Option<Type<'db>> {
@@ -3277,7 +3287,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             .unwrap_or_default();
 
         let call_arguments = self.infer_arguments(arguments, parameter_expectations);
-        let call = function_type.try_call(self.db(), &call_arguments);
+        let call = function_type.try_call(self.db(), call_arguments);
 
         match call {
             Ok(outcome) => {
@@ -3781,7 +3791,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 match operand_type.try_call_dunder(
                     self.db(),
                     unary_dunder_method,
-                    &CallArguments::none(),
+                    CallArguments::none(self.db()),
                 ) {
                     Ok(outcome) => outcome.return_type(self.db()),
                     Err(e) => {
@@ -4032,7 +4042,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             .try_call_dunder(
                                 self.db(),
                                 reflected_dunder,
-                                &CallArguments::positional([left_ty]),
+                                CallArguments::positional(self.db(), [left_ty]),
                             )
                             .map(|outcome| outcome.return_type(self.db()))
                             .or_else(|_| {
@@ -4040,7 +4050,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                     .try_call_dunder(
                                         self.db(),
                                         op.dunder(),
-                                        &CallArguments::positional([right_ty]),
+                                        CallArguments::positional(self.db(), [right_ty]),
                                     )
                                     .map(|outcome| outcome.return_type(self.db()))
                             })
@@ -4053,7 +4063,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                     left_class.member(self.db(), op.dunder())
                 {
                     class_member
-                        .try_call(self.db(), &CallArguments::positional([left_ty, right_ty]))
+                        .try_call(
+                            self.db(),
+                            CallArguments::positional(self.db(), [left_ty, right_ty]),
+                        )
                         .map(|outcome| outcome.return_type(self.db()))
                         .ok()
                 } else {
@@ -4071,7 +4084,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             class_member
                                 .try_call(
                                     self.db(),
-                                    &CallArguments::positional([right_ty, left_ty]),
+                                    CallArguments::positional(self.db(), [right_ty, left_ty]),
                                 )
                                 .map(|outcome| outcome.return_type(self.db()))
                                 .ok()
@@ -4640,21 +4653,23 @@ impl<'db> TypeInferenceBuilder<'db> {
         let db = self.db();
         // The following resource has details about the rich comparison algorithm:
         // https://snarky.ca/unravelling-rich-comparison-operators/
-        let call_dunder = |op: RichCompareOperator,
-                           left: InstanceType<'db>,
-                           right: InstanceType<'db>| {
-            // TODO: How do we want to handle possibly unbound dunder methods?
-            match left.class.class_member(db, op.dunder()) {
-                Symbol::Type(class_member_dunder, Boundness::Bound) => class_member_dunder
-                    .try_call(
-                        db,
-                        &CallArguments::positional([Type::Instance(left), Type::Instance(right)]),
-                    )
-                    .map(|outcome| outcome.return_type(db))
-                    .ok(),
-                _ => None,
-            }
-        };
+        let call_dunder =
+            |op: RichCompareOperator, left: InstanceType<'db>, right: InstanceType<'db>| {
+                // TODO: How do we want to handle possibly unbound dunder methods?
+                match left.class.class_member(db, op.dunder()) {
+                    Symbol::Type(class_member_dunder, Boundness::Bound) => class_member_dunder
+                        .try_call(
+                            db,
+                            CallArguments::positional(
+                                db,
+                                [Type::Instance(left), Type::Instance(right)],
+                            ),
+                        )
+                        .map(|outcome| outcome.return_type(db))
+                        .ok(),
+                    _ => None,
+                }
+            };
 
         // The reflected dunder has priority if the right-hand side is a strict subclass of the left-hand side.
         if left != right && right.is_subtype_of(db, left) {
@@ -4698,7 +4713,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                 contains_dunder
                     .try_call(
                         db,
-                        &CallArguments::positional([Type::Instance(right), Type::Instance(left)]),
+                        CallArguments::positional(
+                            db,
+                            [Type::Instance(right), Type::Instance(left)],
+                        ),
                     )
                     .map(|outcome| outcome.return_type(db))
                     .ok()
@@ -4956,7 +4974,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 match value_ty.try_call_dunder(
                     self.db(),
                     "__getitem__",
-                    &CallArguments::positional([slice_ty]),
+                    CallArguments::positional(self.db(), [slice_ty]),
                 ) {
                     Ok(outcome) => return outcome.return_type(self.db()),
                     Err(err @ CallDunderError::PossiblyUnbound { .. }) => {
@@ -5017,7 +5035,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             }
 
                             return ty
-                                .try_call(self.db(), &CallArguments::positional([value_ty, slice_ty]))
+                                .try_call(self.db(), CallArguments::positional(self.db(),[value_ty, slice_ty]))
                                 .map(|outcome| outcome.return_type(self.db()))
                                 .unwrap_or_else(|err| {
                                     self.context.report_lint(

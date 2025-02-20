@@ -1586,7 +1586,10 @@ impl<'db> Type<'db> {
                         .ignore_possibly_unbound()?
                         .try_call(
                             db,
-                            &CallArguments::positional([instance.unwrap_or(Type::none(db)), owner]),
+                            CallArguments::positional(
+                                db,
+                                [instance.unwrap_or(Type::none(db)), owner],
+                            ),
                         )
                         .map(|outcome| Some(outcome.return_type(db)))
                         .unwrap_or(None)
@@ -1710,7 +1713,7 @@ impl<'db> Type<'db> {
                     // and a subclass could add a `__bool__` method.
 
                     if let Ok(Type::BooleanLiteral(bool_val)) = self
-                        .try_call_dunder(db, "__bool__", &CallArguments::none())
+                        .try_call_dunder(db, "__bool__", CallArguments::none(db))
                         .map(|outcome| outcome.return_type(db))
                     {
                         bool_val.into()
@@ -1783,7 +1786,7 @@ impl<'db> Type<'db> {
             return usize_len.try_into().ok().map(Type::IntLiteral);
         }
 
-        let return_ty = match self.try_call_dunder(db, "__len__", &CallArguments::none()) {
+        let return_ty = match self.try_call_dunder(db, "__len__", CallArguments::none(db)) {
             Ok(outcome) | Err(CallDunderError::PossiblyUnbound(outcome)) => outcome.return_type(db),
 
             // TODO: emit a diagnostic
@@ -1799,359 +1802,377 @@ impl<'db> Type<'db> {
     fn try_call(
         self,
         db: &'db dyn Db,
-        arguments: &CallArguments<'_, 'db>,
+        arguments: CallArguments<'db>,
     ) -> Result<CallOutcome<'db>, CallError<'db>> {
-        match self {
-            Type::Callable(CallableType::BoundMethod(bound_method)) => {
-                let instance = bound_method.self_instance(db);
-                let arguments = arguments.with_self(instance);
+        #[salsa::tracked]
+        fn try_call_query<'db>(
+            db: &'db dyn Db,
+            ty_self: Type<'db>,
+            arguments: CallArguments<'db>,
+        ) -> Result<CallOutcome<'db>, CallError<'db>> {
+            match ty_self {
+                Type::Callable(CallableType::BoundMethod(bound_method)) => {
+                    let instance = bound_method.self_instance(db);
+                    let arguments = arguments.with_self(db, instance);
 
-                let binding = bind_call(
-                    db,
-                    &arguments,
-                    bound_method.function(db).signature(db),
-                    self,
-                );
+                    let binding = bind_call(
+                        db,
+                        arguments,
+                        bound_method.function(db).signature(db),
+                        ty_self,
+                    );
 
-                if binding.has_binding_errors() {
-                    Err(CallError::BindingError { binding })
-                } else {
-                    Ok(CallOutcome::Single(binding))
+                    if binding.has_binding_errors() {
+                        Err(CallError::BindingError { binding })
+                    } else {
+                        Ok(CallOutcome::Single(binding))
+                    }
                 }
-            }
-            Type::Callable(CallableType::MethodWrapperDunderGet(function)) => {
-                // Here, we dynamically model the overloaded function signature of `types.FunctionType.__get__`.
-                // This is required because we need to return more precise types than what the signature in
-                // typeshed provides:
-                //
-                // ```py
-                // class FunctionType:
-                //     # ...
-                //     @overload
-                //     def __get__(self, instance: None, owner: type, /) -> FunctionType: ...
-                //     @overload
-                //     def __get__(self, instance: object, owner: type | None = None, /) -> MethodType: ...
-                // ```
+                Type::Callable(CallableType::MethodWrapperDunderGet(function)) => {
+                    // Here, we dynamically model the overloaded function signature of `types.FunctionType.__get__`.
+                    // This is required because we need to return more precise types than what the signature in
+                    // typeshed provides:
+                    //
+                    // ```py
+                    // class FunctionType:
+                    //     # ...
+                    //     @overload
+                    //     def __get__(self, instance: None, owner: type, /) -> FunctionType: ...
+                    //     @overload
+                    //     def __get__(self, instance: object, owner: type | None = None, /) -> MethodType: ...
+                    // ```
 
-                let first_argument_is_none =
-                    arguments.first_argument().is_some_and(|ty| ty.is_none(db));
+                    let first_argument_is_none = arguments
+                        .first_argument(db)
+                        .is_some_and(|ty| ty.is_none(db));
 
-                let signature = Signature::new(
-                    Parameters::new([
-                        Parameter::new(
-                            Some("instance".into()),
-                            Some(Type::object(db)),
-                            ParameterKind::PositionalOnly { default_ty: None },
-                        ),
-                        if first_argument_is_none {
+                    let signature = Signature::new(
+                        Parameters::new([
                             Parameter::new(
-                                Some("owner".into()),
-                                Some(KnownClass::Type.to_instance(db)),
+                                Some("instance".into()),
+                                Some(Type::object(db)),
                                 ParameterKind::PositionalOnly { default_ty: None },
-                            )
-                        } else {
-                            Parameter::new(
-                                Some("owner".into()),
-                                Some(UnionType::from_elements(
-                                    db,
-                                    [KnownClass::Type.to_instance(db), Type::none(db)],
-                                )),
-                                ParameterKind::PositionalOnly {
-                                    default_ty: Some(Type::none(db)),
-                                },
-                            )
-                        },
-                    ]),
-                    Some(match arguments.first_argument() {
-                        Some(ty) if ty.is_none(db) => Type::FunctionLiteral(function),
-                        Some(instance) => Type::Callable(CallableType::BoundMethod(
-                            BoundMethodType::new(db, function, instance),
-                        )),
-                        _ => Type::unknown(),
-                    }),
-                );
-
-                let binding = bind_call(db, arguments, &signature, self);
-
-                if binding.has_binding_errors() {
-                    Err(CallError::BindingError { binding })
-                } else {
-                    Ok(CallOutcome::Single(binding))
-                }
-            }
-            Type::Callable(CallableType::WrapperDescriptorDunderGet) => {
-                // Here, we also model `types.FunctionType.__get__`, but now we consider a call to
-                // this as a function, i.e. we also expect the `self` argument to be passed in.
-
-                let second_argument_is_none =
-                    arguments.second_argument().is_some_and(|ty| ty.is_none(db));
-
-                let signature = Signature::new(
-                    Parameters::new([
-                        Parameter::new(
-                            Some("self".into()),
-                            Some(KnownClass::FunctionType.to_instance(db)),
-                            ParameterKind::PositionalOnly { default_ty: None },
-                        ),
-                        Parameter::new(
-                            Some("instance".into()),
-                            Some(Type::object(db)),
-                            ParameterKind::PositionalOnly { default_ty: None },
-                        ),
-                        if second_argument_is_none {
-                            Parameter::new(
-                                Some("owner".into()),
-                                Some(KnownClass::Type.to_instance(db)),
-                                ParameterKind::PositionalOnly { default_ty: None },
-                            )
-                        } else {
-                            Parameter::new(
-                                Some("owner".into()),
-                                Some(UnionType::from_elements(
-                                    db,
-                                    [KnownClass::Type.to_instance(db), Type::none(db)],
-                                )),
-                                ParameterKind::PositionalOnly {
-                                    default_ty: Some(Type::none(db)),
-                                },
-                            )
-                        },
-                    ]),
-                    Some(
-                        match (arguments.first_argument(), arguments.second_argument()) {
-                            (Some(function @ Type::FunctionLiteral(_)), Some(instance))
-                                if instance.is_none(db) =>
-                            {
-                                function
-                            }
-                            (Some(Type::FunctionLiteral(function)), Some(instance)) => {
-                                Type::Callable(CallableType::BoundMethod(BoundMethodType::new(
-                                    db, function, instance,
-                                )))
-                            }
+                            ),
+                            if first_argument_is_none {
+                                Parameter::new(
+                                    Some("owner".into()),
+                                    Some(KnownClass::Type.to_instance(db)),
+                                    ParameterKind::PositionalOnly { default_ty: None },
+                                )
+                            } else {
+                                Parameter::new(
+                                    Some("owner".into()),
+                                    Some(UnionType::from_elements(
+                                        db,
+                                        [KnownClass::Type.to_instance(db), Type::none(db)],
+                                    )),
+                                    ParameterKind::PositionalOnly {
+                                        default_ty: Some(Type::none(db)),
+                                    },
+                                )
+                            },
+                        ]),
+                        Some(match arguments.first_argument(db) {
+                            Some(ty) if ty.is_none(db) => Type::FunctionLiteral(function),
+                            Some(instance) => Type::Callable(CallableType::BoundMethod(
+                                BoundMethodType::new(db, function, instance),
+                            )),
                             _ => Type::unknown(),
-                        },
-                    ),
-                );
+                        }),
+                    );
 
-                let binding = bind_call(db, arguments, &signature, self);
+                    let binding = bind_call(db, arguments, &signature, ty_self);
 
-                if binding.has_binding_errors() {
-                    Err(CallError::BindingError { binding })
-                } else {
-                    Ok(CallOutcome::Single(binding))
+                    if binding.has_binding_errors() {
+                        Err(CallError::BindingError { binding })
+                    } else {
+                        Ok(CallOutcome::Single(binding))
+                    }
                 }
-            }
-            Type::FunctionLiteral(function_type) => {
-                let mut binding = bind_call(db, arguments, function_type.signature(db), self);
+                Type::Callable(CallableType::WrapperDescriptorDunderGet) => {
+                    // Here, we also model `types.FunctionType.__get__`, but now we consider a call to
+                    // this as a function, i.e. we also expect the `self` argument to be passed in.
 
-                if binding.has_binding_errors() {
-                    return Err(CallError::BindingError { binding });
+                    let second_argument_is_none = arguments
+                        .second_argument(db)
+                        .is_some_and(|ty| ty.is_none(db));
+
+                    let signature = Signature::new(
+                        Parameters::new([
+                            Parameter::new(
+                                Some("self".into()),
+                                Some(KnownClass::FunctionType.to_instance(db)),
+                                ParameterKind::PositionalOnly { default_ty: None },
+                            ),
+                            Parameter::new(
+                                Some("instance".into()),
+                                Some(Type::object(db)),
+                                ParameterKind::PositionalOnly { default_ty: None },
+                            ),
+                            if second_argument_is_none {
+                                Parameter::new(
+                                    Some("owner".into()),
+                                    Some(KnownClass::Type.to_instance(db)),
+                                    ParameterKind::PositionalOnly { default_ty: None },
+                                )
+                            } else {
+                                Parameter::new(
+                                    Some("owner".into()),
+                                    Some(UnionType::from_elements(
+                                        db,
+                                        [KnownClass::Type.to_instance(db), Type::none(db)],
+                                    )),
+                                    ParameterKind::PositionalOnly {
+                                        default_ty: Some(Type::none(db)),
+                                    },
+                                )
+                            },
+                        ]),
+                        Some(
+                            match (arguments.first_argument(db), arguments.second_argument(db)) {
+                                (Some(function @ Type::FunctionLiteral(_)), Some(instance))
+                                    if instance.is_none(db) =>
+                                {
+                                    function
+                                }
+                                (Some(Type::FunctionLiteral(function)), Some(instance)) => {
+                                    Type::Callable(CallableType::BoundMethod(BoundMethodType::new(
+                                        db, function, instance,
+                                    )))
+                                }
+                                _ => Type::unknown(),
+                            },
+                        ),
+                    );
+
+                    let binding = bind_call(db, arguments, &signature, ty_self);
+
+                    if binding.has_binding_errors() {
+                        Err(CallError::BindingError { binding })
+                    } else {
+                        Ok(CallOutcome::Single(binding))
+                    }
                 }
+                Type::FunctionLiteral(function_type) => {
+                    let mut binding =
+                        bind_call(db, arguments, function_type.signature(db), ty_self);
 
-                match function_type.known(db) {
-                    Some(KnownFunction::IsEquivalentTo) => {
-                        let (ty_a, ty_b) = binding
-                            .two_parameter_types()
-                            .unwrap_or((Type::unknown(), Type::unknown()));
-                        binding
-                            .set_return_type(Type::BooleanLiteral(ty_a.is_equivalent_to(db, ty_b)));
-                    }
-                    Some(KnownFunction::IsSubtypeOf) => {
-                        let (ty_a, ty_b) = binding
-                            .two_parameter_types()
-                            .unwrap_or((Type::unknown(), Type::unknown()));
-                        binding.set_return_type(Type::BooleanLiteral(ty_a.is_subtype_of(db, ty_b)));
-                    }
-                    Some(KnownFunction::IsAssignableTo) => {
-                        let (ty_a, ty_b) = binding
-                            .two_parameter_types()
-                            .unwrap_or((Type::unknown(), Type::unknown()));
-                        binding
-                            .set_return_type(Type::BooleanLiteral(ty_a.is_assignable_to(db, ty_b)));
-                    }
-                    Some(KnownFunction::IsDisjointFrom) => {
-                        let (ty_a, ty_b) = binding
-                            .two_parameter_types()
-                            .unwrap_or((Type::unknown(), Type::unknown()));
-                        binding
-                            .set_return_type(Type::BooleanLiteral(ty_a.is_disjoint_from(db, ty_b)));
-                    }
-                    Some(KnownFunction::IsGradualEquivalentTo) => {
-                        let (ty_a, ty_b) = binding
-                            .two_parameter_types()
-                            .unwrap_or((Type::unknown(), Type::unknown()));
-                        binding.set_return_type(Type::BooleanLiteral(
-                            ty_a.is_gradual_equivalent_to(db, ty_b),
-                        ));
-                    }
-                    Some(KnownFunction::IsFullyStatic) => {
-                        let ty = binding.one_parameter_type().unwrap_or(Type::unknown());
-                        binding.set_return_type(Type::BooleanLiteral(ty.is_fully_static(db)));
-                    }
-                    Some(KnownFunction::IsSingleton) => {
-                        let ty = binding.one_parameter_type().unwrap_or(Type::unknown());
-                        binding.set_return_type(Type::BooleanLiteral(ty.is_singleton(db)));
-                    }
-                    Some(KnownFunction::IsSingleValued) => {
-                        let ty = binding.one_parameter_type().unwrap_or(Type::unknown());
-                        binding.set_return_type(Type::BooleanLiteral(ty.is_single_valued(db)));
+                    if binding.has_binding_errors() {
+                        return Err(CallError::BindingError { binding });
                     }
 
-                    Some(KnownFunction::Len) => {
-                        if let Some(first_arg) = binding.one_parameter_type() {
-                            if let Some(len_ty) = first_arg.len(db) {
-                                binding.set_return_type(len_ty);
-                            }
-                        };
-                    }
+                    match function_type.known(db) {
+                        Some(KnownFunction::IsEquivalentTo) => {
+                            let (ty_a, ty_b) = binding
+                                .two_parameter_types()
+                                .unwrap_or((Type::unknown(), Type::unknown()));
+                            binding.set_return_type(Type::BooleanLiteral(
+                                ty_a.is_equivalent_to(db, ty_b),
+                            ));
+                        }
+                        Some(KnownFunction::IsSubtypeOf) => {
+                            let (ty_a, ty_b) = binding
+                                .two_parameter_types()
+                                .unwrap_or((Type::unknown(), Type::unknown()));
+                            binding.set_return_type(Type::BooleanLiteral(
+                                ty_a.is_subtype_of(db, ty_b),
+                            ));
+                        }
+                        Some(KnownFunction::IsAssignableTo) => {
+                            let (ty_a, ty_b) = binding
+                                .two_parameter_types()
+                                .unwrap_or((Type::unknown(), Type::unknown()));
+                            binding.set_return_type(Type::BooleanLiteral(
+                                ty_a.is_assignable_to(db, ty_b),
+                            ));
+                        }
+                        Some(KnownFunction::IsDisjointFrom) => {
+                            let (ty_a, ty_b) = binding
+                                .two_parameter_types()
+                                .unwrap_or((Type::unknown(), Type::unknown()));
+                            binding.set_return_type(Type::BooleanLiteral(
+                                ty_a.is_disjoint_from(db, ty_b),
+                            ));
+                        }
+                        Some(KnownFunction::IsGradualEquivalentTo) => {
+                            let (ty_a, ty_b) = binding
+                                .two_parameter_types()
+                                .unwrap_or((Type::unknown(), Type::unknown()));
+                            binding.set_return_type(Type::BooleanLiteral(
+                                ty_a.is_gradual_equivalent_to(db, ty_b),
+                            ));
+                        }
+                        Some(KnownFunction::IsFullyStatic) => {
+                            let ty = binding.one_parameter_type().unwrap_or(Type::unknown());
+                            binding.set_return_type(Type::BooleanLiteral(ty.is_fully_static(db)));
+                        }
+                        Some(KnownFunction::IsSingleton) => {
+                            let ty = binding.one_parameter_type().unwrap_or(Type::unknown());
+                            binding.set_return_type(Type::BooleanLiteral(ty.is_singleton(db)));
+                        }
+                        Some(KnownFunction::IsSingleValued) => {
+                            let ty = binding.one_parameter_type().unwrap_or(Type::unknown());
+                            binding.set_return_type(Type::BooleanLiteral(ty.is_single_valued(db)));
+                        }
 
-                    Some(KnownFunction::Repr) => {
-                        if let Some(first_arg) = binding.one_parameter_type() {
-                            binding.set_return_type(first_arg.repr(db));
-                        };
-                    }
+                        Some(KnownFunction::Len) => {
+                            if let Some(first_arg) = binding.one_parameter_type() {
+                                if let Some(len_ty) = first_arg.len(db) {
+                                    binding.set_return_type(len_ty);
+                                }
+                            };
+                        }
 
-                    Some(KnownFunction::Cast) => {
-                        // TODO: Use `.two_parameter_tys()` exclusively
-                        // when overloads are supported.
-                        if let Some(casted_ty) = arguments.first_argument() {
-                            if binding.two_parameter_types().is_some() {
-                                binding.set_return_type(casted_ty);
-                            }
-                        };
-                    }
+                        Some(KnownFunction::Repr) => {
+                            if let Some(first_arg) = binding.one_parameter_type() {
+                                binding.set_return_type(first_arg.repr(db));
+                            };
+                        }
 
-                    Some(KnownFunction::GetattrStatic) => {
-                        let Some((instance_ty, attr_name, default)) =
-                            binding.three_parameter_types()
-                        else {
-                            return Ok(CallOutcome::Single(binding));
-                        };
+                        Some(KnownFunction::Cast) => {
+                            // TODO: Use `.two_parameter_tys()` exclusively
+                            // when overloads are supported.
+                            if let Some(casted_ty) = arguments.first_argument(db) {
+                                if binding.two_parameter_types().is_some() {
+                                    binding.set_return_type(casted_ty);
+                                }
+                            };
+                        }
 
-                        let Some(attr_name) = attr_name.into_string_literal() else {
-                            return Ok(CallOutcome::Single(binding));
-                        };
+                        Some(KnownFunction::GetattrStatic) => {
+                            let Some((instance_ty, attr_name, default)) =
+                                binding.three_parameter_types()
+                            else {
+                                return Ok(CallOutcome::Single(binding));
+                            };
 
-                        let default = if default.is_unknown() {
-                            Type::Never
-                        } else {
-                            default
-                        };
+                            let Some(attr_name) = attr_name.into_string_literal() else {
+                                return Ok(CallOutcome::Single(binding));
+                            };
 
-                        let union_with_default = |ty| UnionType::from_elements(db, [ty, default]);
+                            let default = if default.is_unknown() {
+                                Type::Never
+                            } else {
+                                default
+                            };
 
-                        // TODO: we could emit a diagnostic here (if default is not set)
-                        binding.set_return_type(
-                            match instance_ty.static_member(db, attr_name.value(db)) {
-                                Symbol::Type(ty, Boundness::Bound) => {
-                                    if instance_ty.is_fully_static(db) {
-                                        ty
-                                    } else {
-                                        // Here, we attempt to model the fact that an attribute lookup on
-                                        // a non-fully static type could fail. This is an approximation,
-                                        // as there are gradual types like `tuple[Any]`, on which a lookup
-                                        // of (e.g. of the `index` method) would always succeed.
+                            let union_with_default =
+                                |ty| UnionType::from_elements(db, [ty, default]);
 
+                            // TODO: we could emit a diagnostic here (if default is not set)
+                            binding.set_return_type(
+                                match instance_ty.static_member(db, attr_name.value(db)) {
+                                    Symbol::Type(ty, Boundness::Bound) => {
+                                        if instance_ty.is_fully_static(db) {
+                                            ty
+                                        } else {
+                                            // Here, we attempt to model the fact that an attribute lookup on
+                                            // a non-fully static type could fail. This is an approximation,
+                                            // as there are gradual types like `tuple[Any]`, on which a lookup
+                                            // of (e.g. of the `index` method) would always succeed.
+
+                                            union_with_default(ty)
+                                        }
+                                    }
+                                    Symbol::Type(ty, Boundness::PossiblyUnbound) => {
                                         union_with_default(ty)
                                     }
-                                }
-                                Symbol::Type(ty, Boundness::PossiblyUnbound) => {
-                                    union_with_default(ty)
-                                }
-                                Symbol::Unbound => default,
-                            },
-                        );
+                                    Symbol::Unbound => default,
+                                },
+                            );
+                        }
+
+                        _ => {}
+                    };
+
+                    if binding.has_binding_errors() {
+                        Err(CallError::BindingError { binding })
+                    } else {
+                        Ok(CallOutcome::Single(binding))
                     }
-
-                    _ => {}
-                };
-
-                if binding.has_binding_errors() {
-                    Err(CallError::BindingError { binding })
-                } else {
-                    Ok(CallOutcome::Single(binding))
                 }
-            }
 
-            // TODO annotated return type on `__new__` or metaclass `__call__`
-            // TODO check call vs signatures of `__new__` and/or `__init__`
-            Type::ClassLiteral(ClassLiteralType { class }) => {
-                Ok(CallOutcome::Single(CallBinding::from_return_type(
-                    match class.known(db) {
-                        // If the class is the builtin-bool class (for example `bool(1)`), we try to
-                        // return the specific truthiness value of the input arg, `Literal[True]` for
-                        // the example above.
-                        Some(KnownClass::Bool) => arguments
-                            .first_argument()
-                            .map(|arg| arg.bool(db).into_type(db))
-                            .unwrap_or(Type::BooleanLiteral(false)),
+                // TODO annotated return type on `__new__` or metaclass `__call__`
+                // TODO check call vs signatures of `__new__` and/or `__init__`
+                Type::ClassLiteral(ClassLiteralType { class }) => {
+                    Ok(CallOutcome::Single(CallBinding::from_return_type(
+                        match class.known(db) {
+                            // If the class is the builtin-bool class (for example `bool(1)`), we try to
+                            // return the specific truthiness value of the input arg, `Literal[True]` for
+                            // the example above.
+                            Some(KnownClass::Bool) => arguments
+                                .first_argument(db)
+                                .map(|arg| arg.bool(db).into_type(db))
+                                .unwrap_or(Type::BooleanLiteral(false)),
 
-                        // TODO: Don't ignore the second and third arguments to `str`
-                        //   https://github.com/astral-sh/ruff/pull/16161#discussion_r1958425568
-                        Some(KnownClass::Str) => arguments
-                            .first_argument()
-                            .map(|arg| arg.str(db))
-                            .unwrap_or(Type::string_literal(db, "")),
+                            // TODO: Don't ignore the second and third arguments to `str`
+                            //   https://github.com/astral-sh/ruff/pull/16161#discussion_r1958425568
+                            Some(KnownClass::Str) => arguments
+                                .first_argument(db)
+                                .map(|arg| arg.str(db))
+                                .unwrap_or(Type::string_literal(db, "")),
 
-                        _ => Type::Instance(InstanceType { class }),
-                    },
-                )))
-            }
-
-            instance_ty @ Type::Instance(_) => {
-                instance_ty
-                    .try_call_dunder(db, "__call__", arguments)
-                    .map_err(|err| match err {
-                        CallDunderError::Call(CallError::NotCallable { .. }) => {
-                            // Turn "`<type of illegal '__call__'>` not callable" into
-                            // "`X` not callable"
-                            CallError::NotCallable {
-                                not_callable_ty: self,
-                            }
-                        }
-                        CallDunderError::Call(CallError::Union {
-                            called_ty: _,
-                            bindings,
-                            errors,
-                        }) => CallError::Union {
-                            called_ty: self,
-                            bindings,
-                            errors,
+                            _ => Type::Instance(InstanceType { class }),
                         },
-                        CallDunderError::Call(error) => error,
-                        // Turn "possibly unbound object of type `Literal['__call__']`"
-                        // into "`X` not callable (possibly unbound `__call__` method)"
-                        CallDunderError::PossiblyUnbound(outcome) => {
-                            CallError::PossiblyUnboundDunderCall {
-                                called_type: self,
-                                outcome: Box::new(outcome),
+                    )))
+                }
+
+                instance_ty @ Type::Instance(_) => {
+                    instance_ty
+                        .try_call_dunder(db, "__call__", arguments)
+                        .map_err(|err| match err {
+                            CallDunderError::Call(CallError::NotCallable { .. }) => {
+                                // Turn "`<type of illegal '__call__'>` not callable" into
+                                // "`X` not callable"
+                                CallError::NotCallable {
+                                    not_callable_ty: ty_self,
+                                }
                             }
-                        }
-                        CallDunderError::MethodNotAvailable => {
-                            // Turn "`X.__call__` unbound" into "`X` not callable"
-                            CallError::NotCallable {
-                                not_callable_ty: self,
+                            CallDunderError::Call(CallError::Union {
+                                called_ty: _,
+                                bindings,
+                                errors,
+                            }) => CallError::Union {
+                                called_ty: ty_self,
+                                bindings,
+                                errors,
+                            },
+                            CallDunderError::Call(error) => error,
+                            // Turn "possibly unbound object of type `Literal['__call__']`"
+                            // into "`X` not callable (possibly unbound `__call__` method)"
+                            CallDunderError::PossiblyUnbound(outcome) => {
+                                CallError::PossiblyUnboundDunderCall {
+                                    called_type: ty_self,
+                                    outcome: Box::new(outcome),
+                                }
                             }
-                        }
-                    })
+                            CallDunderError::MethodNotAvailable => {
+                                // Turn "`X.__call__` unbound" into "`X` not callable"
+                                CallError::NotCallable {
+                                    not_callable_ty: ty_self,
+                                }
+                            }
+                        })
+                }
+
+                // Dynamic types are callable, and the return type is the same dynamic type
+                Type::Dynamic(_) => Ok(CallOutcome::Single(CallBinding::from_return_type(ty_self))),
+
+                Type::Union(union) => CallOutcome::try_call_union(db, union, |element| {
+                    element.try_call(db, arguments)
+                }),
+
+                Type::Intersection(_) => Ok(CallOutcome::Single(CallBinding::from_return_type(
+                    todo_type!("Type::Intersection.call()"),
+                ))),
+
+                _ => Err(CallError::NotCallable {
+                    not_callable_ty: ty_self,
+                }),
             }
-
-            // Dynamic types are callable, and the return type is the same dynamic type
-            Type::Dynamic(_) => Ok(CallOutcome::Single(CallBinding::from_return_type(self))),
-
-            Type::Union(union) => {
-                CallOutcome::try_call_union(db, union, |element| element.try_call(db, arguments))
-            }
-
-            Type::Intersection(_) => Ok(CallOutcome::Single(CallBinding::from_return_type(
-                todo_type!("Type::Intersection.call()"),
-            ))),
-
-            _ => Err(CallError::NotCallable {
-                not_callable_ty: self,
-            }),
         }
+
+        try_call_query(db, self, arguments)
     }
 
     /// Return the outcome of calling an class/instance attribute of this type
@@ -2164,13 +2185,13 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         receiver_ty: &Type<'db>,
-        arguments: &CallArguments<'_, 'db>,
+        arguments: CallArguments<'db>,
     ) -> Result<CallOutcome<'db>, CallError<'db>> {
         match self {
             Type::FunctionLiteral(..) => {
                 // Functions are always descriptors, so this would effectively call
                 // the function with the instance as the first argument
-                self.try_call(db, &arguments.with_self(*receiver_ty))
+                self.try_call(db, arguments.with_self(db, *receiver_ty))
             }
 
             Type::Instance(_) | Type::ClassLiteral(_) => self.try_call(db, arguments),
@@ -2197,7 +2218,7 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         name: &str,
-        arguments: &CallArguments<'_, 'db>,
+        arguments: CallArguments<'db>,
     ) -> Result<CallOutcome<'db>, CallDunderError<'db>> {
         match self.to_meta_type(db).member(db, name) {
             Symbol::Type(callable_ty, Boundness::Bound) => {
@@ -2226,12 +2247,12 @@ impl<'db> Type<'db> {
             };
         }
 
-        let dunder_iter_result = self.try_call_dunder(db, "__iter__", &CallArguments::none());
+        let dunder_iter_result = self.try_call_dunder(db, "__iter__", CallArguments::none(db));
         match &dunder_iter_result {
             Ok(outcome) | Err(CallDunderError::PossiblyUnbound(outcome)) => {
                 let iterator_ty = outcome.return_type(db);
 
-                return match iterator_ty.try_call_dunder(db, "__next__", &CallArguments::none()) {
+                return match iterator_ty.try_call_dunder(db, "__next__", CallArguments::none(db)) {
                     Ok(outcome) => {
                         if matches!(
                             dunder_iter_result,
@@ -2279,7 +2300,7 @@ impl<'db> Type<'db> {
         match self.try_call_dunder(
             db,
             "__getitem__",
-            &CallArguments::positional([KnownClass::Int.to_instance(db)]),
+            CallArguments::positional(db, [KnownClass::Int.to_instance(db)]),
         ) {
             Ok(outcome) => IterationOutcome::Iterable {
                 element_ty: outcome.return_type(db),
@@ -4148,9 +4169,9 @@ impl<'db> Class<'db> {
             let namespace = KnownClass::Dict.to_instance(db);
 
             // TODO: Other keyword arguments?
-            let arguments = CallArguments::positional([name, bases, namespace]);
+            let arguments = CallArguments::positional(db, [name, bases, namespace]);
 
-            let return_ty_result = match metaclass.try_call(db, &arguments) {
+            let return_ty_result = match metaclass.try_call(db, arguments) {
                 Ok(outcome) => Ok(outcome.return_type(db)),
 
                 Err(CallError::NotCallable { not_callable_ty }) => Err(MetaclassError {

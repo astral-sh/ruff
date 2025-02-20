@@ -16,7 +16,7 @@ use ruff_text_size::Ranged;
 /// parameters, and any errors resulting from binding the call.
 pub(crate) fn bind_call<'db>(
     db: &'db dyn Db,
-    arguments: &CallArguments<'_, 'db>,
+    arguments: CallArguments<'db>,
     signature: &Signature<'db>,
     callable_ty: Type<'db>,
 ) -> CallBinding<'db> {
@@ -38,7 +38,7 @@ pub(crate) fn bind_call<'db>(
             None
         }
     };
-    for (argument_index, argument) in arguments.iter().enumerate() {
+    for (argument_index, argument) in arguments.args_iter(db).into_iter().enumerate() {
         let (index, parameter, argument_ty, positional) = match argument {
             Argument::Positional(ty) | Argument::Synthetic(ty) => {
                 if matches!(argument, Argument::Synthetic(_)) {
@@ -58,7 +58,7 @@ pub(crate) fn bind_call<'db>(
             }
             Argument::Keyword { name, ty } => {
                 let Some((index, parameter)) = parameters
-                    .keyword_by_name(name)
+                    .keyword_by_name(&name)
                     .or_else(|| parameters.keyword_variadic())
                 else {
                     errors.push(CallBindingError::UnknownArgument {
@@ -81,13 +81,13 @@ pub(crate) fn bind_call<'db>(
                     parameter: ParameterContext::new(parameter, index, positional),
                     argument_index: get_argument_index(argument_index, num_synthetic_args),
                     expected_ty,
-                    provided_ty: *argument_ty,
+                    provided_ty: argument_ty,
                 });
             }
         }
-        if let Some(existing) = parameter_tys[index].replace(*argument_ty) {
+        if let Some(existing) = parameter_tys[index].replace(argument_ty) {
             if parameter.is_variadic() || parameter.is_keyword_variadic() {
-                let union = UnionType::from_elements(db, [existing, *argument_ty]);
+                let union = UnionType::from_elements(db, [existing, argument_ty]);
                 parameter_tys[index].replace(union);
             } else {
                 errors.push(CallBindingError::ParameterAlreadyAssigned {
@@ -137,7 +137,7 @@ pub(crate) fn bind_call<'db>(
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, salsa::Update)]
 pub(crate) struct CallBinding<'db> {
     /// Type of the callable object (function, class...)
     callable_ty: Type<'db>,
@@ -273,7 +273,7 @@ impl std::fmt::Display for ParameterContexts {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, salsa::Update)]
 pub(crate) enum CallBindingError<'db> {
     /// The type of an argument is not assignable to the annotated type of its corresponding
     /// parameter.

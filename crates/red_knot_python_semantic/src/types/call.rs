@@ -11,7 +11,7 @@ pub(super) use bind::{bind_call, CallBinding};
 /// A successfully bound call where all arguments are valid.
 ///
 /// It's guaranteed that the wrapped bindings have no errors.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, salsa::Update)]
 pub(super) enum CallOutcome<'db> {
     /// The call resolves to exactly one binding.
     Single(CallBinding<'db>),
@@ -84,7 +84,7 @@ impl<'db> CallOutcome<'db> {
 }
 
 /// The reason why calling a type failed.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, salsa::Update)]
 pub(super) enum CallError<'db> {
     /// The type is not callable.
     NotCallable {
