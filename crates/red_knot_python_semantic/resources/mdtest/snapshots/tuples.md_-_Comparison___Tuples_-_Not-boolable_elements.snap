@@ -37,7 +37,7 @@ error: lint:not-boolable
    |
 14 | # error: [not-boolable]
 15 | a < b < b
-   | ^^^^^ Object of type `NotBoolable` can not be converted to a bool.
+   | ^^^^^ Object of type `NotBoolable` has an invalid `__bool__` method
    |
 
 ```

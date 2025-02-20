@@ -154,10 +154,10 @@ def _(flag: bool):
 class NotBoolable:
     __bool__ = 3
 
-# error: [not-boolable] "Object of type `NotBoolable` can not be converted to a bool."
+# error: [not-boolable] "Object of type `NotBoolable` has an invalid `__bool__` method"
 if NotBoolable():
     ...
-# error: [not-boolable] "Object of type `NotBoolable` can not be converted to a bool."
+# error: [not-boolable] "Object of type `NotBoolable` has an invalid `__bool__` method"
 elif NotBoolable():
     ...
 ```

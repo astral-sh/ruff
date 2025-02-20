@@ -176,8 +176,8 @@ class WithContains:
     def __contains__(self, item) -> NotBoolable:
         return NotBoolable()
 
-# error: [not-boolable] "Object of type `NotBoolable` can not be converted to a bool."
+# error: [not-boolable] "Object of type `NotBoolable` has an invalid `__bool__` method"
 10 in WithContains() and True
-# error: [not-boolable] "Object of type `NotBoolable` can not be converted to a bool."
+# error: [not-boolable] "Object of type `NotBoolable` has an invalid `__bool__` method"
 10 not in WithContains() or False
 ```

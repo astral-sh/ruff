@@ -3643,7 +3643,7 @@ impl BoolError<'_> {
                         &NOT_BOOLABLE,
                         condition,
                         format_args!(
-                            "Object of type `{}` can not be converted to a bool",
+                            "Object of type `{}` has an invalid `__bool__` method",
                             not_boolable_type.display(context.db())
                         ),
                     );
@@ -3652,7 +3652,7 @@ impl BoolError<'_> {
                         &NOT_BOOLABLE,
                         condition,
                         format_args!(
-                            "Object of type `{not_boolable}` can not be converted to a bool because the return type of its `__bool__` method (`{return_type}`) isn't assignable to `bool",
+                            "Object of type `{not_boolable}` has an invalid `__bool__` method; its return (`{return_type}`) isn't assignable to `bool",
                             not_boolable = not_boolable_type.display(context.db()),
                             return_type = return_type.display(context.db())
                         ),
@@ -3664,7 +3664,7 @@ impl BoolError<'_> {
                     &NOT_BOOLABLE,
                     condition,
                     format_args!(
-                        "Object of type `{}` can not be converted to a bool because its `__bool__` attribute isn't callable.",
+                        "Object of type `{}` has an invalid `__bool__` method; it isn't callable",
                         not_boolable_type.display(context.db())
                     ),
                 );
@@ -3674,7 +3674,7 @@ impl BoolError<'_> {
                     &NOT_BOOLABLE,
                     condition,
                     format_args!(
-                        "Object of type `{}` can not be converted to a bool.",
+                        "Object of type `{}` has an invalid `__bool__` method",
                         not_boolable_type.display(context.db())
                     ),
                 );

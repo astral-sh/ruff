@@ -27,7 +27,7 @@ error: lint:not-boolable
   |
 4 | # error: [not-boolable]
 5 | not NotBoolable()
-  | ^^^^^^^^^^^^^^^^^ Object of type `NotBoolable` can not be converted to a bool.
+  | ^^^^^^^^^^^^^^^^^ Object of type `NotBoolable` has an invalid `__bool__` method
   |
 
 ```
