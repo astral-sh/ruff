@@ -1857,9 +1857,8 @@ impl<'db> Type<'db> {
                 // Here, we also model `types.FunctionType.__get__`, but now we consider a call to
                 // this as a function, i.e. we also expect the `self` argument to be passed in.
 
-                let second_argument_is_none = arguments
-                    .second_argument()
-                    .map_or(false, |ty| ty.is_none(db));
+                let second_argument_is_none =
+                    arguments.second_argument().is_some_and(|ty| ty.is_none(db));
 
                 let signature = Signature::new(
                     Parameters::new([
