@@ -284,6 +284,7 @@ impl Display for LinterSettings {
                 self.fix_safety | nested,
 
                 self.target_version,
+                self.per_file_target_version,
                 self.preview,
                 self.explicit_preview_rules,
                 self.extension | debug,

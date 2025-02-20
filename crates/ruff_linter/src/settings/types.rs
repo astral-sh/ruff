@@ -666,6 +666,22 @@ pub struct CompiledPerFileVersion {
     pub version: ast::PythonVersion,
 }
 
+impl Display for CompiledPerFileVersion {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        display_settings! {
+            formatter = f,
+            fields = [
+                self.absolute_matcher | globmatcher,
+                self.basename_matcher | globmatcher,
+                // TODO
+                // self.negated,
+                self.version,
+            ]
+        }
+        Ok(())
+    }
+}
+
 #[derive(CacheKey, Clone, Debug, Default)]
 pub struct CompiledPerFileVersionList {
     versions: Vec<CompiledPerFileVersion>,
@@ -704,6 +720,21 @@ impl CompiledPerFileVersionList {
                 None
             }
         })
+    }
+}
+
+impl Display for CompiledPerFileVersionList {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        if self.versions.is_empty() {
+            write!(f, "{{}}")?;
+        } else {
+            writeln!(f, "{{")?;
+            for version in &self.versions {
+                writeln!(f, "\t{version}")?;
+            }
+            write!(f, "}}")?;
+        }
+        Ok(())
     }
 }
 

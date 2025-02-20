@@ -262,6 +262,7 @@ impl fmt::Display for FormatterSettings {
             fields = [
                 self.exclude,
                 self.target_version,
+                self.per_file_target_version,
                 self.preview,
                 self.line_width,
                 self.line_ending,
