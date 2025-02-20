@@ -2571,6 +2571,36 @@ fn a005_module_shadowing_strict_default() -> Result<()> {
 /// Test that the linter respects per-file-target-version.
 #[test]
 fn per_file_target_version_linter() {
+    // without per-file-target-version, there should be one UP046 error
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--target-version", "py312"])
+        .args(["--select", "UP046"]) // only triggers on 3.12+
+        .args(["--stdin-filename", "test.py"])
+        .arg("--preview")
+        .arg("-")
+        .pass_stdin(r#"
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class A(Generic[T]):
+    var: T
+"#),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:6:9: UP046 Generic class `A` uses `Generic` subclass instead of type parameters
+    Found 1 error.
+    No fixes available (1 hidden fix can be enabled with the `--unsafe-fixes` option).
+
+    ----- stderr -----
+    "
+    );
+
+    // with per-file-target-version, there should be no errors because the new generic syntax is
+    // unavailable
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
         .args(["--target-version", "py312"])
