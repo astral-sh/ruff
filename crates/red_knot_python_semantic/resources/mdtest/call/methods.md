@@ -89,6 +89,14 @@ If we access an attribute on a bound method object itself, it will defer to `typ
 reveal_type(bound_method.__hash__)  # revealed: <bound method `__hash__` of `MethodType`>
 ```
 
+If an attribute is not available on the bound method object, it will be looked up on the underlying
+function object. We model this explicitly, which means that we can access `__module__` on bound
+methods, even though it is not available on `types.MethodType`:
+
+```py
+reveal_type(bound_method.__module__)  # revealed: str
+```
+
 ## Basic method calls on class objects and instances
 
 ```py
