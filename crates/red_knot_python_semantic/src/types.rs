@@ -1585,6 +1585,9 @@ impl<'db> Type<'db> {
     /// Corresponds to `getattr(<object of type 'self'>, name)`.
     ///
     /// See also: [`Type::static_member`]
+    ///
+    /// TODO: We should return a `Result` here to handle errors that can appear during attribute
+    /// lookup, like a failed `__get__` call on a descriptor.
     #[must_use]
     pub(crate) fn member(&self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
         if name == "__class__" {
