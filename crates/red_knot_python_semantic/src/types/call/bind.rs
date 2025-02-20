@@ -16,7 +16,7 @@ use ruff_text_size::Ranged;
 /// parameters, and any errors resulting from binding the call.
 pub(crate) fn bind_call<'db>(
     db: &'db dyn Db,
-    arguments: &CallArguments<'db>,
+    arguments: CallArguments<'db>,
     signature: &Signature<'db>,
     callable_ty: Type<'db>,
 ) -> CallBinding<'db> {
@@ -38,7 +38,7 @@ pub(crate) fn bind_call<'db>(
             None
         }
     };
-    for (argument_index, argument) in arguments.iter().enumerate() {
+    for (argument_index, argument) in arguments.iter(db).enumerate() {
         let (index, parameter, argument_ty, positional) = match argument {
             Argument::Positional(ty) | Argument::Synthetic(ty) => {
                 if matches!(argument, Argument::Synthetic(_)) {

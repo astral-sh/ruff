@@ -1469,7 +1469,7 @@ impl<'db> Type<'db> {
                     };
 
                     if let Ok(Type::BooleanLiteral(bool_val)) = bool_method
-                        .try_call_bound(db, instance_ty, CallArguments::positional([]))
+                        .try_call_bound(db, instance_ty, CallArguments::positional(db, []))
                         .map(|outcome| outcome.return_type(db))
                     {
                         bool_val.into()
@@ -1543,7 +1543,7 @@ impl<'db> Type<'db> {
         }
 
         let return_ty =
-            match self.try_call_dunder(db, "__len__", CallArguments::positional([*self])) {
+            match self.try_call_dunder(db, "__len__", CallArguments::positional(db, [*self])) {
                 Ok(outcome) | Err(CallDunderError::PossiblyUnbound(outcome)) => {
                     outcome.return_type(db)
                 }
@@ -1566,7 +1566,7 @@ impl<'db> Type<'db> {
     ) -> Result<CallOutcome<'db>, CallError<'db>> {
         match self {
             Type::FunctionLiteral(function_type) => {
-                let mut binding = bind_call(db, &arguments, function_type.signature(db), self);
+                let mut binding = bind_call(db, arguments, function_type.signature(db), self);
                 match function_type.known(db) {
                     Some(KnownFunction::IsEquivalentTo) => {
                         let (ty_a, ty_b) = binding
@@ -1633,7 +1633,7 @@ impl<'db> Type<'db> {
                     Some(KnownFunction::Cast) => {
                         // TODO: Use `.two_parameter_tys()` exclusively
                         // when overloads are supported.
-                        if let Some(casted_ty) = arguments.first_argument() {
+                        if let Some(casted_ty) = arguments.first_argument(db) {
                             if binding.two_parameter_types().is_some() {
                                 binding.set_return_type(casted_ty);
                             }
@@ -1659,14 +1659,14 @@ impl<'db> Type<'db> {
                         // return the specific truthiness value of the input arg, `Literal[True]` for
                         // the example above.
                         Some(KnownClass::Bool) => arguments
-                            .first_argument()
+                            .first_argument(db)
                             .map(|arg| arg.bool(db).into_type(db))
                             .unwrap_or(Type::BooleanLiteral(false)),
 
                         // TODO: Don't ignore the second and third arguments to `str`
                         //   https://github.com/astral-sh/ruff/pull/16161#discussion_r1958425568
                         Some(KnownClass::Str) => arguments
-                            .first_argument()
+                            .first_argument(db)
                             .map(|arg| arg.str(db))
                             .unwrap_or(Type::string_literal(db, "")),
 
@@ -1677,7 +1677,7 @@ impl<'db> Type<'db> {
 
             instance_ty @ Type::Instance(_) => {
                 instance_ty
-                    .try_call_dunder(db, "__call__", arguments.with_self(instance_ty))
+                    .try_call_dunder(db, "__call__", arguments.with_self(db, instance_ty))
                     .map_err(|err| match err {
                         CallDunderError::Call(CallError::NotCallable { .. }) => {
                             // Turn "`<type of illegal '__call__'>` not callable" into
@@ -1716,9 +1716,9 @@ impl<'db> Type<'db> {
             // Dynamic types are callable, and the return type is the same dynamic type
             Type::Dynamic(_) => Ok(CallOutcome::Single(CallBinding::from_return_type(self))),
 
-            Type::Union(union) => CallOutcome::try_call_union(db, union, |element| {
-                element.try_call(db, arguments.clone())
-            }),
+            Type::Union(union) => {
+                CallOutcome::try_call_union(db, union, |element| element.try_call(db, arguments))
+            }
 
             Type::Intersection(_) => Ok(CallOutcome::Single(CallBinding::from_return_type(
                 todo_type!("Type::Intersection.call()"),
@@ -1748,7 +1748,7 @@ impl<'db> Type<'db> {
             Type::FunctionLiteral(..) => {
                 // Functions are always descriptors, so this would effectively call
                 // the function with the instance as the first argument
-                self.try_call(db, arguments.with_self(*receiver_ty))
+                self.try_call(db, arguments.with_self(db, *receiver_ty))
             }
 
             Type::Instance(_) | Type::ClassLiteral(_) => {
@@ -1757,7 +1757,7 @@ impl<'db> Type<'db> {
             }
 
             Type::Union(union) => CallOutcome::try_call_union(db, union, |element| {
-                element.try_call_bound(db, receiver_ty, arguments.clone())
+                element.try_call_bound(db, receiver_ty, arguments)
             }),
 
             Type::Intersection(_) => Ok(CallOutcome::Single(CallBinding::from_return_type(
@@ -1806,7 +1806,7 @@ impl<'db> Type<'db> {
         }
 
         let dunder_iter_result =
-            self.try_call_dunder(db, "__iter__", CallArguments::positional([self]));
+            self.try_call_dunder(db, "__iter__", CallArguments::positional(db, [self]));
         match &dunder_iter_result {
             Ok(outcome) | Err(CallDunderError::PossiblyUnbound(outcome)) => {
                 let iterator_ty = outcome.return_type(db);
@@ -1814,7 +1814,7 @@ impl<'db> Type<'db> {
                 return match iterator_ty.try_call_dunder(
                     db,
                     "__next__",
-                    CallArguments::positional([iterator_ty]),
+                    CallArguments::positional(db, [iterator_ty]),
                 ) {
                     Ok(outcome) => {
                         if matches!(
@@ -1863,7 +1863,7 @@ impl<'db> Type<'db> {
         match self.try_call_dunder(
             db,
             "__getitem__",
-            CallArguments::positional([self, KnownClass::Int.to_instance(db)]),
+            CallArguments::positional(db, [self, KnownClass::Int.to_instance(db)]),
         ) {
             Ok(outcome) => IterationOutcome::Iterable {
                 element_ty: outcome.return_type(db),
@@ -3631,7 +3631,7 @@ impl<'db> Class<'db> {
             let namespace = KnownClass::Dict.to_instance(db);
 
             // TODO: Other keyword arguments?
-            let arguments = CallArguments::positional([name, bases, namespace]);
+            let arguments = CallArguments::positional(db, [name, bases, namespace]);
 
             let return_ty_result = match metaclass.try_call(db, arguments) {
                 Ok(outcome) => Ok(outcome.return_type(db)),

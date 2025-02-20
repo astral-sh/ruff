@@ -1,50 +1,46 @@
 use ruff_python_ast::name::Name;
 
+use crate::Db;
+
 use super::Type;
 
 /// Typed arguments for a single call, in source order.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
-pub(crate) struct CallArguments<'db>(Vec<Argument<'db>>);
+#[salsa::interned]
+pub(crate) struct CallArguments<'db> {
+    #[return_ref]
+    args: Vec<Argument<'db>>,
+}
 
 impl<'db> CallArguments<'db> {
     /// Create a [`CallArguments`] from an iterator over non-variadic positional argument types.
-    pub(crate) fn positional(positional_tys: impl IntoIterator<Item = Type<'db>>) -> Self {
-        positional_tys
+    pub(crate) fn positional(
+        db: &'db dyn Db,
+        positional_tys: impl IntoIterator<Item = Type<'db>>,
+    ) -> Self {
+        let args: Vec<_> = positional_tys
             .into_iter()
             .map(Argument::Positional)
-            .collect()
+            .collect();
+
+        Self::new(db, args)
     }
 
     /// Prepend an extra positional argument.
-    pub(crate) fn with_self(&self, self_ty: Type<'db>) -> Self {
-        let mut arguments = Vec::with_capacity(self.0.len() + 1);
+    pub(crate) fn with_self(self, db: &'db dyn Db, self_ty: Type<'db>) -> Self {
+        let args = self.args(db);
+        let mut arguments = Vec::with_capacity(args.len() + 1);
         arguments.push(Argument::Synthetic(self_ty));
-        arguments.extend_from_slice(&self.0);
-        Self(arguments)
+        arguments.extend_from_slice(args);
+        Self::new(db, arguments)
     }
 
-    pub(crate) fn iter(&self) -> impl Iterator<Item = &Argument<'db>> {
-        self.0.iter()
+    pub(crate) fn iter(self, db: &'db dyn Db) -> impl Iterator<Item = &'db Argument<'db>> {
+        self.args(db).iter()
     }
 
     // TODO this should be eliminated in favor of [`bind_call`]
-    pub(crate) fn first_argument(&self) -> Option<Type<'db>> {
-        self.0.first().map(Argument::ty)
-    }
-}
-
-impl<'db, 'a> IntoIterator for &'a CallArguments<'db> {
-    type Item = &'a Argument<'db>;
-    type IntoIter = std::slice::Iter<'a, Argument<'db>>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.iter()
-    }
-}
-
-impl<'db> FromIterator<Argument<'db>> for CallArguments<'db> {
-    fn from_iter<T: IntoIterator<Item = Argument<'db>>>(iter: T) -> Self {
-        Self(iter.into_iter().collect())
+    pub(crate) fn first_argument(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        self.args(db).first().map(Argument::ty)
     }
 }
 
