@@ -90,11 +90,11 @@ reveal_type(bound_method.__hash__)  # revealed: <bound method `__hash__` of `Met
 ```
 
 If an attribute is not available on the bound method object, it will be looked up on the underlying
-function object. We model this explicitly, which means that we can access `__module__` on bound
+function object. We model this explicitly, which means that we can access `__kwdefaults__` on bound
 methods, even though it is not available on `types.MethodType`:
 
 ```py
-reveal_type(bound_method.__module__)  # revealed: str
+reveal_type(bound_method.__kwdefaults__)  # revealed: @Todo(generics) | None
 ```
 
 ## Basic method calls on class objects and instances
