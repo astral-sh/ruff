@@ -104,6 +104,8 @@ pub fn check_path(
         ));
     }
 
+    let target_version = settings.resolve_target_version(path);
+
     // Run the filesystem-based rules.
     if settings
         .rules
@@ -116,6 +118,7 @@ pub fn check_path(
             locator,
             comment_ranges,
             settings,
+            target_version,
         ));
     }
 
@@ -144,7 +147,6 @@ pub fn check_path(
         if use_ast || use_imports || use_doc_lines {
             let cell_offsets = source_kind.as_ipy_notebook().map(Notebook::cell_offsets);
             let notebook_index = source_kind.as_ipy_notebook().map(Notebook::index);
-            let target_version = settings.resolve_target_version(path);
             if use_ast {
                 diagnostics.extend(check_ast(
                     parsed,

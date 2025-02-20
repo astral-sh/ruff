@@ -69,6 +69,7 @@ impl Violation for StdlibModuleShadowing {
 pub(crate) fn stdlib_module_shadowing(
     mut path: &Path,
     settings: &LinterSettings,
+    target_version: PythonVersion,
 ) -> Option<Diagnostic> {
     if !PySourceType::try_from_path(path).is_some_and(PySourceType::is_py_file) {
         return None;
@@ -98,11 +99,7 @@ pub(crate) fn stdlib_module_shadowing(
 
     let module_name = components.next()?;
 
-    if is_allowed_module(
-        settings,
-        settings.resolve_target_version(&path),
-        &module_name,
-    ) {
+    if is_allowed_module(settings, target_version, &module_name) {
         return None;
     }
 
