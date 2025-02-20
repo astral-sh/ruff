@@ -4668,7 +4668,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                             let eq_result = self.infer_binary_type_comparison(
                                 Type::Tuple(lhs),
                                 ast::CmpOp::Eq,
-                                *ty, range
+                                *ty,
+                                range,
                             ).expect("infer_binary_type_comparison should never return None for `CmpOp::Eq`");
 
                             match eq_result {

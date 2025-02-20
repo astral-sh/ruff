@@ -350,7 +350,7 @@ def f(x: bool, y: int):
 
 <!-- snapshot-diagnostics -->
 
-Python implicitly calls `bool` on the comparison result of preceeding elements (but not for the last
+Python implicitly calls `bool` on the comparison result of preceding elements (but not for the last
 element).
 
 ```py
@@ -368,4 +368,6 @@ class Comparable:
 10 < Comparable() < 20
 # error: [unsupported-bool-conversion]
 10 < Comparable() < Comparable()
+
+Comparable() < Comparable()  # fine
 ```

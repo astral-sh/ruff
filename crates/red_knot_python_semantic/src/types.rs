@@ -2164,10 +2164,11 @@ impl<'db> Type<'db> {
             // TODO annotated return type on `__new__` or metaclass `__call__`
             // TODO check call vs signatures of `__new__` and/or `__init__`
             Type::ClassLiteral(ClassLiteralType { class }) => {
-                // TODO: We should check the call signature and error if the bool call doesn't have the
-                //   right signature and return a binding error).
                 Ok(CallOutcome::Single(CallBinding::from_return_type(
                     match class.known(db) {
+                        // TODO: We should check the call signature and error if the bool call doesn't have the
+                        //   right signature and return a binding error.
+
                         // If the class is the builtin-bool class (for example `bool(1)`), we try to
                         // return the specific truthiness value of the input arg, `Literal[True]` for
                         // the example above.
@@ -3562,7 +3563,12 @@ pub enum TypeVarBoundOrConstraints<'db> {
 /// Error returned if a type isn't iterable.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum IterateError<'db> {
-    /// The type isn't iterable because it doesn't implement the `__iter__` or `__get__item` "protocol".
+    /// The type isn't iterable because it doesn't implement the new-style or old-style iteration protocol
+    ///
+    /// The new-style iteration protocol requies a type being iterated overto have an `__iter__`
+    /// method that returns something with a `__next__` method. The old-style iteration
+    /// protocol requies a type being iterated over to have a `__getitem__` method that accepts
+    /// a positive-integer argument.
     NotIterable { not_iterable_ty: Type<'db> },
 
     /// The type is iterable but the methods aren't always bound.
@@ -3621,6 +3627,8 @@ pub(super) enum BoolError<'db> {
 }
 
 impl BoolError<'_> {
+    // This is an instance method so that `BoolError`'s interface is identical
+    // to `CallError`, `IterateError` etc.
     #[allow(clippy::unused_self)]
     pub(super) fn fallback_truthiness(&self) -> Truthiness {
         Truthiness::Ambiguous

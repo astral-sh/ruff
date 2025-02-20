@@ -107,7 +107,6 @@ more accurately.
 def flag() -> bool:
     return True
 
-# TODO: Not sure if this is correct but we're trying to convert `int` to a bool here? Is this intentional.
 x = int if flag() else str
 reveal_type(x)  # revealed: Literal[int, str]
 
