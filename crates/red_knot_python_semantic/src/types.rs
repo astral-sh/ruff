@@ -1554,18 +1554,6 @@ impl<'db> Type<'db> {
         non_negative_int_literal(db, return_ty)
     }
 
-    /// Returns the return type when calling `self`.
-    ///
-    /// This method should only be used outside of type checking because it omits any errors
-    /// and it automatically falls back to the best known return type. For type checking,
-    /// use [`try_call`](Self::try_call) instead.
-    #[allow(unused)]
-    fn call(self, db: &'db dyn Db, arguments: &CallArguments<'_, 'db>) -> Type<'db> {
-        self.try_call(db, arguments)
-            .map(|outcome| outcome.return_type(db))
-            .unwrap_or_else(|err| err.fallback_return_type(db))
-    }
-
     /// Calls `self`
     ///
     /// Returns `Ok` if the call with the given arguments is successful and `Err` otherwise.
@@ -1781,23 +1769,6 @@ impl<'db> Type<'db> {
                 not_callable_ty: self,
             }),
         }
-    }
-
-    /// Calls the given dunder method and returns its return type.
-    ///
-    /// This method should only be used outside of type checking because it omits
-    /// errors when failing the dunder method failed (e.g. because it doesn't exist). For type checking,
-    /// use [`try_call_dunder`](Self::try_call_dunder) instead.
-    #[allow(unused)]
-    fn call_dunder(
-        self,
-        db: &'db dyn Db,
-        name: &str,
-        arguments: &CallArguments<'_, 'db>,
-    ) -> Type<'db> {
-        self.try_call_dunder(db, name, arguments)
-            .map(|outcome| outcome.return_type(db))
-            .unwrap_or_else(|err| err.fallback_return_type(db))
     }
 
     /// Look up a dunder method on the meta type of `self` and call it.

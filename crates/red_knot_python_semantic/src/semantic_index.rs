@@ -246,7 +246,6 @@ impl<'db> SemanticIndex<'db> {
     }
 
     /// Returns an iterator over all ancestors of `scope`, starting with `scope` itself.
-    #[allow(unused)]
     pub(crate) fn ancestor_scopes(&self, scope: FileScopeId) -> AncestorsIter {
         AncestorsIter::new(self, scope)
     }
