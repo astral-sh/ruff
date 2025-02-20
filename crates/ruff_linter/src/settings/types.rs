@@ -7,6 +7,7 @@ use std::string::ToString;
 
 use anyhow::{bail, Result};
 use globset::{Glob, GlobMatcher, GlobSet, GlobSetBuilder};
+use log::debug;
 use pep440_rs::{VersionSpecifier, VersionSpecifiers};
 use rustc_hash::FxHashMap;
 use serde::{de, Deserialize, Deserializer, Serialize};
@@ -629,44 +630,94 @@ impl Deref for CompiledPerFileIgnore {
 }
 
 #[derive(Debug, Clone, CacheKey, Default)]
-pub struct CompiledPerFileIgnoreList {
-    // Ordered as (absolute path matcher, basename matcher, rules)
-    ignores: Vec<CompiledPerFileIgnore>,
+pub struct CompiledPerFileList<T: CacheKey> {
+    inner: Vec<CompiledPerFile<T>>,
 }
 
-impl CompiledPerFileIgnoreList {
-    /// Given a list of patterns, create a `GlobSet`.
-    pub fn resolve(per_file_ignores: Vec<PerFileIgnore>) -> Result<Self> {
-        let ignores: Result<Vec<_>> = per_file_ignores
+impl<T: CacheKey + std::fmt::Debug> CompiledPerFileList<T> {
+    /// Given a list of [`PerFile`] patterns, create a compiled set of globs.
+    fn resolve(per_file_items: impl IntoIterator<Item = PerFile<T>>) -> Result<Self> {
+        let inner: Result<Vec<_>> = per_file_items
             .into_iter()
             .map(|per_file_ignore| {
                 // Construct absolute path matcher.
                 let absolute_matcher =
-                    Glob::new(&per_file_ignore.0.absolute.to_string_lossy())?.compile_matcher();
+                    Glob::new(&per_file_ignore.absolute.to_string_lossy())?.compile_matcher();
 
                 // Construct basename matcher.
-                let basename_matcher = Glob::new(&per_file_ignore.0.basename)?.compile_matcher();
+                let basename_matcher = Glob::new(&per_file_ignore.basename)?.compile_matcher();
 
-                Ok(CompiledPerFileIgnore(CompiledPerFile::new(
+                Ok(CompiledPerFile::new(
                     absolute_matcher,
                     basename_matcher,
-                    per_file_ignore.0.negated,
-                    per_file_ignore.0.data,
-                )))
+                    per_file_ignore.negated,
+                    per_file_ignore.data,
+                ))
             })
             .collect();
-        Ok(Self { ignores: ignores? })
+        Ok(Self { inner: inner? })
+    }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        self.inner.is_empty()
+    }
+
+    pub(crate) fn iter_matches<'a, 'p>(&'a self, path: &'p Path) -> impl Iterator<Item = &'p T>
+    where
+        'a: 'p,
+    {
+        let file_name = path.file_name().expect("Unable to parse filename");
+        self.inner
+        .iter()
+        .filter_map(move |entry| {
+            if entry.basename_matcher.is_match(file_name) {
+                if entry.negated { None } else {
+                    // TODO need to pass a name here
+                    debug!(
+                        "Adding per-file ignores for {:?} due to basename match on {:?}: {:?}",
+                        path,
+                        entry.basename_matcher.glob().regex(),
+                        entry.data
+                    );
+                    Some(&entry.data)
+                }
+            } else if entry.absolute_matcher.is_match(path) {
+                if entry.negated { None } else {
+                    debug!(
+                        "Adding per-file ignores for {:?} due to absolute match on {:?}: {:?}",
+                        path,
+                        entry.absolute_matcher.glob().regex(),
+                        entry.data
+                    );
+                    Some(&entry.data)
+                }
+            } else if entry.negated {
+                debug!(
+                    "Adding per-file ignores for {:?} due to negated pattern matching neither {:?} nor {:?}: {:?}",
+                    path,
+                    entry.basename_matcher.glob().regex(),
+                    entry.absolute_matcher.glob().regex(),
+                    entry.data
+                );
+                Some(&entry.data)
+            } else {
+                None
+            }
+        })
     }
 }
 
-impl Display for CompiledPerFileIgnoreList {
+impl<T> Display for CompiledPerFileList<T>
+where
+    T: Display + CacheKey,
+{
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        if self.ignores.is_empty() {
+        if self.inner.is_empty() {
             write!(f, "{{}}")?;
         } else {
             writeln!(f, "{{")?;
-            for ignore in &self.ignores {
-                writeln!(f, "\t{}", ignore.0)?;
+            for value in &self.inner {
+                writeln!(f, "\t{value}")?;
             }
             write!(f, "}}")?;
         }
@@ -674,11 +725,31 @@ impl Display for CompiledPerFileIgnoreList {
     }
 }
 
+#[derive(Debug, Clone, CacheKey, Default)]
+pub struct CompiledPerFileIgnoreList(CompiledPerFileList<RuleSet>);
+
+impl CompiledPerFileIgnoreList {
+    /// Given a list of [`PerFileIgnore`] patterns, create a compiled set of globs.
+    ///
+    /// Returns an error if either of the glob patterns cannot be parsed.
+    pub fn resolve(per_file_ignores: Vec<PerFileIgnore>) -> Result<Self> {
+        Ok(Self(CompiledPerFileList::resolve(
+            per_file_ignores.into_iter().map(|ignore| ignore.0),
+        )?))
+    }
+}
+
 impl Deref for CompiledPerFileIgnoreList {
-    type Target = Vec<CompiledPerFileIgnore>;
+    type Target = CompiledPerFileList<RuleSet>;
 
     fn deref(&self) -> &Self::Target {
-        &self.ignores
+        &self.0
+    }
+}
+
+impl Display for CompiledPerFileIgnoreList {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
     }
 }
 
@@ -698,59 +769,24 @@ impl PerFileVersion {
 pub struct CompiledPerFileVersion(CompiledPerFile<ast::PythonVersion>);
 
 #[derive(CacheKey, Clone, Debug, Default)]
-pub struct CompiledPerFileVersionList {
-    versions: Vec<CompiledPerFileVersion>,
-}
+pub struct CompiledPerFileVersionList(CompiledPerFileList<ast::PythonVersion>);
 
 impl CompiledPerFileVersionList {
     /// Given a list of patterns, create a `GlobSet`.
     pub fn resolve(per_file_ignores: Vec<PerFileVersion>) -> Result<Self> {
-        let versions: Result<Vec<_>> = per_file_ignores
-            .into_iter()
-            .map(|per_file_version| {
-                // Construct absolute path matcher.
-                let absolute_matcher =
-                    Glob::new(&per_file_version.0.absolute.to_string_lossy())?.compile_matcher();
-
-                // Construct basename matcher.
-                let basename_matcher = Glob::new(&per_file_version.0.basename)?.compile_matcher();
-
-                Ok(CompiledPerFileVersion(CompiledPerFile::new(
-                    absolute_matcher,
-                    basename_matcher,
-                    per_file_version.0.negated,
-                    per_file_version.0.data,
-                )))
-            })
-            .collect();
-        Ok(Self {
-            versions: versions?,
-        })
+        Ok(Self(CompiledPerFileList::resolve(
+            per_file_ignores.into_iter().map(|version| version.0),
+        )?))
     }
 
     pub fn is_match(&self, path: &Path) -> Option<ast::PythonVersion> {
-        self.versions.iter().find_map(|v| {
-            if v.0.absolute_matcher.is_match(path) || v.0.basename_matcher.is_match(path) {
-                Some(v.0.data)
-            } else {
-                None
-            }
-        })
+        self.0.iter_matches(path).next().copied()
     }
 }
 
 impl Display for CompiledPerFileVersionList {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        if self.versions.is_empty() {
-            write!(f, "{{}}")?;
-        } else {
-            writeln!(f, "{{")?;
-            for version in &self.versions {
-                writeln!(f, "\t{}", version.0)?;
-            }
-            write!(f, "}}")?;
-        }
-        Ok(())
+        self.0.fmt(f)
     }
 }
 
