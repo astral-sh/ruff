@@ -3781,7 +3781,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 match operand_type.try_call_dunder(
                     self.db(),
                     unary_dunder_method,
-                    &CallArguments::positional([]),
+                    &CallArguments::none(),
                 ) {
                     Ok(outcome) => outcome.return_type(self.db()),
                     Err(e) => {
