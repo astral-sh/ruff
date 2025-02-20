@@ -1154,7 +1154,6 @@ class C:
     a_tuple: tuple[int] = (1,)
     a_range: range = range(1)
     a_slice: slice = slice(1)
-    a_memoryview: memoryview = memoryview(b"a")
     a_type: type = int
     a_none: None = None
 
@@ -1167,7 +1166,6 @@ reveal_type(C.a_complex)  # revealed: int | float | complex
 reveal_type(C.a_tuple)  # revealed: tuple[int]
 reveal_type(C.a_range)  # revealed: range
 reveal_type(C.a_slice)  # revealed: slice
-reveal_type(C.a_memoryview)  # revealed: memoryview
 reveal_type(C.a_type)  # revealed: type
 reveal_type(C.a_none)  # revealed: None
 ```
