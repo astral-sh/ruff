@@ -628,15 +628,15 @@ pub struct CompiledPerFileList<T: CacheKey> {
 
 /// Helper trait for debug labels on [`PerFile<T>`] types.
 pub trait PerFileKind {
-    const LABEL: &str;
+    const LABEL: &'static str;
 }
 
 impl PerFileKind for RuleSet {
-    const LABEL: &str = "Adding per-file ignores";
+    const LABEL: &'static str = "Adding per-file ignores";
 }
 
 impl PerFileKind for ast::PythonVersion {
-    const LABEL: &str = "Setting Python version";
+    const LABEL: &'static str = "Setting Python version";
 }
 
 impl<T: CacheKey> CompiledPerFileList<T> {
