@@ -199,7 +199,9 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         expression: Expression<'db>,
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
-        let expression_node = expression.node_ref(self.db).node();
+        let expression_node = expression
+            .node_ref(self.db, self.scope().file(self.db))
+            .node();
         self.evaluate_expression_node_constraint(expression_node, expression, is_positive)
     }
 
@@ -473,7 +475,10 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         subject: Expression<'db>,
         singleton: ast::Singleton,
     ) -> Option<NarrowingConstraints<'db>> {
-        if let Some(ast::ExprName { id, .. }) = subject.node_ref(self.db).as_name_expr() {
+        if let Some(ast::ExprName { id, .. }) = subject
+            .node_ref(self.db, self.scope().file(self.db))
+            .as_name_expr()
+        {
             // SAFETY: we should always have a symbol for every Name node.
             let symbol = self.symbols().symbol_id_by_name(id).unwrap();
 
@@ -495,10 +500,14 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         subject: Expression<'db>,
         cls: Expression<'db>,
     ) -> Option<NarrowingConstraints<'db>> {
-        if let Some(ast::ExprName { id, .. }) = subject.node_ref(self.db).as_name_expr() {
+        if let Some(ast::ExprName { id, .. }) = subject
+            .node_ref(self.db, self.scope().file(self.db))
+            .as_name_expr()
+        {
             // SAFETY: we should always have a symbol for every Name node.
             let symbol = self.symbols().symbol_id_by_name(id).unwrap();
-            let ty = infer_same_file_expression_type(self.db, cls).to_instance(self.db);
+            let ty = infer_same_file_expression_type(self.db, cls, self.scope().file(self.db))
+                .to_instance(self.db);
 
             let mut constraints = NarrowingConstraints::default();
             constraints.insert(symbol, ty);

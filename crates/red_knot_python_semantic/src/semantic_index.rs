@@ -492,7 +492,7 @@ mod tests {
 
         let use_def = use_def_map(&db, scope);
         let binding = use_def.first_public_binding(foo).unwrap();
-        assert!(matches!(binding.kind(&db), DefinitionKind::Import(_)));
+        assert!(matches!(binding.kind(&db, file), DefinitionKind::Import(_)));
     }
 
     #[test]
@@ -533,7 +533,10 @@ mod tests {
                     .expect("symbol to exist"),
             )
             .unwrap();
-        assert!(matches!(binding.kind(&db), DefinitionKind::ImportFrom(_)));
+        assert!(matches!(
+            binding.kind(&db, file),
+            DefinitionKind::ImportFrom(_)
+        ));
     }
 
     #[test]
@@ -553,7 +556,10 @@ mod tests {
         let binding = use_def
             .first_public_binding(global_table.symbol_id_by_name("x").expect("symbol exists"))
             .unwrap();
-        assert!(matches!(binding.kind(&db), DefinitionKind::Assignment(_)));
+        assert!(matches!(
+            binding.kind(&db, file),
+            DefinitionKind::Assignment(_)
+        ));
     }
 
     #[test]
@@ -570,7 +576,7 @@ mod tests {
             .unwrap();
 
         assert!(matches!(
-            binding.kind(&db),
+            binding.kind(&db, file),
             DefinitionKind::AugmentedAssignment(_)
         ));
     }
@@ -606,7 +612,10 @@ y = 2
         let binding = use_def
             .first_public_binding(class_table.symbol_id_by_name("x").expect("symbol exists"))
             .unwrap();
-        assert!(matches!(binding.kind(&db), DefinitionKind::Assignment(_)));
+        assert!(matches!(
+            binding.kind(&db, file),
+            DefinitionKind::Assignment(_)
+        ));
     }
 
     #[test]
@@ -643,7 +652,10 @@ y = 2
                     .expect("symbol exists"),
             )
             .unwrap();
-        assert!(matches!(binding.kind(&db), DefinitionKind::Assignment(_)));
+        assert!(matches!(
+            binding.kind(&db, file),
+            DefinitionKind::Assignment(_)
+        ));
     }
 
     #[test]
@@ -682,7 +694,10 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
                         .expect("symbol exists"),
                 )
                 .unwrap();
-            assert!(matches!(binding.kind(&db), DefinitionKind::Parameter(_)));
+            assert!(matches!(
+                binding.kind(&db, file),
+                DefinitionKind::Parameter(_)
+            ));
         }
         let args_binding = use_def
             .first_public_binding(
@@ -692,7 +707,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
             )
             .unwrap();
         assert!(matches!(
-            args_binding.kind(&db),
+            args_binding.kind(&db, file),
             DefinitionKind::VariadicPositionalParameter(_)
         ));
         let kwargs_binding = use_def
@@ -703,7 +718,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
             )
             .unwrap();
         assert!(matches!(
-            kwargs_binding.kind(&db),
+            kwargs_binding.kind(&db, file),
             DefinitionKind::VariadicKeywordParameter(_)
         ));
     }
@@ -735,7 +750,10 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
             let binding = use_def
                 .first_public_binding(lambda_table.symbol_id_by_name(name).expect("symbol exists"))
                 .unwrap();
-            assert!(matches!(binding.kind(&db), DefinitionKind::Parameter(_)));
+            assert!(matches!(
+                binding.kind(&db, file),
+                DefinitionKind::Parameter(_)
+            ));
         }
         let args_binding = use_def
             .first_public_binding(
@@ -745,7 +763,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
             )
             .unwrap();
         assert!(matches!(
-            args_binding.kind(&db),
+            args_binding.kind(&db, file),
             DefinitionKind::VariadicPositionalParameter(_)
         ));
         let kwargs_binding = use_def
@@ -756,7 +774,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
             )
             .unwrap();
         assert!(matches!(
-            kwargs_binding.kind(&db),
+            kwargs_binding.kind(&db, file),
             DefinitionKind::VariadicKeywordParameter(_)
         ));
     }
@@ -803,7 +821,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
                 )
                 .unwrap();
             assert!(matches!(
-                binding.kind(&db),
+                binding.kind(&db, file),
                 DefinitionKind::Comprehension(_)
             ));
         }
@@ -843,7 +861,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
             element.scoped_use_id(&db, comprehension_scope_id.to_scope_id(&db, file));
 
         let binding = use_def.first_binding_at_use(element_use_id).unwrap();
-        let DefinitionKind::Comprehension(comprehension) = binding.kind(&db) else {
+        let DefinitionKind::Comprehension(comprehension) = binding.kind(&db, file) else {
             panic!("expected generator definition")
         };
         let target = comprehension.target();
@@ -925,7 +943,10 @@ with item1 as x, item2 as y:
             let binding = use_def
                 .first_public_binding(global_table.symbol_id_by_name(name).expect("symbol exists"))
                 .expect("Expected with item definition for {name}");
-            assert!(matches!(binding.kind(&db), DefinitionKind::WithItem(_)));
+            assert!(matches!(
+                binding.kind(&db, file),
+                DefinitionKind::WithItem(_)
+            ));
         }
     }
 
@@ -948,7 +969,10 @@ with context() as (x, y):
             let binding = use_def
                 .first_public_binding(global_table.symbol_id_by_name(name).expect("symbol exists"))
                 .expect("Expected with item definition for {name}");
-            assert!(matches!(binding.kind(&db), DefinitionKind::WithItem(_)));
+            assert!(matches!(
+                binding.kind(&db, file),
+                DefinitionKind::WithItem(_)
+            ));
         }
     }
 
@@ -992,7 +1016,10 @@ def func():
                     .expect("symbol exists"),
             )
             .unwrap();
-        assert!(matches!(binding.kind(&db), DefinitionKind::Function(_)));
+        assert!(matches!(
+            binding.kind(&db, file),
+            DefinitionKind::Function(_)
+        ));
     }
 
     #[test]
@@ -1093,7 +1120,7 @@ class C[T]:
         let x_use_id = x_use_expr_name.scoped_use_id(&db, scope);
         let use_def = use_def_map(&db, scope);
         let binding = use_def.first_binding_at_use(x_use_id).unwrap();
-        let DefinitionKind::Assignment(assignment) = binding.kind(&db) else {
+        let DefinitionKind::Assignment(assignment) = binding.kind(&db, file) else {
             panic!("should be an assignment definition")
         };
         let ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
@@ -1226,7 +1253,7 @@ match subject:
             let binding = use_def
                 .first_public_binding(global_table.symbol_id_by_name(name).expect("symbol exists"))
                 .expect("Expected with item definition for {name}");
-            if let DefinitionKind::MatchPattern(pattern) = binding.kind(&db) {
+            if let DefinitionKind::MatchPattern(pattern) = binding.kind(&db, file) {
                 assert_eq!(pattern.index(), expected_index);
             } else {
                 panic!("Expected match pattern definition for {name}");
@@ -1256,7 +1283,7 @@ match 1:
             let binding = use_def
                 .first_public_binding(global_table.symbol_id_by_name(name).expect("symbol exists"))
                 .expect("Expected with item definition for {name}");
-            if let DefinitionKind::MatchPattern(pattern) = binding.kind(&db) {
+            if let DefinitionKind::MatchPattern(pattern) = binding.kind(&db, file) {
                 assert_eq!(pattern.index(), expected_index);
             } else {
                 panic!("Expected match pattern definition for {name}");
@@ -1277,7 +1304,7 @@ match 1:
             .first_public_binding(global_table.symbol_id_by_name("x").unwrap())
             .unwrap();
 
-        assert!(matches!(binding.kind(&db), DefinitionKind::For(_)));
+        assert!(matches!(binding.kind(&db, file), DefinitionKind::For(_)));
     }
 
     #[test]
@@ -1296,8 +1323,8 @@ match 1:
             .first_public_binding(global_table.symbol_id_by_name("y").unwrap())
             .unwrap();
 
-        assert!(matches!(x_binding.kind(&db), DefinitionKind::For(_)));
-        assert!(matches!(y_binding.kind(&db), DefinitionKind::For(_)));
+        assert!(matches!(x_binding.kind(&db, file), DefinitionKind::For(_)));
+        assert!(matches!(y_binding.kind(&db, file), DefinitionKind::For(_)));
     }
 
     #[test]
@@ -1313,6 +1340,6 @@ match 1:
             .first_public_binding(global_table.symbol_id_by_name("a").unwrap())
             .unwrap();
 
-        assert!(matches!(binding.kind(&db), DefinitionKind::For(_)));
+        assert!(matches!(binding.kind(&db, file), DefinitionKind::For(_)));
     }
 }

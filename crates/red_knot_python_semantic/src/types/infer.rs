@@ -117,8 +117,9 @@ fn infer_definition_types_cycle_recovery<'db>(
     input: Definition<'db>,
 ) -> TypeInference<'db> {
     tracing::trace!("infer_definition_types_cycle_recovery");
-    let mut inference = TypeInference::empty(input.scope(db));
-    let category = input.kind(db).category();
+    let scope = input.scope(db);
+    let mut inference = TypeInference::empty(scope);
+    let category = input.kind(db, scope.file(db)).category();
     if category.is_declaration() {
         inference
             .declarations
@@ -142,7 +143,7 @@ pub(crate) fn infer_definition_types<'db>(
     let file = definition.file(db);
     let _span = tracing::trace_span!(
         "infer_definition_types",
-        range = ?definition.kind(db).target_range(),
+        range = ?definition.kind(db, file).target_range(),
         file = %file.path(db)
     )
     .entered();
@@ -165,7 +166,7 @@ pub(crate) fn infer_deferred_types<'db>(
     let _span = tracing::trace_span!(
         "infer_deferred_types",
         definition = ?definition.as_id(),
-        range = ?definition.kind(db).target_range(),
+        range = ?definition.kind(db, file).target_range(),
         file = %file.path(db)
     )
     .entered();
@@ -188,7 +189,7 @@ pub(crate) fn infer_expression_types<'db>(
     let _span = tracing::trace_span!(
         "infer_expression_types",
         expression = ?expression.as_id(),
-        range = ?expression.node_ref(db).range(),
+        range = ?expression.node_ref(db, file).range(),
         file = %file.path(db)
     )
     .entered();
@@ -203,13 +204,22 @@ pub(crate) fn infer_expression_types<'db>(
 /// This is a small helper around [`infer_expression_types()`] to reduce the boilerplate.
 /// Use [`infer_expression_type()`] if it isn't guaranteed that `expression` is in the same file to
 /// avoid cross-file query dependencies.
+///
+/// `query_file` is the file for which the current query performs type inference.
+/// It acts as a token of prove that we aren't accessing an AST node from a different file
+/// than in which the current enclosing Salsa query (which would lead to cross-file dependencies).
 pub(super) fn infer_same_file_expression_type<'db>(
     db: &'db dyn Db,
     expression: Expression<'db>,
+    query_file: File,
 ) -> Type<'db> {
     let inference = infer_expression_types(db, expression);
     let scope = expression.scope(db);
-    inference.expression_type(expression.node_ref(db).scoped_expression_id(db, scope))
+    inference.expression_type(
+        expression
+            .node_ref(db, query_file)
+            .scoped_expression_id(db, scope),
+    )
 }
 
 /// Infers the type of an expression where the expression might come from another file.
@@ -225,7 +235,7 @@ pub(crate) fn infer_expression_type<'db>(
     expression: Expression<'db>,
 ) -> Type<'db> {
     // It's okay to call the "same file" version here because we're inside a salsa query.
-    infer_same_file_expression_type(db, expression)
+    infer_same_file_expression_type(db, expression, expression.scope(db).file(db))
 }
 
 /// Infer the types for an [`Unpack`] operation.
@@ -238,11 +248,11 @@ pub(crate) fn infer_expression_type<'db>(
 pub(super) fn infer_unpack_types<'db>(db: &'db dyn Db, unpack: Unpack<'db>) -> UnpackResult<'db> {
     let file = unpack.file(db);
     let _span =
-        tracing::trace_span!("infer_unpack_types", range=?unpack.range(db), file=%file.path(db))
+        tracing::trace_span!("infer_unpack_types", range=?unpack.range(db, file), file=%file.path(db))
             .entered();
 
     let mut unpacker = Unpacker::new(db, unpack.scope(db));
-    unpacker.unpack(unpack.target(db), unpack.value(db));
+    unpacker.unpack(unpack.target(db, file), unpack.value(db));
     unpacker.finish()
 }
 
@@ -603,7 +613,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             .iter()
             .filter_map(|(definition, ty)| {
                 // Filter out class literals that result from imports
-                if let DefinitionKind::Class(class) = definition.kind(self.db()) {
+                if let DefinitionKind::Class(class) = definition.kind(self.db(), self.file()) {
                     ty.inner_type()
                         .into_class_literal()
                         .map(|ty| (ty.class, class.node()))
@@ -759,7 +769,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn infer_region_definition(&mut self, definition: Definition<'db>) {
-        match definition.kind(self.db()) {
+        match definition.kind(self.db(), self.file()) {
             DefinitionKind::Function(function) => {
                 self.infer_function_definition(function.node(), definition);
             }
@@ -850,7 +860,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         // to use end-of-scope semantics. This would require custom and possibly a complex
         // implementation to allow this "split" to happen.
 
-        match definition.kind(self.db()) {
+        match definition.kind(self.db(), self.file()) {
             DefinitionKind::Function(function) => self.infer_function_deferred(function.node()),
             DefinitionKind::Class(class) => self.infer_class_deferred(class.node()),
             _ => {}
@@ -860,10 +870,10 @@ impl<'db> TypeInferenceBuilder<'db> {
     fn infer_region_expression(&mut self, expression: Expression<'db>) {
         match expression.kind(self.db()) {
             ExpressionKind::Normal => {
-                self.infer_expression_impl(expression.node_ref(self.db()));
+                self.infer_expression_impl(expression.node_ref(self.db(), self.file()));
             }
             ExpressionKind::TypeExpression => {
-                self.infer_type_expression(expression.node_ref(self.db()));
+                self.infer_type_expression(expression.node_ref(self.db(), self.file()));
             }
         }
     }
@@ -900,7 +910,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn add_binding(&mut self, node: AnyNodeRef, binding: Definition<'db>, ty: Type<'db>) {
-        debug_assert!(binding.kind(self.db()).category().is_binding());
+        debug_assert!(binding.kind(self.db(), self.file()).category().is_binding());
         let use_def = self.index.use_def_map(binding.file_scope(self.db()));
         let declarations = use_def.declarations_at_binding(binding);
         let mut bound_ty = ty;
@@ -935,7 +945,10 @@ impl<'db> TypeInferenceBuilder<'db> {
         declaration: Definition<'db>,
         ty: TypeAndQualifiers<'db>,
     ) {
-        debug_assert!(declaration.kind(self.db()).category().is_declaration());
+        debug_assert!(declaration
+            .kind(self.db(), self.file())
+            .category()
+            .is_declaration());
         let use_def = self.index.use_def_map(declaration.file_scope(self.db()));
         let prior_bindings = use_def.bindings_at_declaration(declaration);
         // unbound_ty is Never because for this check we don't care about unbound
@@ -965,8 +978,14 @@ impl<'db> TypeInferenceBuilder<'db> {
         definition: Definition<'db>,
         declared_and_inferred_ty: &DeclaredAndInferredType<'db>,
     ) {
-        debug_assert!(definition.kind(self.db()).category().is_binding());
-        debug_assert!(definition.kind(self.db()).category().is_declaration());
+        debug_assert!(definition
+            .kind(self.db(), self.file())
+            .category()
+            .is_binding());
+        debug_assert!(definition
+            .kind(self.db(), self.file())
+            .category()
+            .is_declaration());
 
         let (declared_ty, inferred_ty) = match *declared_and_inferred_ty {
             DeclaredAndInferredType::AreTheSame(ty) => (ty.into(), ty),

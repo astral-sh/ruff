@@ -42,7 +42,7 @@ pub(crate) struct Expression<'db> {
     #[no_eq]
     #[tracked]
     #[return_ref]
-    pub(crate) node_ref: AstNodeRef<ast::Expr>,
+    node_ref_inner: AstNodeRef<ast::Expr>,
 
     /// Should this expression be inferred as a normal expression or a type expression?
     pub(crate) kind: ExpressionKind,
@@ -51,6 +51,17 @@ pub(crate) struct Expression<'db> {
 }
 
 impl<'db> Expression<'db> {
+    /// Returns a reference to the expression's AST node.
+    ///
+    /// `query_file` is the file for which the current query performs type inference.
+    /// It acts as a token of prove that we aren't accessing an AST node from a different file
+    /// than in which the current enclosing Salsa query (which would lead to cross-file dependencies).
+    #[inline]
+    pub(crate) fn node_ref(self, db: &'db dyn Db, query_file: File) -> &'db AstNodeRef<ast::Expr> {
+        debug_assert_eq!(self.file(db), query_file);
+        self.node_ref_inner(db)
+    }
+
     pub(crate) fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
         self.file_scope(db).to_scope_id(db, self.file(db))
     }

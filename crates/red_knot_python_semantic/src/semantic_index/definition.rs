@@ -38,7 +38,7 @@ pub struct Definition<'db> {
     #[no_eq]
     #[return_ref]
     #[tracked]
-    pub(crate) kind: DefinitionKind<'db>,
+    kind_inner: DefinitionKind<'db>,
 
     /// This is a dedicated field to avoid accessing `kind` to compute this value.
     pub(crate) is_reexported: bool,
@@ -49,6 +49,18 @@ pub struct Definition<'db> {
 impl<'db> Definition<'db> {
     pub(crate) fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
         self.file_scope(db).to_scope_id(db, self.file(db))
+    }
+
+    /// Returns the definition's kind which gives access to its AST.
+    ///
+    /// `query_file` is the file for which the current query performs type inference.
+    /// It acts as a token of prove that we aren't accessing an AST node from a different file
+    /// than in which the current enclosing Salsa query (which would lead to cross-file dependencies).
+    #[inline]
+    pub(crate) fn kind(self, db: &'db dyn Db, query_file: File) -> &'db DefinitionKind<'db> {
+        debug_assert_eq!(query_file, self.scope(db).file(db));
+
+        self.kind_inner(db)
     }
 }
 
