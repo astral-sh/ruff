@@ -1452,7 +1452,9 @@ impl<'db> Type<'db> {
             Type::AlwaysTruthy => Truthiness::AlwaysTrue,
             Type::AlwaysFalsy => Truthiness::AlwaysFalse,
             instance_ty @ Type::Instance(InstanceType { class }) => {
-                if class.is_known(db, KnownClass::NoneType) {
+                if class.is_known(db, KnownClass::Bool) {
+                    Truthiness::Ambiguous
+                } else if class.is_known(db, KnownClass::NoneType) {
                     Truthiness::AlwaysFalse
                 } else {
                     // We only check the `__bool__` method for truth testing, even though at
