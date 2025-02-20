@@ -364,8 +364,8 @@ class Comparable:
     def __gt__(self, item) -> NotBoolable:
         return NotBoolable()
 
-# error: [not-boolable]
+# error: [unsupported-bool-conversion]
 10 < Comparable() < 20
-# error: [not-boolable]
+# error: [unsupported-bool-conversion]
 10 < Comparable() < Comparable()
 ```

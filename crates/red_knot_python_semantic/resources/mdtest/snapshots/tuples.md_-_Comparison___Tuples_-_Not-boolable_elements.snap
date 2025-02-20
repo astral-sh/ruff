@@ -25,19 +25,19 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/comparison/tuples.
 11 | a = (1, Comparable())
 12 | b = (1, Comparable())
 13 | 
-14 | # error: [not-boolable]
+14 | # error: [unsupported-bool-conversion]
 15 | a < b < b
 ```
 
 # Diagnostics
 
 ```
-error: lint:not-boolable
+error: lint:unsupported-bool-conversion
   --> /src/mdtest_snippet.py:15:1
    |
-14 | # error: [not-boolable]
+14 | # error: [unsupported-bool-conversion]
 15 | a < b < b
-   | ^^^^^ Object of type `NotBoolable` has an invalid `__bool__` method
+   | ^^^^^ Boolean conversion is unsupported for type `NotBoolable`; it incorrectly implements `__bool__`
    |
 
 ```

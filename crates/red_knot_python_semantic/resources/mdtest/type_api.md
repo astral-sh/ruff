@@ -223,7 +223,7 @@ class InvalidBoolDunder:
     def __bool__(self) -> int:
         return 1
 
-# error: [not-boolable] "Object of type `InvalidBoolDunder` has an invalid `__bool__` method; its return (`int`) isn't assignable to `bool"
+# error: [unsupported-bool-conversion]  "Boolean conversion is unsupported for type `InvalidBoolDunder`; the return type of its bool method (`int`) isn't assignable to `bool"
 static_assert(InvalidBoolDunder())
 ```
 

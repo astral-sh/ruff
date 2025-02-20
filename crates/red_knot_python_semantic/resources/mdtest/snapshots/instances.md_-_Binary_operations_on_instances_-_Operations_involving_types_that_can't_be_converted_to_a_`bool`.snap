@@ -17,19 +17,19 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/binary/instances.m
 3 | 
 4 | a = NotBoolable()
 5 | 
-6 | # error: [not-boolable] "Object of type `NotBoolable` has an invalid `__bool__` method"
+6 | # error: [unsupported-bool-conversion]
 7 | 10 and a and True
 ```
 
 # Diagnostics
 
 ```
-error: lint:not-boolable
+error: lint:unsupported-bool-conversion
  --> /src/mdtest_snippet.py:7:8
   |
-6 | # error: [not-boolable] "Object of type `NotBoolable` has an invalid `__bool__` method"
+6 | # error: [unsupported-bool-conversion]
 7 | 10 and a and True
-  |        ^ Object of type `NotBoolable` has an invalid `__bool__` method
+  |        ^ Boolean conversion is unsupported for type `NotBoolable`; it incorrectly implements `__bool__`
   |
 
 ```

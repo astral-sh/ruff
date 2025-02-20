@@ -19,35 +19,35 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/comparison/instanc
  5 |     def __contains__(self, item) -> NotBoolable:
  6 |         return NotBoolable()
  7 | 
- 8 | # error: [not-boolable] "Object of type `NotBoolable` has an invalid `__bool__` method"
+ 8 | # error: [unsupported-bool-conversion]
  9 | 10 in WithContains() and True
-10 | # error: [not-boolable] "Object of type `NotBoolable` has an invalid `__bool__` method"
+10 | # error: [unsupported-bool-conversion]
 11 | 10 not in WithContains() or False
 ```
 
 # Diagnostics
 
 ```
-error: lint:not-boolable
+error: lint:unsupported-bool-conversion
   --> /src/mdtest_snippet.py:9:1
    |
- 8 | # error: [not-boolable] "Object of type `NotBoolable` has an invalid `__bool__` method"
+ 8 | # error: [unsupported-bool-conversion]
  9 | 10 in WithContains() and True
-   | ^^^^^^^^^^^^^^^^^^^^ Object of type `NotBoolable` has an invalid `__bool__` method
-10 | # error: [not-boolable] "Object of type `NotBoolable` has an invalid `__bool__` method"
+   | ^^^^^^^^^^^^^^^^^^^^ Boolean conversion is unsupported for type `NotBoolable`; it incorrectly implements `__bool__`
+10 | # error: [unsupported-bool-conversion]
 11 | 10 not in WithContains() or False
    |
 
 ```
 
 ```
-error: lint:not-boolable
+error: lint:unsupported-bool-conversion
   --> /src/mdtest_snippet.py:11:1
    |
  9 | 10 in WithContains() and True
-10 | # error: [not-boolable] "Object of type `NotBoolable` has an invalid `__bool__` method"
+10 | # error: [unsupported-bool-conversion]
 11 | 10 not in WithContains() or False
-   | ^^^^^^^^^^^^^^^^^^^^^^^^ Object of type `NotBoolable` has an invalid `__bool__` method
+   | ^^^^^^^^^^^^^^^^^^^^^^^^ Boolean conversion is unsupported for type `NotBoolable`; it incorrectly implements `__bool__`
    |
 
 ```
