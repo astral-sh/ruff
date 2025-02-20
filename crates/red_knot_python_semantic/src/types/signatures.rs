@@ -322,7 +322,8 @@ pub(crate) enum ParameterKind<'db> {
 mod tests {
     use super::*;
     use crate::db::tests::{setup_db, TestDb};
-    use crate::types::{global_symbol, FunctionType, KnownClass};
+    use crate::symbol::global_symbol;
+    use crate::types::{FunctionType, KnownClass};
     use ruff_db::system::DbWithTestSystem;
 
     #[track_caller]

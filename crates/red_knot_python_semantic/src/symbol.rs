@@ -183,20 +183,34 @@ pub(crate) fn symbol<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> S
     symbol_impl(db, scope, name, RequiresExplicitReExport::No)
 }
 
-/// Infers the public type of a module-global symbol as seen from within the same file.
+/// Infers the public type of an explicit module-global symbol as seen from within the same file.
 ///
-/// If it's not defined explicitly in the global scope, it will look it up in `types.ModuleType`
-/// with a few very special exceptions.
+/// Note that all global scopes also include various "implicit globals" such as `__name__`,
+/// `__doc__` and `__file__`. This function **does not** consider those symbols; it will return
+/// `Symbol::Unbound` for them. Use the (currently test-only) `global_symbol` query to also include
+/// those additional symbols.
 ///
 /// Use [`imported_symbol`] to perform the lookup as seen from outside the file (e.g. via imports).
-pub(crate) fn global_symbol<'db>(db: &'db dyn Db, file: File, name: &str) -> Symbol<'db> {
+pub(crate) fn explicit_global_symbol<'db>(db: &'db dyn Db, file: File, name: &str) -> Symbol<'db> {
     symbol_impl(
         db,
         global_scope(db, file),
         name,
         RequiresExplicitReExport::No,
     )
-    .or_fall_back_to(db, || module_type_symbol(db, name))
+}
+
+/// Infers the public type of an explicit module-global symbol as seen from within the same file.
+///
+/// Unlike [`explicit_global_symbol`], this function also considers various "implicit globals"
+/// such as `__name__`, `__doc__` and `__file__`. These are looked up as attributes on `types.ModuleType`
+/// rather than being looked up as symbols explicitly defined/declared in the global scope.
+///
+/// Use [`imported_symbol`] to perform the lookup as seen from outside the file (e.g. via imports).
+#[cfg(test)]
+pub(crate) fn global_symbol<'db>(db: &'db dyn Db, file: File, name: &str) -> Symbol<'db> {
+    explicit_global_symbol(db, file, name)
+        .or_fall_back_to(db, || module_type_implicit_global_symbol(db, name))
 }
 
 /// Infers the public type of an imported symbol.
@@ -204,16 +218,16 @@ pub(crate) fn imported_symbol<'db>(db: &'db dyn Db, module: &Module, name: &str)
     // If it's not found in the global scope, check if it's present as an instance on
     // `types.ModuleType` or `builtins.object`.
     //
-    // We do a more limited version of this in `global_symbol`, but there are two crucial
-    // differences here:
+    // We do a more limited version of this in `module_type_implicit_global_symbol`,
+    // but there are two crucial differences here:
     // - If a member is looked up as an attribute, `__init__` is also available on the module, but
     //   it isn't available as a global from inside the module
     // - If a member is looked up as an attribute, members on `builtins.object` are also available
     //   (because `types.ModuleType` inherits from `object`); these attributes are also not
     //   available as globals from inside the module.
     //
-    // The same way as in `global_symbol`, however, we need to be careful to ignore
-    // `__getattr__`. Typeshed has a fake `__getattr__` on `types.ModuleType` to help out with
+    // The same way as in `module_type_implicit_global_symbol`, however, we need to be careful to
+    // ignore `__getattr__`. Typeshed has a fake `__getattr__` on `types.ModuleType` to help out with
     // dynamic imports; we shouldn't use it for `ModuleLiteral` types where we know exactly which
     // module we're dealing with.
     external_symbol_impl(db, module.file(), name).or_fall_back_to(db, || {
@@ -694,13 +708,13 @@ fn module_type_symbols<'db>(db: &'db dyn Db) -> smallvec::SmallVec<[ast::name::N
 /// [`member`] call on the instance type -- we'd just do the [`member`] call on the instance
 /// type, since it has the same end result. The reason to only call [`member`] on [`ModuleType`]
 /// instance when absolutely necessary is that it was a fairly significant performance regression
-/// to fallback to doing that for every name lookup that wasn't found in the module's globals
-/// ([`global_symbol`]). So we use less idiomatic (and much more verbose) code here as a
-/// micro-optimisation because it's used in a very hot path.
+/// to fallback to doing that for every name lookup that wasn't found in the module's globals.
+/// So we use less idiomatic (and much more verbose) code here as a micro-optimisation because
+/// it's used in a very hot path.
 ///
 /// [`member`]: Type::member
 /// [`ModuleType`]: KnownClass::ModuleType
-fn module_type_symbol<'db>(db: &'db dyn Db, name: &str) -> Symbol<'db> {
+pub(crate) fn module_type_implicit_global_symbol<'db>(db: &'db dyn Db, name: &str) -> Symbol<'db> {
     if module_type_symbols(db)
         .iter()
         .any(|module_type_member| &**module_type_member == name)

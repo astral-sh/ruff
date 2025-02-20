@@ -50,7 +50,8 @@ use crate::semantic_index::semantic_index;
 use crate::semantic_index::symbol::{FileScopeId, NodeWithScopeKind, NodeWithScopeRef, ScopeId};
 use crate::semantic_index::SemanticIndex;
 use crate::symbol::{
-    builtins_module_scope, builtins_symbol, symbol, symbol_from_bindings, symbol_from_declarations,
+    builtins_module_scope, builtins_symbol, explicit_global_symbol,
+    module_type_implicit_global_symbol, symbol, symbol_from_bindings, symbol_from_declarations,
     typing_extensions_symbol, LookupError,
 };
 use crate::types::call::{Argument, CallArguments};
@@ -90,7 +91,7 @@ use super::slots::check_class_slots;
 use super::string_annotation::{
     parse_string_annotation, BYTE_STRING_TYPE_ANNOTATION, FSTRING_TYPE_ANNOTATION,
 };
-use super::{global_symbol, CallDunderError, ParameterExpectation, ParameterExpectations};
+use super::{CallDunderError, ParameterExpectation, ParameterExpectations};
 
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
 /// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
@@ -3571,7 +3572,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
 
             Symbol::Unbound
-                // No nonlocal binding? Check the module's globals.
+                // No nonlocal binding? Check the module's explicit globals.
                 // Avoid infinite recursion if `self.scope` already is the module's global scope.
                 .or_fall_back_to(db, || {
                     if file_scope_id.is_global() {
@@ -3588,8 +3589,12 @@ impl<'db> TypeInferenceBuilder<'db> {
                         }
                     }
 
-                    global_symbol(db, self.file(), symbol_name)
+                    explicit_global_symbol(db, self.file(), symbol_name)
                 })
+                // Not found in the module's explicitly declared global symbols?
+                // Check the "implicit globals" such as `__doc__`, `__file__`, `__name__`, etc.
+                // These are looked up as attributes on `types.ModuleType`.
+                .or_fall_back_to(db, || module_type_implicit_global_symbol(db, symbol_name))
                 // Not found in globals? Fallback to builtins
                 // (without infinite recursion if we're already in builtins.)
                 .or_fall_back_to(db, || {
@@ -6245,6 +6250,7 @@ mod tests {
     use crate::semantic_index::definition::Definition;
     use crate::semantic_index::symbol::FileScopeId;
     use crate::semantic_index::{global_scope, semantic_index, symbol_table, use_def_map};
+    use crate::symbol::global_symbol;
     use crate::types::check_types;
     use ruff_db::files::{system_path_to_file, File};
     use ruff_db::system::DbWithTestSystem;
