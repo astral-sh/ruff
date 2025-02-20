@@ -2039,11 +2039,29 @@ impl<'db> Type<'db> {
                             default
                         };
 
-                        let static_member = instance_ty
-                            .static_member(db, attr_name.value(db))
-                            .ignore_possibly_unbound() // TODO: we could emit a diagnostic here (if default is not set)
-                            .unwrap_or(default);
-                        binding.set_return_type(static_member);
+                        let union_with_default = |ty| UnionType::from_elements(db, [ty, default]);
+
+                        // TODO: we could emit a diagnostic here (if default is not set)
+                        binding.set_return_type(
+                            match instance_ty.static_member(db, attr_name.value(db)) {
+                                Symbol::Type(ty, Boundness::Bound) => {
+                                    if instance_ty.is_fully_static(db) {
+                                        ty
+                                    } else {
+                                        // Here, we attempt to model the fact that an attribute lookup on
+                                        // a non-fully static type could fail. This is an approximation,
+                                        // as there are gradual types like `tuple[Any]`, on which a lookup
+                                        // of (e.g. of the `index` method) would always succeed.
+
+                                        union_with_default(ty)
+                                    }
+                                }
+                                Symbol::Type(ty, Boundness::PossiblyUnbound) => {
+                                    union_with_default(ty)
+                                }
+                                Symbol::Unbound => default,
+                            },
+                        );
                     }
 
                     _ => {}
