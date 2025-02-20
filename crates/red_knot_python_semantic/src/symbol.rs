@@ -234,14 +234,7 @@ pub(crate) fn imported_symbol<'db>(db: &'db dyn Db, module: &Module, name: &str)
 /// (e.g. `from builtins import int`).
 pub(crate) fn builtins_symbol<'db>(db: &'db dyn Db, symbol: &str) -> Symbol<'db> {
     resolve_module(db, &KnownModule::Builtins.name())
-        .map(|module| {
-            external_symbol_impl(db, module.file(), symbol).or_fall_back_to(db, || {
-                // We're looking up in the builtins namespace and not the module, so we should
-                // do the normal lookup in `types.ModuleType` and not the special one as in
-                // `imported_symbol`.
-                module_type_symbol(db, symbol)
-            })
-        })
+        .map(|module| external_symbol_impl(db, module.file(), symbol))
         .unwrap_or(Symbol::Unbound)
 }
 
