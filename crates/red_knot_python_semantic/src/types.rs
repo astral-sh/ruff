@@ -1374,7 +1374,6 @@ impl<'db> Type<'db> {
                     | KnownClass::Dict
                     | KnownClass::Slice
                     | KnownClass::Range
-                    | KnownClass::MemoryView
                     | KnownClass::Property
                     | KnownClass::BaseException
                     | KnownClass::BaseExceptionGroup
@@ -1473,8 +1472,7 @@ impl<'db> Type<'db> {
                         | KnownClass::Bytes
                         | KnownClass::Tuple
                         | KnownClass::Slice
-                        | KnownClass::Range
-                        | KnownClass::MemoryView,
+                        | KnownClass::Range,
                     ),
                     "__get__",
                 ) => Symbol::Unbound,
@@ -2708,7 +2706,6 @@ pub enum KnownClass {
     Dict,
     Slice,
     Range,
-    MemoryView,
     Property,
     BaseException,
     BaseExceptionGroup,
@@ -2764,7 +2761,6 @@ impl<'db> KnownClass {
             Self::Type => "type",
             Self::Slice => "slice",
             Self::Range => "range",
-            Self::MemoryView => "memoryview",
             Self::Property => "property",
             Self::BaseException => "BaseException",
             Self::BaseExceptionGroup => "BaseExceptionGroup",
@@ -2851,7 +2847,6 @@ impl<'db> KnownClass {
             | Self::BaseExceptionGroup
             | Self::Slice
             | Self::Range
-            | Self::MemoryView
             | Self::Property => KnownModule::Builtins,
             Self::VersionInfo => KnownModule::Sys,
             Self::GenericAlias
@@ -2922,7 +2917,6 @@ impl<'db> KnownClass {
             | Self::Type
             | Self::Slice
             | Self::Range
-            | Self::MemoryView
             | Self::Property
             | Self::GenericAlias
             | Self::ModuleType
@@ -2964,7 +2958,6 @@ impl<'db> KnownClass {
             "list" => Self::List,
             "slice" => Self::Slice,
             "range" => Self::Range,
-            "memoryview" => Self::MemoryView,
             "BaseException" => Self::BaseException,
             "BaseExceptionGroup" => Self::BaseExceptionGroup,
             "GenericAlias" => Self::GenericAlias,
@@ -3017,7 +3010,6 @@ impl<'db> KnownClass {
             | Self::Dict
             | Self::Slice
             | Self::Range
-            | Self::MemoryView
             | Self::Property
             | Self::GenericAlias
             | Self::ChainMap
