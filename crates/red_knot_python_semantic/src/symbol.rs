@@ -293,7 +293,7 @@ fn core_module_scope(db: &dyn Db, core_module: KnownModule) -> Option<ScopeId<'_
 /// together with boundness information in a [`Symbol`].
 ///
 /// The type will be a union if there are multiple bindings with different types.
-pub(crate) fn symbol_from_bindings<'db>(
+pub(super) fn symbol_from_bindings<'db>(
     db: &'db dyn Db,
     bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
 ) -> Symbol<'db> {
@@ -369,7 +369,6 @@ fn symbol_impl<'db>(
     name: &str,
     requires_explicit_reexport: RequiresExplicitReExport,
 ) -> Symbol<'db> {
-    #[salsa::tracked]
     fn symbol_by_id<'db>(
         db: &'db dyn Db,
         scope: ScopeId<'db>,
@@ -479,6 +478,10 @@ fn symbol_impl<'db>(
 }
 
 /// Implementation of [`symbol_from_bindings`].
+///
+/// ## Implementation Note
+/// This function gets called cross-module. It, therefore, shouldn't
+/// access any AST nodes from the file containing the declarations.
 fn symbol_from_bindings_impl<'db>(
     db: &'db dyn Db,
     bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
@@ -562,6 +565,10 @@ fn symbol_from_bindings_impl<'db>(
 }
 
 /// Implementation of [`symbol_from_declarations`].
+///
+/// ## Implementation Note
+/// This function gets called cross-module. It, therefore, shouldn't
+/// access any AST nodes from the file containing the declarations.
 fn symbol_from_declarations_impl<'db>(
     db: &'db dyn Db,
     declarations: DeclarationsIterator<'_, 'db>,
