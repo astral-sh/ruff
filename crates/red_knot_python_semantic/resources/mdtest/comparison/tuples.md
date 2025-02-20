@@ -147,33 +147,40 @@ of the dunder methods.)
 ```py
 from __future__ import annotations
 
+class EqReturnType: ...
+class NeReturnType: ...
+class LtReturnType: ...
+class LeReturnType: ...
+class GtReturnType: ...
+class GeReturnType: ...
+
 class A:
-    def __eq__(self, o: object) -> str:
-        return "hello"
+    def __eq__(self, o: object) -> EqReturnType:
+        return EqReturnType()
 
-    def __ne__(self, o: object) -> bytes:
-        return b"world"
+    def __ne__(self, o: object) -> NeReturnType:
+        return NeReturnType()
 
-    def __lt__(self, o: A) -> bytearray:
-        return bytearray()
+    def __lt__(self, o: A) -> LtReturnType:
+        return LtReturnType()
 
-    def __le__(self, o: A) -> memoryview:
-        return memoryview(b"")
+    def __le__(self, o: A) -> LeReturnType:
+        return LeReturnType()
 
-    def __gt__(self, o: A) -> tuple:
-        return (1, 2, 3)
+    def __gt__(self, o: A) -> GtReturnType:
+        return GtReturnType()
 
-    def __ge__(self, o: A) -> list:
-        return [1, 2, 3]
+    def __ge__(self, o: A) -> GeReturnType:
+        return GeReturnType()
 
 a = (A(), A())
 
 reveal_type(a == a)  # revealed: bool
 reveal_type(a != a)  # revealed: bool
-reveal_type(a < a)  # revealed: bytearray | Literal[False]
-reveal_type(a <= a)  # revealed: memoryview | Literal[True]
-reveal_type(a > a)  # revealed: tuple | Literal[False]
-reveal_type(a >= a)  # revealed: list | Literal[True]
+reveal_type(a < a)  # revealed: LtReturnType | Literal[False]
+reveal_type(a <= a)  # revealed: LeReturnType | Literal[True]
+reveal_type(a > a)  # revealed: GtReturnType | Literal[False]
+reveal_type(a >= a)  # revealed: GeReturnType | Literal[True]
 
 # If lexicographic comparison is finished before comparing A()
 b = ("1_foo", A())
@@ -186,11 +193,13 @@ reveal_type(b <= c)  # revealed: Literal[True]
 reveal_type(b > c)  # revealed: Literal[False]
 reveal_type(b >= c)  # revealed: Literal[False]
 
+class LtReturnTypeOnB: ...
+
 class B:
-    def __lt__(self, o: B) -> set:
+    def __lt__(self, o: B) -> LtReturnTypeOnB:
         return set()
 
-reveal_type((A(), B()) < (A(), B()))  # revealed: bytearray | set | Literal[False]
+reveal_type((A(), B()) < (A(), B()))  # revealed: LtReturnType | LtReturnTypeOnB | Literal[False]
 ```
 
 #### Special Handling of Eq and NotEq in Lexicographic Comparisons
