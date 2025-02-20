@@ -346,12 +346,14 @@ impl<'db> SemanticIndexBuilder<'db> {
         // SAFETY: `definition_node` is guaranteed to be a child of `self.module`
         let kind = unsafe { definition_node.into_owned(self.module.clone()) };
         let category = kind.category();
+        let is_reexported = kind.is_reexported();
         let definition = Definition::new(
             self.db,
             self.file,
             self.current_scope(),
             symbol,
             kind,
+            is_reexported,
             countme::Count::default(),
         );
 

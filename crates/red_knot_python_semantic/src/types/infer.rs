@@ -118,7 +118,7 @@ fn infer_definition_types_cycle_recovery<'db>(
 ) -> TypeInference<'db> {
     tracing::trace!("infer_definition_types_cycle_recovery");
     let mut inference = TypeInference::empty(input.scope(db));
-    let category = input.category(db);
+    let category = input.kind(db).category();
     if category.is_declaration() {
         inference
             .declarations
@@ -196,6 +196,36 @@ pub(crate) fn infer_expression_types<'db>(
     let index = semantic_index(db, file);
 
     TypeInferenceBuilder::new(db, InferenceRegion::Expression(expression), index).finish()
+}
+
+/// Infers the type of an `expression` that is guaranteed to be in the same file as the calling query.
+///
+/// This is a small helper around [`infer_expression_types()`] to reduce the boilerplate.
+/// Use [`infer_expression_type()`] if it isn't guaranteed that `expression` is in the same file to
+/// avoid cross-file query dependencies.
+pub(super) fn infer_same_file_expression_type<'db>(
+    db: &'db dyn Db,
+    expression: Expression<'db>,
+) -> Type<'db> {
+    let inference = infer_expression_types(db, expression);
+    let scope = expression.scope(db);
+    inference.expression_type(expression.node_ref(db).scoped_expression_id(db, scope))
+}
+
+/// Infers the type of an expression where the expression might come from another file.
+///
+/// Use this over [`infer_expression_types`] if the expression might come from another file than the
+/// enclosing query to avoid cross-file query dependencies.
+///
+/// Use [`infer_same_file_expression_type`] if it is guaranteed that  `expression` is in the same
+/// to avoid unnecessary salsa ingredients. This is normally the case inside the `TypeInferenceBuilder`.
+#[salsa::tracked]
+pub(crate) fn infer_expression_type<'db>(
+    db: &'db dyn Db,
+    expression: Expression<'db>,
+) -> Type<'db> {
+    // It's okay to call the "same file" version here because we're inside a salsa query.
+    infer_same_file_expression_type(db, expression)
 }
 
 /// Infer the types for an [`Unpack`] operation.
@@ -870,7 +900,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn add_binding(&mut self, node: AnyNodeRef, binding: Definition<'db>, ty: Type<'db>) {
-        debug_assert!(binding.is_binding(self.db()));
+        debug_assert!(binding.kind(self.db()).category().is_binding());
         let use_def = self.index.use_def_map(binding.file_scope(self.db()));
         let declarations = use_def.declarations_at_binding(binding);
         let mut bound_ty = ty;
@@ -905,7 +935,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         declaration: Definition<'db>,
         ty: TypeAndQualifiers<'db>,
     ) {
-        debug_assert!(declaration.is_declaration(self.db()));
+        debug_assert!(declaration.kind(self.db()).category().is_declaration());
         let use_def = self.index.use_def_map(declaration.file_scope(self.db()));
         let prior_bindings = use_def.bindings_at_declaration(declaration);
         // unbound_ty is Never because for this check we don't care about unbound
@@ -935,8 +965,8 @@ impl<'db> TypeInferenceBuilder<'db> {
         definition: Definition<'db>,
         declared_and_inferred_ty: &DeclaredAndInferredType<'db>,
     ) {
-        debug_assert!(definition.is_binding(self.db()));
-        debug_assert!(definition.is_declaration(self.db()));
+        debug_assert!(definition.kind(self.db()).category().is_binding());
+        debug_assert!(definition.kind(self.db()).category().is_declaration());
 
         let (declared_ty, inferred_ty) = match *declared_and_inferred_ty {
             DeclaredAndInferredType::AreTheSame(ty) => (ty.into(), ty),
@@ -6610,6 +6640,94 @@ mod tests {
                 def f(self):
                     # a comment!
                     self.attr: str | None = None
+            "#,
+        )?;
+
+        let events = {
+            db.clear_salsa_events();
+            let attr_ty = global_symbol(&db, file_main, "x").expect_type();
+            assert_eq!(attr_ty.display(&db).to_string(), "Unknown | str | None");
+            db.take_salsa_events()
+        };
+
+        assert_function_query_was_not_run(
+            &db,
+            infer_expression_types,
+            x_rhs_expression(&db),
+            &events,
+        );
+
+        Ok(())
+    }
+
+    /// This test verifies that queries
+    #[test]
+    fn dependency_own_instance_member() -> anyhow::Result<()> {
+        fn x_rhs_expression(db: &TestDb) -> Expression<'_> {
+            let file_main = system_path_to_file(db, "/src/main.py").unwrap();
+            let ast = parsed_module(db, file_main);
+            // Get the second statement in `main.py` (x = …) and extract the expression
+            // node on the right-hand side:
+            let x_rhs_node = &ast.syntax().body[1].as_assign_stmt().unwrap().value;
+
+            let index = semantic_index(db, file_main);
+            index.expression(x_rhs_node.as_ref())
+        }
+
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/mod.py",
+            r#"
+            class C:
+                if random.choice([True, False]):
+                    attr: int = 42
+                else:
+                    attr: None = None
+            "#,
+        )?;
+        db.write_dedented(
+            "/src/main.py",
+            r#"
+            from mod import C
+            x = C().attr
+            "#,
+        )?;
+
+        let file_main = system_path_to_file(&db, "/src/main.py").unwrap();
+        let attr_ty = global_symbol(&db, file_main, "x").expect_type();
+        assert_eq!(attr_ty.display(&db).to_string(), "Unknown | int | None");
+
+        // Change the type of `attr` to `str | None`; this should trigger the type of `x` to be re-inferred
+        db.write_dedented(
+            "/src/mod.py",
+            r#"
+            class C:
+                if random.choice([True, False]):
+                    attr: str = "42"
+                else:
+                    attr: None = None
+            "#,
+        )?;
+
+        let events = {
+            db.clear_salsa_events();
+            let attr_ty = global_symbol(&db, file_main, "x").expect_type();
+            assert_eq!(attr_ty.display(&db).to_string(), "Unknown | str | None");
+            db.take_salsa_events()
+        };
+        assert_function_query_was_run(&db, infer_expression_types, x_rhs_expression(&db), &events);
+
+        // Add a comment; this should not trigger the type of `x` to be re-inferred
+        db.write_dedented(
+            "/src/mod.py",
+            r#"
+            class C:
+                # comment
+                if random.choice([True, False]):
+                    attr: str = "42"
+                else:
+                    attr: None = None
             "#,
         )?;
 
