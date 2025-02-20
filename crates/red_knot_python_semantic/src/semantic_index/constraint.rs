@@ -1,7 +1,6 @@
 use ruff_db::files::File;
 use ruff_index::{newtype_index, IndexVec};
 use ruff_python_ast::Singleton;
-use rustc_hash::FxHashMap;
 
 use crate::db::Db;
 use crate::semantic_index::expression::Expression;
@@ -18,16 +17,12 @@ pub(crate) type Constraints<'db> = IndexVec<ScopedConstraintId, Constraint<'db>>
 #[derive(Debug, Default)]
 pub(crate) struct ConstraintsBuilder<'db> {
     constraints: IndexVec<ScopedConstraintId, Constraint<'db>>,
-    constraint_cache: FxHashMap<Constraint<'db>, ScopedConstraintId>,
 }
 
 impl<'db> ConstraintsBuilder<'db> {
     /// Adds a constraint, ensuring that we only store any particular constraint once.
     pub(crate) fn add_constraint(&mut self, constraint: Constraint<'db>) -> ScopedConstraintId {
-        *self
-            .constraint_cache
-            .entry(constraint)
-            .or_insert_with(|| self.constraints.push(constraint))
+        self.constraints.push(constraint)
     }
 
     pub(crate) fn build(mut self) -> Constraints<'db> {

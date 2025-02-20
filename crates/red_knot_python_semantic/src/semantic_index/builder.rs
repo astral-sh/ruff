@@ -457,7 +457,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         let constraint_id = self.current_use_def_map_mut().add_constraint(constraint);
         let id = self
             .current_visibility_constraints_mut()
-            .add_atom(constraint_id, 0);
+            .add_atom(constraint_id);
         self.record_visibility_constraint_id(id);
         id
     }
@@ -1187,13 +1187,14 @@ where
                 // We need multiple copies of the visibility constraint for the while condition,
                 // since we need to model situations where the first evaluation of the condition
                 // returns True, but a later evaluation returns False.
-                let constraint_id = self.current_use_def_map_mut().add_constraint(constraint);
+                let first_constraint_id = self.current_use_def_map_mut().add_constraint(constraint);
+                let later_constraint_id = self.current_use_def_map_mut().add_constraint(constraint);
                 let first_vis_constraint_id = self
                     .current_visibility_constraints_mut()
-                    .add_atom(constraint_id, 0);
+                    .add_atom(first_constraint_id);
                 let later_vis_constraint_id = self
                     .current_visibility_constraints_mut()
-                    .add_atom(constraint_id, 1);
+                    .add_atom(later_constraint_id);
 
                 // Save aside any break states from an outer loop
                 let saved_break_states = std::mem::take(&mut self.loop_break_states);
@@ -1780,7 +1781,7 @@ where
                         };
                         let visibility_constraint = self
                             .current_visibility_constraints_mut()
-                            .add_atom(constraint_id, 0);
+                            .add_atom(constraint_id);
 
                         let after_expr = self.flow_snapshot();
 

@@ -236,58 +236,13 @@ impl std::fmt::Debug for ScopedVisibilityConstraintId {
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 struct InteriorNode {
-    atom: Atom,
+    /// A "variable" that is evaluated as part of a TDD ternary function. For visibility
+    /// constraints, this is a `Constraint` that represents some runtime property of the Python
+    /// code that we are evaluating.
+    atom: ScopedConstraintId,
     if_true: ScopedVisibilityConstraintId,
     if_ambiguous: ScopedVisibilityConstraintId,
     if_false: ScopedVisibilityConstraintId,
-}
-
-/// A "variable" that is evaluated as part of a TDD ternary function. For visibility constraints,
-/// this is a `Constraint` that represents some runtime property of the Python code that we are
-/// evaluating. We intern these constraints in an arena ([`VisibilityConstraints::constraints`]).
-/// An atom is then an index into this arena.
-///
-/// By using a 32-bit index, we would typically allow 4 billion distinct constraints within a
-/// scope. However, we sometimes have to model how a `Constraint` can have a different runtime
-/// value at different points in the execution of the program. To handle this, we reserve the top
-/// byte of an atom to represent a "copy number". This is just an opaque value that allows
-/// different `Atom`s to evaluate the same `Constraint`. This yields a maximum of 16 million
-/// distinct `Constraint`s in a scope, and 256 possible copies of each of those constraints.
-#[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
-struct Atom(u32);
-
-impl Atom {
-    /// Deconstruct an atom into a constraint index and a copy number.
-    #[inline]
-    fn into_index_and_copy(self) -> (ScopedConstraintId, u8) {
-        let copy = self.0 >> 24;
-        let index = self.0 & 0x00ff_ffff;
-        (index.into(), copy as u8)
-    }
-
-    #[inline]
-    fn copy_of(mut self, copy: u8) -> Self {
-        // Clear out the previous copy number
-        self.0 &= 0x00ff_ffff;
-        // OR in the new one
-        self.0 |= u32::from(copy) << 24;
-        self
-    }
-}
-
-impl From<ScopedConstraintId> for Atom {
-    fn from(constraint: ScopedConstraintId) -> Atom {
-        Atom(constraint.as_u32())
-    }
-}
-
-// A custom Debug implementation that prints out the constraint index and copy number as distinct
-// fields.
-impl std::fmt::Debug for Atom {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let (index, copy) = self.into_index_and_copy();
-        f.debug_tuple("Atom").field(&index).field(&copy).finish()
-    }
 }
 
 impl ScopedVisibilityConstraintId {
@@ -377,11 +332,6 @@ impl VisibilityConstraintsBuilder {
         }
     }
 
-    /// Adds a constraint, ensuring that we only store any particular constraint once.
-    fn add_constraint(&mut self, constraint: ScopedConstraintId, copy: u8) -> Atom {
-        Atom::from(constraint).copy_of(copy)
-    }
-
     /// Adds an interior node, ensuring that we always use the same visibility constraint ID for
     /// equal nodes.
     fn add_interior(&mut self, node: InteriorNode) -> ScopedVisibilityConstraintId {
@@ -397,17 +347,23 @@ impl VisibilityConstraintsBuilder {
             .or_insert_with(|| self.interiors.push(node))
     }
 
-    /// Adds a new visibility constraint that checks a single [`Constraint`]. Provide different
-    /// values for `copy` if you need to model that the constraint can evaluate to different
-    /// results at different points in the execution of the program being modeled.
+    /// Adds a new visibility constraint that checks a single [`Constraint`].
+    ///
+    /// [`ScopedConstraintId`]s are the “variables” that are evaluated by a TDD. A TDD variable has
+    /// the same value no matter how many times it appears in the ternary formula that the TDD
+    /// represents.
+    ///
+    /// However, we sometimes have to model how a `Constraint` can have a different runtime
+    /// value at different points in the execution of the program. To handle this, you can take
+    /// advantage of the fact that the [`Constraints`] arena does not deduplicate `Constraint`s.
+    /// You can add a `Constraint` multiple times, yielding different `ScopeConstraintId`s, which
+    /// you can then create separate TDD atoms for.
     pub(crate) fn add_atom(
         &mut self,
         constraint: ScopedConstraintId,
-        copy: u8,
     ) -> ScopedVisibilityConstraintId {
-        let atom = self.add_constraint(constraint, copy);
         self.add_interior(InteriorNode {
-            atom,
+            atom: constraint,
             if_true: ALWAYS_TRUE,
             if_ambiguous: AMBIGUOUS,
             if_false: ALWAYS_FALSE,
@@ -592,8 +548,7 @@ impl VisibilityConstraints {
                 ALWAYS_FALSE => return Truthiness::AlwaysFalse,
                 _ => self.interiors[id],
             };
-            let (constraint_id, _) = node.atom.into_index_and_copy();
-            let constraint = &constraints[constraint_id];
+            let constraint = &constraints[node.atom];
             match Self::analyze_single(db, constraint) {
                 Truthiness::AlwaysTrue => id = node.if_true,
                 Truthiness::Ambiguous => id = node.if_ambiguous,
