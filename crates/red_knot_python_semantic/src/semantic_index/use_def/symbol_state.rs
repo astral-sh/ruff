@@ -137,7 +137,7 @@ impl SymbolDeclarations {
         self.live_declarations.iter()
     }
 
-    /// Iterate over the IDs of each currently line declaration for this symbol
+    /// Iterate over the IDs of each currently live declaration for this symbol
     fn iter_declarations(&self) -> impl Iterator<Item = ScopedDefinitionId> + '_ {
         self.iter().map(|lb| lb.declaration)
     }
@@ -258,7 +258,7 @@ impl SymbolBindings {
         self.live_bindings.iter()
     }
 
-    /// Iterate over the IDs of each currently line binding for this symbol
+    /// Iterate over the IDs of each currently live binding for this symbol
     fn iter_bindings(&self) -> impl Iterator<Item = ScopedDefinitionId> + '_ {
         self.iter().map(|lb| lb.binding)
     }
