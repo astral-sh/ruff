@@ -42,6 +42,7 @@ use crate::types::diagnostic::INVALID_TYPE_FORM;
 use crate::types::infer::infer_unpack_types;
 use crate::types::mro::{Mro, MroError, MroIterator};
 pub(crate) use crate::types::narrow::narrowing_constraint;
+use crate::types::signatures::{Parameter, ParameterKind, Parameters};
 use crate::{Db, FxOrderSet, Module, Program};
 
 mod builder;
@@ -1791,25 +1792,128 @@ impl<'db> Type<'db> {
                 }
             }
             Type::Callable(CallableType::MethodWrapperDunderGet(function)) => {
-                let return_ty = match arguments.first_argument() {
-                    Some(ty) if ty.is_none(db) => Type::FunctionLiteral(function),
-                    Some(instance) => Type::Callable(CallableType::BoundMethod(
-                        BoundMethodType::new(db, function, instance),
-                    )),
-                    _ => Type::unknown(),
-                };
-                Ok(CallOutcome::Single(CallBinding::from_return_type(
-                    return_ty,
-                )))
+                // Here, we dynamically model the overloaded function signature of `types.FunctionType.__get__`.
+                // This is required because we need to return more precise types than what the signature in
+                // typeshed provides:
+                //
+                // ```py
+                // class FunctionType:
+                //     # ...
+                //     @overload
+                //     def __get__(self, instance: None, owner: type, /) -> FunctionType: ...
+                //     @overload
+                //     def __get__(self, instance: object, owner: type | None = None, /) -> MethodType: ...
+                // ```
+
+                let first_argument_is_none =
+                    arguments.first_argument().is_some_and(|ty| ty.is_none(db));
+
+                let signature = Signature::new(
+                    Parameters::new([
+                        Parameter::new(
+                            Some("instance".into()),
+                            Some(Type::object(db)),
+                            ParameterKind::PositionalOnly { default_ty: None },
+                        ),
+                        if first_argument_is_none {
+                            Parameter::new(
+                                Some("owner".into()),
+                                Some(KnownClass::Type.to_instance(db)),
+                                ParameterKind::PositionalOnly { default_ty: None },
+                            )
+                        } else {
+                            Parameter::new(
+                                Some("owner".into()),
+                                Some(UnionType::from_elements(
+                                    db,
+                                    [KnownClass::Type.to_instance(db), Type::none(db)],
+                                )),
+                                ParameterKind::PositionalOnly {
+                                    default_ty: Some(Type::none(db)),
+                                },
+                            )
+                        },
+                    ]),
+                    Some(match arguments.first_argument() {
+                        Some(ty) if ty.is_none(db) => Type::FunctionLiteral(function),
+                        Some(instance) => Type::Callable(CallableType::BoundMethod(
+                            BoundMethodType::new(db, function, instance),
+                        )),
+                        _ => Type::unknown(),
+                    }),
+                );
+
+                let binding = bind_call(db, arguments, &signature, self);
+
+                if binding.has_binding_errors() {
+                    Err(CallError::BindingError { binding })
+                } else {
+                    Ok(CallOutcome::Single(binding))
+                }
             }
             Type::Callable(CallableType::WrapperDescriptorDunderGet) => {
-                let return_ty = match arguments.first_argument() {
-                    Some(f @ Type::FunctionLiteral(_)) => f,
-                    _ => Type::unknown(),
-                };
-                Ok(CallOutcome::Single(CallBinding::from_return_type(
-                    return_ty,
-                )))
+                // Here, we also model `types.FunctionType.__get__`, but now we consider a call to
+                // this as a function, i.e. we also expect the `self` argument to be passed in.
+
+                let second_argument_is_none = arguments
+                    .second_argument()
+                    .map_or(false, |ty| ty.is_none(db));
+
+                let signature = Signature::new(
+                    Parameters::new([
+                        Parameter::new(
+                            Some("self".into()),
+                            Some(KnownClass::FunctionType.to_instance(db)),
+                            ParameterKind::PositionalOnly { default_ty: None },
+                        ),
+                        Parameter::new(
+                            Some("instance".into()),
+                            Some(Type::object(db)),
+                            ParameterKind::PositionalOnly { default_ty: None },
+                        ),
+                        if second_argument_is_none {
+                            Parameter::new(
+                                Some("owner".into()),
+                                Some(KnownClass::Type.to_instance(db)),
+                                ParameterKind::PositionalOnly { default_ty: None },
+                            )
+                        } else {
+                            Parameter::new(
+                                Some("owner".into()),
+                                Some(UnionType::from_elements(
+                                    db,
+                                    [KnownClass::Type.to_instance(db), Type::none(db)],
+                                )),
+                                ParameterKind::PositionalOnly {
+                                    default_ty: Some(Type::none(db)),
+                                },
+                            )
+                        },
+                    ]),
+                    Some(
+                        match (arguments.first_argument(), arguments.second_argument()) {
+                            (Some(function @ Type::FunctionLiteral(_)), Some(instance))
+                                if instance.is_none(db) =>
+                            {
+                                function
+                            }
+                            (Some(Type::FunctionLiteral(function)), Some(instance)) => {
+                                Type::Callable(CallableType::BoundMethod(BoundMethodType::new(
+                                    db, function, instance,
+                                )))
+                            }
+                            _ => Type::unknown(),
+                        },
+                    ),
+                );
+
+                let binding = bind_call(db, arguments, &signature, self);
+
+                if binding.has_binding_errors() {
+                    Err(CallError::BindingError { binding })
+                } else {
+                    Ok(CallOutcome::Single(binding))
+                }
             }
             Type::FunctionLiteral(function_type) => {
                 let mut binding = bind_call(db, arguments, function_type.signature(db), self);

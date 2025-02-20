@@ -190,3 +190,57 @@ type IntOrStr = int | str
 
 reveal_type(IntOrStr.__or__)  # revealed: <bound method `__or__` of `typing.TypeAliasType`>
 ```
+
+## Error cases: Calling `__get__` for methods
+
+The `__get__` method on `types.FunctionType` has the following overloaded signature in typeshed:
+
+```py
+from types import FunctionType, MethodType
+from typing import overload
+
+@overload
+def __get__(self, instance: None, owner: type, /) -> FunctionType: ...
+@overload
+def __get__(self, instance: object, owner: type | None = None, /) -> MethodType: ...
+```
+
+Here, we test that this signature is enforced correctly:
+
+```py
+from inspect import getattr_static
+
+class C:
+    def f(self, x: int) -> str:
+        return "a"
+
+method_wrapper = getattr_static(C, "f").__get__
+
+reveal_type(method_wrapper)  # revealed: <method-wrapper `__get__` of `f`>
+
+# All of these are fine:
+method_wrapper(C(), C)
+method_wrapper(C())
+method_wrapper(C(), None)
+method_wrapper(None, C)
+
+# Passing `None` without an `owner` argument is an
+# error: [missing-argument] "No argument provided for required parameter `owner`"
+method_wrapper(None)
+
+# Passing something that is not assignable to `type` as the `owner` argument is an
+# error: [invalid-argument-type] "Object of type `Literal[1]` cannot be assigned to parameter 2 (`owner`); expected type `type`"
+method_wrapper(None, 1)
+
+# Passing `None` as the `owner` argument when `instance` is `None` is an
+# error: [invalid-argument-type] "Object of type `None` cannot be assigned to parameter 2 (`owner`); expected type `type`"
+method_wrapper(None, None)
+
+# Calling `__get__` without any arguments is an
+# error: [missing-argument] "No argument provided for required parameter `instance`"
+method_wrapper()
+
+# Calling `__get__` with too many positional arguments is an
+# error: [too-many-positional-arguments] "Too many positional arguments: expected 2, got 3"
+method_wrapper(C(), C, "one too many")
+```
