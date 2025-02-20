@@ -1412,10 +1412,6 @@ impl<'db> Type<'db> {
     /// See also: [`Type::member`]
     #[must_use]
     fn static_member(&self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
-        if name == "__class__" {
-            return Symbol::bound(self.to_meta_type(db));
-        }
-
         match self {
             Type::Dynamic(_) => Symbol::bound(self),
 
