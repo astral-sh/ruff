@@ -1,5 +1,6 @@
 use ruff_db::files::File;
 use ruff_python_ast as ast;
+use salsa::Update;
 
 use crate::module_resolver::file_to_module;
 use crate::semantic_index::definition::Definition;
@@ -333,7 +334,7 @@ pub(crate) type SymbolFromDeclarationsResult<'db> =
 /// that this comes with a [`CLASS_VAR`] type qualifier.
 ///
 /// [`CLASS_VAR`]: crate::types::TypeQualifiers::CLASS_VAR
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq, Update)]
 pub(crate) struct SymbolAndQualifiers<'db>(pub(crate) Symbol<'db>, pub(crate) TypeQualifiers);
 
 impl SymbolAndQualifiers<'_> {

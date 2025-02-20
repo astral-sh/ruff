@@ -8,6 +8,7 @@ use indexmap::IndexSet;
 use itertools::Itertools;
 use ruff_db::files::File;
 use ruff_python_ast as ast;
+use ruff_python_ast::name::Name;
 use ruff_python_ast::PythonVersion;
 use type_ordering::union_elements_ordering;
 
@@ -3799,7 +3800,7 @@ impl<'db> Class<'db> {
                 }
                 ClassBase::Class(class) => {
                     if let member @ SymbolAndQualifiers(Symbol::Type(_, _), _) =
-                        class.own_instance_member(db, name)
+                        class.own_instance_member(db, Name::new(name))
                     {
                         return member;
                     }
@@ -3821,7 +3822,6 @@ impl<'db> Class<'db> {
         // We use a separate salsa query here to prevent unrelated changes in the AST of an external
         // file from triggering re-evaluations of downstream queries.
         // See the `dependency_implicit_instance_attribute` test for more information.
-        #[salsa::tracked]
         fn infer_expression_type<'db>(db: &'db dyn Db, expression: Expression<'db>) -> Type<'db> {
             let inference = infer_expression_types(db, expression);
             let expr_scope = expression.scope(db);
@@ -3907,7 +3907,8 @@ impl<'db> Class<'db> {
 
     /// A helper function for `instance_member` that looks up the `name` attribute only on
     /// this class, not on its superclasses.
-    fn own_instance_member(self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
+    #[salsa::tracked]
+    fn own_instance_member(self, db: &'db dyn Db, name: Name) -> SymbolAndQualifiers<'db> {
         // TODO: There are many things that are not yet implemented here:
         // - `typing.Final`
         // - Proper diagnostics
@@ -3917,7 +3918,7 @@ impl<'db> Class<'db> {
         let body_scope = self.body_scope(db);
         let table = symbol_table(db, body_scope);
 
-        if let Some(symbol_id) = table.symbol_id_by_name(name) {
+        if let Some(symbol_id) = table.symbol_id_by_name(&name) {
             let use_def = use_def_map(db, body_scope);
 
             let declarations = use_def.public_declarations(symbol_id);
@@ -3947,7 +3948,7 @@ impl<'db> Class<'db> {
                     let inferred = symbol_from_bindings(db, bindings);
                     let inferred_ty = inferred.ignore_possibly_unbound();
 
-                    Self::implicit_instance_attribute(db, body_scope, name, inferred_ty).into()
+                    Self::implicit_instance_attribute(db, body_scope, &name, inferred_ty).into()
                 }
                 Err((declared_ty, _conflicting_declarations)) => {
                     // There are conflicting declarations for this attribute in the class body.
@@ -3961,7 +3962,7 @@ impl<'db> Class<'db> {
             // This attribute is neither declared nor bound in the class body.
             // It could still be implicitly defined in a method.
 
-            Self::implicit_instance_attribute(db, body_scope, name, None).into()
+            Self::implicit_instance_attribute(db, body_scope, &name, None).into()
         }
     }
 
