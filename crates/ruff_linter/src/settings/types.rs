@@ -576,14 +576,33 @@ pub type IdentifierPattern = glob::Pattern;
 
 /// Like [`PerFile`] but with string globs compiled to [`GlobMatcher`]s for more efficient usage.
 #[derive(Debug, Clone, CacheKey)]
-pub struct CompiledPerFileIgnore {
+pub struct CompiledPerFile<T: CacheKey> {
     pub absolute_matcher: GlobMatcher,
     pub basename_matcher: GlobMatcher,
     pub negated: bool,
-    pub rules: RuleSet,
+    pub data: T,
 }
 
-impl Display for CompiledPerFileIgnore {
+impl<T: CacheKey> CompiledPerFile<T> {
+    fn new(
+        absolute_matcher: GlobMatcher,
+        basename_matcher: GlobMatcher,
+        negated: bool,
+        data: T,
+    ) -> Self {
+        Self {
+            absolute_matcher,
+            basename_matcher,
+            negated,
+            data,
+        }
+    }
+}
+
+impl<T> Display for CompiledPerFile<T>
+where
+    T: Display + CacheKey,
+{
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         display_settings! {
             formatter = f,
@@ -591,10 +610,21 @@ impl Display for CompiledPerFileIgnore {
                 self.absolute_matcher | globmatcher,
                 self.basename_matcher | globmatcher,
                 self.negated,
-                self.rules,
+                self.data,
             ]
         }
         Ok(())
+    }
+}
+
+#[derive(Debug, Clone, CacheKey)]
+pub struct CompiledPerFileIgnore(CompiledPerFile<RuleSet>);
+
+impl Deref for CompiledPerFileIgnore {
+    type Target = CompiledPerFile<RuleSet>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
 
@@ -617,12 +647,12 @@ impl CompiledPerFileIgnoreList {
                 // Construct basename matcher.
                 let basename_matcher = Glob::new(&per_file_ignore.0.basename)?.compile_matcher();
 
-                Ok(CompiledPerFileIgnore {
+                Ok(CompiledPerFileIgnore(CompiledPerFile::new(
                     absolute_matcher,
                     basename_matcher,
-                    negated: per_file_ignore.0.negated,
-                    rules: per_file_ignore.0.data,
-                })
+                    per_file_ignore.0.negated,
+                    per_file_ignore.0.data,
+                )))
             })
             .collect();
         Ok(Self { ignores: ignores? })
@@ -636,7 +666,7 @@ impl Display for CompiledPerFileIgnoreList {
         } else {
             writeln!(f, "{{")?;
             for ignore in &self.ignores {
-                writeln!(f, "\t{ignore}")?;
+                writeln!(f, "\t{}", ignore.0)?;
             }
             write!(f, "}}")?;
         }
@@ -665,27 +695,7 @@ impl PerFileVersion {
 }
 
 #[derive(Debug, Clone, CacheKey)]
-pub struct CompiledPerFileVersion {
-    pub absolute_matcher: GlobMatcher,
-    pub basename_matcher: GlobMatcher,
-    pub negated: bool,
-    pub version: ast::PythonVersion,
-}
-
-impl Display for CompiledPerFileVersion {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        display_settings! {
-            formatter = f,
-            fields = [
-                self.absolute_matcher | globmatcher,
-                self.basename_matcher | globmatcher,
-                self.negated,
-                self.version,
-            ]
-        }
-        Ok(())
-    }
-}
+pub struct CompiledPerFileVersion(CompiledPerFile<ast::PythonVersion>);
 
 #[derive(CacheKey, Clone, Debug, Default)]
 pub struct CompiledPerFileVersionList {
@@ -705,12 +715,12 @@ impl CompiledPerFileVersionList {
                 // Construct basename matcher.
                 let basename_matcher = Glob::new(&per_file_version.0.basename)?.compile_matcher();
 
-                Ok(CompiledPerFileVersion {
+                Ok(CompiledPerFileVersion(CompiledPerFile::new(
                     absolute_matcher,
                     basename_matcher,
-                    negated: per_file_version.0.negated,
-                    version: per_file_version.0.data,
-                })
+                    per_file_version.0.negated,
+                    per_file_version.0.data,
+                )))
             })
             .collect();
         Ok(Self {
@@ -720,8 +730,8 @@ impl CompiledPerFileVersionList {
 
     pub fn is_match(&self, path: &Path) -> Option<ast::PythonVersion> {
         self.versions.iter().find_map(|v| {
-            if v.absolute_matcher.is_match(path) || v.basename_matcher.is_match(path) {
-                Some(v.version)
+            if v.0.absolute_matcher.is_match(path) || v.0.basename_matcher.is_match(path) {
+                Some(v.0.data)
             } else {
                 None
             }
@@ -736,7 +746,7 @@ impl Display for CompiledPerFileVersionList {
         } else {
             writeln!(f, "{{")?;
             for version in &self.versions {
-                writeln!(f, "\t{version}")?;
+                writeln!(f, "\t{}", version.0)?;
             }
             write!(f, "}}")?;
         }

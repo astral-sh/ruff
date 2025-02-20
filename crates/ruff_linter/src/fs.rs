@@ -18,9 +18,9 @@ pub(crate) fn ignores_from_path(path: &Path, ignore_list: &CompiledPerFileIgnore
                         "Adding per-file ignores for {:?} due to basename match on {:?}: {:?}",
                         path,
                         entry.basename_matcher.glob().regex(),
-                        entry.rules
+                        entry.data
                     );
-                    Some(&entry.rules)
+                    Some(&entry.data)
                 }
             } else if entry.absolute_matcher.is_match(path) {
                 if entry.negated { None } else {
@@ -28,9 +28,9 @@ pub(crate) fn ignores_from_path(path: &Path, ignore_list: &CompiledPerFileIgnore
                         "Adding per-file ignores for {:?} due to absolute match on {:?}: {:?}",
                         path,
                         entry.absolute_matcher.glob().regex(),
-                        entry.rules
+                        entry.data
                     );
-                    Some(&entry.rules)
+                    Some(&entry.data)
                 }
             } else if entry.negated {
                 debug!(
@@ -38,9 +38,9 @@ pub(crate) fn ignores_from_path(path: &Path, ignore_list: &CompiledPerFileIgnore
                     path,
                     entry.basename_matcher.glob().regex(),
                     entry.absolute_matcher.glob().regex(),
-                    entry.rules
+                    entry.data
                 );
-                Some(&entry.rules)
+                Some(&entry.data)
             } else {
                 None
             }
