@@ -83,9 +83,11 @@ reveal_type(c.flexible_int)  # revealed: int | None
 
 ## Data and non-data descriptors
 
-Descriptors that define `__set__` or `__delete__` are called *data descriptors* (e.g. properties),
-while those that only define `__get__` are called non-data descriptors (e.g. functions,
-`classmethod` or `staticmethod`).
+Descriptors that define `__set__` or `__delete__` are called *data descriptors*. An example\
+of a data descriptor is a `property` with a setter and/or a deleter.\
+Descriptors that only define `__get__`, meanwhile, are called *non-data descriptors*. Examples
+include\
+functions, `classmethod` or `staticmethod`).
 
 The precedence chain for attribute access is (1) data descriptors, (2) instance attributes, and (3)
 non-data descriptors.
