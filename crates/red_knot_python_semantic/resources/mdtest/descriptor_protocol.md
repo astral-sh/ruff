@@ -343,22 +343,72 @@ Here, we only demonstrate how `__get__` works on functions:
 ```py
 from inspect import getattr_static
 
-def f(x: int) -> str:
+def f(x: object) -> str:
     return "a"
 
 reveal_type(f)  # revealed: Literal[f]
 reveal_type(f.__get__)  # revealed: <method-wrapper `__get__` of `f`>
-reveal_type(f.__get__(None, f))  # revealed: Literal[f]
-reveal_type(f.__get__(None, f)(1))  # revealed: str
+reveal_type(f.__get__(None, type(f)))  # revealed: Literal[f]
+reveal_type(f.__get__(None, type(f))(1))  # revealed: str
 
-reveal_type(getattr_static(f, "__get__"))  # revealed: <wrapper-descriptor `__get__` of `function` objects>
-reveal_type(getattr_static(f, "__get__")(f, None, type(f)))  # revealed: Literal[f]
+wrapper_descriptor = getattr_static(f, "__get__")
+
+reveal_type(wrapper_descriptor)  # revealed: <wrapper-descriptor `__get__` of `function` objects>
+reveal_type(wrapper_descriptor(f, None, type(f)))  # revealed: Literal[f]
 
 # Attribute access on the method-wrapper `f.__get__` falls back to `MethodWrapperType`:
 reveal_type(f.__get__.__hash__)  # revealed: <bound method `__hash__` of `MethodWrapperType`>
 
-# Attribute access on the wrapper-descriptor `getattr_static(f, "__get__")` falls back to `WrapperDescriptorType`:
-reveal_type(getattr_static(f, "__get__").__qualname__)  # revealed: @Todo(@property)
+# Attribute access on the wrapper-descriptor falls back to `WrapperDescriptorType`:
+reveal_type(wrapper_descriptor.__qualname__)  # revealed: @Todo(@property)
+```
+
+We can also bind the free function `f` to an instance of a class `C`:
+
+```py
+class C: ...
+
+bound_method = wrapper_descriptor(f, C(), C)
+
+reveal_type(bound_method)  # revealed: <bound method `f` of `C`>
+```
+
+We can then call it, and the instance of `C` is implicitly passed to the first parameter of `f`
+(`x`):
+
+```py
+reveal_type(bound_method())  # revealed: str
+```
+
+Finally, we test some error cases for the call to the wrapper descriptor:
+
+```py
+# Calling the wrapper descriptor without any arguments is an
+# error: [missing-argument] "No arguments provided for required parameters `self`, `instance`"
+wrapper_descriptor()
+
+# Calling it without the `instance` argument is an also an
+# error: [missing-argument] "No argument provided for required parameter `instance`"
+wrapper_descriptor(f)
+
+# Calling it without the `owner` argument if `instance` is not `None` is an
+# error: [missing-argument] "No argument provided for required parameter `owner`"
+wrapper_descriptor(f, None)
+
+# But calling it with an instance is fine (in this case, the `owner` argument is optional):
+wrapper_descriptor(f, C())
+
+# Calling it with something that is not a `FunctionType` as the first argument is an
+# error: [invalid-argument-type] "Object of type `Literal[1]` cannot be assigned to parameter 1 (`self`); expected type `FunctionType`"
+wrapper_descriptor(1, None, type(f))
+
+# Calling it with something that is not a `type` as the `owner` argument is an
+# error: [invalid-argument-type] "Object of type `Literal[f]` cannot be assigned to parameter 3 (`owner`); expected type `type`"
+wrapper_descriptor(f, None, f)
+
+# Calling it with too many positional arguments is an
+# error: [too-many-positional-arguments] "Too many positional arguments: expected 3, got 4"
+wrapper_descriptor(f, None, type(f), "one too many")
 ```
 
 [descriptors]: https://docs.python.org/3/howto/descriptor.html
