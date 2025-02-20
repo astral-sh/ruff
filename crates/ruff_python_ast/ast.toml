@@ -81,13 +81,6 @@ anynode_is_label = "expression"
 rustdoc = "/// See also [expr](https://docs.python.org/3/library/ast.html#ast.expr)"
 
 [Expr.nodes]
-ExprBoolOp = {}
-ExprNamed = {}
-ExprBinOp = {}
-ExprUnaryOp = {}
-ExprLambda = {}
-ExprIf = {}
-ExprDict = {}
 ExprSet = {}
 ExprListComp = {}
 ExprSetComp = {}
@@ -113,6 +106,35 @@ ExprList = {}
 ExprTuple = {}
 ExprSlice = {}
 ExprIpyEscapeCommand = {}
+ExprBoolOp = { fields = [
+    { name = "op", type = "BoolOp" },
+    { name = "values", type = "Expr", seq = true }
+]}
+ExprNamed = { fields = [
+    { name = "target", type = "Expr" },
+    { name = "value", type = "Expr" }
+]}
+ExprBinOp = { fields = [
+    { name = "left", type = "Expr" },
+    { name = "op", type = "Operator" },
+    { name = "right", type = "Expr" }
+]}
+ExprUnaryOp = { fields = [
+    { name = "op", type = "UnaryOp" },
+    { name = "operand", type = "Expr" }
+]}
+ExprLambda = { fields = [
+    { name = "parameters", type = "Parameters", optional = true },
+    { name = "body", type = "Expr" }
+]}
+ExprIf = { fields = [
+    { name = "test", type = "Expr" },
+    { name = "body", type = "Expr" },
+    { name = "orelse", type = "Expr" }
+]}
+ExprDict = { fields = [
+    { name = "items", type = "DictItem", seq = true },
+]}
 
 [ExceptHandler]
 rustdoc = "/// See also [excepthandler](https://docs.python.org/3/library/ast.html#ast.excepthandler)"

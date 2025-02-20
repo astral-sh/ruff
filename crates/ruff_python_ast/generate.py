@@ -90,11 +90,30 @@ class Node:
     name: str
     variant: str
     ty: str
+    fields: list[Field] | None
 
     def __init__(self, group: Group, node_name: str, node: dict[str, Any]) -> None:
         self.name = node_name
         self.variant = node.get("variant", node_name.removeprefix(group.name))
         self.ty = f"crate::{node_name}"
+        self.fields = None
+        fields = node.get("fields")
+        if fields is not None:
+            self.fields = [Field(f) for f in fields]
+
+
+@dataclass
+class Field:
+    name: str
+    ty: str
+    seq: bool
+    optional: bool
+
+    def __init__(self, field: dict[str, Any]) -> None:
+        self.name = field["name"]
+        self.ty = field["type"]
+        self.seq = field.get("seq", False)
+        self.optional = field.get("optional", False)
 
 
 # ------------------------------------------------------------------------------
@@ -548,6 +567,49 @@ def write_nodekind(out: list[str], ast: Ast) -> None:
 
 
 # ------------------------------------------------------------------------------
+
+
+def write_node(out: list[str], ast: Ast) -> None:
+    write_node_list = [
+        "ExprBoolOp",
+        "ExprNamed",
+        "ExprBinOp",
+        "ExprUnaryOp",
+        "ExprLambda",
+        "ExprIf",
+        "ExprDict",
+    ]
+    group_names = [group.name for group in ast.groups]
+    node_names = [node.name for node in ast.all_nodes]
+    for group in ast.groups:
+        for node in group.nodes:
+            if node.name not in write_node_list:
+                continue
+            if node.fields is not None:
+                out.append("#[derive(Clone, Debug, PartialEq)]")
+                name = node.name
+                out.append(f"pub struct {name} {{")
+                out.append("pub range: ruff_text_size::TextRange,")
+                for field in node.fields:
+                    field_str = f"pub {field.name}: "
+                    inner = f"crate::{field.ty}"
+                    if field.ty in node_names or (
+                        field.ty in group_names and (field.seq is False)
+                    ):
+                        inner = f"Box<{inner}>"
+
+                    if field.seq:
+                        field_str += f"Vec<{inner}>,"
+                    elif field.optional:
+                        field_str += f"Option<{inner}>,"
+                    else:
+                        field_str += f"{inner},"
+                    out.append(field_str)
+                out.append("}")
+                out.append("")
+
+
+# ------------------------------------------------------------------------------
 # Format and write output
 
 
@@ -558,6 +620,7 @@ def generate(ast: Ast) -> list[str]:
     write_ref_enum(out, ast)
     write_anynoderef(out, ast)
     write_nodekind(out, ast)
+    write_node(out, ast)
     return out
 
 
