@@ -274,15 +274,24 @@ impl CacheKey for FilePatternSet {
     }
 }
 
+/// A glob pattern and associated data for matching file paths.
 #[derive(Debug, Clone)]
-struct PerFile<T> {
+pub struct PerFile<T> {
+    /// The glob pattern used to construct the [`PerFile`].
     basename: String,
+    /// The same pattern as `basename` but normalized to the project root directory.
     absolute: PathBuf,
+    /// Whether the glob pattern should be negated (e.g. `!*.ipynb`)
     negated: bool,
+    /// The per-file data associated with these glob patterns.
     data: T,
 }
 
 impl<T> PerFile<T> {
+    /// Construct a new [`PerFile`] from the given glob `pattern` and containing `data`.
+    ///
+    /// If provided, `project_root` is used to construct a second glob pattern normalized to the
+    /// project root directory. See [`fs::normalize_path_to`] for more details.
     fn new(mut pattern: String, project_root: Option<&Path>, data: T) -> Self {
         let negated = pattern.starts_with('!');
         if negated {
@@ -303,6 +312,7 @@ impl<T> PerFile<T> {
     }
 }
 
+/// Per-file ignored linting rules.
 #[derive(Debug, Clone)]
 pub struct PerFileIgnore(PerFile<RuleSet>);
 
@@ -564,6 +574,7 @@ impl Display for RequiredVersion {
 /// pattern matching.
 pub type IdentifierPattern = glob::Pattern;
 
+/// Like [`PerFile`] but with string globs compiled to [`GlobMatcher`]s for more efficient usage.
 #[derive(Debug, Clone, CacheKey)]
 pub struct CompiledPerFileIgnore {
     pub absolute_matcher: GlobMatcher,
@@ -641,8 +652,9 @@ impl Deref for CompiledPerFileIgnoreList {
     }
 }
 
-// This struct and its `new` implementation are adapted directly from `PerFileIgnore`, minus the
-// `negated` field
+/// Contains the target Python version for a given glob pattern.
+///
+/// See [`PerFile`] for details of the representation.
 #[derive(Debug, Clone)]
 pub struct PerFileVersion(PerFile<ast::PythonVersion>);
 
