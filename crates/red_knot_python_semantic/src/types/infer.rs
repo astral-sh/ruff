@@ -1616,7 +1616,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
 
                 let target_ty = enter_ty
-                    .call(self.db(), &CallArguments::positional([context_expression_ty]))
+                    .try_call(self.db(), &CallArguments::positional([context_expression_ty]))
                     .map(|outcome| outcome.return_type(self.db()))
                     .unwrap_or_else(|err|  {
                         // TODO: Use more specific error messages for the different error cases.
@@ -1659,7 +1659,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         }
 
                         if exit_ty
-                            .call(
+                            .try_call(
                                 self.db(),
                                 &CallArguments::positional([
                                     context_manager_ty,
@@ -2209,7 +2209,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 if let Symbol::Type(class_member, boundness) =
                     class.class_member(self.db(), op.in_place_dunder())
                 {
-                    let call = class_member.call(
+                    let call = class_member.try_call(
                         self.db(),
                         &CallArguments::positional([target_type, value_type]),
                     );
@@ -3247,7 +3247,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             .unwrap_or_default();
 
         let call_arguments = self.infer_arguments(arguments, parameter_expectations);
-        let call = function_type.call(self.db(), &call_arguments);
+        let call = function_type.try_call(self.db(), &call_arguments);
 
         match call {
             Ok(outcome) => {
@@ -3747,7 +3747,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     }
                 };
 
-                match operand_type.call_dunder(
+                match operand_type.try_call_dunder(
                     self.db(),
                     unary_dunder_method,
                     &CallArguments::positional([operand_type]),
@@ -3996,7 +3996,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         && rhs_reflected != left_class.member(self.db(), reflected_dunder)
                     {
                         return right_ty
-                            .call_dunder(
+                            .try_call_dunder(
                                 self.db(),
                                 reflected_dunder,
                                 &CallArguments::positional([right_ty, left_ty]),
@@ -4004,7 +4004,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             .map(|outcome| outcome.return_type(self.db()))
                             .or_else(|_| {
                                 left_ty
-                                    .call_dunder(
+                                    .try_call_dunder(
                                         self.db(),
                                         op.dunder(),
                                         &CallArguments::positional([left_ty, right_ty]),
@@ -4020,7 +4020,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     left_class.member(self.db(), op.dunder())
                 {
                     class_member
-                        .call(self.db(), &CallArguments::positional([left_ty, right_ty]))
+                        .try_call(self.db(), &CallArguments::positional([left_ty, right_ty]))
                         .map(|outcome| outcome.return_type(self.db()))
                         .ok()
                 } else {
@@ -4036,7 +4036,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                         {
                             // TODO: Use `call_dunder`
                             class_member
-                                .call(self.db(), &CallArguments::positional([right_ty, left_ty]))
+                                .try_call(
+                                    self.db(),
+                                    &CallArguments::positional([right_ty, left_ty]),
+                                )
                                 .map(|outcome| outcome.return_type(self.db()))
                                 .ok()
                         } else {
@@ -4610,7 +4613,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             // TODO: How do we want to handle possibly unbound dunder methods?
             match left.class.class_member(db, op.dunder()) {
                 Symbol::Type(class_member_dunder, Boundness::Bound) => class_member_dunder
-                    .call(
+                    .try_call(
                         db,
                         &CallArguments::positional([Type::Instance(left), Type::Instance(right)]),
                     )
@@ -4660,7 +4663,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             Symbol::Type(contains_dunder, Boundness::Bound) => {
                 // If `__contains__` is available, it is used directly for the membership test.
                 contains_dunder
-                    .call(
+                    .try_call(
                         db,
                         &CallArguments::positional([Type::Instance(right), Type::Instance(left)]),
                     )
@@ -4917,7 +4920,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 // If the class defines `__getitem__`, return its return type.
                 //
                 // See: https://docs.python.org/3/reference/datamodel.html#class-getitem-versus-getitem
-                match value_ty.call_dunder(
+                match value_ty.try_call_dunder(
                     self.db(),
                     "__getitem__",
                     &CallArguments::positional([value_ty, slice_ty]),
@@ -4981,7 +4984,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             }
 
                             return ty
-                                .call(self.db(), &CallArguments::positional([value_ty, slice_ty]))
+                                .try_call(self.db(), &CallArguments::positional([value_ty, slice_ty]))
                                 .map(|outcome| outcome.return_type(self.db()))
                                 .unwrap_or_else(|err| {
                                     self.context.report_lint(

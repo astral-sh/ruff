@@ -1468,7 +1468,7 @@ impl<'db> Type<'db> {
                     };
 
                     if let Ok(Type::BooleanLiteral(bool_val)) = bool_method
-                        .call_bound(db, instance_ty, &CallArguments::positional([]))
+                        .try_call_bound(db, instance_ty, &CallArguments::positional([]))
                         .map(|outcome| outcome.return_type(db))
                     {
                         bool_val.into()
@@ -1541,12 +1541,15 @@ impl<'db> Type<'db> {
             return usize_len.try_into().ok().map(Type::IntLiteral);
         }
 
-        let return_ty = match self.call_dunder(db, "__len__", &CallArguments::positional([*self])) {
-            Ok(outcome) | Err(CallDunderError::PossiblyUnbound(outcome)) => outcome.return_type(db),
+        let return_ty =
+            match self.try_call_dunder(db, "__len__", &CallArguments::positional([*self])) {
+                Ok(outcome) | Err(CallDunderError::PossiblyUnbound(outcome)) => {
+                    outcome.return_type(db)
+                }
 
-            // TODO: emit a diagnostic
-            Err(err) => err.return_type(db)?,
-        };
+                // TODO: emit a diagnostic
+                Err(err) => err.return_type(db)?,
+            };
 
         non_negative_int_literal(db, return_ty)
     }
@@ -1554,7 +1557,7 @@ impl<'db> Type<'db> {
     /// Calls `self`
     ///
     /// Returns `Ok` if the call with the given arguments is successful and `Err` otherwise.
-    fn call(
+    fn try_call(
         self,
         db: &'db dyn Db,
         arguments: &CallArguments<'_, 'db>,
@@ -1672,7 +1675,7 @@ impl<'db> Type<'db> {
 
             instance_ty @ Type::Instance(_) => {
                 instance_ty
-                    .call_dunder(db, "__call__", &arguments.with_self(instance_ty))
+                    .try_call_dunder(db, "__call__", &arguments.with_self(instance_ty))
                     .map_err(|err| match err {
                         CallDunderError::Call(CallError::NotCallable { .. }) => {
                             // Turn "`<type of illegal '__call__'>` not callable" into
@@ -1712,7 +1715,7 @@ impl<'db> Type<'db> {
             Type::Dynamic(_) => Ok(CallOutcome::Single(CallBinding::from_return_type(self))),
 
             Type::Union(union) => {
-                CallOutcome::try_call_union(db, union, |element| element.call(db, arguments))
+                CallOutcome::try_call_union(db, union, |element| element.try_call(db, arguments))
             }
 
             Type::Intersection(_) => Ok(CallOutcome::Single(CallBinding::from_return_type(
@@ -1731,7 +1734,7 @@ impl<'db> Type<'db> {
     /// `receiver_ty` must be `Type::Instance(_)` or `Type::ClassLiteral`.
     ///
     /// TODO: handle `super()` objects properly
-    fn call_bound(
+    fn try_call_bound(
         self,
         db: &'db dyn Db,
         receiver_ty: &Type<'db>,
@@ -1743,16 +1746,16 @@ impl<'db> Type<'db> {
             Type::FunctionLiteral(..) => {
                 // Functions are always descriptors, so this would effectively call
                 // the function with the instance as the first argument
-                self.call(db, &arguments.with_self(*receiver_ty))
+                self.try_call(db, &arguments.with_self(*receiver_ty))
             }
 
             Type::Instance(_) | Type::ClassLiteral(_) => {
                 // TODO descriptor protocol. For now, assume non-descriptor and call without `self` argument.
-                self.call(db, arguments)
+                self.try_call(db, arguments)
             }
 
             Type::Union(union) => CallOutcome::try_call_union(db, union, |element| {
-                element.call_bound(db, receiver_ty, arguments)
+                element.try_call_bound(db, receiver_ty, arguments)
             }),
 
             Type::Intersection(_) => Ok(CallOutcome::Single(CallBinding::from_return_type(
@@ -1769,16 +1772,16 @@ impl<'db> Type<'db> {
     }
 
     /// Look up a dunder method on the meta type of `self` and call it.
-    fn call_dunder(
+    fn try_call_dunder(
         self,
         db: &'db dyn Db,
         name: &str,
         arguments: &CallArguments<'_, 'db>,
     ) -> Result<CallOutcome<'db>, CallDunderError<'db>> {
         match self.to_meta_type(db).member(db, name) {
-            Symbol::Type(callable_ty, Boundness::Bound) => Ok(callable_ty.call(db, arguments)?),
+            Symbol::Type(callable_ty, Boundness::Bound) => Ok(callable_ty.try_call(db, arguments)?),
             Symbol::Type(callable_ty, Boundness::PossiblyUnbound) => {
-                let call = callable_ty.call(db, arguments)?;
+                let call = callable_ty.try_call(db, arguments)?;
                 Err(CallDunderError::PossiblyUnbound(call))
             }
             Symbol::Unbound => Err(CallDunderError::MethodNotAvailable),
@@ -1801,12 +1804,12 @@ impl<'db> Type<'db> {
         }
 
         let dunder_iter_result =
-            self.call_dunder(db, "__iter__", &CallArguments::positional([self]));
+            self.try_call_dunder(db, "__iter__", &CallArguments::positional([self]));
         match &dunder_iter_result {
             Ok(outcome) | Err(CallDunderError::PossiblyUnbound(outcome)) => {
                 let iterator_ty = outcome.return_type(db);
 
-                return match iterator_ty.call_dunder(
+                return match iterator_ty.try_call_dunder(
                     db,
                     "__next__",
                     &CallArguments::positional([iterator_ty]),
@@ -1855,7 +1858,7 @@ impl<'db> Type<'db> {
         //
         // TODO(Alex) this is only valid if the `__getitem__` method is annotated as
         // accepting `int` or `SupportsIndex`
-        match self.call_dunder(
+        match self.try_call_dunder(
             db,
             "__getitem__",
             &CallArguments::positional([self, KnownClass::Int.to_instance(db)]),
@@ -2693,52 +2696,8 @@ pub enum KnownInstanceType<'db> {
 }
 
 impl<'db> KnownInstanceType<'db> {
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::Annotated => "Annotated",
-            Self::Literal => "Literal",
-            Self::LiteralString => "LiteralString",
-            Self::Optional => "Optional",
-            Self::Union => "Union",
-            Self::TypeVar(_) => "TypeVar",
-            Self::NoReturn => "NoReturn",
-            Self::Never => "Never",
-            Self::Any => "Any",
-            Self::Tuple => "Tuple",
-            Self::Type => "Type",
-            Self::TypeAliasType(_) => "TypeAliasType",
-            Self::TypingSelf => "Self",
-            Self::Final => "Final",
-            Self::ClassVar => "ClassVar",
-            Self::Callable => "Callable",
-            Self::Concatenate => "Concatenate",
-            Self::Unpack => "Unpack",
-            Self::Required => "Required",
-            Self::NotRequired => "NotRequired",
-            Self::TypeAlias => "TypeAlias",
-            Self::TypeGuard => "TypeGuard",
-            Self::TypeIs => "TypeIs",
-            Self::List => "List",
-            Self::Dict => "Dict",
-            Self::DefaultDict => "DefaultDict",
-            Self::Set => "Set",
-            Self::FrozenSet => "FrozenSet",
-            Self::Counter => "Counter",
-            Self::Deque => "Deque",
-            Self::ChainMap => "ChainMap",
-            Self::OrderedDict => "OrderedDict",
-            Self::ReadOnly => "ReadOnly",
-            Self::Unknown => "Unknown",
-            Self::AlwaysTruthy => "AlwaysTruthy",
-            Self::AlwaysFalsy => "AlwaysFalsy",
-            Self::Not => "Not",
-            Self::Intersection => "Intersection",
-            Self::TypeOf => "TypeOf",
-        }
-    }
-
     /// Evaluate the known instance in boolean context
-    pub const fn bool(self) -> Truthiness {
+    pub(crate) const fn bool(self) -> Truthiness {
         match self {
             Self::Annotated
             | Self::Literal
@@ -2783,7 +2742,7 @@ impl<'db> KnownInstanceType<'db> {
     }
 
     /// Return the repr of the symbol at runtime
-    pub fn repr(self, db: &'db dyn Db) -> &'db str {
+    pub(crate) fn repr(self, db: &'db dyn Db) -> &'db str {
         match self {
             Self::Annotated => "typing.Annotated",
             Self::Literal => "typing.Literal",
@@ -2828,7 +2787,7 @@ impl<'db> KnownInstanceType<'db> {
     }
 
     /// Return the [`KnownClass`] which this symbol is an instance of
-    pub const fn class(self) -> KnownClass {
+    pub(crate) const fn class(self) -> KnownClass {
         match self {
             Self::Annotated => KnownClass::SpecialForm,
             Self::Literal => KnownClass::SpecialForm,
@@ -2877,16 +2836,20 @@ impl<'db> KnownInstanceType<'db> {
     /// For example, the symbol `typing.Literal` is an instance of `typing._SpecialForm`,
     /// so `KnownInstanceType::Literal.instance_fallback(db)`
     /// returns `Type::Instance(InstanceType { class: <typing._SpecialForm> })`.
-    pub fn instance_fallback(self, db: &dyn Db) -> Type {
+    pub(crate) fn instance_fallback(self, db: &dyn Db) -> Type {
         self.class().to_instance(db)
     }
 
     /// Return `true` if this symbol is an instance of `class`.
-    pub fn is_instance_of(self, db: &'db dyn Db, class: Class<'db>) -> bool {
+    pub(crate) fn is_instance_of(self, db: &'db dyn Db, class: Class<'db>) -> bool {
         self.class().is_subclass_of(db, class)
     }
 
-    pub fn try_from_file_and_name(db: &'db dyn Db, file: File, symbol_name: &str) -> Option<Self> {
+    pub(crate) fn try_from_file_and_name(
+        db: &'db dyn Db,
+        file: File,
+        symbol_name: &str,
+    ) -> Option<Self> {
         let candidate = match symbol_name {
             "Any" => Self::Any,
             "ClassVar" => Self::ClassVar,
@@ -2937,7 +2900,7 @@ impl<'db> KnownInstanceType<'db> {
     ///
     /// Most variants can only exist in one module, which is the same as `self.class().canonical_module()`.
     /// Some variants could validly be defined in either `typing` or `typing_extensions`, however.
-    pub fn check_module(self, module: KnownModule) -> bool {
+    pub(crate) fn check_module(self, module: KnownModule) -> bool {
         match self {
             Self::Any
             | Self::ClassVar
@@ -3668,7 +3631,7 @@ impl<'db> Class<'db> {
             // TODO: Other keyword arguments?
             let arguments = CallArguments::positional([name, bases, namespace]);
 
-            let return_ty_result = match metaclass.call(db, &arguments) {
+            let return_ty_result = match metaclass.try_call(db, &arguments) {
                 Ok(outcome) => Ok(outcome.return_type(db)),
 
                 Err(CallError::NotCallable { not_callable_ty }) => Err(MetaclassError {
