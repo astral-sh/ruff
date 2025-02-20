@@ -26,6 +26,7 @@ impl<const B: usize> Default for BitSet<B> {
 
 impl<const B: usize> BitSet<B> {
     /// Create and return a new [`BitSet`] with a single `value` inserted.
+    #[cfg(test)]
     pub(super) fn with(value: u32) -> Self {
         let mut bitset = Self::default();
         bitset.insert(value);
@@ -94,6 +95,7 @@ impl<const B: usize> BitSet<B> {
     }
 
     /// Union in-place with another [`BitSet`].
+    #[cfg(test)]
     pub(super) fn union(&mut self, other: &BitSet<B>) {
         let mut max_len = self.blocks().len();
         let other_len = other.blocks().len();

@@ -257,13 +257,12 @@
 //! visits a `StmtIf` node.
 pub(crate) use self::symbol_state::ScopedConstraintId;
 use self::symbol_state::{
-    ConstraintIterator, DeclarationIdIterator, LiveBindingIter, ScopedDefinitionId, SymbolBindings,
-    SymbolDeclarations, SymbolState,
+    ConstraintIterator, LiveBindingIter, LiveDeclaration, LiveDeclarationIter, ScopedDefinitionId,
+    SymbolBindings, SymbolDeclarations, SymbolState,
 };
 use crate::semantic_index::ast_ids::ScopedUseId;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::symbol::{FileScopeId, ScopedSymbolId};
-use crate::semantic_index::use_def::symbol_state::DeclarationIdWithConstraint;
 use crate::visibility_constraints::{
     ScopedVisibilityConstraintId, VisibilityConstraints, VisibilityConstraintsBuilder,
 };
@@ -467,7 +466,7 @@ impl std::iter::FusedIterator for ConstraintsIterator<'_, '_> {}
 pub(crate) struct DeclarationsIterator<'map, 'db> {
     all_definitions: &'map IndexVec<ScopedDefinitionId, Option<Definition<'db>>>,
     pub(crate) visibility_constraints: &'map VisibilityConstraints<'db>,
-    inner: DeclarationIdIterator<'map>,
+    inner: LiveDeclarationIter<'map>,
 }
 
 pub(crate) struct DeclarationWithConstraint<'db> {
@@ -480,13 +479,13 @@ impl<'db> Iterator for DeclarationsIterator<'_, 'db> {
 
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next().map(
-            |DeclarationIdWithConstraint {
-                 definition,
+            |LiveDeclaration {
+                 declaration,
                  visibility_constraint,
              }| {
                 DeclarationWithConstraint {
-                    declaration: self.all_definitions[definition],
-                    visibility_constraint,
+                    declaration: self.all_definitions[*declaration],
+                    visibility_constraint: *visibility_constraint,
                 }
             },
         )
