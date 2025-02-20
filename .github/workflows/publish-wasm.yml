@@ -35,6 +35,8 @@ jobs:
       - name: "Install Rust toolchain"
         run: rustup target add wasm32-unknown-unknown
       - uses: jetli/wasm-pack-action@v0.4.0
+        with:
+          version: v0.13.1
       - uses: jetli/wasm-bindgen-action@v0.2.0
       - name: "Run wasm-pack build"
         run: wasm-pack build --target ${{ matrix.target }} crates/ruff_wasm
