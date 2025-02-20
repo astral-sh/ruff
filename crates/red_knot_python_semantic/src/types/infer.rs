@@ -3753,6 +3753,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             (
                 op @ (ast::UnaryOp::UAdd | ast::UnaryOp::USub | ast::UnaryOp::Invert),
                 Type::FunctionLiteral(_)
+                | Type::Callable(..)
                 | Type::ModuleLiteral(_)
                 | Type::ClassLiteral(_)
                 | Type::SubclassOf(_)
@@ -3780,7 +3781,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 match operand_type.try_call_dunder(
                     self.db(),
                     unary_dunder_method,
-                    &CallArguments::positional([operand_type]),
+                    &CallArguments::none(),
                 ) {
                     Ok(outcome) => outcome.return_type(self.db()),
                     Err(e) => {
@@ -3967,6 +3968,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             // fall back on looking for dunder methods on one of the operand types.
             (
                 Type::FunctionLiteral(_)
+                | Type::Callable(..)
                 | Type::ModuleLiteral(_)
                 | Type::ClassLiteral(_)
                 | Type::SubclassOf(_)
@@ -3983,6 +3985,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 | Type::SliceLiteral(_)
                 | Type::Tuple(_),
                 Type::FunctionLiteral(_)
+                | Type::Callable(..)
                 | Type::ModuleLiteral(_)
                 | Type::ClassLiteral(_)
                 | Type::SubclassOf(_)
@@ -4029,7 +4032,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             .try_call_dunder(
                                 self.db(),
                                 reflected_dunder,
-                                &CallArguments::positional([right_ty, left_ty]),
+                                &CallArguments::positional([left_ty]),
                             )
                             .map(|outcome| outcome.return_type(self.db()))
                             .or_else(|_| {
@@ -4037,7 +4040,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                     .try_call_dunder(
                                         self.db(),
                                         op.dunder(),
-                                        &CallArguments::positional([left_ty, right_ty]),
+                                        &CallArguments::positional([right_ty]),
                                     )
                                     .map(|outcome| outcome.return_type(self.db()))
                             })
@@ -4953,7 +4956,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 match value_ty.try_call_dunder(
                     self.db(),
                     "__getitem__",
-                    &CallArguments::positional([value_ty, slice_ty]),
+                    &CallArguments::positional([slice_ty]),
                 ) {
                     Ok(outcome) => return outcome.return_type(self.db()),
                     Err(err @ CallDunderError::PossiblyUnbound { .. }) => {
