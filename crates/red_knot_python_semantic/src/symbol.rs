@@ -846,4 +846,37 @@ mod tests {
         let property_symbol_name = ast::name::Name::new_static("property");
         assert!(!symbol_names.contains(&property_symbol_name));
     }
+
+    #[track_caller]
+    fn assert_bound_string_symbol<'db>(db: &'db dyn Db, symbol: Symbol<'db>) {
+        assert!(matches!(
+            symbol,
+            Symbol::Type(Type::Instance(_), Boundness::Bound)
+        ));
+        assert_eq!(symbol.expect_type(), KnownClass::Str.to_instance(db));
+    }
+
+    #[test]
+    fn implicit_builtin_globals() {
+        let db = setup_db();
+        assert_bound_string_symbol(&db, builtins_symbol(&db, "__name__"));
+    }
+
+    #[test]
+    fn implicit_typing_globals() {
+        let db = setup_db();
+        assert_bound_string_symbol(&db, typing_symbol(&db, "__name__"));
+    }
+
+    #[test]
+    fn implicit_typing_extensions_globals() {
+        let db = setup_db();
+        assert_bound_string_symbol(&db, typing_extensions_symbol(&db, "__name__"));
+    }
+
+    #[test]
+    fn implicit_sys_globals() {
+        let db = setup_db();
+        assert_bound_string_symbol(&db, known_module_symbol(&db, KnownModule::Sys, "__name__"));
+    }
 }
