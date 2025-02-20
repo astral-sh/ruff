@@ -355,4 +355,6 @@ b = (1, Comparable())
 
 # error: [unsupported-bool-conversion]
 a < b < b
+
+a < b  # fine
 ```
