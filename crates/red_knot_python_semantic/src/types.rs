@@ -1608,15 +1608,14 @@ impl<'db> Type<'db> {
                 "__self__" => Symbol::bound(bound_method.self_instance(db)),
                 "__func__" => Symbol::bound(Type::FunctionLiteral(bound_method.function(db))),
                 _ => {
-                    let member = KnownClass::MethodType.to_instance(db).member(db, name);
-
-                    // If an attribute is not available on the bound method object, it will be looked
-                    // up on the underlying function object:
-                    if member.is_unbound() {
-                        Type::FunctionLiteral(bound_method.function(db)).member(db, name)
-                    } else {
-                        member
-                    }
+                    KnownClass::MethodType
+                        .to_instance(db)
+                        .member(db, name)
+                        .or_fall_back_to(db, || {
+                            // If an attribute is not available on the bound method object,
+                            // it will be looked up on the underlying function object:
+                            Type::FunctionLiteral(bound_method.function(db)).member(db, name)
+                        })
                 }
             },
             Type::Callable(CallableType::MethodWrapperDunderGet(_)) => {
