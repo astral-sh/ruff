@@ -5,6 +5,11 @@ use super::Type;
 pub(crate) struct CallArguments<'a, 'db>(Vec<Argument<'a, 'db>>);
 
 impl<'a, 'db> CallArguments<'a, 'db> {
+    /// Create a [`CallArguments`] with no arguments.
+    pub(crate) fn none() -> Self {
+        Self(Vec::new())
+    }
+
     /// Create a [`CallArguments`] from an iterator over non-variadic positional argument types.
     pub(crate) fn positional(positional_tys: impl IntoIterator<Item = Type<'db>>) -> Self {
         positional_tys

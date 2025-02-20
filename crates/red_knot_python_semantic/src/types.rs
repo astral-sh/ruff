@@ -1680,7 +1680,7 @@ impl<'db> Type<'db> {
                     // and a subclass could add a `__bool__` method.
 
                     if let Ok(Type::BooleanLiteral(bool_val)) = self
-                        .try_call_dunder(db, "__bool__", &CallArguments::positional([]))
+                        .try_call_dunder(db, "__bool__", &CallArguments::none())
                         .map(|outcome| outcome.return_type(db))
                     {
                         bool_val.into()
@@ -1753,7 +1753,7 @@ impl<'db> Type<'db> {
             return usize_len.try_into().ok().map(Type::IntLiteral);
         }
 
-        let return_ty = match self.try_call_dunder(db, "__len__", &CallArguments::positional([])) {
+        let return_ty = match self.try_call_dunder(db, "__len__", &CallArguments::none()) {
             Ok(outcome) | Err(CallDunderError::PossiblyUnbound(outcome)) => outcome.return_type(db),
 
             // TODO: emit a diagnostic
@@ -2173,17 +2173,12 @@ impl<'db> Type<'db> {
             };
         }
 
-        let dunder_iter_result =
-            self.try_call_dunder(db, "__iter__", &CallArguments::positional([]));
+        let dunder_iter_result = self.try_call_dunder(db, "__iter__", &CallArguments::none());
         match &dunder_iter_result {
             Ok(outcome) | Err(CallDunderError::PossiblyUnbound(outcome)) => {
                 let iterator_ty = outcome.return_type(db);
 
-                return match iterator_ty.try_call_dunder(
-                    db,
-                    "__next__",
-                    &CallArguments::positional([]),
-                ) {
+                return match iterator_ty.try_call_dunder(db, "__next__", &CallArguments::none()) {
                     Ok(outcome) => {
                         if matches!(
                             dunder_iter_result,
