@@ -624,7 +624,20 @@ pub struct CompiledPerFileList<T: CacheKey> {
     inner: Vec<CompiledPerFile<T>>,
 }
 
-impl<T: CacheKey + std::fmt::Debug> CompiledPerFileList<T> {
+/// Helper trait for debug labels on [`PerFile<T>`] types.
+pub trait PerFileKind {
+    const LABEL: &str;
+}
+
+impl PerFileKind for RuleSet {
+    const LABEL: &str = "Adding per-file ignores";
+}
+
+impl PerFileKind for ast::PythonVersion {
+    const LABEL: &str = "Setting Python version";
+}
+
+impl<T: CacheKey> CompiledPerFileList<T> {
     /// Given a list of [`PerFile`] patterns, create a compiled set of globs.
     fn resolve(per_file_items: impl IntoIterator<Item = PerFile<T>>) -> Result<Self> {
         let inner: Result<Vec<_>> = per_file_items
@@ -651,20 +664,22 @@ impl<T: CacheKey + std::fmt::Debug> CompiledPerFileList<T> {
     pub(crate) fn is_empty(&self) -> bool {
         self.inner.is_empty()
     }
+}
 
+impl<T: CacheKey + std::fmt::Debug + PerFileKind> CompiledPerFileList<T> {
     pub(crate) fn iter_matches<'a, 'p>(&'a self, path: &'p Path) -> impl Iterator<Item = &'p T>
     where
         'a: 'p,
     {
         let file_name = path.file_name().expect("Unable to parse filename");
-        self.inner
-        .iter()
-        .filter_map(move |entry| {
+        self.inner.iter().filter_map(move |entry| {
             if entry.basename_matcher.is_match(file_name) {
-                if entry.negated { None } else {
-                    // TODO need to pass a name here
+                if entry.negated {
+                    None
+                } else {
                     debug!(
-                        "Adding per-file ignores for {:?} due to basename match on {:?}: {:?}",
+                        "{} for {:?} due to basename match on {:?}: {:?}",
+                        T::LABEL,
                         path,
                         entry.basename_matcher.glob().regex(),
                         entry.data
@@ -672,9 +687,12 @@ impl<T: CacheKey + std::fmt::Debug> CompiledPerFileList<T> {
                     Some(&entry.data)
                 }
             } else if entry.absolute_matcher.is_match(path) {
-                if entry.negated { None } else {
+                if entry.negated {
+                    None
+                } else {
                     debug!(
-                        "Adding per-file ignores for {:?} due to absolute match on {:?}: {:?}",
+                        "{} for {:?} due to absolute match on {:?}: {:?}",
+                        T::LABEL,
                         path,
                         entry.absolute_matcher.glob().regex(),
                         entry.data
@@ -683,7 +701,8 @@ impl<T: CacheKey + std::fmt::Debug> CompiledPerFileList<T> {
                 }
             } else if entry.negated {
                 debug!(
-                    "Adding per-file ignores for {:?} due to negated pattern matching neither {:?} nor {:?}: {:?}",
+                    "{} for {:?} due to negated pattern matching neither {:?} nor {:?}: {:?}",
+                    T::LABEL,
                     path,
                     entry.basename_matcher.glob().regex(),
                     entry.absolute_matcher.glob().regex(),
@@ -754,6 +773,7 @@ impl PerFileVersion {
         Self(PerFile::new(pattern, project_root, version))
     }
 }
+
 #[derive(CacheKey, Clone, Debug, Default)]
 pub struct CompiledPerFileVersionList(CompiledPerFileList<ast::PythonVersion>);
 
