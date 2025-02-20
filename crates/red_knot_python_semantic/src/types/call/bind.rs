@@ -16,7 +16,7 @@ use ruff_text_size::Ranged;
 /// parameters, and any errors resulting from binding the call.
 pub(crate) fn bind_call<'db>(
     db: &'db dyn Db,
-    arguments: &CallArguments<'_, 'db>,
+    arguments: &CallArguments<'db>,
     signature: &Signature<'db>,
     callable_ty: Type<'db>,
 ) -> CallBinding<'db> {
@@ -137,7 +137,7 @@ pub(crate) fn bind_call<'db>(
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, salsa::Update)]
 pub(crate) struct CallBinding<'db> {
     /// Type of the callable object (function, class...)
     callable_ty: Type<'db>,
@@ -266,7 +266,7 @@ impl std::fmt::Display for ParameterContexts {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, salsa::Update)]
 pub(crate) enum CallBindingError<'db> {
     /// The type of an argument is not assignable to the annotated type of its corresponding
     /// parameter.

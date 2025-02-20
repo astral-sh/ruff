@@ -241,6 +241,7 @@ pub enum Type<'db> {
     // TODO protocols, callable types, overloads, generics, type vars
 }
 
+#[salsa::tracked]
 impl<'db> Type<'db> {
     pub const fn any() -> Self {
         Self::Dynamic(DynamicType::Any)
@@ -1468,7 +1469,7 @@ impl<'db> Type<'db> {
                     };
 
                     if let Ok(Type::BooleanLiteral(bool_val)) = bool_method
-                        .try_call_bound(db, instance_ty, &CallArguments::positional([]))
+                        .try_call_bound(db, instance_ty, CallArguments::positional([]))
                         .map(|outcome| outcome.return_type(db))
                     {
                         bool_val.into()
@@ -1542,7 +1543,7 @@ impl<'db> Type<'db> {
         }
 
         let return_ty =
-            match self.try_call_dunder(db, "__len__", &CallArguments::positional([*self])) {
+            match self.try_call_dunder(db, "__len__", CallArguments::positional([*self])) {
                 Ok(outcome) | Err(CallDunderError::PossiblyUnbound(outcome)) => {
                     outcome.return_type(db)
                 }
@@ -1557,14 +1558,15 @@ impl<'db> Type<'db> {
     /// Calls `self`
     ///
     /// Returns `Ok` if the call with the given arguments is successful and `Err` otherwise.
+    #[salsa::tracked]
     fn try_call(
         self,
         db: &'db dyn Db,
-        arguments: &CallArguments<'_, 'db>,
+        arguments: CallArguments<'db>,
     ) -> Result<CallOutcome<'db>, CallError<'db>> {
         match self {
             Type::FunctionLiteral(function_type) => {
-                let mut binding = bind_call(db, arguments, function_type.signature(db), self);
+                let mut binding = bind_call(db, &arguments, function_type.signature(db), self);
                 match function_type.known(db) {
                     Some(KnownFunction::IsEquivalentTo) => {
                         let (ty_a, ty_b) = binding
@@ -1675,7 +1677,7 @@ impl<'db> Type<'db> {
 
             instance_ty @ Type::Instance(_) => {
                 instance_ty
-                    .try_call_dunder(db, "__call__", &arguments.with_self(instance_ty))
+                    .try_call_dunder(db, "__call__", arguments.with_self(instance_ty))
                     .map_err(|err| match err {
                         CallDunderError::Call(CallError::NotCallable { .. }) => {
                             // Turn "`<type of illegal '__call__'>` not callable" into
@@ -1714,9 +1716,9 @@ impl<'db> Type<'db> {
             // Dynamic types are callable, and the return type is the same dynamic type
             Type::Dynamic(_) => Ok(CallOutcome::Single(CallBinding::from_return_type(self))),
 
-            Type::Union(union) => {
-                CallOutcome::try_call_union(db, union, |element| element.try_call(db, arguments))
-            }
+            Type::Union(union) => CallOutcome::try_call_union(db, union, |element| {
+                element.try_call(db, arguments.clone())
+            }),
 
             Type::Intersection(_) => Ok(CallOutcome::Single(CallBinding::from_return_type(
                 todo_type!("Type::Intersection.call()"),
@@ -1738,7 +1740,7 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         receiver_ty: &Type<'db>,
-        arguments: &CallArguments<'_, 'db>,
+        arguments: CallArguments<'db>,
     ) -> Result<CallOutcome<'db>, CallError<'db>> {
         debug_assert!(receiver_ty.is_instance() || receiver_ty.is_class_literal());
 
@@ -1746,7 +1748,7 @@ impl<'db> Type<'db> {
             Type::FunctionLiteral(..) => {
                 // Functions are always descriptors, so this would effectively call
                 // the function with the instance as the first argument
-                self.try_call(db, &arguments.with_self(*receiver_ty))
+                self.try_call(db, arguments.with_self(*receiver_ty))
             }
 
             Type::Instance(_) | Type::ClassLiteral(_) => {
@@ -1755,7 +1757,7 @@ impl<'db> Type<'db> {
             }
 
             Type::Union(union) => CallOutcome::try_call_union(db, union, |element| {
-                element.try_call_bound(db, receiver_ty, arguments)
+                element.try_call_bound(db, receiver_ty, arguments.clone())
             }),
 
             Type::Intersection(_) => Ok(CallOutcome::Single(CallBinding::from_return_type(
@@ -1776,7 +1778,7 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         name: &str,
-        arguments: &CallArguments<'_, 'db>,
+        arguments: CallArguments<'db>,
     ) -> Result<CallOutcome<'db>, CallDunderError<'db>> {
         match self.to_meta_type(db).member(db, name) {
             Symbol::Type(callable_ty, Boundness::Bound) => Ok(callable_ty.try_call(db, arguments)?),
@@ -1804,7 +1806,7 @@ impl<'db> Type<'db> {
         }
 
         let dunder_iter_result =
-            self.try_call_dunder(db, "__iter__", &CallArguments::positional([self]));
+            self.try_call_dunder(db, "__iter__", CallArguments::positional([self]));
         match &dunder_iter_result {
             Ok(outcome) | Err(CallDunderError::PossiblyUnbound(outcome)) => {
                 let iterator_ty = outcome.return_type(db);
@@ -1812,7 +1814,7 @@ impl<'db> Type<'db> {
                 return match iterator_ty.try_call_dunder(
                     db,
                     "__next__",
-                    &CallArguments::positional([iterator_ty]),
+                    CallArguments::positional([iterator_ty]),
                 ) {
                     Ok(outcome) => {
                         if matches!(
@@ -1861,7 +1863,7 @@ impl<'db> Type<'db> {
         match self.try_call_dunder(
             db,
             "__getitem__",
-            &CallArguments::positional([self, KnownClass::Int.to_instance(db)]),
+            CallArguments::positional([self, KnownClass::Int.to_instance(db)]),
         ) {
             Ok(outcome) => IterationOutcome::Iterable {
                 element_ty: outcome.return_type(db),
@@ -3631,7 +3633,7 @@ impl<'db> Class<'db> {
             // TODO: Other keyword arguments?
             let arguments = CallArguments::positional([name, bases, namespace]);
 
-            let return_ty_result = match metaclass.try_call(db, &arguments) {
+            let return_ty_result = match metaclass.try_call(db, arguments) {
                 Ok(outcome) => Ok(outcome.return_type(db)),
 
                 Err(CallError::NotCallable { not_callable_ty }) => Err(MetaclassError {
