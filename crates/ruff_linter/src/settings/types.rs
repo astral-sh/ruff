@@ -275,21 +275,15 @@ impl CacheKey for FilePatternSet {
 }
 
 #[derive(Debug, Clone)]
-pub struct PerFileIgnore {
-    pub(crate) basename: String,
-    pub(crate) absolute: PathBuf,
-    pub(crate) negated: bool,
-    pub(crate) rules: RuleSet,
+struct PerFile<T> {
+    basename: String,
+    absolute: PathBuf,
+    negated: bool,
+    data: T,
 }
 
-impl PerFileIgnore {
-    pub fn new(
-        mut pattern: String,
-        prefixes: &[RuleSelector],
-        project_root: Option<&Path>,
-    ) -> Self {
-        // Rules in preview are included here even if preview mode is disabled; it's safe to ignore disabled rules
-        let rules: RuleSet = prefixes.iter().flat_map(RuleSelector::all_rules).collect();
+impl<T> PerFile<T> {
+    fn new(mut pattern: String, project_root: Option<&Path>, data: T) -> Self {
         let negated = pattern.starts_with('!');
         if negated {
             pattern.drain(..1);
@@ -304,8 +298,20 @@ impl PerFileIgnore {
             basename: pattern,
             absolute,
             negated,
-            rules,
+            data,
         }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct PerFileIgnore(PerFile<RuleSet>);
+
+impl PerFileIgnore {
+    pub fn new(pattern: String, prefixes: &[RuleSelector], project_root: Option<&Path>) -> Self {
+        // Rules in preview are included here even if preview mode is disabled; it's safe to ignore
+        // disabled rules
+        let rules: RuleSet = prefixes.iter().flat_map(RuleSelector::all_rules).collect();
+        Self(PerFile::new(pattern, project_root, rules))
     }
 }
 
@@ -595,16 +601,16 @@ impl CompiledPerFileIgnoreList {
             .map(|per_file_ignore| {
                 // Construct absolute path matcher.
                 let absolute_matcher =
-                    Glob::new(&per_file_ignore.absolute.to_string_lossy())?.compile_matcher();
+                    Glob::new(&per_file_ignore.0.absolute.to_string_lossy())?.compile_matcher();
 
                 // Construct basename matcher.
-                let basename_matcher = Glob::new(&per_file_ignore.basename)?.compile_matcher();
+                let basename_matcher = Glob::new(&per_file_ignore.0.basename)?.compile_matcher();
 
                 Ok(CompiledPerFileIgnore {
                     absolute_matcher,
                     basename_matcher,
-                    negated: per_file_ignore.negated,
-                    rules: per_file_ignore.rules,
+                    negated: per_file_ignore.0.negated,
+                    rules: per_file_ignore.0.data,
                 })
             })
             .collect();
@@ -638,24 +644,11 @@ impl Deref for CompiledPerFileIgnoreList {
 // This struct and its `new` implementation are adapted directly from `PerFileIgnore`, minus the
 // `negated` field
 #[derive(Debug, Clone)]
-pub struct PerFileVersion {
-    pub(crate) basename: String,
-    pub(crate) absolute: PathBuf,
-    pub(crate) version: ast::PythonVersion,
-}
+pub struct PerFileVersion(PerFile<ast::PythonVersion>);
 
 impl PerFileVersion {
     pub fn new(pattern: String, version: ast::PythonVersion, project_root: Option<&Path>) -> Self {
-        let absolute = match project_root {
-            Some(project_root) => fs::normalize_path_to(&pattern, project_root),
-            None => fs::normalize_path(&pattern),
-        };
-
-        Self {
-            basename: pattern,
-            absolute,
-            version,
-        }
+        Self(PerFile::new(pattern, project_root, version))
     }
 }
 
@@ -663,6 +656,7 @@ impl PerFileVersion {
 pub struct CompiledPerFileVersion {
     pub absolute_matcher: GlobMatcher,
     pub basename_matcher: GlobMatcher,
+    pub negated: bool,
     pub version: ast::PythonVersion,
 }
 
@@ -673,8 +667,7 @@ impl Display for CompiledPerFileVersion {
             fields = [
                 self.absolute_matcher | globmatcher,
                 self.basename_matcher | globmatcher,
-                // TODO
-                // self.negated,
+                self.negated,
                 self.version,
             ]
         }
@@ -695,15 +688,16 @@ impl CompiledPerFileVersionList {
             .map(|per_file_version| {
                 // Construct absolute path matcher.
                 let absolute_matcher =
-                    Glob::new(&per_file_version.absolute.to_string_lossy())?.compile_matcher();
+                    Glob::new(&per_file_version.0.absolute.to_string_lossy())?.compile_matcher();
 
                 // Construct basename matcher.
-                let basename_matcher = Glob::new(&per_file_version.basename)?.compile_matcher();
+                let basename_matcher = Glob::new(&per_file_version.0.basename)?.compile_matcher();
 
                 Ok(CompiledPerFileVersion {
                     absolute_matcher,
                     basename_matcher,
-                    version: per_file_version.version,
+                    negated: per_file_version.0.negated,
+                    version: per_file_version.0.data,
                 })
             })
             .collect();
