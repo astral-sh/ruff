@@ -1528,7 +1528,11 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Call the `__get__(instance, owner)` method on a type, if it exists.
+    /// Call the `__get__(instance, owner)` method on a type, and get the return
+    /// type of the call.
+    ///
+    /// If `__get__` is not defined on the type, this method returns `Ok(None)`.
+    /// If the call to `__get__` fails, this method returns an error.
     fn try_call_dunder_get(
         &self,
         db: &'db dyn Db,
