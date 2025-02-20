@@ -1045,7 +1045,7 @@ reveal_type(False.real)  # revealed: Literal[0]
 
 ### Bytes-literal attributes
 
-All attribute access on literal `bytes` types is currently delegated to `buitins.bytes`:
+All attribute access on literal `bytes` types is currently delegated to `builtins.bytes`:
 
 ```py
 reveal_type(b"foo".join)  # revealed: <bound method `join` of `Literal[b"foo"]`>
