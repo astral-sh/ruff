@@ -193,7 +193,16 @@ pub struct FormatterSettings {
 }
 
 impl FormatterSettings {
-    pub fn to_format_options(&self, source_type: PySourceType, source: &str) -> PyFormatOptions {
+    pub fn to_format_options(
+        &self,
+        source_type: PySourceType,
+        source: &str,
+        path: Option<&Path>,
+    ) -> PyFormatOptions {
+        let target_version = path
+            .map(|path| self.resolve_target_version(path))
+            .unwrap_or(self.unresolved_target_version);
+
         let line_ending = match self.line_ending {
             LineEnding::Lf => ruff_formatter::printer::LineEnding::LineFeed,
             LineEnding::CrLf => ruff_formatter::printer::LineEnding::CarriageReturnLineFeed,
@@ -216,7 +225,7 @@ impl FormatterSettings {
         };
 
         PyFormatOptions::from_source_type(source_type)
-            .with_target_version(self.unresolved_target_version)
+            .with_target_version(target_version)
             .with_indent_style(self.indent_style)
             .with_indent_width(self.indent_width)
             .with_quote_style(self.quote_style)

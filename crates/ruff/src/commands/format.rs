@@ -339,17 +339,9 @@ pub(crate) fn format_source(
     settings: &FormatterSettings,
     range: Option<FormatRange>,
 ) -> Result<FormattedSource, FormatCommandError> {
-    let target_version = if let Some(path) = path {
-        settings.resolve_target_version(path)
-    } else {
-        settings.unresolved_target_version
-    };
-
     match &source_kind {
         SourceKind::Python(unformatted) => {
-            let options = settings
-                .to_format_options(source_type, unformatted)
-                .with_target_version(target_version);
+            let options = settings.to_format_options(source_type, unformatted, path);
 
             let formatted = if let Some(range) = range {
                 let line_index = LineIndex::from_source_text(unformatted);
@@ -399,9 +391,7 @@ pub(crate) fn format_source(
                 ));
             }
 
-            let options = settings
-                .to_format_options(source_type, notebook.source_code())
-                .with_target_version(target_version);
+            let options = settings.to_format_options(source_type, notebook.source_code(), path);
 
             let mut output: Option<String> = None;
             let mut last: Option<TextSize> = None;

@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use ruff_formatter::PrintedRange;
 use ruff_python_ast::PySourceType;
 use ruff_python_formatter::{format_module_source, FormatModuleError};
@@ -10,8 +12,10 @@ pub(crate) fn format(
     document: &TextDocument,
     source_type: PySourceType,
     formatter_settings: &FormatterSettings,
+    path: Option<&Path>,
 ) -> crate::Result<Option<String>> {
-    let format_options = formatter_settings.to_format_options(source_type, document.contents());
+    let format_options =
+        formatter_settings.to_format_options(source_type, document.contents(), path);
     match format_module_source(document.contents(), format_options) {
         Ok(formatted) => {
             let formatted = formatted.into_code();
@@ -36,8 +40,10 @@ pub(crate) fn format_range(
     source_type: PySourceType,
     formatter_settings: &FormatterSettings,
     range: TextRange,
+    path: Option<&Path>,
 ) -> crate::Result<Option<PrintedRange>> {
-    let format_options = formatter_settings.to_format_options(source_type, document.contents());
+    let format_options =
+        formatter_settings.to_format_options(source_type, document.contents(), path);
 
     match ruff_python_formatter::format_range(document.contents(), range, format_options) {
         Ok(formatted) => {
