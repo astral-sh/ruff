@@ -30,7 +30,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_future_annotations").join(path).as_path(),
             &settings::LinterSettings {
-                target_version: PythonVersion::PY37,
+                unresolved_target_version: PythonVersion::PY37,
                 ..settings::LinterSettings::for_rule(Rule::FutureRewritableTypeAnnotation)
             },
         )?;
@@ -49,7 +49,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_future_annotations").join(path).as_path(),
             &settings::LinterSettings {
-                target_version: PythonVersion::PY37,
+                unresolved_target_version: PythonVersion::PY37,
                 ..settings::LinterSettings::for_rule(Rule::FutureRequiredTypeAnnotation)
             },
         )?;

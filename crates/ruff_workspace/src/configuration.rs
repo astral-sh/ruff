@@ -184,7 +184,7 @@ impl Configuration {
             exclude: FilePatternSet::try_from_iter(format.exclude.unwrap_or_default())?,
             extension: self.extension.clone().unwrap_or_default(),
             preview: format_preview,
-            target_version,
+            unresolved_target_version: target_version,
             per_file_target_version: per_file_target_version.clone(),
             line_width: self
                 .line_length
@@ -285,7 +285,7 @@ impl Configuration {
                 exclude: FilePatternSet::try_from_iter(lint.exclude.unwrap_or_default())?,
                 extension: self.extension.unwrap_or_default(),
                 preview: lint_preview,
-                target_version,
+                unresolved_target_version: target_version,
                 per_file_target_version,
                 project_root: project_root.to_path_buf(),
                 allowed_confusables: lint

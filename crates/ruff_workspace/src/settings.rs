@@ -165,7 +165,16 @@ pub struct FormatterSettings {
     pub exclude: FilePatternSet,
     pub extension: ExtensionMapping,
     pub preview: PreviewMode,
-    pub target_version: PythonVersion,
+    /// The non-path-resolved Python version specified by the `target-version` input option.
+    ///
+    /// See [`FormatterSettings::resolve_target_version`] for a way to obtain the Python version for
+    /// a given file, while respecting the overrides in `per_file_target_version`.
+    pub unresolved_target_version: PythonVersion,
+    /// Path-specific overrides to `unresolved_target_version`.
+    ///
+    /// See [`FormatterSettings::resolve_target_version`] for a way to check a given [`Path`]
+    /// against these patterns, while falling back to `unresolved_target_version` if none of them
+    /// match.
     pub per_file_target_version: CompiledPerFileVersionList,
 
     pub line_width: LineWidth,
@@ -207,7 +216,7 @@ impl FormatterSettings {
         };
 
         PyFormatOptions::from_source_type(source_type)
-            .with_target_version(self.target_version)
+            .with_target_version(self.unresolved_target_version)
             .with_indent_style(self.indent_style)
             .with_indent_width(self.indent_width)
             .with_quote_style(self.quote_style)
@@ -227,7 +236,7 @@ impl FormatterSettings {
     pub fn resolve_target_version(&self, path: &Path) -> PythonVersion {
         self.per_file_target_version
             .is_match(path)
-            .unwrap_or(self.target_version)
+            .unwrap_or(self.unresolved_target_version)
     }
 }
 
@@ -238,7 +247,7 @@ impl Default for FormatterSettings {
         Self {
             exclude: FilePatternSet::default(),
             extension: ExtensionMapping::default(),
-            target_version: default_options.target_version(),
+            unresolved_target_version: default_options.target_version(),
             per_file_target_version: CompiledPerFileVersionList::default(),
             preview: PreviewMode::Disabled,
             line_width: default_options.line_width(),
@@ -261,7 +270,7 @@ impl fmt::Display for FormatterSettings {
             namespace = "formatter",
             fields = [
                 self.exclude,
-                self.target_version,
+                self.unresolved_target_version,
                 self.per_file_target_version,
                 self.preview,
                 self.line_width,

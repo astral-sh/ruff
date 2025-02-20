@@ -342,7 +342,7 @@ pub(crate) fn format_source(
     let target_version = if let Some(path) = path {
         settings.resolve_target_version(path)
     } else {
-        settings.target_version
+        settings.unresolved_target_version
     };
 
     match &source_kind {
