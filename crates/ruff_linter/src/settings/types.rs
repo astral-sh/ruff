@@ -618,17 +618,7 @@ where
     }
 }
 
-#[derive(Debug, Clone, CacheKey)]
-pub struct CompiledPerFileIgnore(CompiledPerFile<RuleSet>);
-
-impl Deref for CompiledPerFileIgnore {
-    type Target = CompiledPerFile<RuleSet>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
+/// A sequence of [`CompiledPerFile<T>`].
 #[derive(Debug, Clone, CacheKey, Default)]
 pub struct CompiledPerFileList<T: CacheKey> {
     inner: Vec<CompiledPerFile<T>>,
@@ -764,10 +754,6 @@ impl PerFileVersion {
         Self(PerFile::new(pattern, project_root, version))
     }
 }
-
-#[derive(Debug, Clone, CacheKey)]
-pub struct CompiledPerFileVersion(CompiledPerFile<ast::PythonVersion>);
-
 #[derive(CacheKey, Clone, Debug, Default)]
 pub struct CompiledPerFileVersionList(CompiledPerFileList<ast::PythonVersion>);
 
