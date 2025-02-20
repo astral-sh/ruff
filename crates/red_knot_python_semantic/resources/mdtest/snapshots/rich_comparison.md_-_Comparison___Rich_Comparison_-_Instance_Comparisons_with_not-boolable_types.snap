@@ -36,7 +36,7 @@ error: lint:not-boolable
    |
 11 | # error: [not-boolable]
 12 | 10 < Comparable() < 20
-   | ^^^^^^^^^^^^^^^^^ Object of type `NotBoolable` can not be converted to a bool.
+   | ^^^^^^^^^^^^^^^^^ Object of type `NotBoolable` has an invalid `__bool__` method
 13 | # error: [not-boolable]
 14 | 10 < Comparable() < Comparable()
    |
@@ -50,7 +50,7 @@ error: lint:not-boolable
 12 | 10 < Comparable() < 20
 13 | # error: [not-boolable]
 14 | 10 < Comparable() < Comparable()
-   | ^^^^^^^^^^^^^^^^^ Object of type `NotBoolable` can not be converted to a bool.
+   | ^^^^^^^^^^^^^^^^^ Object of type `NotBoolable` has an invalid `__bool__` method
    |
 
 ```

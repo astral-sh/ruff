@@ -17,7 +17,7 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/binary/instances.m
 3 | 
 4 | a = NotBoolable()
 5 | 
-6 | # error: [not-boolable] "Object of type `NotBoolable` can not be converted to a bool."
+6 | # error: [not-boolable] "Object of type `NotBoolable` has an invalid `__bool__` method"
 7 | 10 and a and True
 ```
 
@@ -27,9 +27,9 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/binary/instances.m
 error: lint:not-boolable
  --> /src/mdtest_snippet.py:7:8
   |
-6 | # error: [not-boolable] "Object of type `NotBoolable` can not be converted to a bool."
+6 | # error: [not-boolable] "Object of type `NotBoolable` has an invalid `__bool__` method"
 7 | 10 and a and True
-  |        ^ Object of type `NotBoolable` can not be converted to a bool.
+  |        ^ Object of type `NotBoolable` has an invalid `__bool__` method
   |
 
 ```

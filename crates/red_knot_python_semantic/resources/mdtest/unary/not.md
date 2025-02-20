@@ -187,7 +187,7 @@ class MethodBoolInvalid:
     def __bool__(self) -> int:
         return 0
 
-# error: [not-boolable] "Object of type `MethodBoolInvalid` can not be converted to a bool because the return type of its `__bool__` method (`int`) isn't assignable to `bool"
+# error: [not-boolable] "Object of type `MethodBoolInvalid` has an invalid `__bool__` method; its return (`int`) isn't assignable to `bool"
 # revealed: bool
 reveal_type(not MethodBoolInvalid())
 

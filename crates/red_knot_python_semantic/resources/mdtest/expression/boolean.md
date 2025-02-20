@@ -123,7 +123,7 @@ if NotBoolable():
 class NotBoolable:
     __bool__: int
 
-# error: [not-boolable] "Object of type `NotBoolable` can not be converted to a bool because its `__bool__` attribute isn't callable."
+# error: [not-boolable] "Object of type `NotBoolable` has an invalid `__bool__` method; it isn't callable"
 if NotBoolable():
     ...
 ```
@@ -135,7 +135,7 @@ def test(cond: bool):
     class NotBoolable:
         __bool__ = None if cond else 3
 
-    # error: [not-boolable] "Object of type `NotBoolable` can not be converted to a bool."
+    # error: [not-boolable] "Object of type `NotBoolable` has an invalid `__bool__` method"
     if NotBoolable():
         ...
 ```
@@ -149,7 +149,7 @@ def test(cond: bool):
 
     a = 10 if cond else NotBoolable()
 
-    # error: [not-boolable] "Object of type `NotBoolable` can not be converted to a bool because its `__bool__` attribute isn't callable."
+    # error: [not-boolable] "Object of type `NotBoolable` has an invalid `__bool__` method; it isn't callable"
     if a:
         ...
 ```

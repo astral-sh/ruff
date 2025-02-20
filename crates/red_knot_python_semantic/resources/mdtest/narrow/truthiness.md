@@ -267,7 +267,7 @@ def _(
     if af:
         reveal_type(af)  # revealed: type[AmbiguousClass] & ~AlwaysFalsy
 
-    # error: [not-boolable] "Object of type `MetaDeferred` can not be converted to a bool because the return type of its `__bool__` method (`MetaAmbiguous`) isn't assignable to `bool"
+    # error: [not-boolable] "Object of type `MetaDeferred` has an invalid `__bool__` method; its return (`MetaAmbiguous`) isn't assignable to `bool"
     if d:
         # TODO: Should be `Unknown`
         reveal_type(d)  # revealed: type[DeferredClass] & ~AlwaysFalsy
