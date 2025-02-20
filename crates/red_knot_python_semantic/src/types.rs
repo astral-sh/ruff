@@ -1914,6 +1914,11 @@ impl<'db> Type<'db> {
             }
             Type::FunctionLiteral(function_type) => {
                 let mut binding = bind_call(db, arguments, function_type.signature(db), self);
+
+                if binding.has_binding_errors() {
+                    return Err(CallError::BindingError { binding });
+                }
+
                 match function_type.known(db) {
                     Some(KnownFunction::IsEquivalentTo) => {
                         let (ty_a, ty_b) = binding
