@@ -1,5 +1,7 @@
 # `inspect.getattr_static`
 
+## Basic usage
+
 `inspect.getattr_static` is a function that returns attributes of an object without invoking the
 descriptor protocol (for caveats, see the [official documentation]).
 
@@ -68,6 +70,38 @@ class D:
         self.instance_attr: int = 1
 
 reveal_type(inspect.getattr_static(D(), "instance_attr"))  # revealed: int
+```
+
+## Error cases
+
+We can only infer precise types if the attribute is a literal string. In all other cases, we fall
+back to `Any`:
+
+```py
+import inspect
+
+class C:
+    x: int = 1
+
+def _(attr_name: str):
+    reveal_type(inspect.getattr_static(C(), attr_name))  # revealed: Any
+    reveal_type(inspect.getattr_static(C(), attr_name, 1))  # revealed: Any
+```
+
+But we still detect errors in the number or type of arguments:
+
+```py
+# error: [missing-argument] "No arguments provided for required parameters `obj`, `attr` of function `getattr_static`"
+inspect.getattr_static()
+
+# error: [missing-argument] "No argument provided for required parameter `attr`"
+inspect.getattr_static(C())
+
+# error: [invalid-argument-type] "Object of type `Literal[1]` cannot be assigned to parameter 2 (`attr`) of function `getattr_static`; expected type `str`"
+inspect.getattr_static(C(), 1)
+
+# error: [too-many-positional-arguments] "Too many positional arguments to function `getattr_static`: expected 3, got 4"
+inspect.getattr_static(C(), "x", "default-arg", "one too many")
 ```
 
 [official documentation]: https://docs.python.org/3/library/inspect.html#inspect.getattr_static
