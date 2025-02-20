@@ -2,6 +2,8 @@
 
 ## Background: Functions as descriptors
 
+> Note: See also this related section in the descriptor guide: [Functions and methods].
+
 Say we have a simple class `C` with a function definition `f` inside its body:
 
 ```py
@@ -244,3 +246,5 @@ method_wrapper()
 # error: [too-many-positional-arguments] "Too many positional arguments: expected 2, got 3"
 method_wrapper(C(), C, "one too many")
 ```
+
+[functions and methods]: https://docs.python.org/3/howto/descriptor.html#functions-and-methods
