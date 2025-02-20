@@ -109,7 +109,7 @@ class C:
     non_data_descriptor = NonDataDescriptor()
 
     def f(self):
-        # This explains why data descriptors come first in the precendence chain. If
+        # This explains why data descriptors come first in the precedence chain. If
         # instance attributes would take priority, we would override the descriptor
         # here. Instead, this calls `DataDescriptor.__set__`, i.e. it does not affect
         # the type of the `data_descriptor` attribute.
