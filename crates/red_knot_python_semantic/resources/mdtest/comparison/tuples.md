@@ -353,6 +353,6 @@ class Comparable:
 a = (1, Comparable())
 b = (1, Comparable())
 
-# error: [not-boolable]
+# error: [unsupported-bool-conversion]
 a < b < b
 ```

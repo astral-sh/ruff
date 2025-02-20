@@ -361,7 +361,7 @@ class NotBoolable:
 
 a = NotBoolable()
 
-# error: [not-boolable] "Object of type `NotBoolable` has an invalid `__bool__` method"
+# error: [unsupported-bool-conversion]
 10 and a and True
 ```
 

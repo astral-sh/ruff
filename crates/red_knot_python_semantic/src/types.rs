@@ -39,7 +39,7 @@ use crate::symbol::{
 };
 use crate::types::call::{bind_call, CallArguments, CallBinding, CallOutcome};
 use crate::types::class_base::ClassBase;
-use crate::types::diagnostic::{INVALID_TYPE_FORM, NOT_BOOLABLE};
+use crate::types::diagnostic::{INVALID_TYPE_FORM, UNSUPPORTED_BOOL_CONVERSION};
 use crate::types::infer::infer_unpack_types;
 use crate::types::mro::{Mro, MroError, MroIterator};
 pub(crate) use crate::types::narrow::narrowing_constraint;
@@ -3640,19 +3640,19 @@ impl BoolError<'_> {
                     .is_assignable_to(context.db(), KnownClass::Bool.to_instance(context.db()))
                 {
                     context.report_lint(
-                        &NOT_BOOLABLE,
+                        &UNSUPPORTED_BOOL_CONVERSION,
                         condition,
                         format_args!(
-                            "Object of type `{}` has an invalid `__bool__` method",
+                            "Boolean conversion is unsupported for type `{}`; it incorrectly implements `__bool__`",
                             not_boolable_type.display(context.db())
                         ),
                     );
                 } else {
                     context.report_lint(
-                        &NOT_BOOLABLE,
+                        &UNSUPPORTED_BOOL_CONVERSION,
                         condition,
                         format_args!(
-                            "Object of type `{not_boolable}` has an invalid `__bool__` method; its return (`{return_type}`) isn't assignable to `bool",
+                            "Boolean conversion is unsupported for type `{not_boolable}`; the return type of its bool method (`{return_type}`) isn't assignable to `bool",
                             not_boolable = not_boolable_type.display(context.db()),
                             return_type = return_type.display(context.db())
                         ),
@@ -3661,20 +3661,20 @@ impl BoolError<'_> {
             }
             Self::NotCallable { not_boolable_type } => {
                 context.report_lint(
-                    &NOT_BOOLABLE,
+                    &UNSUPPORTED_BOOL_CONVERSION,
                     condition,
                     format_args!(
-                        "Object of type `{}` has an invalid `__bool__` method; it isn't callable",
+                        "Boolean conversion is unsupported for type `{}`; it's `__bool__` method isn't callable",
                         not_boolable_type.display(context.db())
                     ),
                 );
             }
             Self::Other { not_boolable_type } => {
                 context.report_lint(
-                    &NOT_BOOLABLE,
+                    &UNSUPPORTED_BOOL_CONVERSION,
                     condition,
                     format_args!(
-                        "Object of type `{}` has an invalid `__bool__` method",
+                        "Boolean conversion is unsupported for type `{}`; it incorrectly implements `__bool__`",
                         not_boolable_type.display(context.db())
                     ),
                 );

@@ -22,35 +22,35 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/comparison/instanc
  8 |     def __gt__(self, item) -> NotBoolable:
  9 |         return NotBoolable()
 10 | 
-11 | # error: [not-boolable]
+11 | # error: [unsupported-bool-conversion]
 12 | 10 < Comparable() < 20
-13 | # error: [not-boolable]
+13 | # error: [unsupported-bool-conversion]
 14 | 10 < Comparable() < Comparable()
 ```
 
 # Diagnostics
 
 ```
-error: lint:not-boolable
+error: lint:unsupported-bool-conversion
   --> /src/mdtest_snippet.py:12:1
    |
-11 | # error: [not-boolable]
+11 | # error: [unsupported-bool-conversion]
 12 | 10 < Comparable() < 20
-   | ^^^^^^^^^^^^^^^^^ Object of type `NotBoolable` has an invalid `__bool__` method
-13 | # error: [not-boolable]
+   | ^^^^^^^^^^^^^^^^^ Boolean conversion is unsupported for type `NotBoolable`; it incorrectly implements `__bool__`
+13 | # error: [unsupported-bool-conversion]
 14 | 10 < Comparable() < Comparable()
    |
 
 ```
 
 ```
-error: lint:not-boolable
+error: lint:unsupported-bool-conversion
   --> /src/mdtest_snippet.py:14:1
    |
 12 | 10 < Comparable() < 20
-13 | # error: [not-boolable]
+13 | # error: [unsupported-bool-conversion]
 14 | 10 < Comparable() < Comparable()
-   | ^^^^^^^^^^^^^^^^^ Object of type `NotBoolable` has an invalid `__bool__` method
+   | ^^^^^^^^^^^^^^^^^ Boolean conversion is unsupported for type `NotBoolable`; it incorrectly implements `__bool__`
    |
 
 ```

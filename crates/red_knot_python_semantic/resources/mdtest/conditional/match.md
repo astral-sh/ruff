@@ -53,7 +53,7 @@ class NotBoolable:
 def _(target: int, flag: NotBoolable):
     y = 1
     match target:
-        # error: [not-boolable] "Object of type `NotBoolable` has an invalid `__bool__` method"
+        # error: [unsupported-bool-conversion] "Boolean conversion is unsupported for type `NotBoolable`; it incorrectly implements `__bool__`"
         case 1 if flag:
             y = 2
         case 2:

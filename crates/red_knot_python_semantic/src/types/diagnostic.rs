@@ -44,7 +44,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&MISSING_ARGUMENT);
     registry.register_lint(&NON_SUBSCRIPTABLE);
     registry.register_lint(&NOT_ITERABLE);
-    registry.register_lint(&NOT_BOOLABLE);
+    registry.register_lint(&UNSUPPORTED_BOOL_CONVERSION);
     registry.register_lint(&PARAMETER_ALREADY_ASSIGNED);
     registry.register_lint(&POSSIBLY_UNBOUND_ATTRIBUTE);
     registry.register_lint(&POSSIBLY_UNBOUND_IMPORT);
@@ -493,10 +493,11 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
-    /// Checks for objects that can't be converted to a boolean but are used in a boolean contexts (e.g. condition, `bool(object)`).
+    /// Checks for bool conversions where the object doesn't correctly implement `__bool__`.
     ///
     /// ## Why is this bad?
-    /// Converting an object that can't be converted to a boolean will raise a runtime error.
+    /// If an exception is raised when you attempt to evaluate the truthiness of an object,
+    /// using the object in a boolean context will fail at runtime.
     ///
     /// ## Examples
     ///
@@ -504,11 +505,18 @@ declare_lint! {
     /// class NotBoolable:
     ///     __bool__ = None
     ///
-    /// if NotBoolable():
+    /// b1 = NotBoolable()
+    /// b2 = NotBoolable()
+    ///
+    /// if b1:  # exception raised here
     ///     pass
+    ///
+    /// b1 and b2  # exception raised here
+    /// not b1  # exception raised here
+    /// b1 < b2 < b1  # exception raised here
     /// ```
-    pub(crate) static NOT_BOOLABLE = {
-        summary: "detects usages of objects that can't be converted to a boolean in boolean contexts",
+    pub(crate) static UNSUPPORTED_BOOL_CONVERSION = {
+        summary: "detects boolean conversion where the object doesn't support it",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
