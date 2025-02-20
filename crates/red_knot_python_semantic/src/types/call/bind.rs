@@ -315,7 +315,7 @@ impl<'db> CallBindingError<'db> {
                 if let Some(func_lit) = callable_ty.into_function_literal() {
                     let func_lit_scope = func_lit.body_scope(context.db());
                     let mut span = Span::from(func_lit_scope.file(context.db()));
-                    let node = func_lit_scope.node(context.db());
+                    let node = func_lit_scope.node_unchecked(context.db());
                     if let Some(func_def) = node.as_function() {
                         let range = func_def
                             .parameters

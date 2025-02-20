@@ -110,21 +110,34 @@ pub struct ScopeId<'db> {
 }
 
 impl<'db> ScopeId<'db> {
-    pub(crate) fn is_function_like(self, db: &'db dyn Db) -> bool {
-        self.node(db).scope_kind().is_function_like()
+    pub(crate) fn is_function_like(self, db: &'db dyn Db, query_file: File) -> bool {
+        self.node(db, query_file).scope_kind().is_function_like()
     }
 
-    pub(crate) fn node(self, db: &dyn Db) -> &NodeWithScopeKind {
+    #[inline]
+    pub(crate) fn node(self, db: &dyn Db, query_file: File) -> &NodeWithScopeKind {
+        debug_assert_eq!(self.file(db), query_file);
+        self.node_unchecked(db)
+    }
+
+    /// Returns the scope's node without checking if the query's file matches the scope's file
+    /// (which is desired to avoid cross-module query dependencies).
+    ///
+    /// Use this method when in situations where it's okay to add a cross-module dependency.
+    /// For example, when emitting diagnostics.
+    #[inline]
+    pub(crate) fn node_unchecked(self, db: &dyn Db) -> &NodeWithScopeKind {
         self.scope(db).node()
     }
 
-    pub(crate) fn scope(self, db: &dyn Db) -> &Scope {
+    fn scope(self, db: &dyn Db) -> &Scope {
         semantic_index(db, self.file(db)).scope(self.file_scope_id(db))
     }
 
     #[cfg(test)]
     pub(crate) fn name(self, db: &'db dyn Db) -> &'db str {
-        match self.node(db) {
+        // Use `self.node` if this ever becomes a non-testing function.
+        match self.node_unchecked(db) {
             NodeWithScopeKind::Module => "<module>",
             NodeWithScopeKind::Class(class) | NodeWithScopeKind::ClassTypeParameters(class) => {
                 class.name.as_str()

@@ -3144,7 +3144,8 @@ impl<'db> FunctionType<'db> {
     /// would depend on the function's AST and rerun for every change in that file.
     #[salsa::tracked(return_ref)]
     pub fn signature(self, db: &'db dyn Db) -> Signature<'db> {
-        let function_stmt_node = self.body_scope(db).node(db).expect_function();
+        let body_scope = self.body_scope(db);
+        let function_stmt_node = body_scope.node(db, body_scope.file(db)).expect_function();
         let internal_signature = self.internal_signature(db);
         if function_stmt_node.decorator_list.is_empty() {
             return internal_signature;
@@ -3165,8 +3166,10 @@ impl<'db> FunctionType<'db> {
     /// scope.
     fn internal_signature(self, db: &'db dyn Db) -> Signature<'db> {
         let scope = self.body_scope(db);
-        let function_stmt_node = scope.node(db).expect_function();
-        let definition = semantic_index(db, scope.file(db)).definition(function_stmt_node);
+        let file = scope.file(db);
+
+        let function_stmt_node = scope.node(db, file).expect_function();
+        let definition = semantic_index(db, file).definition(function_stmt_node);
         Signature::from_function(db, definition, function_stmt_node)
     }
 
@@ -3490,9 +3493,10 @@ impl<'db> Class<'db> {
 
     #[salsa::tracked(return_ref)]
     fn explicit_bases_query(self, db: &'db dyn Db) -> Box<[Type<'db>]> {
-        let class_stmt = self.node(db);
+        let file = self.file(db);
+        let class_stmt = self.node(db, file);
 
-        let class_definition = semantic_index(db, self.file(db)).definition(class_stmt);
+        let class_definition = semantic_index(db, file).definition(class_stmt);
 
         class_stmt
             .bases()
@@ -3510,18 +3514,20 @@ impl<'db> Class<'db> {
     /// ## Note
     /// Only call this function from queries in the same file or your
     /// query depends on the AST of another file (bad!).
-    fn node(self, db: &'db dyn Db) -> &'db ast::StmtClassDef {
-        self.body_scope(db).node(db).expect_class()
+    #[inline]
+    fn node(self, db: &'db dyn Db, query_file: File) -> &'db ast::StmtClassDef {
+        self.body_scope(db).node(db, query_file).expect_class()
     }
 
     /// Return the types of the decorators on this class
     #[salsa::tracked(return_ref)]
     fn decorators(self, db: &'db dyn Db) -> Box<[Type<'db>]> {
-        let class_stmt = self.node(db);
+        let file = self.file(db);
+        let class_stmt = self.node(db, file);
         if class_stmt.decorator_list.is_empty() {
             return Box::new([]);
         }
-        let class_definition = semantic_index(db, self.file(db)).definition(class_stmt);
+        let class_definition = semantic_index(db, file).definition(class_stmt);
         class_stmt
             .decorator_list
             .iter()
@@ -3577,14 +3583,17 @@ impl<'db> Class<'db> {
     /// ## Note
     /// Only call this function from queries in the same file or your
     /// query depends on the AST of another file (bad!).
-    fn explicit_metaclass(self, db: &'db dyn Db) -> Option<Type<'db>> {
-        let class_stmt = self.node(db);
+    fn explicit_metaclass(self, db: &'db dyn Db, query_file: File) -> Option<Type<'db>> {
+        let file = self.file(db);
+        debug_assert_eq!(query_file, file);
+
+        let class_stmt = self.node(db, file);
         let metaclass_node = &class_stmt
             .arguments
             .as_ref()?
             .find_keyword("metaclass")?
             .value;
-        let class_definition = semantic_index(db, self.file(db)).definition(class_stmt);
+        let class_definition = semantic_index(db, file).definition(class_stmt);
         let metaclass_ty = definition_expression_type(db, class_definition, metaclass_node);
         Some(metaclass_ty)
     }
@@ -3608,7 +3617,7 @@ impl<'db> Class<'db> {
             return Ok(SubclassOfType::subclass_of_unknown());
         }
 
-        let explicit_metaclass = self.explicit_metaclass(db);
+        let explicit_metaclass = self.explicit_metaclass(db, self.file(db));
         let (metaclass, class_metaclass_was_from) = if let Some(metaclass) = explicit_metaclass {
             (metaclass, self)
         } else if let Some(base_class) = base_classes.next() {
@@ -4015,9 +4024,10 @@ impl<'db> TypeAliasType<'db> {
     #[salsa::tracked]
     pub fn value_type(self, db: &'db dyn Db) -> Type<'db> {
         let scope = self.rhs_scope(db);
+        let file = scope.file(db);
 
-        let type_alias_stmt_node = scope.node(db).expect_type_alias();
-        let definition = semantic_index(db, scope.file(db)).definition(type_alias_stmt_node);
+        let type_alias_stmt_node = scope.node(db, file).expect_type_alias();
+        let definition = semantic_index(db, file).definition(type_alias_stmt_node);
 
         definition_expression_type(db, definition, &type_alias_stmt_node.value)
     }

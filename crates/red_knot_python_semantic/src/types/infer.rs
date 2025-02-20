@@ -547,7 +547,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn infer_region_scope(&mut self, scope: ScopeId<'db>) {
-        let node = scope.node(self.db());
+        let node = scope.node(self.db(), self.file());
         match node {
             NodeWithScopeKind::Module => {
                 let parsed = parsed_module(self.db().upcast(), self.file());
@@ -3539,7 +3539,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             // a local variable or not in function-like scopes. If a variable has any bindings in a
             // function-like scope, it is considered a local variable; it never references another
             // scope. (At runtime, it would use the `LOAD_FAST` opcode.)
-            if has_bindings_in_this_scope && scope.is_function_like(db) {
+            if has_bindings_in_this_scope && scope.is_function_like(db, self.file()) {
                 return Symbol::Unbound;
             }
 
@@ -3554,7 +3554,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 // scope differently (because an unbound name there falls back to builtins), so
                 // check only function-like scopes.
                 let enclosing_scope_id = enclosing_scope_file_id.to_scope_id(db, current_file);
-                if !enclosing_scope_id.is_function_like(db) {
+                if !enclosing_scope_id.is_function_like(db, self.file()) {
                     continue;
                 }
 
