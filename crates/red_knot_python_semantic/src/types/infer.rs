@@ -6657,7 +6657,8 @@ mod tests {
         Ok(())
     }
 
-    /// This test verifies that queries
+    /// This test verifies that changing a class's declaration in a non-meaningful way (e.g. by adding a comment)
+    /// doesn't trigger type inference for expressions that depend on the class's members.
     #[test]
     fn dependency_own_instance_member() -> anyhow::Result<()> {
         fn x_rhs_expression(db: &TestDb) -> Expression<'_> {
