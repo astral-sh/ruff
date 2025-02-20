@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::string::ToString;
 
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use globset::{Glob, GlobMatcher, GlobSet, GlobSetBuilder};
 use log::debug;
 use pep440_rs::{VersionSpecifier, VersionSpecifiers};
@@ -639,16 +639,21 @@ impl PerFileKind for ast::PythonVersion {
 
 impl<T: CacheKey> CompiledPerFileList<T> {
     /// Given a list of [`PerFile`] patterns, create a compiled set of globs.
+    ///
+    /// Returns an error if either of the glob patterns cannot be parsed.
     fn resolve(per_file_items: impl IntoIterator<Item = PerFile<T>>) -> Result<Self> {
         let inner: Result<Vec<_>> = per_file_items
             .into_iter()
             .map(|per_file_ignore| {
                 // Construct absolute path matcher.
-                let absolute_matcher =
-                    Glob::new(&per_file_ignore.absolute.to_string_lossy())?.compile_matcher();
+                let absolute_matcher = Glob::new(&per_file_ignore.absolute.to_string_lossy())
+                    .with_context(|| format!("invalid glob {:?}", per_file_ignore.absolute))?
+                    .compile_matcher();
 
                 // Construct basename matcher.
-                let basename_matcher = Glob::new(&per_file_ignore.basename)?.compile_matcher();
+                let basename_matcher = Glob::new(&per_file_ignore.basename)
+                    .with_context(|| format!("invalid glob {:?}", per_file_ignore.basename))?
+                    .compile_matcher();
 
                 Ok(CompiledPerFile::new(
                     absolute_matcher,
