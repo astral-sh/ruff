@@ -8,6 +8,7 @@ use crate::semantic_index::symbol::{FileScopeId, ScopeId};
 
 // A scoped identifier for each `Constraint` in a scope.
 #[newtype_index]
+#[derive(Ord, PartialOrd)]
 pub(crate) struct ScopedConstraintId;
 
 // A collection of constraints. This is currently stored in `UseDefMap`, which means we maintain a

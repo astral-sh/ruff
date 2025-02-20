@@ -32,7 +32,7 @@ pub(super) fn generate_newtype_index(item: ItemStruct) -> syn::Result<proc_macro
     let semi_token = semi_token.unwrap_or_default();
     let output = quote! {
         #(#attrs)*
-        #[derive(Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
+        #[derive(Copy, Clone, Eq, PartialEq, Hash)]
         #vis #struct_token #ident(std::num::NonZeroU32)#semi_token
 
         impl #ident {
