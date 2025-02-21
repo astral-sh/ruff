@@ -884,13 +884,18 @@ def _(flag: bool):
 
 ## Objects of all types have a `__class__` method
 
+The type of `x.__class__` is the same as `x`'s meta-type. `x.__class__` is always the same value as
+`type(x)`.
+
 ```py
 import typing_extensions
 
 reveal_type(typing_extensions.__class__)  # revealed: Literal[ModuleType]
+reveal_type(type(typing_extensions))  # revealed: Literal[ModuleType]
 
 a = 42
 reveal_type(a.__class__)  # revealed: Literal[int]
+reveal_type(type(a))  # revealed: Literal[int]
 
 b = "42"
 reveal_type(b.__class__)  # revealed: Literal[str]
@@ -906,8 +911,13 @@ reveal_type(e.__class__)  # revealed: Literal[tuple]
 
 def f(a: int, b: typing_extensions.LiteralString, c: int | str, d: type[str]):
     reveal_type(a.__class__)  # revealed: type[int]
+    reveal_type(type(a))  # revealed: type[int]
+
     reveal_type(b.__class__)  # revealed: Literal[str]
+    reveal_type(type(b))  # revealed: Literal[str]
+
     reveal_type(c.__class__)  # revealed: type[int] | type[str]
+    reveal_type(type(c))  # revealed: type[int] | type[str]
 
     # `type[type]`, a.k.a., either the class `type` or some subclass of `type`.
     # It would be incorrect to infer `Literal[type]` here,
