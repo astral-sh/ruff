@@ -5,7 +5,8 @@ use ruff_python_ast::name::Name;
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{
     AnyNodeRef, Arguments, Comprehension, Expr, ExprAttribute, ExprCall, ExprContext,
-    ExprEllipsisLiteral, ExprName, ExprStarred, Identifier,
+    ExprEllipsisLiteral, ExprGenerator, ExprListComp, ExprName, ExprSetComp, ExprStarred,
+    Identifier,
 };
 use ruff_python_semantic::analyze::typing;
 use ruff_python_semantic::{Binding, SemanticModel};
@@ -92,6 +93,7 @@ impl Violation for ReimplementedChainFromIterable {
 /// FURB179
 pub(crate) fn reimplemented_chain_from_iterable_comprehension(
     checker: &Checker,
+    comprehension_kind: ComprehensionKind,
     element: &Expr,
     comprehensions: &[Comprehension],
     original: AnyNodeRef,
@@ -113,7 +115,8 @@ pub(crate) fn reimplemented_chain_from_iterable_comprehension(
     let mut diagnostic = Diagnostic::new(ReimplementedChainFromIterable, original.range());
 
     diagnostic.try_set_optional_fix(|| {
-        replace_with_chain_from_iterable(original, &outer.target, checker)
+        let wrapper = comprehension_kind.wrapper();
+        replace_with_chain_from_iterable(original, wrapper, &outer.target, checker)
     });
 
     checker.report_diagnostic(diagnostic);
@@ -161,7 +164,7 @@ pub(crate) fn reimplemented_chain_from_iterable_call(checker: &Checker, call: &E
             let mut diagnostic = Diagnostic::new(ReimplementedChainFromIterable, call.range);
 
             diagnostic.try_set_optional_fix(|| {
-                replace_with_chain_from_iterable(call.into(), iterable, checker)
+                replace_with_chain_from_iterable(call.into(), None, iterable, checker)
             });
 
             diagnostic
@@ -171,6 +174,41 @@ pub(crate) fn reimplemented_chain_from_iterable_call(checker: &Checker, call: &E
     };
 
     checker.report_diagnostic(diagnostic);
+}
+
+#[derive(Debug, Copy, Clone)]
+pub(crate) enum ComprehensionKind {
+    List,
+    Set,
+    Generator,
+}
+
+impl From<&ExprListComp> for ComprehensionKind {
+    fn from(_value: &ExprListComp) -> Self {
+        Self::List
+    }
+}
+
+impl From<&ExprSetComp> for ComprehensionKind {
+    fn from(_value: &ExprSetComp) -> Self {
+        Self::Set
+    }
+}
+
+impl From<&ExprGenerator> for ComprehensionKind {
+    fn from(_value: &ExprGenerator) -> Self {
+        Self::Generator
+    }
+}
+
+impl ComprehensionKind {
+    fn wrapper(self) -> Option<&'static str> {
+        match self {
+            Self::List => Some("list"),
+            Self::Set => Some("set"),
+            Self::Generator => None,
+        }
+    }
 }
 
 fn add_from_iterable(
@@ -191,6 +229,7 @@ fn add_from_iterable(
 
 fn replace_with_chain_from_iterable(
     to_be_replaced: AnyNodeRef,
+    wrapper: Option<&str>,
     iterable: &Expr,
     checker: &Checker,
 ) -> anyhow::Result<Option<Fix>> {
@@ -234,6 +273,17 @@ fn replace_with_chain_from_iterable(
         .generator()
         .expr(&new_call)
         .replace("...", iterable_in_source);
+
+    let new_content = match wrapper {
+        None => new_content,
+        Some(wrapper) => {
+            if !semantic.has_builtin_binding(wrapper) {
+                return Ok(None);
+            }
+
+            format!("{wrapper}({new_content})")
+        }
+    };
 
     let replace = Edit::range_replacement(new_content, to_be_replaced.range());
 

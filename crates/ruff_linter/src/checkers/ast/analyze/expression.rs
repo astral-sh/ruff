@@ -1618,6 +1618,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.enabled(Rule::ReimplementedChainFromIterable) {
                 refurb::rules::reimplemented_chain_from_iterable_comprehension(
                     checker,
+                    comp.into(),
                     elt,
                     generators,
                     comp.into(),
@@ -1656,6 +1657,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.enabled(Rule::ReimplementedChainFromIterable) {
                 refurb::rules::reimplemented_chain_from_iterable_comprehension(
                     checker,
+                    comp.into(),
                     elt,
                     generators,
                     comp.into(),
@@ -1729,6 +1731,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.enabled(Rule::ReimplementedChainFromIterable) {
                 refurb::rules::reimplemented_chain_from_iterable_comprehension(
                     checker,
+                    generator.into(),
                     elt,
                     generators,
                     generator.into(),
