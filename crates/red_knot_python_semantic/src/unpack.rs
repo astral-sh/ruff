@@ -32,12 +32,10 @@ pub(crate) struct Unpack<'db> {
 
     pub(crate) file_scope: FileScopeId,
 
-    /// The target expression that is being unpacked. For example, in `(a, b) = (1, 2)`, the target
-    /// expression is `(a, b)`.
     #[no_eq]
     #[return_ref]
     #[tracked]
-    pub(crate) target: AstNodeRef<ast::Expr>,
+    target_inner: AstNodeRef<ast::Expr>,
 
     /// The ingredient representing the value expression of the unpacking. For example, in
     /// `(a, b) = (1, 2)`, the value expression is `(1, 2)`.
@@ -54,8 +52,25 @@ impl<'db> Unpack<'db> {
     }
 
     /// Returns the range of the unpack target expression.
-    pub(crate) fn range(self, db: &'db dyn Db) -> TextRange {
-        self.target(db).range()
+    ///
+    /// `query_file` is the file for which the current query performs type inference.
+    /// It acts as a token of prove that we aren't accessing an AST node from a different file
+    /// than in which the current enclosing Salsa query (which would lead to cross-file dependencies).
+    #[inline]
+    pub(crate) fn range(self, db: &'db dyn Db, query_file: File) -> TextRange {
+        self.target(db, query_file).range()
+    }
+
+    /// The target expression that is being unpacked. For example, in `(a, b) = (1, 2)`, the target
+    /// expression is `(a, b)`.
+    ///
+    /// `query_file` is the file for which the current query performs type inference.
+    /// It acts as a token of prove that we aren't accessing an AST node from a different file
+    /// than in which the current enclosing Salsa query (which would lead to cross-file dependencies).
+    #[inline]
+    pub(crate) fn target(self, db: &'db dyn Db, query_file: File) -> &'db AstNodeRef<ast::Expr> {
+        debug_assert_eq!(self.file(db), query_file);
+        self.target_inner(db)
     }
 }
 
@@ -93,12 +108,12 @@ impl<'db> UnpackValue<'db> {
         scope: ScopeId<'db>,
     ) -> ScopedExpressionId {
         self.expression()
-            .node_ref(db)
+            .node_ref(db, scope.file(db))
             .scoped_expression_id(db, scope)
     }
 
     /// Returns the expression as an [`AnyNodeRef`].
-    pub(crate) fn as_any_node_ref(self, db: &'db dyn Db) -> AnyNodeRef<'db> {
-        self.expression().node_ref(db).node().into()
+    pub(crate) fn as_any_node_ref(self, db: &'db dyn Db, file: File) -> AnyNodeRef<'db> {
+        self.expression().node_ref(db, file).node().into()
     }
 }

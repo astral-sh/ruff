@@ -49,7 +49,7 @@ impl<'db> Unpacker<'db> {
             && self.context.in_stub()
             && value
                 .expression()
-                .node_ref(self.db())
+                .node_ref(self.db(), self.scope.file(self.db()))
                 .is_ellipsis_literal_expr()
         {
             value_ty = Type::unknown();
@@ -57,12 +57,17 @@ impl<'db> Unpacker<'db> {
         if value.is_iterable() {
             // If the value is an iterable, then the type that needs to be unpacked is the iterator
             // type.
-            value_ty = value_ty
-                .iterate(self.db())
-                .unwrap_with_diagnostic(&self.context, value.as_any_node_ref(self.db()));
+            value_ty = value_ty.iterate(self.db()).unwrap_with_diagnostic(
+                &self.context,
+                value.as_any_node_ref(self.db(), self.scope.file(self.db())),
+            );
         }
 
-        self.unpack_inner(target, value.as_any_node_ref(self.db()), value_ty);
+        self.unpack_inner(
+            target,
+            value.as_any_node_ref(self.db(), self.scope.file(self.db())),
+            value_ty,
+        );
     }
 
     fn unpack_inner(
