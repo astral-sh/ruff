@@ -22,13 +22,11 @@ pub struct ListStorage<I, K, V> {
 
 impl<I: Idx, K, V> ListStorage<I, K, V> {
     /// Iterates through the entries in a list.
-    pub fn iter(&self, list: Option<I>) -> impl Iterator<Item = (&K, &V)> + '_ {
-        let mut curr = list;
-        std::iter::from_fn(move || {
-            let ListCell(key, value, tail) = &self.cells[curr?];
-            curr = *tail;
-            Some((key, value))
-        })
+    pub fn iter(&self, list: Option<I>) -> ListIterator<'_, I, K, V> {
+        ListIterator {
+            storage: self,
+            curr: list,
+        }
     }
 }
 
@@ -38,6 +36,21 @@ impl<I: Idx, K: Ord, V> ListStorage<I, K, V> {
     /// **Performance**: Note that lookups are O(n), since we use a linked-list representation!
     pub fn get(&self, list: Option<I>, key: &K) -> Option<&V> {
         self.iter(list).find(|(k, _)| *k == key).map(|(_, v)| v)
+    }
+}
+
+pub struct ListIterator<'a, I, K, V> {
+    storage: &'a ListStorage<I, K, V>,
+    curr: Option<I>,
+}
+
+impl<'a, I: Idx, K, V> Iterator for ListIterator<'a, I, K, V> {
+    type Item = (&'a K, &'a V);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let ListCell(key, value, tail) = &self.storage.cells[self.curr?];
+        self.curr = *tail;
+        Some((key, value))
     }
 }
 
