@@ -142,7 +142,7 @@ ExprYieldFrom = { fields = [
 ]}
 ExprCompare = { fields = [
     { name = "left", type = "Expr" },
-    # We don't want this field to be a vec hence the seq is not enabled.
+    # TODO: We don't want this field to be a vec hence the seq is not enabled.
     { name = "ops", type = "Box<[crate::CmpOp]>"},
     { name = "comparators", type = "Box<[Expr]>"}
 ]}

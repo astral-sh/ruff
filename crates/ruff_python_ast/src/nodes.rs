@@ -1,6 +1,9 @@
 #![allow(clippy::derive_partial_eq_without_eq)]
 
-use crate::generated::*;
+use crate::generated::{
+    ExprBytesLiteral, ExprDict, ExprFString, ExprList, ExprName, ExprSet, ExprStringLiteral,
+    ExprTuple,
+};
 use std::borrow::Cow;
 use std::fmt;
 use std::fmt::Debug;
@@ -639,7 +642,7 @@ impl DoubleEndedIterator for DictValueIterator<'_> {
 impl FusedIterator for DictValueIterator<'_> {}
 impl ExactSizeIterator for DictValueIterator<'_> {}
 
-/// See also [Set](https://docs.python.org/3/library/ast.html#ast.Set)
+// /// See also [Set](https://docs.python.org/3/library/ast.html#ast.Set)
 // #[derive(Clone, Debug, PartialEq)]
 // pub struct ExprSet {
 //     pub range: TextRange,

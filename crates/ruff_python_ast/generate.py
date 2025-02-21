@@ -572,8 +572,6 @@ def write_nodekind(out: list[str], ast: Ast) -> None:
 
 
 def write_node(out: list[str], ast: Ast) -> None:
-    group_names = [group.name for group in ast.groups]
-    node_names = [node.name for node in ast.all_nodes]
     for group in ast.groups:
         for node in group.nodes:
             if node.fields is None:
@@ -589,12 +587,10 @@ def write_node(out: list[str], ast: Ast) -> None:
             for field in node.fields:
                 field_str = f"pub {field.name}: "
                 inner = f"crate::{field.ty}"
-                if (field.ty == "Expr" or (field.ty in group_names)) and (
-                    field.seq is False
-                ):
-                    inner = f"Box<{inner}>"
                 if field.ty == "bool" or field.ty.startswith("Box"):
                     inner = field.ty
+                if field.ty == group.name and field.seq is False:
+                    inner = f"Box<{inner}>"
 
                 if field.seq:
                     field_str += f"Vec<{inner}>,"
