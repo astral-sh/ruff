@@ -436,23 +436,25 @@ pub struct SyntaxError {
 
 impl SyntaxError {
     pub fn message(&self) -> String {
-        match self.kind {
-            SyntaxErrorKind::WalrusBeforePy38 => format!(
-                "Cannot use named assignment expression (`:=`) on Python {} (syntax was new in Python 3.8)",
-                self.target_version
-            ),
-            SyntaxErrorKind::MatchBeforePy310 => format!(
-                "Cannot use `match` statement on Python {} (syntax was new in Python 3.10)",
-                self.target_version,
-            ),
-        }
+        let kind = match self.kind {
+            SyntaxErrorKind::WalrusBeforePy38 => "named assignment expression (`:=`)",
+            SyntaxErrorKind::MatchBeforePy310 => "`match` statement",
+            SyntaxErrorKind::ExceptStarBeforePy311 => "`except*`",
+        };
+
+        format!(
+            "Cannot use {kind} on Python {} (syntax was new in Python {})",
+            self.target_version,
+            self.minimum_version(),
+        )
     }
 
     /// The earliest allowed version for the syntax associated with this error.
-    pub const fn version(&self) -> PythonVersion {
+    pub const fn minimum_version(&self) -> PythonVersion {
         match self.kind {
             SyntaxErrorKind::WalrusBeforePy38 => PythonVersion::PY38,
             SyntaxErrorKind::MatchBeforePy310 => PythonVersion::PY310,
+            SyntaxErrorKind::ExceptStarBeforePy311 => PythonVersion::PY311,
         }
     }
 }
@@ -461,6 +463,7 @@ impl SyntaxError {
 pub enum SyntaxErrorKind {
     WalrusBeforePy38,
     MatchBeforePy310,
+    ExceptStarBeforePy311,
 }
 
 impl SyntaxErrorKind {
@@ -468,6 +471,7 @@ impl SyntaxErrorKind {
         match self {
             SyntaxErrorKind::WalrusBeforePy38 => "walrus-before-python-38",
             SyntaxErrorKind::MatchBeforePy310 => "match-before-python-310",
+            SyntaxErrorKind::ExceptStarBeforePy311 => "except-star-before-python-311",
         }
     }
 }
