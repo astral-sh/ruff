@@ -121,7 +121,7 @@ if NotBoolable():
 
 ```py
 class NotBoolable:
-    __bool__: int
+    __bool__ = None
 
 # error: [unsupported-bool-conversion] "Boolean conversion is unsupported for type `NotBoolable`; it's `__bool__` method isn't callable"
 if NotBoolable():

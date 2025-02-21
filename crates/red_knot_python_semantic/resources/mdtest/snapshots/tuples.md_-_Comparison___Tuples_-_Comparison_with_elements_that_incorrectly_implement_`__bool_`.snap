@@ -39,7 +39,7 @@ error: lint:unsupported-bool-conversion
    |
 14 | # error: [unsupported-bool-conversion]
 15 | a < b < b
-   | ^^^^^ Boolean conversion is unsupported for union `NotBoolable | Literal[False]` because `NotBoolable` doesn't implement `__bool__` correctly
+   | ^^^^^ Boolean conversion is unsupported for type `NotBoolable | Literal[False]`; it's `__bool__` method isn't callable
 16 |
 17 | a < b  # fine
    |
