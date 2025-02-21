@@ -27,15 +27,14 @@ use crate::module_resolver::{file_to_module, resolve_module, KnownModule};
 use crate::semantic_index::ast_ids::HasScopedExpressionId;
 use crate::semantic_index::attribute_assignment::AttributeAssignment;
 use crate::semantic_index::definition::Definition;
-use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId};
+use crate::semantic_index::symbol::ScopeId;
 use crate::semantic_index::{
     attribute_assignments, imported_modules, semantic_index, symbol_table, use_def_map,
 };
 use crate::suppression::check_suppressions;
 use crate::symbol::{
-    global_symbol, imported_symbol, known_module_symbol, symbol_from_bindings,
-    symbol_from_declarations, widen_type_for_undeclared_public_symbol, Boundness, LookupError,
-    LookupResult, Symbol, SymbolAndQualifiers,
+    class_symbol, global_symbol, imported_symbol, known_module_symbol, symbol_from_bindings,
+    symbol_from_declarations, Boundness, LookupError, LookupResult, Symbol, SymbolAndQualifiers,
 };
 use crate::types::call::{bind_call, CallArguments, CallBinding, CallOutcome};
 use crate::types::class_base::ClassBase;
@@ -4302,91 +4301,8 @@ impl<'db> Class<'db> {
     /// directly. Use [`Class::class_member`] if you require a method that will
     /// traverse through the MRO until it finds the member.
     pub(crate) fn own_class_member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
-        #[salsa::tracked]
-        fn class_symbol_by_id<'db>(
-            db: &'db dyn Db,
-            scope: ScopeId<'db>,
-            symbol_id: ScopedSymbolId,
-        ) -> Symbol<'db> {
-            let use_def = use_def_map(db, scope);
-
-            // If the symbol is declared, the public type is based on declarations; otherwise, it's based
-            // on inference from bindings.
-
-            let declarations = use_def.public_declarations(symbol_id);
-            let declared = symbol_from_declarations(db, declarations);
-            let bindings = use_def.public_bindings(symbol_id);
-            let inferred = symbol_from_bindings(db, bindings);
-
-            match inferred {
-                // Symbol is possibly undeclared and definitely unbound. Only allow declared ClassVars.
-                Symbol::Unbound => match declared {
-                    Ok(symbol_and_quals @ SymbolAndQualifiers(Symbol::Type(declared_ty, _), _)) => {
-                        if symbol_and_quals.is_class_var() {
-                            // TODO: Same as `symbol` function - We probably don't want to report `Bound` here
-                            // if the symbol is possibly unbound. This requires a bit of
-                            // design work though as we might want a different behavior for stubs and for
-                            // normal modules.
-                            Symbol::bound(declared_ty)
-                        } else {
-                            Symbol::Unbound
-                        }
-                    }
-                    Err((declared_ty, _)) => {
-                        // Intentionally ignore conflicting declared types; that's not our problem,
-                        // it's the problem of the module we are importing from.
-                        if declared_ty.qualifiers().contains(TypeQualifiers::CLASS_VAR) {
-                            Symbol::bound(declared_ty.inner_type())
-                        } else {
-                            // Declared but not as a ClassVar
-                            Symbol::Unbound
-                        }
-                    }
-                    // Undeclared
-                    _ => Symbol::Unbound,
-                },
-                // Symbol is possibly undeclared but (possibly) bound
-                Symbol::Type(inferred_ty, boundness) => match declared {
-                    // Declared and bound - trust the declared type
-                    Ok(SymbolAndQualifiers(symbol @ Symbol::Type(_, Boundness::Bound), _)) => {
-                        symbol
-                    }
-                    // Possibly declared and possibly bound - union the inferred and declared types
-                    Ok(SymbolAndQualifiers(
-                        Symbol::Type(declared_ty, Boundness::PossiblyUnbound),
-                        _,
-                    )) => Symbol::Type(
-                        UnionType::from_elements(db, [inferred_ty, declared_ty]),
-                        boundness,
-                    ),
-                    // Symbol has conflicting declared types
-                    Err((ty, _)) => {
-                        // Intentionally ignore conflicting declared types; that's not our problem,
-                        // it's the problem of the module we are importing from.
-                        Symbol::bound(ty.inner_type())
-                    }
-                    // Symbol is undeclared, return the union of `Unknown` with the inferred type
-                    Ok(SymbolAndQualifiers(Symbol::Unbound, _)) => {
-                        let table = symbol_table(db, scope);
-                        // `__slots__` is a symbol with special behavior in Python's runtime. It can be
-                        // modified externally, but those changes do not take effect. We therefore issue
-                        // a diagnostic if we see it being modified externally. In type inference, we
-                        // can assign a "narrow" type to it even if it is not *declared*. This means, we
-                        // do not have to call [`widen_type_for_undeclared_public_symbol`].
-                        let is_dunder_slots = table.symbol(symbol_id).name() == "__slots__";
-
-                        widen_type_for_undeclared_public_symbol(db, inferred, is_dunder_slots)
-                    }
-                },
-            }
-        }
-
         let body_scope = self.body_scope(db);
-        symbol_table(db, body_scope)
-            .symbol_id_by_name(name)
-            .map_or(Symbol::Unbound, |symbol_id| {
-                class_symbol_by_id(db, body_scope, symbol_id)
-            })
+        class_symbol(db, body_scope, name)
     }
 
     /// Returns the `name` attribute of an instance of this class.
