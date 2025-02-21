@@ -1,10 +1,9 @@
 use ruff_db::files::File;
-use ruff_python_ast as ast;
 
 use crate::module_resolver::file_to_module;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId};
-use crate::semantic_index::{self, global_scope, use_def_map, DeclarationWithConstraint};
+use crate::semantic_index::{global_scope, use_def_map, DeclarationWithConstraint};
 use crate::semantic_index::{
     symbol_table, BindingWithConstraints, BindingWithConstraintsIterator, DeclarationsIterator,
 };
@@ -13,6 +12,8 @@ use crate::types::{
     KnownClass, Truthiness, Type, TypeAndQualifiers, TypeQualifiers, UnionBuilder, UnionType,
 };
 use crate::{resolve_module, Db, KnownModule, Module, Program};
+
+pub(crate) use implicit_globals::module_type_implicit_global_symbol;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Boundness {
@@ -672,63 +673,106 @@ fn symbol_from_declarations_impl<'db>(
     }
 }
 
-/// Return a list of the symbols that typeshed declares in the body scope of
-/// the stub for the class `types.ModuleType`.
-///
-/// Conceptually this could be a `Set` rather than a list,
-/// but the number of symbols declared in this scope is likely to be very small,
-/// so the cost of hashing the names is likely to be more expensive than it's worth.
-#[salsa::tracked(return_ref)]
-fn module_type_symbols<'db>(db: &'db dyn Db) -> smallvec::SmallVec<[ast::name::Name; 8]> {
-    let Some(module_type) = KnownClass::ModuleType
-        .to_class_literal(db)
-        .into_class_literal()
-    else {
-        // The most likely way we get here is if a user specified a `--custom-typeshed-dir`
-        // without a `types.pyi` stub in the `stdlib/` directory
-        return smallvec::SmallVec::default();
-    };
+mod implicit_globals {
+    use ruff_python_ast as ast;
 
-    let module_type_scope = module_type.body_scope(db);
-    let module_type_symbol_table = symbol_table(db, module_type_scope);
+    use crate::db::Db;
+    use crate::semantic_index::{self, symbol_table};
+    use crate::types::KnownClass;
 
-    // `__dict__` and `__init__` are very special members that can be accessed as attributes
-    // on the module when imported, but cannot be accessed as globals *inside* the module.
-    //
-    // `__getattr__` is even more special: it doesn't exist at runtime, but typeshed includes it
-    // to reduce false positives associated with functions that dynamically import modules
-    // and return `Instance(types.ModuleType)`. We should ignore it for any known module-literal type.
-    module_type_symbol_table
-        .symbols()
-        .filter(|symbol| symbol.is_declared())
-        .map(semantic_index::symbol::Symbol::name)
-        .filter(|symbol_name| !matches!(&***symbol_name, "__dict__" | "__getattr__" | "__init__"))
-        .cloned()
-        .collect()
-}
+    use super::Symbol;
 
-/// Return the symbol for a member of `types.ModuleType`.
-///
-/// ## Notes
-///
-/// In general we wouldn't check to see whether a symbol exists on a class before doing the
-/// [`member`] call on the instance type -- we'd just do the [`member`] call on the instance
-/// type, since it has the same end result. The reason to only call [`member`] on [`ModuleType`]
-/// instance when absolutely necessary is that it was a fairly significant performance regression
-/// to fallback to doing that for every name lookup that wasn't found in the module's globals.
-/// So we use less idiomatic (and much more verbose) code here as a micro-optimisation because
-/// it's used in a very hot path.
-///
-/// [`member`]: Type::member
-/// [`ModuleType`]: KnownClass::ModuleType
-pub(crate) fn module_type_implicit_global_symbol<'db>(db: &'db dyn Db, name: &str) -> Symbol<'db> {
-    if module_type_symbols(db)
-        .iter()
-        .any(|module_type_member| &**module_type_member == name)
-    {
-        KnownClass::ModuleType.to_instance(db).member(db, name)
-    } else {
-        Symbol::Unbound
+    /// Looks up the type of an "implicit global symbol". Returns [`Symbol::Unbound`] if
+    /// `name` is not present as an implicit symbol in module-global namespaces.
+    ///
+    /// Implicit global symbols are symbols such as `__doc__`, `__name__`, and `__file__`
+    /// that are implicitly defined in every module's global scope. Because their type is
+    /// always the same, we simply look these up as instance attributes on `types.ModuleType`.
+    ///
+    /// Note that this function should only be used as a fallback if a symbol is being looked
+    /// up in the global scope **from within the same file**. If the symbol is being looked up
+    /// from outside the file (e.g. via imports), use [`super::imported_symbol`] (or fallback logic
+    /// like the logic used in that function) instead. The reason is that this function returns
+    /// [`Symbol::Unbound`] for `__init__` and `__dict__` (which cannot be found in globals if
+    /// the lookup is being done from the same file) -- but these symbols *are* available in the
+    /// global scope if they're being imported **from a different file**.
+    pub(crate) fn module_type_implicit_global_symbol<'db>(
+        db: &'db dyn Db,
+        name: &str,
+    ) -> Symbol<'db> {
+        // In general we wouldn't check to see whether a symbol exists on a class before doing the
+        // `.member()` call on the instance type -- we'd just do the `.member`() call on the instance
+        // type, since it has the same end result. The reason to only call `.member()` on `ModuleType`
+        // when absolutely necessary is that this function is used in a very hot path (name resolution
+        // in `infer.rs`). We use less idiomatic (and much more verbose) code here as a micro-optimisation.
+        if module_type_symbols(db)
+            .iter()
+            .any(|module_type_member| &**module_type_member == name)
+        {
+            KnownClass::ModuleType.to_instance(db).member(db, name)
+        } else {
+            Symbol::Unbound
+        }
+    }
+
+    /// An internal micro-optimisation for `module_type_implicit_global_symbol`.
+    ///
+    /// This function returns a list of the symbols that typeshed declares in the
+    /// body scope of the stub for the class `types.ModuleType`.
+    ///
+    /// The returned list excludes the attributes `__dict__` and `__init__`. These are very
+    /// special members that can be accessed as attributes on the module when imported,
+    /// but cannot be accessed as globals *inside* the module.
+    ///
+    /// The list also excludes `__getattr__`. `__getattr__` is even more special: it doesn't
+    /// exist at runtime, but typeshed includes it to reduce false positives associated with
+    /// functions that dynamically import modules and return `Instance(types.ModuleType)`.
+    /// We should ignore it for any known module-literal type.
+    ///
+    /// Conceptually this function could be a `Set` rather than a list,
+    /// but the number of symbols declared in this scope is likely to be very small,
+    /// so the cost of hashing the names is likely to be more expensive than it's worth.
+    #[salsa::tracked(return_ref)]
+    fn module_type_symbols<'db>(db: &'db dyn Db) -> smallvec::SmallVec<[ast::name::Name; 8]> {
+        let Some(module_type) = KnownClass::ModuleType
+            .to_class_literal(db)
+            .into_class_literal()
+        else {
+            // The most likely way we get here is if a user specified a `--custom-typeshed-dir`
+            // without a `types.pyi` stub in the `stdlib/` directory
+            return smallvec::SmallVec::default();
+        };
+
+        let module_type_scope = module_type.body_scope(db);
+        let module_type_symbol_table = symbol_table(db, module_type_scope);
+
+        module_type_symbol_table
+            .symbols()
+            .filter(|symbol| symbol.is_declared())
+            .map(semantic_index::symbol::Symbol::name)
+            .filter(|symbol_name| {
+                !matches!(&***symbol_name, "__dict__" | "__getattr__" | "__init__")
+            })
+            .cloned()
+            .collect()
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        use crate::db::tests::setup_db;
+
+        #[test]
+        fn module_type_symbols_includes_declared_types_but_not_referenced_types() {
+            let db = setup_db();
+            let symbol_names = module_type_symbols(&db);
+
+            let dunder_name_symbol_name = ast::name::Name::new_static("__name__");
+            assert!(symbol_names.contains(&dunder_name_symbol_name));
+
+            let property_symbol_name = ast::name::Name::new_static("property");
+            assert!(!symbol_names.contains(&property_symbol_name));
+        }
     }
 }
 
@@ -840,18 +884,6 @@ mod tests {
             Symbol::Type(ty1, Bound).or_fall_back_to(&db, || Symbol::Type(ty2, Bound)),
             Symbol::Type(ty1, Bound)
         );
-    }
-
-    #[test]
-    fn module_type_symbols_includes_declared_types_but_not_referenced_types() {
-        let db = setup_db();
-        let symbol_names = module_type_symbols(&db);
-
-        let dunder_name_symbol_name = ast::name::Name::new_static("__name__");
-        assert!(symbol_names.contains(&dunder_name_symbol_name));
-
-        let property_symbol_name = ast::name::Name::new_static("property");
-        assert!(!symbol_names.contains(&property_symbol_name));
     }
 
     #[track_caller]
