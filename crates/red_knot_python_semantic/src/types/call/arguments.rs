@@ -36,6 +36,14 @@ impl<'a, 'db> CallArguments<'a, 'db> {
     }
 
     // TODO this should be eliminated in favor of [`bind_call`]
+    pub(crate) fn exactly_one_argument(&self) -> Option<Type<'db>> {
+        match &*self.0 {
+            [arg] => Some(arg.ty()),
+            _ => None,
+        }
+    }
+
+    // TODO this should be eliminated in favor of [`bind_call`]
     pub(crate) fn second_argument(&self) -> Option<Type<'db>> {
         self.0.get(1).map(Argument::ty)
     }
