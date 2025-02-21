@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Context};
 use red_knot_project::{ProjectDatabase, ProjectMetadata};
-use red_knot_python_semantic::{python_version, HasType, SemanticModel};
+use red_knot_python_semantic::{Program, HasType, SemanticModel};
 use ruff_db::files::{system_path_to_file, File};
 use ruff_db::parsed::parsed_module;
 use ruff_db::system::{SystemPath, SystemPathBuf, TestSystem};
@@ -165,7 +165,7 @@ fn run_corpus_tests(pattern: &str) -> anyhow::Result<()> {
 fn pull_types(db: &ProjectDatabase, file: File) {
     let mut visitor = PullTypesVisitor::new(db, file);
 
-    let ast = parsed_module(db, file, python_version(db));
+    let ast = parsed_module(db, file, Program::get(db).python_version(db));
 
     visitor.visit_body(ast.suite());
 }

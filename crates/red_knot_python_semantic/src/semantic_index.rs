@@ -5,7 +5,6 @@ use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_index::{IndexSlice, IndexVec};
 
-use ruff_python_ast::PythonVersion;
 use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 use salsa::plumbing::AsId;
 use salsa::Update;
@@ -21,7 +20,7 @@ use crate::semantic_index::symbol::{
     FileScopeId, NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopedSymbolId, SymbolTable,
 };
 use crate::semantic_index::use_def::{EagerBindingsKey, ScopedEagerBindingsId, UseDefMap};
-use crate::Db;
+use crate::{Db, Program};
 
 pub mod ast_ids;
 pub mod attribute_assignment;
@@ -46,13 +45,7 @@ type SymbolMap = hashbrown::HashMap<ScopedSymbolId, (), FxBuildHasher>;
 pub(crate) fn semantic_index(db: &dyn Db, file: File) -> SemanticIndex<'_> {
     let _span = tracing::trace_span!("semantic_index", file = %file.path(db)).entered();
 
-    // TODO(brent) need to pass the real PythonVersion here, but tests fail when I change it from
-    // PythonVersion::default()
-    //
-    // I've tried my hacky `python_version` helper function and also
-    // `Program::get(db).python_version(db)`, and many tests fail in both cases (18 with
-    // `python_version`, 48 with `Program::get`)
-    let parsed = parsed_module(db.upcast(), file, PythonVersion::default());
+    let parsed = parsed_module(db.upcast(), file, Program::get(db).python_version(db));
 
     SemanticIndexBuilder::new(db, file, parsed).build()
 }
@@ -414,11 +407,10 @@ impl FusedIterator for ChildrenIter<'_> {}
 mod tests {
     use ruff_db::files::{system_path_to_file, File};
     use ruff_db::parsed::parsed_module;
-    use ruff_db::system::DbWithTestSystem;
     use ruff_python_ast::{self as ast, PythonVersion};
     use ruff_text_size::{Ranged, TextRange};
 
-    use crate::db::tests::TestDb;
+    use crate::db::tests::{TestDb, TestDbBuilder};
     use crate::semantic_index::ast_ids::{HasScopedUseId, ScopedUseId};
     use crate::semantic_index::definition::{Definition, DefinitionKind};
     use crate::semantic_index::symbol::{
@@ -446,10 +438,14 @@ mod tests {
     }
 
     fn test_case(content: impl ToString) -> TestCase {
-        let mut db = TestDb::new();
-        db.write_file("test.py", content).unwrap();
+        const FILENAME: &str = "test.py";
 
-        let file = system_path_to_file(&db, "test.py").unwrap();
+        let db = TestDbBuilder::new()
+            .with_file(FILENAME, &content.to_string())
+            .build()
+            .unwrap();
+
+        let file = system_path_to_file(&db, FILENAME).unwrap();
 
         TestCase { db, file }
     }
