@@ -1,6 +1,6 @@
 use crate::lint::{GetLintError, Level, LintMetadata, LintRegistry, LintStatus};
-use crate::python_version;
 use crate::types::{TypeCheckDiagnostic, TypeCheckDiagnostics};
+use crate::Program;
 use crate::{declare_lint, lint::LintId, Db};
 use ruff_db::diagnostic::DiagnosticId;
 use ruff_db::{files::File, parsed::parsed_module, source::source_text};
@@ -89,7 +89,7 @@ declare_lint! {
 
 #[salsa::tracked(return_ref)]
 pub(crate) fn suppressions(db: &dyn Db, file: File) -> Suppressions {
-    let parsed = parsed_module(db.upcast(), file, python_version(db));
+    let parsed = parsed_module(db.upcast(), file, Program::get(db).python_version(db));
     let source = source_text(db.upcast(), file);
 
     let mut builder = SuppressionsBuilder::new(&source, db.lint_registry());

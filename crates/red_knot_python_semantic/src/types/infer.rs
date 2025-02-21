@@ -32,7 +32,7 @@ use itertools::{Either, Itertools};
 use ruff_db::diagnostic::{DiagnosticId, Severity};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
-use ruff_python_ast::{self as ast, AnyNodeRef, ExprContext, PythonVersion};
+use ruff_python_ast::{self as ast, AnyNodeRef, ExprContext};
 use ruff_text_size::Ranged;
 use rustc_hash::{FxHashMap, FxHashSet};
 use salsa;
@@ -76,7 +76,7 @@ use crate::types::{
 };
 use crate::unpack::Unpack;
 use crate::util::subscript::{PyIndex, PySlice};
-use crate::Db;
+use crate::{Db, Program};
 
 use super::call::CallError;
 use super::context::{InNoTypeCheck, InferContext, WithDiagnostics};
@@ -507,17 +507,15 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn infer_region_scope(&mut self, scope: ScopeId<'db>) {
-        let node = scope.node(self.db());
+        let db = self.db();
+        let node = scope.node(db);
         match node {
             NodeWithScopeKind::Module => {
-                // TODO(brent) need to pass the real PythonVersion here, but tests fail when I
-                // change it from PythonVersion::default()
-                //
-                // I've tried my hacky `python_version` helper function and also
-                // `Program::get(db).python_version(db)`, and many tests fail in both cases (18 with
-                // `python_version`, 19 with `Program::get`)
-                let parsed =
-                    parsed_module(self.db().upcast(), self.file(), PythonVersion::default());
+                let parsed = parsed_module(
+                    db.upcast(),
+                    self.file(),
+                    Program::get(db).python_version(db),
+                );
                 self.infer_module(parsed.syntax());
             }
             NodeWithScopeKind::Function(function) => self.infer_function_body(function.node()),
@@ -552,7 +550,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         // Infer the deferred types for the definitions here to consider the end-of-scope
         // semantics.
         for definition in std::mem::take(&mut self.types.deferred) {
-            self.extend(infer_deferred_types(self.db(), definition));
+            self.extend(infer_deferred_types(db, definition));
         }
         assert!(
             self.types.deferred.is_empty(),
@@ -6223,6 +6221,7 @@ mod tests {
     use ruff_db::files::{system_path_to_file, File};
     use ruff_db::system::DbWithTestSystem;
     use ruff_db::testing::{assert_function_query_was_not_run, assert_function_query_was_run};
+    use ruff_python_ast::PythonVersion;
 
     use super::*;
 
