@@ -110,32 +110,9 @@ pub(crate) fn infer_scope_types<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Ty
     TypeInferenceBuilder::new(db, InferenceRegion::Scope(scope), index).finish()
 }
 
-/// Cycle recovery for [`infer_definition_types()`]: for now, just [`Type::unknown`]
-/// TODO fixpoint iteration
-fn infer_definition_types_cycle_recovery<'db>(
-    db: &'db dyn Db,
-    _cycle: &salsa::Cycle,
-    input: Definition<'db>,
-) -> TypeInference<'db> {
-    tracing::trace!("infer_definition_types_cycle_recovery");
-    let mut inference = TypeInference::empty(input.scope(db));
-    let category = input.kind(db).category();
-    if category.is_declaration() {
-        inference
-            .declarations
-            .insert(input, TypeAndQualifiers::unknown());
-    }
-    if category.is_binding() {
-        inference.bindings.insert(input, Type::unknown());
-    }
-    // TODO we don't fill in expression types for the cycle-participant definitions, which can
-    // later cause a panic when looking up an expression type.
-    inference
-}
-
 /// Infer all types for a [`Definition`] (including sub-expressions).
 /// Use when resolving a symbol name use or public type of a symbol.
-#[salsa::tracked(return_ref, recovery_fn=infer_definition_types_cycle_recovery)]
+#[salsa::tracked(return_ref, cycle_fn=definition_cycle_recover, cycle_initial=definition_cycle_initial)]
 pub(crate) fn infer_definition_types<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
@@ -151,6 +128,23 @@ pub(crate) fn infer_definition_types<'db>(
     let index = semantic_index(db, file);
 
     TypeInferenceBuilder::new(db, InferenceRegion::Definition(definition), index).finish()
+}
+
+fn definition_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &TypeInference<'db>,
+    count: u32,
+    _definition: Definition<'db>,
+) -> salsa::CycleRecoveryAction<TypeInference<'db>> {
+    assert!(count < 10, "cycle did not converge within 10 iterations");
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn definition_cycle_initial<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> TypeInference<'db> {
+    TypeInference::empty(definition.scope(db), Some(Type::Never))
 }
 
 /// Infer types for all deferred type expressions in a [`Definition`].
@@ -180,7 +174,7 @@ pub(crate) fn infer_deferred_types<'db>(
 /// Use rarely; only for cases where we'd otherwise risk double-inferring an expression: RHS of an
 /// assignment, which might be unpacking/multi-target and thus part of multiple definitions, or a
 /// type narrowing guard expression (e.g. if statement test node).
-#[salsa::tracked(return_ref)]
+#[salsa::tracked(return_ref, cycle_fn=expression_cycle_recover, cycle_initial=expression_cycle_initial)]
 pub(crate) fn infer_expression_types<'db>(
     db: &'db dyn Db,
     expression: Expression<'db>,
@@ -197,6 +191,23 @@ pub(crate) fn infer_expression_types<'db>(
     let index = semantic_index(db, file);
 
     TypeInferenceBuilder::new(db, InferenceRegion::Expression(expression), index).finish()
+}
+
+fn expression_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &TypeInference<'db>,
+    count: u32,
+    _expression: Expression<'db>,
+) -> salsa::CycleRecoveryAction<TypeInference<'db>> {
+    assert!(count < 10, "cycle did not converge within 10 iterations");
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn expression_cycle_initial<'db>(
+    db: &'db dyn Db,
+    expression: Expression<'db>,
+) -> TypeInference<'db> {
+    TypeInference::empty(expression.scope(db), Some(Type::Never))
 }
 
 /// Infers the type of an `expression` that is guaranteed to be in the same file as the calling query.
@@ -290,12 +301,15 @@ pub(crate) struct TypeInference<'db> {
     /// The diagnostics for this region.
     diagnostics: TypeCheckDiagnostics,
 
-    /// The scope belong to this region.
+    /// The scope this region is part of.
     scope: ScopeId<'db>,
+
+    /// The fallback type for all expressions/bindings/declarations.
+    fallback_ty: Option<Type<'db>>,
 }
 
 impl<'db> TypeInference<'db> {
-    pub(crate) fn empty(scope: ScopeId<'db>) -> Self {
+    pub(crate) fn empty(scope: ScopeId<'db>, fallback_ty: Option<Type<'db>>) -> Self {
         Self {
             expressions: FxHashMap::default(),
             bindings: FxHashMap::default(),
@@ -303,12 +317,17 @@ impl<'db> TypeInference<'db> {
             deferred: FxHashSet::default(),
             diagnostics: TypeCheckDiagnostics::default(),
             scope,
+            fallback_ty,
         }
     }
 
     #[track_caller]
     pub(crate) fn expression_type(&self, expression: ScopedExpressionId) -> Type<'db> {
-        self.expressions[&expression]
+        if let Some(fallback) = self.fallback_ty {
+            self.try_expression_type(expression).unwrap_or(fallback)
+        } else {
+            self.expressions[&expression]
+        }
     }
 
     pub(crate) fn try_expression_type(&self, expression: ScopedExpressionId) -> Option<Type<'db>> {
@@ -317,12 +336,23 @@ impl<'db> TypeInference<'db> {
 
     #[track_caller]
     pub(crate) fn binding_type(&self, definition: Definition<'db>) -> Type<'db> {
-        self.bindings[&definition]
+        if let Some(fallback) = self.fallback_ty {
+            self.bindings.get(&definition).copied().unwrap_or(fallback)
+        } else {
+            self.bindings[&definition]
+        }
     }
 
     #[track_caller]
     pub(crate) fn declaration_type(&self, definition: Definition<'db>) -> TypeAndQualifiers<'db> {
-        self.declarations[&definition]
+        if let Some(fallback) = self.fallback_ty {
+            self.declarations
+                .get(&definition)
+                .copied()
+                .unwrap_or(fallback.into())
+        } else {
+            self.declarations[&definition]
+        }
     }
 
     pub(crate) fn diagnostics(&self) -> &TypeCheckDiagnostics {
@@ -449,7 +479,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             index,
             region,
             deferred_state: DeferredExpressionState::None,
-            types: TypeInference::empty(scope),
+            types: TypeInference::empty(scope, None),
         }
     }
 
