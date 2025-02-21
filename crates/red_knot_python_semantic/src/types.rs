@@ -1663,7 +1663,7 @@ impl<'db> Type<'db> {
                 let member = self.static_member(db, name);
 
                 let instance = None;
-                let owner = self.to_meta_type(db);
+                let owner = *self;
 
                 // TODO: Handle `__get__` call errors (see above).
                 member.map_type(|ty| ty.try_call_dunder_get(db, instance, owner).unwrap_or(ty))
