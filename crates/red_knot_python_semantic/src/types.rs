@@ -2284,7 +2284,8 @@ impl<'db> Type<'db> {
 
     /// Look up a dunder method on the meta type of `self` and call it.
     ///
-    /// Returns an `Err` if the dunder method can't be called.
+    /// Returns an `Err` if the dunder method can't be called,
+    /// or the given arguments are not valid.
     fn try_call_dunder(
         self,
         db: &'db dyn Db,

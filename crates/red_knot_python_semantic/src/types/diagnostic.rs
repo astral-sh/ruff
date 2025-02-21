@@ -516,7 +516,7 @@ declare_lint! {
     /// b1 < b2 < b1  # exception raised here
     /// ```
     pub(crate) static UNSUPPORTED_BOOL_CONVERSION = {
-        summary: "detects boolean conversion where the object doesn't support it",
+        summary: "detects boolean conversion where the object incorrectly implements `__bool__`",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
