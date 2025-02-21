@@ -71,7 +71,7 @@ class TestClass:
     def __eq__(self, /, other=42):  # support positional-only args
         ...
 
-    def __eq__(self, *, other=42):  # support positional-only args
+    def __eq__(self, *, other=42):  # ignore keyword-only args
         ...
 
     def __cmp__(self): # #16217 assert non-special method is skipped, expects 2 parameters
