@@ -353,7 +353,7 @@ impl VisibilityConstraintsBuilder {
     /// However, we sometimes have to model how a `Constraint` can have a different runtime
     /// value at different points in the execution of the program. To handle this, you can take
     /// advantage of the fact that the [`Constraints`] arena does not deduplicate `Constraint`s.
-    /// You can add a `Constraint` multiple times, yielding different `ScopeConstraintId`s, which
+    /// You can add a `Constraint` multiple times, yielding different `ScopedConstraintId`s, which
     /// you can then create separate TDD atoms for.
     pub(crate) fn add_atom(
         &mut self,
