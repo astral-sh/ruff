@@ -222,14 +222,18 @@ pub struct LinterSettings {
 
     /// The non-path-resolved Python version specified by the `target-version` input option.
     ///
-    /// See [`LinterSettings::resolve_target_version`] for a way to obtain the Python version for a
-    /// given file, while respecting the overrides in `per_file_target_version`.
+    /// If you have a `Checker` available, see its `target_version` method instead.
+    ///
+    /// Otherwise, see [`LinterSettings::resolve_target_version`] for a way to obtain the Python
+    /// version for a given file, while respecting the overrides in `per_file_target_version`.
     pub unresolved_target_version: PythonVersion,
     /// Path-specific overrides to `unresolved_target_version`.
     ///
-    /// See [`LinterSettings::resolve_target_version`] for a way to check a given [`Path`]
-    /// against these patterns, while falling back to `unresolved_target_version` if none of them
-    /// match.
+    /// If you have a `Checker` available, see its `target_version` method instead.
+    ///
+    /// Otherwise, see [`LinterSettings::resolve_target_version`] for a way to check a given
+    /// [`Path`] against these patterns, while falling back to `unresolved_target_version` if none
+    /// of them match.
     pub per_file_target_version: CompiledPerFileTargetVersionList,
     pub preview: PreviewMode,
     pub explicit_preview_rules: bool,
