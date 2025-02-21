@@ -2682,3 +2682,43 @@ except* TypeError as e:
     "
     );
 }
+
+#[test]
+fn type_stmt_before_py312() {
+    let stdin = "type Point = tuple[float, float]";
+
+    // ok on 3.12
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--stdin-filename", "test.py"])
+        .arg("--target-version=py312")
+        .arg("-")
+        .pass_stdin(stdin),
+        @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    "
+    );
+
+    // error on 3.11
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--stdin-filename", "test.py"])
+        .arg("--target-version=py311")
+        .arg("-")
+        .pass_stdin(stdin),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:1:1: SyntaxError: Cannot use `type` statement on Python 3.11 (syntax was new in Python 3.12)
+    Found 1 error.
+
+    ----- stderr -----
+    "
+    );
+}
