@@ -29,7 +29,7 @@ error: lint:unsupported-bool-conversion
   |
 6 | # error: [unsupported-bool-conversion]
 7 | 10 and a and True
-  |        ^ Boolean conversion is unsupported for type `NotBoolable`; it incorrectly implements `__bool__`
+  |        ^ Boolean conversion is unsupported for type `NotBoolable`; it's `__bool__` method isn't callable
   |
 
 ```

@@ -38,7 +38,7 @@ error: lint:unsupported-bool-conversion
    |
 11 | # error: [unsupported-bool-conversion]
 12 | 10 < Comparable() < 20
-   | ^^^^^^^^^^^^^^^^^ Boolean conversion is unsupported for type `NotBoolable`; it incorrectly implements `__bool__`
+   | ^^^^^^^^^^^^^^^^^ Boolean conversion is unsupported for type `NotBoolable`; it's `__bool__` method isn't callable
 13 | # error: [unsupported-bool-conversion]
 14 | 10 < Comparable() < Comparable()
    |
@@ -52,7 +52,7 @@ error: lint:unsupported-bool-conversion
 12 | 10 < Comparable() < 20
 13 | # error: [unsupported-bool-conversion]
 14 | 10 < Comparable() < Comparable()
-   | ^^^^^^^^^^^^^^^^^ Boolean conversion is unsupported for type `NotBoolable`; it incorrectly implements `__bool__`
+   | ^^^^^^^^^^^^^^^^^ Boolean conversion is unsupported for type `NotBoolable`; it's `__bool__` method isn't callable
 15 |
 16 | Comparable() < Comparable()  # fine
    |

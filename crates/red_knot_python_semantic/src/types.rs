@@ -37,7 +37,7 @@ use crate::symbol::{
     imported_symbol, known_module_symbol, symbol, symbol_from_bindings, symbol_from_declarations,
     Boundness, LookupError, LookupResult, Symbol, SymbolAndQualifiers,
 };
-use crate::types::call::{bind_call, CallArguments, CallBinding, CallOutcome};
+use crate::types::call::{bind_call, CallArguments, CallBinding, CallOutcome, UnionCallError};
 use crate::types::class_base::ClassBase;
 use crate::types::diagnostic::{INVALID_TYPE_FORM, UNSUPPORTED_BOOL_CONVERSION};
 use crate::types::infer::infer_unpack_types;
@@ -1780,26 +1780,48 @@ impl<'db> Type<'db> {
                             }
                         }
                         Err(CallDunderError::MethodNotAvailable) => Truthiness::Ambiguous,
-                        Err(CallDunderError::Call(err)) => match err {
-                            CallError::BindingError { binding } => {
-                                return Err(BoolError::IncorrectArguments {
-                                    truthiness: type_to_truthiness(binding.return_type()),
-                                    not_boolable_type: *instance_ty,
-                                });
-                            }
-                            CallError::NotCallable { .. } => {
-                                return Err(BoolError::NotCallable {
-                                    not_boolable_type: *instance_ty,
-                                });
-                            }
+                        Err(CallDunderError::Call(err)) => {
+                            let err = match err {
+                                // Unwrap call errors where only a single variant isn't callable.
+                                // E.g. in the case of `Unknown & T`
+                                // TODO: Improve handling of unions. While this improves messages overall,
+                                //   it still results in loosing information. Or should the information
+                                //   be recomputed when rendering the diagnostic?
+                                CallError::Union(union_error) => {
+                                    if let Type::Union(_) = union_error.called_ty {
+                                        if union_error.errors.len() == 1 {
+                                            union_error.errors.into_vec().pop().unwrap()
+                                        } else {
+                                            CallError::Union(union_error)
+                                        }
+                                    } else {
+                                        CallError::Union(union_error)
+                                    }
+                                }
+                                err => err,
+                            };
 
-                            CallError::PossiblyUnboundDunderCall { .. }
-                            | CallError::Union { .. } => {
-                                return Err(BoolError::Other {
-                                    not_boolable_type: *instance_ty,
-                                });
+                            match err {
+                                CallError::BindingError { binding } => {
+                                    return Err(BoolError::IncorrectArguments {
+                                        truthiness: type_to_truthiness(binding.return_type()),
+                                        not_boolable_type: *instance_ty,
+                                    });
+                                }
+                                CallError::NotCallable { .. } => {
+                                    return Err(BoolError::NotCallable {
+                                        not_boolable_type: *instance_ty,
+                                    });
+                                }
+
+                                CallError::PossiblyUnboundDunderCall { .. }
+                                | CallError::Union(..) => {
+                                    return Err(BoolError::Other {
+                                        not_boolable_type: *self,
+                                    })
+                                }
                             }
-                        },
+                        }
                     }
                 }
             }
@@ -1835,15 +1857,13 @@ impl<'db> Type<'db> {
                         return Err(BoolError::NotCallable {
                             not_boolable_type: *self,
                         });
-                    } else {
-                        return Err(BoolError::Union {
-                            union: *union,
-                            truthiness: truthiness.unwrap_or(Truthiness::Ambiguous),
-                        });
                     }
-                } else {
-                    truthiness.unwrap_or(Truthiness::Ambiguous)
+                    return Err(BoolError::Union {
+                        union: *union,
+                        truthiness: truthiness.unwrap_or(Truthiness::Ambiguous),
+                    });
                 }
+                truthiness.unwrap_or(Truthiness::Ambiguous)
             }
             Type::Intersection(_) => {
                 // TODO
@@ -2224,15 +2244,15 @@ impl<'db> Type<'db> {
                                 not_callable_ty: self,
                             }
                         }
-                        CallDunderError::Call(CallError::Union {
+                        CallDunderError::Call(CallError::Union(UnionCallError {
                             called_ty: _,
                             bindings,
                             errors,
-                        }) => CallError::Union {
+                        })) => CallError::Union(UnionCallError {
                             called_ty: self,
                             bindings,
                             errors,
-                        },
+                        }),
                         CallDunderError::Call(error) => error,
                         // Turn "possibly unbound object of type `Literal['__call__']`"
                         // into "`X` not callable (possibly unbound `__call__` method)"
@@ -3652,7 +3672,7 @@ pub(super) enum BoolError<'db> {
         return_type: Type<'db>,
     },
 
-    /// A union where some variants don't implement `__bool__` correctly.
+    /// A union type doesn't implement `__bool__` correctly.
     Union {
         union: UnionType<'db>,
         truthiness: Truthiness,
@@ -3741,15 +3761,16 @@ impl<'db> BoolError<'db> {
                     .unwrap();
 
                 context.report_lint(
-                    &UNSUPPORTED_BOOL_CONVERSION,
-                    condition,
-                    format_args!(
-                        "Boolean conversion is unsupported for union `{}` because `{}` doesn't implement `__bool__` correctly",
-                        Type::Union(*union).display(context.db()),
-                        first_error.not_boolable_type().display(context.db()),
-                    ),
-                );
+                        &UNSUPPORTED_BOOL_CONVERSION,
+                        condition,
+                        format_args!(
+                            "Boolean conversion is unsupported for union `{}` because `{}` doesn't implement `__bool__` correctly",
+                            Type::Union(*union).display(context.db()),
+                            first_error.not_boolable_type().display(context.db()),
+                        ),
+                    );
             }
+
             Self::Other { not_boolable_type } => {
                 context.report_lint(
                     &UNSUPPORTED_BOOL_CONVERSION,
@@ -4409,11 +4430,11 @@ impl<'db> Class<'db> {
                     kind: MetaclassErrorKind::NotCallable(not_callable_ty),
                 }),
 
-                Err(CallError::Union {
+                Err(CallError::Union(UnionCallError {
                     called_ty,
                     errors,
                     bindings,
-                }) => {
+                })) => {
                     let mut partly_not_callable = false;
 
                     let return_ty = errors

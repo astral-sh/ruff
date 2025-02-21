@@ -54,7 +54,7 @@ use crate::symbol::{
     module_type_implicit_global_symbol, symbol, symbol_from_bindings, symbol_from_declarations,
     typing_extensions_symbol, LookupError,
 };
-use crate::types::call::{Argument, CallArguments};
+use crate::types::call::{Argument, CallArguments, UnionCallError};
 use crate::types::diagnostic::{
     report_invalid_arguments_to_annotated, report_invalid_assignment,
     report_invalid_attribute_assignment, report_unresolved_module, TypeCheckDiagnostics,
@@ -3441,11 +3441,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             );
                         }
 
-                        CallError::Union {
-                            called_ty: _,
-                            bindings: _,
-                            errors,
-                        } => {
+                        CallError::Union(UnionCallError { errors, .. }) => {
                             if let Some(first) = IntoIterator::into_iter(errors).next() {
                                 report_call_error(context, first, call_expression);
                             } else {
