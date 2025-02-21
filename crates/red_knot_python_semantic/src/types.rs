@@ -1699,8 +1699,9 @@ impl<'db> Type<'db> {
             },
             Type::AlwaysTruthy => Truthiness::AlwaysTrue,
             Type::AlwaysFalsy => Truthiness::AlwaysFalse,
-            Type::Instance(InstanceType { class }) => {
-                class.known(db).map(KnownClass::bool).unwrap_or_else(|| {
+            instance_ty @ Type::Instance(InstanceType { class }) => match class.known(db) {
+                Some(known_class) => known_class.bool(),
+                None => {
                     // We only check the `__bool__` method for truth testing, even though at
                     // runtime there is a fallback to `__len__`, since `__bool__` takes precedence
                     // and a subclass could add a `__bool__` method.
@@ -1777,8 +1778,8 @@ impl<'db> Type<'db> {
                             }
                         }
                     }
-                })
-            }
+                }
+            },
             Type::KnownInstance(known_instance) => known_instance.bool(),
             Type::Union(union) => {
                 let mut truthiness = None;
