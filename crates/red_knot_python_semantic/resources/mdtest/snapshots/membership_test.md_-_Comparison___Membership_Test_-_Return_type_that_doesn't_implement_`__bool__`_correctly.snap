@@ -3,7 +3,7 @@ source: crates/red_knot_test/src/lib.rs
 expression: snapshot
 ---
 ---
-mdtest name: membership_test.md - Comparison: Membership Test - Not-boolable return type
+mdtest name: membership_test.md - Comparison: Membership Test - Return type that doesn't implement `__bool__` correctly
 mdtest path: crates/red_knot_python_semantic/resources/mdtest/comparison/instances/membership_test.md
 ---
 

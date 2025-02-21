@@ -36,7 +36,7 @@ def _(flag: bool):
     reveal_type(x)  # revealed: Literal[1] | None
 ```
 
-## not-boolable condition
+## Condition with object that implements `__bool__` incorrectly
 
 ```py
 class NotBoolable:

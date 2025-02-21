@@ -1,4 +1,4 @@
-## not-boolable condition
+## Condition with object that implements `__bool__` incorrectly
 
 ```py
 class NotBoolable:

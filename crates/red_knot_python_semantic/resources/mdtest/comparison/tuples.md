@@ -359,7 +359,6 @@ a < b < b
 a < b  # fine
 ```
 
-
 ## Equality with elements that incorrectly implement `__bool__`
 
 <!-- snapshot-diagnostics -->
@@ -375,4 +374,3 @@ class NotBoolable:
 # error: [unsupported-bool-conversion]
 (A(),) == (A(),)
 ```
-
