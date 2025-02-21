@@ -21,7 +21,10 @@ pub(crate) struct ConstraintsBuilder<'db> {
 }
 
 impl<'db> ConstraintsBuilder<'db> {
-    /// Adds a constraint, ensuring that we only store any particular constraint once.
+    /// Adds a constraint. Note that we do not deduplicate constraints. If you add a `Constraint`
+    /// more than once, you will get distinct `ScopedConstraintId`s for each one. (This lets you
+    /// model constraint expressions that might evaluate to different values at different points of
+    /// execution.)
     pub(crate) fn add_constraint(&mut self, constraint: Constraint<'db>) -> ScopedConstraintId {
         self.constraints.push(constraint)
     }
