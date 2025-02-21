@@ -6814,7 +6814,7 @@ mod tests {
     fn dependency_own_instance_member() -> anyhow::Result<()> {
         fn x_rhs_expression(db: &TestDb) -> Expression<'_> {
             let file_main = system_path_to_file(db, "/src/main.py").unwrap();
-            let ast = parsed_module(db, file_main);
+            let ast = parsed_module(db, file_main, PythonVersion::default());
             // Get the second statement in `main.py` (x = …) and extract the expression
             // node on the right-hand side:
             let x_rhs_node = &ast.syntax().body[1].as_assign_stmt().unwrap().value;
