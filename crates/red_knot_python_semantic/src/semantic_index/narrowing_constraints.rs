@@ -1,58 +1,43 @@
-use std::ops::Index;
-
 use ruff_index::list::{ListBuilder, ListIterator, ListStorage};
-use ruff_index::{newtype_index, IndexVec};
+use ruff_index::newtype_index;
 
 use crate::semantic_index::constraint::ScopedConstraintId;
 
-#[newtype_index]
-#[derive(Ord, PartialOrd)]
-pub(crate) struct ScopedNarrowingConstraintId;
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub(crate) struct ScopedNarrowingConstraintId(u32);
+
+impl ScopedNarrowingConstraintId {
+    #[inline]
+    pub(crate) fn constraint(self) -> ScopedConstraintId {
+        ScopedConstraintId::from(self.0)
+    }
+}
+
+impl From<ScopedConstraintId> for ScopedNarrowingConstraintId {
+    #[inline]
+    fn from(constraint: ScopedConstraintId) -> ScopedNarrowingConstraintId {
+        ScopedNarrowingConstraintId(constraint.as_u32())
+    }
+}
 
 #[newtype_index]
 pub(crate) struct ScopedNarrowingConstraintSetId;
 
-/// A single narrowing constraint.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) struct NarrowingConstraint {
-    pub(crate) constraint: ScopedConstraintId,
-}
-
 #[derive(Debug, Eq, PartialEq)]
 pub(crate) struct NarrowingConstraints {
-    constraints: IndexVec<ScopedNarrowingConstraintId, NarrowingConstraint>,
     lists: ListStorage<ScopedNarrowingConstraintSetId, ScopedNarrowingConstraintId, ()>,
-}
-
-impl Index<ScopedNarrowingConstraintId> for NarrowingConstraints {
-    type Output = NarrowingConstraint;
-
-    #[inline]
-    fn index(&self, index: ScopedNarrowingConstraintId) -> &NarrowingConstraint {
-        &self.constraints[index]
-    }
 }
 
 #[derive(Debug, Default, Eq, PartialEq)]
 pub(crate) struct NarrowingConstraintsBuilder {
-    constraints: IndexVec<ScopedNarrowingConstraintId, NarrowingConstraint>,
     lists: ListBuilder<ScopedNarrowingConstraintSetId, ScopedNarrowingConstraintId, ()>,
 }
 
 impl NarrowingConstraintsBuilder {
-    pub(crate) fn build(mut self) -> NarrowingConstraints {
-        self.constraints.shrink_to_fit();
+    pub(crate) fn build(self) -> NarrowingConstraints {
         NarrowingConstraints {
-            constraints: self.constraints,
             lists: self.lists.build(),
         }
-    }
-
-    pub(crate) fn add_constraint(
-        &mut self,
-        constraint: ScopedConstraintId,
-    ) -> ScopedNarrowingConstraintId {
-        self.constraints.push(NarrowingConstraint { constraint })
     }
 
     pub(crate) fn insert_into_set(
@@ -87,20 +72,6 @@ impl NarrowingConstraints {
     }
 }
 
-impl NarrowingConstraintsBuilder {
-    // This is currently only used in tests, but needs to be defined here to not overly publicize
-    // our internal fields.
-    #[cfg(test)]
-    pub(crate) fn iter_constraints(
-        &self,
-        set: Option<ScopedNarrowingConstraintSetId>,
-    ) -> NarrowingConstraintsIterator<'_> {
-        NarrowingConstraintsIterator {
-            wrapped: self.lists.iter(set),
-        }
-    }
-}
-
 impl Iterator for NarrowingConstraintsIterator<'_> {
     type Item = ScopedNarrowingConstraintId;
 
@@ -108,5 +79,27 @@ impl Iterator for NarrowingConstraintsIterator<'_> {
     fn next(&mut self) -> Option<Self::Item> {
         let (key, ()) = self.wrapped.next()?;
         Some(*key)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    impl ScopedNarrowingConstraintId {
+        pub(crate) fn as_u32(self) -> u32 {
+            self.0
+        }
+    }
+
+    impl NarrowingConstraintsBuilder {
+        pub(crate) fn iter_constraints(
+            &self,
+            set: Option<ScopedNarrowingConstraintSetId>,
+        ) -> NarrowingConstraintsIterator<'_> {
+            NarrowingConstraintsIterator {
+                wrapped: self.lists.iter(set),
+            }
+        }
     }
 }

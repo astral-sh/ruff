@@ -440,7 +440,6 @@ impl<'map, 'db> Iterator for BindingWithConstraintsIterator<'map, 'db> {
                 binding: self.all_definitions[live_binding.binding],
                 narrowing_constraints: ConstraintsIterator {
                     constraints,
-                    narrowing_constraints,
                     constraint_ids: narrowing_constraints
                         .iter_constraints(live_binding.narrowing_constraints),
                 },
@@ -459,7 +458,6 @@ pub(crate) struct BindingWithConstraints<'map, 'db> {
 
 pub(crate) struct ConstraintsIterator<'map, 'db> {
     constraints: &'map Constraints<'db>,
-    narrowing_constraints: &'map NarrowingConstraints,
     constraint_ids: NarrowingConstraintsIterator<'map>,
 }
 
@@ -467,10 +465,9 @@ impl<'db> Iterator for ConstraintsIterator<'_, 'db> {
     type Item = Constraint<'db>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.constraint_ids.next().map(|narrowing_constraint_id| {
-            let narrowing_constraint = &self.narrowing_constraints[narrowing_constraint_id];
-            self.constraints[narrowing_constraint.constraint]
-        })
+        self.constraint_ids
+            .next()
+            .map(|narrowing_constraint| self.constraints[narrowing_constraint.constraint()])
     }
 }
 
@@ -594,7 +591,7 @@ impl<'db> UseDefMapBuilder<'db> {
     }
 
     pub(super) fn record_constraint_id(&mut self, constraint: ScopedConstraintId) {
-        let narrowing_constraint = self.narrowing_constraints.add_constraint(constraint);
+        let narrowing_constraint = constraint.into();
         for state in &mut self.symbol_states {
             state.record_constraint(&mut self.narrowing_constraints, narrowing_constraint);
         }
