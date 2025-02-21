@@ -24,6 +24,7 @@ mod semantic_model;
 pub(crate) mod site_packages;
 mod suppression;
 pub(crate) mod symbol;
+pub mod syntax;
 pub mod types;
 mod unpack;
 mod util;
@@ -48,4 +49,13 @@ pub fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&UNUSED_IGNORE_COMMENT);
     registry.register_lint(&UNKNOWN_RULE);
     registry.register_lint(&INVALID_IGNORE_COMMENT);
+}
+
+// TODO(brent) remove this. It should just be `Program::get(db).python_version(db)`, but for some
+// reason `tests::check_file_skips_type_checking_when_file_cant_be_read` fails when I use `get`, so
+// I factored this out instead of inlining everywhere
+pub fn python_version(db: &dyn Db) -> ruff_python_ast::PythonVersion {
+    Program::try_get(db)
+        .map(|program| program.python_version(db))
+        .unwrap_or_default()
 }

@@ -11,6 +11,7 @@ mod tests {
 
     use anyhow::Result;
     use regex::Regex;
+    use ruff_python_parser::ParseOptions;
     use rustc_hash::FxHashMap;
     use test_case::test_case;
 
@@ -744,8 +745,10 @@ mod tests {
         let source_type = PySourceType::default();
         let source_kind = SourceKind::Python(contents.to_string());
         let settings = LinterSettings::for_rules(Linter::Pyflakes.rules());
-        let parsed =
-            ruff_python_parser::parse_unchecked_source(source_kind.source_code(), source_type);
+        let options = ParseOptions::from(source_type).with_target_version(settings.target_version);
+        let parsed = ruff_python_parser::parse_unchecked(source_kind.source_code(), options)
+            .try_into_module()
+            .expect("PySourceType always parses into a module");
         let locator = Locator::new(&contents);
         let stylist = Stylist::from_tokens(parsed.tokens(), locator.contents());
         let indexer = Indexer::from_tokens(parsed.tokens(), locator.contents());

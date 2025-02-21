@@ -2567,3 +2567,29 @@ fn a005_module_shadowing_strict_default() -> Result<()> {
     });
     Ok(())
 }
+
+#[test]
+fn match_before_py310() {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--stdin-filename", "test.py"])
+        .arg("--target-version=py39")
+        .arg("-")
+        .pass_stdin(
+            r#"
+match 2:
+    case 1:
+        print("it's one")
+"#
+        ),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:2:1: SyntaxError: Cannot use `match` statement on Python 3.9 (syntax was new in Python 3.10)
+    Found 1 error.
+
+    ----- stderr -----
+    "
+    );
+}

@@ -1,5 +1,6 @@
 use std::fmt;
 
+use ruff_python_ast::PythonVersion;
 use ruff_text_size::TextRange;
 
 use crate::TokenKind;
@@ -422,6 +423,45 @@ impl std::fmt::Display for LexicalErrorType {
             LexicalErrorType::MissingUnicodeRbrace => {
                 write!(f, "Missing `}}` in Unicode escape sequence")
             }
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct SyntaxError {
+    pub kind: SyntaxErrorKind,
+    pub range: TextRange,
+    pub target_version: PythonVersion,
+}
+
+impl SyntaxError {
+    pub fn message(&self) -> String {
+        match self.kind {
+            SyntaxErrorKind::MatchBeforePy310 => format!(
+                "Cannot use `match` statement on Python {major}.{minor} (syntax was new in Python 3.10)",
+                major = self.target_version.major,
+                minor = self.target_version.minor,
+            ),
+        }
+    }
+
+    /// The earliest allowed version for the syntax associated with this error.
+    pub const fn version(&self) -> PythonVersion {
+        match self.kind {
+            SyntaxErrorKind::MatchBeforePy310 => PythonVersion::PY310,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub enum SyntaxErrorKind {
+    MatchBeforePy310,
+}
+
+impl SyntaxErrorKind {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            SyntaxErrorKind::MatchBeforePy310 => "match-before-python-310",
         }
     }
 }
