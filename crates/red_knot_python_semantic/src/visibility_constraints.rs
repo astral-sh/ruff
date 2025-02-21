@@ -178,7 +178,9 @@ use std::cmp::Ordering;
 use ruff_index::{Idx, IndexVec};
 use rustc_hash::FxHashMap;
 
-use crate::semantic_index::constraint::{Constraint, ConstraintNode, PatternConstraintKind};
+use crate::semantic_index::constraint::{
+    Constraint, ConstraintNode, Constraints, PatternConstraintKind, ScopedConstraintId,
+};
 use crate::types::{infer_expression_type, Truthiness};
 use crate::Db;
 
@@ -231,67 +233,13 @@ impl std::fmt::Debug for ScopedVisibilityConstraintId {
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 struct InteriorNode {
-    atom: Atom,
+    /// A "variable" that is evaluated as part of a TDD ternary function. For visibility
+    /// constraints, this is a `Constraint` that represents some runtime property of the Python
+    /// code that we are evaluating.
+    atom: ScopedConstraintId,
     if_true: ScopedVisibilityConstraintId,
     if_ambiguous: ScopedVisibilityConstraintId,
     if_false: ScopedVisibilityConstraintId,
-}
-
-/// A "variable" that is evaluated as part of a TDD ternary function. For visibility constraints,
-/// this is a `Constraint` that represents some runtime property of the Python code that we are
-/// evaluating. We intern these constraints in an arena ([`VisibilityConstraints::constraints`]).
-/// An atom is then an index into this arena.
-///
-/// By using a 32-bit index, we would typically allow 4 billion distinct constraints within a
-/// scope. However, we sometimes have to model how a `Constraint` can have a different runtime
-/// value at different points in the execution of the program. To handle this, we reserve the top
-/// byte of an atom to represent a "copy number". This is just an opaque value that allows
-/// different `Atom`s to evaluate the same `Constraint`. This yields a maximum of 16 million
-/// distinct `Constraint`s in a scope, and 256 possible copies of each of those constraints.
-#[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
-struct Atom(u32);
-
-impl Atom {
-    /// Deconstruct an atom into a constraint index and a copy number.
-    #[inline]
-    fn into_index_and_copy(self) -> (u32, u8) {
-        let copy = self.0 >> 24;
-        let index = self.0 & 0x00ff_ffff;
-        (index, copy as u8)
-    }
-
-    #[inline]
-    fn copy_of(mut self, copy: u8) -> Self {
-        // Clear out the previous copy number
-        self.0 &= 0x00ff_ffff;
-        // OR in the new one
-        self.0 |= u32::from(copy) << 24;
-        self
-    }
-}
-
-// A custom Debug implementation that prints out the constraint index and copy number as distinct
-// fields.
-impl std::fmt::Debug for Atom {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let (index, copy) = self.into_index_and_copy();
-        f.debug_tuple("Atom").field(&index).field(&copy).finish()
-    }
-}
-
-impl Idx for Atom {
-    #[inline]
-    fn new(value: usize) -> Self {
-        assert!(value <= 0x00ff_ffff);
-        #[allow(clippy::cast_possible_truncation)]
-        Self(value as u32)
-    }
-
-    #[inline]
-    fn index(self) -> usize {
-        let (index, _) = self.into_index_and_copy();
-        index as usize
-    }
 }
 
 impl ScopedVisibilityConstraintId {
@@ -336,16 +284,13 @@ const SMALLEST_TERMINAL: ScopedVisibilityConstraintId = ALWAYS_FALSE;
 /// A collection of visibility constraints. This is currently stored in `UseDefMap`, which means we
 /// maintain a separate set of visibility constraints for each scope in file.
 #[derive(Debug, PartialEq, Eq, salsa::Update)]
-pub(crate) struct VisibilityConstraints<'db> {
-    constraints: IndexVec<Atom, Constraint<'db>>,
+pub(crate) struct VisibilityConstraints {
     interiors: IndexVec<ScopedVisibilityConstraintId, InteriorNode>,
 }
 
 #[derive(Debug, Default, PartialEq, Eq)]
-pub(crate) struct VisibilityConstraintsBuilder<'db> {
-    constraints: IndexVec<Atom, Constraint<'db>>,
+pub(crate) struct VisibilityConstraintsBuilder {
     interiors: IndexVec<ScopedVisibilityConstraintId, InteriorNode>,
-    constraint_cache: FxHashMap<Constraint<'db>, Atom>,
     interior_cache: FxHashMap<InteriorNode, ScopedVisibilityConstraintId>,
     not_cache: FxHashMap<ScopedVisibilityConstraintId, ScopedVisibilityConstraintId>,
     and_cache: FxHashMap<
@@ -358,10 +303,9 @@ pub(crate) struct VisibilityConstraintsBuilder<'db> {
     >,
 }
 
-impl<'db> VisibilityConstraintsBuilder<'db> {
-    pub(crate) fn build(self) -> VisibilityConstraints<'db> {
+impl VisibilityConstraintsBuilder {
+    pub(crate) fn build(self) -> VisibilityConstraints {
         VisibilityConstraints {
-            constraints: self.constraints,
             interiors: self.interiors,
         }
     }
@@ -385,14 +329,6 @@ impl<'db> VisibilityConstraintsBuilder<'db> {
         }
     }
 
-    /// Adds a constraint, ensuring that we only store any particular constraint once.
-    fn add_constraint(&mut self, constraint: Constraint<'db>, copy: u8) -> Atom {
-        self.constraint_cache
-            .entry(constraint)
-            .or_insert_with(|| self.constraints.push(constraint))
-            .copy_of(copy)
-    }
-
     /// Adds an interior node, ensuring that we always use the same visibility constraint ID for
     /// equal nodes.
     fn add_interior(&mut self, node: InteriorNode) -> ScopedVisibilityConstraintId {
@@ -408,17 +344,23 @@ impl<'db> VisibilityConstraintsBuilder<'db> {
             .or_insert_with(|| self.interiors.push(node))
     }
 
-    /// Adds a new visibility constraint that checks a single [`Constraint`]. Provide different
-    /// values for `copy` if you need to model that the constraint can evaluate to different
-    /// results at different points in the execution of the program being modeled.
+    /// Adds a new visibility constraint that checks a single [`Constraint`].
+    ///
+    /// [`ScopedConstraintId`]s are the “variables” that are evaluated by a TDD. A TDD variable has
+    /// the same value no matter how many times it appears in the ternary formula that the TDD
+    /// represents.
+    ///
+    /// However, we sometimes have to model how a `Constraint` can have a different runtime
+    /// value at different points in the execution of the program. To handle this, you can take
+    /// advantage of the fact that the [`Constraints`] arena does not deduplicate `Constraint`s.
+    /// You can add a `Constraint` multiple times, yielding different `ScopedConstraintId`s, which
+    /// you can then create separate TDD atoms for.
     pub(crate) fn add_atom(
         &mut self,
-        constraint: Constraint<'db>,
-        copy: u8,
+        constraint: ScopedConstraintId,
     ) -> ScopedVisibilityConstraintId {
-        let atom = self.add_constraint(constraint, copy);
         self.add_interior(InteriorNode {
-            atom,
+            atom: constraint,
             if_true: ALWAYS_TRUE,
             if_ambiguous: AMBIGUOUS,
             if_false: ALWAYS_FALSE,
@@ -588,11 +530,12 @@ impl<'db> VisibilityConstraintsBuilder<'db> {
     }
 }
 
-impl<'db> VisibilityConstraints<'db> {
+impl VisibilityConstraints {
     /// Analyze the statically known visibility for a given visibility constraint.
-    pub(crate) fn evaluate(
+    pub(crate) fn evaluate<'db>(
         &self,
         db: &'db dyn Db,
+        constraints: &Constraints<'db>,
         mut id: ScopedVisibilityConstraintId,
     ) -> Truthiness {
         loop {
@@ -602,7 +545,7 @@ impl<'db> VisibilityConstraints<'db> {
                 ALWAYS_FALSE => return Truthiness::AlwaysFalse,
                 _ => self.interiors[id],
             };
-            let constraint = &self.constraints[node.atom];
+            let constraint = &constraints[node.atom];
             match Self::analyze_single(db, constraint) {
                 Truthiness::AlwaysTrue => id = node.if_true,
                 Truthiness::Ambiguous => id = node.if_ambiguous,

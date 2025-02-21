@@ -48,6 +48,7 @@ use itertools::{EitherOrBoth, Itertools};
 use ruff_index::newtype_index;
 use smallvec::{smallvec, SmallVec};
 
+use crate::semantic_index::constraint::ScopedConstraintId;
 use crate::semantic_index::use_def::bitset::{BitSet, BitSetIterator};
 use crate::semantic_index::use_def::VisibilityConstraintsBuilder;
 use crate::visibility_constraints::ScopedVisibilityConstraintId;
@@ -65,10 +66,6 @@ impl ScopedDefinitionId {
     /// at index 0, so this ID is always present.
     pub(super) const UNBOUND: ScopedDefinitionId = ScopedDefinitionId::from_u32(0);
 }
-
-/// A newtype-index for a constraint expression in a particular scope.
-#[newtype_index]
-pub(crate) struct ScopedConstraintId;
 
 /// Can reference this * 64 total constraints inline; more will fall back to the heap.
 const INLINE_CONSTRAINT_BLOCKS: usize = 2;

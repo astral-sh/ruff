@@ -503,6 +503,7 @@ fn symbol_from_bindings_impl<'db>(
     bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
     requires_explicit_reexport: RequiresExplicitReExport,
 ) -> Symbol<'db> {
+    let constraints = bindings_with_constraints.constraints;
     let visibility_constraints = bindings_with_constraints.visibility_constraints;
     let mut bindings_with_constraints = bindings_with_constraints.peekable();
 
@@ -514,9 +515,9 @@ fn symbol_from_bindings_impl<'db>(
         Some(BindingWithConstraints {
             binding,
             visibility_constraint,
-            constraints: _,
+            narrowing_constraints: _,
         }) if binding.map_or(true, is_non_exported) => {
-            visibility_constraints.evaluate(db, *visibility_constraint)
+            visibility_constraints.evaluate(db, constraints, *visibility_constraint)
         }
         _ => Truthiness::AlwaysFalse,
     };
@@ -524,7 +525,7 @@ fn symbol_from_bindings_impl<'db>(
     let mut types = bindings_with_constraints.filter_map(
         |BindingWithConstraints {
              binding,
-             constraints,
+             narrowing_constraints,
              visibility_constraint,
          }| {
             let binding = binding?;
@@ -533,13 +534,14 @@ fn symbol_from_bindings_impl<'db>(
                 return None;
             }
 
-            let static_visibility = visibility_constraints.evaluate(db, visibility_constraint);
+            let static_visibility =
+                visibility_constraints.evaluate(db, constraints, visibility_constraint);
 
             if static_visibility.is_always_false() {
                 return None;
             }
 
-            let mut constraint_tys = constraints
+            let mut constraint_tys = narrowing_constraints
                 .filter_map(|constraint| narrowing_constraint(db, constraint, binding))
                 .peekable();
 
@@ -590,6 +592,7 @@ fn symbol_from_declarations_impl<'db>(
     declarations: DeclarationsIterator<'_, 'db>,
     requires_explicit_reexport: RequiresExplicitReExport,
 ) -> SymbolFromDeclarationsResult<'db> {
+    let constraints = declarations.constraints;
     let visibility_constraints = declarations.visibility_constraints;
     let mut declarations = declarations.peekable();
 
@@ -602,7 +605,7 @@ fn symbol_from_declarations_impl<'db>(
             declaration,
             visibility_constraint,
         }) if declaration.map_or(true, is_non_exported) => {
-            visibility_constraints.evaluate(db, *visibility_constraint)
+            visibility_constraints.evaluate(db, constraints, *visibility_constraint)
         }
         _ => Truthiness::AlwaysFalse,
     };
@@ -618,7 +621,8 @@ fn symbol_from_declarations_impl<'db>(
                 return None;
             }
 
-            let static_visibility = visibility_constraints.evaluate(db, visibility_constraint);
+            let static_visibility =
+                visibility_constraints.evaluate(db, constraints, visibility_constraint);
 
             if static_visibility.is_always_false() {
                 None
