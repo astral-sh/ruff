@@ -160,3 +160,35 @@ reveal_type(42 in A())  # revealed: bool
 # error: [unsupported-operator] "Operator `in` is not supported for types `str` and `A`, in comparing `Literal["hello"]` with `A`"
 reveal_type("hello" in A())  # revealed: bool
 ```
+
+## Return type that doesn't implement `__bool__` correctly
+
+Python implicitly calls `bool` on the result of `__contains__`, so the return type must be
+convertible to `bool`.
+
+TODO: Ideally the message would explain to the user what's wrong. E.g,
+
+```ignore
+error: [operator] cannot use `in` operator on object of type `WithContains`
+    note: This is because the `in` operator implicitly calls `WithContains.__contains__`, but `WithContains.__contains__` is invalidly defined
+    note: `WithContains.__contains__` is invalidly defined because it returns an instance of `NotBoolable`, which cannot be evaluated in a boolean context
+    note: `NotBoolable` cannot be evaluated in a boolean context because its `__bool__` attribute is not callable
+```
+
+It may also be more appropriate to use `unsupported-operator` as the error code.
+
+<!-- snapshot-diagnostics -->
+
+```py
+class NotBoolable:
+    __bool__ = 3
+
+class WithContains:
+    def __contains__(self, item) -> NotBoolable:
+        return NotBoolable()
+
+# error: [unsupported-bool-conversion]
+10 in WithContains() and True
+# error: [unsupported-bool-conversion]
+10 not in WithContains() or False
+```

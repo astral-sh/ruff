@@ -334,3 +334,43 @@ reveal_type(a is not c)  # revealed: Literal[True]
 For tuples like `tuple[int, ...]`, `tuple[Any, ...]`
 
 // TODO
+
+## Comparison with elements that incorrectly implement `__bool_`
+
+<!-- snapshot-diagnostics -->
+
+```py
+class NotBoolable:
+    __bool__ = 5
+
+class Comparable:
+    def __lt__(self, other) -> NotBoolable:
+        return NotBoolable()
+
+    def __gt__(self, other) -> NotBoolable:
+        return NotBoolable()
+
+a = (1, Comparable())
+b = (1, Comparable())
+
+# error: [unsupported-bool-conversion]
+a < b < b
+
+a < b  # fine
+```
+
+## Equality with elements that incorrectly implement `__bool__`
+
+<!-- snapshot-diagnostics -->
+
+```py
+class A:
+    def __eq__(self, other) -> NotBoolable:
+        return NotBoolable()
+
+class NotBoolable:
+    __bool__ = None
+
+# error: [unsupported-bool-conversion]
+(A(),) == (A(),)
+```

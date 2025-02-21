@@ -345,3 +345,29 @@ def f(x: bool, y: int):
     reveal_type(4.2 < x)  # revealed: bool
     reveal_type(x < 4.2)  # revealed: bool
 ```
+
+## Chained comparisons with objects that don't implement `__bool__` correctly
+
+<!-- snapshot-diagnostics -->
+
+Python implicitly calls `bool` on the comparison result of preceding elements (but not for the last
+element) of a chained comparison.
+
+```py
+class NotBoolable:
+    __bool__ = 3
+
+class Comparable:
+    def __lt__(self, item) -> NotBoolable:
+        return NotBoolable()
+
+    def __gt__(self, item) -> NotBoolable:
+        return NotBoolable()
+
+# error: [unsupported-bool-conversion]
+10 < Comparable() < 20
+# error: [unsupported-bool-conversion]
+10 < Comparable() < Comparable()
+
+Comparable() < Comparable()  # fine
+```
