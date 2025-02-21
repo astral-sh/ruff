@@ -16,31 +16,38 @@ most common case involves implementing these methods for the same type:
 ```py
 from __future__ import annotations
 
+class EqReturnType: ...
+class NeReturnType: ...
+class LtReturnType: ...
+class LeReturnType: ...
+class GtReturnType: ...
+class GeReturnType: ...
+
 class A:
-    def __eq__(self, other: A) -> int:
-        return 42
+    def __eq__(self, other: A) -> EqReturnType:
+        return EqReturnType()
 
-    def __ne__(self, other: A) -> bytearray:
-        return bytearray()
+    def __ne__(self, other: A) -> NeReturnType:
+        return NeReturnType()
 
-    def __lt__(self, other: A) -> str:
-        return "42"
+    def __lt__(self, other: A) -> LtReturnType:
+        return LtReturnType()
 
-    def __le__(self, other: A) -> bytes:
-        return b"42"
+    def __le__(self, other: A) -> LeReturnType:
+        return LeReturnType()
 
-    def __gt__(self, other: A) -> list:
-        return [42]
+    def __gt__(self, other: A) -> GtReturnType:
+        return GtReturnType()
 
-    def __ge__(self, other: A) -> set:
-        return {42}
+    def __ge__(self, other: A) -> GeReturnType:
+        return GeReturnType()
 
-reveal_type(A() == A())  # revealed: int
-reveal_type(A() != A())  # revealed: bytearray
-reveal_type(A() < A())  # revealed: str
-reveal_type(A() <= A())  # revealed: bytes
-reveal_type(A() > A())  # revealed: list
-reveal_type(A() >= A())  # revealed: set
+reveal_type(A() == A())  # revealed: EqReturnType
+reveal_type(A() != A())  # revealed: NeReturnType
+reveal_type(A() < A())  # revealed: LtReturnType
+reveal_type(A() <= A())  # revealed: LeReturnType
+reveal_type(A() > A())  # revealed: GtReturnType
+reveal_type(A() >= A())  # revealed: GeReturnType
 ```
 
 ## Rich Comparison Dunder Implementations for Other Class
@@ -51,33 +58,40 @@ type:
 ```py
 from __future__ import annotations
 
+class EqReturnType: ...
+class NeReturnType: ...
+class LtReturnType: ...
+class LeReturnType: ...
+class GtReturnType: ...
+class GeReturnType: ...
+
 class A:
-    def __eq__(self, other: B) -> int:
-        return 42
+    def __eq__(self, other: B) -> EqReturnType:
+        return EqReturnType()
 
-    def __ne__(self, other: B) -> bytearray:
-        return bytearray()
+    def __ne__(self, other: B) -> NeReturnType:
+        return NeReturnType()
 
-    def __lt__(self, other: B) -> str:
-        return "42"
+    def __lt__(self, other: B) -> LtReturnType:
+        return LtReturnType()
 
-    def __le__(self, other: B) -> bytes:
-        return b"42"
+    def __le__(self, other: B) -> LeReturnType:
+        return LeReturnType()
 
-    def __gt__(self, other: B) -> list:
-        return [42]
+    def __gt__(self, other: B) -> GtReturnType:
+        return GtReturnType()
 
-    def __ge__(self, other: B) -> set:
-        return {42}
+    def __ge__(self, other: B) -> GeReturnType:
+        return GeReturnType()
 
 class B: ...
 
-reveal_type(A() == B())  # revealed: int
-reveal_type(A() != B())  # revealed: bytearray
-reveal_type(A() < B())  # revealed: str
-reveal_type(A() <= B())  # revealed: bytes
-reveal_type(A() > B())  # revealed: list
-reveal_type(A() >= B())  # revealed: set
+reveal_type(A() == B())  # revealed: EqReturnType
+reveal_type(A() != B())  # revealed: NeReturnType
+reveal_type(A() < B())  # revealed: LtReturnType
+reveal_type(A() <= B())  # revealed: LeReturnType
+reveal_type(A() > B())  # revealed: GtReturnType
+reveal_type(A() >= B())  # revealed: GeReturnType
 ```
 
 ## Reflected Comparisons
@@ -89,55 +103,64 @@ these methods will be ignored here because they require a mismatched operand typ
 ```py
 from __future__ import annotations
 
+class EqReturnType: ...
+class NeReturnType: ...
+class LtReturnType: ...
+class LeReturnType: ...
+class GtReturnType: ...
+class GeReturnType: ...
+
 class A:
-    def __eq__(self, other: B) -> int:
-        return 42
+    def __eq__(self, other: B) -> EqReturnType:
+        return EqReturnType()
 
-    def __ne__(self, other: B) -> bytearray:
-        return bytearray()
+    def __ne__(self, other: B) -> NeReturnType:
+        return NeReturnType()
 
-    def __lt__(self, other: B) -> str:
-        return "42"
+    def __lt__(self, other: B) -> LtReturnType:
+        return LtReturnType()
 
-    def __le__(self, other: B) -> bytes:
-        return b"42"
+    def __le__(self, other: B) -> LeReturnType:
+        return LeReturnType()
 
-    def __gt__(self, other: B) -> list:
-        return [42]
+    def __gt__(self, other: B) -> GtReturnType:
+        return GtReturnType()
 
-    def __ge__(self, other: B) -> set:
-        return {42}
+    def __ge__(self, other: B) -> GeReturnType:
+        return GeReturnType()
+
+class Unrelated: ...
 
 class B:
     # To override builtins.object.__eq__ and builtins.object.__ne__
     # TODO these should emit an invalid override diagnostic
-    def __eq__(self, other: str) -> B:
+    def __eq__(self, other: Unrelated) -> B:
         return B()
 
-    def __ne__(self, other: str) -> B:
+    def __ne__(self, other: Unrelated) -> B:
         return B()
 
 # Because `object.__eq__` and `object.__ne__` accept `object` in typeshed,
 # this can only happen with an invalid override of these methods,
 # but we still support it.
-reveal_type(B() == A())  # revealed: int
-reveal_type(B() != A())  # revealed: bytearray
+reveal_type(B() == A())  # revealed: EqReturnType
+reveal_type(B() != A())  # revealed: NeReturnType
 
-reveal_type(B() < A())  # revealed: list
-reveal_type(B() <= A())  # revealed: set
+reveal_type(B() < A())  # revealed: GtReturnType
+reveal_type(B() <= A())  # revealed: GeReturnType
 
-reveal_type(B() > A())  # revealed: str
-reveal_type(B() >= A())  # revealed: bytes
+reveal_type(B() > A())  # revealed: LtReturnType
+reveal_type(B() >= A())  # revealed: LeReturnType
 
 class C:
-    def __gt__(self, other: C) -> int:
+    def __gt__(self, other: C) -> EqReturnType:
         return 42
 
-    def __ge__(self, other: C) -> bytearray:
-        return bytearray()
+    def __ge__(self, other: C) -> NeReturnType:
+        return NeReturnType()
 
-reveal_type(C() < C())  # revealed: int
-reveal_type(C() <= C())  # revealed: bytearray
+reveal_type(C() < C())  # revealed: EqReturnType
+reveal_type(C() <= C())  # revealed: NeReturnType
 ```
 
 ## Reflected Comparisons with Subclasses
@@ -148,6 +171,13 @@ than `A`.
 
 ```py
 from __future__ import annotations
+
+class EqReturnType: ...
+class NeReturnType: ...
+class LtReturnType: ...
+class LeReturnType: ...
+class GtReturnType: ...
+class GeReturnType: ...
 
 class A:
     def __eq__(self, other: A) -> A:
@@ -169,32 +199,32 @@ class A:
         return A()
 
 class B(A):
-    def __eq__(self, other: A) -> int:
-        return 42
+    def __eq__(self, other: A) -> EqReturnType:
+        return EqReturnType()
 
-    def __ne__(self, other: A) -> bytearray:
-        return bytearray()
+    def __ne__(self, other: A) -> NeReturnType:
+        return NeReturnType()
 
-    def __lt__(self, other: A) -> str:
-        return "42"
+    def __lt__(self, other: A) -> LtReturnType:
+        return LtReturnType()
 
-    def __le__(self, other: A) -> bytes:
-        return b"42"
+    def __le__(self, other: A) -> LeReturnType:
+        return LeReturnType()
 
-    def __gt__(self, other: A) -> list:
-        return [42]
+    def __gt__(self, other: A) -> GtReturnType:
+        return GtReturnType()
 
-    def __ge__(self, other: A) -> set:
-        return {42}
+    def __ge__(self, other: A) -> GeReturnType:
+        return GeReturnType()
 
-reveal_type(A() == B())  # revealed: int
-reveal_type(A() != B())  # revealed: bytearray
+reveal_type(A() == B())  # revealed: EqReturnType
+reveal_type(A() != B())  # revealed: NeReturnType
 
-reveal_type(A() < B())  # revealed: list
-reveal_type(A() <= B())  # revealed: set
+reveal_type(A() < B())  # revealed: GtReturnType
+reveal_type(A() <= B())  # revealed: GeReturnType
 
-reveal_type(A() > B())  # revealed: str
-reveal_type(A() >= B())  # revealed: bytes
+reveal_type(A() > B())  # revealed: LtReturnType
+reveal_type(A() >= B())  # revealed: LeReturnType
 ```
 
 ## Reflected Comparisons with Subclass But Falls Back to LHS
@@ -314,4 +344,30 @@ def f(x: bool, y: int):
     reveal_type(y < x)  # revealed: bool
     reveal_type(4.2 < x)  # revealed: bool
     reveal_type(x < 4.2)  # revealed: bool
+```
+
+## Chained comparisons with objects that don't implement `__bool__` correctly
+
+<!-- snapshot-diagnostics -->
+
+Python implicitly calls `bool` on the comparison result of preceding elements (but not for the last
+element) of a chained comparison.
+
+```py
+class NotBoolable:
+    __bool__ = 3
+
+class Comparable:
+    def __lt__(self, item) -> NotBoolable:
+        return NotBoolable()
+
+    def __gt__(self, item) -> NotBoolable:
+        return NotBoolable()
+
+# error: [unsupported-bool-conversion]
+10 < Comparable() < 20
+# error: [unsupported-bool-conversion]
+10 < Comparable() < Comparable()
+
+Comparable() < Comparable()  # fine
 ```

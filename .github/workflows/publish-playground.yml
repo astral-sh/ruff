@@ -35,6 +35,8 @@ jobs:
           cache: "npm"
           cache-dependency-path: playground/package-lock.json
       - uses: jetli/wasm-pack-action@v0.4.0
+        with:
+          version: v0.13.1
       - uses: jetli/wasm-bindgen-action@v0.2.0
       - name: "Run wasm-pack"
         run: wasm-pack build --target web --out-dir ../../playground/src/pkg crates/ruff_wasm

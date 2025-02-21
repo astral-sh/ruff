@@ -33,7 +33,7 @@ use ruff_db::diagnostic::{DiagnosticId, Severity};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::{self as ast, AnyNodeRef, ExprContext};
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxHashMap, FxHashSet};
 use salsa;
 use salsa::plumbing::AsId;
@@ -50,10 +50,11 @@ use crate::semantic_index::semantic_index;
 use crate::semantic_index::symbol::{FileScopeId, NodeWithScopeKind, NodeWithScopeRef, ScopeId};
 use crate::semantic_index::SemanticIndex;
 use crate::symbol::{
-    builtins_module_scope, builtins_symbol, symbol, symbol_from_bindings, symbol_from_declarations,
+    builtins_module_scope, builtins_symbol, explicit_global_symbol,
+    module_type_implicit_global_symbol, symbol, symbol_from_bindings, symbol_from_declarations,
     typing_extensions_symbol, LookupError,
 };
-use crate::types::call::{Argument, CallArguments};
+use crate::types::call::{Argument, CallArguments, UnionCallError};
 use crate::types::diagnostic::{
     report_invalid_arguments_to_annotated, report_invalid_assignment,
     report_invalid_attribute_assignment, report_unresolved_module, TypeCheckDiagnostics,
@@ -68,9 +69,9 @@ use crate::types::mro::MroErrorKind;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     todo_type, Boundness, Class, ClassLiteralType, DynamicType, FunctionType, InstanceType,
-    IntersectionBuilder, IntersectionType, IterationOutcome, KnownClass, KnownFunction,
-    KnownInstanceType, MetaclassCandidate, MetaclassErrorKind, SliceLiteralType, SubclassOfType,
-    Symbol, SymbolAndQualifiers, Truthiness, TupleType, Type, TypeAliasType, TypeAndQualifiers,
+    IntersectionBuilder, IntersectionType, KnownClass, KnownFunction, KnownInstanceType,
+    MetaclassCandidate, MetaclassErrorKind, SliceLiteralType, SubclassOfType, Symbol,
+    SymbolAndQualifiers, Truthiness, TupleType, Type, TypeAliasType, TypeAndQualifiers,
     TypeArrayDisplay, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarInstance, UnionBuilder,
     UnionType,
 };
@@ -90,7 +91,7 @@ use super::slots::check_class_slots;
 use super::string_annotation::{
     parse_string_annotation, BYTE_STRING_TYPE_ANNOTATION, FSTRING_TYPE_ANNOTATION,
 };
-use super::{global_symbol, CallDunderError, ParameterExpectation, ParameterExpectations};
+use super::{CallDunderError, ParameterExpectation, ParameterExpectations};
 
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
 /// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
@@ -118,7 +119,7 @@ fn infer_definition_types_cycle_recovery<'db>(
 ) -> TypeInference<'db> {
     tracing::trace!("infer_definition_types_cycle_recovery");
     let mut inference = TypeInference::empty(input.scope(db));
-    let category = input.category(db);
+    let category = input.kind(db).category();
     if category.is_declaration() {
         inference
             .declarations
@@ -196,6 +197,36 @@ pub(crate) fn infer_expression_types<'db>(
     let index = semantic_index(db, file);
 
     TypeInferenceBuilder::new(db, InferenceRegion::Expression(expression), index).finish()
+}
+
+/// Infers the type of an `expression` that is guaranteed to be in the same file as the calling query.
+///
+/// This is a small helper around [`infer_expression_types()`] to reduce the boilerplate.
+/// Use [`infer_expression_type()`] if it isn't guaranteed that `expression` is in the same file to
+/// avoid cross-file query dependencies.
+pub(super) fn infer_same_file_expression_type<'db>(
+    db: &'db dyn Db,
+    expression: Expression<'db>,
+) -> Type<'db> {
+    let inference = infer_expression_types(db, expression);
+    let scope = expression.scope(db);
+    inference.expression_type(expression.node_ref(db).scoped_expression_id(db, scope))
+}
+
+/// Infers the type of an expression where the expression might come from another file.
+///
+/// Use this over [`infer_expression_types`] if the expression might come from another file than the
+/// enclosing query to avoid cross-file query dependencies.
+///
+/// Use [`infer_same_file_expression_type`] if it is guaranteed that  `expression` is in the same
+/// to avoid unnecessary salsa ingredients. This is normally the case inside the `TypeInferenceBuilder`.
+#[salsa::tracked]
+pub(crate) fn infer_expression_type<'db>(
+    db: &'db dyn Db,
+    expression: Expression<'db>,
+) -> Type<'db> {
+    // It's okay to call the "same file" version here because we're inside a salsa query.
+    infer_same_file_expression_type(db, expression)
 }
 
 /// Infer the types for an [`Unpack`] operation.
@@ -875,7 +906,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn add_binding(&mut self, node: AnyNodeRef, binding: Definition<'db>, ty: Type<'db>) {
-        debug_assert!(binding.is_binding(self.db()));
+        debug_assert!(binding.kind(self.db()).category().is_binding());
         let use_def = self.index.use_def_map(binding.file_scope(self.db()));
         let declarations = use_def.declarations_at_binding(binding);
         let mut bound_ty = ty;
@@ -910,7 +941,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         declaration: Definition<'db>,
         ty: TypeAndQualifiers<'db>,
     ) {
-        debug_assert!(declaration.is_declaration(self.db()));
+        debug_assert!(declaration.kind(self.db()).category().is_declaration());
         let use_def = self.index.use_def_map(declaration.file_scope(self.db()));
         let prior_bindings = use_def.bindings_at_declaration(declaration);
         // unbound_ty is Never because for this check we don't care about unbound
@@ -940,8 +971,8 @@ impl<'db> TypeInferenceBuilder<'db> {
         definition: Definition<'db>,
         declared_and_inferred_ty: &DeclaredAndInferredType<'db>,
     ) {
-        debug_assert!(definition.is_binding(self.db()));
-        debug_assert!(definition.is_declaration(self.db()));
+        debug_assert!(definition.kind(self.db()).category().is_binding());
+        debug_assert!(definition.kind(self.db()).category().is_declaration());
 
         let (declared_ty, inferred_ty) = match *declared_and_inferred_ty {
             DeclaredAndInferredType::AreTheSame(ty) => (ty.into(), ty),
@@ -1455,7 +1486,12 @@ impl<'db> TypeInferenceBuilder<'db> {
             elif_else_clauses,
         } = if_statement;
 
-        self.infer_standalone_expression(test);
+        let test_ty = self.infer_standalone_expression(test);
+
+        if let Err(err) = test_ty.try_bool(self.db()) {
+            err.report_diagnostic(&self.context, &**test);
+        }
+
         self.infer_body(body);
 
         for clause in elif_else_clauses {
@@ -1466,7 +1502,11 @@ impl<'db> TypeInferenceBuilder<'db> {
             } = clause;
 
             if let Some(test) = &test {
-                self.infer_standalone_expression(test);
+                let test_ty = self.infer_standalone_expression(test);
+
+                if let Err(err) = test_ty.try_bool(self.db()) {
+                    err.report_diagnostic(&self.context, test);
+                }
             }
 
             self.infer_body(body);
@@ -1621,7 +1661,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
 
                 let target_ty = enter_ty
-                    .call(self.db(), &CallArguments::positional([context_expression_ty]))
+                    .try_call(self.db(), &CallArguments::positional([context_expression_ty]))
                     .map(|outcome| outcome.return_type(self.db()))
                     .unwrap_or_else(|err|  {
                         // TODO: Use more specific error messages for the different error cases.
@@ -1664,7 +1704,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         }
 
                         if exit_ty
-                            .call(
+                            .try_call(
                                 self.db(),
                                 &CallArguments::positional([
                                     context_manager_ty,
@@ -1862,9 +1902,15 @@ impl<'db> TypeInferenceBuilder<'db> {
                 guard,
             } = case;
             self.infer_match_pattern(pattern);
-            guard
-                .as_deref()
-                .map(|guard| self.infer_standalone_expression(guard));
+
+            if let Some(guard) = guard.as_deref() {
+                let guard_ty = self.infer_standalone_expression(guard);
+
+                if let Err(err) = guard_ty.try_bool(self.db()) {
+                    err.report_diagnostic(&self.context, guard);
+                }
+            }
+
             self.infer_body(body);
         }
     }
@@ -2214,7 +2260,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 if let Symbol::Type(class_member, boundness) =
                     class.class_member(self.db(), op.in_place_dunder())
                 {
-                    let call = class_member.call(
+                    let call = class_member.try_call(
                         self.db(),
                         &CallArguments::positional([target_type, value_type]),
                     );
@@ -2333,7 +2379,10 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = for_statement;
 
         self.infer_target(target, iter, |db, iter_ty| {
-            iter_ty.iterate(db).unwrap_without_diagnostic()
+            // TODO: `infer_for_statement_definition` reports a diagnostic if `iter_ty` isn't iterable
+            //  but only if the target is a name. We should report a diagnostic here if the target isn't a name:
+            //  `for a.x in not_iterable: ...
+            iter_ty.iterate(db)
         });
 
         self.infer_body(body);
@@ -2362,9 +2411,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                     let name_ast_id = name.scoped_expression_id(self.db(), self.scope());
                     unpacked.expression_type(name_ast_id)
                 }
-                TargetKind::Name => iterable_ty
-                    .iterate(self.db())
-                    .unwrap_with_diagnostic(&self.context, iterable.into()),
+                TargetKind::Name => iterable_ty.try_iterate(self.db()).unwrap_or_else(|err| {
+                    err.report_diagnostic(&self.context, iterable.into());
+                    err.fallback_element_type()
+                }),
             }
         };
 
@@ -2380,7 +2430,12 @@ impl<'db> TypeInferenceBuilder<'db> {
             orelse,
         } = while_statement;
 
-        self.infer_standalone_expression(test);
+        let test_ty = self.infer_standalone_expression(test);
+
+        if let Err(err) = test_ty.try_bool(self.db()) {
+            err.report_diagnostic(&self.context, &**test);
+        }
+
         self.infer_body(body);
         self.infer_body(orelse);
     }
@@ -2462,7 +2517,12 @@ impl<'db> TypeInferenceBuilder<'db> {
             msg,
         } = assert;
 
-        self.infer_expression(test);
+        let test_ty = self.infer_expression(test);
+
+        if let Err(err) = test_ty.try_bool(self.db()) {
+            err.report_diagnostic(&self.context, &**test);
+        }
+
         self.infer_optional_expression(msg.as_deref());
     }
 
@@ -3146,9 +3206,10 @@ impl<'db> TypeInferenceBuilder<'db> {
             // TODO: async iterables/iterators! -- Alex
             todo_type!("async iterables/iterators")
         } else {
-            iterable_ty
-                .iterate(self.db())
-                .unwrap_with_diagnostic(&self.context, iterable.into())
+            iterable_ty.try_iterate(self.db()).unwrap_or_else(|err| {
+                err.report_diagnostic(&self.context, iterable.into());
+                err.fallback_element_type()
+            })
         };
 
         self.types.expressions.insert(
@@ -3204,7 +3265,10 @@ impl<'db> TypeInferenceBuilder<'db> {
         let body_ty = self.infer_expression(body);
         let orelse_ty = self.infer_expression(orelse);
 
-        match test_ty.bool(self.db()) {
+        match test_ty.try_bool(self.db()).unwrap_or_else(|err| {
+            err.report_diagnostic(&self.context, &**test);
+            err.fallback_truthiness()
+        }) {
             Truthiness::AlwaysTrue => body_ty,
             Truthiness::AlwaysFalse => orelse_ty,
             Truthiness::Ambiguous => UnionType::from_elements(self.db(), [body_ty, orelse_ty]),
@@ -3252,7 +3316,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             .unwrap_or_default();
 
         let call_arguments = self.infer_arguments(arguments, parameter_expectations);
-        let call = function_type.call(self.db(), &call_arguments);
+        let call = function_type.try_call(self.db(), &call_arguments);
 
         match call {
             Ok(outcome) => {
@@ -3297,7 +3361,26 @@ impl<'db> TypeInferenceBuilder<'db> {
                         }
                         KnownFunction::StaticAssert => {
                             if let Some((parameter_ty, message)) = binding.two_parameter_types() {
-                                let truthiness = parameter_ty.bool(self.db());
+                                let truthiness = match parameter_ty.try_bool(self.db()) {
+                                    Ok(truthiness) => truthiness,
+                                    Err(err) => {
+                                        let condition = arguments
+                                            .find_argument("condition", 0)
+                                            .map(|argument| match argument {
+                                                ruff_python_ast::ArgOrKeyword::Arg(expr) => {
+                                                    ast::AnyNodeRef::from(expr)
+                                                }
+                                                ruff_python_ast::ArgOrKeyword::Keyword(keyword) => {
+                                                    ast::AnyNodeRef::from(keyword)
+                                                }
+                                            })
+                                            .unwrap_or(ast::AnyNodeRef::from(call_expression));
+
+                                        err.report_diagnostic(&self.context, condition);
+
+                                        continue;
+                                    }
+                                };
 
                                 if !truthiness.is_always_true() {
                                     if let Some(message) =
@@ -3363,14 +3446,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                             );
                         }
 
-                        CallError::Union {
-                            called_ty: _,
-                            bindings: _,
-                            errors,
-                        } => {
-                            // TODO: Remove the `Vec::from` call once we use the Rust 2024 edition
-                            //  which adds `Box<[T]>::into_iter`
-                            if let Some(first) = Vec::from(errors).into_iter().next() {
+                        CallError::Union(UnionCallError { errors, .. }) => {
+                            if let Some(first) = IntoIterator::into_iter(errors).next() {
                                 report_call_error(context, first, call_expression);
                             } else {
                                 debug_assert!(
@@ -3412,9 +3489,10 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = starred;
 
         let iterable_ty = self.infer_expression(value);
-        iterable_ty
-            .iterate(self.db())
-            .unwrap_with_diagnostic(&self.context, value.as_ref().into());
+        iterable_ty.try_iterate(self.db()).unwrap_or_else(|err| {
+            err.report_diagnostic(&self.context, value.as_ref().into());
+            err.fallback_element_type()
+        });
 
         // TODO
         todo_type!("starred expression")
@@ -3430,9 +3508,10 @@ impl<'db> TypeInferenceBuilder<'db> {
         let ast::ExprYieldFrom { range: _, value } = yield_from;
 
         let iterable_ty = self.infer_expression(value);
-        iterable_ty
-            .iterate(self.db())
-            .unwrap_with_diagnostic(&self.context, value.as_ref().into());
+        iterable_ty.try_iterate(self.db()).unwrap_or_else(|err| {
+            err.report_diagnostic(&self.context, value.as_ref().into());
+            err.fallback_element_type()
+        });
 
         // TODO get type from `ReturnType` of generator
         todo_type!("Generic `typing.Generator` type")
@@ -3546,7 +3625,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
 
             Symbol::Unbound
-                // No nonlocal binding? Check the module's globals.
+                // No nonlocal binding? Check the module's explicit globals.
                 // Avoid infinite recursion if `self.scope` already is the module's global scope.
                 .or_fall_back_to(db, || {
                     if file_scope_id.is_global() {
@@ -3563,8 +3642,12 @@ impl<'db> TypeInferenceBuilder<'db> {
                         }
                     }
 
-                    global_symbol(db, self.file(), symbol_name)
+                    explicit_global_symbol(db, self.file(), symbol_name)
                 })
+                // Not found in the module's explicitly declared global symbols?
+                // Check the "implicit globals" such as `__doc__`, `__file__`, `__name__`, etc.
+                // These are looked up as attributes on `types.ModuleType`.
+                .or_fall_back_to(db, || module_type_implicit_global_symbol(db, symbol_name))
                 // Not found in globals? Fallback to builtins
                 // (without infinite recursion if we're already in builtins.)
                 .or_fall_back_to(db, || {
@@ -3724,10 +3807,18 @@ impl<'db> TypeInferenceBuilder<'db> {
                 Type::IntLiteral(!i64::from(bool))
             }
 
-            (ast::UnaryOp::Not, ty) => ty.bool(self.db()).negate().into_type(self.db()),
+            (ast::UnaryOp::Not, ty) => ty
+                .try_bool(self.db())
+                .unwrap_or_else(|err| {
+                    err.report_diagnostic(&self.context, unary);
+                    err.fallback_truthiness()
+                })
+                .negate()
+                .into_type(self.db()),
             (
                 op @ (ast::UnaryOp::UAdd | ast::UnaryOp::USub | ast::UnaryOp::Invert),
                 Type::FunctionLiteral(_)
+                | Type::Callable(..)
                 | Type::ModuleLiteral(_)
                 | Type::ClassLiteral(_)
                 | Type::SubclassOf(_)
@@ -3752,10 +3843,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                     }
                 };
 
-                match operand_type.call_dunder(
+                match operand_type.try_call_dunder(
                     self.db(),
                     unary_dunder_method,
-                    &CallArguments::positional([operand_type]),
+                    &CallArguments::none(),
                 ) {
                     Ok(outcome) => outcome.return_type(self.db()),
                     Err(e) => {
@@ -3942,6 +4033,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             // fall back on looking for dunder methods on one of the operand types.
             (
                 Type::FunctionLiteral(_)
+                | Type::Callable(..)
                 | Type::ModuleLiteral(_)
                 | Type::ClassLiteral(_)
                 | Type::SubclassOf(_)
@@ -3958,6 +4050,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 | Type::SliceLiteral(_)
                 | Type::Tuple(_),
                 Type::FunctionLiteral(_)
+                | Type::Callable(..)
                 | Type::ModuleLiteral(_)
                 | Type::ClassLiteral(_)
                 | Type::SubclassOf(_)
@@ -4001,18 +4094,18 @@ impl<'db> TypeInferenceBuilder<'db> {
                         && rhs_reflected != left_class.member(self.db(), reflected_dunder)
                     {
                         return right_ty
-                            .call_dunder(
+                            .try_call_dunder(
                                 self.db(),
                                 reflected_dunder,
-                                &CallArguments::positional([right_ty, left_ty]),
+                                &CallArguments::positional([left_ty]),
                             )
                             .map(|outcome| outcome.return_type(self.db()))
                             .or_else(|_| {
                                 left_ty
-                                    .call_dunder(
+                                    .try_call_dunder(
                                         self.db(),
                                         op.dunder(),
-                                        &CallArguments::positional([left_ty, right_ty]),
+                                        &CallArguments::positional([right_ty]),
                                     )
                                     .map(|outcome| outcome.return_type(self.db()))
                             })
@@ -4025,7 +4118,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     left_class.member(self.db(), op.dunder())
                 {
                     class_member
-                        .call(self.db(), &CallArguments::positional([left_ty, right_ty]))
+                        .try_call(self.db(), &CallArguments::positional([left_ty, right_ty]))
                         .map(|outcome| outcome.return_type(self.db()))
                         .ok()
                 } else {
@@ -4041,7 +4134,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                         {
                             // TODO: Use `call_dunder`
                             class_member
-                                .call(self.db(), &CallArguments::positional([right_ty, left_ty]))
+                                .try_call(
+                                    self.db(),
+                                    &CallArguments::positional([right_ty, left_ty]),
+                                )
                                 .map(|outcome| outcome.return_type(self.db()))
                                 .ok()
                         } else {
@@ -4063,11 +4159,13 @@ impl<'db> TypeInferenceBuilder<'db> {
             *op,
             values.iter().enumerate(),
             |builder, (index, value)| {
-                if index == values.len() - 1 {
+                let ty = if index == values.len() - 1 {
                     builder.infer_expression(value)
                 } else {
                     builder.infer_standalone_expression(value)
-                }
+                };
+
+                (ty, value.range())
             },
         )
     }
@@ -4084,7 +4182,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     ) -> Type<'db>
     where
         Iterator: IntoIterator<Item = Item>,
-        F: Fn(&mut Self, Item) -> Type<'db>,
+        F: Fn(&mut Self, Item) -> (Type<'db>, TextRange),
     {
         let mut done = false;
         let db = self.db();
@@ -4092,37 +4190,48 @@ impl<'db> TypeInferenceBuilder<'db> {
         let elements = operations
             .into_iter()
             .with_position()
-            .map(|(position, ty)| {
-                let ty = infer_ty(self, ty);
-
-                if done {
-                    return Type::Never;
-                }
+            .map(|(position, item)| {
+                let (ty, range) = infer_ty(self, item);
 
                 let is_last = matches!(
                     position,
                     itertools::Position::Last | itertools::Position::Only
                 );
 
-                match (ty.bool(db), is_last, op) {
-                    (Truthiness::AlwaysTrue, false, ast::BoolOp::And) => Type::Never,
-                    (Truthiness::AlwaysFalse, false, ast::BoolOp::Or) => Type::Never,
-
-                    (Truthiness::AlwaysFalse, _, ast::BoolOp::And)
-                    | (Truthiness::AlwaysTrue, _, ast::BoolOp::Or) => {
-                        done = true;
+                if is_last {
+                    if done {
+                        Type::Never
+                    } else {
                         ty
                     }
+                } else {
+                    let truthiness = ty.try_bool(self.db()).unwrap_or_else(|err| {
+                        err.report_diagnostic(&self.context, range);
+                        err.fallback_truthiness()
+                    });
 
-                    (Truthiness::Ambiguous, false, _) => IntersectionBuilder::new(db)
-                        .add_positive(ty)
-                        .add_negative(match op {
-                            ast::BoolOp::And => Type::AlwaysTruthy,
-                            ast::BoolOp::Or => Type::AlwaysFalsy,
-                        })
-                        .build(),
+                    if done {
+                        return Type::Never;
+                    };
 
-                    (_, true, _) => ty,
+                    match (truthiness, op) {
+                        (Truthiness::AlwaysTrue, ast::BoolOp::And) => Type::Never,
+                        (Truthiness::AlwaysFalse, ast::BoolOp::Or) => Type::Never,
+
+                        (Truthiness::AlwaysFalse, ast::BoolOp::And)
+                        | (Truthiness::AlwaysTrue, ast::BoolOp::Or) => {
+                            done = true;
+                            ty
+                        }
+
+                        (Truthiness::Ambiguous, _) => IntersectionBuilder::new(db)
+                            .add_positive(ty)
+                            .add_negative(match op {
+                                ast::BoolOp::And => Type::AlwaysTruthy,
+                                ast::BoolOp::Or => Type::AlwaysFalsy,
+                            })
+                            .build(),
+                    }
                 }
             });
 
@@ -4138,9 +4247,6 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = compare;
 
         self.infer_expression(left);
-        for right in comparators {
-            self.infer_expression(right);
-        }
 
         // https://docs.python.org/3/reference/expressions.html#comparisons
         // > Formally, if `a, b, c, …, y, z` are expressions and `op1, op2, …, opN` are comparison
@@ -4157,15 +4263,17 @@ impl<'db> TypeInferenceBuilder<'db> {
                 .zip(ops),
             |builder, ((left, right), op)| {
                 let left_ty = builder.expression_type(left);
-                let right_ty = builder.expression_type(right);
+                let right_ty = builder.infer_expression(right);
 
-                builder
-                    .infer_binary_type_comparison(left_ty, *op, right_ty)
+                let range = TextRange::new(left.start(), right.end());
+
+                let ty = builder
+                    .infer_binary_type_comparison(left_ty, *op, right_ty, range)
                     .unwrap_or_else(|error| {
                         // Handle unsupported operators (diagnostic, `bool`/`Unknown` outcome)
                         builder.context.report_lint(
                             &UNSUPPORTED_OPERATOR,
-                            AnyNodeRef::ExprCompare(compare),
+                            range,
                             format_args!(
                                 "Operator `{}` is not supported for types `{}` and `{}`{}",
                                 error.op,
@@ -4192,7 +4300,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                             // Other operators can return arbitrary types
                             _ => Type::unknown(),
                         }
-                    })
+                    });
+
+                (ty, range)
             },
         )
     }
@@ -4203,14 +4313,19 @@ impl<'db> TypeInferenceBuilder<'db> {
         op: ast::CmpOp,
         other: Type<'db>,
         intersection_on: IntersectionOn,
+        range: TextRange,
     ) -> Result<Type<'db>, CompareUnsupportedError<'db>> {
         // If a comparison yields a definitive true/false answer on a (positive) part
         // of an intersection type, it will also yield a definitive answer on the full
         // intersection type, which is even more specific.
         for pos in intersection.positive(self.db()) {
             let result = match intersection_on {
-                IntersectionOn::Left => self.infer_binary_type_comparison(*pos, op, other)?,
-                IntersectionOn::Right => self.infer_binary_type_comparison(other, op, *pos)?,
+                IntersectionOn::Left => {
+                    self.infer_binary_type_comparison(*pos, op, other, range)?
+                }
+                IntersectionOn::Right => {
+                    self.infer_binary_type_comparison(other, op, *pos, range)?
+                }
             };
             if let Type::BooleanLiteral(b) = result {
                 return Ok(Type::BooleanLiteral(b));
@@ -4221,8 +4336,12 @@ impl<'db> TypeInferenceBuilder<'db> {
         // special cases that allow us to narrow down the result type of the comparison.
         for neg in intersection.negative(self.db()) {
             let result = match intersection_on {
-                IntersectionOn::Left => self.infer_binary_type_comparison(*neg, op, other).ok(),
-                IntersectionOn::Right => self.infer_binary_type_comparison(other, op, *neg).ok(),
+                IntersectionOn::Left => self
+                    .infer_binary_type_comparison(*neg, op, other, range)
+                    .ok(),
+                IntersectionOn::Right => self
+                    .infer_binary_type_comparison(other, op, *neg, range)
+                    .ok(),
             };
 
             match (op, result) {
@@ -4283,8 +4402,12 @@ impl<'db> TypeInferenceBuilder<'db> {
         let mut builder = IntersectionBuilder::new(self.db());
         for pos in intersection.positive(self.db()) {
             let result = match intersection_on {
-                IntersectionOn::Left => self.infer_binary_type_comparison(*pos, op, other)?,
-                IntersectionOn::Right => self.infer_binary_type_comparison(other, op, *pos)?,
+                IntersectionOn::Left => {
+                    self.infer_binary_type_comparison(*pos, op, other, range)?
+                }
+                IntersectionOn::Right => {
+                    self.infer_binary_type_comparison(other, op, *pos, range)?
+                }
             };
             builder = builder.add_positive(result);
         }
@@ -4303,6 +4426,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         left: Type<'db>,
         op: ast::CmpOp,
         right: Type<'db>,
+        range: TextRange,
     ) -> Result<Type<'db>, CompareUnsupportedError<'db>> {
         // Note: identity (is, is not) for equal builtin types is unreliable and not part of the
         // language spec.
@@ -4312,14 +4436,16 @@ impl<'db> TypeInferenceBuilder<'db> {
             (Type::Union(union), other) => {
                 let mut builder = UnionBuilder::new(self.db());
                 for element in union.elements(self.db()) {
-                    builder = builder.add(self.infer_binary_type_comparison(*element, op, other)?);
+                    builder =
+                        builder.add(self.infer_binary_type_comparison(*element, op, other, range)?);
                 }
                 Ok(builder.build())
             }
             (other, Type::Union(union)) => {
                 let mut builder = UnionBuilder::new(self.db());
                 for element in union.elements(self.db()) {
-                    builder = builder.add(self.infer_binary_type_comparison(other, op, *element)?);
+                    builder =
+                        builder.add(self.infer_binary_type_comparison(other, op, *element, range)?);
                 }
                 Ok(builder.build())
             }
@@ -4330,6 +4456,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     op,
                     right,
                     IntersectionOn::Left,
+                    range,
                 ),
             (left, Type::Intersection(intersection)) => self
                 .infer_binary_intersection_type_comparison(
@@ -4337,6 +4464,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     op,
                     left,
                     IntersectionOn::Right,
+                    range,
                 ),
 
             (Type::IntLiteral(n), Type::IntLiteral(m)) => match op {
@@ -4367,29 +4495,38 @@ impl<'db> TypeInferenceBuilder<'db> {
                     right_ty: right,
                 }),
             },
-            (Type::IntLiteral(_), Type::Instance(_)) => {
-                self.infer_binary_type_comparison(KnownClass::Int.to_instance(self.db()), op, right)
-            }
-            (Type::Instance(_), Type::IntLiteral(_)) => {
-                self.infer_binary_type_comparison(left, op, KnownClass::Int.to_instance(self.db()))
-            }
+            (Type::IntLiteral(_), Type::Instance(_)) => self.infer_binary_type_comparison(
+                KnownClass::Int.to_instance(self.db()),
+                op,
+                right,
+                range,
+            ),
+            (Type::Instance(_), Type::IntLiteral(_)) => self.infer_binary_type_comparison(
+                left,
+                op,
+                KnownClass::Int.to_instance(self.db()),
+                range,
+            ),
 
             // Booleans are coded as integers (False = 0, True = 1)
             (Type::IntLiteral(n), Type::BooleanLiteral(b)) => self.infer_binary_type_comparison(
                 Type::IntLiteral(n),
                 op,
                 Type::IntLiteral(i64::from(b)),
+                range,
             ),
             (Type::BooleanLiteral(b), Type::IntLiteral(m)) => self.infer_binary_type_comparison(
                 Type::IntLiteral(i64::from(b)),
                 op,
                 Type::IntLiteral(m),
+                range,
             ),
             (Type::BooleanLiteral(a), Type::BooleanLiteral(b)) => self
                 .infer_binary_type_comparison(
                     Type::IntLiteral(i64::from(a)),
                     op,
                     Type::IntLiteral(i64::from(b)),
+                    range,
                 ),
 
             (Type::StringLiteral(salsa_s1), Type::StringLiteral(salsa_s2)) => {
@@ -4420,19 +4557,31 @@ impl<'db> TypeInferenceBuilder<'db> {
                     }
                 }
             }
-            (Type::StringLiteral(_), _) => {
-                self.infer_binary_type_comparison(KnownClass::Str.to_instance(self.db()), op, right)
-            }
-            (_, Type::StringLiteral(_)) => {
-                self.infer_binary_type_comparison(left, op, KnownClass::Str.to_instance(self.db()))
-            }
+            (Type::StringLiteral(_), _) => self.infer_binary_type_comparison(
+                KnownClass::Str.to_instance(self.db()),
+                op,
+                right,
+                range,
+            ),
+            (_, Type::StringLiteral(_)) => self.infer_binary_type_comparison(
+                left,
+                op,
+                KnownClass::Str.to_instance(self.db()),
+                range,
+            ),
 
-            (Type::LiteralString, _) => {
-                self.infer_binary_type_comparison(KnownClass::Str.to_instance(self.db()), op, right)
-            }
-            (_, Type::LiteralString) => {
-                self.infer_binary_type_comparison(left, op, KnownClass::Str.to_instance(self.db()))
-            }
+            (Type::LiteralString, _) => self.infer_binary_type_comparison(
+                KnownClass::Str.to_instance(self.db()),
+                op,
+                right,
+                range,
+            ),
+            (_, Type::LiteralString) => self.infer_binary_type_comparison(
+                left,
+                op,
+                KnownClass::Str.to_instance(self.db()),
+                range,
+            ),
 
             (Type::BytesLiteral(salsa_b1), Type::BytesLiteral(salsa_b2)) => {
                 let b1 = &**salsa_b1.value(self.db());
@@ -4470,21 +4619,33 @@ impl<'db> TypeInferenceBuilder<'db> {
                 KnownClass::Bytes.to_instance(self.db()),
                 op,
                 right,
+                range,
             ),
             (_, Type::BytesLiteral(_)) => self.infer_binary_type_comparison(
                 left,
                 op,
                 KnownClass::Bytes.to_instance(self.db()),
+                range,
             ),
             (Type::Tuple(_), Type::Instance(InstanceType { class }))
                 if class.is_known(self.db(), KnownClass::VersionInfo) =>
             {
-                self.infer_binary_type_comparison(left, op, Type::version_info_tuple(self.db()))
+                self.infer_binary_type_comparison(
+                    left,
+                    op,
+                    Type::version_info_tuple(self.db()),
+                    range,
+                )
             }
             (Type::Instance(InstanceType { class }), Type::Tuple(_))
                 if class.is_known(self.db(), KnownClass::VersionInfo) =>
             {
-                self.infer_binary_type_comparison(Type::version_info_tuple(self.db()), op, right)
+                self.infer_binary_type_comparison(
+                    Type::version_info_tuple(self.db()),
+                    op,
+                    right,
+                    range,
+                )
             }
             (Type::Tuple(lhs), Type::Tuple(rhs)) => {
                 // Note: This only works on heterogeneous tuple types.
@@ -4492,7 +4653,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let rhs_elements = rhs.elements(self.db());
 
                 let mut tuple_rich_comparison =
-                    |op| self.infer_tuple_rich_comparison(lhs_elements, op, rhs_elements);
+                    |op| self.infer_tuple_rich_comparison(lhs_elements, op, rhs_elements, range);
 
                 match op {
                     ast::CmpOp::Eq => tuple_rich_comparison(RichCompareOperator::Eq),
@@ -4510,10 +4671,14 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 Type::Tuple(lhs),
                                 ast::CmpOp::Eq,
                                 *ty,
+                                range,
                             ).expect("infer_binary_type_comparison should never return None for `CmpOp::Eq`");
 
                             match eq_result {
                                 todo @ Type::Dynamic(DynamicType::Todo(_)) => return Ok(todo),
+                                // It's okay to ignore errors here because Python doesn't call `__bool__`
+                                // for different union variants. Instead, this is just for us to
+                                // evaluate a possibly truthy value to `false` or `true`.
                                 ty => match ty.bool(self.db()) {
                                     Truthiness::AlwaysTrue => eq_count += 1,
                                     Truthiness::AlwaysFalse => not_eq_count += 1,
@@ -4539,6 +4704,9 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                         Ok(match eq_result {
                             todo @ Type::Dynamic(DynamicType::Todo(_)) => todo,
+                            // It's okay to ignore errors here because Python doesn't call `__bool__`
+                            // for `is` and `is not` comparisons. This is an implementation detail
+                            // for how we determine the truthiness of a type.
                             ty => match ty.bool(self.db()) {
                                 Truthiness::AlwaysFalse => Type::BooleanLiteral(op.is_is_not()),
                                 _ => KnownClass::Bool.to_instance(self.db()),
@@ -4552,8 +4720,9 @@ impl<'db> TypeInferenceBuilder<'db> {
             (Type::Instance(left_instance), Type::Instance(right_instance)) => {
                 let rich_comparison =
                     |op| self.infer_rich_comparison(left_instance, right_instance, op);
-                let membership_test_comparison =
-                    |op| self.infer_membership_test_comparison(left_instance, right_instance, op);
+                let membership_test_comparison = |op, range: TextRange| {
+                    self.infer_membership_test_comparison(left_instance, right_instance, op, range)
+                };
                 match op {
                     ast::CmpOp::Eq => rich_comparison(RichCompareOperator::Eq),
                     ast::CmpOp::NotEq => rich_comparison(RichCompareOperator::Ne),
@@ -4561,9 +4730,11 @@ impl<'db> TypeInferenceBuilder<'db> {
                     ast::CmpOp::LtE => rich_comparison(RichCompareOperator::Le),
                     ast::CmpOp::Gt => rich_comparison(RichCompareOperator::Gt),
                     ast::CmpOp::GtE => rich_comparison(RichCompareOperator::Ge),
-                    ast::CmpOp::In => membership_test_comparison(MembershipTestCompareOperator::In),
+                    ast::CmpOp::In => {
+                        membership_test_comparison(MembershipTestCompareOperator::In, range)
+                    }
                     ast::CmpOp::NotIn => {
-                        membership_test_comparison(MembershipTestCompareOperator::NotIn)
+                        membership_test_comparison(MembershipTestCompareOperator::NotIn, range)
                     }
                     ast::CmpOp::Is => {
                         if left.is_disjoint_from(self.db(), right) {
@@ -4612,10 +4783,9 @@ impl<'db> TypeInferenceBuilder<'db> {
         let call_dunder = |op: RichCompareOperator,
                            left: InstanceType<'db>,
                            right: InstanceType<'db>| {
-            // TODO: How do we want to handle possibly unbound dunder methods?
             match left.class.class_member(db, op.dunder()) {
                 Symbol::Type(class_member_dunder, Boundness::Bound) => class_member_dunder
-                    .call(
+                    .try_call(
                         db,
                         &CallArguments::positional([Type::Instance(left), Type::Instance(right)]),
                     )
@@ -4657,6 +4827,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         left: InstanceType<'db>,
         right: InstanceType<'db>,
         op: MembershipTestCompareOperator,
+        range: TextRange,
     ) -> Result<Type<'db>, CompareUnsupportedError<'db>> {
         let db = self.db();
 
@@ -4665,7 +4836,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             Symbol::Type(contains_dunder, Boundness::Bound) => {
                 // If `__contains__` is available, it is used directly for the membership test.
                 contains_dunder
-                    .call(
+                    .try_call(
                         db,
                         &CallArguments::positional([Type::Instance(right), Type::Instance(left)]),
                     )
@@ -4674,11 +4845,10 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
             _ => {
                 // iteration-based membership test
-                match Type::Instance(right).iterate(db) {
-                    IterationOutcome::Iterable { .. } => Some(KnownClass::Bool.to_instance(db)),
-                    IterationOutcome::NotIterable { .. }
-                    | IterationOutcome::PossiblyUnboundDunderIter { .. } => None,
-                }
+                Type::Instance(right)
+                    .try_iterate(db)
+                    .map(|_| KnownClass::Bool.to_instance(db))
+                    .ok()
             }
         };
 
@@ -4688,7 +4858,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                     return ty;
                 }
 
-                let truthiness = ty.bool(db);
+                let truthiness = ty.try_bool(db).unwrap_or_else(|err| {
+                    err.report_diagnostic(&self.context, range);
+                    err.fallback_truthiness()
+                });
 
                 match op {
                     MembershipTestCompareOperator::In => truthiness.into_type(db),
@@ -4712,6 +4885,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         left: &[Type<'db>],
         op: RichCompareOperator,
         right: &[Type<'db>],
+        range: TextRange,
     ) -> Result<Type<'db>, CompareUnsupportedError<'db>> {
         let left_iter = left.iter().copied();
         let right_iter = right.iter().copied();
@@ -4720,46 +4894,49 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         for (l_ty, r_ty) in left_iter.zip(right_iter) {
             let pairwise_eq_result = self
-                .infer_binary_type_comparison(l_ty, ast::CmpOp::Eq, r_ty)
+                .infer_binary_type_comparison(l_ty, ast::CmpOp::Eq, r_ty, range)
                 .expect("infer_binary_type_comparison should never return None for `CmpOp::Eq`");
 
-            match pairwise_eq_result {
-                // If propagation is required, return the result as is
-                todo @ Type::Dynamic(DynamicType::Todo(_)) => return Ok(todo),
-                ty => match ty.bool(self.db()) {
-                    // - AlwaysTrue : Continue to the next pair for lexicographic comparison
-                    Truthiness::AlwaysTrue => continue,
-                    // - AlwaysFalse:
-                    // Lexicographic comparisons will always terminate with this pair.
-                    // Complete the comparison and return the result.
-                    // - Ambiguous:
-                    // Lexicographic comparisons might continue to the next pair (if eq_result is true),
-                    // or terminate here (if eq_result is false).
-                    // To account for cases where the comparison terminates here, add the pairwise comparison result to the union builder.
-                    eq_truthiness @ (Truthiness::AlwaysFalse | Truthiness::Ambiguous) => {
-                        let pairwise_compare_result = match op {
-                            RichCompareOperator::Lt
-                            | RichCompareOperator::Le
-                            | RichCompareOperator::Gt
-                            | RichCompareOperator::Ge => {
-                                self.infer_binary_type_comparison(l_ty, op.into(), r_ty)?
-                            }
-                            // For `==` and `!=`, we already figure out the result from `pairwise_eq_result`
-                            // NOTE: The CPython implementation does not account for non-boolean return types
-                            // or cases where `!=` is not the negation of `==`, we also do not consider these cases.
-                            RichCompareOperator::Eq => Type::BooleanLiteral(false),
-                            RichCompareOperator::Ne => Type::BooleanLiteral(true),
-                        };
-
-                        builder = builder.add(pairwise_compare_result);
-
-                        if eq_truthiness.is_ambiguous() {
-                            continue;
+            match pairwise_eq_result
+                .try_bool(self.db())
+                .unwrap_or_else(|err| {
+                    // TODO: We should, whenever possible, pass the range of the left and right elements
+                    //   instead of the range of the whole tuple.
+                    err.report_diagnostic(&self.context, range);
+                    err.fallback_truthiness()
+                }) {
+                // - AlwaysTrue : Continue to the next pair for lexicographic comparison
+                Truthiness::AlwaysTrue => continue,
+                // - AlwaysFalse:
+                // Lexicographic comparisons will always terminate with this pair.
+                // Complete the comparison and return the result.
+                // - Ambiguous:
+                // Lexicographic comparisons might continue to the next pair (if eq_result is true),
+                // or terminate here (if eq_result is false).
+                // To account for cases where the comparison terminates here, add the pairwise comparison result to the union builder.
+                eq_truthiness @ (Truthiness::AlwaysFalse | Truthiness::Ambiguous) => {
+                    let pairwise_compare_result = match op {
+                        RichCompareOperator::Lt
+                        | RichCompareOperator::Le
+                        | RichCompareOperator::Gt
+                        | RichCompareOperator::Ge => {
+                            self.infer_binary_type_comparison(l_ty, op.into(), r_ty, range)?
                         }
+                        // For `==` and `!=`, we already figure out the result from `pairwise_eq_result`
+                        // NOTE: The CPython implementation does not account for non-boolean return types
+                        // or cases where `!=` is not the negation of `==`, we also do not consider these cases.
+                        RichCompareOperator::Eq => Type::BooleanLiteral(false),
+                        RichCompareOperator::Ne => Type::BooleanLiteral(true),
+                    };
 
-                        return Ok(builder.build());
+                    builder = builder.add(pairwise_compare_result);
+
+                    if eq_truthiness.is_ambiguous() {
+                        continue;
                     }
-                },
+
+                    return Ok(builder.build());
+                }
             }
         }
 
@@ -4922,10 +5099,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                 // If the class defines `__getitem__`, return its return type.
                 //
                 // See: https://docs.python.org/3/reference/datamodel.html#class-getitem-versus-getitem
-                match value_ty.call_dunder(
+                match value_ty.try_call_dunder(
                     self.db(),
                     "__getitem__",
-                    &CallArguments::positional([value_ty, slice_ty]),
+                    &CallArguments::positional([slice_ty]),
                 ) {
                     Ok(outcome) => return outcome.return_type(self.db()),
                     Err(err @ CallDunderError::PossiblyUnbound { .. }) => {
@@ -4986,7 +5163,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             }
 
                             return ty
-                                .call(self.db(), &CallArguments::positional([value_ty, slice_ty]))
+                                .try_call(self.db(), &CallArguments::positional([value_ty, slice_ty]))
                                 .map(|outcome| outcome.return_type(self.db()))
                                 .unwrap_or_else(|err| {
                                     self.context.report_lint(
@@ -6217,6 +6394,7 @@ mod tests {
     use crate::semantic_index::definition::Definition;
     use crate::semantic_index::symbol::FileScopeId;
     use crate::semantic_index::{global_scope, semantic_index, symbol_table, use_def_map};
+    use crate::symbol::global_symbol;
     use crate::types::check_types;
     use ruff_db::files::{system_path_to_file, File};
     use ruff_db::system::DbWithTestSystem;
@@ -6610,6 +6788,95 @@ mod tests {
                 def f(self):
                     # a comment!
                     self.attr: str | None = None
+            "#,
+        )?;
+
+        let events = {
+            db.clear_salsa_events();
+            let attr_ty = global_symbol(&db, file_main, "x").expect_type();
+            assert_eq!(attr_ty.display(&db).to_string(), "Unknown | str | None");
+            db.take_salsa_events()
+        };
+
+        assert_function_query_was_not_run(
+            &db,
+            infer_expression_types,
+            x_rhs_expression(&db),
+            &events,
+        );
+
+        Ok(())
+    }
+
+    /// This test verifies that changing a class's declaration in a non-meaningful way (e.g. by adding a comment)
+    /// doesn't trigger type inference for expressions that depend on the class's members.
+    #[test]
+    fn dependency_own_instance_member() -> anyhow::Result<()> {
+        fn x_rhs_expression(db: &TestDb) -> Expression<'_> {
+            let file_main = system_path_to_file(db, "/src/main.py").unwrap();
+            let ast = parsed_module(db, file_main);
+            // Get the second statement in `main.py` (x = …) and extract the expression
+            // node on the right-hand side:
+            let x_rhs_node = &ast.syntax().body[1].as_assign_stmt().unwrap().value;
+
+            let index = semantic_index(db, file_main);
+            index.expression(x_rhs_node.as_ref())
+        }
+
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/mod.py",
+            r#"
+            class C:
+                if random.choice([True, False]):
+                    attr: int = 42
+                else:
+                    attr: None = None
+            "#,
+        )?;
+        db.write_dedented(
+            "/src/main.py",
+            r#"
+            from mod import C
+            x = C().attr
+            "#,
+        )?;
+
+        let file_main = system_path_to_file(&db, "/src/main.py").unwrap();
+        let attr_ty = global_symbol(&db, file_main, "x").expect_type();
+        assert_eq!(attr_ty.display(&db).to_string(), "Unknown | int | None");
+
+        // Change the type of `attr` to `str | None`; this should trigger the type of `x` to be re-inferred
+        db.write_dedented(
+            "/src/mod.py",
+            r#"
+            class C:
+                if random.choice([True, False]):
+                    attr: str = "42"
+                else:
+                    attr: None = None
+            "#,
+        )?;
+
+        let events = {
+            db.clear_salsa_events();
+            let attr_ty = global_symbol(&db, file_main, "x").expect_type();
+            assert_eq!(attr_ty.display(&db).to_string(), "Unknown | str | None");
+            db.take_salsa_events()
+        };
+        assert_function_query_was_run(&db, infer_expression_types, x_rhs_expression(&db), &events);
+
+        // Add a comment; this should not trigger the type of `x` to be re-inferred
+        db.write_dedented(
+            "/src/mod.py",
+            r#"
+            class C:
+                # comment
+                if random.choice([True, False]):
+                    attr: str = "42"
+                else:
+                    attr: None = None
             "#,
         )?;
 

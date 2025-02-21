@@ -57,11 +57,11 @@ impl<'db> CallOutcome<'db> {
                 not_callable_ty: Type::Union(union),
             })
         } else {
-            Err(CallError::Union {
+            Err(CallError::Union(UnionCallError {
                 errors: errors.into(),
                 bindings: bindings.into(),
                 called_ty: Type::Union(union),
-            })
+            }))
         }
     }
 
@@ -96,16 +96,7 @@ pub(super) enum CallError<'db> {
     /// can't be called with the given arguments.
     ///
     /// A union where all variants are not callable is represented as a `NotCallable` error.
-    Union {
-        /// The variants that can't be called with the given arguments.
-        errors: Box<[CallError<'db>]>,
-
-        /// The bindings for the callable variants (that have no binding errors).
-        bindings: Box<[CallBinding<'db>]>,
-
-        /// The union type that we tried calling.
-        called_ty: Type<'db>,
-    },
+    Union(UnionCallError<'db>),
 
     /// The type has a `__call__` method but it isn't always bound.
     PossiblyUnboundDunderCall {
@@ -126,9 +117,9 @@ impl<'db> CallError<'db> {
             CallError::NotCallable { .. } => None,
             // If some variants are callable, and some are not, return the union of the return types of the callable variants
             // combined with `Type::Unknown`
-            CallError::Union {
-                errors, bindings, ..
-            } => Some(UnionType::from_elements(
+            CallError::Union(UnionCallError {
+                bindings, errors, ..
+            }) => Some(UnionType::from_elements(
                 db,
                 bindings
                     .iter()
@@ -158,7 +149,7 @@ impl<'db> CallError<'db> {
             Self::NotCallable {
                 not_callable_ty, ..
             } => *not_callable_ty,
-            Self::Union { called_ty, .. } => *called_ty,
+            Self::Union(UnionCallError { called_ty, .. }) => *called_ty,
             Self::PossiblyUnboundDunderCall { called_type, .. } => *called_type,
             Self::BindingError { binding } => binding.callable_type(),
         }
@@ -167,6 +158,18 @@ impl<'db> CallError<'db> {
     pub(super) const fn is_not_callable(&self) -> bool {
         matches!(self, Self::NotCallable { .. })
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct UnionCallError<'db> {
+    /// The variants that can't be called with the given arguments.
+    pub(super) errors: Box<[CallError<'db>]>,
+
+    /// The bindings for the callable variants (that have no binding errors).
+    pub(super) bindings: Box<[CallBinding<'db>]>,
+
+    /// The union type that we tried calling.
+    pub(super) called_ty: Type<'db>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

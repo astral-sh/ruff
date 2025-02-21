@@ -78,7 +78,6 @@ pub(crate) fn bind_call<'db>(
         if let Some(expected_ty) = parameter.annotated_type() {
             if !argument_ty.is_assignable_to(db, expected_ty) {
                 errors.push(CallBindingError::InvalidArgumentType {
-                    callable_ty,
                     parameter: ParameterContext::new(parameter, index, positional),
                     argument_index: get_argument_index(argument_index, num_synthetic_args),
                     expected_ty,
@@ -194,6 +193,13 @@ impl<'db> CallBinding<'db> {
         }
     }
 
+    pub(crate) fn three_parameter_types(&self) -> Option<(Type<'db>, Type<'db>, Type<'db>)> {
+        match self.parameter_types() {
+            [first, second, third] => Some((*first, *second, *third)),
+            _ => None,
+        }
+    }
+
     fn callable_name(&self, db: &'db dyn Db) -> Option<&str> {
         match self.callable_ty {
             Type::FunctionLiteral(function) => Some(function.name(db)),
@@ -205,7 +211,7 @@ impl<'db> CallBinding<'db> {
     pub(crate) fn report_diagnostics(&self, context: &InferContext<'db>, node: ast::AnyNodeRef) {
         let callable_name = self.callable_name(context.db());
         for error in &self.errors {
-            error.report_diagnostic(context, node, callable_name);
+            error.report_diagnostic(context, node, self.callable_ty, callable_name);
         }
     }
 
@@ -272,7 +278,6 @@ pub(crate) enum CallBindingError<'db> {
     /// The type of an argument is not assignable to the annotated type of its corresponding
     /// parameter.
     InvalidArgumentType {
-        callable_ty: Type<'db>,
         parameter: ParameterContext,
         argument_index: Option<usize>,
         expected_ty: Type<'db>,
@@ -303,11 +308,11 @@ impl<'db> CallBindingError<'db> {
         &self,
         context: &InferContext<'db>,
         node: ast::AnyNodeRef,
+        callable_ty: Type<'db>,
         callable_name: Option<&str>,
     ) {
         match self {
             Self::InvalidArgumentType {
-                callable_ty,
                 parameter,
                 argument_index,
                 expected_ty,
