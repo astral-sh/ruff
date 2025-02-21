@@ -93,7 +93,7 @@ pub(crate) fn manual_list_copy(checker: &Checker, for_stmt: &ast::StmtFor) {
     }
 
     // Only flag direct list copies (e.g., `for x in y: filtered.append(x)`).
-    if !arg.as_name_expr().is_some_and(|arg| arg.id == *id) {
+    if arg.as_name_expr().is_none_or(|arg| arg.id != *id) {
         return;
     }
 

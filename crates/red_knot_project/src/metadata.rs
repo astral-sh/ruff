@@ -77,10 +77,10 @@ impl ProjectMetadata {
         // If the `options` don't specify a python version but the `project.requires-python` field is set,
         // use that as a lower bound instead.
         if let Some(project) = project {
-            if !options
+            if options
                 .environment
                 .as_ref()
-                .is_some_and(|env| env.python_version.is_some())
+                .is_none_or(|env| env.python_version.is_none())
             {
                 if let Some(requires_python) = project.resolve_requires_python_lower_bound()? {
                     let mut environment = options.environment.unwrap_or_default();
