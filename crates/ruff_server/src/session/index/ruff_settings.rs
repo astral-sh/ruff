@@ -18,7 +18,9 @@ use ruff_workspace::{
     resolver::{ConfigurationTransformer, Relativity},
 };
 
-use crate::session::settings::{ConfigurationPreference, ResolvedEditorSettings};
+use crate::session::settings::{
+    ConfigurationPreference, ResolvedConfiguration, ResolvedEditorSettings,
+};
 
 #[derive(Debug)]
 pub struct RuffSettings {
@@ -363,21 +365,41 @@ impl ConfigurationTransformer for EditorConfigurationTransformer<'_> {
             ..Configuration::default()
         };
 
-        // Merge in the editor-specified configuration file, if it exists.
-        let editor_configuration = if let Some(config_file_path) = configuration {
-            tracing::debug!(
-                "Combining settings from editor-specified configuration file at: {}",
-                config_file_path.display()
-            );
-            match open_configuration_file(&config_file_path) {
-                Ok(config_from_file) => editor_configuration.combine(config_from_file),
-                err => {
-                    tracing::error!(
-                        "{:?}",
-                        err.context("Unable to load editor-specified configuration file")
-                            .unwrap_err()
+        // Merge in the editor-specified configuration.
+        let editor_configuration = if let Some(configuration) = configuration {
+            match configuration {
+                ResolvedConfiguration::FilePath(path) => {
+                    tracing::debug!(
+                        "Combining settings from editor-specified configuration file at: {}",
+                        path.display()
                     );
-                    editor_configuration
+                    match open_configuration_file(&path) {
+                        Ok(config_from_file) => editor_configuration.combine(config_from_file),
+                        err => {
+                            tracing::error!(
+                                "{:?}",
+                                err.context("Unable to load editor-specified configuration file")
+                                    .unwrap_err()
+                            );
+                            editor_configuration
+                        }
+                    }
+                }
+                ResolvedConfiguration::Inline(options) => {
+                    tracing::debug!(
+                        "Combining settings from editor-specified inline configuration"
+                    );
+                    match Configuration::from_options(options, None, project_root) {
+                        Ok(configuration) => editor_configuration.combine(configuration),
+                        err => {
+                            tracing::error!(
+                                "{:?}",
+                                err.context("Unable to load editor-specified inline configuration")
+                                    .unwrap_err()
+                            );
+                            editor_configuration
+                        }
+                    }
                 }
             }
         } else {

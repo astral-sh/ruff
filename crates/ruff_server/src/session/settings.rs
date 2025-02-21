@@ -3,8 +3,11 @@ use std::{ops::Deref, path::PathBuf, str::FromStr};
 use lsp_types::Url;
 use rustc_hash::FxHashMap;
 use serde::Deserialize;
+use serde_json::{Map, Value};
+use thiserror::Error;
 
 use ruff_linter::{line_width::LineLength, RuleSelector};
+use ruff_workspace::options::Options;
 
 /// Maps a workspace URI to its associated client settings. Used during server initialization.
 pub(crate) type WorkspaceSettingsMap = FxHashMap<Url, ClientSettings>;
@@ -31,7 +34,7 @@ pub(crate) struct ResolvedClientSettings {
 #[derive(Clone, Debug)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 pub(crate) struct ResolvedEditorSettings {
-    pub(super) configuration: Option<PathBuf>,
+    pub(super) configuration: Option<ResolvedConfiguration>,
     pub(super) lint_preview: Option<bool>,
     pub(super) format_preview: Option<bool>,
     pub(super) select: Option<Vec<RuleSelector>>,
@@ -40,6 +43,48 @@ pub(crate) struct ResolvedEditorSettings {
     pub(super) exclude: Option<Vec<String>>,
     pub(super) line_length: Option<LineLength>,
     pub(super) configuration_preference: ConfigurationPreference,
+}
+
+/// The resolved configuration from the client settings.
+#[derive(Clone, Debug)]
+#[cfg_attr(test, derive(PartialEq, Eq))]
+pub(crate) enum ResolvedConfiguration {
+    FilePath(PathBuf),
+    Inline(Options),
+}
+
+impl TryFrom<&ClientConfiguration> for ResolvedConfiguration {
+    type Error = ResolvedConfigurationError;
+
+    fn try_from(value: &ClientConfiguration) -> Result<Self, Self::Error> {
+        match value {
+            ClientConfiguration::String(path) => Ok(ResolvedConfiguration::FilePath(
+                PathBuf::from(shellexpand::full(path)?.as_ref()),
+            )),
+            ClientConfiguration::Object(map) => {
+                let options = toml::Table::try_from(map)?.try_into::<Options>()?;
+                if options.extend.is_some() {
+                    Err(ResolvedConfigurationError::ExtendNotSupported)
+                } else {
+                    Ok(ResolvedConfiguration::Inline(options))
+                }
+            }
+        }
+    }
+}
+
+/// An error that can occur when trying to resolve the `configuration` value from the client
+/// settings.
+#[derive(Debug, Error)]
+pub(crate) enum ResolvedConfigurationError {
+    #[error(transparent)]
+    EnvVarLookupError(#[from] shellexpand::LookupError<std::env::VarError>),
+    #[error("error serializing configuration to TOML: {0}")]
+    InvalidToml(#[from] toml::ser::Error),
+    #[error(transparent)]
+    InvalidRuffSchema(#[from] toml::de::Error),
+    #[error("using `extend` is unsupported for inline configuration")]
+    ExtendNotSupported,
 }
 
 /// Determines how multiple conflicting configurations should be resolved - in this
@@ -57,12 +102,23 @@ pub(crate) enum ConfigurationPreference {
     EditorOnly,
 }
 
+/// A direct representation of of `configuration` schema within the client settings.
+#[derive(Debug, Deserialize)]
+#[cfg_attr(test, derive(PartialEq, Eq))]
+#[serde(untagged)]
+enum ClientConfiguration {
+    /// A path to a configuration file.
+    String(String),
+    /// An object containing the configuration options.
+    Object(Map<String, Value>),
+}
+
 /// This is a direct representation of the settings schema sent by the client.
 #[derive(Debug, Deserialize, Default)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[serde(rename_all = "camelCase")]
 pub struct ClientSettings {
-    configuration: Option<String>,
+    configuration: Option<ClientConfiguration>,
     fix_all: Option<bool>,
     organize_imports: Option<bool>,
     lint: Option<LintOptions>,
@@ -306,11 +362,15 @@ impl ResolvedClientSettings {
             ),
             editor_settings: ResolvedEditorSettings {
                 configuration: Self::resolve_optional(all_settings, |settings| {
-                    settings
-                        .configuration
-                        .as_ref()
-                        .and_then(|config_path| shellexpand::full(config_path).ok())
-                        .map(|config_path| PathBuf::from(config_path.as_ref()))
+                    settings.configuration.as_ref().and_then(|configuration| {
+                        match ResolvedConfiguration::try_from(configuration) {
+                            Ok(configuration) => Some(configuration),
+                            Err(err) => {
+                                tracing::error!("Failed to resolve configuration: {err}");
+                                None
+                            }
+                        }
+                    })
                 }),
                 lint_preview: Self::resolve_optional(all_settings, |settings| {
                     settings.lint.as_ref()?.preview
@@ -444,6 +504,9 @@ mod tests {
     // the `cwd` and the `workspace` value.
     const EMPTY_MULTIPLE_WORKSPACE_INIT_OPTIONS_FIXTURE: &str =
         include_str!("../../resources/test/fixtures/settings/empty_multiple_workspace.json");
+
+    const INLINE_CONFIGURATION_FIXTURE: &str =
+        include_str!("../../resources/test/fixtures/settings/inline_configuration.json");
 
     fn deserialize_fixture<T: DeserializeOwned>(content: &str) -> T {
         serde_json::from_str(content).expect("test fixture JSON should deserialize")
@@ -854,5 +917,201 @@ mod tests {
 
         all_settings.set_preview(true);
         assert_preview_all_settings(&all_settings, true);
+    }
+
+    #[test]
+    fn inline_configuration() {
+        let options: InitializationOptions = deserialize_fixture(INLINE_CONFIGURATION_FIXTURE);
+
+        let AllSettings {
+            global_settings,
+            workspace_settings: None,
+        } = AllSettings::from_init_options(options)
+        else {
+            panic!("Expected global settings only");
+        };
+
+        let settings = ResolvedClientSettings::global(&global_settings);
+
+        assert_debug_snapshot!(settings.editor_settings, @r"
+        ResolvedEditorSettings {
+            configuration: Some(
+                Inline(
+                    Options {
+                        cache_dir: None,
+                        extend: None,
+                        output_format: None,
+                        fix: None,
+                        unsafe_fixes: None,
+                        fix_only: None,
+                        show_fixes: None,
+                        required_version: None,
+                        preview: None,
+                        exclude: None,
+                        extend_exclude: None,
+                        extend_include: None,
+                        force_exclude: None,
+                        include: None,
+                        respect_gitignore: None,
+                        builtins: None,
+                        namespace_packages: None,
+                        target_version: None,
+                        src: None,
+                        line_length: Some(
+                            LineLength(
+                                100,
+                            ),
+                        ),
+                        indent_width: None,
+                        lint: Some(
+                            LintOptions {
+                                common: LintCommonOptions {
+                                    allowed_confusables: None,
+                                    dummy_variable_rgx: None,
+                                    extend_ignore: None,
+                                    extend_select: Some(
+                                        [
+                                            Rule {
+                                                prefix: Isort(
+                                                    _001,
+                                                ),
+                                                redirected_from: None,
+                                            },
+                                        ],
+                                    ),
+                                    extend_fixable: None,
+                                    extend_unfixable: None,
+                                    external: None,
+                                    fixable: None,
+                                    ignore: None,
+                                    extend_safe_fixes: None,
+                                    extend_unsafe_fixes: None,
+                                    ignore_init_module_imports: None,
+                                    logger_objects: None,
+                                    select: None,
+                                    explicit_preview_rules: None,
+                                    task_tags: None,
+                                    typing_modules: None,
+                                    unfixable: None,
+                                    flake8_annotations: None,
+                                    flake8_bandit: None,
+                                    flake8_boolean_trap: None,
+                                    flake8_bugbear: None,
+                                    flake8_builtins: None,
+                                    flake8_comprehensions: None,
+                                    flake8_copyright: None,
+                                    flake8_errmsg: None,
+                                    flake8_quotes: None,
+                                    flake8_self: None,
+                                    flake8_tidy_imports: None,
+                                    flake8_type_checking: None,
+                                    flake8_gettext: None,
+                                    flake8_implicit_str_concat: None,
+                                    flake8_import_conventions: None,
+                                    flake8_pytest_style: None,
+                                    flake8_unused_arguments: None,
+                                    isort: None,
+                                    mccabe: None,
+                                    pep8_naming: None,
+                                    pycodestyle: None,
+                                    pydocstyle: None,
+                                    pyflakes: None,
+                                    pylint: None,
+                                    pyupgrade: None,
+                                    per_file_ignores: None,
+                                    extend_per_file_ignores: None,
+                                },
+                                exclude: None,
+                                pydoclint: None,
+                                ruff: None,
+                                preview: None,
+                            },
+                        ),
+                        lint_top_level: DeprecatedTopLevelLintOptions(
+                            LintCommonOptions {
+                                allowed_confusables: None,
+                                dummy_variable_rgx: None,
+                                extend_ignore: None,
+                                extend_select: None,
+                                extend_fixable: None,
+                                extend_unfixable: None,
+                                external: None,
+                                fixable: None,
+                                ignore: None,
+                                extend_safe_fixes: None,
+                                extend_unsafe_fixes: None,
+                                ignore_init_module_imports: None,
+                                logger_objects: None,
+                                select: None,
+                                explicit_preview_rules: None,
+                                task_tags: None,
+                                typing_modules: None,
+                                unfixable: None,
+                                flake8_annotations: None,
+                                flake8_bandit: None,
+                                flake8_boolean_trap: None,
+                                flake8_bugbear: None,
+                                flake8_builtins: None,
+                                flake8_comprehensions: None,
+                                flake8_copyright: None,
+                                flake8_errmsg: None,
+                                flake8_quotes: None,
+                                flake8_self: None,
+                                flake8_tidy_imports: None,
+                                flake8_type_checking: None,
+                                flake8_gettext: None,
+                                flake8_implicit_str_concat: None,
+                                flake8_import_conventions: None,
+                                flake8_pytest_style: None,
+                                flake8_unused_arguments: None,
+                                isort: None,
+                                mccabe: None,
+                                pep8_naming: None,
+                                pycodestyle: None,
+                                pydocstyle: None,
+                                pyflakes: None,
+                                pylint: None,
+                                pyupgrade: None,
+                                per_file_ignores: None,
+                                extend_per_file_ignores: None,
+                            },
+                        ),
+                        format: Some(
+                            FormatOptions {
+                                exclude: None,
+                                preview: None,
+                                indent_style: None,
+                                quote_style: Some(
+                                    Single,
+                                ),
+                                skip_magic_trailing_comma: None,
+                                line_ending: None,
+                                docstring_code_format: None,
+                                docstring_code_line_length: None,
+                            },
+                        ),
+                        analyze: None,
+                    },
+                ),
+            ),
+            lint_preview: None,
+            format_preview: None,
+            select: None,
+            extend_select: Some(
+                [
+                    Rule {
+                        prefix: Ruff(
+                            _001,
+                        ),
+                        redirected_from: None,
+                    },
+                ],
+            ),
+            ignore: None,
+            exclude: None,
+            line_length: None,
+            configuration_preference: EditorFirst,
+        }
+        ");
     }
 }
