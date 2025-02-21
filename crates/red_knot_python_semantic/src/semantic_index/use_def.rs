@@ -260,20 +260,22 @@ use ruff_index::{newtype_index, IndexVec};
 use rustc_hash::FxHashMap;
 
 use self::symbol_state::{
-    ConstraintIndexIterator, LiveBindingsIterator, LiveDeclaration, LiveDeclarationsIterator,
-    ScopedDefinitionId, SymbolBindings, SymbolDeclarations, SymbolState,
+    LiveBindingsIterator, LiveDeclaration, LiveDeclarationsIterator, ScopedDefinitionId,
+    SymbolBindings, SymbolDeclarations, SymbolState,
 };
 use crate::semantic_index::ast_ids::ScopedUseId;
 use crate::semantic_index::constraint::{
     Constraint, Constraints, ConstraintsBuilder, ScopedConstraintId,
 };
 use crate::semantic_index::definition::Definition;
+use crate::semantic_index::narrowing_constraints::{
+    NarrowingConstraints, NarrowingConstraintsBuilder, NarrowingConstraintsIterator,
+};
 use crate::semantic_index::symbol::{FileScopeId, ScopedSymbolId};
 use crate::semantic_index::visibility_constraints::{
     ScopedVisibilityConstraintId, VisibilityConstraints, VisibilityConstraintsBuilder,
 };
 
-mod bitset;
 mod symbol_state;
 
 /// Applicable definitions and constraints for every use of a name.
@@ -285,6 +287,9 @@ pub(crate) struct UseDefMap<'db> {
 
     /// Array of [`Constraint`] in this scope.
     constraints: Constraints<'db>,
+
+    /// Array of narrowing constraints in this scope.
+    narrowing_constraints: NarrowingConstraints,
 
     /// Array of visibility constraints in this scope.
     visibility_constraints: VisibilityConstraints,
@@ -370,6 +375,7 @@ impl<'db> UseDefMap<'db> {
         BindingWithConstraintsIterator {
             all_definitions: &self.all_definitions,
             constraints: &self.constraints,
+            narrowing_constraints: &self.narrowing_constraints,
             visibility_constraints: &self.visibility_constraints,
             inner: bindings.iter(),
         }
@@ -416,6 +422,7 @@ type EagerBindings = IndexVec<ScopedEagerBindingsId, SymbolBindings>;
 pub(crate) struct BindingWithConstraintsIterator<'map, 'db> {
     all_definitions: &'map IndexVec<ScopedDefinitionId, Option<Definition<'db>>>,
     pub(crate) constraints: &'map Constraints<'db>,
+    pub(crate) narrowing_constraints: &'map NarrowingConstraints,
     pub(crate) visibility_constraints: &'map VisibilityConstraints,
     inner: LiveBindingsIterator<'map>,
 }
@@ -425,6 +432,7 @@ impl<'map, 'db> Iterator for BindingWithConstraintsIterator<'map, 'db> {
 
     fn next(&mut self) -> Option<Self::Item> {
         let constraints = self.constraints;
+        let narrowing_constraints = self.narrowing_constraints;
 
         self.inner
             .next()
@@ -432,7 +440,9 @@ impl<'map, 'db> Iterator for BindingWithConstraintsIterator<'map, 'db> {
                 binding: self.all_definitions[live_binding.binding],
                 narrowing_constraints: ConstraintsIterator {
                     constraints,
-                    constraint_ids: live_binding.narrowing_constraints.iter(),
+                    narrowing_constraints,
+                    constraint_ids: narrowing_constraints
+                        .iter_constraints(live_binding.narrowing_constraints),
                 },
                 visibility_constraint: live_binding.visibility_constraint,
             })
@@ -449,16 +459,18 @@ pub(crate) struct BindingWithConstraints<'map, 'db> {
 
 pub(crate) struct ConstraintsIterator<'map, 'db> {
     constraints: &'map Constraints<'db>,
-    constraint_ids: ConstraintIndexIterator<'map>,
+    narrowing_constraints: &'map NarrowingConstraints,
+    constraint_ids: NarrowingConstraintsIterator<'map>,
 }
 
 impl<'db> Iterator for ConstraintsIterator<'_, 'db> {
     type Item = Constraint<'db>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.constraint_ids
-            .next()
-            .map(|constraint_id| self.constraints[ScopedConstraintId::from_u32(constraint_id)])
+        self.constraint_ids.next().map(|narrowing_constraint_id| {
+            let narrowing_constraint = &self.narrowing_constraints[narrowing_constraint_id];
+            self.constraints[narrowing_constraint.constraint]
+        })
     }
 }
 
@@ -509,7 +521,10 @@ pub(super) struct UseDefMapBuilder<'db> {
     all_definitions: IndexVec<ScopedDefinitionId, Option<Definition<'db>>>,
 
     /// Builder of constraints.
-    constraints: ConstraintsBuilder<'db>,
+    pub(super) constraints: ConstraintsBuilder<'db>,
+
+    /// Builder of narrowing constraints.
+    pub(super) narrowing_constraints: NarrowingConstraintsBuilder,
 
     /// Builder of visibility constraints.
     pub(super) visibility_constraints: VisibilityConstraintsBuilder,
@@ -542,6 +557,7 @@ impl Default for UseDefMapBuilder<'_> {
         Self {
             all_definitions: IndexVec::from_iter([None]),
             constraints: ConstraintsBuilder::default(),
+            narrowing_constraints: NarrowingConstraintsBuilder::default(),
             visibility_constraints: VisibilityConstraintsBuilder::default(),
             scope_start_visibility: ScopedVisibilityConstraintId::ALWAYS_TRUE,
             bindings_by_use: IndexVec::new(),
@@ -578,8 +594,9 @@ impl<'db> UseDefMapBuilder<'db> {
     }
 
     pub(super) fn record_constraint_id(&mut self, constraint: ScopedConstraintId) {
+        let narrowing_constraint = self.narrowing_constraints.add_constraint(constraint);
         for state in &mut self.symbol_states {
-            state.record_constraint(constraint);
+            state.record_constraint(&mut self.narrowing_constraints, narrowing_constraint);
         }
     }
 
@@ -737,10 +754,15 @@ impl<'db> UseDefMapBuilder<'db> {
         let mut snapshot_definitions_iter = snapshot.symbol_states.into_iter();
         for current in &mut self.symbol_states {
             if let Some(snapshot) = snapshot_definitions_iter.next() {
-                current.merge(snapshot, &mut self.visibility_constraints);
+                current.merge(
+                    snapshot,
+                    &mut self.narrowing_constraints,
+                    &mut self.visibility_constraints,
+                );
             } else {
                 current.merge(
                     SymbolState::undefined(snapshot.scope_start_visibility),
+                    &mut self.narrowing_constraints,
                     &mut self.visibility_constraints,
                 );
                 // Symbol not present in snapshot, so it's unbound/undeclared from that path.
@@ -763,6 +785,7 @@ impl<'db> UseDefMapBuilder<'db> {
         UseDefMap {
             all_definitions: self.all_definitions,
             constraints: self.constraints.build(),
+            narrowing_constraints: self.narrowing_constraints.build(),
             visibility_constraints: self.visibility_constraints.build(),
             bindings_by_use: self.bindings_by_use,
             public_symbols: self.symbol_states,

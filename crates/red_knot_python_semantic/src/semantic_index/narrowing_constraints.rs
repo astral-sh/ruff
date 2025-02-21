@@ -87,6 +87,20 @@ impl NarrowingConstraints {
     }
 }
 
+impl NarrowingConstraintsBuilder {
+    // This is currently only used in tests, but needs to be defined here to not overly publicize
+    // our internal fields.
+    #[cfg(test)]
+    pub(crate) fn iter_constraints(
+        &self,
+        set: Option<ScopedNarrowingConstraintSetId>,
+    ) -> NarrowingConstraintsIterator<'_> {
+        NarrowingConstraintsIterator {
+            wrapped: self.lists.iter(set),
+        }
+    }
+}
+
 impl Iterator for NarrowingConstraintsIterator<'_> {
     type Item = ScopedNarrowingConstraintId;
 
