@@ -257,28 +257,79 @@ method_wrapper(C(), C, "one too many")
 
 ## `@classmethod`
 
+### Basic
+
+When a `@classmethod` attribute is accessed, it returns a bound method object, even when accessed on
+the class object itself:
+
 ```py
 from __future__ import annotations
-
-from inspect import getattr_static
 
 class C:
     @classmethod
     def f(cls: type[C], x: int) -> str:
         return "a"
 
-reveal_type(getattr_static(C, "f"))  # revealed: Literal[f]
-reveal_type(getattr_static(C, "f").__get__)  # revealed: <method-wrapper `__get__` of `f`>
-
-reveal_type(getattr_static(C, "f").__get__(None, C))  # revealed: <bound method `f` of `Literal[C]`>
-reveal_type(getattr_static(C, "f").__get__(C()))  # revealed: <bound method `f` of `type[C]`>
-
-# Class methods are bound even when accessed on the class object:
 reveal_type(C.f)  # revealed: <bound method `f` of `Literal[C]`>
 reveal_type(C().f)  # revealed: <bound method `f` of `type[C]`>
+```
 
+The `cls` method argument is then implicitly passed as the first argument when calling the method:
+
+```py
 reveal_type(C.f(1))  # revealed: str
 reveal_type(C().f(1))  # revealed: str
+```
+
+When the class method is called incorrectly, we detect it:
+
+```py
+C.f("incorrect")  # error: [invalid-argument-type]
+C.f()  # error: [missing-argument]
+C.f(1, 2)  # error: [too-many-positional-arguments]
+```
+
+If the `cls` parameter is wrongly annotated, we emit an error at the call site:
+
+```py
+class D:
+    @classmethod
+    def f(cls: D):
+        # This function is wrongly annotated, it should be `type[D]` instead of `D`
+        pass
+
+# error: [invalid-argument-type] "Object of type `Literal[D]` cannot be assigned to parameter 1 (`cls`); expected type `D`"
+D.f()
+```
+
+### Accessing the classmethod as a static member
+
+Accessing a `@classmethod`-decorated function at runtime returns a `classmethod` object. We
+currently don't model this explicitly:
+
+```py
+from inspect import getattr_static
+
+class C:
+    @classmethod
+    def f(cls): ...
+
+reveal_type(getattr_static(C, "f"))  # revealed: Literal[f]
+reveal_type(getattr_static(C, "f").__get__)  # revealed: <method-wrapper `__get__` of `f`>
+```
+
+But we correctly model how the `classmethod` descriptor works:
+
+```py
+reveal_type(getattr_static(C, "f").__get__(None, C))  # revealed: <bound method `f` of `Literal[C]`>
+reveal_type(getattr_static(C, "f").__get__(C(), C))  # revealed: <bound method `f` of `Literal[C]`>
+reveal_type(getattr_static(C, "f").__get__(C()))  # revealed: <bound method `f` of `type[C]`>
+```
+
+The `owner` argument takes precedence over the `instance` argument:
+
+```py
+reveal_type(getattr_static(C, "f").__get__("dummy", C))  # revealed: <bound method `f` of `Literal[C]`>
 ```
 
 [functions and methods]: https://docs.python.org/3/howto/descriptor.html#functions-and-methods
