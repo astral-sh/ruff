@@ -1249,6 +1249,13 @@ impl Stmt {
 /// See also [expr](https://docs.python.org/3/library/ast.html#ast.expr)
 #[derive(Clone, Debug, PartialEq)]
 pub enum Expr {
+    BoolOp(crate::ExprBoolOp),
+    Named(crate::ExprNamed),
+    BinOp(crate::ExprBinOp),
+    UnaryOp(crate::ExprUnaryOp),
+    Lambda(crate::ExprLambda),
+    If(crate::ExprIf),
+    Dict(crate::ExprDict),
     Set(crate::ExprSet),
     ListComp(crate::ExprListComp),
     SetComp(crate::ExprSetComp),
@@ -1274,13 +1281,48 @@ pub enum Expr {
     Tuple(crate::ExprTuple),
     Slice(crate::ExprSlice),
     IpyEscapeCommand(crate::ExprIpyEscapeCommand),
-    BoolOp(crate::ExprBoolOp),
-    Named(crate::ExprNamed),
-    BinOp(crate::ExprBinOp),
-    UnaryOp(crate::ExprUnaryOp),
-    Lambda(crate::ExprLambda),
-    If(crate::ExprIf),
-    Dict(crate::ExprDict),
+}
+
+impl From<crate::ExprBoolOp> for Expr {
+    fn from(node: crate::ExprBoolOp) -> Self {
+        Self::BoolOp(node)
+    }
+}
+
+impl From<crate::ExprNamed> for Expr {
+    fn from(node: crate::ExprNamed) -> Self {
+        Self::Named(node)
+    }
+}
+
+impl From<crate::ExprBinOp> for Expr {
+    fn from(node: crate::ExprBinOp) -> Self {
+        Self::BinOp(node)
+    }
+}
+
+impl From<crate::ExprUnaryOp> for Expr {
+    fn from(node: crate::ExprUnaryOp) -> Self {
+        Self::UnaryOp(node)
+    }
+}
+
+impl From<crate::ExprLambda> for Expr {
+    fn from(node: crate::ExprLambda) -> Self {
+        Self::Lambda(node)
+    }
+}
+
+impl From<crate::ExprIf> for Expr {
+    fn from(node: crate::ExprIf) -> Self {
+        Self::If(node)
+    }
+}
+
+impl From<crate::ExprDict> for Expr {
+    fn from(node: crate::ExprDict) -> Self {
+        Self::Dict(node)
+    }
 }
 
 impl From<crate::ExprSet> for Expr {
@@ -1433,51 +1475,16 @@ impl From<crate::ExprIpyEscapeCommand> for Expr {
     }
 }
 
-impl From<crate::ExprBoolOp> for Expr {
-    fn from(node: crate::ExprBoolOp) -> Self {
-        Self::BoolOp(node)
-    }
-}
-
-impl From<crate::ExprNamed> for Expr {
-    fn from(node: crate::ExprNamed) -> Self {
-        Self::Named(node)
-    }
-}
-
-impl From<crate::ExprBinOp> for Expr {
-    fn from(node: crate::ExprBinOp) -> Self {
-        Self::BinOp(node)
-    }
-}
-
-impl From<crate::ExprUnaryOp> for Expr {
-    fn from(node: crate::ExprUnaryOp) -> Self {
-        Self::UnaryOp(node)
-    }
-}
-
-impl From<crate::ExprLambda> for Expr {
-    fn from(node: crate::ExprLambda) -> Self {
-        Self::Lambda(node)
-    }
-}
-
-impl From<crate::ExprIf> for Expr {
-    fn from(node: crate::ExprIf) -> Self {
-        Self::If(node)
-    }
-}
-
-impl From<crate::ExprDict> for Expr {
-    fn from(node: crate::ExprDict) -> Self {
-        Self::Dict(node)
-    }
-}
-
 impl ruff_text_size::Ranged for Expr {
     fn range(&self) -> ruff_text_size::TextRange {
         match self {
+            Self::BoolOp(node) => node.range(),
+            Self::Named(node) => node.range(),
+            Self::BinOp(node) => node.range(),
+            Self::UnaryOp(node) => node.range(),
+            Self::Lambda(node) => node.range(),
+            Self::If(node) => node.range(),
+            Self::Dict(node) => node.range(),
             Self::Set(node) => node.range(),
             Self::ListComp(node) => node.range(),
             Self::SetComp(node) => node.range(),
@@ -1503,19 +1510,271 @@ impl ruff_text_size::Ranged for Expr {
             Self::Tuple(node) => node.range(),
             Self::Slice(node) => node.range(),
             Self::IpyEscapeCommand(node) => node.range(),
-            Self::BoolOp(node) => node.range(),
-            Self::Named(node) => node.range(),
-            Self::BinOp(node) => node.range(),
-            Self::UnaryOp(node) => node.range(),
-            Self::Lambda(node) => node.range(),
-            Self::If(node) => node.range(),
-            Self::Dict(node) => node.range(),
         }
     }
 }
 
 #[allow(dead_code, clippy::match_wildcard_for_single_variants)]
 impl Expr {
+    #[inline]
+    pub const fn is_bool_op_expr(&self) -> bool {
+        matches!(self, Self::BoolOp(_))
+    }
+
+    #[inline]
+    pub fn bool_op_expr(self) -> Option<crate::ExprBoolOp> {
+        match self {
+            Self::BoolOp(val) => Some(val),
+            _ => None,
+        }
+    }
+
+    #[inline]
+    pub fn expect_bool_op_expr(self) -> crate::ExprBoolOp {
+        match self {
+            Self::BoolOp(val) => val,
+            _ => panic!("called expect on {self:?}"),
+        }
+    }
+
+    #[inline]
+    pub fn as_bool_op_expr_mut(&mut self) -> Option<&mut crate::ExprBoolOp> {
+        match self {
+            Self::BoolOp(val) => Some(val),
+            _ => None,
+        }
+    }
+
+    #[inline]
+    pub fn as_bool_op_expr(&self) -> Option<&crate::ExprBoolOp> {
+        match self {
+            Self::BoolOp(val) => Some(val),
+            _ => None,
+        }
+    }
+
+    #[inline]
+    pub const fn is_named_expr(&self) -> bool {
+        matches!(self, Self::Named(_))
+    }
+
+    #[inline]
+    pub fn named_expr(self) -> Option<crate::ExprNamed> {
+        match self {
+            Self::Named(val) => Some(val),
+            _ => None,
+        }
+    }
+
+    #[inline]
+    pub fn expect_named_expr(self) -> crate::ExprNamed {
+        match self {
+            Self::Named(val) => val,
+            _ => panic!("called expect on {self:?}"),
+        }
+    }
+
+    #[inline]
+    pub fn as_named_expr_mut(&mut self) -> Option<&mut crate::ExprNamed> {
+        match self {
+            Self::Named(val) => Some(val),
+            _ => None,
+        }
+    }
+
+    #[inline]
+    pub fn as_named_expr(&self) -> Option<&crate::ExprNamed> {
+        match self {
+            Self::Named(val) => Some(val),
+            _ => None,
+        }
+    }
+
+    #[inline]
+    pub const fn is_bin_op_expr(&self) -> bool {
+        matches!(self, Self::BinOp(_))
+    }
+
+    #[inline]
+    pub fn bin_op_expr(self) -> Option<crate::ExprBinOp> {
+        match self {
+            Self::BinOp(val) => Some(val),
+            _ => None,
+        }
+    }
+
+    #[inline]
+    pub fn expect_bin_op_expr(self) -> crate::ExprBinOp {
+        match self {
+            Self::BinOp(val) => val,
+            _ => panic!("called expect on {self:?}"),
+        }
+    }
+
+    #[inline]
+    pub fn as_bin_op_expr_mut(&mut self) -> Option<&mut crate::ExprBinOp> {
+        match self {
+            Self::BinOp(val) => Some(val),
+            _ => None,
+        }
+    }
+
+    #[inline]
+    pub fn as_bin_op_expr(&self) -> Option<&crate::ExprBinOp> {
+        match self {
+            Self::BinOp(val) => Some(val),
+            _ => None,
+        }
+    }
+
+    #[inline]
+    pub const fn is_unary_op_expr(&self) -> bool {
+        matches!(self, Self::UnaryOp(_))
+    }
+
+    #[inline]
+    pub fn unary_op_expr(self) -> Option<crate::ExprUnaryOp> {
+        match self {
+            Self::UnaryOp(val) => Some(val),
+            _ => None,
+        }
+    }
+
+    #[inline]
+    pub fn expect_unary_op_expr(self) -> crate::ExprUnaryOp {
+        match self {
+            Self::UnaryOp(val) => val,
+            _ => panic!("called expect on {self:?}"),
+        }
+    }
+
+    #[inline]
+    pub fn as_unary_op_expr_mut(&mut self) -> Option<&mut crate::ExprUnaryOp> {
+        match self {
+            Self::UnaryOp(val) => Some(val),
+            _ => None,
+        }
+    }
+
+    #[inline]
+    pub fn as_unary_op_expr(&self) -> Option<&crate::ExprUnaryOp> {
+        match self {
+            Self::UnaryOp(val) => Some(val),
+            _ => None,
+        }
+    }
+
+    #[inline]
+    pub const fn is_lambda_expr(&self) -> bool {
+        matches!(self, Self::Lambda(_))
+    }
+
+    #[inline]
+    pub fn lambda_expr(self) -> Option<crate::ExprLambda> {
+        match self {
+            Self::Lambda(val) => Some(val),
+            _ => None,
+        }
+    }
+
+    #[inline]
+    pub fn expect_lambda_expr(self) -> crate::ExprLambda {
+        match self {
+            Self::Lambda(val) => val,
+            _ => panic!("called expect on {self:?}"),
+        }
+    }
+
+    #[inline]
+    pub fn as_lambda_expr_mut(&mut self) -> Option<&mut crate::ExprLambda> {
+        match self {
+            Self::Lambda(val) => Some(val),
+            _ => None,
+        }
+    }
+
+    #[inline]
+    pub fn as_lambda_expr(&self) -> Option<&crate::ExprLambda> {
+        match self {
+            Self::Lambda(val) => Some(val),
+            _ => None,
+        }
+    }
+
+    #[inline]
+    pub const fn is_if_expr(&self) -> bool {
+        matches!(self, Self::If(_))
+    }
+
+    #[inline]
+    pub fn if_expr(self) -> Option<crate::ExprIf> {
+        match self {
+            Self::If(val) => Some(val),
+            _ => None,
+        }
+    }
+
+    #[inline]
+    pub fn expect_if_expr(self) -> crate::ExprIf {
+        match self {
+            Self::If(val) => val,
+            _ => panic!("called expect on {self:?}"),
+        }
+    }
+
+    #[inline]
+    pub fn as_if_expr_mut(&mut self) -> Option<&mut crate::ExprIf> {
+        match self {
+            Self::If(val) => Some(val),
+            _ => None,
+        }
+    }
+
+    #[inline]
+    pub fn as_if_expr(&self) -> Option<&crate::ExprIf> {
+        match self {
+            Self::If(val) => Some(val),
+            _ => None,
+        }
+    }
+
+    #[inline]
+    pub const fn is_dict_expr(&self) -> bool {
+        matches!(self, Self::Dict(_))
+    }
+
+    #[inline]
+    pub fn dict_expr(self) -> Option<crate::ExprDict> {
+        match self {
+            Self::Dict(val) => Some(val),
+            _ => None,
+        }
+    }
+
+    #[inline]
+    pub fn expect_dict_expr(self) -> crate::ExprDict {
+        match self {
+            Self::Dict(val) => val,
+            _ => panic!("called expect on {self:?}"),
+        }
+    }
+
+    #[inline]
+    pub fn as_dict_expr_mut(&mut self) -> Option<&mut crate::ExprDict> {
+        match self {
+            Self::Dict(val) => Some(val),
+            _ => None,
+        }
+    }
+
+    #[inline]
+    pub fn as_dict_expr(&self) -> Option<&crate::ExprDict> {
+        match self {
+            Self::Dict(val) => Some(val),
+            _ => None,
+        }
+    }
+
     #[inline]
     pub const fn is_set_expr(&self) -> bool {
         matches!(self, Self::Set(_))
@@ -2440,265 +2699,6 @@ impl Expr {
             _ => None,
         }
     }
-
-    #[inline]
-    pub const fn is_bool_op_expr(&self) -> bool {
-        matches!(self, Self::BoolOp(_))
-    }
-
-    #[inline]
-    pub fn bool_op_expr(self) -> Option<crate::ExprBoolOp> {
-        match self {
-            Self::BoolOp(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_bool_op_expr(self) -> crate::ExprBoolOp {
-        match self {
-            Self::BoolOp(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_bool_op_expr_mut(&mut self) -> Option<&mut crate::ExprBoolOp> {
-        match self {
-            Self::BoolOp(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn as_bool_op_expr(&self) -> Option<&crate::ExprBoolOp> {
-        match self {
-            Self::BoolOp(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub const fn is_named_expr(&self) -> bool {
-        matches!(self, Self::Named(_))
-    }
-
-    #[inline]
-    pub fn named_expr(self) -> Option<crate::ExprNamed> {
-        match self {
-            Self::Named(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_named_expr(self) -> crate::ExprNamed {
-        match self {
-            Self::Named(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_named_expr_mut(&mut self) -> Option<&mut crate::ExprNamed> {
-        match self {
-            Self::Named(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn as_named_expr(&self) -> Option<&crate::ExprNamed> {
-        match self {
-            Self::Named(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub const fn is_bin_op_expr(&self) -> bool {
-        matches!(self, Self::BinOp(_))
-    }
-
-    #[inline]
-    pub fn bin_op_expr(self) -> Option<crate::ExprBinOp> {
-        match self {
-            Self::BinOp(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_bin_op_expr(self) -> crate::ExprBinOp {
-        match self {
-            Self::BinOp(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_bin_op_expr_mut(&mut self) -> Option<&mut crate::ExprBinOp> {
-        match self {
-            Self::BinOp(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn as_bin_op_expr(&self) -> Option<&crate::ExprBinOp> {
-        match self {
-            Self::BinOp(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub const fn is_unary_op_expr(&self) -> bool {
-        matches!(self, Self::UnaryOp(_))
-    }
-
-    #[inline]
-    pub fn unary_op_expr(self) -> Option<crate::ExprUnaryOp> {
-        match self {
-            Self::UnaryOp(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_unary_op_expr(self) -> crate::ExprUnaryOp {
-        match self {
-            Self::UnaryOp(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_unary_op_expr_mut(&mut self) -> Option<&mut crate::ExprUnaryOp> {
-        match self {
-            Self::UnaryOp(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn as_unary_op_expr(&self) -> Option<&crate::ExprUnaryOp> {
-        match self {
-            Self::UnaryOp(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub const fn is_lambda_expr(&self) -> bool {
-        matches!(self, Self::Lambda(_))
-    }
-
-    #[inline]
-    pub fn lambda_expr(self) -> Option<crate::ExprLambda> {
-        match self {
-            Self::Lambda(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_lambda_expr(self) -> crate::ExprLambda {
-        match self {
-            Self::Lambda(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_lambda_expr_mut(&mut self) -> Option<&mut crate::ExprLambda> {
-        match self {
-            Self::Lambda(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn as_lambda_expr(&self) -> Option<&crate::ExprLambda> {
-        match self {
-            Self::Lambda(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub const fn is_if_expr(&self) -> bool {
-        matches!(self, Self::If(_))
-    }
-
-    #[inline]
-    pub fn if_expr(self) -> Option<crate::ExprIf> {
-        match self {
-            Self::If(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_if_expr(self) -> crate::ExprIf {
-        match self {
-            Self::If(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_if_expr_mut(&mut self) -> Option<&mut crate::ExprIf> {
-        match self {
-            Self::If(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn as_if_expr(&self) -> Option<&crate::ExprIf> {
-        match self {
-            Self::If(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub const fn is_dict_expr(&self) -> bool {
-        matches!(self, Self::Dict(_))
-    }
-
-    #[inline]
-    pub fn dict_expr(self) -> Option<crate::ExprDict> {
-        match self {
-            Self::Dict(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn expect_dict_expr(self) -> crate::ExprDict {
-        match self {
-            Self::Dict(val) => val,
-            _ => panic!("called expect on {self:?}"),
-        }
-    }
-
-    #[inline]
-    pub fn as_dict_expr_mut(&mut self) -> Option<&mut crate::ExprDict> {
-        match self {
-            Self::Dict(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub fn as_dict_expr(&self) -> Option<&crate::ExprDict> {
-        match self {
-            Self::Dict(val) => Some(val),
-            _ => None,
-        }
-    }
 }
 
 /// See also [excepthandler](https://docs.python.org/3/library/ast.html#ast.excepthandler)
@@ -3548,6 +3548,48 @@ impl ruff_text_size::Ranged for crate::StmtIpyEscapeCommand {
     }
 }
 
+impl ruff_text_size::Ranged for crate::ExprBoolOp {
+    fn range(&self) -> ruff_text_size::TextRange {
+        self.range
+    }
+}
+
+impl ruff_text_size::Ranged for crate::ExprNamed {
+    fn range(&self) -> ruff_text_size::TextRange {
+        self.range
+    }
+}
+
+impl ruff_text_size::Ranged for crate::ExprBinOp {
+    fn range(&self) -> ruff_text_size::TextRange {
+        self.range
+    }
+}
+
+impl ruff_text_size::Ranged for crate::ExprUnaryOp {
+    fn range(&self) -> ruff_text_size::TextRange {
+        self.range
+    }
+}
+
+impl ruff_text_size::Ranged for crate::ExprLambda {
+    fn range(&self) -> ruff_text_size::TextRange {
+        self.range
+    }
+}
+
+impl ruff_text_size::Ranged for crate::ExprIf {
+    fn range(&self) -> ruff_text_size::TextRange {
+        self.range
+    }
+}
+
+impl ruff_text_size::Ranged for crate::ExprDict {
+    fn range(&self) -> ruff_text_size::TextRange {
+        self.range
+    }
+}
+
 impl ruff_text_size::Ranged for crate::ExprSet {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
@@ -3693,48 +3735,6 @@ impl ruff_text_size::Ranged for crate::ExprSlice {
 }
 
 impl ruff_text_size::Ranged for crate::ExprIpyEscapeCommand {
-    fn range(&self) -> ruff_text_size::TextRange {
-        self.range
-    }
-}
-
-impl ruff_text_size::Ranged for crate::ExprBoolOp {
-    fn range(&self) -> ruff_text_size::TextRange {
-        self.range
-    }
-}
-
-impl ruff_text_size::Ranged for crate::ExprNamed {
-    fn range(&self) -> ruff_text_size::TextRange {
-        self.range
-    }
-}
-
-impl ruff_text_size::Ranged for crate::ExprBinOp {
-    fn range(&self) -> ruff_text_size::TextRange {
-        self.range
-    }
-}
-
-impl ruff_text_size::Ranged for crate::ExprUnaryOp {
-    fn range(&self) -> ruff_text_size::TextRange {
-        self.range
-    }
-}
-
-impl ruff_text_size::Ranged for crate::ExprLambda {
-    fn range(&self) -> ruff_text_size::TextRange {
-        self.range
-    }
-}
-
-impl ruff_text_size::Ranged for crate::ExprIf {
-    fn range(&self) -> ruff_text_size::TextRange {
-        self.range
-    }
-}
-
-impl ruff_text_size::Ranged for crate::ExprDict {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
     }
@@ -3994,6 +3994,13 @@ impl Expr {
         V: crate::visitor::source_order::SourceOrderVisitor<'a> + ?Sized,
     {
         match self {
+            Expr::BoolOp(node) => node.visit_source_order(visitor),
+            Expr::Named(node) => node.visit_source_order(visitor),
+            Expr::BinOp(node) => node.visit_source_order(visitor),
+            Expr::UnaryOp(node) => node.visit_source_order(visitor),
+            Expr::Lambda(node) => node.visit_source_order(visitor),
+            Expr::If(node) => node.visit_source_order(visitor),
+            Expr::Dict(node) => node.visit_source_order(visitor),
             Expr::Set(node) => node.visit_source_order(visitor),
             Expr::ListComp(node) => node.visit_source_order(visitor),
             Expr::SetComp(node) => node.visit_source_order(visitor),
@@ -4019,13 +4026,6 @@ impl Expr {
             Expr::Tuple(node) => node.visit_source_order(visitor),
             Expr::Slice(node) => node.visit_source_order(visitor),
             Expr::IpyEscapeCommand(node) => node.visit_source_order(visitor),
-            Expr::BoolOp(node) => node.visit_source_order(visitor),
-            Expr::Named(node) => node.visit_source_order(visitor),
-            Expr::BinOp(node) => node.visit_source_order(visitor),
-            Expr::UnaryOp(node) => node.visit_source_order(visitor),
-            Expr::Lambda(node) => node.visit_source_order(visitor),
-            Expr::If(node) => node.visit_source_order(visitor),
-            Expr::Dict(node) => node.visit_source_order(visitor),
         }
     }
 }
@@ -4397,6 +4397,20 @@ impl ruff_text_size::Ranged for StmtRef<'_> {
 /// See also [expr](https://docs.python.org/3/library/ast.html#ast.expr)
 #[derive(Clone, Copy, Debug, PartialEq, is_macro::Is)]
 pub enum ExprRef<'a> {
+    #[is(name = "bool_op_expr")]
+    BoolOp(&'a crate::ExprBoolOp),
+    #[is(name = "named_expr")]
+    Named(&'a crate::ExprNamed),
+    #[is(name = "bin_op_expr")]
+    BinOp(&'a crate::ExprBinOp),
+    #[is(name = "unary_op_expr")]
+    UnaryOp(&'a crate::ExprUnaryOp),
+    #[is(name = "lambda_expr")]
+    Lambda(&'a crate::ExprLambda),
+    #[is(name = "if_expr")]
+    If(&'a crate::ExprIf),
+    #[is(name = "dict_expr")]
+    Dict(&'a crate::ExprDict),
     #[is(name = "set_expr")]
     Set(&'a crate::ExprSet),
     #[is(name = "list_comp_expr")]
@@ -4447,25 +4461,18 @@ pub enum ExprRef<'a> {
     Slice(&'a crate::ExprSlice),
     #[is(name = "ipy_escape_command_expr")]
     IpyEscapeCommand(&'a crate::ExprIpyEscapeCommand),
-    #[is(name = "bool_op_expr")]
-    BoolOp(&'a crate::ExprBoolOp),
-    #[is(name = "named_expr")]
-    Named(&'a crate::ExprNamed),
-    #[is(name = "bin_op_expr")]
-    BinOp(&'a crate::ExprBinOp),
-    #[is(name = "unary_op_expr")]
-    UnaryOp(&'a crate::ExprUnaryOp),
-    #[is(name = "lambda_expr")]
-    Lambda(&'a crate::ExprLambda),
-    #[is(name = "if_expr")]
-    If(&'a crate::ExprIf),
-    #[is(name = "dict_expr")]
-    Dict(&'a crate::ExprDict),
 }
 
 impl<'a> From<&'a Expr> for ExprRef<'a> {
     fn from(node: &'a Expr) -> Self {
         match node {
+            Expr::BoolOp(node) => ExprRef::BoolOp(node),
+            Expr::Named(node) => ExprRef::Named(node),
+            Expr::BinOp(node) => ExprRef::BinOp(node),
+            Expr::UnaryOp(node) => ExprRef::UnaryOp(node),
+            Expr::Lambda(node) => ExprRef::Lambda(node),
+            Expr::If(node) => ExprRef::If(node),
+            Expr::Dict(node) => ExprRef::Dict(node),
             Expr::Set(node) => ExprRef::Set(node),
             Expr::ListComp(node) => ExprRef::ListComp(node),
             Expr::SetComp(node) => ExprRef::SetComp(node),
@@ -4491,14 +4498,49 @@ impl<'a> From<&'a Expr> for ExprRef<'a> {
             Expr::Tuple(node) => ExprRef::Tuple(node),
             Expr::Slice(node) => ExprRef::Slice(node),
             Expr::IpyEscapeCommand(node) => ExprRef::IpyEscapeCommand(node),
-            Expr::BoolOp(node) => ExprRef::BoolOp(node),
-            Expr::Named(node) => ExprRef::Named(node),
-            Expr::BinOp(node) => ExprRef::BinOp(node),
-            Expr::UnaryOp(node) => ExprRef::UnaryOp(node),
-            Expr::Lambda(node) => ExprRef::Lambda(node),
-            Expr::If(node) => ExprRef::If(node),
-            Expr::Dict(node) => ExprRef::Dict(node),
         }
+    }
+}
+
+impl<'a> From<&'a crate::ExprBoolOp> for ExprRef<'a> {
+    fn from(node: &'a crate::ExprBoolOp) -> Self {
+        Self::BoolOp(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprNamed> for ExprRef<'a> {
+    fn from(node: &'a crate::ExprNamed) -> Self {
+        Self::Named(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprBinOp> for ExprRef<'a> {
+    fn from(node: &'a crate::ExprBinOp) -> Self {
+        Self::BinOp(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprUnaryOp> for ExprRef<'a> {
+    fn from(node: &'a crate::ExprUnaryOp) -> Self {
+        Self::UnaryOp(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprLambda> for ExprRef<'a> {
+    fn from(node: &'a crate::ExprLambda) -> Self {
+        Self::Lambda(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprIf> for ExprRef<'a> {
+    fn from(node: &'a crate::ExprIf) -> Self {
+        Self::If(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprDict> for ExprRef<'a> {
+    fn from(node: &'a crate::ExprDict) -> Self {
+        Self::Dict(node)
     }
 }
 
@@ -4652,51 +4694,16 @@ impl<'a> From<&'a crate::ExprIpyEscapeCommand> for ExprRef<'a> {
     }
 }
 
-impl<'a> From<&'a crate::ExprBoolOp> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprBoolOp) -> Self {
-        Self::BoolOp(node)
-    }
-}
-
-impl<'a> From<&'a crate::ExprNamed> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprNamed) -> Self {
-        Self::Named(node)
-    }
-}
-
-impl<'a> From<&'a crate::ExprBinOp> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprBinOp) -> Self {
-        Self::BinOp(node)
-    }
-}
-
-impl<'a> From<&'a crate::ExprUnaryOp> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprUnaryOp) -> Self {
-        Self::UnaryOp(node)
-    }
-}
-
-impl<'a> From<&'a crate::ExprLambda> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprLambda) -> Self {
-        Self::Lambda(node)
-    }
-}
-
-impl<'a> From<&'a crate::ExprIf> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprIf) -> Self {
-        Self::If(node)
-    }
-}
-
-impl<'a> From<&'a crate::ExprDict> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprDict) -> Self {
-        Self::Dict(node)
-    }
-}
-
 impl ruff_text_size::Ranged for ExprRef<'_> {
     fn range(&self) -> ruff_text_size::TextRange {
         match self {
+            Self::BoolOp(node) => node.range(),
+            Self::Named(node) => node.range(),
+            Self::BinOp(node) => node.range(),
+            Self::UnaryOp(node) => node.range(),
+            Self::Lambda(node) => node.range(),
+            Self::If(node) => node.range(),
+            Self::Dict(node) => node.range(),
             Self::Set(node) => node.range(),
             Self::ListComp(node) => node.range(),
             Self::SetComp(node) => node.range(),
@@ -4722,13 +4729,6 @@ impl ruff_text_size::Ranged for ExprRef<'_> {
             Self::Tuple(node) => node.range(),
             Self::Slice(node) => node.range(),
             Self::IpyEscapeCommand(node) => node.range(),
-            Self::BoolOp(node) => node.range(),
-            Self::Named(node) => node.range(),
-            Self::BinOp(node) => node.range(),
-            Self::UnaryOp(node) => node.range(),
-            Self::Lambda(node) => node.range(),
-            Self::If(node) => node.range(),
-            Self::Dict(node) => node.range(),
         }
     }
 }
@@ -4963,6 +4963,13 @@ pub enum AnyNodeRef<'a> {
     StmtBreak(&'a crate::StmtBreak),
     StmtContinue(&'a crate::StmtContinue),
     StmtIpyEscapeCommand(&'a crate::StmtIpyEscapeCommand),
+    ExprBoolOp(&'a crate::ExprBoolOp),
+    ExprNamed(&'a crate::ExprNamed),
+    ExprBinOp(&'a crate::ExprBinOp),
+    ExprUnaryOp(&'a crate::ExprUnaryOp),
+    ExprLambda(&'a crate::ExprLambda),
+    ExprIf(&'a crate::ExprIf),
+    ExprDict(&'a crate::ExprDict),
     ExprSet(&'a crate::ExprSet),
     ExprListComp(&'a crate::ExprListComp),
     ExprSetComp(&'a crate::ExprSetComp),
@@ -4988,13 +4995,6 @@ pub enum AnyNodeRef<'a> {
     ExprTuple(&'a crate::ExprTuple),
     ExprSlice(&'a crate::ExprSlice),
     ExprIpyEscapeCommand(&'a crate::ExprIpyEscapeCommand),
-    ExprBoolOp(&'a crate::ExprBoolOp),
-    ExprNamed(&'a crate::ExprNamed),
-    ExprBinOp(&'a crate::ExprBinOp),
-    ExprUnaryOp(&'a crate::ExprUnaryOp),
-    ExprLambda(&'a crate::ExprLambda),
-    ExprIf(&'a crate::ExprIf),
-    ExprDict(&'a crate::ExprDict),
     ExceptHandlerExceptHandler(&'a crate::ExceptHandlerExceptHandler),
     FStringExpressionElement(&'a crate::FStringExpressionElement),
     FStringLiteralElement(&'a crate::FStringLiteralElement),
@@ -5115,6 +5115,13 @@ impl<'a> From<StmtRef<'a>> for AnyNodeRef<'a> {
 impl<'a> From<&'a Expr> for AnyNodeRef<'a> {
     fn from(node: &'a Expr) -> AnyNodeRef<'a> {
         match node {
+            Expr::BoolOp(node) => AnyNodeRef::ExprBoolOp(node),
+            Expr::Named(node) => AnyNodeRef::ExprNamed(node),
+            Expr::BinOp(node) => AnyNodeRef::ExprBinOp(node),
+            Expr::UnaryOp(node) => AnyNodeRef::ExprUnaryOp(node),
+            Expr::Lambda(node) => AnyNodeRef::ExprLambda(node),
+            Expr::If(node) => AnyNodeRef::ExprIf(node),
+            Expr::Dict(node) => AnyNodeRef::ExprDict(node),
             Expr::Set(node) => AnyNodeRef::ExprSet(node),
             Expr::ListComp(node) => AnyNodeRef::ExprListComp(node),
             Expr::SetComp(node) => AnyNodeRef::ExprSetComp(node),
@@ -5140,13 +5147,6 @@ impl<'a> From<&'a Expr> for AnyNodeRef<'a> {
             Expr::Tuple(node) => AnyNodeRef::ExprTuple(node),
             Expr::Slice(node) => AnyNodeRef::ExprSlice(node),
             Expr::IpyEscapeCommand(node) => AnyNodeRef::ExprIpyEscapeCommand(node),
-            Expr::BoolOp(node) => AnyNodeRef::ExprBoolOp(node),
-            Expr::Named(node) => AnyNodeRef::ExprNamed(node),
-            Expr::BinOp(node) => AnyNodeRef::ExprBinOp(node),
-            Expr::UnaryOp(node) => AnyNodeRef::ExprUnaryOp(node),
-            Expr::Lambda(node) => AnyNodeRef::ExprLambda(node),
-            Expr::If(node) => AnyNodeRef::ExprIf(node),
-            Expr::Dict(node) => AnyNodeRef::ExprDict(node),
         }
     }
 }
@@ -5154,6 +5154,13 @@ impl<'a> From<&'a Expr> for AnyNodeRef<'a> {
 impl<'a> From<ExprRef<'a>> for AnyNodeRef<'a> {
     fn from(node: ExprRef<'a>) -> AnyNodeRef<'a> {
         match node {
+            ExprRef::BoolOp(node) => AnyNodeRef::ExprBoolOp(node),
+            ExprRef::Named(node) => AnyNodeRef::ExprNamed(node),
+            ExprRef::BinOp(node) => AnyNodeRef::ExprBinOp(node),
+            ExprRef::UnaryOp(node) => AnyNodeRef::ExprUnaryOp(node),
+            ExprRef::Lambda(node) => AnyNodeRef::ExprLambda(node),
+            ExprRef::If(node) => AnyNodeRef::ExprIf(node),
+            ExprRef::Dict(node) => AnyNodeRef::ExprDict(node),
             ExprRef::Set(node) => AnyNodeRef::ExprSet(node),
             ExprRef::ListComp(node) => AnyNodeRef::ExprListComp(node),
             ExprRef::SetComp(node) => AnyNodeRef::ExprSetComp(node),
@@ -5179,13 +5186,6 @@ impl<'a> From<ExprRef<'a>> for AnyNodeRef<'a> {
             ExprRef::Tuple(node) => AnyNodeRef::ExprTuple(node),
             ExprRef::Slice(node) => AnyNodeRef::ExprSlice(node),
             ExprRef::IpyEscapeCommand(node) => AnyNodeRef::ExprIpyEscapeCommand(node),
-            ExprRef::BoolOp(node) => AnyNodeRef::ExprBoolOp(node),
-            ExprRef::Named(node) => AnyNodeRef::ExprNamed(node),
-            ExprRef::BinOp(node) => AnyNodeRef::ExprBinOp(node),
-            ExprRef::UnaryOp(node) => AnyNodeRef::ExprUnaryOp(node),
-            ExprRef::Lambda(node) => AnyNodeRef::ExprLambda(node),
-            ExprRef::If(node) => AnyNodeRef::ExprIf(node),
-            ExprRef::Dict(node) => AnyNodeRef::ExprDict(node),
         }
     }
 }
@@ -5436,6 +5436,48 @@ impl<'a> From<&'a crate::StmtIpyEscapeCommand> for AnyNodeRef<'a> {
     }
 }
 
+impl<'a> From<&'a crate::ExprBoolOp> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::ExprBoolOp) -> AnyNodeRef<'a> {
+        AnyNodeRef::ExprBoolOp(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprNamed> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::ExprNamed) -> AnyNodeRef<'a> {
+        AnyNodeRef::ExprNamed(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprBinOp> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::ExprBinOp) -> AnyNodeRef<'a> {
+        AnyNodeRef::ExprBinOp(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprUnaryOp> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::ExprUnaryOp) -> AnyNodeRef<'a> {
+        AnyNodeRef::ExprUnaryOp(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprLambda> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::ExprLambda) -> AnyNodeRef<'a> {
+        AnyNodeRef::ExprLambda(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprIf> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::ExprIf) -> AnyNodeRef<'a> {
+        AnyNodeRef::ExprIf(node)
+    }
+}
+
+impl<'a> From<&'a crate::ExprDict> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::ExprDict) -> AnyNodeRef<'a> {
+        AnyNodeRef::ExprDict(node)
+    }
+}
+
 impl<'a> From<&'a crate::ExprSet> for AnyNodeRef<'a> {
     fn from(node: &'a crate::ExprSet) -> AnyNodeRef<'a> {
         AnyNodeRef::ExprSet(node)
@@ -5583,48 +5625,6 @@ impl<'a> From<&'a crate::ExprSlice> for AnyNodeRef<'a> {
 impl<'a> From<&'a crate::ExprIpyEscapeCommand> for AnyNodeRef<'a> {
     fn from(node: &'a crate::ExprIpyEscapeCommand) -> AnyNodeRef<'a> {
         AnyNodeRef::ExprIpyEscapeCommand(node)
-    }
-}
-
-impl<'a> From<&'a crate::ExprBoolOp> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::ExprBoolOp) -> AnyNodeRef<'a> {
-        AnyNodeRef::ExprBoolOp(node)
-    }
-}
-
-impl<'a> From<&'a crate::ExprNamed> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::ExprNamed) -> AnyNodeRef<'a> {
-        AnyNodeRef::ExprNamed(node)
-    }
-}
-
-impl<'a> From<&'a crate::ExprBinOp> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::ExprBinOp) -> AnyNodeRef<'a> {
-        AnyNodeRef::ExprBinOp(node)
-    }
-}
-
-impl<'a> From<&'a crate::ExprUnaryOp> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::ExprUnaryOp) -> AnyNodeRef<'a> {
-        AnyNodeRef::ExprUnaryOp(node)
-    }
-}
-
-impl<'a> From<&'a crate::ExprLambda> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::ExprLambda) -> AnyNodeRef<'a> {
-        AnyNodeRef::ExprLambda(node)
-    }
-}
-
-impl<'a> From<&'a crate::ExprIf> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::ExprIf) -> AnyNodeRef<'a> {
-        AnyNodeRef::ExprIf(node)
-    }
-}
-
-impl<'a> From<&'a crate::ExprDict> for AnyNodeRef<'a> {
-    fn from(node: &'a crate::ExprDict) -> AnyNodeRef<'a> {
-        AnyNodeRef::ExprDict(node)
     }
 }
 
@@ -5856,6 +5856,13 @@ impl ruff_text_size::Ranged for AnyNodeRef<'_> {
             AnyNodeRef::StmtBreak(node) => node.range(),
             AnyNodeRef::StmtContinue(node) => node.range(),
             AnyNodeRef::StmtIpyEscapeCommand(node) => node.range(),
+            AnyNodeRef::ExprBoolOp(node) => node.range(),
+            AnyNodeRef::ExprNamed(node) => node.range(),
+            AnyNodeRef::ExprBinOp(node) => node.range(),
+            AnyNodeRef::ExprUnaryOp(node) => node.range(),
+            AnyNodeRef::ExprLambda(node) => node.range(),
+            AnyNodeRef::ExprIf(node) => node.range(),
+            AnyNodeRef::ExprDict(node) => node.range(),
             AnyNodeRef::ExprSet(node) => node.range(),
             AnyNodeRef::ExprListComp(node) => node.range(),
             AnyNodeRef::ExprSetComp(node) => node.range(),
@@ -5881,13 +5888,6 @@ impl ruff_text_size::Ranged for AnyNodeRef<'_> {
             AnyNodeRef::ExprTuple(node) => node.range(),
             AnyNodeRef::ExprSlice(node) => node.range(),
             AnyNodeRef::ExprIpyEscapeCommand(node) => node.range(),
-            AnyNodeRef::ExprBoolOp(node) => node.range(),
-            AnyNodeRef::ExprNamed(node) => node.range(),
-            AnyNodeRef::ExprBinOp(node) => node.range(),
-            AnyNodeRef::ExprUnaryOp(node) => node.range(),
-            AnyNodeRef::ExprLambda(node) => node.range(),
-            AnyNodeRef::ExprIf(node) => node.range(),
-            AnyNodeRef::ExprDict(node) => node.range(),
             AnyNodeRef::ExceptHandlerExceptHandler(node) => node.range(),
             AnyNodeRef::FStringExpressionElement(node) => node.range(),
             AnyNodeRef::FStringLiteralElement(node) => node.range(),
@@ -5955,6 +5955,13 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::StmtBreak(node) => std::ptr::NonNull::from(*node).cast(),
             AnyNodeRef::StmtContinue(node) => std::ptr::NonNull::from(*node).cast(),
             AnyNodeRef::StmtIpyEscapeCommand(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::ExprBoolOp(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::ExprNamed(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::ExprBinOp(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::ExprUnaryOp(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::ExprLambda(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::ExprIf(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::ExprDict(node) => std::ptr::NonNull::from(*node).cast(),
             AnyNodeRef::ExprSet(node) => std::ptr::NonNull::from(*node).cast(),
             AnyNodeRef::ExprListComp(node) => std::ptr::NonNull::from(*node).cast(),
             AnyNodeRef::ExprSetComp(node) => std::ptr::NonNull::from(*node).cast(),
@@ -5980,13 +5987,6 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::ExprTuple(node) => std::ptr::NonNull::from(*node).cast(),
             AnyNodeRef::ExprSlice(node) => std::ptr::NonNull::from(*node).cast(),
             AnyNodeRef::ExprIpyEscapeCommand(node) => std::ptr::NonNull::from(*node).cast(),
-            AnyNodeRef::ExprBoolOp(node) => std::ptr::NonNull::from(*node).cast(),
-            AnyNodeRef::ExprNamed(node) => std::ptr::NonNull::from(*node).cast(),
-            AnyNodeRef::ExprBinOp(node) => std::ptr::NonNull::from(*node).cast(),
-            AnyNodeRef::ExprUnaryOp(node) => std::ptr::NonNull::from(*node).cast(),
-            AnyNodeRef::ExprLambda(node) => std::ptr::NonNull::from(*node).cast(),
-            AnyNodeRef::ExprIf(node) => std::ptr::NonNull::from(*node).cast(),
-            AnyNodeRef::ExprDict(node) => std::ptr::NonNull::from(*node).cast(),
             AnyNodeRef::ExceptHandlerExceptHandler(node) => std::ptr::NonNull::from(*node).cast(),
             AnyNodeRef::FStringExpressionElement(node) => std::ptr::NonNull::from(*node).cast(),
             AnyNodeRef::FStringLiteralElement(node) => std::ptr::NonNull::from(*node).cast(),
@@ -6058,6 +6058,13 @@ impl<'a> AnyNodeRef<'a> {
             AnyNodeRef::StmtBreak(node) => node.visit_source_order(visitor),
             AnyNodeRef::StmtContinue(node) => node.visit_source_order(visitor),
             AnyNodeRef::StmtIpyEscapeCommand(node) => node.visit_source_order(visitor),
+            AnyNodeRef::ExprBoolOp(node) => node.visit_source_order(visitor),
+            AnyNodeRef::ExprNamed(node) => node.visit_source_order(visitor),
+            AnyNodeRef::ExprBinOp(node) => node.visit_source_order(visitor),
+            AnyNodeRef::ExprUnaryOp(node) => node.visit_source_order(visitor),
+            AnyNodeRef::ExprLambda(node) => node.visit_source_order(visitor),
+            AnyNodeRef::ExprIf(node) => node.visit_source_order(visitor),
+            AnyNodeRef::ExprDict(node) => node.visit_source_order(visitor),
             AnyNodeRef::ExprSet(node) => node.visit_source_order(visitor),
             AnyNodeRef::ExprListComp(node) => node.visit_source_order(visitor),
             AnyNodeRef::ExprSetComp(node) => node.visit_source_order(visitor),
@@ -6083,13 +6090,6 @@ impl<'a> AnyNodeRef<'a> {
             AnyNodeRef::ExprTuple(node) => node.visit_source_order(visitor),
             AnyNodeRef::ExprSlice(node) => node.visit_source_order(visitor),
             AnyNodeRef::ExprIpyEscapeCommand(node) => node.visit_source_order(visitor),
-            AnyNodeRef::ExprBoolOp(node) => node.visit_source_order(visitor),
-            AnyNodeRef::ExprNamed(node) => node.visit_source_order(visitor),
-            AnyNodeRef::ExprBinOp(node) => node.visit_source_order(visitor),
-            AnyNodeRef::ExprUnaryOp(node) => node.visit_source_order(visitor),
-            AnyNodeRef::ExprLambda(node) => node.visit_source_order(visitor),
-            AnyNodeRef::ExprIf(node) => node.visit_source_order(visitor),
-            AnyNodeRef::ExprDict(node) => node.visit_source_order(visitor),
             AnyNodeRef::ExceptHandlerExceptHandler(node) => node.visit_source_order(visitor),
             AnyNodeRef::FStringExpressionElement(node) => node.visit_source_order(visitor),
             AnyNodeRef::FStringLiteralElement(node) => node.visit_source_order(visitor),
@@ -6173,7 +6173,14 @@ impl AnyNodeRef<'_> {
     pub const fn is_expression(self) -> bool {
         matches!(
             self,
-            AnyNodeRef::ExprSet(_)
+            AnyNodeRef::ExprBoolOp(_)
+                | AnyNodeRef::ExprNamed(_)
+                | AnyNodeRef::ExprBinOp(_)
+                | AnyNodeRef::ExprUnaryOp(_)
+                | AnyNodeRef::ExprLambda(_)
+                | AnyNodeRef::ExprIf(_)
+                | AnyNodeRef::ExprDict(_)
+                | AnyNodeRef::ExprSet(_)
                 | AnyNodeRef::ExprListComp(_)
                 | AnyNodeRef::ExprSetComp(_)
                 | AnyNodeRef::ExprDictComp(_)
@@ -6198,13 +6205,6 @@ impl AnyNodeRef<'_> {
                 | AnyNodeRef::ExprTuple(_)
                 | AnyNodeRef::ExprSlice(_)
                 | AnyNodeRef::ExprIpyEscapeCommand(_)
-                | AnyNodeRef::ExprBoolOp(_)
-                | AnyNodeRef::ExprNamed(_)
-                | AnyNodeRef::ExprBinOp(_)
-                | AnyNodeRef::ExprUnaryOp(_)
-                | AnyNodeRef::ExprLambda(_)
-                | AnyNodeRef::ExprIf(_)
-                | AnyNodeRef::ExprDict(_)
         )
     }
 }
@@ -6280,6 +6280,13 @@ pub enum NodeKind {
     StmtBreak,
     StmtContinue,
     StmtIpyEscapeCommand,
+    ExprBoolOp,
+    ExprNamed,
+    ExprBinOp,
+    ExprUnaryOp,
+    ExprLambda,
+    ExprIf,
+    ExprDict,
     ExprSet,
     ExprListComp,
     ExprSetComp,
@@ -6305,13 +6312,6 @@ pub enum NodeKind {
     ExprTuple,
     ExprSlice,
     ExprIpyEscapeCommand,
-    ExprBoolOp,
-    ExprNamed,
-    ExprBinOp,
-    ExprUnaryOp,
-    ExprLambda,
-    ExprIf,
-    ExprDict,
     ExceptHandlerExceptHandler,
     FStringExpressionElement,
     FStringLiteralElement,
@@ -6377,6 +6377,13 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::StmtBreak(_) => NodeKind::StmtBreak,
             AnyNodeRef::StmtContinue(_) => NodeKind::StmtContinue,
             AnyNodeRef::StmtIpyEscapeCommand(_) => NodeKind::StmtIpyEscapeCommand,
+            AnyNodeRef::ExprBoolOp(_) => NodeKind::ExprBoolOp,
+            AnyNodeRef::ExprNamed(_) => NodeKind::ExprNamed,
+            AnyNodeRef::ExprBinOp(_) => NodeKind::ExprBinOp,
+            AnyNodeRef::ExprUnaryOp(_) => NodeKind::ExprUnaryOp,
+            AnyNodeRef::ExprLambda(_) => NodeKind::ExprLambda,
+            AnyNodeRef::ExprIf(_) => NodeKind::ExprIf,
+            AnyNodeRef::ExprDict(_) => NodeKind::ExprDict,
             AnyNodeRef::ExprSet(_) => NodeKind::ExprSet,
             AnyNodeRef::ExprListComp(_) => NodeKind::ExprListComp,
             AnyNodeRef::ExprSetComp(_) => NodeKind::ExprSetComp,
@@ -6402,13 +6409,6 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::ExprTuple(_) => NodeKind::ExprTuple,
             AnyNodeRef::ExprSlice(_) => NodeKind::ExprSlice,
             AnyNodeRef::ExprIpyEscapeCommand(_) => NodeKind::ExprIpyEscapeCommand,
-            AnyNodeRef::ExprBoolOp(_) => NodeKind::ExprBoolOp,
-            AnyNodeRef::ExprNamed(_) => NodeKind::ExprNamed,
-            AnyNodeRef::ExprBinOp(_) => NodeKind::ExprBinOp,
-            AnyNodeRef::ExprUnaryOp(_) => NodeKind::ExprUnaryOp,
-            AnyNodeRef::ExprLambda(_) => NodeKind::ExprLambda,
-            AnyNodeRef::ExprIf(_) => NodeKind::ExprIf,
-            AnyNodeRef::ExprDict(_) => NodeKind::ExprDict,
             AnyNodeRef::ExceptHandlerExceptHandler(_) => NodeKind::ExceptHandlerExceptHandler,
             AnyNodeRef::FStringExpressionElement(_) => NodeKind::FStringExpressionElement,
             AnyNodeRef::FStringLiteralElement(_) => NodeKind::FStringLiteralElement,
@@ -6494,4 +6494,173 @@ pub struct ExprIf {
 pub struct ExprDict {
     pub range: ruff_text_size::TextRange,
     pub items: Vec<crate::DictItem>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprSet {
+    pub range: ruff_text_size::TextRange,
+    pub elts: Vec<crate::Expr>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprListComp {
+    pub range: ruff_text_size::TextRange,
+    pub elt: Box<crate::Expr>,
+    pub generators: Vec<crate::Comprehension>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprSetComp {
+    pub range: ruff_text_size::TextRange,
+    pub elt: Box<crate::Expr>,
+    pub generators: Vec<crate::Comprehension>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprDictComp {
+    pub range: ruff_text_size::TextRange,
+    pub key: Box<crate::Expr>,
+    pub value: Box<crate::Expr>,
+    pub generators: Vec<crate::Comprehension>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprGenerator {
+    pub range: ruff_text_size::TextRange,
+    pub elt: Box<crate::Expr>,
+    pub generators: Vec<crate::Comprehension>,
+    pub parenthesized: bool,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprAwait {
+    pub range: ruff_text_size::TextRange,
+    pub value: Box<crate::Expr>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprYield {
+    pub range: ruff_text_size::TextRange,
+    pub value: Option<Box<crate::Expr>>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprYieldFrom {
+    pub range: ruff_text_size::TextRange,
+    pub value: Box<crate::Expr>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprCompare {
+    pub range: ruff_text_size::TextRange,
+    pub left: Box<crate::Expr>,
+    pub ops: Box<[crate::CmpOp]>,
+    pub comparators: Box<[Expr]>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprCall {
+    pub range: ruff_text_size::TextRange,
+    pub func: Box<crate::Expr>,
+    pub arguments: crate::Arguments,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprFString {
+    pub range: ruff_text_size::TextRange,
+    pub value: crate::FStringValue,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprStringLiteral {
+    pub range: ruff_text_size::TextRange,
+    pub value: crate::StringLiteralValue,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprBytesLiteral {
+    pub range: ruff_text_size::TextRange,
+    pub value: crate::BytesLiteralValue,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprNumberLiteral {
+    pub range: ruff_text_size::TextRange,
+    pub value: crate::Number,
+}
+
+#[derive(Clone, Debug, PartialEq, Default)]
+pub struct ExprBooleanLiteral {
+    pub range: ruff_text_size::TextRange,
+    pub value: bool,
+}
+
+#[derive(Clone, Debug, PartialEq, Default)]
+pub struct ExprNoneLiteral {
+    pub range: ruff_text_size::TextRange,
+}
+
+#[derive(Clone, Debug, PartialEq, Default)]
+pub struct ExprEllipsisLiteral {
+    pub range: ruff_text_size::TextRange,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprAttribute {
+    pub range: ruff_text_size::TextRange,
+    pub value: Box<crate::Expr>,
+    pub attr: crate::Identifier,
+    pub ctx: crate::ExprContext,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprSubscript {
+    pub range: ruff_text_size::TextRange,
+    pub value: Box<crate::Expr>,
+    pub slice: Box<crate::Expr>,
+    pub ctx: crate::ExprContext,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprStarred {
+    pub range: ruff_text_size::TextRange,
+    pub value: Box<crate::Expr>,
+    pub ctx: crate::ExprContext,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprName {
+    pub range: ruff_text_size::TextRange,
+    pub id: crate::name::Name,
+    pub ctx: crate::ExprContext,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprList {
+    pub range: ruff_text_size::TextRange,
+    pub elts: Vec<crate::Expr>,
+    pub ctx: crate::ExprContext,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprTuple {
+    pub range: ruff_text_size::TextRange,
+    pub elts: Vec<crate::Expr>,
+    pub ctx: crate::ExprContext,
+    pub parenthesized: bool,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprSlice {
+    pub range: ruff_text_size::TextRange,
+    pub lower: Option<Box<crate::Expr>>,
+    pub upper: Option<Box<crate::Expr>>,
+    pub step: Option<Box<crate::Expr>>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprIpyEscapeCommand {
+    pub range: ruff_text_size::TextRange,
+    pub kind: crate::IpyEscapeKind,
+    pub value: Box<str>,
 }
