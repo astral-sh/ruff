@@ -457,10 +457,6 @@ fn diagnostics_to_messages(
         builder.finish()
     });
 
-    // ignore version-related syntax errors when fuzzing
-    #[cfg(fuzzing)]
-    let syntax_errors = &syntax_errors[..0];
-
     parse_errors
         .iter()
         .map(|parse_error| Message::from_parse_error(parse_error, locator, file.deref().clone()))
