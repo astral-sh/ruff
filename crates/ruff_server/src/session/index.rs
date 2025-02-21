@@ -11,7 +11,7 @@ use thiserror::Error;
 pub(crate) use ruff_settings::RuffSettings;
 
 use crate::edit::LanguageId;
-use crate::server::{Workspace, Workspaces};
+use crate::workspace::{Workspace, Workspaces};
 use crate::{
     edit::{DocumentKey, DocumentVersion, NotebookDocument},
     PositionEncoding, TextDocument,
