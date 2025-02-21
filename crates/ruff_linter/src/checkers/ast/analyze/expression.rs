@@ -433,6 +433,15 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.enabled(Rule::BannedApi) {
                 flake8_tidy_imports::rules::banned_attribute_access(checker, expr);
             }
+            if checker.enabled(Rule::BannedFunction) {
+                if let Expr::Call(call) = expr {
+                    if let Some(diagnostic) =
+                        flake8_tidy_imports::rules::banned_function(checker, call)
+                    {
+                        checker.report_diagnostic(diagnostic);
+                    }
+                }
+            }
             if checker.enabled(Rule::PrivateMemberAccess) {
                 flake8_self::rules::private_member_access(checker, expr);
             }
@@ -464,6 +473,12 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 range: _,
             },
         ) => {
+            if checker.enabled(Rule::BannedFunction) {
+                if let Some(diagnostic) = flake8_tidy_imports::rules::banned_function(checker, call)
+                {
+                    checker.report_diagnostic(diagnostic);
+                }
+            }
             if checker.any_enabled(&[
                 // pylint
                 Rule::BadStringFormatCharacter,

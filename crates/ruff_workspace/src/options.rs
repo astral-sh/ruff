@@ -1852,6 +1852,14 @@ pub struct Flake8TidyImportsOptions {
         "#
     )]
     pub banned_module_level_imports: Option<Vec<String>>,
+
+    /// A mapping of function names to their associated API ban messages.
+    #[option(
+        default = "{}",
+        value_type = "map[str, ApiBan]",
+        example = r#"banned-functions = { "os.system": "Use subprocess.run instead", "os.popen": "Use subprocess.run instead" }"#
+    )]
+    pub banned_functions: Option<FxHashMap<String, ApiBan>>,
 }
 
 impl Flake8TidyImportsOptions {
@@ -1860,6 +1868,7 @@ impl Flake8TidyImportsOptions {
             ban_relative_imports: self.ban_relative_imports.unwrap_or(Strictness::Parents),
             banned_api: self.banned_api.unwrap_or_default(),
             banned_module_level_imports: self.banned_module_level_imports.unwrap_or_default(),
+            banned_functions: self.banned_functions.unwrap_or_default(),
         }
     }
 }
