@@ -166,6 +166,17 @@ reveal_type("hello" in A())  # revealed: bool
 Python implicitly calls `bool` on the result of `__contains__`, so the return type must be
 convertible to `bool`.
 
+TODO: Ideally the message would explain to the user what's wrong. E.g,
+
+```ignore
+error: [operator] cannot use `in` operator on object of type `WithContains`
+    note: This is because the `in` operator implicitly calls `WithContains.__contains__`, but `WithContains.__contains__` is invalidly defined
+    note: `WithContains.__contains__` is invalidly defined because it returns an instance of `NotBoolable`, which cannot be evaluated in a boolean context
+    note: `NotBoolable` cannot be evaluated in a boolean context because its `__bool__` attribute is not callable
+```
+
+It may also be more appropriate to use `unsupported-operator` as the error code.
+
 <!-- snapshot-diagnostics -->
 
 ```py
