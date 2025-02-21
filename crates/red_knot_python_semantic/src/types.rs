@@ -635,6 +635,9 @@ impl<'db> Type<'db> {
                     .to_instance(db)
                     .is_subtype_of(db, target)
             }
+            (Type::Callable(CallableType::ClassMethod(_)), _) => KnownClass::Classmethod
+                .to_instance(db)
+                .is_subtype_of(db, target),
 
             // A fully static heterogenous tuple type `A` is a subtype of a fully static heterogeneous tuple type `B`
             // iff the two tuple types have the same number of elements and each element-type in `A` is a subtype
@@ -956,7 +959,8 @@ impl<'db> Type<'db> {
                 | Type::Callable(
                     CallableType::BoundMethod(..)
                     | CallableType::MethodWrapperDunderGet(..)
-                    | CallableType::WrapperDescriptorDunderGet,
+                    | CallableType::WrapperDescriptorDunderGet
+                    | CallableType::ClassMethod(..),
                 )
                 | Type::ModuleLiteral(..)
                 | Type::ClassLiteral(..)
@@ -970,7 +974,8 @@ impl<'db> Type<'db> {
                 | Type::Callable(
                     CallableType::BoundMethod(..)
                     | CallableType::MethodWrapperDunderGet(..)
-                    | CallableType::WrapperDescriptorDunderGet,
+                    | CallableType::WrapperDescriptorDunderGet
+                    | CallableType::ClassMethod(..),
                 )
                 | Type::ModuleLiteral(..)
                 | Type::ClassLiteral(..)
@@ -1170,6 +1175,15 @@ impl<'db> Type<'db> {
                 Type::Callable(CallableType::WrapperDescriptorDunderGet),
             ) => !KnownClass::WrapperDescriptorType.is_subclass_of(db, class),
 
+            (
+                Type::Callable(CallableType::ClassMethod(_)),
+                Type::Instance(InstanceType { class }),
+            )
+            | (
+                Type::Instance(InstanceType { class }),
+                Type::Callable(CallableType::ClassMethod(_)),
+            ) => !KnownClass::Classmethod.is_subclass_of(db, class),
+
             (Type::ModuleLiteral(..), other @ Type::Instance(..))
             | (other @ Type::Instance(..), Type::ModuleLiteral(..)) => {
                 // Modules *can* actually be instances of `ModuleType` subclasses
@@ -1218,7 +1232,8 @@ impl<'db> Type<'db> {
             | Type::Callable(
                 CallableType::BoundMethod(_)
                 | CallableType::MethodWrapperDunderGet(_)
-                | CallableType::WrapperDescriptorDunderGet,
+                | CallableType::WrapperDescriptorDunderGet
+                | CallableType::ClassMethod(_),
             )
             | Type::ModuleLiteral(..)
             | Type::IntLiteral(_)
@@ -1287,7 +1302,8 @@ impl<'db> Type<'db> {
             | Type::Callable(
                 CallableType::BoundMethod(_)
                 | CallableType::MethodWrapperDunderGet(_)
-                | CallableType::WrapperDescriptorDunderGet,
+                | CallableType::WrapperDescriptorDunderGet
+                | CallableType::ClassMethod(_),
             )
             | Type::ClassLiteral(..)
             | Type::ModuleLiteral(..)
@@ -1330,7 +1346,8 @@ impl<'db> Type<'db> {
             | Type::Callable(
                 CallableType::BoundMethod(..)
                 | CallableType::MethodWrapperDunderGet(..)
-                | CallableType::WrapperDescriptorDunderGet,
+                | CallableType::WrapperDescriptorDunderGet
+                | CallableType::ClassMethod(..),
             )
             | Type::ModuleLiteral(..)
             | Type::ClassLiteral(..)
@@ -1393,6 +1410,9 @@ impl<'db> Type<'db> {
                     .to_instance(db)
                     .static_member(db, name)
             }
+            Type::Callable(CallableType::ClassMethod(_)) => KnownClass::Classmethod
+                .to_instance(db)
+                .static_member(db, name),
 
             Type::ModuleLiteral(module) => module.static_member(db, name),
 
@@ -1598,6 +1618,15 @@ impl<'db> Type<'db> {
                     .to_instance(db)
                     .member(db, name)
             }
+            Type::Callable(CallableType::ClassMethod(function)) if name == "__get__" => {
+                Symbol::bound(Type::Callable(CallableType::MethodWrapperDunderGet(
+                    *function,
+                )))
+            }
+            Type::Callable(CallableType::ClassMethod(function)) => KnownClass::Classmethod
+                .to_instance(db)
+                .member(db, name)
+                .or_fall_back_to(db, || Type::FunctionLiteral(*function).member(db, name)),
 
             Type::Instance(..)
             | Type::BooleanLiteral(..)
@@ -1948,13 +1977,29 @@ impl<'db> Type<'db> {
                             )
                         },
                     ]),
-                    Some(match arguments.first_argument() {
-                        Some(ty) if ty.is_none(db) => Type::FunctionLiteral(function),
-                        Some(instance) => Type::Callable(CallableType::BoundMethod(
-                            BoundMethodType::new(db, function, instance),
-                        )),
-                        _ => Type::unknown(),
-                    }),
+                    if function.has_known_class_decorator(db, KnownClass::Classmethod)
+                        && function.decorators(db).len() == 1
+                    {
+                        if let Some(owner) = arguments.second_argument() {
+                            Some(Type::Callable(CallableType::BoundMethod(
+                                BoundMethodType::new(db, function, owner),
+                            )))
+                        } else if let Some(instance) = arguments.first_argument() {
+                            Some(Type::Callable(CallableType::BoundMethod(
+                                BoundMethodType::new(db, function, instance.to_meta_type(db)),
+                            )))
+                        } else {
+                            Some(Type::unknown())
+                        }
+                    } else {
+                        Some(match arguments.first_argument() {
+                            Some(ty) if ty.is_none(db) => Type::FunctionLiteral(function),
+                            Some(instance) => Type::Callable(CallableType::BoundMethod(
+                                BoundMethodType::new(db, function, instance),
+                            )),
+                            _ => Type::unknown(),
+                        })
+                    },
                 );
 
                 let binding = bind_call(db, arguments, &signature, self);
@@ -2004,18 +2049,40 @@ impl<'db> Type<'db> {
                         },
                     ]),
                     Some(
-                        match (arguments.first_argument(), arguments.second_argument()) {
-                            (Some(function @ Type::FunctionLiteral(_)), Some(instance))
-                                if instance.is_none(db) =>
+                        if let Some(function_ty @ Type::FunctionLiteral(function)) =
+                            arguments.first_argument()
+                        {
+                            if function.has_known_class_decorator(db, KnownClass::Classmethod)
+                                && function.decorators(db).len() == 1
                             {
-                                function
+                                if let Some(owner) = arguments.third_argument() {
+                                    Type::Callable(CallableType::BoundMethod(BoundMethodType::new(
+                                        db, function, owner,
+                                    )))
+                                } else if let Some(instance) = arguments.second_argument() {
+                                    Type::Callable(CallableType::BoundMethod(BoundMethodType::new(
+                                        db,
+                                        function,
+                                        instance.to_meta_type(db),
+                                    )))
+                                } else {
+                                    Type::unknown()
+                                }
+                            } else {
+                                if let Some(instance) = arguments.second_argument() {
+                                    if instance.is_none(db) {
+                                        function_ty
+                                    } else {
+                                        Type::Callable(CallableType::BoundMethod(
+                                            BoundMethodType::new(db, function, instance),
+                                        ))
+                                    }
+                                } else {
+                                    Type::unknown()
+                                }
                             }
-                            (Some(Type::FunctionLiteral(function)), Some(instance)) => {
-                                Type::Callable(CallableType::BoundMethod(BoundMethodType::new(
-                                    db, function, instance,
-                                )))
-                            }
-                            _ => Type::unknown(),
+                        } else {
+                            Type::unknown()
                         },
                     ),
                 );
@@ -2106,6 +2173,10 @@ impl<'db> Type<'db> {
                                 binding.set_return_type(casted_ty);
                             }
                         };
+                    }
+
+                    Some(KnownFunction::Overload) => {
+                        binding.set_return_type(todo_type!("overload(..) return type"));
                     }
 
                     Some(KnownFunction::GetattrStatic) => {
@@ -2616,6 +2687,9 @@ impl<'db> Type<'db> {
             Type::Callable(CallableType::WrapperDescriptorDunderGet) => {
                 KnownClass::WrapperDescriptorType.to_class_literal(db)
             }
+            Type::Callable(CallableType::ClassMethod(_)) => {
+                KnownClass::Classmethod.to_class_literal(db)
+            }
             Type::ModuleLiteral(_) => KnownClass::ModuleType.to_class_literal(db),
             Type::Tuple(_) => KnownClass::Tuple.to_class_literal(db),
             Type::ClassLiteral(ClassLiteralType { class }) => class.metaclass(db),
@@ -2853,6 +2927,7 @@ pub enum KnownClass {
     Property,
     BaseException,
     BaseExceptionGroup,
+    Classmethod,
     // Types
     GenericAlias,
     ModuleType,
@@ -2937,7 +3012,8 @@ impl<'db> KnownClass {
             | Self::Counter
             | Self::DefaultDict
             | Self::Deque
-            | Self::Float => Truthiness::Ambiguous,
+            | Self::Float
+            | Self::Classmethod => Truthiness::Ambiguous,
         }
     }
 
@@ -2961,6 +3037,7 @@ impl<'db> KnownClass {
             Self::Property => "property",
             Self::BaseException => "BaseException",
             Self::BaseExceptionGroup => "BaseExceptionGroup",
+            Self::Classmethod => "classmethod",
             Self::GenericAlias => "GenericAlias",
             Self::ModuleType => "ModuleType",
             Self::FunctionType => "FunctionType",
@@ -3042,6 +3119,7 @@ impl<'db> KnownClass {
             | Self::Dict
             | Self::BaseException
             | Self::BaseExceptionGroup
+            | Self::Classmethod
             | Self::Slice
             | Self::Range
             | Self::Property => KnownModule::Builtins,
@@ -3114,6 +3192,7 @@ impl<'db> KnownClass {
             | KnownClass::Property
             | KnownClass::BaseException
             | KnownClass::BaseExceptionGroup
+            | KnownClass::Classmethod
             | KnownClass::GenericAlias
             | KnownClass::ModuleType
             | KnownClass::FunctionType
@@ -3176,6 +3255,7 @@ impl<'db> KnownClass {
             | Self::SupportsIndex
             | Self::BaseException
             | Self::BaseExceptionGroup
+            | Self::Classmethod
             | Self::TypeVar => false,
         }
     }
@@ -3200,8 +3280,10 @@ impl<'db> KnownClass {
             "list" => Self::List,
             "slice" => Self::Slice,
             "range" => Self::Range,
+            "property" => Self::Property,
             "BaseException" => Self::BaseException,
             "BaseExceptionGroup" => Self::BaseExceptionGroup,
+            "classmethod" => Self::Classmethod,
             "GenericAlias" => Self::GenericAlias,
             "NoneType" => Self::NoneType,
             "ModuleType" => Self::ModuleType,
@@ -3266,6 +3348,7 @@ impl<'db> KnownClass {
             | Self::BaseException
             | Self::EllipsisType
             | Self::BaseExceptionGroup
+            | Self::Classmethod
             | Self::FunctionType
             | Self::MethodType
             | Self::MethodWrapperType
@@ -3919,8 +4002,18 @@ pub struct FunctionType<'db> {
 
 #[salsa::tracked]
 impl<'db> FunctionType<'db> {
-    pub fn has_decorator(self, db: &dyn Db, decorator: Type<'_>) -> bool {
-        self.decorators(db).contains(&decorator)
+    pub fn has_known_class_decorator(self, db: &dyn Db, decorator: KnownClass) -> bool {
+        self.decorators(db).iter().any(|d| {
+            d.into_class_literal()
+                .is_some_and(|c| c.class.is_known(db, decorator))
+        })
+    }
+
+    pub fn has_known_function_decorator(self, db: &dyn Db, decorator: KnownFunction) -> bool {
+        self.decorators(db).iter().any(|d| {
+            d.into_function_literal()
+                .is_some_and(|f| f.is_known(db, decorator))
+        })
     }
 
     /// Typed externally-visible signature for this function.
@@ -3937,13 +4030,23 @@ impl<'db> FunctionType<'db> {
     /// would depend on the function's AST and rerun for every change in that file.
     #[salsa::tracked(return_ref)]
     pub fn signature(self, db: &'db dyn Db) -> Signature<'db> {
-        let function_stmt_node = self.body_scope(db).node(db).expect_function();
         let internal_signature = self.internal_signature(db);
-        if function_stmt_node.decorator_list.is_empty() {
-            return internal_signature;
+
+        let decorators = self.decorators(db);
+        let mut decorators = decorators.iter();
+
+        if let Some(d) = decorators.next() {
+            if d.into_class_literal()
+                .is_some_and(|c| c.class.is_known(db, KnownClass::Classmethod))
+                && decorators.next().is_none()
+            {
+                internal_signature
+            } else {
+                Signature::todo()
+            }
+        } else {
+            internal_signature
         }
-        // TODO process the effect of decorators on the signature
-        Signature::todo()
     }
 
     /// Typed internally-visible signature for this function.
@@ -3989,6 +4092,8 @@ pub enum KnownFunction {
     AssertType,
     /// `typing(_extensions).cast`
     Cast,
+    /// `typing(_extensions).overload`
+    Overload,
 
     /// `inspect.getattr_static`
     GetattrStatic,
@@ -4036,6 +4141,7 @@ impl KnownFunction {
             "no_type_check" => Self::NoTypeCheck,
             "assert_type" => Self::AssertType,
             "cast" => Self::Cast,
+            "overload" => Self::Overload,
             "getattr_static" => Self::GetattrStatic,
             "static_assert" => Self::StaticAssert,
             "is_subtype_of" => Self::IsSubtypeOf,
@@ -4063,7 +4169,12 @@ impl KnownFunction {
                 }
             },
             Self::Len | Self::Repr => module.is_builtins(),
-            Self::AssertType | Self::Cast | Self::RevealType | Self::Final | Self::NoTypeCheck => {
+            Self::AssertType
+            | Self::Cast
+            | Self::Overload
+            | Self::RevealType
+            | Self::Final
+            | Self::NoTypeCheck => {
                 matches!(module, KnownModule::Typing | KnownModule::TypingExtensions)
             }
             Self::GetattrStatic => {
@@ -4100,6 +4211,7 @@ impl KnownFunction {
             Self::ConstraintFunction(_)
             | Self::Len
             | Self::Repr
+            | Self::Overload
             | Self::Final
             | Self::NoTypeCheck
             | Self::RevealType
@@ -4157,6 +4269,9 @@ pub enum CallableType<'db> {
     /// type. We currently add this as a separate variant because `FunctionType.__get__`
     /// is an overloaded method and we do not support `@overload` yet.
     WrapperDescriptorDunderGet,
+
+    /// Represents a `builtins.classmethod` object.
+    ClassMethod(FunctionType<'db>),
 }
 
 /// Describes whether the parameters in a function expect value expressions or type expressions.
@@ -4769,8 +4884,25 @@ impl<'db> Class<'db> {
                         // TODO: Eventually, we are going to process all decorators correctly. This is
                         // just a temporary heuristic to provide a broad categorization into properties
                         // and non-property methods.
-                        if function.has_decorator(db, KnownClass::Property.to_class_literal(db)) {
+                        if function.has_known_class_decorator(db, KnownClass::Property) {
                             SymbolAndQualifiers::todo("@property")
+                        } else if function.has_known_class_decorator(db, KnownClass::Classmethod)
+                            && function.decorators(db).len() == 1
+                        {
+                            // if function.decorators(db).len() == 1 {
+                            //     SymbolAndQualifiers(
+                            //         Symbol::bound(Type::Callable(CallableType::ClassMethod(
+                            //             function,
+                            //         ))),
+                            //         qualifiers,
+                            //     )
+                            // } else {
+                            // SymbolAndQualifiers::todo("decorated classmethod")
+                            // }
+                            SymbolAndQualifiers(Symbol::bound(declared_ty), qualifiers)
+                        } else if function.has_known_function_decorator(db, KnownFunction::Overload)
+                        {
+                            SymbolAndQualifiers::todo("overloaded method")
                         } else if !function.decorators(db).is_empty() {
                             SymbolAndQualifiers::todo("decorated method")
                         } else {

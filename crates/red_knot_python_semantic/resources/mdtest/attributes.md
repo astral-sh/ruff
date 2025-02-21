@@ -1042,8 +1042,8 @@ Most attribute accesses on bool-literal types are delegated to `builtins.bool`, 
 bools are instances of that class:
 
 ```py
-reveal_type(True.__and__)  # revealed: @Todo(decorated method)
-reveal_type(False.__or__)  # revealed: @Todo(decorated method)
+reveal_type(True.__and__)  # revealed: @Todo(overloaded method)
+reveal_type(False.__or__)  # revealed: @Todo(overloaded method)
 ```
 
 Some attributes are special-cased, however:
