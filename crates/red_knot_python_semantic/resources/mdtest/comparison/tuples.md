@@ -335,7 +335,7 @@ For tuples like `tuple[int, ...]`, `tuple[Any, ...]`
 
 // TODO
 
-## Not-boolable elements
+## With elements that incorrectly implement `__bool_`
 
 <!-- snapshot-diagnostics -->
 
