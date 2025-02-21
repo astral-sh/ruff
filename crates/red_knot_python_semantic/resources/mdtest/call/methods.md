@@ -255,4 +255,30 @@ method_wrapper()
 method_wrapper(C(), C, "one too many")
 ```
 
+## `@classmethod`
+
+```py
+from __future__ import annotations
+
+from inspect import getattr_static
+
+class C:
+    @classmethod
+    def f(cls: type[C], x: int) -> str:
+        return "a"
+
+reveal_type(getattr_static(C, "f"))  # revealed: Literal[f]
+reveal_type(getattr_static(C, "f").__get__)  # revealed: <method-wrapper `__get__` of `f`>
+
+reveal_type(getattr_static(C, "f").__get__(None, C))  # revealed: <bound method `f` of `Literal[C]`>
+reveal_type(getattr_static(C, "f").__get__(C()))  # revealed: <bound method `f` of `type[C]`>
+
+# Class methods are bound even when accessed on the class object:
+reveal_type(C.f)  # revealed: <bound method `f` of `Literal[C]`>
+reveal_type(C().f)  # revealed: <bound method `f` of `type[C]`>
+
+reveal_type(C.f(1))  # revealed: str
+reveal_type(C().f(1))  # revealed: str
+```
+
 [functions and methods]: https://docs.python.org/3/howto/descriptor.html#functions-and-methods

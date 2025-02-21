@@ -39,6 +39,11 @@ impl<'a, 'db> CallArguments<'a, 'db> {
     pub(crate) fn second_argument(&self) -> Option<Type<'db>> {
         self.0.get(1).map(Argument::ty)
     }
+
+    // TODO this should be eliminated in favor of [`bind_call`]
+    pub(crate) fn third_argument(&self) -> Option<Type<'db>> {
+        self.0.get(2).map(Argument::ty)
+    }
 }
 
 impl<'db, 'a, 'b> IntoIterator for &'b CallArguments<'a, 'db> {
