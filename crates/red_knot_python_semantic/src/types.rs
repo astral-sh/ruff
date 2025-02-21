@@ -3679,7 +3679,7 @@ pub(super) enum BoolError<'db> {
     },
 
     /// Any other reason why the type can't be converted to a bool.
-    /// E.g. because the type is a union and not all variants support `__bool__` or
+    /// E.g. because calling `__bool__` returns in a union type and not all variants support `__bool__` or
     /// because `__bool__` points to a type that has a possibly unbound `__call__` method.
     Other { not_boolable_type: Type<'db> },
 }
