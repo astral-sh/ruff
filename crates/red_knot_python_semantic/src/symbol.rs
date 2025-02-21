@@ -500,7 +500,7 @@ fn symbol_from_bindings_impl<'db>(
         Some(BindingWithConstraints {
             binding,
             visibility_constraint,
-            constraints: _,
+            narrowing_constraints: _,
         }) if binding.map_or(true, is_non_exported) => {
             visibility_constraints.evaluate(db, constraints, *visibility_constraint)
         }
@@ -510,7 +510,7 @@ fn symbol_from_bindings_impl<'db>(
     let mut types = bindings_with_constraints.filter_map(
         |BindingWithConstraints {
              binding,
-             constraints: binding_constraints,
+             narrowing_constraints,
              visibility_constraint,
          }| {
             let binding = binding?;
@@ -526,7 +526,7 @@ fn symbol_from_bindings_impl<'db>(
                 return None;
             }
 
-            let mut constraint_tys = binding_constraints
+            let mut constraint_tys = narrowing_constraints
                 .filter_map(|constraint| narrowing_constraint(db, constraint, binding))
                 .peekable();
 

@@ -430,7 +430,7 @@ impl<'map, 'db> Iterator for BindingWithConstraintsIterator<'map, 'db> {
             .next()
             .map(|live_binding| BindingWithConstraints {
                 binding: self.all_definitions[live_binding.binding],
-                constraints: ConstraintsIterator {
+                narrowing_constraints: ConstraintsIterator {
                     constraints,
                     constraint_ids: live_binding.narrowing_constraints.iter(),
                 },
@@ -443,7 +443,7 @@ impl std::iter::FusedIterator for BindingWithConstraintsIterator<'_, '_> {}
 
 pub(crate) struct BindingWithConstraints<'map, 'db> {
     pub(crate) binding: Option<Definition<'db>>,
-    pub(crate) constraints: ConstraintsIterator<'map, 'db>,
+    pub(crate) narrowing_constraints: ConstraintsIterator<'map, 'db>,
     pub(crate) visibility_constraint: ScopedVisibilityConstraintId,
 }
 
