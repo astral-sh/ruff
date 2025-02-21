@@ -180,6 +180,7 @@ reveal_type(Sub)  # revealed: Literal[Sub]
 class Base[T]: ...
 
 # TODO: error: [unresolved-reference]
+# error: [non-subscriptable]
 class Sub(Base[Sub]): ...
 ```
 
