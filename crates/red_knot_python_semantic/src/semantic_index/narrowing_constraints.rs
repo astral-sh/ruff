@@ -8,8 +8,7 @@
 //! This module defines how narrowing constraints are stored internally.
 //!
 //! A _narrowing constraint_ consists of a list of _clauses_, each of which corresponds with an
-//! expression in the source file (represented by a
-//! [`Constraint`][crate::semantic_index::constraint::Constraint]). We need to support the
+//! expression in the source file (represented by a [`Constraint`]). We need to support the
 //! following operations on narrowing constraints:
 //!
 //! - Adding a new clause to an existing constraint
@@ -19,6 +18,8 @@
 //! In particular, note that we do not need random access to the clauses in a constraint. That
 //! means that we can use a simple [_sorted association list_][ruff_index::list] as our data
 //! structure.
+//!
+//! [`Constraint`]: crate::semantic_index::constraint::Constraint
 
 use ruff_index::list::{ListBuilder, ListIterator, ListStorage};
 use ruff_index::newtype_index;
@@ -32,6 +33,8 @@ use crate::semantic_index::constraint::ScopedConstraintId;
 ///
 /// An instance of this type represents a _non-empty_ narrowing constraint. You will often wrap
 /// this in `Option` and use `None` to represent an empty narrowing constraint.
+///
+/// [`Constraint`]: crate::semantic_index::constraint::Constraint
 #[newtype_index]
 pub(crate) struct ScopedNarrowingConstraintId;
 
@@ -41,6 +44,8 @@ pub(crate) struct ScopedNarrowingConstraintId;
 /// Note that those [`Constraint`]s are stored in [their own
 /// arena][crate::semantic_index::constraint::Constraints], so internally we use a
 /// [`ScopedConstraintId`] to refer to the underlying constraint.
+///
+/// [`Constraint`]: crate::semantic_index::constraint::Constraint
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub(crate) struct ScopedNarrowingConstraintClause(ScopedConstraintId);
 
