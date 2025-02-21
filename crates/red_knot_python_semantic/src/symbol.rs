@@ -38,7 +38,7 @@ pub(crate) enum Boundness {
 /// possibly_unbound:  Symbol::Type(Type::IntLiteral(2), Boundness::PossiblyUnbound),
 /// non_existent:      Symbol::Unbound,
 /// ```
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, salsa::Update)]
 pub(crate) enum Symbol<'db> {
     Type(Type<'db>, Boundness),
     Unbound,
@@ -382,7 +382,7 @@ pub(crate) type SymbolFromDeclarationsResult<'db> =
 /// that this comes with a [`CLASS_VAR`] type qualifier.
 ///
 /// [`CLASS_VAR`]: crate::types::TypeQualifiers::CLASS_VAR
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq, salsa::Update)]
 pub(crate) struct SymbolAndQualifiers<'db>(pub(crate) Symbol<'db>, pub(crate) TypeQualifiers);
 
 impl SymbolAndQualifiers<'_> {
@@ -412,6 +412,7 @@ impl<'db> From<Symbol<'db>> for SymbolAndQualifiers<'db> {
     }
 }
 
+#[salsa::tracked]
 fn symbol_by_id<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
