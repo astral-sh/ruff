@@ -91,3 +91,32 @@ class PossiblyUnboundTrue:
 
 reveal_type(bool(PossiblyUnboundTrue()))  # revealed: bool
 ```
+
+### Special-cased classes
+
+Some special-cased `@final` classes are known by red-knot to have instances that are either always
+truthy or always falsy.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+import types
+import typing
+import sys
+from knot_extensions import AlwaysTruthy, static_assert, is_subtype_of
+from typing_extensions import _NoDefaultType
+
+static_assert(is_subtype_of(sys.version_info.__class__, AlwaysTruthy))
+static_assert(is_subtype_of(types.EllipsisType, AlwaysTruthy))
+static_assert(is_subtype_of(_NoDefaultType, AlwaysTruthy))
+static_assert(is_subtype_of(slice, AlwaysTruthy))
+static_assert(is_subtype_of(types.FunctionType, AlwaysTruthy))
+static_assert(is_subtype_of(types.MethodType, AlwaysTruthy))
+static_assert(is_subtype_of(typing.TypeVar, AlwaysTruthy))
+static_assert(is_subtype_of(typing.TypeAliasType, AlwaysTruthy))
+static_assert(is_subtype_of(types.MethodWrapperType, AlwaysTruthy))
+static_assert(is_subtype_of(types.WrapperDescriptorType, AlwaysTruthy))
+```
