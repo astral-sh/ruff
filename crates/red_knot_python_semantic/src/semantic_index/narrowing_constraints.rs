@@ -4,33 +4,33 @@ use ruff_index::newtype_index;
 use crate::semantic_index::constraint::ScopedConstraintId;
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
-pub(crate) struct ScopedNarrowingConstraintId(u32);
+pub(crate) struct ScopedNarrowingConstraintClause(u32);
 
-impl ScopedNarrowingConstraintId {
+impl ScopedNarrowingConstraintClause {
     #[inline]
     pub(crate) fn constraint(self) -> ScopedConstraintId {
         ScopedConstraintId::from(self.0)
     }
 }
 
-impl From<ScopedConstraintId> for ScopedNarrowingConstraintId {
+impl From<ScopedConstraintId> for ScopedNarrowingConstraintClause {
     #[inline]
-    fn from(constraint: ScopedConstraintId) -> ScopedNarrowingConstraintId {
-        ScopedNarrowingConstraintId(constraint.as_u32())
+    fn from(constraint: ScopedConstraintId) -> ScopedNarrowingConstraintClause {
+        ScopedNarrowingConstraintClause(constraint.as_u32())
     }
 }
 
 #[newtype_index]
-pub(crate) struct ScopedNarrowingConstraintSetId;
+pub(crate) struct ScopedNarrowingConstraintId;
 
 #[derive(Debug, Eq, PartialEq)]
 pub(crate) struct NarrowingConstraints {
-    lists: ListStorage<ScopedNarrowingConstraintSetId, ScopedNarrowingConstraintId, ()>,
+    lists: ListStorage<ScopedNarrowingConstraintId, ScopedNarrowingConstraintClause, ()>,
 }
 
 #[derive(Debug, Default, Eq, PartialEq)]
 pub(crate) struct NarrowingConstraintsBuilder {
-    lists: ListBuilder<ScopedNarrowingConstraintSetId, ScopedNarrowingConstraintId, ()>,
+    lists: ListBuilder<ScopedNarrowingConstraintId, ScopedNarrowingConstraintClause, ()>,
 }
 
 impl NarrowingConstraintsBuilder {
@@ -40,31 +40,31 @@ impl NarrowingConstraintsBuilder {
         }
     }
 
-    pub(crate) fn insert_into_set(
+    pub(crate) fn add(
         &mut self,
-        set: Option<ScopedNarrowingConstraintSetId>,
-        element: ScopedNarrowingConstraintId,
-    ) -> Option<ScopedNarrowingConstraintSetId> {
+        set: Option<ScopedNarrowingConstraintId>,
+        element: ScopedNarrowingConstraintClause,
+    ) -> Option<ScopedNarrowingConstraintId> {
         self.lists.insert_if_needed(set, element, ())
     }
 
-    pub(crate) fn intersect_sets(
+    pub(crate) fn intersect(
         &mut self,
-        a: Option<ScopedNarrowingConstraintSetId>,
-        b: Option<ScopedNarrowingConstraintSetId>,
-    ) -> Option<ScopedNarrowingConstraintSetId> {
+        a: Option<ScopedNarrowingConstraintId>,
+        b: Option<ScopedNarrowingConstraintId>,
+    ) -> Option<ScopedNarrowingConstraintId> {
         self.lists.intersect(a, b, |(), ()| ())
     }
 }
 
 pub(crate) struct NarrowingConstraintsIterator<'a> {
-    wrapped: ListIterator<'a, ScopedNarrowingConstraintSetId, ScopedNarrowingConstraintId, ()>,
+    wrapped: ListIterator<'a, ScopedNarrowingConstraintId, ScopedNarrowingConstraintClause, ()>,
 }
 
 impl NarrowingConstraints {
-    pub(crate) fn iter_constraints(
+    pub(crate) fn iter_clauses(
         &self,
-        set: Option<ScopedNarrowingConstraintSetId>,
+        set: Option<ScopedNarrowingConstraintId>,
     ) -> NarrowingConstraintsIterator<'_> {
         NarrowingConstraintsIterator {
             wrapped: self.lists.iter(set),
@@ -73,7 +73,7 @@ impl NarrowingConstraints {
 }
 
 impl Iterator for NarrowingConstraintsIterator<'_> {
-    type Item = ScopedNarrowingConstraintId;
+    type Item = ScopedNarrowingConstraintClause;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -86,7 +86,7 @@ impl Iterator for NarrowingConstraintsIterator<'_> {
 mod tests {
     use super::*;
 
-    impl ScopedNarrowingConstraintId {
+    impl ScopedNarrowingConstraintClause {
         pub(crate) fn as_u32(self) -> u32 {
             self.0
         }
@@ -95,7 +95,7 @@ mod tests {
     impl NarrowingConstraintsBuilder {
         pub(crate) fn iter_constraints(
             &self,
-            set: Option<ScopedNarrowingConstraintSetId>,
+            set: Option<ScopedNarrowingConstraintId>,
         ) -> NarrowingConstraintsIterator<'_> {
             NarrowingConstraintsIterator {
                 wrapped: self.lists.iter(set),

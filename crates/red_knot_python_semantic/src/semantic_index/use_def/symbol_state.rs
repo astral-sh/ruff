@@ -47,7 +47,7 @@ use ruff_index::newtype_index;
 use smallvec::{smallvec, SmallVec};
 
 use crate::semantic_index::narrowing_constraints::{
-    NarrowingConstraintsBuilder, ScopedNarrowingConstraintId, ScopedNarrowingConstraintSetId,
+    NarrowingConstraintsBuilder, ScopedNarrowingConstraintClause, ScopedNarrowingConstraintId,
 };
 use crate::semantic_index::visibility_constraints::{
     ScopedVisibilityConstraintId, VisibilityConstraintsBuilder,
@@ -189,7 +189,7 @@ pub(super) struct SymbolBindings {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct LiveBinding {
     pub(super) binding: ScopedDefinitionId,
-    pub(super) narrowing_constraints: Option<ScopedNarrowingConstraintSetId>,
+    pub(super) narrowing_constraint: Option<ScopedNarrowingConstraintId>,
     pub(super) visibility_constraint: ScopedVisibilityConstraintId,
 }
 
@@ -199,7 +199,7 @@ impl SymbolBindings {
     fn unbound(scope_start_visibility: ScopedVisibilityConstraintId) -> Self {
         let initial_binding = LiveBinding {
             binding: ScopedDefinitionId::UNBOUND,
-            narrowing_constraints: None,
+            narrowing_constraint: None,
             visibility_constraint: scope_start_visibility,
         };
         Self {
@@ -218,7 +218,7 @@ impl SymbolBindings {
         self.live_bindings.clear();
         self.live_bindings.push(LiveBinding {
             binding,
-            narrowing_constraints: None,
+            narrowing_constraint: None,
             visibility_constraint,
         });
     }
@@ -227,11 +227,11 @@ impl SymbolBindings {
     pub(super) fn record_constraint(
         &mut self,
         narrowing_constraints: &mut NarrowingConstraintsBuilder,
-        constraint: ScopedNarrowingConstraintId,
+        constraint: ScopedNarrowingConstraintClause,
     ) {
         for binding in &mut self.live_bindings {
-            binding.narrowing_constraints =
-                narrowing_constraints.insert_into_set(binding.narrowing_constraints, constraint);
+            binding.narrowing_constraint =
+                narrowing_constraints.add(binding.narrowing_constraint, constraint);
         }
     }
 
@@ -291,8 +291,8 @@ impl SymbolBindings {
                     // If the same definition is visible through both paths, any constraint
                     // that applies on only one path is irrelevant to the resulting type from
                     // unioning the two paths, so we intersect the constraints.
-                    let narrowing_constraints = narrowing_constraints
-                        .intersect_sets(a.narrowing_constraints, b.narrowing_constraints);
+                    let narrowing_constraint = narrowing_constraints
+                        .intersect(a.narrowing_constraint, b.narrowing_constraint);
 
                     // For visibility constraints, we merge them using a ternary OR operation:
                     let visibility_constraint = visibility_constraints
@@ -300,7 +300,7 @@ impl SymbolBindings {
 
                     self.live_bindings.push(LiveBinding {
                         binding: a.binding,
-                        narrowing_constraints,
+                        narrowing_constraint,
                         visibility_constraint,
                     });
                 }
@@ -343,7 +343,7 @@ impl SymbolState {
     pub(super) fn record_constraint(
         &mut self,
         narrowing_constraints: &mut NarrowingConstraintsBuilder,
-        constraint: ScopedNarrowingConstraintId,
+        constraint: ScopedNarrowingConstraintClause,
     ) {
         self.bindings
             .record_constraint(narrowing_constraints, constraint);
@@ -421,7 +421,7 @@ mod tests {
                     def_id.as_u32().to_string()
                 };
                 let constraints = narrowing_constraints
-                    .iter_constraints(live_binding.narrowing_constraints)
+                    .iter_constraints(live_binding.narrowing_constraint)
                     .map(|idx| idx.as_u32().to_string())
                     .collect::<Vec<_>>()
                     .join(", ");

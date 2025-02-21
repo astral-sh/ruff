@@ -8,7 +8,7 @@ use crate::semantic_index::{
     symbol_table, BindingWithConstraints, BindingWithConstraintsIterator, DeclarationsIterator,
 };
 use crate::types::{
-    binding_type, declaration_type, narrowing_constraint, todo_type, IntersectionBuilder,
+    binding_type, declaration_type, infer_narrowing_constraint, todo_type, IntersectionBuilder,
     KnownClass, Truthiness, Type, TypeAndQualifiers, TypeQualifiers, UnionBuilder, UnionType,
 };
 use crate::{resolve_module, Db, KnownModule, Module, Program};
@@ -515,7 +515,7 @@ fn symbol_from_bindings_impl<'db>(
         Some(BindingWithConstraints {
             binding,
             visibility_constraint,
-            narrowing_constraints: _,
+            narrowing_constraint: _,
         }) if binding.map_or(true, is_non_exported) => {
             visibility_constraints.evaluate(db, constraints, *visibility_constraint)
         }
@@ -525,7 +525,7 @@ fn symbol_from_bindings_impl<'db>(
     let mut types = bindings_with_constraints.filter_map(
         |BindingWithConstraints {
              binding,
-             narrowing_constraints,
+             narrowing_constraint,
              visibility_constraint,
          }| {
             let binding = binding?;
@@ -541,8 +541,8 @@ fn symbol_from_bindings_impl<'db>(
                 return None;
             }
 
-            let mut constraint_tys = narrowing_constraints
-                .filter_map(|constraint| narrowing_constraint(db, constraint, binding))
+            let mut constraint_tys = narrowing_constraint
+                .filter_map(|constraint| infer_narrowing_constraint(db, constraint, binding))
                 .peekable();
 
             let binding_ty = binding_type(db, binding);
