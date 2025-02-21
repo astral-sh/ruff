@@ -33,8 +33,8 @@ use crate::semantic_index::{
 };
 use crate::suppression::check_suppressions;
 use crate::symbol::{
-    global_symbol, imported_symbol, known_module_symbol, symbol, symbol_from_bindings,
-    symbol_from_declarations, Boundness, LookupError, LookupResult, Symbol, SymbolAndQualifiers,
+    imported_symbol, known_module_symbol, symbol, symbol_from_bindings, symbol_from_declarations,
+    Boundness, LookupError, LookupResult, Symbol, SymbolAndQualifiers,
 };
 use crate::types::call::{bind_call, CallArguments, CallBinding, CallOutcome};
 use crate::types::class_base::ClassBase;
@@ -5084,7 +5084,7 @@ static_assertions::assert_eq_size!(Type, [u8; 16]);
 pub(crate) mod tests {
     use super::*;
     use crate::db::tests::{setup_db, TestDbBuilder};
-    use crate::symbol::{typing_extensions_symbol, typing_symbol};
+    use crate::symbol::{global_symbol, typing_extensions_symbol, typing_symbol};
     use ruff_db::files::system_path_to_file;
     use ruff_db::parsed::parsed_module;
     use ruff_db::system::DbWithTestSystem;
