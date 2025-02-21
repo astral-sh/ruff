@@ -7,12 +7,25 @@ use crate::Idx;
 #[derive(Debug, Eq, PartialEq)]
 struct ListCell<I, K, V>(K, V, Option<I>);
 
-/// Stores one or more _association lists_, which map keys to values.
+/// Stores one or more _association lists_, which are linked lists of key/value pairs. We
+/// additionally guarantee that the elements of an association list are sorted (by their keys), and
+/// that they do not contain any entries with duplicate keys.
 ///
-/// Internally, association lists are stored using a linked list, where the linked list cells are
-/// stored in an [`IndexVec`]. The `I` type is the [`Idx`] that you want to use with this
-/// `IndexVec`. That means that an association list is represented by an `Option<I>`, with `None`
-/// representing an empty list.
+/// Association lists have fallen out of favor in recent decades, since you often need operations
+/// that are inefficient on them. In particular, looking up a random element by index is O(n), just
+/// like a linked list; and looking up an element by key is also O(n), since you must do a linear
+/// scan of the list to find the matching element. The typical implementation also suffers from
+/// poor cache locality and high memory allocation overhead, since individual list cells are
+/// typically allocated separately from the heap.
+///
+/// We solve that last problem by storing the cells of an association list in an [`IndexVec`]
+/// arena. You provide the index type (`I`) that you want to use with this arena. That means that
+/// an individual association list is represented by an `Option<I>`, with `None` representing an
+/// empty list.
+///
+/// We exploit structural sharing where possible, reusing cells across multiple lists when we can.
+/// That said, we don't guarantee that lists are canonical — it's entirely possible for two lists
+/// with identical contents to use different list cells and have different identifiers.
 ///
 /// This type provides read-only access to the lists.  Use a [`ListBuilder`] to create lists.
 #[derive(Debug, Eq, PartialEq)]
