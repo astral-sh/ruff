@@ -3062,6 +3062,7 @@ impl<'db> KnownClass {
             "MethodWrapperType" => Self::MethodWrapperType,
             "WrapperDescriptorType" => Self::WrapperDescriptorType,
             "TypeAliasType" => Self::TypeAliasType,
+            "TypeVar" => Self::TypeVar,
             "ChainMap" => Self::ChainMap,
             "Counter" => Self::Counter,
             "defaultdict" => Self::DefaultDict,
