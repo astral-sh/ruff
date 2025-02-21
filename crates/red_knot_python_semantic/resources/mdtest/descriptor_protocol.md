@@ -201,14 +201,11 @@ class C:
 
 c1 = C.factory("test")  # okay
 
-# TODO: should be `C`
-reveal_type(c1)  # revealed: @Todo(return type)
+reveal_type(c1)  # revealed: C
 
-# TODO: should be `str`
-reveal_type(C.get_name())  # revealed: @Todo(return type)
+reveal_type(C.get_name())  # revealed: str
 
-# TODO: should be `str`
-reveal_type(C("42").get_name())  # revealed: @Todo(decorated method)
+reveal_type(C("42").get_name())  # revealed: str
 ```
 
 ## Descriptors only work when used as class variables
