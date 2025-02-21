@@ -9,6 +9,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "512761e0bb2578dd7380c6baaa0f4ce03e84f95e960231d1dec8bf4d7d6e2627"
 
 [[package]]
+name = "ahash"
+version = "0.8.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e89da841a80418a9b391ebaea17f5c112ffaaa96f621d2c285b5174da76b9011"
+dependencies = [
+ "cfg-if",
+ "once_cell",
+ "version_check",
+ "zerocopy 0.7.35",
+]
+
+[[package]]
 name = "aho-corasick"
 version = "1.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1100,6 +1112,10 @@ name = "hashbrown"
 version = "0.14.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e5274423e17b7c9fc20b6e7e208532f9b19825d82dfd615708b70edd83df41f1"
+dependencies = [
+ "ahash",
+ "allocator-api2",
+]
 
 [[package]]
 name = "hashbrown"
@@ -1107,18 +1123,17 @@ version = "0.15.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bf151400ff0baff5465007dd2f3e717f3fe502074ca563069ce3a6629d07b289"
 dependencies = [
- "allocator-api2",
  "equivalent",
  "foldhash",
 ]
 
 [[package]]
 name = "hashlink"
-version = "0.10.0"
+version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7382cf6263419f2d8df38c55d7da83da5c18aef87fc7a7fc1fb1e344edfe14c1"
+checksum = "6ba4ff7128dee98c7dc9794b6a411377e1404dba1c97deb8d1a55297bd25d8af"
 dependencies = [
- "hashbrown 0.15.2",
+ "hashbrown 0.14.5",
 ]
 
 [[package]]
@@ -3323,14 +3338,14 @@ checksum = "6ea1a2d0a644769cc99faa24c3ad26b379b786fe7c36fd3c546254801650e6dd"
 [[package]]
 name = "salsa"
 version = "0.18.0"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=c8826fa4d1d9e3cba4c6e578763878b71fa9a10d#c8826fa4d1d9e3cba4c6e578763878b71fa9a10d"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=54fdd7df752044bb658896b9c1d1a8b89cba0adf#54fdd7df752044bb658896b9c1d1a8b89cba0adf"
 dependencies = [
  "arc-swap",
  "boxcar",
  "compact_str",
  "crossbeam-queue",
  "dashmap 6.1.0",
- "hashbrown 0.15.2",
+ "hashbrown 0.14.5",
  "hashlink",
  "indexmap",
  "parking_lot",
@@ -3345,12 +3360,12 @@ dependencies = [
 [[package]]
 name = "salsa-macro-rules"
 version = "0.1.0"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=c8826fa4d1d9e3cba4c6e578763878b71fa9a10d#c8826fa4d1d9e3cba4c6e578763878b71fa9a10d"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=54fdd7df752044bb658896b9c1d1a8b89cba0adf#54fdd7df752044bb658896b9c1d1a8b89cba0adf"
 
 [[package]]
 name = "salsa-macros"
 version = "0.18.0"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=c8826fa4d1d9e3cba4c6e578763878b71fa9a10d#c8826fa4d1d9e3cba4c6e578763878b71fa9a10d"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=54fdd7df752044bb658896b9c1d1a8b89cba0adf#54fdd7df752044bb658896b9c1d1a8b89cba0adf"
 dependencies = [
  "heck",
  "proc-macro2",

@@ -384,7 +384,28 @@ fn symbol_impl<'db>(
     name: &str,
     requires_explicit_reexport: RequiresExplicitReExport,
 ) -> Symbol<'db> {
-    #[salsa::tracked]
+    fn symbol_cycle_recover<'db>(
+        _db: &'db dyn Db,
+        _value: &Symbol<'db>,
+        count: u32,
+        _scope: ScopeId<'db>,
+        _symbol_id: ScopedSymbolId,
+        _requires_explicit_reexport: RequiresExplicitReExport,
+    ) -> salsa::CycleRecoveryAction<Symbol<'db>> {
+        assert!(count < 10, "cycle did not converge within 10 iterations");
+        salsa::CycleRecoveryAction::Iterate
+    }
+
+    fn symbol_cycle_initial<'db>(
+        _db: &'db dyn Db,
+        _scope: ScopeId<'db>,
+        _symbol_id: ScopedSymbolId,
+        _requires_explicit_reexport: RequiresExplicitReExport,
+    ) -> Symbol<'db> {
+        Symbol::bound(Type::Never)
+    }
+
+    #[salsa::tracked(cycle_fn=symbol_cycle_recover, cycle_initial=symbol_cycle_initial)]
     fn symbol_by_id<'db>(
         db: &'db dyn Db,
         scope: ScopeId<'db>,
