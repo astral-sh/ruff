@@ -204,7 +204,7 @@ class PossiblyUnboundBool:
 reveal_type(not PossiblyUnboundBool())
 ```
 
-## Not-boolable types
+## Object that implements `__bool__` incorrectly
 
 <!-- snapshot-diagnostics -->
 

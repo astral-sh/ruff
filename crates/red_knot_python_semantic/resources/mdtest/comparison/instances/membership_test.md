@@ -161,7 +161,7 @@ reveal_type(42 in A())  # revealed: bool
 reveal_type("hello" in A())  # revealed: bool
 ```
 
-## Not-boolable return type
+## Return type that doesn't implement `__bool__` correctly
 
 Python implicitly calls `bool` on the result of `__contains__`, so the return type must be
 convertible to `bool`.

@@ -140,7 +140,7 @@ def test(cond: bool):
         ...
 ```
 
-## Union containing not-boolable variant
+## Union with some variants implementing `__bool__` incorrectly
 
 ```py
 def test(cond: bool):

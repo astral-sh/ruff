@@ -3,7 +3,7 @@ source: crates/red_knot_test/src/lib.rs
 expression: snapshot
 ---
 ---
-mdtest name: not.md - Unary not - Not-boolable types
+mdtest name: not.md - Unary not - Object that implements `__bool__` incorrectly
 mdtest path: crates/red_knot_python_semantic/resources/mdtest/unary/not.md
 ---
 

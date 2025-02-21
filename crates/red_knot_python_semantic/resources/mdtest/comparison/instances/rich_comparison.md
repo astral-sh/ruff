@@ -346,7 +346,7 @@ def f(x: bool, y: int):
     reveal_type(x < 4.2)  # revealed: bool
 ```
 
-## Chained comparisons with not-boolable types
+## Chained comparisons with objects that don't implement `__bool__` correctly
 
 <!-- snapshot-diagnostics -->
 

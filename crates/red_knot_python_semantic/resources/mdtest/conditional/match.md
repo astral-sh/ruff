@@ -44,7 +44,7 @@ def _(target: int):
     reveal_type(y)  # revealed: Literal[2, 3, 4]
 ```
 
-## not-boolable guard
+## Guard with object that implements `__bool__` incorrectly
 
 ```py
 class NotBoolable:

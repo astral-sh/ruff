@@ -3566,9 +3566,9 @@ pub enum TypeVarBoundOrConstraints<'db> {
 enum IterateError<'db> {
     /// The type isn't iterable because it doesn't implement the new-style or old-style iteration protocol
     ///
-    /// The new-style iteration protocol requies a type being iterated overto have an `__iter__`
+    /// The new-style iteration protocol requires a type being iterated over to have an `__iter__`
     /// method that returns something with a `__next__` method. The old-style iteration
-    /// protocol requies a type being iterated over to have a `__getitem__` method that accepts
+    /// protocol requires a type being iterated over to have a `__getitem__` method that accepts
     /// a positive-integer argument.
     NotIterable { not_iterable_ty: Type<'db> },
 
