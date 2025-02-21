@@ -285,6 +285,31 @@ C.descriptor = "something else"
 reveal_type(C.descriptor)  # revealed: Unknown | int
 ```
 
+## `__get__` is called with correct arguments
+
+```py
+from __future__ import annotations
+
+class TailoredForClassObjectAccess:
+    def __get__(self, instance: None, owner: type[C]) -> int:
+        return 1
+
+class TailoredForInstanceAccess:
+    def __get__(self, instance: C, owner: type[C] | None = None) -> str:
+        return "a"
+
+class C:
+    class_object_access: TailoredForClassObjectAccess = TailoredForClassObjectAccess()
+    instance_access: TailoredForInstanceAccess = TailoredForInstanceAccess()
+
+reveal_type(C.class_object_access)  # revealed: int
+reveal_type(C().instance_access)  # revealed: str
+
+# TODO: These should emit a diagnostic
+reveal_type(C().class_object_access)  # revealed: TailoredForClassObjectAccess
+reveal_type(C.instance_access)  # revealed: TailoredForInstanceAccess
+```
+
 ## Descriptors with incorrect `__get__` signature
 
 ```py
