@@ -578,15 +578,15 @@ impl Display for RequiredVersion {
 pub type IdentifierPattern = glob::Pattern;
 
 /// Like [`PerFile`] but with string globs compiled to [`GlobMatcher`]s for more efficient usage.
-#[derive(Debug, Clone, CacheKey)]
-pub struct CompiledPerFile<T: CacheKey> {
+#[derive(Debug, Clone)]
+pub struct CompiledPerFile<T> {
     pub absolute_matcher: GlobMatcher,
     pub basename_matcher: GlobMatcher,
     pub negated: bool,
     pub data: T,
 }
 
-impl<T: CacheKey> CompiledPerFile<T> {
+impl<T> CompiledPerFile<T> {
     fn new(
         absolute_matcher: GlobMatcher,
         basename_matcher: GlobMatcher,
@@ -602,9 +602,21 @@ impl<T: CacheKey> CompiledPerFile<T> {
     }
 }
 
+impl<T> CacheKey for CompiledPerFile<T>
+where
+    T: CacheKey,
+{
+    fn cache_key(&self, state: &mut CacheKeyHasher) {
+        self.absolute_matcher.cache_key(state);
+        self.basename_matcher.cache_key(state);
+        self.negated.cache_key(state);
+        self.data.cache_key(state);
+    }
+}
+
 impl<T> Display for CompiledPerFile<T>
 where
-    T: Display + CacheKey,
+    T: Display,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         display_settings! {
@@ -621,12 +633,21 @@ where
 }
 
 /// A sequence of [`CompiledPerFile<T>`].
-#[derive(Debug, Clone, CacheKey, Default)]
-pub struct CompiledPerFileList<T: CacheKey> {
+#[derive(Debug, Clone, Default)]
+pub struct CompiledPerFileList<T> {
     inner: Vec<CompiledPerFile<T>>,
 }
 
-impl<T: CacheKey> CompiledPerFileList<T> {
+impl<T> CacheKey for CompiledPerFileList<T>
+where
+    T: CacheKey,
+{
+    fn cache_key(&self, state: &mut CacheKeyHasher) {
+        self.inner.cache_key(state);
+    }
+}
+
+impl<T> CompiledPerFileList<T> {
     /// Given a list of [`PerFile`] patterns, create a compiled set of globs.
     ///
     /// Returns an error if either of the glob patterns cannot be parsed.
@@ -660,7 +681,7 @@ impl<T: CacheKey> CompiledPerFileList<T> {
     }
 }
 
-impl<T: CacheKey + std::fmt::Debug> CompiledPerFileList<T> {
+impl<T: std::fmt::Debug> CompiledPerFileList<T> {
     /// Return an iterator over the entries in `self` that match the input `path`.
     ///
     /// `debug_label` is used for [`debug!`] messages explaining why certain patterns were matched.
@@ -719,7 +740,7 @@ impl<T: CacheKey + std::fmt::Debug> CompiledPerFileList<T> {
 
 impl<T> Display for CompiledPerFileList<T>
 where
-    T: Display + CacheKey,
+    T: Display,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         if self.inner.is_empty() {
