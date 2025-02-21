@@ -56,7 +56,7 @@ pub fn parse_type_annotation(
     string_expr: &ExprStringLiteral,
     source: &str,
 ) -> AnnotationParseResult {
-    if let Some(string_literal) = string_expr.as_unconcatenated_literal() {
+    if let Some(string_literal) = string_expr.as_single_part_string() {
         // Compare the raw contents (without quotes) of the expression with the parsed contents
         // contained in the string literal.
         if &source[string_literal.content_range()] == string_literal.as_str() {

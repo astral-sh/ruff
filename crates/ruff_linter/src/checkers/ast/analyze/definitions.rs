@@ -183,7 +183,7 @@ pub(crate) fn definitions(checker: &mut Checker) {
             };
 
             // We don't recognise implicitly concatenated strings as valid docstrings in our model currently.
-            let Some(sole_string_part) = string_literal.as_unconcatenated_literal() else {
+            let Some(sole_string_part) = string_literal.as_single_part_string() else {
                 #[allow(deprecated)]
                 let location = checker
                     .locator

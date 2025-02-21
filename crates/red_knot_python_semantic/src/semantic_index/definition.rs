@@ -33,10 +33,15 @@ pub struct Definition<'db> {
     /// The symbol defined.
     pub(crate) symbol: ScopedSymbolId,
 
+    /// WARNING: Only access this field when doing type inference for the same
+    /// file as where `Definition` is defined to avoid cross-file query dependencies.
     #[no_eq]
     #[return_ref]
     #[tracked]
     pub(crate) kind: DefinitionKind<'db>,
+
+    /// This is a dedicated field to avoid accessing `kind` to compute this value.
+    pub(crate) is_reexported: bool,
 
     count: countme::Count<Definition<'static>>,
 }
@@ -44,22 +49,6 @@ pub struct Definition<'db> {
 impl<'db> Definition<'db> {
     pub(crate) fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
         self.file_scope(db).to_scope_id(db, self.file(db))
-    }
-
-    pub(crate) fn category(self, db: &'db dyn Db) -> DefinitionCategory {
-        self.kind(db).category()
-    }
-
-    pub(crate) fn is_declaration(self, db: &'db dyn Db) -> bool {
-        self.kind(db).category().is_declaration()
-    }
-
-    pub(crate) fn is_binding(self, db: &'db dyn Db) -> bool {
-        self.kind(db).category().is_binding()
-    }
-
-    pub(crate) fn is_reexported(self, db: &'db dyn Db) -> bool {
-        self.kind(db).is_reexported()
     }
 }
 

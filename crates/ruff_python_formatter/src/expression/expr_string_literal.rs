@@ -28,7 +28,7 @@ impl FormatRuleWithOptions<ExprStringLiteral, PyFormatContext<'_>> for FormatExp
 
 impl FormatNodeRule<ExprStringLiteral> for FormatExprStringLiteral {
     fn fmt_fields(&self, item: &ExprStringLiteral, f: &mut PyFormatter) -> FormatResult<()> {
-        if let Some(string_literal) = item.as_unconcatenated_literal() {
+        if let Some(string_literal) = item.as_single_part_string() {
             string_literal.format().with_options(self.kind).fmt(f)
         } else {
             // Always join strings that aren't parenthesized and thus, always on a single line.

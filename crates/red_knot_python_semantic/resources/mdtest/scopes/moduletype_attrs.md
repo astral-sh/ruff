@@ -9,7 +9,7 @@ is unbound.
 ```py
 reveal_type(__name__)  # revealed: str
 reveal_type(__file__)  # revealed: str | None
-reveal_type(__loader__)  # revealed: LoaderProtocol | None
+reveal_type(__loader__)  # revealed: @Todo(instance attribute on class with dynamic base) | None
 reveal_type(__package__)  # revealed: str | None
 reveal_type(__doc__)  # revealed: str | None
 
@@ -54,10 +54,10 @@ inside the module:
 import typing
 
 reveal_type(typing.__name__)  # revealed: str
-reveal_type(typing.__init__)  # revealed: @Todo(bound method)
+reveal_type(typing.__init__)  # revealed: <bound method `__init__` of `ModuleType`>
 
 # These come from `builtins.object`, not `types.ModuleType`:
-reveal_type(typing.__eq__)  # revealed: @Todo(bound method)
+reveal_type(typing.__eq__)  # revealed: <bound method `__eq__` of `ModuleType`>
 
 reveal_type(typing.__class__)  # revealed: Literal[ModuleType]
 

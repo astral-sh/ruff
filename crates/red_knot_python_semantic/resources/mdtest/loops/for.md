@@ -183,25 +183,32 @@ for x in Test():
 ## Union type as iterable and union type as iterator
 
 ```py
-class TestIter:
-    def __next__(self) -> int | Exception:
-        return 42
+class Result1A: ...
+class Result1B: ...
+class Result2A: ...
+class Result2B: ...
+class Result3: ...
+class Result4: ...
+
+class TestIter1:
+    def __next__(self) -> Result1A | Result1B:
+        return Result1B()
 
 class TestIter2:
-    def __next__(self) -> str | tuple[int, int]:
-        return "42"
+    def __next__(self) -> Result2A | Result2B:
+        return Result2B()
 
 class TestIter3:
-    def __next__(self) -> bytes:
-        return b"42"
+    def __next__(self) -> Result3:
+        return Result3()
 
 class TestIter4:
-    def __next__(self) -> memoryview:
-        return memoryview(b"42")
+    def __next__(self) -> Result4:
+        return Result4()
 
 class Test:
-    def __iter__(self) -> TestIter | TestIter2:
-        return TestIter()
+    def __iter__(self) -> TestIter1 | TestIter2:
+        return TestIter1()
 
 class Test2:
     def __iter__(self) -> TestIter3 | TestIter4:
@@ -209,7 +216,7 @@ class Test2:
 
 def _(flag: bool):
     for x in Test() if flag else Test2():
-        reveal_type(x)  # revealed: int | Exception | str | tuple[int, int] | bytes | memoryview
+        reveal_type(x)  # revealed: Result1A | Result1B | Result2A | Result2B | Result3 | Result4
 ```
 
 ## Union type as iterable where one union element has no `__iter__` method

@@ -4,7 +4,7 @@ use insta::assert_snapshot;
 
 use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal};
 use ruff_python_ast::{AnyNodeRef, BoolOp, CmpOp, Operator, Singleton, UnaryOp};
-use ruff_python_parser::{parse, Mode};
+use ruff_python_parser::{parse, Mode, ParseOptions};
 
 #[test]
 fn function_arguments() {
@@ -147,7 +147,7 @@ fn f_strings() {
 }
 
 fn trace_source_order_visitation(source: &str) -> String {
-    let parsed = parse(source, Mode::Module).unwrap();
+    let parsed = parse(source, ParseOptions::from(Mode::Module)).unwrap();
 
     let mut visitor = RecordVisitor::default();
     visitor.visit_mod(parsed.syntax());

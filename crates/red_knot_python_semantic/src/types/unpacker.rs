@@ -124,7 +124,7 @@ impl<'db> Unpacker<'db> {
                             Ordering::Less => {
                                 self.context.report_lint(
                                     &INVALID_ASSIGNMENT,
-                                    target.into(),
+                                    target,
                                     format_args!(
                                         "Too many values to unpack (expected {}, got {})",
                                         elts.len(),
@@ -135,7 +135,7 @@ impl<'db> Unpacker<'db> {
                             Ordering::Greater => {
                                 self.context.report_lint(
                                     &INVALID_ASSIGNMENT,
-                                    target.into(),
+                                    target,
                                     format_args!(
                                         "Not enough values to unpack (expected {}, got {})",
                                         elts.len(),
@@ -232,7 +232,7 @@ impl<'db> Unpacker<'db> {
         } else {
             self.context.report_lint(
                 &INVALID_ASSIGNMENT,
-                expr.into(),
+                expr,
                 format_args!(
                     "Not enough values to unpack (expected {} or more, got {})",
                     targets.len() - 1,

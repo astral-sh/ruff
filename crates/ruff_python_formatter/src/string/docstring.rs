@@ -11,6 +11,7 @@ use regex::Regex;
 
 use ruff_formatter::printer::SourceMapGeneration;
 use ruff_python_ast::{str::Quote, AnyStringFlags, StringFlags};
+use ruff_python_parser::ParseOptions;
 use ruff_python_trivia::CommentRanges;
 use {
     ruff_formatter::{write, FormatOptions, IndentStyle, LineWidth, Printed},
@@ -492,8 +493,6 @@ impl<'src> DocstringLinePrinter<'_, '_, '_, 'src> {
         &mut self,
         kind: &mut CodeExampleKind<'_>,
     ) -> FormatResult<Option<Vec<OutputDocstringLine<'static>>>> {
-        use ruff_python_parser::AsMode;
-
         let line_width = match self.f.options().docstring_code_line_width() {
             DocstringCodeLineWidth::Fixed(width) => width,
             DocstringCodeLineWidth::Dynamic => {
@@ -570,7 +569,8 @@ impl<'src> DocstringLinePrinter<'_, '_, '_, 'src> {
                 std::format!(r#""""{}""""#, printed.as_code())
             }
         };
-        let result = ruff_python_parser::parse(&wrapped, self.f.options().source_type().as_mode());
+        let result =
+            ruff_python_parser::parse(&wrapped, ParseOptions::from(self.f.options().source_type()));
         // If the resulting code is not valid, then reset and pass through
         // the docstring lines as-is.
         if result.is_err() {
@@ -1580,10 +1580,8 @@ fn docstring_format_source(
     docstring_quote_style: Quote,
     source: &str,
 ) -> Result<Printed, FormatModuleError> {
-    use ruff_python_parser::AsMode;
-
     let source_type = options.source_type();
-    let parsed = ruff_python_parser::parse(source, source_type.as_mode())?;
+    let parsed = ruff_python_parser::parse(source, ParseOptions::from(source_type))?;
     let comment_ranges = CommentRanges::from(parsed.tokens());
     let source_code = ruff_formatter::SourceCode::new(source);
     let comments = crate::Comments::from_ast(parsed.syntax(), source_code, &comment_ranges);

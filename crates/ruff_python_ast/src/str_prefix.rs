@@ -71,6 +71,13 @@ impl FStringPrefix {
         }
     }
 
+    pub const fn text_len(self) -> TextSize {
+        match self {
+            Self::Regular => TextSize::new(1),
+            Self::Raw { .. } => TextSize::new(2),
+        }
+    }
+
     /// Return true if this prefix indicates a "raw f-string",
     /// e.g. `rf"{bar}"` or `Rf"{bar}"`
     pub const fn is_raw(self) -> bool {
@@ -102,6 +109,13 @@ impl ByteStringPrefix {
             Self::Regular => "b",
             Self::Raw { uppercase_r: true } => "Rb",
             Self::Raw { uppercase_r: false } => "rb",
+        }
+    }
+
+    pub const fn text_len(self) -> TextSize {
+        match self {
+            Self::Regular => TextSize::new(1),
+            Self::Raw { .. } => TextSize::new(2),
         }
     }
 
@@ -147,6 +161,14 @@ impl AnyStringPrefix {
             Self::Regular(regular_prefix) => regular_prefix.as_str(),
             Self::Bytes(bytestring_prefix) => bytestring_prefix.as_str(),
             Self::Format(fstring_prefix) => fstring_prefix.as_str(),
+        }
+    }
+
+    pub const fn text_len(self) -> TextSize {
+        match self {
+            Self::Regular(regular_prefix) => regular_prefix.text_len(),
+            Self::Bytes(bytestring_prefix) => bytestring_prefix.text_len(),
+            Self::Format(fstring_prefix) => fstring_prefix.text_len(),
         }
     }
 

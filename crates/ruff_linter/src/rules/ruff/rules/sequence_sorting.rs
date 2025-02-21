@@ -300,8 +300,10 @@ impl<'a> SortClassification<'a> {
                     let Some(string_node) = expr.as_string_literal_expr() else {
                         return Self::NotAListOfStringLiterals;
                     };
-                    any_implicit_concatenation |= string_node.value.is_implicit_concatenated();
-                    items.push(string_node.value.to_str());
+                    match string_node.as_single_part_string() {
+                        Some(literal) => items.push(&*literal.value),
+                        None => any_implicit_concatenation = true,
+                    }
                 }
                 if any_implicit_concatenation {
                     return Self::UnsortedButUnfixable;

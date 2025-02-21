@@ -127,3 +127,23 @@ pub fn is_pytest_importorskip(stmt: &Stmt, semantic: &SemanticModel) -> bool {
             matches!(qualified_name.segments(), ["pytest", "importorskip"])
         })
 }
+
+/// Returns `true` if a [`Stmt`] is a dynamic modification of the Python
+/// module search path, e.g.,
+/// ```python
+/// import site
+///
+/// site.addsitedir(...)
+/// ```
+pub fn is_site_sys_path_modification(stmt: &Stmt, semantic: &SemanticModel) -> bool {
+    if let Stmt::Expr(ast::StmtExpr { value, .. }) = stmt {
+        if let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() {
+            return semantic
+                .resolve_qualified_name(func.as_ref())
+                .is_some_and(|qualified_name| {
+                    matches!(qualified_name.segments(), ["site", "addsitedir"])
+                });
+        }
+    }
+    false
+}
