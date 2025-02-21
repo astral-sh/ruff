@@ -335,7 +335,7 @@ For tuples like `tuple[int, ...]`, `tuple[Any, ...]`
 
 // TODO
 
-## With elements that incorrectly implement `__bool_`
+## Comparison with elements that incorrectly implement `__bool_`
 
 <!-- snapshot-diagnostics -->
 
@@ -358,3 +358,21 @@ a < b < b
 
 a < b  # fine
 ```
+
+
+## Equality with elements that incorrectly implement `__bool__`
+
+<!-- snapshot-diagnostics -->
+
+```py
+class A:
+    def __eq__(self, other) -> NotBoolable:
+        return NotBoolable()
+
+class NotBoolable:
+    __bool__ = None
+
+# error: [unsupported-bool-conversion]
+(A(),) == (A(),)
+```
+

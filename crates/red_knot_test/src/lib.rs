@@ -253,7 +253,12 @@ fn run_test(
         })
         .collect();
 
-    if !snapshot_diagnostics.is_empty() {
+    if snapshot_diagnostics.is_empty() && test.should_snapshot_diagnostics() {
+        panic!(
+            "Test `{}` requested snapshotting diagnostics but it didn't produce any.",
+            test.name()
+        );
+    } else if !snapshot_diagnostics.is_empty() {
         let snapshot =
             create_diagnostic_snapshot(db, relative_fixture_path, test, snapshot_diagnostics);
         let name = test.name().replace(' ', "_").replace(':', "__");
