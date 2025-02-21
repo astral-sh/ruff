@@ -226,13 +226,13 @@ fn create_diagnostic(
 ) -> bool {
     let mut diagnostic = Diagnostic::new(
         FastApiNonAnnotatedDependency {
-            py_version: checker.settings.target_version,
+            py_version: checker.target_version(),
         },
         parameter.range,
     );
 
     let try_generate_fix = || {
-        let module = if checker.settings.target_version >= PythonVersion::PY39 {
+        let module = if checker.target_version() >= PythonVersion::PY39 {
             "typing"
         } else {
             "typing_extensions"

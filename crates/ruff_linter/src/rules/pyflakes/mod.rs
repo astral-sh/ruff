@@ -218,7 +218,7 @@ mod tests {
         let diagnostics = test_snippet(
             "PythonFinalizationError",
             &LinterSettings {
-                target_version: ruff_python_ast::PythonVersion::PY312,
+                unresolved_target_version: ruff_python_ast::PythonVersion::PY312,
                 ..LinterSettings::for_rule(Rule::UndefinedName)
             },
         );

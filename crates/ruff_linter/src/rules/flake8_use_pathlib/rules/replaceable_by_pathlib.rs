@@ -152,7 +152,7 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
             ),
             // PTH115
             // Python 3.9+
-            ["os", "readlink"] if checker.settings.target_version >= PythonVersion::PY39 => {
+            ["os", "readlink"] if checker.target_version() >= PythonVersion::PY39 => {
                 Some(OsReadlink.into())
             }
             // PTH208,

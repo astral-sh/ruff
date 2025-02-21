@@ -99,7 +99,7 @@ pub(crate) fn builtin_attribute_shadowing(
             name,
             checker.source_type,
             &checker.settings.flake8_builtins.builtins_ignorelist,
-            checker.settings.target_version,
+            checker.target_version(),
         ) {
             // Ignore explicit overrides.
             if class_def.decorator_list.iter().any(|decorator| {

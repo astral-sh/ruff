@@ -108,7 +108,7 @@ pub(crate) fn async_function_with_timeout(checker: &Checker, function_def: &ast:
     };
 
     // asyncio.timeout feature was first introduced in Python 3.11
-    if module == AsyncModule::AsyncIo && checker.settings.target_version < PythonVersion::PY311 {
+    if module == AsyncModule::AsyncIo && checker.target_version() < PythonVersion::PY311 {
         return;
     }
 

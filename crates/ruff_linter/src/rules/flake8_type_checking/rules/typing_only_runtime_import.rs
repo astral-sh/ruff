@@ -307,7 +307,7 @@ pub(crate) fn typing_only_runtime_import(
                 checker.package(),
                 checker.settings.isort.detect_same_package,
                 &checker.settings.isort.known_modules,
-                checker.settings.target_version,
+                checker.target_version(),
                 checker.settings.isort.no_sections,
                 &checker.settings.isort.section_order,
                 &checker.settings.isort.default_section,

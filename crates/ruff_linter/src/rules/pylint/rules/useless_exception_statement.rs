@@ -55,7 +55,7 @@ pub(crate) fn useless_exception_statement(checker: &Checker, expr: &ast::StmtExp
         return;
     };
 
-    if is_builtin_exception(func, checker.semantic(), checker.settings.target_version) {
+    if is_builtin_exception(func, checker.semantic(), checker.target_version()) {
         let mut diagnostic = Diagnostic::new(UselessExceptionStatement, expr.range());
         diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
             "raise ".to_string(),

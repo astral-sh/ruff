@@ -722,7 +722,7 @@ pub(crate) fn deprecated_import(checker: &Checker, import_from_stmt: &StmtImport
         checker.locator(),
         checker.stylist(),
         checker.tokens(),
-        checker.settings.target_version,
+        checker.target_version(),
     );
 
     for (operation, fix) in fixer.without_renames() {

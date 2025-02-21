@@ -3,7 +3,7 @@ use std::path::{Component, Path, PathBuf};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::PySourceType;
+use ruff_python_ast::{PySourceType, PythonVersion};
 use ruff_python_stdlib::path::is_module_file;
 use ruff_python_stdlib::sys::is_known_standard_library;
 use ruff_text_size::TextRange;
@@ -69,6 +69,7 @@ impl Violation for StdlibModuleShadowing {
 pub(crate) fn stdlib_module_shadowing(
     mut path: &Path,
     settings: &LinterSettings,
+    target_version: PythonVersion,
 ) -> Option<Diagnostic> {
     if !PySourceType::try_from_path(path).is_some_and(PySourceType::is_py_file) {
         return None;
@@ -98,7 +99,7 @@ pub(crate) fn stdlib_module_shadowing(
 
     let module_name = components.next()?;
 
-    if is_allowed_module(settings, &module_name) {
+    if is_allowed_module(settings, target_version, &module_name) {
         return None;
     }
 
@@ -129,7 +130,7 @@ fn get_prefix<'a>(settings: &'a LinterSettings, path: &Path) -> Option<&'a PathB
     prefix
 }
 
-fn is_allowed_module(settings: &LinterSettings, module: &str) -> bool {
+fn is_allowed_module(settings: &LinterSettings, version: PythonVersion, module: &str) -> bool {
     // Shadowing private stdlib modules is okay.
     // https://github.com/astral-sh/ruff/issues/12949
     if module.starts_with('_') && !module.starts_with("__") {
@@ -145,5 +146,5 @@ fn is_allowed_module(settings: &LinterSettings, module: &str) -> bool {
         return true;
     }
 
-    !is_known_standard_library(settings.target_version.minor, module)
+    !is_known_standard_library(version.minor, module)
 }

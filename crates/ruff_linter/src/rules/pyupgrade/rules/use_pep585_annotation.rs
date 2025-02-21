@@ -98,7 +98,7 @@ pub(crate) fn use_pep585_annotation(checker: &Checker, expr: &Expr, replacement:
                         checker.semantic(),
                     )?;
                     let binding_edit = Edit::range_replacement(binding, expr.range());
-                    let applicability = if checker.settings.target_version >= PythonVersion::PY310 {
+                    let applicability = if checker.target_version() >= PythonVersion::PY310 {
                         Applicability::Safe
                     } else {
                         Applicability::Unsafe
@@ -122,7 +122,7 @@ pub(crate) fn use_pep585_annotation(checker: &Checker, expr: &Expr, replacement:
                     Ok(Fix::applicable_edits(
                         import_edit,
                         [reference_edit],
-                        if checker.settings.target_version >= PythonVersion::PY310 {
+                        if checker.target_version() >= PythonVersion::PY310 {
                             Applicability::Safe
                         } else {
                             Applicability::Unsafe

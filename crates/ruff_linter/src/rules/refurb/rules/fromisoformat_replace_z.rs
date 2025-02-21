@@ -82,7 +82,7 @@ impl AlwaysFixableViolation for FromisoformatReplaceZ {
 
 /// FURB162
 pub(crate) fn fromisoformat_replace_z(checker: &Checker, call: &ExprCall) {
-    if checker.settings.target_version < PythonVersion::PY311 {
+    if checker.target_version() < PythonVersion::PY311 {
         return;
     }
 

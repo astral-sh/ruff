@@ -5,8 +5,9 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::string::ToString;
 
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use globset::{Glob, GlobMatcher, GlobSet, GlobSetBuilder};
+use log::debug;
 use pep440_rs::{VersionSpecifier, VersionSpecifiers};
 use rustc_hash::FxHashMap;
 use serde::{de, Deserialize, Deserializer, Serialize};
@@ -274,22 +275,25 @@ impl CacheKey for FilePatternSet {
     }
 }
 
+/// A glob pattern and associated data for matching file paths.
 #[derive(Debug, Clone)]
-pub struct PerFileIgnore {
-    pub(crate) basename: String,
-    pub(crate) absolute: PathBuf,
-    pub(crate) negated: bool,
-    pub(crate) rules: RuleSet,
+pub struct PerFile<T> {
+    /// The glob pattern used to construct the [`PerFile`].
+    basename: String,
+    /// The same pattern as `basename` but normalized to the project root directory.
+    absolute: PathBuf,
+    /// Whether the glob pattern should be negated (e.g. `!*.ipynb`)
+    negated: bool,
+    /// The per-file data associated with these glob patterns.
+    data: T,
 }
 
-impl PerFileIgnore {
-    pub fn new(
-        mut pattern: String,
-        prefixes: &[RuleSelector],
-        project_root: Option<&Path>,
-    ) -> Self {
-        // Rules in preview are included here even if preview mode is disabled; it's safe to ignore disabled rules
-        let rules: RuleSet = prefixes.iter().flat_map(RuleSelector::all_rules).collect();
+impl<T> PerFile<T> {
+    /// Construct a new [`PerFile`] from the given glob `pattern` and containing `data`.
+    ///
+    /// If provided, `project_root` is used to construct a second glob pattern normalized to the
+    /// project root directory. See [`fs::normalize_path_to`] for more details.
+    fn new(mut pattern: String, project_root: Option<&Path>, data: T) -> Self {
         let negated = pattern.starts_with('!');
         if negated {
             pattern.drain(..1);
@@ -304,8 +308,23 @@ impl PerFileIgnore {
             basename: pattern,
             absolute,
             negated,
-            rules,
+            data,
         }
+    }
+}
+
+/// Per-file ignored linting rules.
+///
+/// See [`PerFile`] for details of the representation.
+#[derive(Debug, Clone)]
+pub struct PerFileIgnore(PerFile<RuleSet>);
+
+impl PerFileIgnore {
+    pub fn new(pattern: String, prefixes: &[RuleSelector], project_root: Option<&Path>) -> Self {
+        // Rules in preview are included here even if preview mode is disabled; it's safe to ignore
+        // disabled rules
+        let rules: RuleSet = prefixes.iter().flat_map(RuleSelector::all_rules).collect();
+        Self(PerFile::new(pattern, project_root, rules))
     }
 }
 
@@ -558,15 +577,47 @@ impl Display for RequiredVersion {
 /// pattern matching.
 pub type IdentifierPattern = glob::Pattern;
 
-#[derive(Debug, Clone, CacheKey)]
-pub struct CompiledPerFileIgnore {
+/// Like [`PerFile`] but with string globs compiled to [`GlobMatcher`]s for more efficient usage.
+#[derive(Debug, Clone)]
+pub struct CompiledPerFile<T> {
     pub absolute_matcher: GlobMatcher,
     pub basename_matcher: GlobMatcher,
     pub negated: bool,
-    pub rules: RuleSet,
+    pub data: T,
 }
 
-impl Display for CompiledPerFileIgnore {
+impl<T> CompiledPerFile<T> {
+    fn new(
+        absolute_matcher: GlobMatcher,
+        basename_matcher: GlobMatcher,
+        negated: bool,
+        data: T,
+    ) -> Self {
+        Self {
+            absolute_matcher,
+            basename_matcher,
+            negated,
+            data,
+        }
+    }
+}
+
+impl<T> CacheKey for CompiledPerFile<T>
+where
+    T: CacheKey,
+{
+    fn cache_key(&self, state: &mut CacheKeyHasher) {
+        self.absolute_matcher.cache_key(state);
+        self.basename_matcher.cache_key(state);
+        self.negated.cache_key(state);
+        self.data.cache_key(state);
+    }
+}
+
+impl<T> Display for CompiledPerFile<T>
+where
+    T: Display,
+{
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         display_settings! {
             formatter = f,
@@ -574,52 +625,130 @@ impl Display for CompiledPerFileIgnore {
                 self.absolute_matcher | globmatcher,
                 self.basename_matcher | globmatcher,
                 self.negated,
-                self.rules,
+                self.data,
             ]
         }
         Ok(())
     }
 }
 
-#[derive(Debug, Clone, CacheKey, Default)]
-pub struct CompiledPerFileIgnoreList {
-    // Ordered as (absolute path matcher, basename matcher, rules)
-    ignores: Vec<CompiledPerFileIgnore>,
+/// A sequence of [`CompiledPerFile<T>`].
+#[derive(Debug, Clone, Default)]
+pub struct CompiledPerFileList<T> {
+    inner: Vec<CompiledPerFile<T>>,
 }
 
-impl CompiledPerFileIgnoreList {
-    /// Given a list of patterns, create a `GlobSet`.
-    pub fn resolve(per_file_ignores: Vec<PerFileIgnore>) -> Result<Self> {
-        let ignores: Result<Vec<_>> = per_file_ignores
-            .into_iter()
-            .map(|per_file_ignore| {
-                // Construct absolute path matcher.
-                let absolute_matcher =
-                    Glob::new(&per_file_ignore.absolute.to_string_lossy())?.compile_matcher();
-
-                // Construct basename matcher.
-                let basename_matcher = Glob::new(&per_file_ignore.basename)?.compile_matcher();
-
-                Ok(CompiledPerFileIgnore {
-                    absolute_matcher,
-                    basename_matcher,
-                    negated: per_file_ignore.negated,
-                    rules: per_file_ignore.rules,
-                })
-            })
-            .collect();
-        Ok(Self { ignores: ignores? })
+impl<T> CacheKey for CompiledPerFileList<T>
+where
+    T: CacheKey,
+{
+    fn cache_key(&self, state: &mut CacheKeyHasher) {
+        self.inner.cache_key(state);
     }
 }
 
-impl Display for CompiledPerFileIgnoreList {
+impl<T> CompiledPerFileList<T> {
+    /// Given a list of [`PerFile`] patterns, create a compiled set of globs.
+    ///
+    /// Returns an error if either of the glob patterns cannot be parsed.
+    fn resolve(per_file_items: impl IntoIterator<Item = PerFile<T>>) -> Result<Self> {
+        let inner: Result<Vec<_>> = per_file_items
+            .into_iter()
+            .map(|per_file_ignore| {
+                // Construct absolute path matcher.
+                let absolute_matcher = Glob::new(&per_file_ignore.absolute.to_string_lossy())
+                    .with_context(|| format!("invalid glob {:?}", per_file_ignore.absolute))?
+                    .compile_matcher();
+
+                // Construct basename matcher.
+                let basename_matcher = Glob::new(&per_file_ignore.basename)
+                    .with_context(|| format!("invalid glob {:?}", per_file_ignore.basename))?
+                    .compile_matcher();
+
+                Ok(CompiledPerFile::new(
+                    absolute_matcher,
+                    basename_matcher,
+                    per_file_ignore.negated,
+                    per_file_ignore.data,
+                ))
+            })
+            .collect();
+        Ok(Self { inner: inner? })
+    }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        self.inner.is_empty()
+    }
+}
+
+impl<T: std::fmt::Debug> CompiledPerFileList<T> {
+    /// Return an iterator over the entries in `self` that match the input `path`.
+    ///
+    /// `debug_label` is used for [`debug!`] messages explaining why certain patterns were matched.
+    pub(crate) fn iter_matches<'a, 'p>(
+        &'a self,
+        path: &'p Path,
+        debug_label: &'static str,
+    ) -> impl Iterator<Item = &'p T>
+    where
+        'a: 'p,
+    {
+        let file_name = path.file_name().expect("Unable to parse filename");
+        self.inner.iter().filter_map(move |entry| {
+            if entry.basename_matcher.is_match(file_name) {
+                if entry.negated {
+                    None
+                } else {
+                    debug!(
+                        "{} for {:?} due to basename match on {:?}: {:?}",
+                        debug_label,
+                        path,
+                        entry.basename_matcher.glob().regex(),
+                        entry.data
+                    );
+                    Some(&entry.data)
+                }
+            } else if entry.absolute_matcher.is_match(path) {
+                if entry.negated {
+                    None
+                } else {
+                    debug!(
+                        "{} for {:?} due to absolute match on {:?}: {:?}",
+                        debug_label,
+                        path,
+                        entry.absolute_matcher.glob().regex(),
+                        entry.data
+                    );
+                    Some(&entry.data)
+                }
+            } else if entry.negated {
+                debug!(
+                    "{} for {:?} due to negated pattern matching neither {:?} nor {:?}: {:?}",
+                    debug_label,
+                    path,
+                    entry.basename_matcher.glob().regex(),
+                    entry.absolute_matcher.glob().regex(),
+                    entry.data
+                );
+                Some(&entry.data)
+            } else {
+                None
+            }
+        })
+    }
+}
+
+impl<T> Display for CompiledPerFileList<T>
+where
+    T: Display,
+{
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        if self.ignores.is_empty() {
+        if self.inner.is_empty() {
             write!(f, "{{}}")?;
         } else {
             writeln!(f, "{{")?;
-            for ignore in &self.ignores {
-                writeln!(f, "\t{ignore}")?;
+            for value in &self.inner {
+                writeln!(f, "\t{value}")?;
             }
             write!(f, "}}")?;
         }
@@ -627,11 +756,70 @@ impl Display for CompiledPerFileIgnoreList {
     }
 }
 
+#[derive(Debug, Clone, CacheKey, Default)]
+pub struct CompiledPerFileIgnoreList(CompiledPerFileList<RuleSet>);
+
+impl CompiledPerFileIgnoreList {
+    /// Given a list of [`PerFileIgnore`] patterns, create a compiled set of globs.
+    ///
+    /// Returns an error if either of the glob patterns cannot be parsed.
+    pub fn resolve(per_file_ignores: Vec<PerFileIgnore>) -> Result<Self> {
+        Ok(Self(CompiledPerFileList::resolve(
+            per_file_ignores.into_iter().map(|ignore| ignore.0),
+        )?))
+    }
+}
+
 impl Deref for CompiledPerFileIgnoreList {
-    type Target = Vec<CompiledPerFileIgnore>;
+    type Target = CompiledPerFileList<RuleSet>;
 
     fn deref(&self) -> &Self::Target {
-        &self.ignores
+        &self.0
+    }
+}
+
+impl Display for CompiledPerFileIgnoreList {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+/// Contains the target Python version for a given glob pattern.
+///
+/// See [`PerFile`] for details of the representation.
+#[derive(Debug, Clone)]
+pub struct PerFileTargetVersion(PerFile<ast::PythonVersion>);
+
+impl PerFileTargetVersion {
+    pub fn new(pattern: String, version: ast::PythonVersion, project_root: Option<&Path>) -> Self {
+        Self(PerFile::new(pattern, project_root, version))
+    }
+}
+
+#[derive(CacheKey, Clone, Debug, Default)]
+pub struct CompiledPerFileTargetVersionList(CompiledPerFileList<ast::PythonVersion>);
+
+impl CompiledPerFileTargetVersionList {
+    /// Given a list of [`PerFileTargetVersion`] patterns, create a compiled set of globs.
+    ///
+    /// Returns an error if either of the glob patterns cannot be parsed.
+    pub fn resolve(per_file_versions: Vec<PerFileTargetVersion>) -> Result<Self> {
+        Ok(Self(CompiledPerFileList::resolve(
+            per_file_versions.into_iter().map(|version| version.0),
+        )?))
+    }
+
+    pub fn is_match(&self, path: &Path) -> Option<ast::PythonVersion> {
+        self.0
+            .iter_matches(path, "Setting Python version")
+            .next()
+            .copied()
+    }
+}
+
+impl Display for CompiledPerFileTargetVersionList {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
     }
 }
 

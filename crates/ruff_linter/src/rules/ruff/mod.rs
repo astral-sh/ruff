@@ -129,7 +129,7 @@ mod tests {
                     extend_markup_names: vec![],
                     allowed_markup_calls: vec![],
                 },
-                target_version: PythonVersion::PY310,
+                unresolved_target_version: PythonVersion::PY310,
                 ..LinterSettings::for_rule(Rule::IncorrectlyParenthesizedTupleInSubscript)
             },
         )?;

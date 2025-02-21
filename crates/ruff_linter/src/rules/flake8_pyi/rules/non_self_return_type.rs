@@ -215,7 +215,7 @@ fn replace_with_self_fix(
     let semantic = checker.semantic();
 
     let (self_import, self_binding) = {
-        let source_module = if checker.settings.target_version >= PythonVersion::PY311 {
+        let source_module = if checker.target_version() >= PythonVersion::PY311 {
             "typing"
         } else {
             "typing_extensions"

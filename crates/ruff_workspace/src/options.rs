@@ -333,6 +333,29 @@ pub struct Options {
     )]
     pub target_version: Option<PythonVersion>,
 
+    /// A list of mappings from glob-style file pattern to Python version to use when checking the
+    /// corresponding file(s).
+    ///
+    /// This may be useful for overriding the global Python version settings in `target-version` or
+    /// `requires-python` for a subset of files. For example, if you have a project with a minimum
+    /// supported Python version of 3.9 but a subdirectory of developer scripts that want to use a
+    /// newer feature like the `match` statement from Python 3.10, you can use
+    /// `per-file-target-version` to specify `"developer_scripts/*.py" = "py310"`.
+    ///
+    /// This setting is used by the linter to enforce any enabled version-specific lint rules, as
+    /// well as by the formatter for any version-specific formatting options, such as parenthesizing
+    /// context managers on Python 3.10+.
+    #[option(
+        default = "{}",
+        value_type = "dict[str, PythonVersion]",
+        scope = "per-file-target-version",
+        example = r#"
+            # Override the project-wide Python version for a developer scripts directory:
+            "scripts/**.py" = "py312"
+        "#
+    )]
+    pub per_file_target_version: Option<FxHashMap<String, PythonVersion>>,
+
     /// The directories to consider when resolving first- vs. third-party
     /// imports.
     ///

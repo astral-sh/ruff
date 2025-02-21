@@ -177,11 +177,11 @@ pub(crate) fn implicit_optional(checker: &Checker, parameters: &Parameters) {
                 let Some(expr) = type_hint_explicitly_allows_none(
                     parsed_annotation.expression(),
                     checker,
-                    checker.settings.target_version,
+                    checker.target_version(),
                 ) else {
                     continue;
                 };
-                let conversion_type = checker.settings.target_version.into();
+                let conversion_type = checker.target_version().into();
 
                 let mut diagnostic =
                     Diagnostic::new(ImplicitOptional { conversion_type }, expr.range());
@@ -192,14 +192,12 @@ pub(crate) fn implicit_optional(checker: &Checker, parameters: &Parameters) {
             }
         } else {
             // Unquoted annotation.
-            let Some(expr) = type_hint_explicitly_allows_none(
-                annotation,
-                checker,
-                checker.settings.target_version,
-            ) else {
+            let Some(expr) =
+                type_hint_explicitly_allows_none(annotation, checker, checker.target_version())
+            else {
                 continue;
             };
-            let conversion_type = checker.settings.target_version.into();
+            let conversion_type = checker.target_version().into();
 
             let mut diagnostic =
                 Diagnostic::new(ImplicitOptional { conversion_type }, expr.range());
