@@ -7,7 +7,7 @@ use lsp_types::{ClientCapabilities, FileEvent, NotebookDocumentCellChange, Url};
 use settings::ResolvedClientSettings;
 
 use crate::edit::{DocumentKey, DocumentVersion, NotebookDocument};
-use crate::server::Workspaces;
+use crate::workspace::Workspaces;
 use crate::{PositionEncoding, TextDocument};
 
 pub(crate) use self::capabilities::ResolvedClientCapabilities;
