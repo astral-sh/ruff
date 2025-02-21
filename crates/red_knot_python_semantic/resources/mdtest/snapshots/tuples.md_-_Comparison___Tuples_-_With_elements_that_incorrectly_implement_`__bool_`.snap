@@ -3,7 +3,7 @@ source: crates/red_knot_test/src/lib.rs
 expression: snapshot
 ---
 ---
-mdtest name: tuples.md - Comparison: Tuples - Not-boolable elements
+mdtest name: tuples.md - Comparison: Tuples - With elements that incorrectly implement `__bool_`
 mdtest path: crates/red_knot_python_semantic/resources/mdtest/comparison/tuples.md
 ---
 
