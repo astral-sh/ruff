@@ -155,7 +155,7 @@ fn definition_cycle_initial<'db>(
 ///
 /// Deferred expressions are type expressions (annotations, base classes, aliases...) in a stub
 /// file, or in a file with `from __future__ import annotations`, or stringified annotations.
-#[salsa::tracked(return_ref)]
+#[salsa::tracked(return_ref, cycle_fn=deferred_cycle_recover, cycle_initial=deferred_cycle_initial)]
 pub(crate) fn infer_deferred_types<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
@@ -172,6 +172,20 @@ pub(crate) fn infer_deferred_types<'db>(
     let index = semantic_index(db, file);
 
     TypeInferenceBuilder::new(db, InferenceRegion::Deferred(definition), index).finish()
+}
+
+fn deferred_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &TypeInference<'db>,
+    count: u32,
+    _definition: Definition<'db>,
+) -> salsa::CycleRecoveryAction<TypeInference<'db>> {
+    assert!(count < 10, "cycle did not converge within 10 iterations");
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn deferred_cycle_initial<'db>(db: &'db dyn Db, definition: Definition<'db>) -> TypeInference<'db> {
+    TypeInference::empty(definition.scope(db), Some(Type::Never))
 }
 
 /// Infer all types for an [`Expression`] (including sub-expressions).

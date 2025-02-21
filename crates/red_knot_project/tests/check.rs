@@ -280,9 +280,6 @@ impl SourceOrderVisitor<'_> for PullTypesVisitor<'_> {
 /// Whether or not the .py/.pyi version of this file is expected to fail
 #[rustfmt::skip]
 const KNOWN_FAILURES: &[(&str, bool, bool)] = &[
-    // related to circular references in class definitions
-    ("crates/ruff_linter/resources/test/fixtures/pyflakes/F821_26.py", false, true),
-    ("crates/ruff_linter/resources/test/fixtures/pyflakes/F821_27.py", true, true),
     // related to circular references in type aliases (salsa cycle panic):
     ("crates/ruff_python_parser/resources/inline/err/type_alias_invalid_value_expr.py", true, true),
     ("crates/ruff_linter/resources/test/fixtures/flake8_type_checking/TC008.py", true, true),
