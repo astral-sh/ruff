@@ -28,8 +28,10 @@ mod builder;
 pub(crate) mod constraint;
 pub mod definition;
 pub mod expression;
+mod narrowing_constraints;
 pub mod symbol;
 mod use_def;
+mod visibility_constraints;
 
 pub(crate) use self::use_def::{
     BindingWithConstraints, BindingWithConstraintsIterator, DeclarationWithConstraint,

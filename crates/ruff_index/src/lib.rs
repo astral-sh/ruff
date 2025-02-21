@@ -4,6 +4,7 @@
 //! Inspired by [rustc_index](https://github.com/rust-lang/rust/blob/master/compiler/rustc_index/src/lib.rs).
 
 mod idx;
+pub mod list;
 mod slice;
 mod vec;
 
