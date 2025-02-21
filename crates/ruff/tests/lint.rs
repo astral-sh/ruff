@@ -2569,6 +2569,46 @@ fn a005_module_shadowing_strict_default() -> Result<()> {
 }
 
 #[test]
+fn walrus_before_py38() {
+    // ok
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--stdin-filename", "test.py"])
+        .arg("--target-version=py38")
+        .arg("-")
+        .pass_stdin(r#"if x := 1: pass"#),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:1:10: E701 Multiple statements on one line (colon)
+    Found 1 error.
+
+    ----- stderr -----
+    "
+    );
+
+    // not ok on 3.7
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--stdin-filename", "test.py"])
+        .arg("--target-version=py37")
+        .arg("-")
+        .pass_stdin(r#"if x := 1: pass"#),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:1:4: SyntaxError: Cannot use named assignment expression (`:=`) on Python 3.7 (syntax was new in Python 3.8)
+    test.py:1:10: E701 Multiple statements on one line (colon)
+    Found 2 errors.
+
+    ----- stderr -----
+    "
+    );
+}
+
+#[test]
 fn match_before_py310() {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)

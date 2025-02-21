@@ -437,10 +437,13 @@ pub struct SyntaxError {
 impl SyntaxError {
     pub fn message(&self) -> String {
         match self.kind {
+            SyntaxErrorKind::WalrusBeforePy38 => format!(
+                "Cannot use named assignment expression (`:=`) on Python {} (syntax was new in Python 3.8)",
+                self.target_version
+            ),
             SyntaxErrorKind::MatchBeforePy310 => format!(
-                "Cannot use `match` statement on Python {major}.{minor} (syntax was new in Python 3.10)",
-                major = self.target_version.major,
-                minor = self.target_version.minor,
+                "Cannot use `match` statement on Python {} (syntax was new in Python 3.10)",
+                self.target_version,
             ),
         }
     }
@@ -448,6 +451,7 @@ impl SyntaxError {
     /// The earliest allowed version for the syntax associated with this error.
     pub const fn version(&self) -> PythonVersion {
         match self.kind {
+            SyntaxErrorKind::WalrusBeforePy38 => PythonVersion::PY38,
             SyntaxErrorKind::MatchBeforePy310 => PythonVersion::PY310,
         }
     }
@@ -455,12 +459,14 @@ impl SyntaxError {
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum SyntaxErrorKind {
+    WalrusBeforePy38,
     MatchBeforePy310,
 }
 
 impl SyntaxErrorKind {
     pub const fn as_str(self) -> &'static str {
         match self {
+            SyntaxErrorKind::WalrusBeforePy38 => "walrus-before-python-38",
             SyntaxErrorKind::MatchBeforePy310 => "match-before-python-310",
         }
     }

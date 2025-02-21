@@ -1458,13 +1458,22 @@ impl<'src> Parser<'src> {
             );
         }
 
+        let range = self.node_range(try_start);
+        if is_star && self.options.target_version < PythonVersion::PY311 {
+            self.syntax_errors.push(SyntaxError {
+                kind: SyntaxErrorKind::ExceptStarBeforePy311,
+                range,
+                target_version: self.options.target_version,
+            });
+        }
+
         ast::StmtTry {
             body: try_body,
             handlers,
             orelse,
             finalbody,
             is_star,
-            range: self.node_range(try_start),
+            range,
         }
     }
 
