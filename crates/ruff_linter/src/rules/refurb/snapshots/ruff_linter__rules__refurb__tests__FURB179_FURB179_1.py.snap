@@ -36,7 +36,7 @@ FURB179_1.py:25:12: FURB179 [*] Use `chain.from_iterable()` instead
 23 23 | 
 24 24 | def flatten_via_list_comp(rows):
 25    |-    return [col for row in rows for col in row]
-   25 |+    return itertools.chain.from_iterable(row)
+   25 |+    return list(itertools.chain.from_iterable(row))
 26 26 | 
 27 27 | def flatten_via_set_comp(rows):
 28 28 |     return {col for row in rows for col in row}
@@ -56,7 +56,7 @@ FURB179_1.py:28:12: FURB179 [*] Use `chain.from_iterable()` instead
 26 26 | 
 27 27 | def flatten_via_set_comp(rows):
 28    |-    return {col for row in rows for col in row}
-   28 |+    return itertools.chain.from_iterable(row)
+   28 |+    return set(itertools.chain.from_iterable(row))
 29 29 | 
 30 30 | def flatten_with_function_source():
 31 31 |     return (col for row in f() for col in row)
