@@ -2886,6 +2886,12 @@ impl<'db> KnownClass {
     /// or have an ambiguous truthiness.
     const fn bool(self) -> Truthiness {
         match self {
+            // N.B. It's only generally safe to infer `Truthiness::AlwaysTrue` for a `KnownClass`
+            // variant if the class's `__bool__` method always returns the same thing *and* the
+            // class is `@final`.
+            //
+            // E.g. `ModuleType.__bool__` always returns `True`, but `ModuleType` is not `@final`.
+            // Equally, `range` is `@final`, but its `__bool__` method can return `False`.
             Self::EllipsisType
             | Self::NoDefaultType
             | Self::MethodType
