@@ -369,7 +369,7 @@ FURB179_0.py:54:5: FURB179 [*] Use `chain.from_iterable()` instead
 56    |-    for a in l
 57    |-    for b, c in a
 58    |-]
-   54 |+_ = chain.from_iterable(a)
+   54 |+_ = list(chain.from_iterable(a))
 59 55 | 
 60 56 | _ = print(  # Preserved
 61 57 |     {  # Comment
@@ -392,7 +392,16 @@ FURB179_0.py:61:5: FURB179 [*] Use `chain.from_iterable()` instead
 61    |-    {  # Comment
 62    |-        a for b in c for a in b
 63    |-    }
-   61 |+    chain.from_iterable(b)
+   61 |+    set(chain.from_iterable(b))
 64 62 | )
 65 63 | 
-66 64 |
+66 64 | 
+
+FURB179_0.py:69:9: FURB179 Use `chain.from_iterable()` instead
+   |
+67 | def _():
+68 |     set = {0}
+69 |     _ = {c for b in a for c in b}
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^ FURB179
+   |
+   = help: Replace with `chain.from_iterable()`

@@ -64,6 +64,11 @@ _ = print(  # Preserved
 )
 
 
+def _():
+    set = {0}
+    _ = {c for b in a for c in b}
+
+
 ### No errors
 
 sum(l, [])  # Already caught by RUF017
