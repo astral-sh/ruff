@@ -4782,7 +4782,6 @@ impl<'db> TypeInferenceBuilder<'db> {
         let call_dunder = |op: RichCompareOperator,
                            left: InstanceType<'db>,
                            right: InstanceType<'db>| {
-            // TODO: How do we want to handle possibly unbound dunder methods?
             match left.class.class_member(db, op.dunder()) {
                 Symbol::Type(class_member_dunder, Boundness::Bound) => class_member_dunder
                     .try_call(
@@ -4897,45 +4896,46 @@ impl<'db> TypeInferenceBuilder<'db> {
                 .infer_binary_type_comparison(l_ty, ast::CmpOp::Eq, r_ty, range)
                 .expect("infer_binary_type_comparison should never return None for `CmpOp::Eq`");
 
-            match pairwise_eq_result {
-                // If propagation is required, return the result as is
-                todo @ Type::Dynamic(DynamicType::Todo(_)) => return Ok(todo),
-                // Using `bool` here is fine because we only use it to get to a truthiness
-                // but it doesn't mimic a runtime `bool` call.
-                ty => match ty.bool(self.db()) {
-                    // - AlwaysTrue : Continue to the next pair for lexicographic comparison
-                    Truthiness::AlwaysTrue => continue,
-                    // - AlwaysFalse:
-                    // Lexicographic comparisons will always terminate with this pair.
-                    // Complete the comparison and return the result.
-                    // - Ambiguous:
-                    // Lexicographic comparisons might continue to the next pair (if eq_result is true),
-                    // or terminate here (if eq_result is false).
-                    // To account for cases where the comparison terminates here, add the pairwise comparison result to the union builder.
-                    eq_truthiness @ (Truthiness::AlwaysFalse | Truthiness::Ambiguous) => {
-                        let pairwise_compare_result = match op {
-                            RichCompareOperator::Lt
-                            | RichCompareOperator::Le
-                            | RichCompareOperator::Gt
-                            | RichCompareOperator::Ge => {
-                                self.infer_binary_type_comparison(l_ty, op.into(), r_ty, range)?
-                            }
-                            // For `==` and `!=`, we already figure out the result from `pairwise_eq_result`
-                            // NOTE: The CPython implementation does not account for non-boolean return types
-                            // or cases where `!=` is not the negation of `==`, we also do not consider these cases.
-                            RichCompareOperator::Eq => Type::BooleanLiteral(false),
-                            RichCompareOperator::Ne => Type::BooleanLiteral(true),
-                        };
-
-                        builder = builder.add(pairwise_compare_result);
-
-                        if eq_truthiness.is_ambiguous() {
-                            continue;
+            match pairwise_eq_result
+                .try_bool(self.db())
+                .unwrap_or_else(|err| {
+                    // TODO: We should, whenever possible, pass the range of the left and right elements
+                    //   instead of the range of the whole tuple.
+                    err.report_diagnostic(&self.context, range);
+                    err.fallback_truthiness()
+                }) {
+                // - AlwaysTrue : Continue to the next pair for lexicographic comparison
+                Truthiness::AlwaysTrue => continue,
+                // - AlwaysFalse:
+                // Lexicographic comparisons will always terminate with this pair.
+                // Complete the comparison and return the result.
+                // - Ambiguous:
+                // Lexicographic comparisons might continue to the next pair (if eq_result is true),
+                // or terminate here (if eq_result is false).
+                // To account for cases where the comparison terminates here, add the pairwise comparison result to the union builder.
+                eq_truthiness @ (Truthiness::AlwaysFalse | Truthiness::Ambiguous) => {
+                    let pairwise_compare_result = match op {
+                        RichCompareOperator::Lt
+                        | RichCompareOperator::Le
+                        | RichCompareOperator::Gt
+                        | RichCompareOperator::Ge => {
+                            self.infer_binary_type_comparison(l_ty, op.into(), r_ty, range)?
                         }
+                        // For `==` and `!=`, we already figure out the result from `pairwise_eq_result`
+                        // NOTE: The CPython implementation does not account for non-boolean return types
+                        // or cases where `!=` is not the negation of `==`, we also do not consider these cases.
+                        RichCompareOperator::Eq => Type::BooleanLiteral(false),
+                        RichCompareOperator::Ne => Type::BooleanLiteral(true),
+                    };
 
-                        return Ok(builder.build());
+                    builder = builder.add(pairwise_compare_result);
+
+                    if eq_truthiness.is_ambiguous() {
+                        continue;
                     }
-                },
+
+                    return Ok(builder.build());
+                }
             }
         }
 
