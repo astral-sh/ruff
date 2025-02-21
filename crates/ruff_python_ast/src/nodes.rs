@@ -1,5 +1,6 @@
 #![allow(clippy::derive_partial_eq_without_eq)]
 
+use crate::generated::*;
 use std::borrow::Cow;
 use std::fmt;
 use std::fmt::Debug;
@@ -120,6 +121,7 @@ pub struct StmtClassDef {
     pub decorator_list: Vec<Decorator>,
     pub name: Identifier,
     pub type_params: Option<Box<TypeParams>>,
+    // TODO: can remove?
     pub arguments: Option<Box<Arguments>>,
     pub body: Vec<Stmt>,
 }
@@ -379,23 +381,23 @@ impl ExprRef<'_> {
     }
 }
 
-/// An AST node used to represent a IPython escape command at the expression level.
-///
-/// For example,
-/// ```python
-/// dir = !pwd
-/// ```
-///
-/// Here, the escape kind can only be `!` or `%` otherwise it is a syntax error.
-///
-/// For more information related to terminology and syntax of escape commands,
-/// see [`StmtIpyEscapeCommand`].
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprIpyEscapeCommand {
-    pub range: TextRange,
-    pub kind: IpyEscapeKind,
-    pub value: Box<str>,
-}
+// /// An AST node used to represent a IPython escape command at the expression level.
+// ///
+// /// For example,
+// /// ```python
+// /// dir = !pwd
+// /// ```
+// ///
+// /// Here, the escape kind can only be `!` or `%` otherwise it is a syntax error.
+// ///
+// /// For more information related to terminology and syntax of escape commands,
+// /// see [`StmtIpyEscapeCommand`].
+// #[derive(Clone, Debug, PartialEq)]
+// pub struct ExprIpyEscapeCommand {
+//     pub range: TextRange,
+//     pub kind: IpyEscapeKind,
+//     pub value: Box<str>,
+// }
 
 // /// See also [BoolOp](https://docs.python.org/3/library/ast.html#ast.BoolOp)
 // #[derive(Clone, Debug, PartialEq)]
@@ -502,7 +504,7 @@ impl Ranged for DictItem {
 //     pub items: Vec<DictItem>,
 // }
 
-impl crate::ExprDict {
+impl ExprDict {
     /// Returns an `Iterator` over the AST nodes representing the
     /// dictionary's keys.
     pub fn iter_keys(&self) -> DictKeyIterator {
@@ -544,7 +546,7 @@ impl crate::ExprDict {
     }
 }
 
-impl<'a> IntoIterator for &'a crate::ExprDict {
+impl<'a> IntoIterator for &'a ExprDict {
     type IntoIter = std::slice::Iter<'a, DictItem>;
     type Item = &'a DictItem;
 
@@ -638,11 +640,11 @@ impl FusedIterator for DictValueIterator<'_> {}
 impl ExactSizeIterator for DictValueIterator<'_> {}
 
 /// See also [Set](https://docs.python.org/3/library/ast.html#ast.Set)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprSet {
-    pub range: TextRange,
-    pub elts: Vec<Expr>,
-}
+// #[derive(Clone, Debug, PartialEq)]
+// pub struct ExprSet {
+//     pub range: TextRange,
+//     pub elts: Vec<Expr>,
+// }
 
 impl ExprSet {
     pub fn iter(&self) -> std::slice::Iter<'_, Expr> {
@@ -667,77 +669,77 @@ impl<'a> IntoIterator for &'a ExprSet {
     }
 }
 
-/// See also [ListComp](https://docs.python.org/3/library/ast.html#ast.ListComp)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprListComp {
-    pub range: TextRange,
-    pub elt: Box<Expr>,
-    pub generators: Vec<Comprehension>,
-}
+// /// See also [ListComp](https://docs.python.org/3/library/ast.html#ast.ListComp)
+// #[derive(Clone, Debug, PartialEq)]
+// pub struct ExprListComp {
+//     pub range: TextRange,
+//     pub elt: Box<Expr>,
+//     pub generators: Vec<Comprehension>,
+// }
 
-/// See also [SetComp](https://docs.python.org/3/library/ast.html#ast.SetComp)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprSetComp {
-    pub range: TextRange,
-    pub elt: Box<Expr>,
-    pub generators: Vec<Comprehension>,
-}
+// /// See also [SetComp](https://docs.python.org/3/library/ast.html#ast.SetComp)
+// #[derive(Clone, Debug, PartialEq)]
+// pub struct ExprSetComp {
+//     pub range: TextRange,
+//     pub elt: Box<Expr>,
+//     pub generators: Vec<Comprehension>,
+// }
 
-/// See also [DictComp](https://docs.python.org/3/library/ast.html#ast.DictComp)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprDictComp {
-    pub range: TextRange,
-    pub key: Box<Expr>,
-    pub value: Box<Expr>,
-    pub generators: Vec<Comprehension>,
-}
+// /// See also [DictComp](https://docs.python.org/3/library/ast.html#ast.DictComp)
+// #[derive(Clone, Debug, PartialEq)]
+// pub struct ExprDictComp {
+//     pub range: TextRange,
+//     pub key: Box<Expr>,
+//     pub value: Box<Expr>,
+//     pub generators: Vec<Comprehension>,
+// }
 
-/// See also [GeneratorExp](https://docs.python.org/3/library/ast.html#ast.GeneratorExp)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprGenerator {
-    pub range: TextRange,
-    pub elt: Box<Expr>,
-    pub generators: Vec<Comprehension>,
-    pub parenthesized: bool,
-}
+// /// See also [GeneratorExp](https://docs.python.org/3/library/ast.html#ast.GeneratorExp)
+// #[derive(Clone, Debug, PartialEq)]
+// pub struct ExprGenerator {
+//     pub range: TextRange,
+//     pub elt: Box<Expr>,
+//     pub generators: Vec<Comprehension>,
+//     pub parenthesized: bool,
+// }
 
-/// See also [Await](https://docs.python.org/3/library/ast.html#ast.Await)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprAwait {
-    pub range: TextRange,
-    pub value: Box<Expr>,
-}
+// /// See also [Await](https://docs.python.org/3/library/ast.html#ast.Await)
+// #[derive(Clone, Debug, PartialEq)]
+// pub struct ExprAwait {
+//     pub range: TextRange,
+//     pub value: Box<Expr>,
+// }
 
-/// See also [Yield](https://docs.python.org/3/library/ast.html#ast.Yield)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprYield {
-    pub range: TextRange,
-    pub value: Option<Box<Expr>>,
-}
+// /// See also [Yield](https://docs.python.org/3/library/ast.html#ast.Yield)
+// #[derive(Clone, Debug, PartialEq)]
+// pub struct ExprYield {
+//     pub range: TextRange,
+//     pub value: Option<Box<Expr>>,
+// }
 
-/// See also [YieldFrom](https://docs.python.org/3/library/ast.html#ast.YieldFrom)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprYieldFrom {
-    pub range: TextRange,
-    pub value: Box<Expr>,
-}
+// /// See also [YieldFrom](https://docs.python.org/3/library/ast.html#ast.YieldFrom)
+// #[derive(Clone, Debug, PartialEq)]
+// pub struct ExprYieldFrom {
+//     pub range: TextRange,
+//     pub value: Box<Expr>,
+// }
 
-/// See also [Compare](https://docs.python.org/3/library/ast.html#ast.Compare)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprCompare {
-    pub range: TextRange,
-    pub left: Box<Expr>,
-    pub ops: Box<[CmpOp]>,
-    pub comparators: Box<[Expr]>,
-}
+// /// See also [Compare](https://docs.python.org/3/library/ast.html#ast.Compare)
+// #[derive(Clone, Debug, PartialEq)]
+// pub struct ExprCompare {
+//     pub range: TextRange,
+//     pub left: Box<Expr>,
+//     pub ops: Box<[CmpOp]>,
+//     pub comparators: Box<[Expr]>,
+// }
 
-/// See also [Call](https://docs.python.org/3/library/ast.html#ast.Call)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprCall {
-    pub range: TextRange,
-    pub func: Box<Expr>,
-    pub arguments: Arguments,
-}
+// /// See also [Call](https://docs.python.org/3/library/ast.html#ast.Call)
+// #[derive(Clone, Debug, PartialEq)]
+// pub struct ExprCall {
+//     pub range: TextRange,
+//     pub func: Box<Expr>,
+//     pub arguments: Arguments,
+// }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct FStringFormatSpec {
@@ -811,19 +813,19 @@ pub struct DebugText {
     pub trailing: String,
 }
 
-/// An AST node that represents either a single-part f-string literal
-/// or an implicitly concatenated f-string literal.
-///
-/// This type differs from the original Python AST ([JoinedStr]) in that it
-/// doesn't join the implicitly concatenated parts into a single string. Instead,
-/// it keeps them separate and provide various methods to access the parts.
-///
-/// [JoinedStr]: https://docs.python.org/3/library/ast.html#ast.JoinedStr
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprFString {
-    pub range: TextRange,
-    pub value: FStringValue,
-}
+// /// An AST node that represents either a single-part f-string literal
+// /// or an implicitly concatenated f-string literal.
+// ///
+// /// This type differs from the original Python AST ([JoinedStr]) in that it
+// /// doesn't join the implicitly concatenated parts into a single string. Instead,
+// /// it keeps them separate and provide various methods to access the parts.
+// ///
+// /// [JoinedStr]: https://docs.python.org/3/library/ast.html#ast.JoinedStr
+// #[derive(Clone, Debug, PartialEq)]
+// pub struct ExprFString {
+//     pub range: TextRange,
+//     pub value: FStringValue,
+// }
 
 impl ExprFString {
     /// Returns the single [`FString`] if the f-string isn't implicitly concatenated, [`None`]
@@ -1286,13 +1288,13 @@ impl fmt::Debug for FStringElements {
     }
 }
 
-/// An AST node that represents either a single-part string literal
-/// or an implicitly concatenated string literal.
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprStringLiteral {
-    pub range: TextRange,
-    pub value: StringLiteralValue,
-}
+// /// An AST node that represents either a single-part string literal
+// /// or an implicitly concatenated string literal.
+// #[derive(Clone, Debug, PartialEq)]
+// pub struct ExprStringLiteral {
+//     pub range: TextRange,
+//     pub value: StringLiteralValue,
+// }
 
 impl ExprStringLiteral {
     /// Return `Some(literal)` if the string only consists of a single `StringLiteral` part
@@ -1738,13 +1740,13 @@ impl Debug for ConcatenatedStringLiteral {
     }
 }
 
-/// An AST node that represents either a single-part bytestring literal
-/// or an implicitly concatenated bytestring literal.
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprBytesLiteral {
-    pub range: TextRange,
-    pub value: BytesLiteralValue,
-}
+// /// An AST node that represents either a single-part bytestring literal
+// /// or an implicitly concatenated bytestring literal.
+// #[derive(Clone, Debug, PartialEq)]
+// pub struct ExprBytesLiteral {
+//     pub range: TextRange,
+//     pub value: BytesLiteralValue,
+// }
 
 impl ExprBytesLiteral {
     /// Return `Some(literal)` if the bytestring only consists of a single `BytesLiteral` part
@@ -2347,11 +2349,11 @@ impl From<FStringFlags> for AnyStringFlags {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprNumberLiteral {
-    pub range: TextRange,
-    pub value: Number,
-}
+// #[derive(Clone, Debug, PartialEq)]
+// pub struct ExprNumberLiteral {
+//     pub range: TextRange,
+//     pub value: Number,
+// }
 
 #[derive(Clone, Debug, PartialEq, is_macro::Is)]
 pub enum Number {
@@ -2360,55 +2362,55 @@ pub enum Number {
     Complex { real: f64, imag: f64 },
 }
 
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct ExprBooleanLiteral {
-    pub range: TextRange,
-    pub value: bool,
-}
+// #[derive(Clone, Debug, Default, PartialEq)]
+// pub struct ExprBooleanLiteral {
+//     pub range: TextRange,
+//     pub value: bool,
+// }
 
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct ExprNoneLiteral {
-    pub range: TextRange,
-}
+// #[derive(Clone, Debug, Default, PartialEq)]
+// pub struct ExprNoneLiteral {
+//     pub range: TextRange,
+// }
 
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct ExprEllipsisLiteral {
-    pub range: TextRange,
-}
+// #[derive(Clone, Debug, Default, PartialEq)]
+// pub struct ExprEllipsisLiteral {
+//     pub range: TextRange,
+// }
 
-/// See also [Attribute](https://docs.python.org/3/library/ast.html#ast.Attribute)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprAttribute {
-    pub range: TextRange,
-    pub value: Box<Expr>,
-    pub attr: Identifier,
-    pub ctx: ExprContext,
-}
+// /// See also [Attribute](https://docs.python.org/3/library/ast.html#ast.Attribute)
+// #[derive(Clone, Debug, PartialEq)]
+// pub struct ExprAttribute {
+//     pub range: TextRange,
+//     pub value: Box<Expr>,
+//     pub attr: Identifier,
+//     pub ctx: ExprContext,
+// }
 
-/// See also [Subscript](https://docs.python.org/3/library/ast.html#ast.Subscript)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprSubscript {
-    pub range: TextRange,
-    pub value: Box<Expr>,
-    pub slice: Box<Expr>,
-    pub ctx: ExprContext,
-}
+// /// See also [Subscript](https://docs.python.org/3/library/ast.html#ast.Subscript)
+// #[derive(Clone, Debug, PartialEq)]
+// pub struct ExprSubscript {
+//     pub range: TextRange,
+//     pub value: Box<Expr>,
+//     pub slice: Box<Expr>,
+//     pub ctx: ExprContext,
+// }
 
-/// See also [Starred](https://docs.python.org/3/library/ast.html#ast.Starred)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprStarred {
-    pub range: TextRange,
-    pub value: Box<Expr>,
-    pub ctx: ExprContext,
-}
+// /// See also [Starred](https://docs.python.org/3/library/ast.html#ast.Starred)
+// #[derive(Clone, Debug, PartialEq)]
+// pub struct ExprStarred {
+//     pub range: TextRange,
+//     pub value: Box<Expr>,
+//     pub ctx: ExprContext,
+// }
 
-/// See also [Name](https://docs.python.org/3/library/ast.html#ast.Name)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprName {
-    pub range: TextRange,
-    pub id: Name,
-    pub ctx: ExprContext,
-}
+// /// See also [Name](https://docs.python.org/3/library/ast.html#ast.Name)
+// #[derive(Clone, Debug, PartialEq)]
+// pub struct ExprName {
+//     pub range: TextRange,
+//     pub id: Name,
+//     pub ctx: ExprContext,
+// }
 
 impl ExprName {
     pub fn id(&self) -> &Name {
@@ -2416,13 +2418,13 @@ impl ExprName {
     }
 }
 
-/// See also [List](https://docs.python.org/3/library/ast.html#ast.List)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprList {
-    pub range: TextRange,
-    pub elts: Vec<Expr>,
-    pub ctx: ExprContext,
-}
+// /// See also [List](https://docs.python.org/3/library/ast.html#ast.List)
+// #[derive(Clone, Debug, PartialEq)]
+// pub struct ExprList {
+//     pub range: TextRange,
+//     pub elts: Vec<Expr>,
+//     pub ctx: ExprContext,
+// }
 
 impl ExprList {
     pub fn iter(&self) -> std::slice::Iter<'_, Expr> {
@@ -2447,16 +2449,16 @@ impl<'a> IntoIterator for &'a ExprList {
     }
 }
 
-/// See also [Tuple](https://docs.python.org/3/library/ast.html#ast.Tuple)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprTuple {
-    pub range: TextRange,
-    pub elts: Vec<Expr>,
-    pub ctx: ExprContext,
-
-    /// Whether the tuple is parenthesized in the source code.
-    pub parenthesized: bool,
-}
+// /// See also [Tuple](https://docs.python.org/3/library/ast.html#ast.Tuple)
+// #[derive(Clone, Debug, PartialEq)]
+// pub struct ExprTuple {
+//     pub range: TextRange,
+//     pub elts: Vec<Expr>,
+//     pub ctx: ExprContext,
+//
+//     /// Whether the tuple is parenthesized in the source code.
+//     pub parenthesized: bool,
+// }
 
 impl ExprTuple {
     pub fn iter(&self) -> std::slice::Iter<'_, Expr> {
@@ -2481,14 +2483,14 @@ impl<'a> IntoIterator for &'a ExprTuple {
     }
 }
 
-/// See also [Slice](https://docs.python.org/3/library/ast.html#ast.Slice)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprSlice {
-    pub range: TextRange,
-    pub lower: Option<Box<Expr>>,
-    pub upper: Option<Box<Expr>>,
-    pub step: Option<Box<Expr>>,
-}
+// /// See also [Slice](https://docs.python.org/3/library/ast.html#ast.Slice)
+// #[derive(Clone, Debug, PartialEq)]
+// pub struct ExprSlice {
+//     pub range: TextRange,
+//     pub lower: Option<Box<Expr>>,
+//     pub upper: Option<Box<Expr>>,
+//     pub step: Option<Box<Expr>>,
+// }
 
 /// See also [expr_context](https://docs.python.org/3/library/ast.html#ast.expr_context)
 #[derive(Clone, Debug, PartialEq, is_macro::Is, Copy, Hash, Eq)]
@@ -3625,6 +3627,7 @@ mod tests {
     #[allow(clippy::wildcard_imports)]
     use super::*;
 
+    use crate::generated::*;
     use crate::Mod;
 
     #[test]
@@ -3641,25 +3644,25 @@ mod tests {
         assert_eq!(std::mem::size_of::<Expr>(), 64);
         assert_eq!(std::mem::size_of::<ExprAttribute>(), 56);
         assert_eq!(std::mem::size_of::<ExprAwait>(), 16);
-        assert_eq!(std::mem::size_of::<crate::ExprBinOp>(), 32);
-        assert_eq!(std::mem::size_of::<crate::ExprBoolOp>(), 40);
+        assert_eq!(std::mem::size_of::<ExprBinOp>(), 32);
+        assert_eq!(std::mem::size_of::<ExprBoolOp>(), 40);
         assert_eq!(std::mem::size_of::<ExprBooleanLiteral>(), 12);
         assert_eq!(std::mem::size_of::<ExprBytesLiteral>(), 40);
         assert_eq!(std::mem::size_of::<ExprCall>(), 56);
         assert_eq!(std::mem::size_of::<ExprCompare>(), 48);
-        assert_eq!(std::mem::size_of::<crate::ExprDict>(), 32);
+        assert_eq!(std::mem::size_of::<ExprDict>(), 32);
         assert_eq!(std::mem::size_of::<ExprDictComp>(), 48);
         assert_eq!(std::mem::size_of::<ExprEllipsisLiteral>(), 8);
         // 56 for Rustc < 1.76
         assert!(matches!(std::mem::size_of::<ExprFString>(), 48 | 56));
         assert_eq!(std::mem::size_of::<ExprGenerator>(), 48);
-        assert_eq!(std::mem::size_of::<crate::ExprIf>(), 32);
+        assert_eq!(std::mem::size_of::<ExprIf>(), 32);
         assert_eq!(std::mem::size_of::<ExprIpyEscapeCommand>(), 32);
-        assert_eq!(std::mem::size_of::<crate::ExprLambda>(), 24);
+        assert_eq!(std::mem::size_of::<ExprLambda>(), 24);
         assert_eq!(std::mem::size_of::<ExprList>(), 40);
         assert_eq!(std::mem::size_of::<ExprListComp>(), 40);
         assert_eq!(std::mem::size_of::<ExprName>(), 40);
-        assert_eq!(std::mem::size_of::<crate::ExprNamed>(), 24);
+        assert_eq!(std::mem::size_of::<ExprNamed>(), 24);
         assert_eq!(std::mem::size_of::<ExprNoneLiteral>(), 8);
         assert_eq!(std::mem::size_of::<ExprNumberLiteral>(), 32);
         assert_eq!(std::mem::size_of::<ExprSet>(), 32);
@@ -3669,7 +3672,7 @@ mod tests {
         assert_eq!(std::mem::size_of::<ExprStringLiteral>(), 56);
         assert_eq!(std::mem::size_of::<ExprSubscript>(), 32);
         assert_eq!(std::mem::size_of::<ExprTuple>(), 40);
-        assert_eq!(std::mem::size_of::<crate::ExprUnaryOp>(), 24);
+        assert_eq!(std::mem::size_of::<ExprUnaryOp>(), 24);
         assert_eq!(std::mem::size_of::<ExprYield>(), 16);
         assert_eq!(std::mem::size_of::<ExprYieldFrom>(), 16);
     }

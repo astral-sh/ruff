@@ -91,6 +91,7 @@ class Node:
     variant: str
     ty: str
     fields: list[Field] | None
+    derives: list[str] | None
 
     def __init__(self, group: Group, node_name: str, node: dict[str, Any]) -> None:
         self.name = node_name
@@ -100,6 +101,7 @@ class Node:
         fields = node.get("fields")
         if fields is not None:
             self.fields = [Field(f) for f in fields]
+        self.derives = node.get("derives", [])
 
 
 @dataclass
@@ -570,43 +572,39 @@ def write_nodekind(out: list[str], ast: Ast) -> None:
 
 
 def write_node(out: list[str], ast: Ast) -> None:
-    write_node_list = [
-        "ExprBoolOp",
-        "ExprNamed",
-        "ExprBinOp",
-        "ExprUnaryOp",
-        "ExprLambda",
-        "ExprIf",
-        "ExprDict",
-    ]
     group_names = [group.name for group in ast.groups]
     node_names = [node.name for node in ast.all_nodes]
     for group in ast.groups:
         for node in group.nodes:
-            if node.name not in write_node_list:
+            if node.fields is None:
                 continue
-            if node.fields is not None:
-                out.append("#[derive(Clone, Debug, PartialEq)]")
-                name = node.name
-                out.append(f"pub struct {name} {{")
-                out.append("pub range: ruff_text_size::TextRange,")
-                for field in node.fields:
-                    field_str = f"pub {field.name}: "
-                    inner = f"crate::{field.ty}"
-                    if field.ty in node_names or (
-                        field.ty in group_names and (field.seq is False)
-                    ):
-                        inner = f"Box<{inner}>"
+            out.append(
+                "#[derive(Clone, Debug, PartialEq, "
+                + ", ".join(node.derives or [])
+                + ")]"
+            )
+            name = node.name
+            out.append(f"pub struct {name} {{")
+            out.append("pub range: ruff_text_size::TextRange,")
+            for field in node.fields:
+                field_str = f"pub {field.name}: "
+                inner = f"crate::{field.ty}"
+                if (field.ty == "Expr" or (field.ty in group_names)) and (
+                    field.seq is False
+                ):
+                    inner = f"Box<{inner}>"
+                if field.ty == "bool" or field.ty.startswith("Box"):
+                    inner = field.ty
 
-                    if field.seq:
-                        field_str += f"Vec<{inner}>,"
-                    elif field.optional:
-                        field_str += f"Option<{inner}>,"
-                    else:
-                        field_str += f"{inner},"
-                    out.append(field_str)
-                out.append("}")
-                out.append("")
+                if field.seq:
+                    field_str += f"Vec<{inner}>,"
+                elif field.optional:
+                    field_str += f"Option<{inner}>,"
+                else:
+                    field_str += f"{inner},"
+                out.append(field_str)
+            out.append("}")
+            out.append("")
 
 
 # ------------------------------------------------------------------------------

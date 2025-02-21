@@ -1,6 +1,7 @@
 use ruff_text_size::TextRange;
 
 use crate::visitor::transformer::{walk_expr, walk_keyword, Transformer};
+use crate::{self as ast};
 use crate::{Expr, Keyword};
 
 /// Change an expression's location (recursively) to match a desired, fixed
@@ -17,100 +18,100 @@ struct Relocator {
 impl Transformer for Relocator {
     fn visit_expr(&self, expr: &mut Expr) {
         match expr {
-            Expr::BoolOp(crate::ExprBoolOp { range, .. }) => {
+            Expr::BoolOp(ast::ExprBoolOp { range, .. }) => {
                 *range = self.range;
             }
-            Expr::Named(crate::ExprNamed { range, .. }) => {
+            Expr::Named(ast::ExprNamed { range, .. }) => {
                 *range = self.range;
             }
-            Expr::BinOp(crate::ExprBinOp { range, .. }) => {
+            Expr::BinOp(ast::ExprBinOp { range, .. }) => {
                 *range = self.range;
             }
-            Expr::UnaryOp(crate::ExprUnaryOp { range, .. }) => {
+            Expr::UnaryOp(ast::ExprUnaryOp { range, .. }) => {
                 *range = self.range;
             }
-            Expr::Lambda(crate::ExprLambda { range, .. }) => {
+            Expr::Lambda(ast::ExprLambda { range, .. }) => {
                 *range = self.range;
             }
-            Expr::If(crate::ExprIf { range, .. }) => {
+            Expr::If(ast::ExprIf { range, .. }) => {
                 *range = self.range;
             }
-            Expr::Dict(crate::ExprDict { range, .. }) => {
+            Expr::Dict(ast::ExprDict { range, .. }) => {
                 *range = self.range;
             }
-            Expr::Set(crate::ExprSet { range, .. }) => {
+            Expr::Set(ast::ExprSet { range, .. }) => {
                 *range = self.range;
             }
-            Expr::ListComp(crate::ExprListComp { range, .. }) => {
+            Expr::ListComp(ast::ExprListComp { range, .. }) => {
                 *range = self.range;
             }
-            Expr::SetComp(crate::ExprSetComp { range, .. }) => {
+            Expr::SetComp(ast::ExprSetComp { range, .. }) => {
                 *range = self.range;
             }
-            Expr::DictComp(crate::ExprDictComp { range, .. }) => {
+            Expr::DictComp(ast::ExprDictComp { range, .. }) => {
                 *range = self.range;
             }
-            Expr::Generator(crate::ExprGenerator { range, .. }) => {
+            Expr::Generator(ast::ExprGenerator { range, .. }) => {
                 *range = self.range;
             }
-            Expr::Await(crate::ExprAwait { range, .. }) => {
+            Expr::Await(ast::ExprAwait { range, .. }) => {
                 *range = self.range;
             }
-            Expr::Yield(crate::ExprYield { range, .. }) => {
+            Expr::Yield(ast::ExprYield { range, .. }) => {
                 *range = self.range;
             }
-            Expr::YieldFrom(crate::ExprYieldFrom { range, .. }) => {
+            Expr::YieldFrom(ast::ExprYieldFrom { range, .. }) => {
                 *range = self.range;
             }
-            Expr::Compare(crate::ExprCompare { range, .. }) => {
+            Expr::Compare(ast::ExprCompare { range, .. }) => {
                 *range = self.range;
             }
-            Expr::Call(crate::ExprCall { range, .. }) => {
+            Expr::Call(ast::ExprCall { range, .. }) => {
                 *range = self.range;
             }
-            Expr::FString(crate::ExprFString { range, .. }) => {
+            Expr::FString(ast::ExprFString { range, .. }) => {
                 *range = self.range;
             }
-            Expr::StringLiteral(crate::ExprStringLiteral { range, .. }) => {
+            Expr::StringLiteral(ast::ExprStringLiteral { range, .. }) => {
                 *range = self.range;
             }
-            Expr::BytesLiteral(crate::ExprBytesLiteral { range, .. }) => {
+            Expr::BytesLiteral(ast::ExprBytesLiteral { range, .. }) => {
                 *range = self.range;
             }
-            Expr::NumberLiteral(crate::ExprNumberLiteral { range, .. }) => {
+            Expr::NumberLiteral(ast::ExprNumberLiteral { range, .. }) => {
                 *range = self.range;
             }
-            Expr::BooleanLiteral(crate::ExprBooleanLiteral { range, .. }) => {
+            Expr::BooleanLiteral(ast::ExprBooleanLiteral { range, .. }) => {
                 *range = self.range;
             }
-            Expr::NoneLiteral(crate::ExprNoneLiteral { range }) => {
+            Expr::NoneLiteral(ast::ExprNoneLiteral { range }) => {
                 *range = self.range;
             }
-            Expr::EllipsisLiteral(crate::ExprEllipsisLiteral { range }) => {
+            Expr::EllipsisLiteral(ast::ExprEllipsisLiteral { range }) => {
                 *range = self.range;
             }
-            Expr::Attribute(crate::ExprAttribute { range, .. }) => {
+            Expr::Attribute(ast::ExprAttribute { range, .. }) => {
                 *range = self.range;
             }
-            Expr::Subscript(crate::ExprSubscript { range, .. }) => {
+            Expr::Subscript(ast::ExprSubscript { range, .. }) => {
                 *range = self.range;
             }
-            Expr::Starred(crate::ExprStarred { range, .. }) => {
+            Expr::Starred(ast::ExprStarred { range, .. }) => {
                 *range = self.range;
             }
-            Expr::Name(crate::ExprName { range, .. }) => {
+            Expr::Name(ast::ExprName { range, .. }) => {
                 *range = self.range;
             }
-            Expr::List(crate::ExprList { range, .. }) => {
+            Expr::List(ast::ExprList { range, .. }) => {
                 *range = self.range;
             }
-            Expr::Tuple(crate::ExprTuple { range, .. }) => {
+            Expr::Tuple(ast::ExprTuple { range, .. }) => {
                 *range = self.range;
             }
-            Expr::Slice(crate::ExprSlice { range, .. }) => {
+            Expr::Slice(ast::ExprSlice { range, .. }) => {
                 *range = self.range;
             }
-            Expr::IpyEscapeCommand(crate::ExprIpyEscapeCommand { range, .. }) => {
+            Expr::IpyEscapeCommand(ast::ExprIpyEscapeCommand { range, .. }) => {
                 *range = self.range;
             }
         }
