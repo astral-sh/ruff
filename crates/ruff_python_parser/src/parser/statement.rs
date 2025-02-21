@@ -3257,8 +3257,14 @@ impl<'src> Parser<'src> {
                 None
             };
 
+            let range = self.node_range(start);
+
+            if default.is_some() && self.options.target_version < PythonVersion::PY313 {
+                self.add_syntax_error(SyntaxErrorKind::TypeParamDefaultBeforePy313, range);
+            }
+
             ast::TypeParam::TypeVar(ast::TypeParamTypeVar {
-                range: self.node_range(start),
+                range,
                 name,
                 bound,
                 default,

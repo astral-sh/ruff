@@ -478,6 +478,7 @@ syntax_errors! {
     (ExceptStarBeforePy311, PY311, "`except*`", "except-star-before-python-311"),
     (TypeStmtBeforePy312, PY312, "`type` statement", "type-stmt-before-python-312"),
     (TypeParamsBeforePy312, PY312, "type parameter list", "type-params-before-python-312"),
+    (TypeParamDefaultBeforePy313, PY313, "type parameter default", "type-param-default-before-python-313"),
 }
 
 #[cfg(target_pointer_width = "64")]

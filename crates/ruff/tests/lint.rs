@@ -2783,3 +2783,53 @@ type ListOrSet[T] = list[T] | set[T]
     "
     );
 }
+
+#[test]
+fn type_parameter_defaults_before_py313() {
+    let stdin = r#"
+def max[T = int](args: list[T]) -> T:
+    ...
+
+class Bag[T = int]:
+	...
+
+type ListOrSet[T = int] = list[T] | set[T]
+"#;
+
+    // ok on 3.13
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--stdin-filename", "test.py"])
+        .arg("--target-version=py313")
+        .arg("-")
+        .pass_stdin(stdin),
+        @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    "
+    );
+
+    // 3 errors on 3.12
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--stdin-filename", "test.py"])
+        .arg("--target-version=py312")
+        .arg("-")
+        .pass_stdin(stdin),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:2:9: SyntaxError: Cannot use type parameter default on Python 3.12 (syntax was new in Python 3.13)
+    test.py:5:11: SyntaxError: Cannot use type parameter default on Python 3.12 (syntax was new in Python 3.13)
+    test.py:8:16: SyntaxError: Cannot use type parameter default on Python 3.12 (syntax was new in Python 3.13)
+    Found 3 errors.
+
+    ----- stderr -----
+    "
+    );
+}
