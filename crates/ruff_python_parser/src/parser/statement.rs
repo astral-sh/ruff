@@ -3093,10 +3093,13 @@ impl<'src> Parser<'src> {
 
         self.expect(TokenKind::Rsqb);
 
-        ast::TypeParams {
-            range: self.node_range(start),
-            type_params,
+        let range = self.node_range(start);
+
+        if self.options.target_version < PythonVersion::PY312 {
+            self.add_syntax_error(SyntaxErrorKind::TypeParamsBeforePy312, range);
         }
+
+        ast::TypeParams { range, type_params }
     }
 
     /// Parses a type parameter.

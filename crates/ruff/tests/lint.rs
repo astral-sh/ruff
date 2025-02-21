@@ -2722,3 +2722,64 @@ fn type_stmt_before_py312() {
     "
     );
 }
+
+#[test]
+fn type_parameter_lists_before_py312() {
+    let stdin = r#"
+from typing import Iterator
+
+def max[T](args: list[T]) -> T:
+    ...
+
+async def amax[T](args: list[T]) -> T:
+    ...
+
+class Bag[T]:
+    def __iter__(self) -> Iterator[T]:
+        ...
+
+    def add(self, arg: T) -> None:
+        ...
+
+type ListOrSet[T] = list[T] | set[T]
+"#;
+
+    // ok on 3.12
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--stdin-filename", "test.py"])
+        .arg("--target-version=py312")
+        .arg("-")
+        .pass_stdin(stdin),
+        @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    "
+    );
+
+    // 5 errors on 3.11 (4 from parameter lists, 1 from the `type` statement)
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--stdin-filename", "test.py"])
+        .arg("--target-version=py311")
+        .arg("-")
+        .pass_stdin(stdin),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:4:8: SyntaxError: Cannot use type parameter list on Python 3.11 (syntax was new in Python 3.12)
+    test.py:7:15: SyntaxError: Cannot use type parameter list on Python 3.11 (syntax was new in Python 3.12)
+    test.py:10:10: SyntaxError: Cannot use type parameter list on Python 3.11 (syntax was new in Python 3.12)
+    test.py:17:1: SyntaxError: Cannot use `type` statement on Python 3.11 (syntax was new in Python 3.12)
+    test.py:17:15: SyntaxError: Cannot use type parameter list on Python 3.11 (syntax was new in Python 3.12)
+    Found 5 errors.
+
+    ----- stderr -----
+    "
+    );
+}

@@ -477,6 +477,7 @@ syntax_errors! {
     (MatchBeforePy310, PY310, "`match` statement",  "match-before-python-310"),
     (ExceptStarBeforePy311, PY311, "`except*`", "except-star-before-python-311"),
     (TypeStmtBeforePy312, PY312, "`type` statement", "type-stmt-before-python-312"),
+    (TypeParamsBeforePy312, PY312, "type parameter list", "type-params-before-python-312"),
 }
 
 #[cfg(target_pointer_width = "64")]
