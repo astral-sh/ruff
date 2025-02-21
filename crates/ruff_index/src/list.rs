@@ -52,6 +52,7 @@ impl<I: Idx, K: Ord, V> ListStorage<I, K, V> {
     }
 }
 
+#[derive(Debug)]
 pub struct ListIterator<'a, I, K, V> {
     storage: &'a ListStorage<I, K, V>,
     curr: Option<I>,
@@ -229,6 +230,21 @@ impl<I: Idx, K: Clone + Ord, V: Clone> ListBuilder<I, K, V> {
                 self.union(a, *b_tail, combine),
             ),
         };
+        self.add_cell(new_key, new_value, new_tail)
+    }
+}
+
+impl<I: Idx, K: Clone, V> ListBuilder<I, K, V> {
+    /// Applies a function to each value in a list, returning a new list.
+    pub fn map<F>(&mut self, list: Option<I>, mut f: F) -> Option<I>
+    where
+        F: FnMut(&V) -> V,
+    {
+        let list_id = list?;
+        let ListCell(key, value, tail) = &self.storage.cells[list_id];
+        let new_key = key.clone();
+        let new_value = f(value);
+        let new_tail = self.map(*tail, f);
         self.add_cell(new_key, new_value, new_tail)
     }
 }

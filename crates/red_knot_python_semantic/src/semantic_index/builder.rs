@@ -308,11 +308,11 @@ impl<'db> SemanticIndexBuilder<'db> {
         self.current_use_def_map().snapshot()
     }
 
-    fn flow_restore(&mut self, state: FlowSnapshot) {
+    fn flow_restore(&mut self, state: &FlowSnapshot) {
         self.current_use_def_map_mut().restore(state);
     }
 
-    fn flow_merge(&mut self, state: FlowSnapshot) {
+    fn flow_merge(&mut self, state: &FlowSnapshot) {
         self.current_use_def_map_mut().merge(state);
     }
 
@@ -478,7 +478,7 @@ impl<'db> SemanticIndexBuilder<'db> {
 
     /// Simplifies (resets) visibility constraints on all live bindings and declarations that did
     /// not see any new definitions since the given snapshot.
-    fn simplify_visibility_constraints(&mut self, snapshot: FlowSnapshot) {
+    fn simplify_visibility_constraints(&mut self, snapshot: &FlowSnapshot) {
         self.current_use_def_map_mut()
             .simplify_visibility_constraints(snapshot);
     }
@@ -876,7 +876,7 @@ where
                             let pre_return_state = matches!(last_stmt, ast::Stmt::Return(_))
                                 .then(|| builder.flow_snapshot());
                             builder.visit_stmt(last_stmt);
-                            if let Some(pre_return_state) = pre_return_state {
+                            if let Some(pre_return_state) = &pre_return_state {
                                 builder.flow_restore(pre_return_state);
                             }
                         }
@@ -1144,7 +1144,7 @@ where
                     post_clauses.push(self.flow_snapshot());
                     // we can only take an elif/else branch if none of the previous ones were
                     // taken
-                    self.flow_restore(no_branch_taken.clone());
+                    self.flow_restore(&no_branch_taken);
                     self.record_negated_constraint(last_constraint);
 
                     let elif_constraint = if let Some(elif_test) = clause_test {
@@ -1169,11 +1169,11 @@ where
                     }
                 }
 
-                for post_clause_state in post_clauses {
+                for post_clause_state in &post_clauses {
                     self.flow_merge(post_clause_state);
                 }
 
-                self.simplify_visibility_constraints(no_branch_taken);
+                self.simplify_visibility_constraints(&no_branch_taken);
             }
             ast::Stmt::While(ast::StmtWhile {
                 test,
@@ -1231,23 +1231,23 @@ where
                 // To model this correctly, we need two copies of the while condition constraint,
                 // since the first and later evaluations might produce different results.
                 let post_body = self.flow_snapshot();
-                self.flow_restore(pre_loop.clone());
+                self.flow_restore(&pre_loop);
                 self.record_negated_visibility_constraint(first_vis_constraint_id);
-                self.flow_merge(post_body);
+                self.flow_merge(&post_body);
                 self.record_negated_constraint(constraint);
                 self.visit_body(orelse);
                 self.record_negated_visibility_constraint(later_vis_constraint_id);
 
                 // Breaking out of a while loop bypasses the `else` clause, so merge in the break
                 // states after visiting `else`.
-                for break_state in break_states {
+                for break_state in &break_states {
                     let snapshot = self.flow_snapshot();
                     self.flow_restore(break_state);
                     self.record_visibility_constraint_id(body_vis_constraint_id);
-                    self.flow_merge(snapshot);
+                    self.flow_merge(&snapshot);
                 }
 
-                self.simplify_visibility_constraints(pre_loop);
+                self.simplify_visibility_constraints(&pre_loop);
             }
             ast::Stmt::With(ast::StmtWith {
                 items,
@@ -1349,12 +1349,12 @@ where
 
                 // We may execute the `else` clause without ever executing the body, so merge in
                 // the pre-loop state before visiting `else`.
-                self.flow_merge(pre_loop);
+                self.flow_merge(&pre_loop);
                 self.visit_body(orelse);
 
                 // Breaking out of a `for` loop bypasses the `else` clause, so merge in the break
                 // states after visiting `else`.
-                for break_state in break_states {
+                for break_state in &break_states {
                     self.flow_merge(break_state);
                 }
             }
@@ -1377,7 +1377,7 @@ where
                 for (i, case) in cases.iter().enumerate() {
                     if i != 0 {
                         post_case_snapshots.push(self.flow_snapshot());
-                        self.flow_restore(after_subject.clone());
+                        self.flow_restore(&after_subject);
                     }
 
                     self.current_match_case = Some(CurrentMatchCase::new(&case.pattern));
@@ -1406,18 +1406,18 @@ where
                     .is_some_and(|case| case.guard.is_none() && case.pattern.is_wildcard())
                 {
                     post_case_snapshots.push(self.flow_snapshot());
-                    self.flow_restore(after_subject.clone());
+                    self.flow_restore(&after_subject);
 
                     for id in &vis_constraints {
                         self.record_negated_visibility_constraint(*id);
                     }
                 }
 
-                for post_clause_state in post_case_snapshots {
+                for post_clause_state in &post_case_snapshots {
                     self.flow_merge(post_clause_state);
                 }
 
-                self.simplify_visibility_constraints(after_subject);
+                self.simplify_visibility_constraints(&after_subject);
             }
             ast::Stmt::Try(ast::StmtTry {
                 body,
@@ -1458,8 +1458,8 @@ where
                     let post_try_block_state = self.flow_snapshot();
 
                     // Prepare for visiting the `except` block(s)
-                    self.flow_restore(pre_try_block_state);
-                    for state in try_block_snapshots {
+                    self.flow_restore(&pre_try_block_state);
+                    for state in &try_block_snapshots {
                         self.flow_merge(state);
                     }
 
@@ -1502,18 +1502,18 @@ where
                         // as we'll immediately call `self.flow_restore()` to a different state
                         // as soon as this loop over the handlers terminates.
                         if i < (num_handlers - 1) {
-                            self.flow_restore(pre_except_state.clone());
+                            self.flow_restore(&pre_except_state);
                         }
                     }
 
                     // If we get to the `else` block, we know that 0 of the `except` blocks can have been executed,
                     // and the entire `try` block must have been executed:
-                    self.flow_restore(post_try_block_state);
+                    self.flow_restore(&post_try_block_state);
                 }
 
                 self.visit_body(orelse);
 
-                for post_except_state in post_except_states {
+                for post_except_state in &post_except_states {
                     self.flow_merge(post_except_state);
                 }
 
@@ -1698,13 +1698,13 @@ where
                 self.visit_expr(body);
                 let visibility_constraint = self.record_visibility_constraint(constraint);
                 let post_body = self.flow_snapshot();
-                self.flow_restore(pre_if.clone());
+                self.flow_restore(&pre_if);
 
                 self.record_negated_constraint(constraint);
                 self.visit_expr(orelse);
                 self.record_negated_visibility_constraint(visibility_constraint);
-                self.flow_merge(post_body);
-                self.simplify_visibility_constraints(pre_if);
+                self.flow_merge(&post_body);
+                self.simplify_visibility_constraints(&pre_if);
             }
             ast::Expr::ListComp(
                 list_comprehension @ ast::ExprListComp {
@@ -1800,17 +1800,17 @@ where
                         // Then we model the non-short-circuiting behavior. Here, we need to delay
                         // the application of the visibility constraint until after the expression
                         // has been evaluated, so we only push it onto the stack here.
-                        self.flow_restore(after_expr);
+                        self.flow_restore(&after_expr);
                         self.record_constraint_id(constraint_id);
                         visibility_constraints.push(visibility_constraint);
                     }
                 }
 
-                for snapshot in snapshots {
+                for snapshot in &snapshots {
                     self.flow_merge(snapshot);
                 }
 
-                self.simplify_visibility_constraints(pre_op);
+                self.simplify_visibility_constraints(&pre_op);
             }
             ast::Expr::Attribute(ast::ExprAttribute {
                 value: object,
