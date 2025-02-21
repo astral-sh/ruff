@@ -613,7 +613,7 @@ mod tests {
         let settings = Settings {
             cache_dir,
             linter: LinterSettings {
-                target_version: PythonVersion::PY310,
+                target_version: PythonVersion::latest(),
                 ..Default::default()
             },
             ..Settings::default()
