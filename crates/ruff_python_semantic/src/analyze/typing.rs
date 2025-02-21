@@ -572,7 +572,7 @@ pub trait TypeChecker {
 /// NOTE: this function doesn't perform more serious type inference, so it won't be able
 ///       to understand if the value gets initialized from a call to a function always returning
 ///       lists. This also implies no interfile analysis.
-fn check_type<T: TypeChecker>(binding: &Binding, semantic: &SemanticModel) -> bool {
+pub fn check_type<T: TypeChecker>(binding: &Binding, semantic: &SemanticModel) -> bool {
     match binding.kind {
         BindingKind::Assignment => match binding.statement(semantic) {
             // Given:
