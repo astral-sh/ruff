@@ -66,7 +66,7 @@ impl Cell {
                     .metadata
                     .vscode
                     .as_ref()
-                    .map_or(true, |vscode| vscode.language_id == "python") =>
+                    .is_none_or(|vscode| vscode.language_id == "python") =>
             {
                 &cell.source
             }

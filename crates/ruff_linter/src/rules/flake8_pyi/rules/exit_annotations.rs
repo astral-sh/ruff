@@ -294,7 +294,7 @@ fn check_positional_args_for_overloaded_method(
         predicate: impl FnOnce(&Expr) -> bool,
         semantic: &SemanticModel,
     ) -> bool {
-        parameter.annotation().map_or(true, |annotation| {
+        parameter.annotation().is_none_or(|annotation| {
             predicate(annotation) || is_object_or_unused(annotation, semantic)
         })
     }

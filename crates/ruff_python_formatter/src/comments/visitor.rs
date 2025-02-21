@@ -65,7 +65,7 @@ impl<'a, 'builder> CommentsVisitor<'a, 'builder> {
     fn can_skip(&mut self, node_end: TextSize) -> bool {
         self.comment_ranges
             .peek()
-            .map_or(true, |next_comment| next_comment.start() >= node_end)
+            .is_none_or(|next_comment| next_comment.start() >= node_end)
     }
 }
 

@@ -55,7 +55,7 @@ impl ImplicitImports {
                 // Always prefer stub files over non-stub files.
                 if submodules
                     .get(name)
-                    .map_or(true, |implicit_import| !implicit_import.is_stub_file)
+                    .is_none_or(|implicit_import| !implicit_import.is_stub_file)
                 {
                     submodules.insert(
                         name.to_string(),
