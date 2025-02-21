@@ -149,7 +149,7 @@ def test(cond: bool):
 
     a = 10 if cond else NotBoolable()
 
-    # error: [unsupported-bool-conversion] "Boolean conversion is unsupported for type `NotBoolable`; it's `__bool__` method isn't callable"
+    # error: [unsupported-bool-conversion] "Boolean conversion is unsupported for type `Literal[10] | NotBoolable`; it's `__bool__` method isn't callable"
     if a:
         ...
 ```

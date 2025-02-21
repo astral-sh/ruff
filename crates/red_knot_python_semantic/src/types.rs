@@ -1751,38 +1751,39 @@ impl<'db> Type<'db> {
                     // runtime there is a fallback to `__len__`, since `__bool__` takes precedence
                     // and a subclass could add a `__bool__` method.
 
+                    let type_to_truthiness = |ty| {
+                        if let Type::BooleanLiteral(bool_val) = ty {
+                            Truthiness::from(bool_val)
+                        } else {
+                            Truthiness::Ambiguous
+                        }
+                    };
+
                     match self.try_call_dunder(db, "__bool__", &CallArguments::none()) {
                         ref result @ (Ok(ref outcome)
                         | Err(CallDunderError::PossiblyUnbound(ref outcome))) => {
-                            match outcome.return_type(db) {
-                                Type::BooleanLiteral(bool_val) => {
-                                    if result.is_ok() {
-                                        bool_val.into()
-                                    } else {
-                                        // Don't trust possibly unbound `__bool__` method.
-                                        Truthiness::Ambiguous
-                                    }
-                                }
-                                return_type
-                                    if return_type
-                                        .is_assignable_to(db, KnownClass::Bool.to_instance(db)) =>
-                                {
-                                    Truthiness::Ambiguous
-                                }
-                                // The type has a `__bool__` method, but it doesn't return a boolean.
-                                _ => {
-                                    return Err(BoolError::IncorrectReturnType {
-                                        return_type: outcome.return_type(db),
-                                        not_boolable_type: *instance_ty,
-                                    });
-                                }
+                            let return_type = outcome.return_type(db);
+
+                            // The type has a `__bool__` method, but it doesn't return a boolean.
+                            if !return_type.is_assignable_to(db, KnownClass::Bool.to_instance(db)) {
+                                return Err(BoolError::IncorrectReturnType {
+                                    return_type: outcome.return_type(db),
+                                    not_boolable_type: *instance_ty,
+                                });
+                            }
+
+                            if result.is_ok() {
+                                type_to_truthiness(return_type)
+                            } else {
+                                // Don't trust possibly unbound `__bool__` method.
+                                Truthiness::Ambiguous
                             }
                         }
                         Err(CallDunderError::MethodNotAvailable) => Truthiness::Ambiguous,
                         Err(CallDunderError::Call(err)) => match err {
                             CallError::BindingError { binding } => {
                                 return Err(BoolError::IncorrectArguments {
-                                    return_type: binding.return_type(),
+                                    truthiness: type_to_truthiness(binding.return_type()),
                                     not_boolable_type: *instance_ty,
                                 });
                             }
@@ -1804,22 +1805,45 @@ impl<'db> Type<'db> {
             }
             Type::KnownInstance(known_instance) => known_instance.bool(),
             Type::Union(union) => {
-                let mut union_elements = union.elements(db).iter();
-                let first_element = union_elements.next().unwrap();
-                let mut truthiness = first_element.try_bool_impl(db, allow_short_circuit)?;
+                let mut truthiness = None;
+                let mut all_not_callable = true;
+                let mut has_errors = false;
 
-                for element in union_elements {
-                    if truthiness.is_ambiguous() && allow_short_circuit {
-                        return Ok(truthiness);
-                    }
+                for element in union.elements(db) {
+                    let element_truthiness = match element.try_bool_impl(db, allow_short_circuit) {
+                        Ok(truthiness) => truthiness,
+                        Err(err) => {
+                            has_errors = true;
+                            all_not_callable &= matches!(err, BoolError::NotCallable { .. });
+                            err.fallback_truthiness()
+                        }
+                    };
 
-                    let element_truthiness = element.try_bool_impl(db, allow_short_circuit)?;
-                    if element_truthiness != truthiness {
-                        truthiness = Truthiness::Ambiguous;
+                    truthiness.get_or_insert(element_truthiness);
+
+                    if Some(element_truthiness) != truthiness {
+                        truthiness = Some(Truthiness::Ambiguous);
+
+                        if allow_short_circuit {
+                            return Ok(Truthiness::Ambiguous);
+                        }
                     }
                 }
 
-                truthiness
+                if has_errors {
+                    if all_not_callable {
+                        return Err(BoolError::NotCallable {
+                            not_boolable_type: *self,
+                        });
+                    } else {
+                        return Err(BoolError::Union {
+                            union: *union,
+                            truthiness: truthiness.unwrap_or(Truthiness::Ambiguous),
+                        });
+                    }
+                } else {
+                    truthiness.unwrap_or(Truthiness::Ambiguous)
+                }
             }
             Type::Intersection(_) => {
                 // TODO
@@ -3618,7 +3642,7 @@ pub(super) enum BoolError<'db> {
     /// with the given arguments.
     IncorrectArguments {
         not_boolable_type: Type<'db>,
-        return_type: Type<'db>,
+        truthiness: Truthiness,
     },
 
     /// The type has a `__bool__` method, is callable with the given arguments,
@@ -3628,18 +3652,43 @@ pub(super) enum BoolError<'db> {
         return_type: Type<'db>,
     },
 
+    /// A union where some variants don't implement `__bool__` correctly.
+    Union {
+        union: UnionType<'db>,
+        truthiness: Truthiness,
+    },
+
     /// Any other reason why the type can't be converted to a bool.
     /// E.g. because the type is a union and not all variants support `__bool__` or
     /// because `__bool__` points to a type that has a possibly unbound `__call__` method.
     Other { not_boolable_type: Type<'db> },
 }
 
-impl BoolError<'_> {
-    // This is an instance method so that `BoolError`'s interface is identical
-    // to `CallError`, `IterateError` etc.
-    #[allow(clippy::unused_self)]
+impl<'db> BoolError<'db> {
     pub(super) fn fallback_truthiness(&self) -> Truthiness {
-        Truthiness::Ambiguous
+        match self {
+            BoolError::NotCallable { .. }
+            | BoolError::IncorrectReturnType { .. }
+            | BoolError::Other { .. } => Truthiness::Ambiguous,
+            BoolError::IncorrectArguments { truthiness, .. }
+            | BoolError::Union { truthiness, .. } => *truthiness,
+        }
+    }
+
+    fn not_boolable_type(&self) -> Type<'db> {
+        match self {
+            BoolError::NotCallable {
+                not_boolable_type, ..
+            }
+            | BoolError::IncorrectArguments {
+                not_boolable_type, ..
+            }
+            | BoolError::Other { not_boolable_type }
+            | BoolError::IncorrectReturnType {
+                not_boolable_type, ..
+            } => *not_boolable_type,
+            BoolError::Union { union, .. } => Type::Union(*union),
+        }
     }
 
     pub(super) fn report_diagnostic(&self, context: &InferContext, condition: impl Ranged) {
@@ -3649,17 +3698,16 @@ impl BoolError<'_> {
     fn report_diagnostic_impl(&self, context: &InferContext, condition: TextRange) {
         match self {
             Self::IncorrectArguments {
-                not_boolable_type,
-                return_type: _,
+                not_boolable_type, ..
             } => {
                 context.report_lint(
-                        &UNSUPPORTED_BOOL_CONVERSION,
-                        condition,
-                        format_args!(
-                            "Boolean conversion is unsupported for type `{}`; it incorrectly implements `__bool__`",
-                            not_boolable_type.display(context.db())
-                        ),
-                    );
+                    &UNSUPPORTED_BOOL_CONVERSION,
+                    condition,
+                    format_args!(
+                        "Boolean conversion is unsupported for type `{}`; it incorrectly implements `__bool__`",
+                        not_boolable_type.display(context.db())
+                    ),
+                );
             }
             Self::IncorrectReturnType {
                 not_boolable_type,
@@ -3682,6 +3730,23 @@ impl BoolError<'_> {
                     format_args!(
                         "Boolean conversion is unsupported for type `{}`; it's `__bool__` method isn't callable",
                         not_boolable_type.display(context.db())
+                    ),
+                );
+            }
+            Self::Union { union, .. } => {
+                let first_error = union
+                    .elements(context.db())
+                    .iter()
+                    .find_map(|element| element.try_bool(context.db()).err())
+                    .unwrap();
+
+                context.report_lint(
+                    &UNSUPPORTED_BOOL_CONVERSION,
+                    condition,
+                    format_args!(
+                        "Boolean conversion is unsupported for union `{}` because `{}` doesn't implement `__bool__` correctly",
+                        Type::Union(*union).display(context.db()),
+                        first_error.not_boolable_type().display(context.db()),
                     ),
                 );
             }
