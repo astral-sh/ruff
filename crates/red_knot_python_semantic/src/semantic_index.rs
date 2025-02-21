@@ -437,11 +437,11 @@ mod tests {
         file: File,
     }
 
-    fn test_case(content: impl ToString) -> TestCase {
+    fn test_case(content: &str) -> TestCase {
         const FILENAME: &str = "test.py";
 
         let db = TestDbBuilder::new()
-            .with_file(FILENAME, &content.to_string())
+            .with_file(FILENAME, content)
             .build()
             .unwrap();
 
