@@ -167,7 +167,7 @@ class A:
     __slots__ = ()
     __slots__ += ("a", "b")
 
-reveal_type(A.__slots__)  # revealed: @Todo(return type)
+reveal_type(A.__slots__)  # revealed: @Todo(return type of decorated function)
 
 class B:
     __slots__ = ("c", "d")

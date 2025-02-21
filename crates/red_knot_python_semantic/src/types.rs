@@ -4010,7 +4010,7 @@ impl<'db> FunctionType<'db> {
             {
                 internal_signature
             } else {
-                Signature::todo()
+                Signature::todo("return type of decorated function")
             }
         } else {
             internal_signature
@@ -4847,24 +4847,14 @@ impl<'db> Class<'db> {
 
                     if let Some(function) = declared_ty.into_function_literal() {
                         // TODO: Eventually, we are going to process all decorators correctly. This is
-                        // just a temporary heuristic to provide a broad categorization into properties
-                        // and non-property methods.
-                        if function.has_known_class_decorator(db, KnownClass::Property) {
-                            SymbolAndQualifiers::todo("@property")
-                        } else if function.has_known_class_decorator(db, KnownClass::Classmethod)
+                        // just a temporary heuristic to provide a broad categorization
+
+                        if function.has_known_class_decorator(db, KnownClass::Classmethod)
                             && function.decorators(db).len() == 1
                         {
-                            // if function.decorators(db).len() == 1 {
-                            //     SymbolAndQualifiers(
-                            //         Symbol::bound(Type::Callable(CallableType::ClassMethod(
-                            //             function,
-                            //         ))),
-                            //         qualifiers,
-                            //     )
-                            // } else {
-                            // SymbolAndQualifiers::todo("decorated classmethod")
-                            // }
                             SymbolAndQualifiers(Symbol::bound(declared_ty), qualifiers)
+                        } else if function.has_known_class_decorator(db, KnownClass::Property) {
+                            SymbolAndQualifiers::todo("@property")
                         } else if function.has_known_function_decorator(db, KnownFunction::Overload)
                         {
                             SymbolAndQualifiers::todo("overloaded method")

@@ -29,10 +29,10 @@ impl<'db> Signature<'db> {
     }
 
     /// Return a todo signature: (*args: Todo, **kwargs: Todo) -> Todo
-    pub(crate) fn todo() -> Self {
+    pub(crate) fn todo(reason: &'static str) -> Self {
         Self {
             parameters: Parameters::todo(),
-            return_ty: Some(todo_type!("return type")),
+            return_ty: Some(todo_type!(reason)),
         }
     }
 
@@ -650,7 +650,7 @@ mod tests {
         .unwrap();
         let func = get_function_f(&db, "/src/a.py");
 
-        let expected_sig = Signature::todo();
+        let expected_sig = Signature::todo("return type of decorated function");
 
         // With no decorators, internal and external signature are the same
         assert_eq!(func.signature(&db), &expected_sig);
