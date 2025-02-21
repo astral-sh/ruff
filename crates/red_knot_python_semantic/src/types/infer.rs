@@ -2374,8 +2374,9 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = for_statement;
 
         self.infer_target(target, iter, |db, iter_ty| {
-            // It's okay to ignore the `iterate` outcome here because
-            // `infer_for_statement_definition` reports a diagnostic if `iter_ty` isn't iterable.
+            // TOOD: `infer_for_statement_definition` reports a diagnostic if `iter_ty` isn't iterable
+            //  but only if the target is a name. We should report a diagnostic here if the target isn't a name:
+            //  `for a.x in not_iterable: ...
             iter_ty.iterate(db)
         });
 
