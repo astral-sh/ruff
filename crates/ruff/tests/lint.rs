@@ -2633,3 +2633,52 @@ match 2:
     "
     );
 }
+
+#[test]
+fn except_star_before_py311() {
+    let stdin = r#"
+try:
+    raise Exception
+except* TypeError as e:
+    pass
+"#;
+
+    // ok on 3.11
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--stdin-filename", "test.py"])
+        .arg("--target-version=py311")
+        .arg("-")
+        .pass_stdin(stdin),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:4:22: F841 [*] Local variable `e` is assigned to but never used
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    "
+    );
+
+    // error on 3.10
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--stdin-filename", "test.py"])
+        .arg("--target-version=py310")
+        .arg("-")
+        .pass_stdin(stdin),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:2:1: SyntaxError: Cannot use `except*` on Python 3.10 (syntax was new in Python 3.11)
+    test.py:4:22: F841 [*] Local variable `e` is assigned to but never used
+    Found 2 errors.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    "
+    );
+}
