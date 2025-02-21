@@ -626,19 +626,6 @@ pub struct CompiledPerFileList<T: CacheKey> {
     inner: Vec<CompiledPerFile<T>>,
 }
 
-/// Helper trait for debug labels on [`PerFile<T>`] types.
-pub trait PerFileKind {
-    const LABEL: &'static str;
-}
-
-impl PerFileKind for RuleSet {
-    const LABEL: &'static str = "Adding per-file ignores";
-}
-
-impl PerFileKind for ast::PythonVersion {
-    const LABEL: &'static str = "Setting Python version";
-}
-
 impl<T: CacheKey> CompiledPerFileList<T> {
     /// Given a list of [`PerFile`] patterns, create a compiled set of globs.
     ///
@@ -673,8 +660,15 @@ impl<T: CacheKey> CompiledPerFileList<T> {
     }
 }
 
-impl<T: CacheKey + std::fmt::Debug + PerFileKind> CompiledPerFileList<T> {
-    pub(crate) fn iter_matches<'a, 'p>(&'a self, path: &'p Path) -> impl Iterator<Item = &'p T>
+impl<T: CacheKey + std::fmt::Debug> CompiledPerFileList<T> {
+    /// Return an iterator over the entries in `self` that match the input `path`.
+    ///
+    /// `debug_label` is used for [`debug!`] messages explaining why certain patterns were matched.
+    pub(crate) fn iter_matches<'a, 'p>(
+        &'a self,
+        path: &'p Path,
+        debug_label: &'static str,
+    ) -> impl Iterator<Item = &'p T>
     where
         'a: 'p,
     {
@@ -686,7 +680,7 @@ impl<T: CacheKey + std::fmt::Debug + PerFileKind> CompiledPerFileList<T> {
                 } else {
                     debug!(
                         "{} for {:?} due to basename match on {:?}: {:?}",
-                        T::LABEL,
+                        debug_label,
                         path,
                         entry.basename_matcher.glob().regex(),
                         entry.data
@@ -699,7 +693,7 @@ impl<T: CacheKey + std::fmt::Debug + PerFileKind> CompiledPerFileList<T> {
                 } else {
                     debug!(
                         "{} for {:?} due to absolute match on {:?}: {:?}",
-                        T::LABEL,
+                        debug_label,
                         path,
                         entry.absolute_matcher.glob().regex(),
                         entry.data
@@ -709,7 +703,7 @@ impl<T: CacheKey + std::fmt::Debug + PerFileKind> CompiledPerFileList<T> {
             } else if entry.negated {
                 debug!(
                     "{} for {:?} due to negated pattern matching neither {:?} nor {:?}: {:?}",
-                    T::LABEL,
+                    debug_label,
                     path,
                     entry.basename_matcher.glob().regex(),
                     entry.absolute_matcher.glob().regex(),
@@ -795,7 +789,10 @@ impl CompiledPerFileTargetVersionList {
     }
 
     pub fn is_match(&self, path: &Path) -> Option<ast::PythonVersion> {
-        self.0.iter_matches(path).next().copied()
+        self.0
+            .iter_matches(path, "Setting Python version")
+            .next()
+            .copied()
     }
 }
 
