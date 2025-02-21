@@ -112,8 +112,7 @@ def _(flag: bool):
         reveal_type(t)  # revealed: Literal[NoneType]
 
     if issubclass(t, type(None)):
-        # TODO: this should be just `Literal[NoneType]`
-        reveal_type(t)  # revealed: Literal[int, NoneType]
+        reveal_type(t)  # revealed: Literal[NoneType]
 ```
 
 ## `classinfo` contains multiple types
