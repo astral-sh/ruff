@@ -2181,7 +2181,12 @@ impl<'db> Type<'db> {
                         Some(KnownClass::Str) => arguments
                             .first_argument()
                             .map(|arg| arg.str(db))
-                            .unwrap_or(Type::string_literal(db, "")),
+                            .unwrap_or_else(|| Type::string_literal(db, "")),
+
+                        Some(KnownClass::Type) => arguments
+                            .exactly_one_argument()
+                            .map(|arg| arg.to_meta_type(db))
+                            .unwrap_or_else(|| KnownClass::Type.to_instance(db)),
 
                         _ => Type::Instance(InstanceType { class }),
                     },
