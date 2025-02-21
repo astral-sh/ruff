@@ -9,6 +9,7 @@ use itertools::Itertools;
 use ruff_db::files::File;
 use ruff_python_ast as ast;
 use ruff_python_ast::PythonVersion;
+use ruff_text_size::{Ranged, TextRange};
 use type_ordering::union_elements_ordering;
 
 pub(crate) use self::builder::{IntersectionBuilder, UnionBuilder};
@@ -36,9 +37,9 @@ use crate::symbol::{
     imported_symbol, known_module_symbol, symbol, symbol_from_bindings, symbol_from_declarations,
     Boundness, LookupError, LookupResult, Symbol, SymbolAndQualifiers,
 };
-use crate::types::call::{bind_call, CallArguments, CallBinding, CallOutcome};
+use crate::types::call::{bind_call, CallArguments, CallBinding, CallOutcome, UnionCallError};
 use crate::types::class_base::ClassBase;
-use crate::types::diagnostic::INVALID_TYPE_FORM;
+use crate::types::diagnostic::{INVALID_TYPE_FORM, UNSUPPORTED_BOOL_CONVERSION};
 use crate::types::infer::infer_unpack_types;
 use crate::types::mro::{Mro, MroError, MroIterator};
 pub(crate) use crate::types::narrow::narrowing_constraint;
@@ -1681,27 +1682,66 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Resolves the boolean value of the type and falls back to [`Truthiness::Ambiguous`] if the type doesn't implement `__bool__` correctly.
+    ///
+    /// This method should only be used outside type checking or when evaluating if a type
+    /// is truthy or falsy in a context where Python doesn't make an implicit `bool` call.
+    /// Use [`try_bool`](Self::try_bool) for type checking or implicit `bool` calls.
+    pub(crate) fn bool(&self, db: &'db dyn Db) -> Truthiness {
+        self.try_bool_impl(db, true)
+            .unwrap_or_else(|err| err.fallback_truthiness())
+    }
+
     /// Resolves the boolean value of a type.
     ///
     /// This is used to determine the value that would be returned
     /// when `bool(x)` is called on an object `x`.
-    pub(crate) fn bool(&self, db: &'db dyn Db) -> Truthiness {
-        match self {
+    ///
+    /// Returns an error if the type doesn't implement `__bool__` correctly.
+    pub(crate) fn try_bool(&self, db: &'db dyn Db) -> Result<Truthiness, BoolError<'db>> {
+        self.try_bool_impl(db, false)
+    }
+
+    /// Resolves the boolean value of a type.
+    ///
+    /// Setting `allow_short_circuit` to `true` allows the implementation to
+    /// early return if the bool value of any union variant is `Truthiness::Ambiguous`.
+    /// Early returning shows a 1-2% perf improvement on our benchmarks because
+    /// `bool` (which doesn't care about errors) is used heavily when evaluating statically known branches.
+    ///
+    /// An alternative to this flag is to implement a trait similar to Rust's `Try` trait.
+    /// The advantage of that is that it would allow collecting the errors as well. However,
+    /// it is significantly more complex and duplicating the logic into `bool` without the error
+    /// handling didn't show any significant performance difference to when using the `allow_short_circuit` flag.
+    #[inline]
+    fn try_bool_impl(
+        &self,
+        db: &'db dyn Db,
+        allow_short_circuit: bool,
+    ) -> Result<Truthiness, BoolError<'db>> {
+        let truthiness = match self {
             Type::Dynamic(_) | Type::Never => Truthiness::Ambiguous,
             Type::FunctionLiteral(_) => Truthiness::AlwaysTrue,
             Type::Callable(_) => Truthiness::AlwaysTrue,
             Type::ModuleLiteral(_) => Truthiness::AlwaysTrue,
             Type::ClassLiteral(ClassLiteralType { class }) => {
-                class.metaclass(db).to_instance(db).bool(db)
+                return class
+                    .metaclass(db)
+                    .to_instance(db)
+                    .try_bool_impl(db, allow_short_circuit);
             }
-            Type::SubclassOf(subclass_of_ty) => subclass_of_ty
-                .subclass_of()
-                .into_class()
-                .map(|class| Type::class_literal(class).bool(db))
-                .unwrap_or(Truthiness::Ambiguous),
+            Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
+                ClassBase::Dynamic(_) => Truthiness::Ambiguous,
+                ClassBase::Class(class) => {
+                    return class
+                        .metaclass(db)
+                        .to_instance(db)
+                        .try_bool_impl(db, allow_short_circuit);
+                }
+            },
             Type::AlwaysTruthy => Truthiness::AlwaysTrue,
             Type::AlwaysFalsy => Truthiness::AlwaysFalse,
-            Type::Instance(InstanceType { class }) => {
+            instance_ty @ Type::Instance(InstanceType { class }) => {
                 if class.is_known(db, KnownClass::Bool) {
                     Truthiness::Ambiguous
                 } else if class.is_known(db, KnownClass::NoneType) {
@@ -1711,32 +1751,119 @@ impl<'db> Type<'db> {
                     // runtime there is a fallback to `__len__`, since `__bool__` takes precedence
                     // and a subclass could add a `__bool__` method.
 
-                    if let Ok(Type::BooleanLiteral(bool_val)) = self
-                        .try_call_dunder(db, "__bool__", &CallArguments::none())
-                        .map(|outcome| outcome.return_type(db))
-                    {
-                        bool_val.into()
-                    } else {
-                        // TODO diagnostic if not assignable to bool
-                        Truthiness::Ambiguous
+                    let type_to_truthiness = |ty| {
+                        if let Type::BooleanLiteral(bool_val) = ty {
+                            Truthiness::from(bool_val)
+                        } else {
+                            Truthiness::Ambiguous
+                        }
+                    };
+
+                    match self.try_call_dunder(db, "__bool__", &CallArguments::none()) {
+                        ref result @ (Ok(ref outcome)
+                        | Err(CallDunderError::PossiblyUnbound(ref outcome))) => {
+                            let return_type = outcome.return_type(db);
+
+                            // The type has a `__bool__` method, but it doesn't return a boolean.
+                            if !return_type.is_assignable_to(db, KnownClass::Bool.to_instance(db)) {
+                                return Err(BoolError::IncorrectReturnType {
+                                    return_type: outcome.return_type(db),
+                                    not_boolable_type: *instance_ty,
+                                });
+                            }
+
+                            if result.is_ok() {
+                                type_to_truthiness(return_type)
+                            } else {
+                                // Don't trust possibly unbound `__bool__` method.
+                                Truthiness::Ambiguous
+                            }
+                        }
+                        Err(CallDunderError::MethodNotAvailable) => Truthiness::Ambiguous,
+                        Err(CallDunderError::Call(err)) => {
+                            let err = match err {
+                                // Unwrap call errors where only a single variant isn't callable.
+                                // E.g. in the case of `Unknown & T`
+                                // TODO: Improve handling of unions. While this improves messages overall,
+                                //   it still results in loosing information. Or should the information
+                                //   be recomputed when rendering the diagnostic?
+                                CallError::Union(union_error) => {
+                                    if let Type::Union(_) = union_error.called_ty {
+                                        if union_error.errors.len() == 1 {
+                                            union_error.errors.into_vec().pop().unwrap()
+                                        } else {
+                                            CallError::Union(union_error)
+                                        }
+                                    } else {
+                                        CallError::Union(union_error)
+                                    }
+                                }
+                                err => err,
+                            };
+
+                            match err {
+                                CallError::BindingError { binding } => {
+                                    return Err(BoolError::IncorrectArguments {
+                                        truthiness: type_to_truthiness(binding.return_type()),
+                                        not_boolable_type: *instance_ty,
+                                    });
+                                }
+                                CallError::NotCallable { .. } => {
+                                    return Err(BoolError::NotCallable {
+                                        not_boolable_type: *instance_ty,
+                                    });
+                                }
+
+                                CallError::PossiblyUnboundDunderCall { .. }
+                                | CallError::Union(..) => {
+                                    return Err(BoolError::Other {
+                                        not_boolable_type: *self,
+                                    })
+                                }
+                            }
+                        }
                     }
                 }
             }
             Type::KnownInstance(known_instance) => known_instance.bool(),
             Type::Union(union) => {
-                let union_elements = union.elements(db);
-                let first_element_truthiness = union_elements[0].bool(db);
-                if first_element_truthiness.is_ambiguous() {
-                    return Truthiness::Ambiguous;
+                let mut truthiness = None;
+                let mut all_not_callable = true;
+                let mut has_errors = false;
+
+                for element in union.elements(db) {
+                    let element_truthiness = match element.try_bool_impl(db, allow_short_circuit) {
+                        Ok(truthiness) => truthiness,
+                        Err(err) => {
+                            has_errors = true;
+                            all_not_callable &= matches!(err, BoolError::NotCallable { .. });
+                            err.fallback_truthiness()
+                        }
+                    };
+
+                    truthiness.get_or_insert(element_truthiness);
+
+                    if Some(element_truthiness) != truthiness {
+                        truthiness = Some(Truthiness::Ambiguous);
+
+                        if allow_short_circuit {
+                            return Ok(Truthiness::Ambiguous);
+                        }
+                    }
                 }
-                if !union_elements
-                    .iter()
-                    .skip(1)
-                    .all(|element| element.bool(db) == first_element_truthiness)
-                {
-                    return Truthiness::Ambiguous;
+
+                if has_errors {
+                    if all_not_callable {
+                        return Err(BoolError::NotCallable {
+                            not_boolable_type: *self,
+                        });
+                    }
+                    return Err(BoolError::Union {
+                        union: *union,
+                        truthiness: truthiness.unwrap_or(Truthiness::Ambiguous),
+                    });
                 }
-                first_element_truthiness
+                truthiness.unwrap_or(Truthiness::Ambiguous)
             }
             Type::Intersection(_) => {
                 // TODO
@@ -1749,7 +1876,9 @@ impl<'db> Type<'db> {
             Type::BytesLiteral(bytes) => Truthiness::from(!bytes.value(db).is_empty()),
             Type::SliceLiteral(_) => Truthiness::AlwaysTrue,
             Type::Tuple(items) => Truthiness::from(!items.elements(db).is_empty()),
-        }
+        };
+
+        Ok(truthiness)
     }
 
     /// Return the type of `len()` on a type if it is known more precisely than `int`,
@@ -2081,6 +2210,9 @@ impl<'db> Type<'db> {
             Type::ClassLiteral(ClassLiteralType { class }) => {
                 Ok(CallOutcome::Single(CallBinding::from_return_type(
                     match class.known(db) {
+                        // TODO: We should check the call signature and error if the bool call doesn't have the
+                        //   right signature and return a binding error.
+
                         // If the class is the builtin-bool class (for example `bool(1)`), we try to
                         // return the specific truthiness value of the input arg, `Literal[True]` for
                         // the example above.
@@ -2112,15 +2244,15 @@ impl<'db> Type<'db> {
                                 not_callable_ty: self,
                             }
                         }
-                        CallDunderError::Call(CallError::Union {
+                        CallDunderError::Call(CallError::Union(UnionCallError {
                             called_ty: _,
                             bindings,
                             errors,
-                        }) => CallError::Union {
+                        })) => CallError::Union(UnionCallError {
                             called_ty: self,
                             bindings,
                             errors,
-                        },
+                        }),
                         CallDunderError::Call(error) => error,
                         // Turn "possibly unbound object of type `Literal['__call__']`"
                         // into "`X` not callable (possibly unbound `__call__` method)"
@@ -2195,6 +2327,9 @@ impl<'db> Type<'db> {
     }
 
     /// Look up a dunder method on the meta type of `self` and call it.
+    ///
+    /// Returns an `Err` if the dunder method can't be called,
+    /// or the given arguments are not valid.
     fn try_call_dunder(
         self,
         db: &'db dyn Db,
@@ -2213,6 +2348,15 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Returns the element type when iterating over `self`.
+    ///
+    /// This method should only be used outside of type checking because it omits any errors.
+    /// For type checking, use [`try_iterate`](Self::try_iterate) instead.
+    fn iterate(self, db: &'db dyn Db) -> Type<'db> {
+        self.try_iterate(db)
+            .unwrap_or_else(|err| err.fallback_element_type())
+    }
+
     /// Given the type of an object that is iterated over in some way,
     /// return the type of objects that are yielded by that iteration.
     ///
@@ -2221,11 +2365,9 @@ impl<'db> Type<'db> {
     /// for y in x:
     ///     pass
     /// ```
-    fn iterate(self, db: &'db dyn Db) -> IterationOutcome<'db> {
+    fn try_iterate(self, db: &'db dyn Db) -> Result<Type<'db>, IterateError<'db>> {
         if let Type::Tuple(tuple_type) = self {
-            return IterationOutcome::Iterable {
-                element_ty: UnionType::from_elements(db, tuple_type.elements(db)),
-            };
+            return Ok(UnionType::from_elements(db, tuple_type.elements(db)));
         }
 
         let dunder_iter_result = self.try_call_dunder(db, "__iter__", &CallArguments::none());
@@ -2239,33 +2381,31 @@ impl<'db> Type<'db> {
                             dunder_iter_result,
                             Err(CallDunderError::PossiblyUnbound { .. })
                         ) {
-                            IterationOutcome::PossiblyUnboundDunderIter {
+                            Err(IterateError::PossiblyUnbound {
                                 iterable_ty: self,
                                 element_ty: outcome.return_type(db),
-                            }
+                            })
                         } else {
-                            IterationOutcome::Iterable {
-                                element_ty: outcome.return_type(db),
-                            }
+                            Ok(outcome.return_type(db))
                         }
                     }
                     Err(CallDunderError::PossiblyUnbound(outcome)) => {
-                        IterationOutcome::PossiblyUnboundDunderIter {
+                        Err(IterateError::PossiblyUnbound {
                             iterable_ty: self,
                             element_ty: outcome.return_type(db),
-                        }
+                        })
                     }
-                    Err(_) => IterationOutcome::NotIterable {
+                    Err(_) => Err(IterateError::NotIterable {
                         not_iterable_ty: self,
-                    },
+                    }),
                 };
             }
             // If `__iter__` exists but can't be called or doesn't have the expected signature,
             // return not iterable over falling back to `__getitem__`.
             Err(CallDunderError::Call(_)) => {
-                return IterationOutcome::NotIterable {
+                return Err(IterateError::NotIterable {
                     not_iterable_ty: self,
-                }
+                })
             }
             Err(CallDunderError::MethodNotAvailable) => {
                 // No `__iter__` attribute, try `__getitem__` next.
@@ -2283,18 +2423,14 @@ impl<'db> Type<'db> {
             "__getitem__",
             &CallArguments::positional([KnownClass::Int.to_instance(db)]),
         ) {
-            Ok(outcome) => IterationOutcome::Iterable {
+            Ok(outcome) => Ok(outcome.return_type(db)),
+            Err(CallDunderError::PossiblyUnbound(outcome)) => Err(IterateError::PossiblyUnbound {
+                iterable_ty: self,
                 element_ty: outcome.return_type(db),
-            },
-            Err(CallDunderError::PossiblyUnbound(outcome)) => {
-                IterationOutcome::PossiblyUnboundDunderIter {
-                    iterable_ty: self,
-                    element_ty: outcome.return_type(db),
-                }
-            }
-            Err(_) => IterationOutcome::NotIterable {
+            }),
+            Err(_) => Err(IterateError::NotIterable {
                 not_iterable_ty: self,
-            },
+            }),
         }
     }
 
@@ -3469,47 +3605,182 @@ pub enum TypeVarBoundOrConstraints<'db> {
     Constraints(TupleType<'db>),
 }
 
+/// Error returned if a type isn't iterable.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum IterationOutcome<'db> {
-    Iterable {
-        element_ty: Type<'db>,
-    },
-    NotIterable {
-        not_iterable_ty: Type<'db>,
-    },
-    PossiblyUnboundDunderIter {
+enum IterateError<'db> {
+    /// The type isn't iterable because it doesn't implement the new-style or old-style iteration protocol
+    ///
+    /// The new-style iteration protocol requires a type being iterated over to have an `__iter__`
+    /// method that returns something with a `__next__` method. The old-style iteration
+    /// protocol requires a type being iterated over to have a `__getitem__` method that accepts
+    /// a positive-integer argument.
+    NotIterable { not_iterable_ty: Type<'db> },
+
+    /// The type is iterable but the methods aren't always bound.
+    PossiblyUnbound {
         iterable_ty: Type<'db>,
         element_ty: Type<'db>,
     },
 }
 
-impl<'db> IterationOutcome<'db> {
-    fn unwrap_with_diagnostic(
-        self,
-        context: &InferContext<'db>,
-        iterable_node: ast::AnyNodeRef,
-    ) -> Type<'db> {
+impl<'db> IterateError<'db> {
+    /// Reports the diagnostic for this error.
+    fn report_diagnostic(&self, context: &InferContext<'db>, iterable_node: ast::AnyNodeRef) {
         match self {
-            Self::Iterable { element_ty } => element_ty,
             Self::NotIterable { not_iterable_ty } => {
-                report_not_iterable(context, iterable_node, not_iterable_ty);
-                Type::unknown()
+                report_not_iterable(context, iterable_node, *not_iterable_ty);
             }
-            Self::PossiblyUnboundDunderIter {
+            Self::PossiblyUnbound {
                 iterable_ty,
-                element_ty,
+                element_ty: _,
             } => {
-                report_not_iterable_possibly_unbound(context, iterable_node, iterable_ty);
-                element_ty
+                report_not_iterable_possibly_unbound(context, iterable_node, *iterable_ty);
             }
         }
     }
 
-    fn unwrap_without_diagnostic(self) -> Type<'db> {
+    /// Returns the element type if it is known, or `None` if the type is never iterable.
+    fn element_type(&self) -> Option<Type<'db>> {
         match self {
-            Self::Iterable { element_ty } => element_ty,
-            Self::NotIterable { .. } => Type::unknown(),
-            Self::PossiblyUnboundDunderIter { element_ty, .. } => element_ty,
+            IterateError::NotIterable { .. } => None,
+            IterateError::PossiblyUnbound { element_ty, .. } => Some(*element_ty),
+        }
+    }
+
+    /// Returns the element type if it is known, or `Type::unknown()` if it is not.
+    fn fallback_element_type(&self) -> Type<'db> {
+        self.element_type().unwrap_or(Type::unknown())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) enum BoolError<'db> {
+    /// The type has a `__bool__` attribute but it can't be called.
+    NotCallable { not_boolable_type: Type<'db> },
+
+    /// The type has a callable `__bool__` attribute, but it isn't callable
+    /// with the given arguments.
+    IncorrectArguments {
+        not_boolable_type: Type<'db>,
+        truthiness: Truthiness,
+    },
+
+    /// The type has a `__bool__` method, is callable with the given arguments,
+    /// but the return type isn't assignable to `bool`.
+    IncorrectReturnType {
+        not_boolable_type: Type<'db>,
+        return_type: Type<'db>,
+    },
+
+    /// A union type doesn't implement `__bool__` correctly.
+    Union {
+        union: UnionType<'db>,
+        truthiness: Truthiness,
+    },
+
+    /// Any other reason why the type can't be converted to a bool.
+    /// E.g. because calling `__bool__` returns in a union type and not all variants support `__bool__` or
+    /// because `__bool__` points to a type that has a possibly unbound `__call__` method.
+    Other { not_boolable_type: Type<'db> },
+}
+
+impl<'db> BoolError<'db> {
+    pub(super) fn fallback_truthiness(&self) -> Truthiness {
+        match self {
+            BoolError::NotCallable { .. }
+            | BoolError::IncorrectReturnType { .. }
+            | BoolError::Other { .. } => Truthiness::Ambiguous,
+            BoolError::IncorrectArguments { truthiness, .. }
+            | BoolError::Union { truthiness, .. } => *truthiness,
+        }
+    }
+
+    fn not_boolable_type(&self) -> Type<'db> {
+        match self {
+            BoolError::NotCallable {
+                not_boolable_type, ..
+            }
+            | BoolError::IncorrectArguments {
+                not_boolable_type, ..
+            }
+            | BoolError::Other { not_boolable_type }
+            | BoolError::IncorrectReturnType {
+                not_boolable_type, ..
+            } => *not_boolable_type,
+            BoolError::Union { union, .. } => Type::Union(*union),
+        }
+    }
+
+    pub(super) fn report_diagnostic(&self, context: &InferContext, condition: impl Ranged) {
+        self.report_diagnostic_impl(context, condition.range());
+    }
+
+    fn report_diagnostic_impl(&self, context: &InferContext, condition: TextRange) {
+        match self {
+            Self::IncorrectArguments {
+                not_boolable_type, ..
+            } => {
+                context.report_lint(
+                    &UNSUPPORTED_BOOL_CONVERSION,
+                    condition,
+                    format_args!(
+                        "Boolean conversion is unsupported for type `{}`; it incorrectly implements `__bool__`",
+                        not_boolable_type.display(context.db())
+                    ),
+                );
+            }
+            Self::IncorrectReturnType {
+                not_boolable_type,
+                return_type,
+            } => {
+                context.report_lint(
+                    &UNSUPPORTED_BOOL_CONVERSION,
+                    condition,
+                    format_args!(
+                        "Boolean conversion is unsupported for type `{not_boolable}`; the return type of its bool method (`{return_type}`) isn't assignable to `bool",
+                        not_boolable = not_boolable_type.display(context.db()),
+                        return_type = return_type.display(context.db())
+                    ),
+                );
+            }
+            Self::NotCallable { not_boolable_type } => {
+                context.report_lint(
+                    &UNSUPPORTED_BOOL_CONVERSION,
+                    condition,
+                    format_args!(
+                        "Boolean conversion is unsupported for type `{}`; its `__bool__` method isn't callable",
+                        not_boolable_type.display(context.db())
+                    ),
+                );
+            }
+            Self::Union { union, .. } => {
+                let first_error = union
+                    .elements(context.db())
+                    .iter()
+                    .find_map(|element| element.try_bool(context.db()).err())
+                    .unwrap();
+
+                context.report_lint(
+                        &UNSUPPORTED_BOOL_CONVERSION,
+                        condition,
+                        format_args!(
+                            "Boolean conversion is unsupported for union `{}` because `{}` doesn't implement `__bool__` correctly",
+                            Type::Union(*union).display(context.db()),
+                            first_error.not_boolable_type().display(context.db()),
+                        ),
+                    );
+            }
+
+            Self::Other { not_boolable_type } => {
+                context.report_lint(
+                    &UNSUPPORTED_BOOL_CONVERSION,
+                    condition,
+                    format_args!(
+                        "Boolean conversion is unsupported for type `{}`; it incorrectly implements `__bool__`",
+                        not_boolable_type.display(context.db())
+                    ),
+                );
+            }
         }
     }
 }
@@ -4159,11 +4430,11 @@ impl<'db> Class<'db> {
                     kind: MetaclassErrorKind::NotCallable(not_callable_ty),
                 }),
 
-                Err(CallError::Union {
+                Err(CallError::Union(UnionCallError {
                     called_ty,
                     errors,
                     bindings,
-                }) => {
+                })) => {
                     let mut partly_not_callable = false;
 
                     let return_ty = errors
@@ -4389,10 +4660,9 @@ impl<'db> Class<'db> {
                     //
                     //     for self.name in <iterable>:
 
-                    // TODO: Potential diagnostics resulting from the iterable are currently not reported.
-
                     let iterable_ty = infer_expression_type(db, *iterable);
-                    let inferred_ty = iterable_ty.iterate(db).unwrap_without_diagnostic();
+                    // TODO: Potential diagnostics resulting from the iterable are currently not reported.
+                    let inferred_ty = iterable_ty.iterate(db);
 
                     union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
                 }
