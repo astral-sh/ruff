@@ -4373,6 +4373,18 @@ impl<'db> Class<'db> {
                     let annotation_ty = infer_expression_type(db, *annotation);
 
                     // TODO: check if there are conflicting declarations
+                    let table = symbol_table(db, class_body_scope);
+                    if let Some(symbol_id) = table.symbol_id_by_name(name) {
+                        let use_def = use_def_map(db, class_body_scope);
+                        let declarations = use_def.public_declarations(symbol_id);
+
+                        if let Err((_, _conflicting_declarations)) =
+                            symbol_from_declarations(db, declarations)
+                        {
+                            // There are conflicting declarations for this attribute in the class body.
+                        }
+                    }
+
                     return Symbol::bound(annotation_ty);
                 }
                 AttributeAssignment::Unannotated { value } => {
