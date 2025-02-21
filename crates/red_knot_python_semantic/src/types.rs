@@ -635,9 +635,6 @@ impl<'db> Type<'db> {
                     .to_instance(db)
                     .is_subtype_of(db, target)
             }
-            (Type::Callable(CallableType::ClassMethod(_)), _) => KnownClass::Classmethod
-                .to_instance(db)
-                .is_subtype_of(db, target),
 
             // A fully static heterogenous tuple type `A` is a subtype of a fully static heterogeneous tuple type `B`
             // iff the two tuple types have the same number of elements and each element-type in `A` is a subtype
@@ -959,8 +956,7 @@ impl<'db> Type<'db> {
                 | Type::Callable(
                     CallableType::BoundMethod(..)
                     | CallableType::MethodWrapperDunderGet(..)
-                    | CallableType::WrapperDescriptorDunderGet
-                    | CallableType::ClassMethod(..),
+                    | CallableType::WrapperDescriptorDunderGet,
                 )
                 | Type::ModuleLiteral(..)
                 | Type::ClassLiteral(..)
@@ -974,8 +970,7 @@ impl<'db> Type<'db> {
                 | Type::Callable(
                     CallableType::BoundMethod(..)
                     | CallableType::MethodWrapperDunderGet(..)
-                    | CallableType::WrapperDescriptorDunderGet
-                    | CallableType::ClassMethod(..),
+                    | CallableType::WrapperDescriptorDunderGet,
                 )
                 | Type::ModuleLiteral(..)
                 | Type::ClassLiteral(..)
@@ -1175,15 +1170,6 @@ impl<'db> Type<'db> {
                 Type::Callable(CallableType::WrapperDescriptorDunderGet),
             ) => !KnownClass::WrapperDescriptorType.is_subclass_of(db, class),
 
-            (
-                Type::Callable(CallableType::ClassMethod(_)),
-                Type::Instance(InstanceType { class }),
-            )
-            | (
-                Type::Instance(InstanceType { class }),
-                Type::Callable(CallableType::ClassMethod(_)),
-            ) => !KnownClass::Classmethod.is_subclass_of(db, class),
-
             (Type::ModuleLiteral(..), other @ Type::Instance(..))
             | (other @ Type::Instance(..), Type::ModuleLiteral(..)) => {
                 // Modules *can* actually be instances of `ModuleType` subclasses
@@ -1232,8 +1218,7 @@ impl<'db> Type<'db> {
             | Type::Callable(
                 CallableType::BoundMethod(_)
                 | CallableType::MethodWrapperDunderGet(_)
-                | CallableType::WrapperDescriptorDunderGet
-                | CallableType::ClassMethod(_),
+                | CallableType::WrapperDescriptorDunderGet,
             )
             | Type::ModuleLiteral(..)
             | Type::IntLiteral(_)
@@ -1302,8 +1287,7 @@ impl<'db> Type<'db> {
             | Type::Callable(
                 CallableType::BoundMethod(_)
                 | CallableType::MethodWrapperDunderGet(_)
-                | CallableType::WrapperDescriptorDunderGet
-                | CallableType::ClassMethod(_),
+                | CallableType::WrapperDescriptorDunderGet,
             )
             | Type::ClassLiteral(..)
             | Type::ModuleLiteral(..)
@@ -1346,8 +1330,7 @@ impl<'db> Type<'db> {
             | Type::Callable(
                 CallableType::BoundMethod(..)
                 | CallableType::MethodWrapperDunderGet(..)
-                | CallableType::WrapperDescriptorDunderGet
-                | CallableType::ClassMethod(..),
+                | CallableType::WrapperDescriptorDunderGet,
             )
             | Type::ModuleLiteral(..)
             | Type::ClassLiteral(..)
@@ -1410,9 +1393,6 @@ impl<'db> Type<'db> {
                     .to_instance(db)
                     .static_member(db, name)
             }
-            Type::Callable(CallableType::ClassMethod(_)) => KnownClass::Classmethod
-                .to_instance(db)
-                .static_member(db, name),
 
             Type::ModuleLiteral(module) => module.static_member(db, name),
 
@@ -1618,15 +1598,6 @@ impl<'db> Type<'db> {
                     .to_instance(db)
                     .member(db, name)
             }
-            Type::Callable(CallableType::ClassMethod(function)) if name == "__get__" => {
-                Symbol::bound(Type::Callable(CallableType::MethodWrapperDunderGet(
-                    *function,
-                )))
-            }
-            Type::Callable(CallableType::ClassMethod(function)) => KnownClass::Classmethod
-                .to_instance(db)
-                .member(db, name)
-                .or_fall_back_to(db, || Type::FunctionLiteral(*function).member(db, name)),
 
             Type::Instance(..)
             | Type::BooleanLiteral(..)
@@ -2686,9 +2657,6 @@ impl<'db> Type<'db> {
             }
             Type::Callable(CallableType::WrapperDescriptorDunderGet) => {
                 KnownClass::WrapperDescriptorType.to_class_literal(db)
-            }
-            Type::Callable(CallableType::ClassMethod(_)) => {
-                KnownClass::Classmethod.to_class_literal(db)
             }
             Type::ModuleLiteral(_) => KnownClass::ModuleType.to_class_literal(db),
             Type::Tuple(_) => KnownClass::Tuple.to_class_literal(db),
@@ -4269,9 +4237,6 @@ pub enum CallableType<'db> {
     /// type. We currently add this as a separate variant because `FunctionType.__get__`
     /// is an overloaded method and we do not support `@overload` yet.
     WrapperDescriptorDunderGet,
-
-    /// Represents a `builtins.classmethod` object.
-    ClassMethod(FunctionType<'db>),
 }
 
 /// Describes whether the parameters in a function expect value expressions or type expressions.
