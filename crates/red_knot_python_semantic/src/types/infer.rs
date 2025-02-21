@@ -100,7 +100,7 @@ use super::{CallDunderError, ParameterExpectation, ParameterExpectations};
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
 /// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
 /// scope.
-#[salsa::tracked(return_ref)]
+#[salsa::tracked(return_ref, cycle_fn=scope_cycle_recover, cycle_initial=scope_cycle_initial)]
 pub(crate) fn infer_scope_types<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> TypeInference<'db> {
     let file = scope.file(db);
     let _span =
@@ -112,6 +112,20 @@ pub(crate) fn infer_scope_types<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Ty
     let index = semantic_index(db, file);
 
     TypeInferenceBuilder::new(db, InferenceRegion::Scope(scope), index).finish()
+}
+
+fn scope_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &TypeInference<'db>,
+    count: u32,
+    _scope: ScopeId<'db>,
+) -> salsa::CycleRecoveryAction<TypeInference<'db>> {
+    assert!(count < 10, "cycle did not converge within 10 iterations");
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn scope_cycle_initial<'db>(_db: &'db dyn Db, scope: ScopeId<'db>) -> TypeInference<'db> {
+    TypeInference::empty(scope, Some(Type::Never))
 }
 
 /// Infer all types for a [`Definition`] (including sub-expressions).
