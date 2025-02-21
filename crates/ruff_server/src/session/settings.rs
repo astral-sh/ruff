@@ -6,7 +6,9 @@ use serde::Deserialize;
 use serde_json::{Map, Value};
 use thiserror::Error;
 
-use ruff_linter::{line_width::LineLength, RuleSelector};
+use ruff_linter::line_width::LineLength;
+use ruff_linter::rule_selector::ParseError;
+use ruff_linter::RuleSelector;
 use ruff_workspace::options::Options;
 
 /// Maps a workspace URI to its associated client settings. Used during server initialization.
@@ -319,7 +321,9 @@ impl ResolvedClientSettings {
     }
 
     fn new_impl(all_settings: &[&ClientSettings]) -> Self {
-        Self {
+        let mut contains_invalid_settings = false;
+
+        let settings = Self {
             fix_all: Self::resolve_or(all_settings, |settings| settings.fix_all, true),
             organize_imports: Self::resolve_or(
                 all_settings,
@@ -369,6 +373,7 @@ impl ResolvedClientSettings {
                                 tracing::error!(
                                     "Failed to load settings from `configuration`: {err}"
                                 );
+                                contains_invalid_settings = true;
                                 None
                             }
                         }
@@ -381,34 +386,25 @@ impl ResolvedClientSettings {
                     settings.format.as_ref()?.preview
                 }),
                 select: Self::resolve_optional(all_settings, |settings| {
-                    settings
-                        .lint
-                        .as_ref()?
-                        .select
-                        .as_ref()?
-                        .iter()
-                        .map(|rule| RuleSelector::from_str(rule).ok())
-                        .collect()
+                    Self::resolve_rules(
+                        settings.lint.as_ref()?.select.as_ref()?,
+                        RuleSelectorKey::Select,
+                        &mut contains_invalid_settings,
+                    )
                 }),
                 extend_select: Self::resolve_optional(all_settings, |settings| {
-                    settings
-                        .lint
-                        .as_ref()?
-                        .extend_select
-                        .as_ref()?
-                        .iter()
-                        .map(|rule| RuleSelector::from_str(rule).ok())
-                        .collect()
+                    Self::resolve_rules(
+                        settings.lint.as_ref()?.extend_select.as_ref()?,
+                        RuleSelectorKey::ExtendSelect,
+                        &mut contains_invalid_settings,
+                    )
                 }),
                 ignore: Self::resolve_optional(all_settings, |settings| {
-                    settings
-                        .lint
-                        .as_ref()?
-                        .ignore
-                        .as_ref()?
-                        .iter()
-                        .map(|rule| RuleSelector::from_str(rule).ok())
-                        .collect()
+                    Self::resolve_rules(
+                        settings.lint.as_ref()?.ignore.as_ref()?,
+                        RuleSelectorKey::Ignore,
+                        &mut contains_invalid_settings,
+                    )
                 }),
                 exclude: Self::resolve_optional(all_settings, |settings| settings.exclude.clone()),
                 line_length: Self::resolve_optional(all_settings, |settings| settings.line_length),
@@ -418,6 +414,37 @@ impl ResolvedClientSettings {
                     ConfigurationPreference::EditorFirst,
                 ),
             },
+        };
+
+        if contains_invalid_settings {
+            show_err_msg!(
+                "Ruff received invalid client settings. Refer to the logs for more information."
+            );
+        }
+
+        settings
+    }
+
+    fn resolve_rules(
+        rules: &[String],
+        key: RuleSelectorKey,
+        contains_invalid_settings: &mut bool,
+    ) -> Option<Vec<RuleSelector>> {
+        let (mut known, mut unknown) = (vec![], vec![]);
+        for rule in rules {
+            match RuleSelector::from_str(rule) {
+                Ok(selector) => known.push(selector),
+                Err(ParseError::Unknown(_)) => unknown.push(rule),
+            }
+        }
+        if !unknown.is_empty() {
+            *contains_invalid_settings = true;
+            tracing::error!("Unknown rule selectors found in `{key}`: {unknown:?}");
+        }
+        if known.is_empty() {
+            None
+        } else {
+            Some(known)
         }
     }
 
@@ -427,7 +454,7 @@ impl ResolvedClientSettings {
     /// Use [`ResolvedClientSettings::resolve_or`] for settings that should have default values.
     fn resolve_optional<T>(
         all_settings: &[&ClientSettings],
-        get: impl Fn(&ClientSettings) -> Option<T>,
+        get: impl FnMut(&ClientSettings) -> Option<T>,
     ) -> Option<T> {
         all_settings.iter().map(Deref::deref).find_map(get)
     }
@@ -443,6 +470,23 @@ impl ResolvedClientSettings {
         default: T,
     ) -> T {
         Self::resolve_optional(all_settings, get).unwrap_or(default)
+    }
+}
+
+#[derive(Copy, Clone)]
+enum RuleSelectorKey {
+    Select,
+    ExtendSelect,
+    Ignore,
+}
+
+impl std::fmt::Display for RuleSelectorKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            RuleSelectorKey::Select => f.write_str("lint.select"),
+            RuleSelectorKey::ExtendSelect => f.write_str("lint.extendSelect"),
+            RuleSelectorKey::Ignore => f.write_str("lint.ignore"),
+        }
     }
 }
 
