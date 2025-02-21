@@ -168,7 +168,7 @@ impl<'db> Unpacker<'db> {
                     // SAFETY: `target_types` is initialized with the same length as `elts`.
                     let element_ty = match target_types[index].as_slice() {
                         [] => Type::unknown(),
-                        types => UnionType::from_elements(self.db(), types),
+                        types => UnionType::from_elements(self.db(), types.iter().copied()),
                     };
                     self.unpack_inner(element, value_expr, element_ty);
                 }

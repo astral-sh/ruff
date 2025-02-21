@@ -50,6 +50,17 @@ impl<'db> UnionBuilder<'db> {
         self
     }
 
+    #[inline]
+    pub(crate) fn extend(mut self, elements: impl IntoIterator<Item = Type<'db>>) -> Self {
+        let elements = elements.into_iter();
+
+        for element in elements {
+            self = self.add(element);
+        }
+
+        self
+    }
+
     /// Adds a type to this union.
     pub(crate) fn add(mut self, ty: Type<'db>) -> Self {
         match ty {
