@@ -60,7 +60,7 @@ impl NarrowingConstraintsBuilder {
         set: Option<ScopedNarrowingConstraintSetId>,
         element: ScopedNarrowingConstraintId,
     ) -> Option<ScopedNarrowingConstraintSetId> {
-        self.lists.insert(set, element, ())
+        self.lists.insert_if_needed(set, element, ())
     }
 
     pub(crate) fn intersect_sets(

@@ -115,6 +115,38 @@ impl<I: Idx, K: Clone + Ord, V: Clone> ListBuilder<I, K, V> {
             }
         }
     }
+
+    /// Inserts a new key/value pair into an existing list.  If there is already an entry with an
+    /// equal key, the original value is retained, and the new value is thrown away.
+    pub fn insert_if_needed(&mut self, list: Option<I>, key: K, value: V) -> Option<I> {
+        let Some(curr_id) = list else {
+            // First entry in the list
+            return self.add_cell(key, value, None);
+        };
+
+        let ListCell(curr_key, _, tail) = &self.storage.cells[curr_id];
+        match key.cmp(curr_key) {
+            // Existing entry with equal key; retain the previous value.
+            Ordering::Equal => list,
+            // List does not already contain this key, and this is where we should add it.
+            Ordering::Less => self.add_cell(key, value, list),
+            // If this key is in the list, it's further along.
+            Ordering::Greater => {
+                let tail = *tail;
+                let new_tail = self.insert_if_needed(tail, key, value);
+                if new_tail == tail {
+                    // The element was already in the list, so we don't need to stitch up a new
+                    // one.
+                    return list;
+                }
+                // Reborrow to satisfy the borrow checker
+                let ListCell(curr_key, curr_value, _) = &self.storage.cells[curr_id];
+                let new_key = curr_key.clone();
+                let new_value = curr_value.clone();
+                self.add_cell(new_key, new_value, new_tail)
+            }
+        }
+    }
 }
 
 impl<I: Idx, K: Clone + Ord, V: Clone> ListBuilder<I, K, V> {
