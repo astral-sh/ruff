@@ -1351,51 +1351,9 @@ impl<'db> Type<'db> {
                 .iter()
                 .all(|elem| elem.is_single_valued(db)),
 
-            Type::Instance(InstanceType { class }) => match class.known(db) {
-                Some(
-                    KnownClass::NoneType
-                    | KnownClass::NoDefaultType
-                    | KnownClass::VersionInfo
-                    | KnownClass::EllipsisType
-                    | KnownClass::TypeAliasType,
-                ) => true,
-                Some(
-                    KnownClass::Bool
-                    | KnownClass::Object
-                    | KnownClass::Bytes
-                    | KnownClass::Type
-                    | KnownClass::Int
-                    | KnownClass::Float
-                    | KnownClass::Complex
-                    | KnownClass::Str
-                    | KnownClass::List
-                    | KnownClass::Tuple
-                    | KnownClass::Set
-                    | KnownClass::FrozenSet
-                    | KnownClass::Dict
-                    | KnownClass::Slice
-                    | KnownClass::Range
-                    | KnownClass::Property
-                    | KnownClass::BaseException
-                    | KnownClass::BaseExceptionGroup
-                    | KnownClass::GenericAlias
-                    | KnownClass::ModuleType
-                    | KnownClass::FunctionType
-                    | KnownClass::MethodType
-                    | KnownClass::MethodWrapperType
-                    | KnownClass::WrapperDescriptorType
-                    | KnownClass::SpecialForm
-                    | KnownClass::ChainMap
-                    | KnownClass::Counter
-                    | KnownClass::DefaultDict
-                    | KnownClass::Deque
-                    | KnownClass::OrderedDict
-                    | KnownClass::SupportsIndex
-                    | KnownClass::StdlibAlias
-                    | KnownClass::TypeVar,
-                ) => false,
-                None => false,
-            },
+            Type::Instance(InstanceType { class }) => {
+                class.known(db).is_some_and(KnownClass::is_single_valued)
+            }
 
             Type::Dynamic(_)
             | Type::Never
@@ -1741,12 +1699,9 @@ impl<'db> Type<'db> {
             },
             Type::AlwaysTruthy => Truthiness::AlwaysTrue,
             Type::AlwaysFalsy => Truthiness::AlwaysFalse,
-            instance_ty @ Type::Instance(InstanceType { class }) => {
-                if class.is_known(db, KnownClass::Bool) {
-                    Truthiness::Ambiguous
-                } else if class.is_known(db, KnownClass::NoneType) {
-                    Truthiness::AlwaysFalse
-                } else {
+            instance_ty @ Type::Instance(InstanceType { class }) => match class.known(db) {
+                Some(known_class) => known_class.bool(),
+                None => {
                     // We only check the `__bool__` method for truth testing, even though at
                     // runtime there is a fallback to `__len__`, since `__bool__` takes precedence
                     // and a subclass could add a `__bool__` method.
@@ -1824,7 +1779,7 @@ impl<'db> Type<'db> {
                         }
                     }
                 }
-            }
+            },
             Type::KnownInstance(known_instance) => known_instance.bool(),
             Type::Union(union) => {
                 let mut truthiness = None;
@@ -2928,6 +2883,59 @@ impl<'db> KnownClass {
         matches!(self, Self::Bool)
     }
 
+    /// Determine whether instances of this class are always truthy, always falsy,
+    /// or have an ambiguous truthiness.
+    const fn bool(self) -> Truthiness {
+        match self {
+            // N.B. It's only generally safe to infer `Truthiness::AlwaysTrue` for a `KnownClass`
+            // variant if the class's `__bool__` method always returns the same thing *and* the
+            // class is `@final`.
+            //
+            // E.g. `ModuleType.__bool__` always returns `True`, but `ModuleType` is not `@final`.
+            // Equally, `range` is `@final`, but its `__bool__` method can return `False`.
+            Self::EllipsisType
+            | Self::NoDefaultType
+            | Self::MethodType
+            | Self::Slice
+            | Self::FunctionType
+            | Self::VersionInfo
+            | Self::TypeAliasType
+            | Self::TypeVar
+            | Self::WrapperDescriptorType
+            | Self::MethodWrapperType => Truthiness::AlwaysTrue,
+
+            Self::NoneType => Truthiness::AlwaysFalse,
+
+            Self::BaseException
+            | Self::Object
+            | Self::OrderedDict
+            | Self::BaseExceptionGroup
+            | Self::Bool
+            | Self::Str
+            | Self::List
+            | Self::GenericAlias
+            | Self::StdlibAlias
+            | Self::SupportsIndex
+            | Self::Set
+            | Self::Tuple
+            | Self::Int
+            | Self::Type
+            | Self::Bytes
+            | Self::FrozenSet
+            | Self::Range
+            | Self::Property
+            | Self::SpecialForm
+            | Self::Dict
+            | Self::ModuleType
+            | Self::ChainMap
+            | Self::Complex
+            | Self::Counter
+            | Self::DefaultDict
+            | Self::Deque
+            | Self::Float => Truthiness::Ambiguous,
+        }
+    }
+
     pub fn as_str(&self, db: &'db dyn Db) -> &'static str {
         match self {
             Self::Bool => "bool",
@@ -3074,6 +3082,51 @@ impl<'db> KnownClass {
         }
     }
 
+    /// Return true if all instances of this `KnownClass` compare equal.
+    const fn is_single_valued(self) -> bool {
+        match self {
+            KnownClass::NoneType
+            | KnownClass::NoDefaultType
+            | KnownClass::VersionInfo
+            | KnownClass::EllipsisType
+            | KnownClass::TypeAliasType => true,
+
+            KnownClass::Bool
+            | KnownClass::Object
+            | KnownClass::Bytes
+            | KnownClass::Type
+            | KnownClass::Int
+            | KnownClass::Float
+            | KnownClass::Complex
+            | KnownClass::Str
+            | KnownClass::List
+            | KnownClass::Tuple
+            | KnownClass::Set
+            | KnownClass::FrozenSet
+            | KnownClass::Dict
+            | KnownClass::Slice
+            | KnownClass::Range
+            | KnownClass::Property
+            | KnownClass::BaseException
+            | KnownClass::BaseExceptionGroup
+            | KnownClass::GenericAlias
+            | KnownClass::ModuleType
+            | KnownClass::FunctionType
+            | KnownClass::MethodType
+            | KnownClass::MethodWrapperType
+            | KnownClass::WrapperDescriptorType
+            | KnownClass::SpecialForm
+            | KnownClass::ChainMap
+            | KnownClass::Counter
+            | KnownClass::DefaultDict
+            | KnownClass::Deque
+            | KnownClass::OrderedDict
+            | KnownClass::SupportsIndex
+            | KnownClass::StdlibAlias
+            | KnownClass::TypeVar => false,
+        }
+    }
+
     /// Is this class a singleton class?
     ///
     /// A singleton class is a class where it is known that only one instance can ever exist at runtime.
@@ -3152,6 +3205,7 @@ impl<'db> KnownClass {
             "MethodWrapperType" => Self::MethodWrapperType,
             "WrapperDescriptorType" => Self::WrapperDescriptorType,
             "TypeAliasType" => Self::TypeAliasType,
+            "TypeVar" => Self::TypeVar,
             "ChainMap" => Self::ChainMap,
             "Counter" => Self::Counter,
             "defaultdict" => Self::DefaultDict,
