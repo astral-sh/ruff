@@ -1771,7 +1771,7 @@ impl<'db> Type<'db> {
                                 }
                                 // The type has a `__bool__` method, but it doesn't return a boolean.
                                 _ => {
-                                    return Err(BoolError::BindingError {
+                                    return Err(BoolError::IncorrectReturnType {
                                         return_type: outcome.return_type(db),
                                         not_boolable_type: *instance_ty,
                                     });
@@ -1781,7 +1781,7 @@ impl<'db> Type<'db> {
                         Err(CallDunderError::MethodNotAvailable) => Truthiness::Ambiguous,
                         Err(CallDunderError::Call(err)) => match err {
                             CallError::BindingError { binding } => {
-                                return Err(BoolError::BindingError {
+                                return Err(BoolError::IncorrectArguments {
                                     return_type: binding.return_type(),
                                     not_boolable_type: *instance_ty,
                                 });
@@ -3614,9 +3614,16 @@ pub(super) enum BoolError<'db> {
     /// The type has a `__bool__` attribute but it can't be called.
     NotCallable { not_boolable_type: Type<'db> },
 
-    /// The type has a callable `__bool__` attribute, but it doesn't have the
-    /// expected signature (parameters or return type).
-    BindingError {
+    /// The type has a callable `__bool__` attribute, but it isn't callable
+    /// with the given arguments.
+    IncorrectArguments {
+        not_boolable_type: Type<'db>,
+        return_type: Type<'db>,
+    },
+
+    /// The type has a `__bool__` method, is callable with the given arguments,
+    /// but the return type isn't assignable to `bool`.
+    IncorrectReturnType {
         not_boolable_type: Type<'db>,
         return_type: Type<'db>,
     },
@@ -3641,14 +3648,11 @@ impl BoolError<'_> {
 
     fn report_diagnostic_impl(&self, context: &InferContext, condition: TextRange) {
         match self {
-            Self::BindingError {
+            Self::IncorrectArguments {
                 not_boolable_type,
-                return_type,
+                return_type: _,
             } => {
-                if return_type
-                    .is_assignable_to(context.db(), KnownClass::Bool.to_instance(context.db()))
-                {
-                    context.report_lint(
+                context.report_lint(
                         &UNSUPPORTED_BOOL_CONVERSION,
                         condition,
                         format_args!(
@@ -3656,17 +3660,20 @@ impl BoolError<'_> {
                             not_boolable_type.display(context.db())
                         ),
                     );
-                } else {
-                    context.report_lint(
-                        &UNSUPPORTED_BOOL_CONVERSION,
-                        condition,
-                        format_args!(
-                            "Boolean conversion is unsupported for type `{not_boolable}`; the return type of its bool method (`{return_type}`) isn't assignable to `bool",
-                            not_boolable = not_boolable_type.display(context.db()),
-                            return_type = return_type.display(context.db())
-                        ),
-                    );
-                }
+            }
+            Self::IncorrectReturnType {
+                not_boolable_type,
+                return_type,
+            } => {
+                context.report_lint(
+                    &UNSUPPORTED_BOOL_CONVERSION,
+                    condition,
+                    format_args!(
+                        "Boolean conversion is unsupported for type `{not_boolable}`; the return type of its bool method (`{return_type}`) isn't assignable to `bool",
+                        not_boolable = not_boolable_type.display(context.db()),
+                        return_type = return_type.display(context.db())
+                    ),
+                );
             }
             Self::NotCallable { not_boolable_type } => {
                 context.report_lint(
