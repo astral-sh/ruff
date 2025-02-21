@@ -34,8 +34,8 @@ use crate::semantic_index::{
 };
 use crate::suppression::check_suppressions;
 use crate::symbol::{
-    imported_symbol, known_module_symbol, symbol, symbol_from_bindings, symbol_from_declarations,
-    Boundness, LookupError, LookupResult, Symbol, SymbolAndQualifiers,
+    class_symbol, imported_symbol, known_module_symbol, symbol_from_bindings,
+    symbol_from_declarations, Boundness, LookupError, LookupResult, Symbol, SymbolAndQualifiers,
 };
 use crate::types::call::{bind_call, CallArguments, CallBinding, CallOutcome, UnionCallError};
 use crate::types::class_base::ClassBase;
@@ -4565,14 +4565,15 @@ impl<'db> Class<'db> {
         }
     }
 
-    /// Returns the inferred type of the class member named `name`.
+    /// Returns the inferred type of the class member named `name`. Only bound members
+    /// or those marked as ClassVars are considered.
     ///
     /// Returns [`Symbol::Unbound`] if `name` cannot be found in this class's scope
     /// directly. Use [`Class::class_member`] if you require a method that will
     /// traverse through the MRO until it finds the member.
     pub(crate) fn own_class_member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
-        let scope = self.body_scope(db);
-        symbol(db, scope, name)
+        let body_scope = self.body_scope(db);
+        class_symbol(db, body_scope, name)
     }
 
     /// Returns the `name` attribute of an instance of this class.
