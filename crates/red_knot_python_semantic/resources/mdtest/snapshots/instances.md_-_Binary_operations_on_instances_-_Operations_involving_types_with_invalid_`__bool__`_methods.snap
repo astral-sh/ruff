@@ -3,7 +3,7 @@ source: crates/red_knot_test/src/lib.rs
 expression: snapshot
 ---
 ---
-mdtest name: instances.md - Binary operations on instances - Operations involving types with invalid `__bool__` method
+mdtest name: instances.md - Binary operations on instances - Operations involving types with invalid `__bool__` methods
 mdtest path: crates/red_knot_python_semantic/resources/mdtest/binary/instances.md
 ---
 
@@ -29,7 +29,7 @@ error: lint:unsupported-bool-conversion
   |
 6 | # error: [unsupported-bool-conversion]
 7 | 10 and a and True
-  |        ^ Boolean conversion is unsupported for type `NotBoolable`; it's `__bool__` method isn't callable
+  |        ^ Boolean conversion is unsupported for type `NotBoolable`; its `__bool__` method isn't callable
   |
 
 ```

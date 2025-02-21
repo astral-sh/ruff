@@ -163,8 +163,18 @@ reveal_type("hello" in A())  # revealed: bool
 
 ## Return type that doesn't implement `__bool__` correctly
 
-Python implicitly calls `bool` on the result of `__contains__`, so the return type must be
-convertible to `bool`.
+`in` and `not in` operations will fail at runtime if the object on the right-hand side of the
+operation has a `__contains__` method that returns a type which is not convertible to `bool`. This
+is because of the way these operations are handled by the Python interpreter at runtime. If we
+assume that `y` is an object that has a `__contains__` method, the Python expression `x in y`
+desugars to a `contains(y, x)` call, where `contains` looks something like this:
+
+```ignore
+def contains(y, x):
+    return bool(type(y).__contains__(y, x))
+```
+
+where the `bool()` conversion itself implicitly calls `__bool__` under the hood.
 
 TODO: Ideally the message would explain to the user what's wrong. E.g,
 
@@ -188,7 +198,7 @@ class WithContains:
         return NotBoolable()
 
 # error: [unsupported-bool-conversion]
-10 in WithContains() and True
+10 in WithContains()
 # error: [unsupported-bool-conversion]
-10 not in WithContains() or False
+10 not in WithContains()
 ```

@@ -351,7 +351,7 @@ class Y(Foo): ...
 reveal_type(X() + Y())  # revealed: int
 ```
 
-## Operations involving types with invalid `__bool__` method
+## Operations involving types with invalid `__bool__` methods
 
 <!-- snapshot-diagnostics -->
 

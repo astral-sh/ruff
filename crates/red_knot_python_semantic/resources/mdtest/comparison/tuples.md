@@ -335,9 +335,23 @@ For tuples like `tuple[int, ...]`, `tuple[Any, ...]`
 
 // TODO
 
-## Comparison with elements that incorrectly implement `__bool_`
+## Chained comparisons with elements that incorrectly implement `__bool__`
 
 <!-- snapshot-diagnostics -->
+
+For an operation `A() < A()` to succeed at runtime, the `A.__lt__` method does not necessarily need
+to return an object that is convertible to a `bool`. However, the return type _does_ need to be
+convertible to a `bool` for the operation `A() < A() < A()` (a _chained_ comparison) to succeed.
+This is because `A() < A() < A()` desugars to something like this, which involves several implicit
+conversions to `bool`:
+
+```ignore
+def compute_chained_comparison():
+  a1 = A()
+  a2 = A()
+  first_comparison = a1 < a2
+  return first_comparison and (a2 < A())
+```
 
 ```py
 class NotBoolable:
@@ -362,6 +376,10 @@ a < b  # fine
 ## Equality with elements that incorrectly implement `__bool__`
 
 <!-- snapshot-diagnostics -->
+
+Python does not generally attempt to coerce the result of `==` and `!=` operations between two
+arbitrary objects to a `bool`, but a comparison of tuples will fail if the result of comparing any
+pair of elements at equivalent positions cannot be converted to a `bool`:
 
 ```py
 class A:

@@ -4,6 +4,6 @@
 class NotBoolable:
     __bool__ = 3
 
-# error: [unsupported-bool-conversion] "Boolean conversion is unsupported for type `NotBoolable`; it's `__bool__` method isn't callable"
+# error: [unsupported-bool-conversion] "Boolean conversion is unsupported for type `NotBoolable`; its `__bool__` method isn't callable"
 assert NotBoolable()
 ```

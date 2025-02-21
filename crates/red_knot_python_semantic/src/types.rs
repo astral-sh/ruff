@@ -3748,7 +3748,7 @@ impl<'db> BoolError<'db> {
                     &UNSUPPORTED_BOOL_CONVERSION,
                     condition,
                     format_args!(
-                        "Boolean conversion is unsupported for type `{}`; it's `__bool__` method isn't callable",
+                        "Boolean conversion is unsupported for type `{}`; its `__bool__` method isn't callable",
                         not_boolable_type.display(context.db())
                     ),
                 );

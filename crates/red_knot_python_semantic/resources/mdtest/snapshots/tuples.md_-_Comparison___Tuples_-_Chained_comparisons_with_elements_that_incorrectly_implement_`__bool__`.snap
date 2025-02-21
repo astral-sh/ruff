@@ -3,7 +3,7 @@ source: crates/red_knot_test/src/lib.rs
 expression: snapshot
 ---
 ---
-mdtest name: tuples.md - Comparison: Tuples - Comparison with elements that incorrectly implement `__bool_`
+mdtest name: tuples.md - Comparison: Tuples - Chained comparisons with elements that incorrectly implement `__bool__`
 mdtest path: crates/red_knot_python_semantic/resources/mdtest/comparison/tuples.md
 ---
 
@@ -39,7 +39,7 @@ error: lint:unsupported-bool-conversion
    |
 14 | # error: [unsupported-bool-conversion]
 15 | a < b < b
-   | ^^^^^ Boolean conversion is unsupported for type `NotBoolable | Literal[False]`; it's `__bool__` method isn't callable
+   | ^^^^^ Boolean conversion is unsupported for type `NotBoolable | Literal[False]`; its `__bool__` method isn't callable
 16 |
 17 | a < b  # fine
    |

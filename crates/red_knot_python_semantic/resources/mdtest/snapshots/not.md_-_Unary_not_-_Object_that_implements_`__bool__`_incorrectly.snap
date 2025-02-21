@@ -27,7 +27,7 @@ error: lint:unsupported-bool-conversion
   |
 4 | # error: [unsupported-bool-conversion]
 5 | not NotBoolable()
-  | ^^^^^^^^^^^^^^^^^ Boolean conversion is unsupported for type `NotBoolable`; it's `__bool__` method isn't callable
+  | ^^^^^^^^^^^^^^^^^ Boolean conversion is unsupported for type `NotBoolable`; its `__bool__` method isn't callable
   |
 
 ```

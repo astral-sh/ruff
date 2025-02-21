@@ -31,7 +31,7 @@ error: lint:unsupported-bool-conversion
   |
 8 | # error: [unsupported-bool-conversion]
 9 | (A(),) == (A(),)
-  | ^^^^^^^^^^^^^^^^ Boolean conversion is unsupported for type `NotBoolable`; it's `__bool__` method isn't callable
+  | ^^^^^^^^^^^^^^^^ Boolean conversion is unsupported for type `NotBoolable`; its `__bool__` method isn't callable
   |
 
 ```
