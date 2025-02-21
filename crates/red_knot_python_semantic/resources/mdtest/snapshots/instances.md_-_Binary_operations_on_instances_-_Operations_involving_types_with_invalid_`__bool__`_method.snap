@@ -3,7 +3,7 @@ source: crates/red_knot_test/src/lib.rs
 expression: snapshot
 ---
 ---
-mdtest name: instances.md - Binary operations on instances - Operations involving types that can't be converted to a `bool`
+mdtest name: instances.md - Binary operations on instances - Operations involving types with invalid `__bool__` method
 mdtest path: crates/red_knot_python_semantic/resources/mdtest/binary/instances.md
 ---
 

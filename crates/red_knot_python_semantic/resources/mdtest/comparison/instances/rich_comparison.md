@@ -346,12 +346,12 @@ def f(x: bool, y: int):
     reveal_type(x < 4.2)  # revealed: bool
 ```
 
-## Instance Comparisons with not-boolable types
+## Chained comparisons with not-boolable types
 
 <!-- snapshot-diagnostics -->
 
 Python implicitly calls `bool` on the comparison result of preceding elements (but not for the last
-element).
+element) of a chained comparison.
 
 ```py
 class NotBoolable:
