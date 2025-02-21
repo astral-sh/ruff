@@ -16,7 +16,7 @@ use crate::parser::{helpers, FunctionKind, Parser};
 use crate::string::{parse_fstring_literal_element, parse_string_literal, StringType};
 use crate::token::{TokenKind, TokenValue};
 use crate::token_set::TokenSet;
-use crate::{FStringErrorType, Mode, ParseErrorType, SyntaxError, SyntaxErrorKind};
+use crate::{FStringErrorType, Mode, ParseErrorType, SyntaxErrorKind};
 
 use super::{FStringElementsKind, Parenthesized, RecoveryContextKind};
 
@@ -2164,11 +2164,7 @@ impl<'src> Parser<'src> {
         let range = self.node_range(start);
 
         if self.options.target_version < PythonVersion::PY38 {
-            self.syntax_errors.push(SyntaxError {
-                kind: SyntaxErrorKind::WalrusBeforePy38,
-                range,
-                target_version: self.options.target_version,
-            });
+            self.add_syntax_error(SyntaxErrorKind::WalrusBeforePy38, range);
         }
 
         ast::ExprNamed {

@@ -434,46 +434,49 @@ pub struct SyntaxError {
     pub target_version: PythonVersion,
 }
 
-impl SyntaxError {
-    pub fn message(&self) -> String {
-        let kind = match self.kind {
-            SyntaxErrorKind::WalrusBeforePy38 => "named assignment expression (`:=`)",
-            SyntaxErrorKind::MatchBeforePy310 => "`match` statement",
-            SyntaxErrorKind::ExceptStarBeforePy311 => "`except*`",
-        };
-
-        format!(
-            "Cannot use {kind} on Python {} (syntax was new in Python {})",
-            self.target_version,
-            self.minimum_version(),
-        )
-    }
-
-    /// The earliest allowed version for the syntax associated with this error.
-    pub const fn minimum_version(&self) -> PythonVersion {
-        match self.kind {
-            SyntaxErrorKind::WalrusBeforePy38 => PythonVersion::PY38,
-            SyntaxErrorKind::MatchBeforePy310 => PythonVersion::PY310,
-            SyntaxErrorKind::ExceptStarBeforePy311 => PythonVersion::PY311,
+macro_rules! syntax_errors {
+    ($(($variant:ident, $version:ident, $error_msg:expr, $error_str:expr)$(,)?)*) => {
+        #[derive(Debug, PartialEq, Clone, Copy)]
+        pub enum SyntaxErrorKind {
+            $($variant,)*
         }
-    }
+
+        impl SyntaxError {
+            pub fn message(&self) -> String {
+                let kind = match self.kind {
+                    $(SyntaxErrorKind::$variant => $error_msg,)*
+                };
+
+                format!(
+                    "Cannot use {kind} on Python {} (syntax was new in Python {})",
+                    self.target_version,
+                    self.minimum_version(),
+                )
+            }
+
+            /// The earliest allowed version for the syntax associated with this error.
+            pub const fn minimum_version(&self) -> PythonVersion {
+                match self.kind {
+                    $(SyntaxErrorKind::$variant => PythonVersion::$version,)*
+                }
+            }
+        }
+
+        impl SyntaxErrorKind {
+            pub const fn as_str(self) -> &'static str {
+                match self {
+                    $(SyntaxErrorKind::$variant => $error_str,)*
+                }
+            }
+        }
+    };
 }
 
-#[derive(Debug, PartialEq, Clone, Copy)]
-pub enum SyntaxErrorKind {
-    WalrusBeforePy38,
-    MatchBeforePy310,
-    ExceptStarBeforePy311,
-}
-
-impl SyntaxErrorKind {
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            SyntaxErrorKind::WalrusBeforePy38 => "walrus-before-python-38",
-            SyntaxErrorKind::MatchBeforePy310 => "match-before-python-310",
-            SyntaxErrorKind::ExceptStarBeforePy311 => "except-star-before-python-311",
-        }
-    }
+syntax_errors! {
+    (WalrusBeforePy38, PY38, "named assignment expression (`:=`)",  "walrus-before-python-38"),
+    (MatchBeforePy310, PY310, "`match` statement",  "match-before-python-310"),
+    (ExceptStarBeforePy311, PY311, "`except*`", "except-star-before-python-311"),
+    (TypeStmtBeforePy312, PY312, "`type` statement", "type-stmt-before-python-312"),
 }
 
 #[cfg(target_pointer_width = "64")]

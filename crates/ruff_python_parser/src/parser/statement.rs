@@ -17,7 +17,7 @@ use crate::parser::{
 };
 use crate::token::{TokenKind, TokenValue};
 use crate::token_set::TokenSet;
-use crate::{Mode, ParseErrorType, SyntaxError, SyntaxErrorKind};
+use crate::{Mode, ParseErrorType, SyntaxErrorKind};
 
 use super::expression::ExpressionContext;
 use super::Parenthesized;
@@ -910,11 +910,17 @@ impl<'src> Parser<'src> {
         // type x = x := 1
         let value = self.parse_conditional_expression_or_higher();
 
+        let range = self.node_range(start);
+
+        if self.options.target_version < PythonVersion::PY312 {
+            self.add_syntax_error(SyntaxErrorKind::TypeStmtBeforePy312, range);
+        }
+
         ast::StmtTypeAlias {
             name: Box::new(name),
             type_params,
             value: Box::new(value.expr),
-            range: self.node_range(start),
+            range,
         }
     }
 
@@ -1460,11 +1466,7 @@ impl<'src> Parser<'src> {
 
         let range = self.node_range(try_start);
         if is_star && self.options.target_version < PythonVersion::PY311 {
-            self.syntax_errors.push(SyntaxError {
-                kind: SyntaxErrorKind::ExceptStarBeforePy311,
-                range,
-                target_version: self.options.target_version,
-            });
+            self.add_syntax_error(SyntaxErrorKind::ExceptStarBeforePy311, range);
         }
 
         ast::StmtTry {
@@ -2275,11 +2277,7 @@ impl<'src> Parser<'src> {
         let range = self.node_range(start);
 
         if self.options.target_version < PythonVersion::PY310 {
-            self.syntax_errors.push(SyntaxError {
-                kind: SyntaxErrorKind::MatchBeforePy310,
-                range,
-                target_version: self.options.target_version,
-            });
+            self.add_syntax_error(SyntaxErrorKind::MatchBeforePy310, range);
         }
 
         ast::StmtMatch {
