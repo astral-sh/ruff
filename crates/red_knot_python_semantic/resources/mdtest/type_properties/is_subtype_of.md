@@ -292,6 +292,31 @@ static_assert(not is_subtype_of(str, AlwaysTruthy))
 static_assert(not is_subtype_of(str, AlwaysFalsy))
 ```
 
+### `TypeGuard` and `TypeIs`
+
+`TypeGuard[...]` and `TypeIs[...]` are subtypes of `bool`.
+
+```py
+from knot_extensions import is_subtype_of, static_assert
+from typing_extensions import TypeGuard, TypeIs
+
+static_assert(is_subtype_of(TypeGuard[int], bool))
+static_assert(is_subtype_of(TypeIs[str], bool))
+```
+
+`TypeIs` is invariant. `TypeGuard` is covariant.
+
+```py
+from knot_extensions import is_subtype_of, static_assert
+from typing_extensions import TypeGuard, TypeIs
+
+static_assert(is_subtype_of(TypeGuard[bool], TypeGuard[int]))
+
+static_assert(not is_subtype_of(TypeGuard[int], TypeGuard[bool]))
+static_assert(not is_subtype_of(TypeIs[bool], TypeIs[int]))
+static_assert(not is_subtype_of(TypeIs[int], TypeIs[bool]))
+```
+
 ### Module literals
 
 ```py
