@@ -302,7 +302,9 @@ jobs:
       - name: "Install Rust toolchain"
         env:
           MSRV: ${{ steps.msrv.outputs.value }}
-        run: rustup default "${MSRV}"
+        run: |
+          rustup default "${MSRV}"
+          rustup toolchain install "${MSRV}" --component rustfmt
       - name: "Install mold"
         uses: rui314/setup-mold@v1
       - name: "Install cargo nextest"
