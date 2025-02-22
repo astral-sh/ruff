@@ -141,14 +141,19 @@ mod tests {
     use std::path::Path;
     use std::process::Command;
 
+    /// replaces all occurrences of "\r\n" with "\n" in the given string. Useful to make sure the file
+    /// content is same on all platforms.
+    fn normalize_newlines(s: &str) -> String {
+        s.replace("\r\n", "\n")
+    }
+
     #[test]
     fn test_astgen() {
-        let generated_path = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("src")
-            .join("generated.rs");
+        let project_root = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let generated_path = project_root.join("src").join("generated.rs");
         let original_content =
             fs::read_to_string(&generated_path).expect("Failed to read generated.rs");
-        let generate_script = Path::new(env!("CARGO_MANIFEST_DIR")).join("generate.py");
+        let generate_script = project_root.join("generate.py");
         let output = Command::new("uv")
             .arg("run")
             .arg(&generate_script)
@@ -163,7 +168,7 @@ mod tests {
         let new_content = fs::read_to_string(&generated_path)
             .expect("Failed to read generated.rs after generation");
         assert!(
-            original_content == new_content,
+            normalize_newlines(&original_content) == normalize_newlines(&new_content),
             "{} has changed after running {}. Commit the changes.",
             generated_path.display(),
             generate_script.display()
