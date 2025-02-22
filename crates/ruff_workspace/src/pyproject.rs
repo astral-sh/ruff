@@ -97,6 +97,17 @@ pub fn find_settings_toml<P: AsRef<Path>>(path: P) -> Result<Option<PathBuf>> {
     Ok(None)
 }
 
+/// Derive target version from `required-version` in `pyproject.toml`, if
+/// such a file exists in an ancestor directory.
+pub fn find_fallback_target_version<P: AsRef<Path>>(path: P) -> Option<PythonVersion> {
+    for directory in path.as_ref().ancestors() {
+        if let Some(fallback) = get_fallback_target_version(directory) {
+            return Some(fallback);
+        }
+    }
+    None
+}
+
 /// Find the path to the user-specific `pyproject.toml` or `ruff.toml`, if it
 /// exists.
 #[cfg(not(target_arch = "wasm32"))]
