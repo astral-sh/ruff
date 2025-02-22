@@ -2086,6 +2086,256 @@ select = ["UP006"]
 }
 
 #[test]
+/// ```
+/// tmp
+/// ├── pyproject.toml #<--- no `[tool.ruff]`
+/// └── test.py
+/// ```
+fn requires_python_no_tool() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let project_dir = tempdir.path().canonicalize()?;
+    let ruff_toml = tempdir.path().join("pyproject.toml");
+    fs::write(
+        &ruff_toml,
+        r#"[project]
+requires-python = ">= 3.11"
+"#,
+    )?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&project_dir).as_str(), "[TMP]/"),(r"(?m)^.*(\[.*\])\[DEBUG\](.*)$","$1[DEBUG]$2")]
+    }, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .arg("-v")
+            .args(["--select","UP007"])
+            .args(["--stdin-filename", "test.py"])
+            .arg("-")
+            .current_dir(project_dir)
+            .pass_stdin(r#"from typing import Union;foo: Union[int, str] = 1"#), @r###"
+        success: false
+        exit_code: 1
+        ----- stdout -----
+        test.py:1:31: UP007 [*] Use `X | Y` for type annotations
+        Found 1 error.
+        [*] 1 fixable with the `--fix` option.
+
+        ----- stderr -----
+        [ruff::resolve][DEBUG] Using Ruff default settings
+        [ruff_workspace::pyproject][DEBUG] Detected minimum supported `requires-python` version: 3.11
+        [ruff::resolve][DEBUG] Deriving `target-version` from found `requires-python`.
+        "###);
+    });
+    Ok(())
+}
+
+#[test]
+/// ```
+/// tmp
+/// ├── pyproject.toml #<-- no [tool.ruff]
+/// ├── ruff.toml #<-- no `target-version`
+/// └── test.py
+/// ```
+fn requires_python_ruff_toml_no_target_fallback() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let project_dir = tempdir.path().canonicalize()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"[lint]
+select = ["UP007"]
+"#,
+    )?;
+
+    let pyproject_toml = tempdir.path().join("pyproject.toml");
+    fs::write(
+        &pyproject_toml,
+        r#"[project]
+requires-python = ">= 3.11"
+"#,
+    )?;
+
+    let testpy = tempdir.path().join("test.py");
+    fs::write(
+        &testpy,
+        r#"
+from typing import Union;foo: Union[int, str] = 1
+"#,
+    )?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&project_dir).as_str(), "[TMP]/"),(r"(?m)\n.*\[ruff::commands::check\].*$",""),(r"(?m)^.*(\[.*\])\[DEBUG\](.*)$","$1[DEBUG]$2")]
+    }, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .arg("test.py")
+            .arg("-v")
+            .current_dir(project_dir), @r###"
+        success: false
+        exit_code: 1
+        ----- stdout -----
+        test.py:2:31: UP007 [*] Use `X | Y` for type annotations
+        Found 1 error.
+        [*] 1 fixable with the `--fix` option.
+
+        ----- stderr -----
+        [ruff::resolve][DEBUG] Using configuration file (via parent) at: [TMP]/ruff.toml
+        [ruff_workspace::pyproject][DEBUG] No `target-version` found in `ruff.toml`
+        [ruff_workspace::pyproject][DEBUG] Detected minimum supported `requires-python` version: 3.11
+        [ruff_workspace::pyproject][DEBUG] Deriving `target-version` from `requires-python` in `pyproject.toml`
+        [ruff::diagnostics][DEBUG] Checking: [TMP]/test.py
+        "###);
+    });
+    Ok(())
+}
+
+#[test]
+/// ```
+/// tmp
+/// ├── foo
+/// │   ├── pyproject.toml #<-- no [tool.ruff], no `requires-python`
+/// │   └── test.py
+/// └── pyproject.toml #<-- no [tool.ruff], has `requires-python`
+/// ```
+fn requires_python_pyproject_toml_above() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let project_dir = tempdir.path().canonicalize()?;
+    let outer_pyproject = tempdir.path().join("pyproject.toml");
+    fs::write(
+        &outer_pyproject,
+        r#"[project]
+requires-python = ">= 3.11"
+"#,
+    )?;
+
+    let foodir = tempdir.path().join("foo");
+    fs::create_dir(foodir)?;
+
+    let inner_pyproject = tempdir.path().join("foo/pyproject.toml");
+    fs::write(
+        &inner_pyproject,
+        r#"[project]
+"#,
+    )?;
+
+    let testpy = tempdir.path().join("foo/test.py");
+    fs::write(
+        &testpy,
+        r#"
+from typing import Union;foo: Union[int, str] = 1
+"#,
+    )?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&project_dir).as_str(), "[TMP]/"),(r"(?m)\n.*\[ruff::commands::check\].*$",""),(r"(?m)^.*(\[.*\])\[DEBUG\](.*)$","$1[DEBUG]$2")]
+    }, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .arg("-v")
+            .args(["--select","UP007"])
+            .arg("foo/test.py")
+            .current_dir(&project_dir), @r###"
+        success: false
+        exit_code: 1
+        ----- stdout -----
+        foo/test.py:2:31: UP007 [*] Use `X | Y` for type annotations
+        Found 1 error.
+        [*] 1 fixable with the `--fix` option.
+
+        ----- stderr -----
+        [ruff::resolve][DEBUG] Using Ruff default settings
+        [ruff_workspace::pyproject][DEBUG] Detected minimum supported `requires-python` version: 3.11
+        [ruff::resolve][DEBUG] Deriving `target-version` from found `requires-python`.
+        [ruff::diagnostics][DEBUG] Checking: [TMP]/foo/test.py
+        "###);
+    });
+    Ok(())
+}
+
+#[test]
+/// ```
+/// tmp
+/// ├── foo
+/// │   ├── pyproject.toml #<-- no [tool.ruff]
+/// │   └── test.py
+/// └── ruff.toml #<-- no `target-version`
+/// ```
+fn requires_python_ruff_toml_above() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let project_dir = tempdir.path().canonicalize()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+[lint]
+select = ["UP007"]
+"#,
+    )?;
+
+    let foodir = tempdir.path().join("foo");
+    fs::create_dir(foodir)?;
+
+    let pyproject_toml = tempdir.path().join("foo/pyproject.toml");
+    fs::write(
+        &pyproject_toml,
+        r#"[project]
+requires-python = ">= 3.11"
+"#,
+    )?;
+
+    let testpy = tempdir.path().join("foo/test.py");
+    fs::write(
+        &testpy,
+        r#"
+from typing import Union;foo: Union[int, str] = 1
+"#,
+    )?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&project_dir).as_str(), "[TMP]/"),(r"(?m)\n.*\[ruff::commands::check\].*$",""),(r"(?m)^.*(\[.*\])\[DEBUG\](.*)$","$1[DEBUG]$2")]
+    }, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .arg("-v")
+            .arg("foo/test.py")
+            .current_dir(&project_dir), @r###"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        All checks passed!
+
+        ----- stderr -----
+        [ruff::resolve][DEBUG] Using configuration file (via parent) at: [TMP]/ruff.toml
+        [ruff_workspace::pyproject][DEBUG] No `target-version` found in `ruff.toml`
+        [ruff_workspace::pyproject][DEBUG] No `pyproject.toml` with `requires-python` in same directory; `target-version` unspecified
+        [ruff::diagnostics][DEBUG] Checking: [TMP]/foo/test.py
+        "###);
+    });
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&project_dir).as_str(), "[TMP]/"),(r"(?m)\n.*\[ruff::commands::check\].*$",""),(r"(?m)^.*(\[.*\])\[DEBUG\](.*)$","$1[DEBUG]$2")]
+    }, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .arg("-v")
+            .arg("test.py")
+            .current_dir(&project_dir.join("foo")), @r###"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        All checks passed!
+
+        ----- stderr -----
+        [ruff::resolve][DEBUG] Using configuration file (via parent) at: [TMP]/ruff.toml
+        [ruff_workspace::pyproject][DEBUG] No `target-version` found in `ruff.toml`
+        [ruff_workspace::pyproject][DEBUG] No `pyproject.toml` with `requires-python` in same directory; `target-version` unspecified
+        [ruff::diagnostics][DEBUG] Checking: [TMP]/foo/test.py
+        "###);
+    });
+    Ok(())
+}
+
+#[test]
 fn checks_notebooks_in_stable() -> anyhow::Result<()> {
     let tempdir = TempDir::new()?;
     std::fs::write(
