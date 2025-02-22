@@ -241,30 +241,34 @@ suites:
     `except` suite ran to completion
 
 ```py
-def could_raise_returns_str() -> str:
-    return "foo"
+class A: ...
+class B: ...
+class C: ...
 
-def could_raise_returns_bytes() -> bytes:
-    return b"foo"
+def could_raise_returns_A() -> A:
+    return A()
 
-def could_raise_returns_bool() -> bool:
-    return True
+def could_raise_returns_B() -> B:
+    return B()
+
+def could_raise_returns_C() -> C:
+    return C()
 
 x = 1
 
 try:
     reveal_type(x)  # revealed: Literal[1]
-    x = could_raise_returns_str()
-    reveal_type(x)  # revealed: str
+    x = could_raise_returns_A()
+    reveal_type(x)  # revealed: A
 except TypeError:
-    reveal_type(x)  # revealed: Literal[1] | str
-    x = could_raise_returns_bytes()
-    reveal_type(x)  # revealed: bytes
-    x = could_raise_returns_bool()
-    reveal_type(x)  # revealed: bool
+    reveal_type(x)  # revealed: Literal[1] | A
+    x = could_raise_returns_B()
+    reveal_type(x)  # revealed: B
+    x = could_raise_returns_C()
+    reveal_type(x)  # revealed: C
 finally:
-    # TODO: should be `Literal[1] | str | bytes | bool`
-    reveal_type(x)  # revealed: str | bool
+    # TODO: should be `Literal[1] | A | B | C`
+    reveal_type(x)  # revealed: A | C
     x = 2
     reveal_type(x)  # revealed: Literal[2]
 
@@ -282,53 +286,56 @@ x = 1
 
 try:
     reveal_type(x)  # revealed: Literal[1]
-    x = could_raise_returns_str()
-    reveal_type(x)  # revealed: str
+    x = could_raise_returns_A()
+    reveal_type(x)  # revealed: A
 except TypeError:
-    reveal_type(x)  # revealed: Literal[1] | str
-    x = could_raise_returns_bytes()
-    reveal_type(x)  # revealed: bytes
-    x = could_raise_returns_bool()
-    reveal_type(x)  # revealed: bool
+    reveal_type(x)  # revealed: Literal[1] | A
+    x = could_raise_returns_B()
+    reveal_type(x)  # revealed: B
+    x = could_raise_returns_C()
+    reveal_type(x)  # revealed: C
 finally:
-    # TODO: should be `Literal[1] | str | bytes | bool`
-    reveal_type(x)  # revealed: str | bool
+    # TODO: should be `Literal[1] | A | B | C`
+    reveal_type(x)  # revealed: A | C
 
-reveal_type(x)  # revealed: str | bool
+reveal_type(x)  # revealed: A | C
 ```
 
 An example with multiple `except` branches and a `finally` branch:
 
 ```py
-def could_raise_returns_memoryview() -> memoryview:
-    return memoryview(b"")
+class D: ...
+class E: ...
 
-def could_raise_returns_float() -> float:
-    return 3.14
+def could_raise_returns_D() -> D:
+    return D()
+
+def could_raise_returns_E() -> E:
+    return E()
 
 x = 1
 
 try:
     reveal_type(x)  # revealed: Literal[1]
-    x = could_raise_returns_str()
-    reveal_type(x)  # revealed: str
+    x = could_raise_returns_A()
+    reveal_type(x)  # revealed: A
 except TypeError:
-    reveal_type(x)  # revealed: Literal[1] | str
-    x = could_raise_returns_bytes()
-    reveal_type(x)  # revealed: bytes
-    x = could_raise_returns_bool()
-    reveal_type(x)  # revealed: bool
+    reveal_type(x)  # revealed: Literal[1] | A
+    x = could_raise_returns_B()
+    reveal_type(x)  # revealed: B
+    x = could_raise_returns_C()
+    reveal_type(x)  # revealed: C
 except ValueError:
-    reveal_type(x)  # revealed: Literal[1] | str
-    x = could_raise_returns_memoryview()
-    reveal_type(x)  # revealed: memoryview
-    x = could_raise_returns_float()
-    reveal_type(x)  # revealed: float
+    reveal_type(x)  # revealed: Literal[1] | A
+    x = could_raise_returns_D()
+    reveal_type(x)  # revealed: D
+    x = could_raise_returns_E()
+    reveal_type(x)  # revealed: E
 finally:
-    # TODO: should be `Literal[1] | str | bytes | bool | memoryview | float`
-    reveal_type(x)  # revealed: str | bool | float
+    # TODO: should be `Literal[1] | A | B | C | D | E`
+    reveal_type(x)  # revealed: A | C | E
 
-reveal_type(x)  # revealed: str | bool | float
+reveal_type(x)  # revealed: A | C | E
 ```
 
 ## Combining `except`, `else` and `finally` branches
@@ -338,84 +345,93 @@ control flow could have jumped to the `finally` suite from partway through the `
 an exception raised *there*.
 
 ```py
-def could_raise_returns_str() -> str:
-    return "foo"
+class A: ...
+class B: ...
+class C: ...
+class D: ...
+class E: ...
 
-def could_raise_returns_bytes() -> bytes:
-    return b"foo"
+def could_raise_returns_A() -> A:
+    return A()
 
-def could_raise_returns_bool() -> bool:
-    return True
+def could_raise_returns_B() -> B:
+    return B()
 
-def could_raise_returns_memoryview() -> memoryview:
-    return memoryview(b"")
+def could_raise_returns_C() -> C:
+    return C()
 
-def could_raise_returns_float() -> float:
-    return 3.14
+def could_raise_returns_D() -> D:
+    return D()
+
+def could_raise_returns_E() -> E:
+    return E()
 
 x = 1
 
 try:
     reveal_type(x)  # revealed: Literal[1]
-    x = could_raise_returns_str()
-    reveal_type(x)  # revealed: str
+    x = could_raise_returns_A()
+    reveal_type(x)  # revealed: A
 except TypeError:
-    reveal_type(x)  # revealed: Literal[1] | str
-    x = could_raise_returns_bytes()
-    reveal_type(x)  # revealed: bytes
-    x = could_raise_returns_bool()
-    reveal_type(x)  # revealed: bool
+    reveal_type(x)  # revealed: Literal[1] | A
+    x = could_raise_returns_B()
+    reveal_type(x)  # revealed: B
+    x = could_raise_returns_C()
+    reveal_type(x)  # revealed: C
 else:
-    reveal_type(x)  # revealed: str
-    x = could_raise_returns_memoryview()
-    reveal_type(x)  # revealed: memoryview
-    x = could_raise_returns_float()
-    reveal_type(x)  # revealed: float
+    reveal_type(x)  # revealed: A
+    x = could_raise_returns_D()
+    reveal_type(x)  # revealed: D
+    x = could_raise_returns_E()
+    reveal_type(x)  # revealed: E
 finally:
-    # TODO: should be `Literal[1] | str | bytes | bool | memoryview | float`
-    reveal_type(x)  # revealed: bool | float
+    # TODO: should be `Literal[1] | A | B | C | D | E`
+    reveal_type(x)  # revealed: C | E
 
-reveal_type(x)  # revealed: bool | float
+reveal_type(x)  # revealed: C | E
 ```
 
 The same again, this time with multiple `except` branches:
 
 ```py
-def could_raise_returns_range() -> range:
-    return range(42)
+class F: ...
+class G: ...
 
-def could_raise_returns_slice() -> slice:
-    return slice(None)
+def could_raise_returns_F() -> F:
+    return F()
+
+def could_raise_returns_G() -> G:
+    return G()
 
 x = 1
 
 try:
     reveal_type(x)  # revealed: Literal[1]
-    x = could_raise_returns_str()
-    reveal_type(x)  # revealed: str
+    x = could_raise_returns_A()
+    reveal_type(x)  # revealed: A
 except TypeError:
-    reveal_type(x)  # revealed: Literal[1] | str
-    x = could_raise_returns_bytes()
-    reveal_type(x)  # revealed: bytes
-    x = could_raise_returns_bool()
-    reveal_type(x)  # revealed: bool
+    reveal_type(x)  # revealed: Literal[1] | A
+    x = could_raise_returns_B()
+    reveal_type(x)  # revealed: B
+    x = could_raise_returns_C()
+    reveal_type(x)  # revealed: C
 except ValueError:
-    reveal_type(x)  # revealed: Literal[1] | str
-    x = could_raise_returns_memoryview()
-    reveal_type(x)  # revealed: memoryview
-    x = could_raise_returns_float()
-    reveal_type(x)  # revealed: float
+    reveal_type(x)  # revealed: Literal[1] | A
+    x = could_raise_returns_D()
+    reveal_type(x)  # revealed: D
+    x = could_raise_returns_E()
+    reveal_type(x)  # revealed: E
 else:
-    reveal_type(x)  # revealed: str
-    x = could_raise_returns_range()
-    reveal_type(x)  # revealed: range
-    x = could_raise_returns_slice()
-    reveal_type(x)  # revealed: slice
+    reveal_type(x)  # revealed: A
+    x = could_raise_returns_F()
+    reveal_type(x)  # revealed: F
+    x = could_raise_returns_G()
+    reveal_type(x)  # revealed: G
 finally:
-    # TODO: should be `Literal[1] | str | bytes | bool | memoryview | float | range | slice`
-    reveal_type(x)  # revealed: bool | float | slice
+    # TODO: should be `Literal[1] | A | B | C | D | E | F | G`
+    reveal_type(x)  # revealed: C | E | G
 
-reveal_type(x)  # revealed: bool | float | slice
+reveal_type(x)  # revealed: C | E | G
 ```
 
 ## Nested `try`/`except` blocks
@@ -429,92 +445,101 @@ a suite containing statements that could possibly raise exceptions, which would 
 jumping out of that suite prior to the suite running to completion.
 
 ```py
-def could_raise_returns_str() -> str:
-    return "foo"
+class A: ...
+class B: ...
+class C: ...
+class D: ...
+class E: ...
+class F: ...
+class G: ...
+class H: ...
+class I: ...
+class J: ...
+class K: ...
 
-def could_raise_returns_bytes() -> bytes:
-    return b"foo"
+def could_raise_returns_A() -> A:
+    return A()
 
-def could_raise_returns_bool() -> bool:
-    return True
+def could_raise_returns_B() -> B:
+    return B()
 
-def could_raise_returns_memoryview() -> memoryview:
-    return memoryview(b"")
+def could_raise_returns_C() -> C:
+    return C()
 
-def could_raise_returns_float() -> float:
-    return 3.14
+def could_raise_returns_D() -> D:
+    return D()
 
-def could_raise_returns_range() -> range:
-    return range(42)
+def could_raise_returns_E() -> E:
+    return E()
 
-def could_raise_returns_slice() -> slice:
-    return slice(None)
+def could_raise_returns_F() -> F:
+    return F()
 
-def could_raise_returns_complex() -> complex:
-    return 3j
+def could_raise_returns_G() -> G:
+    return G()
 
-def could_raise_returns_bytearray() -> bytearray:
-    return bytearray()
+def could_raise_returns_H() -> H:
+    return H()
 
-class Foo: ...
-class Bar: ...
+def could_raise_returns_I() -> I:
+    return I()
 
-def could_raise_returns_Foo() -> Foo:
-    return Foo()
+def could_raise_returns_J() -> J:
+    return J()
 
-def could_raise_returns_Bar() -> Bar:
-    return Bar()
+def could_raise_returns_K() -> K:
+    return K()
 
 x = 1
 
 try:
     try:
         reveal_type(x)  # revealed: Literal[1]
-        x = could_raise_returns_str()
-        reveal_type(x)  # revealed: str
+        x = could_raise_returns_A()
+        reveal_type(x)  # revealed: A
     except TypeError:
-        reveal_type(x)  # revealed: Literal[1] | str
-        x = could_raise_returns_bytes()
-        reveal_type(x)  # revealed: bytes
-        x = could_raise_returns_bool()
-        reveal_type(x)  # revealed: bool
+        reveal_type(x)  # revealed: Literal[1] | A
+        x = could_raise_returns_B()
+        reveal_type(x)  # revealed: B
+        x = could_raise_returns_C()
+        reveal_type(x)  # revealed: C
     except ValueError:
-        reveal_type(x)  # revealed: Literal[1] | str
-        x = could_raise_returns_memoryview()
-        reveal_type(x)  # revealed: memoryview
-        x = could_raise_returns_float()
-        reveal_type(x)  # revealed: float
+        reveal_type(x)  # revealed: Literal[1] | A
+        x = could_raise_returns_D()
+        reveal_type(x)  # revealed: D
+        x = could_raise_returns_E()
+        reveal_type(x)  # revealed: E
     else:
-        reveal_type(x)  # revealed: str
-        x = could_raise_returns_range()
-        reveal_type(x)  # revealed: range
-        x = could_raise_returns_slice()
-        reveal_type(x)  # revealed: slice
+        reveal_type(x)  # revealed: A
+        x = could_raise_returns_F()
+        reveal_type(x)  # revealed: F
+        x = could_raise_returns_G()
+        reveal_type(x)  # revealed: G
     finally:
-        # TODO: should be `Literal[1] | str | bytes | bool | memoryview | float | range | slice`
-        reveal_type(x)  # revealed: bool | float | slice
+        # TODO: should be `Literal[1] | A | B | C | D | E | F | G`
+        reveal_type(x)  # revealed: C | E | G
         x = 2
         reveal_type(x)  # revealed: Literal[2]
     reveal_type(x)  # revealed: Literal[2]
 except:
-    reveal_type(x)  # revealed: Literal[1, 2] | str | bytes | bool | memoryview | float | range | slice
-    x = could_raise_returns_complex()
-    reveal_type(x)  # revealed: complex
-    x = could_raise_returns_bytearray()
-    reveal_type(x)  # revealed: bytearray
+    reveal_type(x)  # revealed: Literal[1, 2] | A | B | C | D | E | F | G
+    x = could_raise_returns_H()
+    reveal_type(x)  # revealed: H
+    x = could_raise_returns_I()
+    reveal_type(x)  # revealed: I
 else:
     reveal_type(x)  # revealed: Literal[2]
-    x = could_raise_returns_Foo()
-    reveal_type(x)  # revealed: Foo
-    x = could_raise_returns_Bar()
-    reveal_type(x)  # revealed: Bar
+    x = could_raise_returns_J()
+    reveal_type(x)  # revealed: J
+    x = could_raise_returns_K()
+    reveal_type(x)  # revealed: K
 finally:
-    # TODO: should be `Literal[1, 2] | str | bytes | bool | memoryview | float | range | slice | complex | bytearray | Foo | Bar`
-    reveal_type(x)  # revealed: bytearray | Bar
+    # TODO: should be `Literal[1, 2] | A | B | C | D | E | F | G | H | I | J | K`
+    reveal_type(x)  # revealed: I | K
 
 # Either one `except` branch or the `else`
 # must have been taken and completed to get here:
-reveal_type(x)  # revealed: bytearray | Bar
+reveal_type(x)  # revealed: I | K
 ```
 
 ## Nested scopes inside `try` blocks
@@ -523,50 +548,56 @@ Shadowing a variable in an inner scope has no effect on type inference of the va
 in the outer scope:
 
 ```py
-def could_raise_returns_str() -> str:
-    return "foo"
+class A: ...
+class B: ...
+class C: ...
+class D: ...
+class E: ...
 
-def could_raise_returns_bytes() -> bytes:
-    return b"foo"
+def could_raise_returns_A() -> A:
+    return A()
 
-def could_raise_returns_range() -> range:
-    return range(42)
+def could_raise_returns_B() -> B:
+    return B()
 
-def could_raise_returns_bytearray() -> bytearray:
-    return bytearray()
+def could_raise_returns_C() -> C:
+    return C()
 
-def could_raise_returns_float() -> float:
-    return 3.14
+def could_raise_returns_D() -> D:
+    return D()
+
+def could_raise_returns_E() -> E:
+    return E()
 
 x = 1
 
 try:
 
-    def foo(param=could_raise_returns_str()):
-        x = could_raise_returns_str()
+    def foo(param=could_raise_returns_A()):
+        x = could_raise_returns_A()
 
         try:
-            reveal_type(x)  # revealed: str
-            x = could_raise_returns_bytes()
-            reveal_type(x)  # revealed: bytes
+            reveal_type(x)  # revealed: A
+            x = could_raise_returns_B()
+            reveal_type(x)  # revealed: B
         except:
-            reveal_type(x)  # revealed: str | bytes
-            x = could_raise_returns_bytearray()
-            reveal_type(x)  # revealed: bytearray
-            x = could_raise_returns_float()
-            reveal_type(x)  # revealed: float
+            reveal_type(x)  # revealed: A | B
+            x = could_raise_returns_C()
+            reveal_type(x)  # revealed: C
+            x = could_raise_returns_D()
+            reveal_type(x)  # revealed: D
         finally:
-            # TODO: should be `str | bytes | bytearray | float`
-            reveal_type(x)  # revealed: bytes | float
-        reveal_type(x)  # revealed: bytes | float
+            # TODO: should be `A | B | C | D`
+            reveal_type(x)  # revealed: B | D
+        reveal_type(x)  # revealed: B | D
     x = foo
     reveal_type(x)  # revealed: Literal[foo]
 except:
     reveal_type(x)  # revealed: Literal[1] | Literal[foo]
 
     class Bar:
-        x = could_raise_returns_range()
-        reveal_type(x)  # revealed: range
+        x = could_raise_returns_E()
+        reveal_type(x)  # revealed: E
 
     x = Bar
     reveal_type(x)  # revealed: Literal[Bar]

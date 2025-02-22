@@ -2,9 +2,9 @@ use std::fmt;
 
 /// Representation of a Python version.
 ///
-/// Unlike the `TargetVersion` enums in the CLI crates,
-/// this does not necessarily represent a Python version that we actually support.
+/// N.B. This does not necessarily represent a Python version that we actually support.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[cfg_attr(feature = "cache", derive(ruff_macros::CacheKey))]
 pub struct PythonVersion {
     pub major: u8,
     pub minor: u8,
@@ -41,12 +41,26 @@ impl PythonVersion {
             PythonVersion::PY312,
             PythonVersion::PY313,
         ]
-        .iter()
-        .copied()
+        .into_iter()
+    }
+
+    pub const fn latest() -> Self {
+        Self::PY313
+    }
+
+    pub const fn as_tuple(self) -> (u8, u8) {
+        (self.major, self.minor)
     }
 
     pub fn free_threaded_build_available(self) -> bool {
         self >= PythonVersion::PY313
+    }
+
+    /// Return `true` if the current version supports [PEP 701].
+    ///
+    /// [PEP 701]: https://peps.python.org/pep-0701/
+    pub fn supports_pep_701(self) -> bool {
+        self >= Self::PY312
     }
 }
 
@@ -84,7 +98,7 @@ impl fmt::Display for PythonVersion {
 
 #[cfg(feature = "serde")]
 mod serde {
-    use crate::PythonVersion;
+    use super::PythonVersion;
 
     impl<'de> serde::Deserialize<'de> for PythonVersion {
         fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>

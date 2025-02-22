@@ -32,9 +32,9 @@ _T = TypeVar("_T")
 _T_co = TypeVar("_T_co", covariant=True)
 _T_io = TypeVar("_T_io", bound=IO[str] | None)
 _ExitT_co = TypeVar("_ExitT_co", covariant=True, bound=bool | None, default=bool | None)
+_F = TypeVar("_F", bound=Callable[..., Any])
 _G = TypeVar("_G", bound=Generator[Any, Any, Any] | AsyncGenerator[Any, Any], covariant=True)
 _P = ParamSpec("_P")
-_R = TypeVar("_R")
 
 _SendT_contra = TypeVar("_SendT_contra", contravariant=True, default=None)
 _ReturnT_co = TypeVar("_ReturnT_co", covariant=True, default=None)
@@ -64,13 +64,9 @@ class AbstractAsyncContextManager(ABC, Protocol[_T_co, _ExitT_co]):  # type: ign
         self, exc_type: type[BaseException] | None, exc_value: BaseException | None, traceback: TracebackType | None, /
     ) -> _ExitT_co: ...
 
-class _WrappedCallable(Generic[_P, _R]):
-    __wrapped__: Callable[_P, _R]
-    def __call__(self, *args: _P.args, **kwargs: _P.kwargs) -> _R: ...
-
 class ContextDecorator:
     def _recreate_cm(self) -> Self: ...
-    def __call__(self, func: Callable[_P, _R]) -> _WrappedCallable[_P, _R]: ...
+    def __call__(self, func: _F) -> _F: ...
 
 class _GeneratorContextManagerBase(Generic[_G]):
     # Ideally this would use ParamSpec, but that requires (*args, **kwargs), which this isn't. see #6676
@@ -97,11 +93,11 @@ class _GeneratorContextManager(
 def contextmanager(func: Callable[_P, Iterator[_T_co]]) -> Callable[_P, _GeneratorContextManager[_T_co]]: ...
 
 if sys.version_info >= (3, 10):
-    _AR = TypeVar("_AR", bound=Awaitable[Any])
+    _AF = TypeVar("_AF", bound=Callable[..., Awaitable[Any]])
 
     class AsyncContextDecorator:
         def _recreate_cm(self) -> Self: ...
-        def __call__(self, func: Callable[_P, _AR]) -> _WrappedCallable[_P, _AR]: ...
+        def __call__(self, func: _AF) -> _AF: ...
 
     class _AsyncGeneratorContextManager(
         _GeneratorContextManagerBase[AsyncGenerator[_T_co, _SendT_contra]],

@@ -11,7 +11,7 @@ use crate::normalizer::Normalizer;
 use ruff_formatter::FormatOptions;
 use ruff_python_ast::comparable::ComparableMod;
 use ruff_python_formatter::{format_module_source, format_range, PreviewMode, PyFormatOptions};
-use ruff_python_parser::{parse, AsMode};
+use ruff_python_parser::{parse, ParseOptions};
 use ruff_source_file::{LineIndex, OneIndexed};
 use ruff_text_size::{TextRange, TextSize};
 
@@ -26,8 +26,9 @@ fn black_compatibility() {
 
         let options: PyFormatOptions = if let Ok(options_file) = fs::File::open(&options_path) {
             let reader = BufReader::new(options_file);
-            serde_json::from_reader(reader)
-                .unwrap_or_else(|_| panic!("Option file {options_path:?} to be a valid Json file"))
+            serde_json::from_reader(reader).unwrap_or_else(|_| {
+                panic!("Expected option file {options_path:?} to be a valid Json file")
+            })
         } else {
             PyFormatOptions::from_extension(input_path)
         };
@@ -180,10 +181,12 @@ fn format() {
         let mut snapshot = format!("## Input\n{}", CodeFrame::new("python", &content));
         let options_path = input_path.with_extension("options.json");
 
-        if let Ok(options_file) = fs::File::open(options_path) {
+        if let Ok(options_file) = fs::File::open(&options_path) {
             let reader = BufReader::new(options_file);
             let options: Vec<PyFormatOptions> =
-                serde_json::from_reader(reader).expect("Options to be a valid Json file");
+                serde_json::from_reader(reader).unwrap_or_else(|_| {
+                    panic!("Expected option file {options_path:?} to be a valid Json file")
+                });
 
             writeln!(snapshot, "## Outputs").unwrap();
 
@@ -390,14 +393,14 @@ fn ensure_unchanged_ast(
     let source_type = options.source_type();
 
     // Parse the unformatted code.
-    let mut unformatted_ast = parse(unformatted_code, source_type.as_mode())
+    let mut unformatted_ast = parse(unformatted_code, ParseOptions::from(source_type))
         .expect("Unformatted code to be valid syntax")
         .into_syntax();
     Normalizer.visit_module(&mut unformatted_ast);
     let unformatted_ast = ComparableMod::from(&unformatted_ast);
 
     // Parse the formatted code.
-    let mut formatted_ast = parse(formatted_code, source_type.as_mode())
+    let mut formatted_ast = parse(formatted_code, ParseOptions::from(source_type))
         .expect("Formatted code to be valid syntax")
         .into_syntax();
     Normalizer.visit_module(&mut formatted_ast);
@@ -473,7 +476,7 @@ magic-trailing-comma       = {magic_trailing_comma:?}
 docstring-code             = {docstring_code:?}
 docstring-code-line-width  = {docstring_code_line_width:?}
 preview                    = {preview:?}
-target_version             = {target_version:?}
+target_version             = {target_version}
 source_type                = {source_type:?}"#,
             indent_style = self.0.indent_style(),
             indent_width = self.0.indent_width().value(),

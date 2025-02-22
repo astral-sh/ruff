@@ -8,10 +8,10 @@ use crate::types::string_annotation::{
 };
 use crate::types::{ClassLiteralType, KnownInstanceType, Type};
 use crate::{declare_lint, Db};
-use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity, Span};
+use ruff_db::diagnostic::{Diagnostic, DiagnosticId, SecondaryDiagnosticMessage, Severity, Span};
 use ruff_db::files::File;
 use ruff_python_ast::{self as ast, AnyNodeRef};
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::TextRange;
 use rustc_hash::FxHashSet;
 use std::borrow::Cow;
 use std::fmt::Formatter;
@@ -44,6 +44,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&MISSING_ARGUMENT);
     registry.register_lint(&NON_SUBSCRIPTABLE);
     registry.register_lint(&NOT_ITERABLE);
+    registry.register_lint(&UNSUPPORTED_BOOL_CONVERSION);
     registry.register_lint(&PARAMETER_ALREADY_ASSIGNED);
     registry.register_lint(&POSSIBLY_UNBOUND_ATTRIBUTE);
     registry.register_lint(&POSSIBLY_UNBOUND_IMPORT);
@@ -492,6 +493,37 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
+    /// Checks for bool conversions where the object doesn't correctly implement `__bool__`.
+    ///
+    /// ## Why is this bad?
+    /// If an exception is raised when you attempt to evaluate the truthiness of an object,
+    /// using the object in a boolean context will fail at runtime.
+    ///
+    /// ## Examples
+    ///
+    /// ```python
+    /// class NotBoolable:
+    ///     __bool__ = None
+    ///
+    /// b1 = NotBoolable()
+    /// b2 = NotBoolable()
+    ///
+    /// if b1:  # exception raised here
+    ///     pass
+    ///
+    /// b1 and b2  # exception raised here
+    /// not b1  # exception raised here
+    /// b1 < b2 < b1  # exception raised here
+    /// ```
+    pub(crate) static UNSUPPORTED_BOOL_CONVERSION = {
+        summary: "detects boolean conversion where the object incorrectly implements `__bool__`",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
     /// Checks for calls which provide more than one argument for a single parameter.
     ///
     /// ## Why is this bad?
@@ -777,6 +809,7 @@ pub struct TypeCheckDiagnostic {
     pub(crate) range: TextRange,
     pub(crate) severity: Severity,
     pub(crate) file: File,
+    pub(crate) secondary_messages: Vec<SecondaryDiagnosticMessage>,
 }
 
 impl TypeCheckDiagnostic {
@@ -806,14 +839,12 @@ impl Diagnostic for TypeCheckDiagnostic {
         Some(Span::from(self.file).with_range(self.range))
     }
 
+    fn secondary_messages(&self) -> &[SecondaryDiagnosticMessage] {
+        &self.secondary_messages
+    }
+
     fn severity(&self) -> Severity {
         self.severity
-    }
-}
-
-impl Ranged for TypeCheckDiagnostic {
-    fn range(&self) -> TextRange {
-        self.range
     }
 }
 
@@ -1048,7 +1079,7 @@ pub(super) fn report_possibly_unresolved_reference(
 
     context.report_lint(
         &POSSIBLY_UNRESOLVED_REFERENCE,
-        expr_name_node.into(),
+        expr_name_node,
         format_args!("Name `{id}` used when possibly not defined"),
     );
 }
@@ -1058,7 +1089,7 @@ pub(super) fn report_unresolved_reference(context: &InferContext, expr_name_node
 
     context.report_lint(
         &UNRESOLVED_REFERENCE,
-        expr_name_node.into(),
+        expr_name_node,
         format_args!("Name `{id}` used when not defined"),
     );
 }
@@ -1066,7 +1097,7 @@ pub(super) fn report_unresolved_reference(context: &InferContext, expr_name_node
 pub(super) fn report_invalid_exception_caught(context: &InferContext, node: &ast::Expr, ty: Type) {
     context.report_lint(
         &INVALID_EXCEPTION_CAUGHT,
-        node.into(),
+        node,
         format_args!(
             "Cannot catch object of type `{}` in an exception handler \
             (must be a `BaseException` subclass or a tuple of `BaseException` subclasses)",
@@ -1078,7 +1109,7 @@ pub(super) fn report_invalid_exception_caught(context: &InferContext, node: &ast
 pub(crate) fn report_invalid_exception_raised(context: &InferContext, node: &ast::Expr, ty: Type) {
     context.report_lint(
         &INVALID_RAISE,
-        node.into(),
+        node,
         format_args!(
             "Cannot raise object of type `{}` (must be a `BaseException` subclass or instance)",
             ty.display(context.db())
@@ -1089,7 +1120,7 @@ pub(crate) fn report_invalid_exception_raised(context: &InferContext, node: &ast
 pub(crate) fn report_invalid_exception_cause(context: &InferContext, node: &ast::Expr, ty: Type) {
     context.report_lint(
         &INVALID_RAISE,
-        node.into(),
+        node,
         format_args!(
             "Cannot use object of type `{}` as exception cause \
             (must be a `BaseException` subclass or instance or `None`)",
@@ -1101,7 +1132,7 @@ pub(crate) fn report_invalid_exception_cause(context: &InferContext, node: &ast:
 pub(crate) fn report_base_with_incompatible_slots(context: &InferContext, node: &ast::Expr) {
     context.report_lint(
         &INCOMPATIBLE_SLOTS,
-        node.into(),
+        node,
         format_args!("Class base has incompatible `__slots__`"),
     );
 }
@@ -1113,7 +1144,7 @@ pub(crate) fn report_invalid_arguments_to_annotated<'db>(
 ) {
     context.report_lint(
         &INVALID_TYPE_FORM,
-        subscript.into(),
+        subscript,
         format_args!(
             "Special form `{}` expected at least 2 arguments (one type and at least one metadata element)",
             KnownInstanceType::Annotated.repr(db)

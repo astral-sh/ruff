@@ -5,7 +5,7 @@ pub use range::format_range;
 use ruff_formatter::prelude::*;
 use ruff_formatter::{format, write, FormatError, Formatted, PrintError, Printed, SourceCode};
 use ruff_python_ast::{AnyNodeRef, Mod};
-use ruff_python_parser::{parse, AsMode, ParseError, Parsed};
+use ruff_python_parser::{parse, ParseError, ParseOptions, Parsed};
 use ruff_python_trivia::CommentRanges;
 use ruff_text_size::Ranged;
 
@@ -15,7 +15,7 @@ use crate::comments::{
 pub use crate::context::PyFormatContext;
 pub use crate::options::{
     DocstringCode, DocstringCodeLineWidth, MagicTrailingComma, PreviewMode, PyFormatOptions,
-    PythonVersion, QuoteStyle,
+    QuoteStyle,
 };
 use crate::range::is_logical_line;
 pub use crate::shared_traits::{AsFormat, FormattedIter, FormattedIterExt, IntoFormat};
@@ -112,7 +112,7 @@ pub fn format_module_source(
     options: PyFormatOptions,
 ) -> Result<Printed, FormatModuleError> {
     let source_type = options.source_type();
-    let parsed = parse(source, source_type.as_mode())?;
+    let parsed = parse(source, ParseOptions::from(source_type))?;
     let comment_ranges = CommentRanges::from(parsed.tokens());
     let formatted = format_module_ast(&parsed, &comment_ranges, source, options)?;
     Ok(formatted.print()?)
@@ -154,7 +154,7 @@ mod tests {
     use insta::assert_snapshot;
 
     use ruff_python_ast::PySourceType;
-    use ruff_python_parser::{parse, AsMode};
+    use ruff_python_parser::{parse, ParseOptions};
     use ruff_python_trivia::CommentRanges;
     use ruff_text_size::{TextRange, TextSize};
 
@@ -199,7 +199,7 @@ def main() -> None:
 
         // Parse the AST.
         let source_path = "code_inline.py";
-        let parsed = parse(source, source_type.as_mode()).unwrap();
+        let parsed = parse(source, ParseOptions::from(source_type)).unwrap();
         let comment_ranges = CommentRanges::from(parsed.tokens());
         let options = PyFormatOptions::from_extension(Path::new(source_path));
         let formatted = format_module_ast(&parsed, &comment_ranges, source, options).unwrap();

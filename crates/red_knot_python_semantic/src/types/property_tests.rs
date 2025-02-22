@@ -27,11 +27,12 @@
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 
 use crate::db::tests::{setup_db, TestDb};
+use crate::symbol::{builtins_symbol, known_module_symbol};
 use crate::types::{
-    builtins_symbol, known_module_symbol, IntersectionBuilder, KnownClass, KnownInstanceType,
+    BoundMethodType, CallableType, IntersectionBuilder, KnownClass, KnownInstanceType,
     SubclassOfType, TupleType, Type, UnionType,
 };
-use crate::KnownModule;
+use crate::{Db, KnownModule};
 use quickcheck::{Arbitrary, Gen};
 
 /// A test representation of a type that can be transformed unambiguously into a real Type,
@@ -67,6 +68,24 @@ pub(crate) enum Ty {
     SubclassOfAbcClass(&'static str),
     AlwaysTruthy,
     AlwaysFalsy,
+    BuiltinsFunction(&'static str),
+    BuiltinsBoundMethod {
+        class: &'static str,
+        method: &'static str,
+    },
+}
+
+#[salsa::tracked]
+fn create_bound_method<'db>(
+    db: &'db dyn Db,
+    function: Type<'db>,
+    builtins_class: Type<'db>,
+) -> Type<'db> {
+    Type::Callable(CallableType::BoundMethod(BoundMethodType::new(
+        db,
+        function.expect_function_literal(),
+        builtins_class.to_instance(db),
+    )))
 }
 
 impl Ty {
@@ -123,6 +142,13 @@ impl Ty {
             ),
             Ty::AlwaysTruthy => Type::AlwaysTruthy,
             Ty::AlwaysFalsy => Type::AlwaysFalsy,
+            Ty::BuiltinsFunction(name) => builtins_symbol(db, name).expect_type(),
+            Ty::BuiltinsBoundMethod { class, method } => {
+                let builtins_class = builtins_symbol(db, class).expect_type();
+                let function = builtins_class.static_member(db, method).expect_type();
+
+                create_bound_method(db, function, builtins_class)
+            }
         }
     }
 }
@@ -173,6 +199,16 @@ fn arbitrary_core_type(g: &mut Gen) -> Ty {
         Ty::SubclassOfAbcClass("ABCMeta"),
         Ty::AlwaysTruthy,
         Ty::AlwaysFalsy,
+        Ty::BuiltinsFunction("chr"),
+        Ty::BuiltinsFunction("ascii"),
+        Ty::BuiltinsBoundMethod {
+            class: "str",
+            method: "isascii",
+        },
+        Ty::BuiltinsBoundMethod {
+            class: "int",
+            method: "bit_length",
+        },
     ])
     .unwrap()
     .clone()

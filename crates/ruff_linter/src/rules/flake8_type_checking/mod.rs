@@ -10,6 +10,7 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
+    use ruff_python_ast::PythonVersion;
     use test_case::test_case;
 
     use crate::registry::{Linter, Rule};
@@ -91,7 +92,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings {
-                target_version: settings::types::PythonVersion::Py39,
+                target_version: PythonVersion::PY39,
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;

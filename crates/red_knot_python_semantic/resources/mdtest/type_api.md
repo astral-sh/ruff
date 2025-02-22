@@ -223,7 +223,7 @@ class InvalidBoolDunder:
     def __bool__(self) -> int:
         return 1
 
-# error: "Static assertion error: argument of type `InvalidBoolDunder` has an ambiguous static truthiness"
+# error: [unsupported-bool-conversion]  "Boolean conversion is unsupported for type `InvalidBoolDunder`; the return type of its bool method (`int`) isn't assignable to `bool"
 static_assert(InvalidBoolDunder())
 ```
 

@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/range_formatting/docstring_code_examples.py
-snapshot_kind: text
 ---
 ## Input
 ```python
@@ -122,7 +121,7 @@ magic-trailing-comma       = Respect
 docstring-code             = Enabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
-target_version             = Py39
+target_version             = 3.9
 source_type                = Python
 ```
 
@@ -274,7 +273,7 @@ magic-trailing-comma       = Respect
 docstring-code             = Enabled
 docstring-code-line-width  = 88
 preview                    = Disabled
-target_version             = Py39
+target_version             = 3.9
 source_type                = Python
 ```
 

@@ -1,7 +1,6 @@
 //! This module takes care of parsing a type annotation.
 
 use ruff_python_ast::relocate::relocate_expr;
-use ruff_python_ast::str::raw_contents;
 use ruff_python_ast::{Expr, ExprStringLiteral, ModExpression, StringLiteral};
 use ruff_text_size::Ranged;
 
@@ -57,14 +56,10 @@ pub fn parse_type_annotation(
     string_expr: &ExprStringLiteral,
     source: &str,
 ) -> AnnotationParseResult {
-    let expr_text = &source[string_expr.range()];
-
-    if let [string_literal] = string_expr.value.as_slice() {
+    if let Some(string_literal) = string_expr.as_single_part_string() {
         // Compare the raw contents (without quotes) of the expression with the parsed contents
         // contained in the string literal.
-        if raw_contents(expr_text)
-            .is_some_and(|raw_contents| raw_contents == string_literal.as_str())
-        {
+        if &source[string_literal.content_range()] == string_literal.as_str() {
             parse_simple_type_annotation(string_literal, source)
         } else {
             // The raw contents of the string doesn't match the parsed content. This could be the

@@ -6,7 +6,7 @@ use ruff_python_stdlib::builtins;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::settings::types::PythonVersion;
+use ruff_python_ast::PythonVersion;
 
 /// ## What it does
 /// Checks for an exception that is not raised.
@@ -75,6 +75,6 @@ fn is_builtin_exception(
         .resolve_qualified_name(expr)
         .is_some_and(|qualified_name| {
             matches!(qualified_name.segments(), ["" | "builtins", name]
-            if builtins::is_exception(name, target_version.minor()))
+            if builtins::is_exception(name, target_version.minor))
         })
 }

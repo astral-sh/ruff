@@ -523,7 +523,7 @@ fn check_dynamically_typed<F>(
             if type_hint_resolves_to_any(
                 parsed_annotation.expression(),
                 checker,
-                checker.settings.target_version.minor(),
+                checker.settings.target_version,
             ) {
                 diagnostics.push(Diagnostic::new(
                     AnyType { name: func() },
@@ -532,7 +532,7 @@ fn check_dynamically_typed<F>(
             }
         }
     } else {
-        if type_hint_resolves_to_any(annotation, checker, checker.settings.target_version.minor()) {
+        if type_hint_resolves_to_any(annotation, checker, checker.settings.target_version) {
             diagnostics.push(Diagnostic::new(
                 AnyType { name: func() },
                 annotation.range(),

@@ -1,9 +1,39 @@
 use ruff_db::files::File;
+use ruff_index::{newtype_index, IndexVec};
 use ruff_python_ast::Singleton;
 
 use crate::db::Db;
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::symbol::{FileScopeId, ScopeId};
+
+// A scoped identifier for each `Constraint` in a scope.
+#[newtype_index]
+#[derive(Ord, PartialOrd)]
+pub(crate) struct ScopedConstraintId;
+
+// A collection of constraints. This is currently stored in `UseDefMap`, which means we maintain a
+// separate set of constraints for each scope in a file.
+pub(crate) type Constraints<'db> = IndexVec<ScopedConstraintId, Constraint<'db>>;
+
+#[derive(Debug, Default)]
+pub(crate) struct ConstraintsBuilder<'db> {
+    constraints: IndexVec<ScopedConstraintId, Constraint<'db>>,
+}
+
+impl<'db> ConstraintsBuilder<'db> {
+    /// Adds a constraint. Note that we do not deduplicate constraints. If you add a `Constraint`
+    /// more than once, you will get distinct `ScopedConstraintId`s for each one. (This lets you
+    /// model constraint expressions that might evaluate to different values at different points of
+    /// execution.)
+    pub(crate) fn add_constraint(&mut self, constraint: Constraint<'db>) -> ScopedConstraintId {
+        self.constraints.push(constraint)
+    }
+
+    pub(crate) fn build(mut self) -> Constraints<'db> {
+        self.constraints.shrink_to_fit();
+        self.constraints
+    }
+}
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update)]
 pub(crate) struct Constraint<'db> {

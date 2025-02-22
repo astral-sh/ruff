@@ -70,11 +70,11 @@ from typing import Literal
 def _(
     u1: (int | str) | bytes,
     u2: int | (str | bytes),
-    u3: int | (str | (bytes | complex)),
+    u3: int | (str | (bytes | bytearray)),
 ) -> None:
     reveal_type(u1)  # revealed: int | str | bytes
     reveal_type(u2)  # revealed: int | str | bytes
-    reveal_type(u3)  # revealed: int | str | bytes | complex
+    reveal_type(u3)  # revealed: int | str | bytes | bytearray
 ```
 
 ## Simplification using subtyping

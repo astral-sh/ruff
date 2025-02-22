@@ -4,6 +4,6 @@
   },
   {
     "quote_style": "preserve",
-    "target_version": "py312"
+    "target_version": "3.12"
   }
 ]

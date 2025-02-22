@@ -264,6 +264,8 @@ UP013.py:46:1: UP013 [*] Convert `X` from `TypedDict` functional to class syntax
 47 | |     "some_config": int,  # important
 48 | | })
    | |__^ UP013
+49 |
+50 |   # Private names should not be reported (OK)
    |
    = help: Convert `X` to class syntax
 
@@ -276,3 +278,6 @@ UP013.py:46:1: UP013 [*] Convert `X` from `TypedDict` functional to class syntax
 48    |-})
    46 |+class X(TypedDict):
    47 |+    some_config: int
+49 48 | 
+50 49 | # Private names should not be reported (OK)
+51 50 | WithPrivate = TypedDict("WithPrivate", {"__x": int})

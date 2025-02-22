@@ -21,12 +21,13 @@ ruff_macros = { workspace = true }
 ruff_python_ast = { workspace = true }
 ruff_python_formatter = { workspace = true, features = ["serde"] }
 ruff_python_semantic = { workspace = true, features = ["serde"] }
-ruff_python_stdlib = {workspace = true}
+ruff_python_stdlib = { workspace = true }
 ruff_source_file = { workspace = true }
 
 anyhow = { workspace = true }
 colored = { workspace = true }
 ignore = { workspace = true }
+indexmap = { workspace = true }
 is-macro = { workspace = true }
 itertools = { workspace = true }
 log = { workspace = true }
@@ -58,7 +59,12 @@ ignored = ["colored"]
 
 [features]
 default = []
-schemars = ["dep:schemars", "ruff_formatter/schemars", "ruff_python_formatter/schemars", "ruff_python_semantic/schemars"]
+schemars = [
+    "dep:schemars",
+    "ruff_formatter/schemars",
+    "ruff_python_formatter/schemars",
+    "ruff_python_semantic/schemars",
+]
 
 [lints]
 workspace = true

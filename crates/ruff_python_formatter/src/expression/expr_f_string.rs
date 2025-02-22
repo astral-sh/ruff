@@ -15,13 +15,7 @@ pub struct FormatExprFString;
 
 impl FormatNodeRule<ExprFString> for FormatExprFString {
     fn fmt_fields(&self, item: &ExprFString, f: &mut PyFormatter) -> FormatResult<()> {
-        let ExprFString { value, .. } = item;
-
-        if let [f_string_part] = value.as_slice() {
-            // SAFETY: A single string literal cannot be an f-string. This is guaranteed by the
-            // [`ruff_python_ast::FStringValue::single`] constructor.
-            let f_string = f_string_part.as_f_string().unwrap();
-
+        if let Some(f_string) = item.as_single_part_fstring() {
             f_string.format().fmt(f)
         } else {
             // Always join fstrings that aren't parenthesized and thus, are always on a single line.
@@ -44,16 +38,18 @@ impl NeedsParentheses for ExprFString {
         _parent: AnyNodeRef,
         context: &PyFormatContext,
     ) -> OptionalParentheses {
-        if self.value.is_implicit_concatenated() {
-            OptionalParentheses::Multiline
-        } else if StringLike::FString(self).is_multiline(context)
-            || self.value.as_single().is_some_and(|f_string| {
-                FStringLayout::from_f_string(f_string, context.source()).is_multiline()
-            })
-        {
-            OptionalParentheses::Never
+        if let Some(fstring_part) = self.as_single_part_fstring() {
+            // The f-string is not implicitly concatenated
+            if StringLike::FString(self).is_multiline(context)
+                || FStringLayout::from_f_string(fstring_part, context.source()).is_multiline()
+            {
+                OptionalParentheses::Never
+            } else {
+                OptionalParentheses::BestFit
+            }
         } else {
-            OptionalParentheses::BestFit
+            // The f-string is implicitly concatenated
+            OptionalParentheses::Multiline
         }
     }
 }

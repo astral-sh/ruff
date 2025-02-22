@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use js_sys::Error;
+use ruff_linter::settings::types::PythonVersion;
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
@@ -10,7 +11,6 @@ use ruff_linter::directives;
 use ruff_linter::line_width::{IndentWidth, LineLength};
 use ruff_linter::linter::check_path;
 use ruff_linter::registry::AsRule;
-use ruff_linter::settings::types::PythonVersion;
 use ruff_linter::settings::{flags, DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX};
 use ruff_linter::source_kind::SourceKind;
 use ruff_linter::Locator;
@@ -18,7 +18,9 @@ use ruff_python_ast::{Mod, PySourceType};
 use ruff_python_codegen::Stylist;
 use ruff_python_formatter::{format_module_ast, pretty_comments, PyFormatContext, QuoteStyle};
 use ruff_python_index::Indexer;
-use ruff_python_parser::{parse, parse_unchecked, parse_unchecked_source, Mode, Parsed};
+use ruff_python_parser::{
+    parse, parse_unchecked, parse_unchecked_source, Mode, ParseOptions, Parsed,
+};
 use ruff_python_trivia::CommentRanges;
 use ruff_source_file::SourceLocation;
 use ruff_text_size::Ranged;
@@ -264,13 +266,13 @@ impl Workspace {
 
     /// Parses the content and returns its AST
     pub fn parse(&self, contents: &str) -> Result<String, Error> {
-        let parsed = parse_unchecked(contents, Mode::Module);
+        let parsed = parse_unchecked(contents, ParseOptions::from(Mode::Module));
 
         Ok(format!("{:#?}", parsed.into_syntax()))
     }
 
     pub fn tokens(&self, contents: &str) -> Result<String, Error> {
-        let parsed = parse_unchecked(contents, Mode::Module);
+        let parsed = parse_unchecked(contents, ParseOptions::from(Mode::Module));
 
         Ok(format!("{:#?}", parsed.tokens().as_ref()))
     }
@@ -288,7 +290,7 @@ struct ParsedModule<'a> {
 
 impl<'a> ParsedModule<'a> {
     fn from_source(source_code: &'a str) -> Result<Self, Error> {
-        let parsed = parse(source_code, Mode::Module).map_err(into_error)?;
+        let parsed = parse(source_code, ParseOptions::from(Mode::Module)).map_err(into_error)?;
         let comment_ranges = CommentRanges::from(parsed.tokens());
         Ok(Self {
             source_code,

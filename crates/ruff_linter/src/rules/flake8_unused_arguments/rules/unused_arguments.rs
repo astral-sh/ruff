@@ -422,7 +422,6 @@ pub(crate) fn unused_arguments(checker: &Checker, scope: &Scope) {
                         && !is_not_implemented_stub_with_variable(function_def, checker.semantic())
                         && (!visibility::is_magic(name)
                             || visibility::is_init(name)
-                            || visibility::is_new(name)
                             || visibility::is_call(name))
                         && !visibility::is_abstract(decorator_list, checker.semantic())
                         && !visibility::is_override(decorator_list, checker.semantic())
@@ -437,7 +436,6 @@ pub(crate) fn unused_arguments(checker: &Checker, scope: &Scope) {
                         && !is_not_implemented_stub_with_variable(function_def, checker.semantic())
                         && (!visibility::is_magic(name)
                             || visibility::is_init(name)
-                            || visibility::is_new(name)
                             || visibility::is_call(name))
                         && !visibility::is_abstract(decorator_list, checker.semantic())
                         && !visibility::is_override(decorator_list, checker.semantic())
@@ -452,13 +450,25 @@ pub(crate) fn unused_arguments(checker: &Checker, scope: &Scope) {
                         && !is_not_implemented_stub_with_variable(function_def, checker.semantic())
                         && (!visibility::is_magic(name)
                             || visibility::is_init(name)
-                            || visibility::is_new(name)
                             || visibility::is_call(name))
                         && !visibility::is_abstract(decorator_list, checker.semantic())
                         && !visibility::is_override(decorator_list, checker.semantic())
                         && !visibility::is_overload(decorator_list, checker.semantic())
                     {
                         function(Argumentable::StaticMethod, parameters, scope, checker);
+                    }
+                }
+                function_type::FunctionType::NewMethod => {
+                    if checker.enabled(Argumentable::StaticMethod.rule_code())
+                        && !function_type::is_stub(function_def, checker.semantic())
+                        && !is_not_implemented_stub_with_variable(function_def, checker.semantic())
+                        && !visibility::is_abstract(decorator_list, checker.semantic())
+                        && !visibility::is_override(decorator_list, checker.semantic())
+                        && !visibility::is_overload(decorator_list, checker.semantic())
+                    {
+                        // we use `method()` here rather than `function()`, as although `__new__` is
+                        // an implicit staticmethod, `__new__` methods must always have at least one parameter
+                        method(Argumentable::StaticMethod, parameters, scope, checker);
                     }
                 }
             }

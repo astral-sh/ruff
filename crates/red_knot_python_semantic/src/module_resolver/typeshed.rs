@@ -4,11 +4,12 @@ use std::num::{NonZeroU16, NonZeroUsize};
 use std::ops::{RangeFrom, RangeInclusive};
 use std::str::FromStr;
 
+use ruff_python_ast::PythonVersion;
 use rustc_hash::FxHashMap;
 
 use crate::db::Db;
 use crate::module_name::ModuleName;
-use crate::{Program, PythonVersion};
+use crate::Program;
 
 pub(in crate::module_resolver) fn vendored_typeshed_versions(db: &dyn Db) -> TypeshedVersions {
     TypeshedVersions::from_str(
@@ -278,12 +279,12 @@ impl FromStr for PyVersionRange {
         let mut parts = s.split('-').map(str::trim);
         match (parts.next(), parts.next(), parts.next()) {
             (Some(lower), Some(""), None) => {
-                let lower = PythonVersion::from_versions_file_string(lower)?;
+                let lower = python_version_from_versions_file_string(lower)?;
                 Ok(Self::AvailableFrom(lower..))
             }
             (Some(lower), Some(upper), None) => {
-                let lower = PythonVersion::from_versions_file_string(lower)?;
-                let upper = PythonVersion::from_versions_file_string(upper)?;
+                let lower = python_version_from_versions_file_string(lower)?;
+                let upper = python_version_from_versions_file_string(upper)?;
                 Ok(Self::AvailableWithin(lower..=upper))
             }
             _ => Err(TypeshedVersionsParseErrorKind::UnexpectedNumberOfHyphens),
@@ -302,21 +303,21 @@ impl fmt::Display for PyVersionRange {
     }
 }
 
-impl PythonVersion {
-    fn from_versions_file_string(s: &str) -> Result<Self, TypeshedVersionsParseErrorKind> {
-        let mut parts = s.split('.').map(str::trim);
-        let (Some(major), Some(minor), None) = (parts.next(), parts.next(), parts.next()) else {
-            return Err(TypeshedVersionsParseErrorKind::UnexpectedNumberOfPeriods(
-                s.to_string(),
-            ));
-        };
-        PythonVersion::try_from((major, minor)).map_err(|int_parse_error| {
-            TypeshedVersionsParseErrorKind::IntegerParsingFailure {
-                version: s.to_string(),
-                err: int_parse_error,
-            }
-        })
-    }
+fn python_version_from_versions_file_string(
+    s: &str,
+) -> Result<PythonVersion, TypeshedVersionsParseErrorKind> {
+    let mut parts = s.split('.').map(str::trim);
+    let (Some(major), Some(minor), None) = (parts.next(), parts.next(), parts.next()) else {
+        return Err(TypeshedVersionsParseErrorKind::UnexpectedNumberOfPeriods(
+            s.to_string(),
+        ));
+    };
+    PythonVersion::try_from((major, minor)).map_err(|int_parse_error| {
+        TypeshedVersionsParseErrorKind::IntegerParsingFailure {
+            version: s.to_string(),
+            err: int_parse_error,
+        }
+    })
 }
 
 #[cfg(test)]

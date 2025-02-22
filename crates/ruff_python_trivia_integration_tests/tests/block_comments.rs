@@ -1,4 +1,4 @@
-use ruff_python_parser::{parse_unchecked, Mode};
+use ruff_python_parser::{parse_unchecked, Mode, ParseOptions};
 use ruff_python_trivia::CommentRanges;
 use ruff_text_size::TextSize;
 
@@ -6,7 +6,7 @@ use ruff_text_size::TextSize;
 fn block_comments_two_line_block_at_start() {
     // arrange
     let source = "# line 1\n# line 2\n";
-    let parsed = parse_unchecked(source, Mode::Module);
+    let parsed = parse_unchecked(source, ParseOptions::from(Mode::Module));
     let comment_ranges = CommentRanges::from(parsed.tokens());
 
     // act
@@ -20,7 +20,7 @@ fn block_comments_two_line_block_at_start() {
 fn block_comments_indented_block() {
     // arrange
     let source = "    # line 1\n    # line 2\n";
-    let parsed = parse_unchecked(source, Mode::Module);
+    let parsed = parse_unchecked(source, ParseOptions::from(Mode::Module));
     let comment_ranges = CommentRanges::from(parsed.tokens());
 
     // act
@@ -34,7 +34,7 @@ fn block_comments_indented_block() {
 fn block_comments_single_line_is_not_a_block() {
     // arrange
     let source = "\n";
-    let parsed = parse_unchecked(source, Mode::Module);
+    let parsed = parse_unchecked(source, ParseOptions::from(Mode::Module));
     let comment_ranges = CommentRanges::from(parsed.tokens());
 
     // act
@@ -48,7 +48,7 @@ fn block_comments_single_line_is_not_a_block() {
 fn block_comments_lines_with_code_not_a_block() {
     // arrange
     let source = "x = 1  # line 1\ny = 2  # line 2\n";
-    let parsed = parse_unchecked(source, Mode::Module);
+    let parsed = parse_unchecked(source, ParseOptions::from(Mode::Module));
     let comment_ranges = CommentRanges::from(parsed.tokens());
 
     // act
@@ -62,7 +62,7 @@ fn block_comments_lines_with_code_not_a_block() {
 fn block_comments_sequential_lines_not_in_block() {
     // arrange
     let source = "    # line 1\n        # line 2\n";
-    let parsed = parse_unchecked(source, Mode::Module);
+    let parsed = parse_unchecked(source, ParseOptions::from(Mode::Module));
     let comment_ranges = CommentRanges::from(parsed.tokens());
 
     // act
@@ -81,7 +81,7 @@ fn block_comments_lines_in_triple_quotes_not_a_block() {
         # line 2
         """
         "#;
-    let parsed = parse_unchecked(source, Mode::Module);
+    let parsed = parse_unchecked(source, ParseOptions::from(Mode::Module));
     let comment_ranges = CommentRanges::from(parsed.tokens());
 
     // act
@@ -117,7 +117,7 @@ y = 2  # do not form a block comment
 # therefore do not form a block comment
 """
         "#;
-    let parsed = parse_unchecked(source, Mode::Module);
+    let parsed = parse_unchecked(source, ParseOptions::from(Mode::Module));
     let comment_ranges = CommentRanges::from(parsed.tokens());
 
     // act

@@ -1,6 +1,7 @@
 use ruff_linter::display_settings;
-use ruff_linter::settings::types::{ExtensionMapping, FilePatternSet, PreviewMode, PythonVersion};
+use ruff_linter::settings::types::{ExtensionMapping, FilePatternSet, PreviewMode};
 use ruff_macros::CacheKey;
+use ruff_python_ast::PythonVersion;
 use std::collections::BTreeMap;
 use std::fmt;
 use std::path::PathBuf;
@@ -24,7 +25,7 @@ impl fmt::Display for AnalyzeSettings {
             fields = [
                 self.exclude,
                 self.preview,
-                self.target_version | debug,
+                self.target_version,
                 self.detect_string_imports,
                 self.extension | debug,
                 self.include_dependencies | debug,

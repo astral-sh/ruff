@@ -106,10 +106,6 @@ from airflow.www.utils import get_sensitive_variables_fields, should_hide_value_
 PY36, PY37, PY38, PY39, PY310, PY311, PY312
 DatasetFromRoot()
 
-dataset_from_root = DatasetFromRoot()
-dataset_from_root.iter_datasets()
-dataset_from_root.iter_dataset_aliases()
-
 # airflow.api_connexion.security
 requires_access, requires_access_dataset
 
@@ -130,23 +126,13 @@ DatasetAlias()
 DatasetAliasEvent()
 DatasetAll()
 DatasetAny()
-expand_alias_to_datasets
 Metadata()
-
-dataset_to_test_method_call = Dataset()
-dataset_to_test_method_call.iter_datasets()
-dataset_to_test_method_call.iter_dataset_aliases()
-
-alias_to_test_method_call = DatasetAlias()
-alias_to_test_method_call.iter_datasets()
-alias_to_test_method_call.iter_dataset_aliases()
-
-any_to_test_method_call = DatasetAny()
-any_to_test_method_call.iter_datasets()
-any_to_test_method_call.iter_dataset_aliases()
+expand_alias_to_datasets
 
 # airflow.datasets.manager
-DatasetManager(), dataset_manager, resolve_dataset_manager
+DatasetManager()
+dataset_manager
+resolve_dataset_manager
 
 # airflow.hooks
 BaseHook()
@@ -155,10 +141,16 @@ BaseHook()
 DatasetLineageInfo()
 
 # airflow.listeners.spec.dataset
-on_dataset_changed, on_dataset_created
+on_dataset_changed
+on_dataset_created
 
 # airflow.metrics.validators
-AllowListValidator(), BlockListValidator()
+AllowListValidator()
+BlockListValidator()
+
+# airflow.operators.dummy
+EmptyOperator()
+DummyOperator()
 
 # airflow.operators.dummy_operator
 dummy_operator.EmptyOperator()
@@ -170,9 +162,6 @@ BaseBranchOperator()
 # airflow.operators.dagrun_operator
 TriggerDagRunLink()
 TriggerDagRunOperator()
-
-# airflow.operators.dummy
-EmptyOperator(), DummyOperator()
 
 # airflow.operators.email_operator
 EmailOperator()
@@ -214,7 +203,8 @@ gcs.convert_dataset_to_openlineage
 mysql.sanitize_uri
 
 # airflow.providers.openlineage
-DatasetInfo(), translate_airflow_dataset
+DatasetInfo()
+translate_airflow_dataset
 
 # airflow.providers.postgres
 postgres.sanitize_uri
@@ -224,8 +214,7 @@ trino.sanitize_uri
 
 # airflow.secrets
 # get_connection
-lfb = LocalFilesystemBackend()
-lfb.get_connections()
+LocalFilesystemBackend()
 load_connections
 
 # airflow.security.permissions
@@ -282,13 +271,16 @@ get_parsing_context
 apply_defaults
 
 # airflow.utils.file
-TemporaryDirector(), mkdirs
+TemporaryDirector()
+mkdirs
 
 #  airflow.utils.helpers
-chain, cross_downstream
+chain
+cross_downstream
 
 # airflow.utils.state
-SHUTDOWN, terminating_states
+SHUTDOWN
+terminating_states
 
 #  airflow.utils.trigger_rule
 TriggerRule.DUMMY
@@ -299,4 +291,5 @@ has_access
 has_access_dataset
 
 # airflow.www.utils
-get_sensitive_variables_fields, should_hide_value_for_key
+get_sensitive_variables_fields
+should_hide_value_for_key

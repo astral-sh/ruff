@@ -313,3 +313,23 @@ FURB188.py:193:5: FURB188 [*] Prefer `str.removeprefix()` over conditionally rep
 195 194 |     
 196 195 |     # should not be linted
 197 196 |     text = "\ud800\udc00heythere"
+
+FURB188.py:205:5: FURB188 [*] Prefer `str.removesuffix()` over conditionally replacing with slice.
+    |
+203 |   def func():
+204 |       a = "sjdfaskldjfakljklfoo"
+205 | /     if a.endswith("foo"):
+206 | |         a = a[: -len("foo")]
+    | |____________________________^ FURB188
+207 |       print(a)
+    |
+    = help: Use removesuffix instead of assignment conditional upon endswith.
+
+ℹ Safe fix
+202 202 | # https://github.com/astral-sh/ruff/issues/16231
+203 203 | def func():
+204 204 |     a = "sjdfaskldjfakljklfoo"
+205     |-    if a.endswith("foo"):
+206     |-        a = a[: -len("foo")]
+    205 |+    a = a.removesuffix("foo")
+207 206 |     print(a)

@@ -4,8 +4,9 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use log::debug;
-use pep440_rs::VersionSpecifiers;
+use pep440_rs::{Operator, Version, VersionSpecifiers};
 use serde::{Deserialize, Serialize};
+use strum::IntoEnumIterator;
 
 use ruff_linter::settings::types::PythonVersion;
 
@@ -150,8 +151,7 @@ pub(super) fn load_options<P: AsRef<Path>>(path: P) -> Result<Options> {
         if ruff.target_version.is_none() {
             if let Some(project) = pyproject.project {
                 if let Some(requires_python) = project.requires_python {
-                    ruff.target_version =
-                        PythonVersion::get_minimum_supported_version(&requires_python);
+                    ruff.target_version = get_minimum_supported_version(&requires_python);
                 }
             }
         }
@@ -165,6 +165,38 @@ pub(super) fn load_options<P: AsRef<Path>>(path: P) -> Result<Options> {
         }
         ruff
     }
+}
+
+/// Infer the minimum supported [`PythonVersion`] from a `requires-python` specifier.
+fn get_minimum_supported_version(requires_version: &VersionSpecifiers) -> Option<PythonVersion> {
+    /// Truncate a version to its major and minor components.
+    fn major_minor(version: &Version) -> Option<Version> {
+        let major = version.release().first()?;
+        let minor = version.release().get(1)?;
+        Some(Version::new([major, minor]))
+    }
+
+    // Extract the minimum supported version from the specifiers.
+    let minimum_version = requires_version
+        .iter()
+        .filter(|specifier| {
+            matches!(
+                specifier.operator(),
+                Operator::Equal
+                    | Operator::EqualStar
+                    | Operator::ExactEqual
+                    | Operator::TildeEqual
+                    | Operator::GreaterThan
+                    | Operator::GreaterThanEqual
+            )
+        })
+        .filter_map(|specifier| major_minor(specifier.version()))
+        .min()?;
+
+    debug!("Detected minimum supported `requires-python` version: {minimum_version}");
+
+    // Find the Python version that matches the minimum supported version.
+    PythonVersion::iter().find(|version| Version::from(*version) == minimum_version)
 }
 
 #[cfg(test)]
