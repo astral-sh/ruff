@@ -921,35 +921,6 @@ impl<'a> IntoIterator for &'a TypeCheckDiagnostics {
     }
 }
 
-/// Emit a diagnostic declaring that the object represented by `node` is not iterable
-pub(super) fn report_not_iterable(context: &InferContext, node: AnyNodeRef, not_iterable_ty: Type) {
-    context.report_lint(
-        &NOT_ITERABLE,
-        node,
-        format_args!(
-            "Object of type `{}` is not iterable",
-            not_iterable_ty.display(context.db())
-        ),
-    );
-}
-
-/// Emit a diagnostic declaring that the object represented by `node` is not iterable
-/// because its `__iter__` method is possibly unbound.
-pub(super) fn report_not_iterable_possibly_unbound(
-    context: &InferContext,
-    node: AnyNodeRef,
-    element_ty: Type,
-) {
-    context.report_lint(
-        &NOT_ITERABLE,
-        node,
-        format_args!(
-            "Object of type `{}` is not iterable because its `__iter__` method is possibly unbound",
-            element_ty.display(context.db())
-        ),
-    );
-}
-
 /// Emit a diagnostic declaring that an index is out of bounds for a tuple.
 pub(super) fn report_index_out_of_bounds(
     context: &InferContext,

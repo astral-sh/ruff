@@ -231,7 +231,7 @@ class Test:
         return TestIter()
 
 def _(flag: bool):
-    # error: [not-iterable] "Object of type `Test | Literal[42]` is not iterable because its `__iter__` method is possibly unbound"
+    # error: [not-iterable] "Object of type `Test | Literal[42]` may not be iterable because its `__iter__` method is possibly unbound and it doesn't have a `__getitem__` method"
     for x in Test() if flag else 42:
         reveal_type(x)  # revealed: int
 ```
@@ -253,7 +253,7 @@ class Test2:
 
 def _(flag: bool):
     # TODO: Improve error message to state which union variant isn't iterable (https://github.com/astral-sh/ruff/issues/13989)
-    # error: "Object of type `Test | Test2` is not iterable"
+    # error: "Object of type `Test | Test2` may not be iterable because its `__iter__` method returns an object of type `TestIter | int`, which may not have a `__next__` method"
     for x in Test() if flag else Test2():
         reveal_type(x)  # revealed: int
 ```
@@ -269,7 +269,7 @@ class Test:
     def __iter__(self) -> TestIter | int:
         return TestIter()
 
-# error: [not-iterable] "Object of type `Test` is not iterable"
+# error: [not-iterable] "Object of type `Test` may not be iterable because its `__iter__` method returns an object of type `TestIter | int`, which may not have a `__next__` method"
 for x in Test():
     reveal_type(x)  # revealed: int
 ```

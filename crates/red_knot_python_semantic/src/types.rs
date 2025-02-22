@@ -4,7 +4,7 @@ use std::str::FromStr;
 use bitflags::bitflags;
 use call::{CallDunderError, CallError};
 use context::InferContext;
-use diagnostic::{report_not_iterable, report_not_iterable_possibly_unbound};
+use diagnostic::NOT_ITERABLE;
 use ruff_db::files::File;
 use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextRange};
@@ -2350,7 +2350,7 @@ impl<'db> Type<'db> {
     /// For type checking, use [`try_iterate`](Self::try_iterate) instead.
     fn iterate(self, db: &'db dyn Db) -> Type<'db> {
         self.try_iterate(db)
-            .unwrap_or_else(|err| err.fallback_element_type())
+            .unwrap_or_else(|err| err.fallback_element_type(db))
     }
 
     /// Given the type of an object that is iterated over in some way,
@@ -2361,73 +2361,173 @@ impl<'db> Type<'db> {
     /// for y in x:
     ///     pass
     /// ```
-    fn try_iterate(self, db: &'db dyn Db) -> Result<Type<'db>, IterateError<'db>> {
+    fn try_iterate(self, db: &'db dyn Db) -> Result<Type<'db>, IterationError<'db>> {
         if let Type::Tuple(tuple_type) = self {
             return Ok(UnionType::from_elements(db, tuple_type.elements(db)));
         }
 
-        let dunder_iter_result = self.try_call_dunder(db, "__iter__", &CallArguments::none());
-        match &dunder_iter_result {
-            Ok(outcome) | Err(CallDunderError::PossiblyUnbound(outcome)) => {
-                let iterator_ty = outcome.return_type(db);
+        let try_call_dunder_getitem = || {
+            self.try_call_dunder(
+                db,
+                "__getitem__",
+                &CallArguments::positional([KnownClass::Int.to_instance(db)]),
+            )
+            .map(|outcome| outcome.return_type(db))
+        };
 
-                return match iterator_ty.try_call_dunder(db, "__next__", &CallArguments::none()) {
-                    Ok(outcome) => {
-                        if matches!(
-                            dunder_iter_result,
-                            Err(CallDunderError::PossiblyUnbound { .. })
-                        ) {
-                            Err(IterateError::PossiblyUnbound {
-                                iterable_ty: self,
-                                element_ty: outcome.return_type(db),
-                            })
-                        } else {
-                            Ok(outcome.return_type(db))
+        let try_call_dunder_next_on_iterator = |iterator: Type<'db>| {
+            iterator
+                .try_call_dunder(db, "__next__", &CallArguments::none())
+                .map(|outcome| outcome.return_type(db))
+        };
+
+        let dunder_iter_result = self
+            .try_call_dunder(db, "__iter__", &CallArguments::none())
+            .map(|outcome| outcome.return_type(db));
+
+        let iteration_result = match dunder_iter_result {
+            Ok(iterator_type) => {
+                // `__iter__` is definitely bound and calling it succeeds.
+                // See what calling `__next__` on the object returned by `__iter__` gives us...
+                try_call_dunder_next_on_iterator(iterator_type).map_err(|dunder_next_call_error| {
+                    match dunder_next_call_error {
+                        // `__iter__` is bound and callable but it returns an object that has no `__next__` method
+                        CallDunderError::MethodNotAvailable => {
+                            IterationErrorKind::IteratorHasNoNextMethod { iterator_type }
+                        }
+
+                        // `__iter__` is bound and callable but it returns an object with possibly unbound `__next__`
+                        CallDunderError::PossiblyUnbound(dunder_next_outcome) => {
+                            IterationErrorKind::IteratorHasPossiblyUnboundNextMethod {
+                                iterator_type,
+                                element_type: dunder_next_outcome.return_type(db),
+                            }
+                        }
+
+                        // `__iter__` is bound and callable and returns an object with a `__next__` method.
+                        // However, `__next__` cannot be called with the expected arguments.
+                        CallDunderError::Call(dunder_next_call_error) => {
+                            IterationErrorKind::IteratorHasInvalidNextMethod {
+                                iterator_type,
+                                element_type: dunder_next_call_error.fallback_return_type(db),
+                            }
                         }
                     }
-                    Err(CallDunderError::PossiblyUnbound(outcome)) => {
-                        Err(IterateError::PossiblyUnbound {
-                            iterable_ty: self,
-                            element_ty: outcome.return_type(db),
-                        })
-                    }
-                    Err(_) => Err(IterateError::NotIterable {
-                        not_iterable_ty: self,
-                    }),
-                };
-            }
-            // If `__iter__` exists but can't be called or doesn't have the expected signature,
-            // return not iterable over falling back to `__getitem__`.
-            Err(CallDunderError::Call(_)) => {
-                return Err(IterateError::NotIterable {
-                    not_iterable_ty: self,
                 })
             }
-            Err(CallDunderError::MethodNotAvailable) => {
-                // No `__iter__` attribute, try `__getitem__` next.
-            }
-        }
 
-        // Although it's not considered great practice,
-        // classes that define `__getitem__` are also iterable,
-        // even if they do not define `__iter__`.
-        //
-        // TODO(Alex) this is only valid if the `__getitem__` method is annotated as
-        // accepting `int` or `SupportsIndex`
-        match self.try_call_dunder(
-            db,
-            "__getitem__",
-            &CallArguments::positional([KnownClass::Int.to_instance(db)]),
-        ) {
-            Ok(outcome) => Ok(outcome.return_type(db)),
-            Err(CallDunderError::PossiblyUnbound(outcome)) => Err(IterateError::PossiblyUnbound {
-                iterable_ty: self,
-                element_ty: outcome.return_type(db),
-            }),
-            Err(_) => Err(IterateError::NotIterable {
-                not_iterable_ty: self,
-            }),
-        }
+            // `__iter__` is possibly unbound...
+            Err(CallDunderError::PossiblyUnbound(dunder_iter_outcome)) => {
+                let iterator_type = dunder_iter_outcome.return_type(db);
+
+                match try_call_dunder_next_on_iterator(iterator_type) {
+                    Ok(element_type_from_dunder_next) => {
+                        try_call_dunder_getitem()
+                            .map(|element_type_from_getitem| {
+                                // If `__iter__` is possibly unbound,
+                                // but it returns an object that has a bound and valid `__next__` method,
+                                // *and* the object has a bound and valid `__getitem__` method,
+                                // we infer a union of the type returned by the `__next__` method
+                                // and the type returned by the `__getitem__` method.
+                                //
+                                // No diagnostic is emitted; iteration will always succeed!
+                                UnionType::from_elements(
+                                    db,
+                                    [element_type_from_dunder_next, element_type_from_getitem],
+                                )
+                            })
+                            .map_err(|getitem_call_error| match getitem_call_error {
+                                // `__iter__` is possibly unbound,
+                                // and it returns an object that has a bound and valid `__next__` method.
+                                // But there's no `__getitem__` method to fallback to in the event that `__iter__`
+                                // is unbound, so we emit a diagnostic.
+                                CallDunderError::MethodNotAvailable => {
+                                    IterationErrorKind::PossiblyUnboundDunderIterAndNoGetitem {
+                                        element_type: element_type_from_dunder_next
+                                    }
+                                },
+
+                                // Same as above, but `__getitem__` is possibly unbound rather than definitely unbound.
+                                CallDunderError::PossiblyUnbound(getitem_outcome) => {
+                                    IterationErrorKind::PossiblyUnboundDunderIterAndPossiblyUnboundGetitem {
+                                        dunder_next_return_type: element_type_from_dunder_next,
+                                        dunder_getitem_return_type: getitem_outcome.return_type(db),
+                                    }
+                                },
+
+                                // `__iter__` is possibly unbound,
+                                // and it returns an object that has a bound and valid `__next__` method.
+                                // There *is* a `__getitem__` method to fallback to in the event that `__iter__`
+                                // is unbound... but it can't be called with the expected arguments.
+                                CallDunderError::Call(getitem_outcome) => {
+                                    IterationErrorKind::PossiblyUnboundDunderIterAndInvalidGetItem {
+                                        dunder_next_return_type: element_type_from_dunder_next,
+                                        dunder_getitem_return_type: getitem_outcome.fallback_return_type(db)
+                                    }
+                                },
+                            })
+                    }
+
+                    // `__iter__` is possibly unbound, and even when it is bound,
+                    // the object it returns doesn't have a `__next__` method (which seems more important).
+                    Err(CallDunderError::MethodNotAvailable) => {
+                        Err(IterationErrorKind::IteratorHasNoNextMethod { iterator_type })
+                    }
+
+                    // `__iter__` is possibly unbound, and even when it is bound,
+                    // the object it returns has a possibly unbound `__next__` method.
+                    Err(CallDunderError::PossiblyUnbound(dunder_next_outcome)) => {
+                        Err(IterationErrorKind::IteratorHasPossiblyUnboundNextMethod {
+                            iterator_type,
+                            element_type: dunder_next_outcome.return_type(db),
+                        })
+                    }
+
+                    // `__iter__` is possibly unbound, and even when it is bound, the `__next__`
+                    // method of the object returned by `__iter__` can't be called with the expected arguments.
+                    Err(CallDunderError::Call(dunder_next_call)) => {
+                        Err(IterationErrorKind::IteratorHasInvalidNextMethod {
+                            iterator_type,
+                            element_type: dunder_next_call.fallback_return_type(db),
+                        })
+                    }
+                }
+            }
+
+            // `__iter__` is definitely bound but it can't be called with the expected arguments
+            Err(CallDunderError::Call(dunder_iter_call_error)) => Err(
+                IterationErrorKind::DunderIterCallError(dunder_iter_call_error),
+            ),
+
+            // There's no `__iter__` method. Try `__getitem__` instead...
+            Err(CallDunderError::MethodNotAvailable) => {
+                try_call_dunder_getitem().map_err(|getitem_call_error| match getitem_call_error {
+                    // There's no `__getitem__` method either
+                    CallDunderError::MethodNotAvailable => {
+                        IterationErrorKind::DunderIterAndGetitemBothUnavailable
+                    }
+
+                    // There is a `__getitem__` method, but it's possibly unbound
+                    CallDunderError::PossiblyUnbound(dunder_getitem_call_outcome) => {
+                        IterationErrorKind::NoDunderIterAndPossiblyUnboundGetitem {
+                            dunder_getitem_call_outcome,
+                        }
+                    }
+
+                    // There is a `__getitem__` method, but it can't be called with the expected arguments
+                    CallDunderError::Call(dunder_getitem_call_error) => {
+                        IterationErrorKind::NoDunderIterAndInvalidGetitem {
+                            dunder_getitem_call_error,
+                        }
+                    }
+                })
+            }
+        };
+
+        iteration_result.map_err(|error_kind| IterationError {
+            iterable_type: self,
+            error_kind,
+        })
     }
 
     #[must_use]
@@ -2909,51 +3009,245 @@ pub enum TypeVarBoundOrConstraints<'db> {
     Constraints(TupleType<'db>),
 }
 
-/// Error returned if a type isn't iterable.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum IterateError<'db> {
-    /// The type isn't iterable because it doesn't implement the new-style or old-style iteration protocol
-    ///
-    /// The new-style iteration protocol requires a type being iterated over to have an `__iter__`
-    /// method that returns something with a `__next__` method. The old-style iteration
-    /// protocol requires a type being iterated over to have a `__getitem__` method that accepts
-    /// a positive-integer argument.
-    NotIterable { not_iterable_ty: Type<'db> },
+/// Error returned if a type is not (or may not be) iterable.
+#[derive(Debug)]
+struct IterationError<'db> {
+    /// The type of the object that the analysed code attempted to iterate over.
+    iterable_type: Type<'db>,
 
-    /// The type is iterable but the methods aren't always bound.
-    PossiblyUnbound {
-        iterable_ty: Type<'db>,
-        element_ty: Type<'db>,
+    /// The precise kind of error encountered when trying to iterate over the type.
+    error_kind: IterationErrorKind<'db>,
+}
+
+impl<'db> IterationError<'db> {
+    fn fallback_element_type(&self, db: &'db dyn Db) -> Type<'db> {
+        self.error_kind.fallback_element_type(db)
+    }
+
+    fn report_diagnostic(&self, context: &InferContext<'db>, iterable_node: ast::AnyNodeRef) {
+        self.error_kind
+            .report_diagnostic(context, self.iterable_type, iterable_node);
+    }
+}
+
+#[derive(Debug)]
+enum IterationErrorKind<'db> {
+    /// The object being iterated over has neither an `__iter__` method
+    /// nor a `__getitem__` method.
+    DunderIterAndGetitemBothUnavailable,
+
+    /// The object being iterated over has a bound `__iter__` method,
+    /// but calling it with the expected arguments results in an error.
+    DunderIterCallError(CallError<'db>),
+
+    /// The object being iterated over has a bound `__iter__` method
+    /// with the expected parameter spec, but the `__iter__` method doesn't return
+    /// an object with a `__next__` method.
+    IteratorHasNoNextMethod { iterator_type: Type<'db> },
+
+    /// The object being iterated over has a bound `__iter__` method
+    /// with the expected parameter spec, but the `__iter__` method returns
+    /// an object that has a possibly unbound `__next__` method.
+    IteratorHasPossiblyUnboundNextMethod {
+        iterator_type: Type<'db>,
+        element_type: Type<'db>,
+    },
+
+    /// The object being iterated over has a bound `__iter__` method
+    /// with the expected parameter spec, but the `__iter__` method returns
+    /// an object with a `__next__` method that is invalid in some other way.
+    IteratorHasInvalidNextMethod {
+        iterator_type: Type<'db>,
+        element_type: Type<'db>,
+    },
+
+    /// The object being iterated over has an `__iter__` method,
+    /// and the object returned by the `__iter__` method has a valid `__next__` method.
+    ///
+    /// However, the `__iter__` method is possibly unbound,
+    /// and there is no `__getitem__` method to fallback to.
+    PossiblyUnboundDunderIterAndNoGetitem { element_type: Type<'db> },
+
+    /// The object being iterated over has `__iter__` *and* `__getitem__` methods.
+    /// However, *both* are possibly unbound.
+    PossiblyUnboundDunderIterAndPossiblyUnboundGetitem {
+        dunder_next_return_type: Type<'db>,
+        dunder_getitem_return_type: Type<'db>,
+    },
+
+    /// The object being iterated over has `__iter__` *and* `__getitem__` methods.
+    /// However, its `__iter__` method is possibly unbound and its `__getitem__` method
+    /// cannot be used for the old-style iteration protocol.
+    PossiblyUnboundDunderIterAndInvalidGetItem {
+        dunder_next_return_type: Type<'db>,
+        dunder_getitem_return_type: Type<'db>,
+    },
+
+    /// The object being iterated over does not have an `__iter__` method.
+    /// It does have a `__getitem__` method, but the `__getitem__` method
+    /// is possibly unbound.
+    NoDunderIterAndPossiblyUnboundGetitem {
+        dunder_getitem_call_outcome: CallOutcome<'db>,
+    },
+
+    /// The object being iterated over does not have an `__iter__` method.
+    /// It does have a `__getitem__` method, but the `__getitem__` method
+    /// cannot be called with the expected arguments.
+    NoDunderIterAndInvalidGetitem {
+        dunder_getitem_call_error: CallError<'db>,
     },
 }
 
-impl<'db> IterateError<'db> {
-    /// Reports the diagnostic for this error.
-    fn report_diagnostic(&self, context: &InferContext<'db>, iterable_node: ast::AnyNodeRef) {
+impl<'db> IterationErrorKind<'db> {
+    fn fallback_element_type(&self, db: &'db dyn Db) -> Type<'db> {
         match self {
-            Self::NotIterable { not_iterable_ty } => {
-                report_not_iterable(context, iterable_node, *not_iterable_ty);
+            Self::DunderIterAndGetitemBothUnavailable | Self::IteratorHasNoNextMethod { .. } => {
+                Type::unknown()
             }
-            Self::PossiblyUnbound {
-                iterable_ty,
-                element_ty: _,
+
+            Self::DunderIterCallError(dunder_iter_call_error) => dunder_iter_call_error
+                .fallback_return_type(db)
+                .try_call_dunder(db, "__next__", &CallArguments::none())
+                .map(|dunder_next_outcome| dunder_next_outcome.return_type(db))
+                .unwrap_or_else(|dunder_next_call_error| {
+                    dunder_next_call_error.fallback_return_type(db)
+                }),
+
+            Self::PossiblyUnboundDunderIterAndPossiblyUnboundGetitem {
+                dunder_getitem_return_type,
+                dunder_next_return_type,
+            }
+            | Self::PossiblyUnboundDunderIterAndInvalidGetItem {
+                dunder_next_return_type,
+                dunder_getitem_return_type,
             } => {
-                report_not_iterable_possibly_unbound(context, iterable_node, *iterable_ty);
+                UnionType::from_elements(db, [dunder_next_return_type, dunder_getitem_return_type])
+            }
+
+            Self::NoDunderIterAndInvalidGetitem {
+                dunder_getitem_call_error,
+            } => dunder_getitem_call_error.fallback_return_type(db),
+
+            Self::NoDunderIterAndPossiblyUnboundGetitem {
+                dunder_getitem_call_outcome,
+            } => dunder_getitem_call_outcome.return_type(db),
+
+            Self::IteratorHasPossiblyUnboundNextMethod { element_type, .. }
+            | Self::IteratorHasInvalidNextMethod { element_type, .. }
+            | Self::PossiblyUnboundDunderIterAndNoGetitem { element_type } => *element_type,
+        }
+    }
+
+    fn report_diagnostic(
+        &self,
+        context: &InferContext<'db>,
+        iterable_type: Type<'db>,
+        iterable_node: ast::AnyNodeRef,
+    ) {
+        let db = context.db();
+
+        let report_not_iterable = |arguments: std::fmt::Arguments| {
+            context.report_lint(&NOT_ITERABLE, iterable_node, arguments);
+        };
+
+        match self {
+            Self::DunderIterAndGetitemBothUnavailable => report_not_iterable(format_args!(
+                "Object of type `{}` is not iterable because it doesn't have \
+                    an `__iter__` method or a `__getitem__` method",
+                iterable_type.display(db)
+            )),
+            Self::DunderIterCallError(dunder_iter_call_error) => match dunder_iter_call_error {
+                CallError::NotCallable { not_callable_ty } => report_not_iterable(                    format_args!(
+                    "Object of type `{iterable_type}` is not iterable because its `__iter__` attribute \
+                        has type `{dunder_iter_type}`, which is not callable",
+                    iterable_type = iterable_type.display(db),
+                    dunder_iter_type = not_callable_ty.display(db),
+                )),
+                CallError::PossiblyUnboundDunderCall { called_type, .. } => report_not_iterable(format_args!(
+                    "Object of type `{iterable_type}` may not be iterable because its `__iter__` attribute \
+                        (with type `{dunder_iter_type}`) may not be callable",
+                    iterable_type = iterable_type.display(db),
+                    dunder_iter_type = called_type.display(db),
+                )),
+                CallError::BindingError { .. } => report_not_iterable(format_args!(
+                    "Object of type `{iterable_type}` is not iterable because its `__iter__` method \
+                        has an invalid signature (expected `def __iter__(self): ...`)",
+                    iterable_type = iterable_type.display(db),
+                )),
+                CallError::Union(UnionCallError { called_ty, .. }) => report_not_iterable(format_args!(
+                    "Object of type `{iterable_type}` may not iterable because its `__iter__` method \
+                        has type `{dunder_iter_type}`, and some members of the union do not conform to the iteration protocol",
+                    iterable_type = iterable_type.display(context.db()),
+                    dunder_iter_type = called_ty.display(context.db()),
+                )),
+            }
+            Self::IteratorHasNoNextMethod { iterator_type } => report_not_iterable(format_args!(
+                "Object of type `{iterable_type}` is not iterable because its `__iter__` method returns \
+                    an object of type `{iterator_type}`, which has no `__next__` method",
+                iterable_type = iterable_type.display(db),
+                iterator_type = iterator_type.display(db),
+            )),
+            Self::IteratorHasPossiblyUnboundNextMethod { iterator_type, .. } => report_not_iterable(format_args!(
+                "Object of type `{iterable_type}` may not be iterable because its `__iter__` method returns \
+                    an object of type `{iterator_type}`, which may not have a `__next__` method",
+                iterable_type = iterable_type.display(db),
+                iterator_type = iterator_type.display(db),
+            )),
+            Self::IteratorHasInvalidNextMethod { iterator_type, .. } => report_not_iterable(format_args!(
+                "Object of type `{iterable_type}` is not iterable because its `__iter__` method returns \
+                    an object of type `{iterator_type}`, which has an invalid `__next__` method",
+                iterable_type = iterable_type.display(db),
+                iterator_type = iterator_type.display(db),
+            )),
+            Self::PossiblyUnboundDunderIterAndNoGetitem { .. } => report_not_iterable(format_args!(
+                "Object of type `{}` may not be iterable because its `__iter__` method is possibly unbound \
+                    and it doesn't have a `__getitem__` method",
+                iterable_type.display(db)
+            )),
+            Self::PossiblyUnboundDunderIterAndInvalidGetItem { .. } => report_not_iterable(format_args!(
+                "Object of type `{}` may not be iterable because its `__iter__` method is possibly unbound \
+                    and its `__getitem__` method does not support the old-style iteration protocol",
+                iterable_type.display(db)
+            )),
+            Self::PossiblyUnboundDunderIterAndPossiblyUnboundGetitem { .. } => report_not_iterable(format_args!(
+                "Object of type `{}` may not be iterable because its `__iter__` and `__getitem__` \
+                methods may both be unbound",
+                iterable_type.display(db)
+            )),
+            Self::NoDunderIterAndPossiblyUnboundGetitem { .. } => report_not_iterable(format_args!(
+                "Object of type `{}` may not be iterable because it has no `__iter__` method \
+                    and its `__getitem__` method may be unbound",
+                iterable_type.display(db)
+            )),
+
+            Self::NoDunderIterAndInvalidGetitem { dunder_getitem_call_error } => match dunder_getitem_call_error {
+                CallError::NotCallable { not_callable_ty } => report_not_iterable(format_args!(
+                    "Object of type `{iterable_type}` is not iterable because it has no `__iter__` method and \
+                        its `__getitem__` attribute has type `{dunder_getitem_type}`, which is not callable",
+                    iterable_type = iterable_type.display(db),
+                    dunder_getitem_type = not_callable_ty.display(db),
+                )),
+                CallError::PossiblyUnboundDunderCall { called_type, .. } => report_not_iterable(format_args!(
+                    "Object of type `{iterable_type}` may not be iterable because it has no `__iter__` method and \
+                        its `__getitem__` attribute (with type `{dunder_getitem_type}`) may not be callable",
+                    iterable_type = iterable_type.display(db),
+                    dunder_getitem_type = called_type.display(db),
+                )),
+                CallError::BindingError { .. } => report_not_iterable(format_args!(
+                    "Object of type `{iterable_type}` is not iterable because it has no `__iter__` method and \
+                        its `__getitem__` method has an incorrect signature for the old-style iteration protocol",
+                    iterable_type = iterable_type.display(db),
+                )),
+                CallError::Union(UnionCallError { called_ty, .. }) => report_not_iterable(format_args!(
+                    "Object of type `{iterable_type}` may not iterable because it has no `__iter__` method \
+                    and its `__getitem__` method has type `{dunder_iter_type}`, \
+                    and some elements of this union type do not conform to the expected `__getitem__` signature \
+                    of the old-style iteration protocol",
+                    iterable_type = iterable_type.display(context.db()),
+                    dunder_iter_type = called_ty.display(context.db()),
+                )),
             }
         }
-    }
-
-    /// Returns the element type if it is known, or `None` if the type is never iterable.
-    fn element_type(&self) -> Option<Type<'db>> {
-        match self {
-            IterateError::NotIterable { .. } => None,
-            IterateError::PossiblyUnbound { element_ty, .. } => Some(*element_ty),
-        }
-    }
-
-    /// Returns the element type if it is known, or `Type::unknown()` if it is not.
-    fn fallback_element_type(&self) -> Type<'db> {
-        self.element_type().unwrap_or(Type::unknown())
     }
 }
 

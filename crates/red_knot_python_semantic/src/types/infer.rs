@@ -2414,7 +2414,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
                 TargetKind::Name => iterable_ty.try_iterate(self.db()).unwrap_or_else(|err| {
                     err.report_diagnostic(&self.context, iterable.into());
-                    err.fallback_element_type()
+                    err.fallback_element_type(self.db())
                 }),
             }
         };
@@ -3209,7 +3209,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         } else {
             iterable_ty.try_iterate(self.db()).unwrap_or_else(|err| {
                 err.report_diagnostic(&self.context, iterable.into());
-                err.fallback_element_type()
+                err.fallback_element_type(self.db())
             })
         };
 
@@ -3492,7 +3492,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let iterable_ty = self.infer_expression(value);
         iterable_ty.try_iterate(self.db()).unwrap_or_else(|err| {
             err.report_diagnostic(&self.context, value.as_ref().into());
-            err.fallback_element_type()
+            err.fallback_element_type(self.db())
         });
 
         // TODO
@@ -3511,7 +3511,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let iterable_ty = self.infer_expression(value);
         iterable_ty.try_iterate(self.db()).unwrap_or_else(|err| {
             err.report_diagnostic(&self.context, value.as_ref().into());
-            err.fallback_element_type()
+            err.fallback_element_type(self.db())
         });
 
         // TODO get type from `ReturnType` of generator
