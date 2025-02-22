@@ -152,6 +152,24 @@ impl Display for DisplayRepresentation<'_> {
             }
             Type::AlwaysTruthy => f.write_str("AlwaysTruthy"),
             Type::AlwaysFalsy => f.write_str("AlwaysFalsy"),
+            Type::TypeGuard(type_guard) => {
+                f.write_str("TypeGuard[")?;
+                if let Some((_, _, name)) = type_guard.symbol_info(self.db) {
+                    f.write_str(&name)?;
+                    f.write_str(", ")?;
+                }
+                type_guard.ty(self.db).display(self.db).fmt(f)?;
+                f.write_str("]")
+            }
+            Type::TypeIs(type_is) => {
+                f.write_str("TypeIs[")?;
+                if let Some((_, _, name)) = type_is.symbol_info(self.db) {
+                    f.write_str(&name)?;
+                    f.write_str(", ")?;
+                }
+                type_is.ty(self.db).display(self.db).fmt(f)?;
+                f.write_str("]")
+            }
         }
     }
 }

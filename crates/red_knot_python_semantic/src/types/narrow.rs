@@ -429,6 +429,45 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         // TODO: add support for PEP 604 union types on the right hand side of `isinstance`
         // and `issubclass`, for example `isinstance(x, str | (int | float))`.
         match callable_ty {
+            Type::FunctionLiteral(function_type) if function_type.known(self.db).is_none() => {
+                let return_ty =
+                    inference.expression_type(expr_call.scoped_expression_id(self.db, scope));
+
+                // TODO: Handle unions and intersections
+                let (guarded_ty, symbol, is_typeguard) = match return_ty {
+                    Type::TypeGuard(type_guard) => {
+                        let (_, symbol, _) = type_guard.symbol_info(self.db)?;
+                        (*type_guard.ty(self.db), symbol, true)
+                    }
+                    Type::TypeIs(type_is) => {
+                        let (_, symbol, _) = type_is.symbol_info(self.db)?;
+                        (*type_is.ty(self.db), symbol, false)
+                    }
+                    _ => return None,
+                };
+
+                let mut constraints = NarrowingConstraints::default();
+
+                // `TypeGuard` does not narrow in the negative case.
+                // ```python
+                // def f(a) -> TypeGuard[str]: ...
+                //
+                // a: str | int
+                //
+                // if not f(a):
+                //     reveal_type(a)  # str | int
+                // else:
+                //     reveal_type(a)  # str
+                // ```
+                if is_positive || !is_typeguard {
+                    constraints.insert(
+                        symbol,
+                        guarded_ty.negate_if(self.db, !is_positive && !is_typeguard),
+                    );
+                }
+
+                Some(constraints)
+            }
             Type::FunctionLiteral(function_type) if expr_call.arguments.keywords.is_empty() => {
                 let function = function_type.known(self.db)?.into_constraint_function()?;
 

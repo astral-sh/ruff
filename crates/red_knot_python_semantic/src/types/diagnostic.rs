@@ -40,6 +40,8 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_PARAMETER_DEFAULT);
     registry.register_lint(&INVALID_RAISE);
     registry.register_lint(&INVALID_TYPE_FORM);
+    registry.register_lint(&INVALID_TYPE_GUARD_DEFINITION);
+    registry.register_lint(&INVALID_TYPE_GUARD_CALL);
     registry.register_lint(&INVALID_TYPE_VARIABLE_CONSTRAINTS);
     registry.register_lint(&MISSING_ARGUMENT);
     registry.register_lint(&NON_SUBSCRIPTABLE);
@@ -420,6 +422,40 @@ declare_lint! {
     /// TODO #14889
     pub(crate) static INVALID_TYPE_FORM = {
         summary: "detects invalid type forms",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for type guard functions without
+    /// a first non-self-like non-keyword-only non-variadic parameter.
+    ///
+    /// ## Why is this bad?
+    /// Type narrowing functions must accept at least one positional argument
+    /// (non-static methods must accept another in addition to `self`/`cls`).
+    ///
+    /// Extra parameters/arguments are allowed but do not affect narrowing.
+    pub(crate) static INVALID_TYPE_GUARD_DEFINITION = {
+        summary: "detects malformed type guard functions",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for type guard function calls without a valid target.
+    ///
+    /// ## Why is this bad?
+    /// The first non-keyword non-variadic argument to a type guard function
+    /// is its target and must map to a symbol.
+    ///
+    /// Starred (`is_str(*a)`), literal (`is_str(42)`) and other non-symbol-like
+    /// expressions are invalid as narrowing targets.
+    pub(crate) static INVALID_TYPE_GUARD_CALL = {
+        summary: "detects type guard function calls that has no narrowing effect",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
@@ -1121,4 +1157,37 @@ pub(crate) fn report_invalid_arguments_to_annotated<'db>(
             KnownInstanceType::Annotated.repr(db)
         ),
     );
+}
+
+pub(crate) fn report_type_guard_function_with_incorrect_arity(
+    context: &InferContext,
+    node: AnyNodeRef,
+    is_non_static_method: bool,
+) {
+    context.report_lint(
+        &INVALID_TYPE_GUARD_DEFINITION,
+        node,
+        format_args!(
+            "This type guard function must accept at least {} positional arguments",
+            if is_non_static_method { 2 } else { 1 }
+        ),
+    )
+}
+
+pub(crate) fn report_typeis_function_with_incorrect_types<'db>(
+    db: &'db dyn Db,
+    context: &InferContext<'db>,
+    node: AnyNodeRef,
+    input_ty: Type,
+    return_ty: Type,
+) {
+    context.report_lint(
+        &INVALID_TYPE_GUARD_DEFINITION,
+        node,
+        format_args!(
+            "Return type `{}` is not assignable to input type `{}`",
+            return_ty.display(db),
+            input_ty.display(db),
+        ),
+    )
 }

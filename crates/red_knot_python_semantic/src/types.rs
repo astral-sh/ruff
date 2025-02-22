@@ -25,7 +25,7 @@ use crate::module_name::ModuleName;
 use crate::module_resolver::{file_to_module, resolve_module, KnownModule};
 use crate::semantic_index::ast_ids::HasScopedExpressionId;
 use crate::semantic_index::definition::Definition;
-use crate::semantic_index::symbol::ScopeId;
+use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId};
 use crate::semantic_index::{imported_modules, semantic_index};
 use crate::suppression::check_suppressions;
 use crate::symbol::{imported_symbol, Boundness, Symbol, SymbolAndQualifiers};
@@ -205,7 +205,7 @@ pub enum Type<'db> {
     ModuleLiteral(ModuleLiteralType<'db>),
     /// A specific class object
     ClassLiteral(ClassLiteralType<'db>),
-    // The set of all class objects that are subclasses of the given class (C), spelled `type[C]`.
+    /// The set of all class objects that are subclasses of the given class (C), spelled `type[C]`.
     SubclassOf(SubclassOfType<'db>),
     /// The set of Python objects with the given class in their __class__'s method resolution order
     Instance(InstanceType<'db>),
@@ -236,6 +236,10 @@ pub enum Type<'db> {
     /// A heterogeneous tuple type, with elements of the given types in source order.
     // TODO: Support variable length homogeneous tuple type like `tuple[int, ...]`.
     Tuple(TupleType<'db>),
+    /// A subtype of `bool` that allows narrowing in positive cases.
+    TypeGuard(TypeGuardType<'db>),
+    /// A subtype of `bool` that allows narrowing in both positive and negative cases.
+    TypeIs(TypeIsType<'db>),
     // TODO protocols, callable types, overloads, generics, type vars
 }
 
@@ -469,7 +473,9 @@ impl<'db> Type<'db> {
             | Type::ClassLiteral(_)
             | Type::KnownInstance(_)
             | Type::IntLiteral(_)
-            | Type::SubclassOf(_) => self,
+            | Type::SubclassOf(_)
+            | Type::TypeGuard(_)
+            | Type::TypeIs(_) => self,
         }
     }
 
@@ -593,9 +599,17 @@ impl<'db> Type<'db> {
             (Type::StringLiteral(_) | Type::LiteralString, _) => {
                 KnownClass::Str.to_instance(db).is_subtype_of(db, target)
             }
-            (Type::BooleanLiteral(_), _) => {
+
+            // `TypeGuard` is covariant
+            (Type::TypeGuard(left), Type::TypeGuard(right)) => {
+                left.ty(db).is_subtype_of(db, *right.ty(db))
+            }
+
+            // `TypeGuard[T]` and `TypeIs[T]` are subtypes of `bool`.
+            (Type::BooleanLiteral(_) | Type::TypeGuard(_) | Type::TypeIs(_), _) => {
                 KnownClass::Bool.to_instance(db).is_subtype_of(db, target)
             }
+
             (Type::IntLiteral(_), _) => KnownClass::Int.to_instance(db).is_subtype_of(db, target),
             (Type::BytesLiteral(_), _) => {
                 KnownClass::Bytes.to_instance(db).is_subtype_of(db, target)
@@ -1068,14 +1082,21 @@ impl<'db> Type<'db> {
                 known_instance_ty.is_disjoint_from(db, KnownClass::Tuple.to_instance(db))
             }
 
-            (Type::BooleanLiteral(..), Type::Instance(InstanceType { class }))
-            | (Type::Instance(InstanceType { class }), Type::BooleanLiteral(..)) => {
+            (
+                Type::BooleanLiteral(..) | Type::TypeGuard(_) | Type::TypeIs(_),
+                Type::Instance(InstanceType { class }),
+            )
+            | (
+                Type::Instance(InstanceType { class }),
+                Type::BooleanLiteral(..) | Type::TypeGuard(_) | Type::TypeIs(_),
+            ) => {
                 // A `Type::BooleanLiteral()` must be an instance of exactly `bool`
                 // (it cannot be an instance of a `bool` subclass)
                 !KnownClass::Bool.is_subclass_of(db, class)
             }
 
-            (Type::BooleanLiteral(..), _) | (_, Type::BooleanLiteral(..)) => true,
+            (Type::BooleanLiteral(..) | Type::TypeGuard(_) | Type::TypeIs(_), _)
+            | (_, Type::BooleanLiteral(..) | Type::TypeGuard(_) | Type::TypeIs(_)) => true,
 
             (Type::IntLiteral(..), Type::Instance(InstanceType { class }))
             | (Type::Instance(InstanceType { class }), Type::IntLiteral(..)) => {
@@ -1249,6 +1270,8 @@ impl<'db> Type<'db> {
                 .elements(db)
                 .iter()
                 .all(|elem| elem.is_fully_static(db)),
+            Type::TypeGuard(type_guard) => type_guard.ty(db).is_fully_static(db),
+            Type::TypeIs(type_is) => type_is.ty(db).is_fully_static(db),
             // TODO: Once we support them, make sure that we return `false` for other types
             // containing gradual forms such as `tuple[Any, ...]` or `Callable[..., str]`.
             // Conversely, make sure to return `true` for homogeneous tuples such as
@@ -1268,7 +1291,9 @@ impl<'db> Type<'db> {
             | Type::StringLiteral(..)
             | Type::BytesLiteral(..)
             | Type::SliceLiteral(..)
-            | Type::LiteralString => {
+            | Type::LiteralString
+            | Type::TypeGuard(_)
+            | Type::TypeIs(_) => {
                 // Note: The literal types included in this pattern are not true singletons.
                 // There can be multiple Python objects (at different memory locations) that
                 // are both of type Literal[345], for example.
@@ -1355,7 +1380,9 @@ impl<'db> Type<'db> {
             | Type::Intersection(..)
             | Type::LiteralString
             | Type::AlwaysTruthy
-            | Type::AlwaysFalsy => false,
+            | Type::AlwaysFalsy
+            | Type::TypeGuard(_)
+            | Type::TypeIs(_) => false,
         }
     }
 
@@ -1443,6 +1470,10 @@ impl<'db> Type<'db> {
                 // TODO more attributes could probably be usefully special-cased
                 _ => KnownClass::Int.to_instance(db).static_member(db, name),
             },
+
+            Type::TypeGuard(_) | Type::TypeIs(_) => {
+                KnownClass::Bool.to_instance(db).member(db, name)
+            }
 
             Type::BooleanLiteral(bool_value) => match name {
                 "real" | "numerator" => Symbol::bound(Type::IntLiteral(i64::from(*bool_value))),
@@ -1602,7 +1633,9 @@ impl<'db> Type<'db> {
             | Type::SliceLiteral(..)
             | Type::Tuple(..)
             | Type::KnownInstance(..)
-            | Type::FunctionLiteral(..) => {
+            | Type::FunctionLiteral(..)
+            | Type::TypeGuard(..)
+            | Type::TypeIs(..) => {
                 let member = self.static_member(db, name);
 
                 let instance = Some(*self);
@@ -1673,6 +1706,7 @@ impl<'db> Type<'db> {
     ) -> Result<Truthiness, BoolError<'db>> {
         let truthiness = match self {
             Type::Dynamic(_) | Type::Never => Truthiness::Ambiguous,
+            Type::TypeGuard(_) | Type::TypeIs(_) => Truthiness::Ambiguous,
             Type::FunctionLiteral(_) => Truthiness::AlwaysTrue,
             Type::Callable(_) => Truthiness::AlwaysTrue,
             Type::ModuleLiteral(_) => Truthiness::AlwaysTrue,
@@ -2453,7 +2487,9 @@ impl<'db> Type<'db> {
             | Type::Tuple(_)
             | Type::LiteralString
             | Type::AlwaysTruthy
-            | Type::AlwaysFalsy => Type::unknown(),
+            | Type::AlwaysFalsy
+            | Type::TypeGuard(_)
+            | Type::TypeIs(_) => Type::unknown(),
         }
     }
 
@@ -2660,6 +2696,7 @@ impl<'db> Type<'db> {
                 ),
             },
 
+            Type::TypeGuard(_) | Type::TypeIs(_) => KnownClass::Bool.to_class_literal(db),
             Type::StringLiteral(_) | Type::LiteralString => KnownClass::Str.to_class_literal(db),
             Type::Dynamic(dynamic) => SubclassOfType::from(db, ClassBase::Dynamic(*dynamic)),
             // TODO intersections
@@ -3546,6 +3583,8 @@ pub enum KnownFunction {
     Repr,
     /// `typing(_extensions).final`
     Final,
+    /// `builtins.staticmethod`
+    StaticMethod,
 
     /// [`typing(_extensions).no_type_check`](https://typing.readthedocs.io/en/latest/spec/directives.html#no-type-check)
     NoTypeCheck,
@@ -3603,7 +3642,7 @@ impl KnownFunction {
     /// Return `true` if `self` is defined in `module` at runtime.
     const fn check_module(self, module: KnownModule) -> bool {
         match self {
-            Self::IsInstance | Self::IsSubclass | Self::Len | Self::Repr => module.is_builtins(),
+            Self::IsInstance | Self::IsSubclass | Self::Len | Self::Repr | Self::StaticMethod => module.is_builtins(),
             Self::AssertType
             | Self::Cast
             | Self::Overload
@@ -3650,7 +3689,8 @@ impl KnownFunction {
             | Self::NoTypeCheck
             | Self::RevealType
             | Self::GetattrStatic
-            | Self::StaticAssert => ParameterExpectations::AllValueExpressions,
+            | Self::StaticAssert
+            | Self::StaticMethod => ParameterExpectations::AllValueExpressions,
         }
     }
 }
@@ -4225,6 +4265,7 @@ impl SliceLiteralType<'_> {
         (self.start(db), self.stop(db), self.step(db))
     }
 }
+
 #[salsa::interned]
 pub struct TupleType<'db> {
     #[return_ref]
@@ -4289,6 +4330,63 @@ impl<'db> TupleType<'db> {
         self.elements(db).len()
     }
 }
+
+macro_rules! type_guard_type_is_impl {
+    ($type:ident, $struct:ident) => {
+        impl<'db> $struct<'db> {
+            pub fn unbound(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
+                Type::$type(Self::new(db, ty, None))
+            }
+
+            pub fn bound(
+                db: &'db dyn Db,
+                ty: Type<'db>,
+                scope: ScopeId<'db>,
+                symbol: ScopedSymbolId,
+                name: String,
+            ) -> Type<'db> {
+                Type::$type(Self::new(db, ty, Some((scope, symbol, name))))
+            }
+
+            #[must_use]
+            pub fn bind(
+                self,
+                db: &'db dyn Db,
+                scope: ScopeId<'db>,
+                symbol: ScopedSymbolId,
+                name: String,
+            ) -> Type<'db> {
+                Self::bound(db, *self.ty(db), scope, symbol, name)
+            }
+
+            pub fn is_bound(&self, db: &'db dyn Db) -> bool {
+                self.symbol_info(db).is_some()
+            }
+
+            pub fn is_unbound(&self, db: &'db dyn Db) -> bool {
+                self.symbol_info(db).is_none()
+            }
+        }
+    };
+}
+
+#[salsa::interned]
+pub struct TypeGuardType<'db> {
+    #[return_ref]
+    ty: Type<'db>,
+    symbol_info: Option<(ScopeId<'db>, ScopedSymbolId, String)>,
+}
+
+type_guard_type_is_impl!(TypeGuard, TypeGuardType);
+
+#[salsa::interned]
+pub struct TypeIsType<'db> {
+    #[return_ref]
+    ty: Type<'db>,
+    symbol_info: Option<(ScopeId<'db>, ScopedSymbolId, String)>,
+}
+
+type_guard_type_is_impl!(TypeIs, TypeIsType);
 
 // Make sure that the `Type` enum does not grow unexpectedly.
 #[cfg(not(debug_assertions))]

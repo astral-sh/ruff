@@ -110,6 +110,14 @@ pub(super) fn union_elements_ordering<'db>(left: &Type<'db>, right: &Type<'db>) 
             Type::Instance(InstanceType { class: right }),
         ) => left.cmp(right),
 
+        (Type::TypeGuard(left), Type::TypeGuard(right)) => left.cmp(right),
+        (Type::TypeGuard(_), _) => Ordering::Less,
+        (_, Type::TypeGuard(_)) => Ordering::Greater,
+
+        (Type::TypeIs(left), Type::TypeIs(right)) => left.cmp(right),
+        (Type::TypeIs(_), _) => Ordering::Less,
+        (_, Type::TypeIs(_)) => Ordering::Greater,
+
         (Type::Instance(_), _) => Ordering::Less,
         (_, Type::Instance(_)) => Ordering::Greater,
 

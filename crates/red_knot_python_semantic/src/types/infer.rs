@@ -46,9 +46,9 @@ use crate::semantic_index::definition::{
     ExceptHandlerDefinitionKind, ForStmtDefinitionKind, TargetKind,
 };
 use crate::semantic_index::expression::{Expression, ExpressionKind};
-use crate::semantic_index::semantic_index;
 use crate::semantic_index::symbol::{FileScopeId, NodeWithScopeKind, NodeWithScopeRef, ScopeId};
 use crate::semantic_index::SemanticIndex;
+use crate::semantic_index::{semantic_index, symbol_table};
 use crate::symbol::{
     builtins_module_scope, builtins_symbol, explicit_global_symbol,
     module_type_implicit_global_symbol, symbol, symbol_from_bindings, symbol_from_declarations,
@@ -61,7 +61,7 @@ use crate::types::diagnostic::{
     CALL_NON_CALLABLE, CALL_POSSIBLY_UNBOUND_METHOD, CONFLICTING_DECLARATIONS,
     CONFLICTING_METACLASS, CYCLIC_CLASS_DEFINITION, DIVISION_BY_ZERO, DUPLICATE_BASE,
     INCONSISTENT_MRO, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE, INVALID_CONTEXT_MANAGER,
-    INVALID_DECLARATION, INVALID_PARAMETER_DEFAULT, INVALID_TYPE_FORM,
+    INVALID_DECLARATION, INVALID_PARAMETER_DEFAULT, INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL,
     INVALID_TYPE_VARIABLE_CONSTRAINTS, POSSIBLY_UNBOUND_ATTRIBUTE, POSSIBLY_UNBOUND_IMPORT,
     UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_IMPORT, UNSUPPORTED_OPERATOR,
 };
@@ -71,8 +71,9 @@ use crate::types::{
     class::MetaclassErrorKind, todo_type, Class, DynamicType, FunctionType, InstanceType,
     IntersectionBuilder, IntersectionType, KnownClass, KnownFunction, KnownInstanceType,
     MetaclassCandidate, SliceLiteralType, SubclassOfType, Symbol, SymbolAndQualifiers, Truthiness,
-    TupleType, Type, TypeAliasType, TypeAndQualifiers, TypeArrayDisplay, TypeQualifiers,
-    TypeVarBoundOrConstraints, TypeVarInstance, UnionBuilder, UnionType,
+    TupleType, Type, TypeAliasType, TypeAndQualifiers, TypeArrayDisplay, TypeGuardType, TypeIsType, TypeQualifiers,
+    TypeVarBoundOrConstraints,
+    TypeVarInstance, UnionBuilder, UnionType,
 };
 use crate::unpack::Unpack;
 use crate::util::subscript::{PyIndex, PySlice};
@@ -3424,7 +3425,48 @@ impl<'db> TypeInferenceBuilder<'db> {
                     }
                 }
 
-                outcome.return_type(self.db())
+                let db = self.db();
+                let scope = self.scope();
+                let return_ty = outcome.return_type(db);
+
+                let find_narrowed_symbol = || match arguments.args.first() {
+                    None => {
+                        self.context.report_lint(
+                            &INVALID_TYPE_GUARD_CALL,
+                            arguments.range(),
+                            format_args!("Type guard call does not have a target"),
+                        );
+                        None
+                    }
+                    Some(ast::Expr::Name(ast::ExprName { id, .. })) => {
+                        let name = id.as_str();
+                        let symbol = symbol_table(db, scope).symbol_id_by_name(name)?;
+
+                        Some((symbol, name.to_string()))
+                    }
+                    // TODO: Attribute and subscript narrowing
+                    Some(expr) => {
+                        self.context.report_lint(
+                            &INVALID_TYPE_GUARD_CALL,
+                            expr.range(),
+                            format_args!("Type guard call target is not a symbol"),
+                        );
+                        None
+                    }
+                };
+
+                // TODO: Handle unions/intersections
+                match return_ty {
+                    Type::TypeGuard(type_guard) => match find_narrowed_symbol() {
+                        Some((symbol, name)) => type_guard.bind(db, scope, symbol, name),
+                        None => return_ty,
+                    },
+                    Type::TypeIs(type_is) => match find_narrowed_symbol() {
+                        Some((symbol, name)) => type_is.bind(db, scope, symbol, name),
+                        None => return_ty,
+                    },
+                    _ => return_ty,
+                }
             }
             Err(err) => {
                 // TODO: We currently only report the first error. Ideally, we'd report
@@ -3896,7 +3938,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                 | Type::LiteralString
                 | Type::BytesLiteral(_)
                 | Type::SliceLiteral(_)
-                | Type::Tuple(_),
+                | Type::Tuple(_)
+                | Type::TypeGuard(_)
+                | Type::TypeIs(_),
             ) => {
                 let unary_dunder_method = match op {
                     ast::UnaryOp::Invert => "__invert__",
@@ -4112,7 +4156,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                 | Type::LiteralString
                 | Type::BytesLiteral(_)
                 | Type::SliceLiteral(_)
-                | Type::Tuple(_),
+                | Type::Tuple(_)
+                | Type::TypeGuard(_)
+                | Type::TypeIs(_),
                 Type::FunctionLiteral(_)
                 | Type::Callable(..)
                 | Type::ModuleLiteral(_)
@@ -4129,7 +4175,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                 | Type::LiteralString
                 | Type::BytesLiteral(_)
                 | Type::SliceLiteral(_)
-                | Type::Tuple(_),
+                | Type::Tuple(_)
+                | Type::TypeGuard(_)
+                | Type::TypeIs(_),
                 op,
             ) => {
                 // We either want to call lhs.__op__ or rhs.__rop__. The full decision tree from
@@ -6043,6 +6091,28 @@ impl<'db> TypeInferenceBuilder<'db> {
                     argument_type
                 }
             },
+            KnownInstanceType::TypeGuard | KnownInstanceType::TypeIs => match arguments_slice {
+                ast::Expr::Tuple(_) => {
+                    self.context.report_lint(
+                        &INVALID_TYPE_FORM,
+                        subscript,
+                        format_args!(
+                            "Special form `{}` expected exactly one type parameter",
+                            known_instance.repr(self.db())
+                        ),
+                    );
+                    Type::unknown()
+                }
+                _ => {
+                    let ty = self.infer_type_expression(arguments_slice);
+
+                    if matches!(known_instance, KnownInstanceType::TypeGuard) {
+                        TypeGuardType::unbound(self.db(), ty)
+                    } else {
+                        TypeIsType::unbound(self.db(), ty)
+                    }
+                }
+            },
 
             // TODO: Generics
             KnownInstanceType::ChainMap => {
@@ -6104,14 +6174,6 @@ impl<'db> TypeInferenceBuilder<'db> {
             KnownInstanceType::Required => {
                 self.infer_type_expression(arguments_slice);
                 todo_type!("`Required[]` type qualifier")
-            }
-            KnownInstanceType::TypeIs => {
-                self.infer_type_expression(arguments_slice);
-                todo_type!("`TypeIs[]` special form")
-            }
-            KnownInstanceType::TypeGuard => {
-                self.infer_type_expression(arguments_slice);
-                todo_type!("`TypeGuard[]` special form")
             }
             KnownInstanceType::Concatenate => {
                 self.infer_type_expression(arguments_slice);
