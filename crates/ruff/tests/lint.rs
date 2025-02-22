@@ -2319,7 +2319,7 @@ from typing import Union;foo: Union[int, str] = 1
             .args(STDIN_BASE_OPTIONS)
             .arg("-v")
             .arg("test.py")
-            .current_dir(&project_dir.join("foo")), @r###"
+            .current_dir(project_dir.join("foo")), @r###"
         success: true
         exit_code: 0
         ----- stdout -----
