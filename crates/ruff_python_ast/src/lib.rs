@@ -134,3 +134,38 @@ impl<P: AsRef<Path>> From<P> for PySourceType {
         Self::try_from_path(path).unwrap_or_default()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+    use std::path::Path;
+    use std::process::Command;
+
+    #[test]
+    fn test_astgen() {
+        let generated_path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("src")
+            .join("generated.rs");
+        let original_content =
+            fs::read_to_string(&generated_path).expect("Failed to read generated.rs");
+        let generate_script = Path::new(env!("CARGO_MANIFEST_DIR")).join("generate.py");
+        let output = Command::new("python")
+            .arg(&generate_script)
+            .output()
+            .expect("Failed to run AST generator script");
+
+        assert!(
+            output.status.success(),
+            "AST generator failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let new_content = fs::read_to_string(&generated_path)
+            .expect("Failed to read generated.rs after generation");
+        assert!(
+            original_content == new_content,
+            "{} has changed after running {}. Commit the changes.",
+            generated_path.display(),
+            generate_script.display()
+        );
+    }
+}

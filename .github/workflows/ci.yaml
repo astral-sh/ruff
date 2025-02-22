@@ -392,7 +392,6 @@ jobs:
         run: rustup component add rustfmt
       # Run all code generation scripts, and verify that the current output is
       # already checked into git.
-      - run: python crates/ruff_python_ast/generate.py
       - run: python crates/ruff_python_formatter/generate.py
       - run: test -z "$(git status --porcelain)"
       # Verify that adding a plugin or rule produces clean code.
