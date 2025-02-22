@@ -2123,7 +2123,7 @@ requires-python = ">= 3.11"
         ----- stderr -----
         [ruff::resolve][DEBUG] Using Ruff default settings
         [ruff_workspace::pyproject][DEBUG] Detected minimum supported `requires-python` version: 3.11
-        [ruff::resolve][DEBUG] Deriving `target-version` from found `requires-python`.
+        [ruff::resolve][DEBUG] Deriving `target-version` from found `requires-python`
         "###);
     });
     Ok(())
@@ -2245,7 +2245,7 @@ from typing import Union;foo: Union[int, str] = 1
         ----- stderr -----
         [ruff::resolve][DEBUG] Using Ruff default settings
         [ruff_workspace::pyproject][DEBUG] Detected minimum supported `requires-python` version: 3.11
-        [ruff::resolve][DEBUG] Deriving `target-version` from found `requires-python`.
+        [ruff::resolve][DEBUG] Deriving `target-version` from found `requires-python`
         [ruff::diagnostics][DEBUG] Checking: [TMP]/foo/test.py
         "###);
     });
