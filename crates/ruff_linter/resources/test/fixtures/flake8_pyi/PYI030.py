@@ -91,3 +91,84 @@ field25: typing.Union[typing_extensions.Literal[1], typing.Union[Literal[2], typ
 from typing import IO, Literal
 
 InlineOption = Literal["a"] | Literal["b"] | IO[str]
+
+# Unsafe fix when comments are deleted
+field26: (
+    # First group
+    Literal["a", "b"]
+    # Second group
+    | Literal["c", "d"]
+)
+field27: (
+    Literal["a", "b"]  # First group
+    | Literal["c", "d"]  # Second group
+)
+field28: (
+    # First group
+    Literal[1]
+    # Second group
+    | Literal[2]
+    # Third group
+    | str
+    # Fourth group
+    | Literal[3]
+)
+field29: (
+    Literal[1]  # First group
+    | Literal[2]  # Second group
+    | str  # Third group
+    | Literal[3]  # Fourth group
+)
+field30: (
+    Literal[
+        # First group
+        1,
+        # Second group
+        2,
+    ]
+    # Third group
+    | Literal[3],
+)
+field31: (
+    Literal[
+        1,  # First group
+        2,  # Second group
+    ]
+    | Literal[3],  # Third group
+)
+
+
+def field32(
+    arg1: (
+        # First group
+        Literal[1]
+        # Second group
+        | Literal[2]
+    )
+):
+    print(arg1)
+
+
+def field33(
+    arg1: (
+        Literal[1]  # First group
+        | Literal[2]  # Second group
+    )
+):
+    print(arg1)
+
+
+def field34() -> (
+    # First group
+    Literal[1]
+    # Second group
+    | Literal[2]
+):
+    return "my Literal[1]ing"
+
+
+def field35() -> (
+        Literal[1]  # First group
+        | Literal[2]  # Second group
+):
+    return "my Literal[1]ing"

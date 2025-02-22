@@ -28,6 +28,10 @@ use crate::checkers::ast::Checker;
 /// field: Literal[1, 2] | str
 /// ```
 ///
+/// ## Fix safety
+/// This fix is safe as long as the type expression doesn't span multiple
+/// lines and includes comments on any of the lines apart from the last one.
+///
 /// ## References
 /// - [Python documentation: `typing.Literal`](https://docs.python.org/3/library/typing.html#typing.Literal)
 #[derive(ViolationMetadata)]
@@ -133,10 +137,12 @@ pub(crate) fn unnecessary_literal_union<'a>(checker: &Checker, expr: &'a Expr) {
 
         if other_exprs.is_empty() {
             // if the union is only literals, we just replace the whole thing with a single literal
-            Fix::safe_edit(Edit::range_replacement(
-                checker.generator().expr(&literal),
-                expr.range(),
-            ))
+            let edit = Edit::range_replacement(checker.generator().expr(&literal), expr.range());
+            if checker.comment_ranges().intersects(expr.range()) {
+                Fix::unsafe_edit(edit)
+            } else {
+                Fix::safe_edit(edit)
+            }
         } else {
             let elts: Vec<Expr> = std::iter::once(literal)
                 .chain(other_exprs.into_iter().cloned())
@@ -160,7 +166,12 @@ pub(crate) fn unnecessary_literal_union<'a>(checker: &Checker, expr: &'a Expr) {
                 checker.generator().expr(&pep_604_union(&elts))
             };
 
-            Fix::safe_edit(Edit::range_replacement(content, expr.range()))
+            let edit = Edit::range_replacement(content, expr.range());
+            if checker.comment_ranges().intersects(expr.range()) {
+                Fix::unsafe_edit(edit)
+            } else {
+                Fix::safe_edit(edit)
+            }
         }
     });
 
