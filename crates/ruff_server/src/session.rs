@@ -1,11 +1,13 @@
 //! Data model, state management, and configuration resolution.
 
+use std::path::Path;
 use std::sync::Arc;
 
 use lsp_types::{ClientCapabilities, FileEvent, NotebookDocumentCellChange, Url};
+use settings::ResolvedClientSettings;
 
 use crate::edit::{DocumentKey, DocumentVersion, NotebookDocument};
-use crate::server::Workspaces;
+use crate::workspace::Workspaces;
 use crate::{PositionEncoding, TextDocument};
 
 pub(crate) use self::capabilities::ResolvedClientCapabilities;
@@ -147,24 +149,32 @@ impl Session {
         Ok(())
     }
 
-    pub(crate) fn num_documents(&self) -> usize {
-        self.index.num_documents()
-    }
-
-    pub(crate) fn num_workspaces(&self) -> usize {
-        self.index.num_workspaces()
-    }
-
-    pub(crate) fn list_config_files(&self) -> Vec<&std::path::Path> {
-        self.index.list_config_files()
-    }
-
     pub(crate) fn resolved_client_capabilities(&self) -> &ResolvedClientCapabilities {
         &self.resolved_client_capabilities
     }
 
     pub(crate) fn encoding(&self) -> PositionEncoding {
         self.position_encoding
+    }
+
+    /// Returns an iterator over the paths to the configuration files in the index.
+    pub(crate) fn config_file_paths(&self) -> impl Iterator<Item = &Path> {
+        self.index.config_file_paths()
+    }
+
+    /// Returns the resolved global client settings.
+    pub(crate) fn global_client_settings(&self) -> ResolvedClientSettings {
+        ResolvedClientSettings::global(&self.global_settings)
+    }
+
+    /// Returns the number of open documents in the session.
+    pub(crate) fn open_documents_len(&self) -> usize {
+        self.index.open_documents_len()
+    }
+
+    /// Returns an iterator over the workspace root folders in the session.
+    pub(crate) fn workspace_root_folders(&self) -> impl Iterator<Item = &Path> {
+        self.index.workspace_root_folders()
     }
 }
 
@@ -183,5 +193,16 @@ impl DocumentSnapshot {
 
     pub(crate) fn encoding(&self) -> PositionEncoding {
         self.position_encoding
+    }
+
+    /// Returns `true` if this snapshot represents a notebook cell.
+    pub(crate) const fn is_notebook_cell(&self) -> bool {
+        matches!(
+            &self.document_ref,
+            index::DocumentQuery::Notebook {
+                cell_url: Some(_),
+                ..
+            }
+        )
     }
 }

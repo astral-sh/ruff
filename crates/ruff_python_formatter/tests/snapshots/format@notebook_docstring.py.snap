@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/notebook_docstring.py
-snapshot_kind: text
 ---
 ## Input
 ```python
@@ -25,7 +24,7 @@ magic-trailing-comma       = Respect
 docstring-code             = Disabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
-target_version             = Py39
+target_version             = 3.9
 source_type                = Ipynb
 ```
 
@@ -49,7 +48,7 @@ magic-trailing-comma       = Respect
 docstring-code             = Disabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
-target_version             = Py39
+target_version             = 3.9
 source_type                = Python
 ```
 

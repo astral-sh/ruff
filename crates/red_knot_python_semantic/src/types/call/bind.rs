@@ -6,7 +6,9 @@ use crate::types::diagnostic::{
 };
 use crate::types::signatures::Parameter;
 use crate::types::{todo_type, UnionType};
+use ruff_db::diagnostic::{SecondaryDiagnosticMessage, Span};
 use ruff_python_ast as ast;
+use ruff_text_size::Ranged;
 
 /// Bind a [`CallArguments`] against a callable [`Signature`].
 ///
@@ -161,6 +163,10 @@ impl<'db> CallBinding<'db> {
         }
     }
 
+    pub(crate) fn callable_type(&self) -> Type<'db> {
+        self.callable_ty
+    }
+
     pub(crate) fn set_return_type(&mut self, return_ty: Type<'db>) {
         self.return_ty = return_ty;
     }
@@ -187,6 +193,13 @@ impl<'db> CallBinding<'db> {
         }
     }
 
+    pub(crate) fn three_parameter_types(&self) -> Option<(Type<'db>, Type<'db>, Type<'db>)> {
+        match self.parameter_types() {
+            [first, second, third] => Some((*first, *second, *third)),
+            _ => None,
+        }
+    }
+
     fn callable_name(&self, db: &'db dyn Db) -> Option<&str> {
         match self.callable_ty {
             Type::FunctionLiteral(function) => Some(function.name(db)),
@@ -195,11 +208,15 @@ impl<'db> CallBinding<'db> {
         }
     }
 
-    pub(super) fn report_diagnostics(&self, context: &InferContext<'db>, node: ast::AnyNodeRef) {
+    pub(crate) fn report_diagnostics(&self, context: &InferContext<'db>, node: ast::AnyNodeRef) {
         let callable_name = self.callable_name(context.db());
         for error in &self.errors {
-            error.report_diagnostic(context, node, callable_name);
+            error.report_diagnostic(context, node, self.callable_ty, callable_name);
         }
+    }
+
+    pub(crate) fn has_binding_errors(&self) -> bool {
+        !self.errors.is_empty()
     }
 }
 
@@ -291,6 +308,7 @@ impl<'db> CallBindingError<'db> {
         &self,
         context: &InferContext<'db>,
         node: ast::AnyNodeRef,
+        callable_ty: Type<'db>,
         callable_name: Option<&str>,
     ) {
         match self {
@@ -300,9 +318,29 @@ impl<'db> CallBindingError<'db> {
                 expected_ty,
                 provided_ty,
             } => {
+                let mut messages = vec![];
+                if let Some(func_lit) = callable_ty.into_function_literal() {
+                    let func_lit_scope = func_lit.body_scope(context.db());
+                    let mut span = Span::from(func_lit_scope.file(context.db()));
+                    let node = func_lit_scope.node(context.db());
+                    if let Some(func_def) = node.as_function() {
+                        let range = func_def
+                            .parameters
+                            .iter()
+                            .nth(parameter.index)
+                            .map(|param| param.range())
+                            .unwrap_or(func_def.parameters.range);
+                        span = span.with_range(range);
+                        messages.push(SecondaryDiagnosticMessage::new(
+                            span,
+                            "parameter declared in function definition here",
+                        ));
+                    }
+                }
+
                 let provided_ty_display = provided_ty.display(context.db());
                 let expected_ty_display = expected_ty.display(context.db());
-                context.report_lint(
+                context.report_lint_with_secondary_messages(
                     &INVALID_ARGUMENT_TYPE,
                     Self::get_node(node, *argument_index),
                     format_args!(
@@ -314,6 +352,7 @@ impl<'db> CallBindingError<'db> {
                             String::new()
                         }
                     ),
+                    messages,
                 );
             }
 

@@ -21,6 +21,13 @@ pub(crate) struct Signature<'db> {
 }
 
 impl<'db> Signature<'db> {
+    pub(crate) fn new(parameters: Parameters<'db>, return_ty: Option<Type<'db>>) -> Self {
+        Self {
+            parameters,
+            return_ty,
+        }
+    }
+
     /// Return a todo signature: (*args: Todo, **kwargs: Todo) -> Todo
     pub(crate) fn todo() -> Self {
         Self {
@@ -64,6 +71,10 @@ impl<'db> Signature<'db> {
 pub(crate) struct Parameters<'db>(Vec<Parameter<'db>>);
 
 impl<'db> Parameters<'db> {
+    pub(crate) fn new(parameters: impl IntoIterator<Item = Parameter<'db>>) -> Self {
+        Self(parameters.into_iter().collect())
+    }
+
     /// Return todo parameters: (*args: Todo, **kwargs: Todo)
     fn todo() -> Self {
         Self(vec![
@@ -233,6 +244,18 @@ pub(crate) struct Parameter<'db> {
 }
 
 impl<'db> Parameter<'db> {
+    pub(crate) fn new(
+        name: Option<Name>,
+        annotated_ty: Option<Type<'db>>,
+        kind: ParameterKind<'db>,
+    ) -> Self {
+        Self {
+            name,
+            annotated_ty,
+            kind,
+        }
+    }
+
     fn from_node_and_kind(
         db: &'db dyn Db,
         definition: Definition<'db>,
@@ -322,7 +345,8 @@ pub(crate) enum ParameterKind<'db> {
 mod tests {
     use super::*;
     use crate::db::tests::{setup_db, TestDb};
-    use crate::types::{global_symbol, FunctionType, KnownClass};
+    use crate::symbol::global_symbol;
+    use crate::types::{FunctionType, KnownClass};
     use ruff_db::system::DbWithTestSystem;
 
     #[track_caller]

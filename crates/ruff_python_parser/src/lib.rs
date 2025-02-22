@@ -68,6 +68,7 @@ use std::iter::FusedIterator;
 use std::ops::Deref;
 
 pub use crate::error::{FStringErrorType, LexicalErrorType, ParseError, ParseErrorType};
+pub use crate::parser::ParseOptions;
 pub use crate::token::{Token, TokenKind};
 
 use crate::parser::Parser;
@@ -110,7 +111,7 @@ pub mod typing;
 /// assert!(module.is_ok());
 /// ```
 pub fn parse_module(source: &str) -> Result<Parsed<ModModule>, ParseError> {
-    Parser::new(source, Mode::Module)
+    Parser::new(source, ParseOptions::from(Mode::Module))
         .parse()
         .try_into_module()
         .unwrap()
@@ -133,7 +134,7 @@ pub fn parse_module(source: &str) -> Result<Parsed<ModModule>, ParseError> {
 /// assert!(expr.is_ok());
 /// ```
 pub fn parse_expression(source: &str) -> Result<Parsed<ModExpression>, ParseError> {
-    Parser::new(source, Mode::Expression)
+    Parser::new(source, ParseOptions::from(Mode::Expression))
         .parse()
         .try_into_expression()
         .unwrap()
@@ -161,7 +162,7 @@ pub fn parse_expression_range(
     range: TextRange,
 ) -> Result<Parsed<ModExpression>, ParseError> {
     let source = &source[..range.end().to_usize()];
-    Parser::new_starts_at(source, Mode::Expression, range.start())
+    Parser::new_starts_at(source, range.start(), ParseOptions::from(Mode::Expression))
         .parse()
         .try_into_expression()
         .unwrap()
@@ -187,8 +188,12 @@ pub fn parse_parenthesized_expression_range(
     range: TextRange,
 ) -> Result<Parsed<ModExpression>, ParseError> {
     let source = &source[..range.end().to_usize()];
-    let parsed =
-        Parser::new_starts_at(source, Mode::ParenthesizedExpression, range.start()).parse();
+    let parsed = Parser::new_starts_at(
+        source,
+        range.start(),
+        ParseOptions::from(Mode::ParenthesizedExpression),
+    )
+    .parse();
     parsed.try_into_expression().unwrap().into_result()
 }
 
@@ -227,11 +232,11 @@ pub fn parse_string_annotation(
     }
 }
 
-/// Parse the given Python source code using the specified [`Mode`].
+/// Parse the given Python source code using the specified [`ParseOptions`].
 ///
-/// This function is the most general function to parse Python code. Based on the [`Mode`] supplied,
-/// it can be used to parse a single expression, a full Python program, an interactive expression
-/// or a Python program containing IPython escape commands.
+/// This function is the most general function to parse Python code. Based on the [`Mode`] supplied
+/// via the [`ParseOptions`], it can be used to parse a single expression, a full Python program,
+/// an interactive expression or a Python program containing IPython escape commands.
 ///
 /// # Example
 ///
@@ -239,16 +244,16 @@ pub fn parse_string_annotation(
 /// parsing:
 ///
 /// ```
-/// use ruff_python_parser::{Mode, parse};
+/// use ruff_python_parser::{parse, Mode, ParseOptions};
 ///
-/// let parsed = parse("1 + 2", Mode::Expression);
+/// let parsed = parse("1 + 2", ParseOptions::from(Mode::Expression));
 /// assert!(parsed.is_ok());
 /// ```
 ///
 /// Alternatively, we can parse a full Python program consisting of multiple lines:
 ///
 /// ```
-/// use ruff_python_parser::{Mode, parse};
+/// use ruff_python_parser::{parse, Mode, ParseOptions};
 ///
 /// let source = r#"
 /// class Greeter:
@@ -256,39 +261,39 @@ pub fn parse_string_annotation(
 ///   def greet(self):
 ///    print("Hello, world!")
 /// "#;
-/// let parsed = parse(source, Mode::Module);
+/// let parsed = parse(source, ParseOptions::from(Mode::Module));
 /// assert!(parsed.is_ok());
 /// ```
 ///
 /// Additionally, we can parse a Python program containing IPython escapes:
 ///
 /// ```
-/// use ruff_python_parser::{Mode, parse};
+/// use ruff_python_parser::{parse, Mode, ParseOptions};
 ///
 /// let source = r#"
 /// %timeit 1 + 2
 /// ?str.replace
 /// !ls
 /// "#;
-/// let parsed = parse(source, Mode::Ipython);
+/// let parsed = parse(source, ParseOptions::from(Mode::Ipython));
 /// assert!(parsed.is_ok());
 /// ```
-pub fn parse(source: &str, mode: Mode) -> Result<Parsed<Mod>, ParseError> {
-    parse_unchecked(source, mode).into_result()
+pub fn parse(source: &str, options: ParseOptions) -> Result<Parsed<Mod>, ParseError> {
+    parse_unchecked(source, options).into_result()
 }
 
-/// Parse the given Python source code using the specified [`Mode`].
+/// Parse the given Python source code using the specified [`ParseOptions`].
 ///
 /// This is same as the [`parse`] function except that it doesn't check for any [`ParseError`]
 /// and returns the [`Parsed`] as is.
-pub fn parse_unchecked(source: &str, mode: Mode) -> Parsed<Mod> {
-    Parser::new(source, mode).parse()
+pub fn parse_unchecked(source: &str, options: ParseOptions) -> Parsed<Mod> {
+    Parser::new(source, options).parse()
 }
 
 /// Parse the given Python source code using the specified [`PySourceType`].
 pub fn parse_unchecked_source(source: &str, source_type: PySourceType) -> Parsed<ModModule> {
     // SAFETY: Safe because `PySourceType` always parses to a `ModModule`
-    Parser::new(source, source_type.as_mode())
+    Parser::new(source, ParseOptions::from(source_type))
         .parse()
         .try_into_module()
         .unwrap()

@@ -92,7 +92,7 @@ impl<'a> AvoidableEscapedQuoteChecker<'a> {
         Self {
             locator,
             quotes_settings: &settings.flake8_quotes,
-            supports_pep701: settings.target_version.supports_pep701(),
+            supports_pep701: settings.target_version.supports_pep_701(),
             diagnostics: vec![],
         }
     }

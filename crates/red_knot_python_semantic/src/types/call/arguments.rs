@@ -5,6 +5,11 @@ use super::Type;
 pub(crate) struct CallArguments<'a, 'db>(Vec<Argument<'a, 'db>>);
 
 impl<'a, 'db> CallArguments<'a, 'db> {
+    /// Create a [`CallArguments`] with no arguments.
+    pub(crate) fn none() -> Self {
+        Self(Vec::new())
+    }
+
     /// Create a [`CallArguments`] from an iterator over non-variadic positional argument types.
     pub(crate) fn positional(positional_tys: impl IntoIterator<Item = Type<'db>>) -> Self {
         positional_tys
@@ -28,6 +33,19 @@ impl<'a, 'db> CallArguments<'a, 'db> {
     // TODO this should be eliminated in favor of [`bind_call`]
     pub(crate) fn first_argument(&self) -> Option<Type<'db>> {
         self.0.first().map(Argument::ty)
+    }
+
+    // TODO this should be eliminated in favor of [`bind_call`]
+    pub(crate) fn exactly_one_argument(&self) -> Option<Type<'db>> {
+        match &*self.0 {
+            [arg] => Some(arg.ty()),
+            _ => None,
+        }
+    }
+
+    // TODO this should be eliminated in favor of [`bind_call`]
+    pub(crate) fn second_argument(&self) -> Option<Type<'db>> {
+        self.0.get(1).map(Argument::ty)
     }
 }
 

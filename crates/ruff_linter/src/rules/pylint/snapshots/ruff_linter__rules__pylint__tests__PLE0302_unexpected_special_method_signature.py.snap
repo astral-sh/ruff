@@ -71,3 +71,75 @@ unexpected_special_method_signature.py:65:9: PLE0302 The special method `__round
    |         ^^^^^^^^^ PLE0302
 66 |         ...
    |
+
+unexpected_special_method_signature.py:89:9: PLE0302 The special method `__next__` expects 1 parameter, 2 were given
+   |
+87 |         ...
+88 |
+89 |     def __next__(self, x): # #16217 assert special method is linted, expects 1 parameter
+   |         ^^^^^^^^ PLE0302
+90 |         ...
+   |
+
+unexpected_special_method_signature.py:92:9: PLE0302 The special method `__buffer__` expects 2 parameters, 1 was given
+   |
+90 |         ...
+91 |
+92 |     def __buffer__(self): # #16217 assert special method is linted, expects 2 parameters
+   |         ^^^^^^^^^^ PLE0302
+93 |         ...
+   |
+
+unexpected_special_method_signature.py:95:9: PLE0302 The special method `__class_getitem__` expects 2 parameters, 1 was given
+   |
+93 |         ...
+94 |
+95 |     def __class_getitem__(self): # #16217 assert special method is linted, expects 2 parameters
+   |         ^^^^^^^^^^^^^^^^^ PLE0302
+96 |         ...
+   |
+
+unexpected_special_method_signature.py:98:9: PLE0302 The special method `__mro_entries__` expects 2 parameters, 1 was given
+   |
+96 |         ...
+97 |
+98 |     def __mro_entries__(self): # #16217 assert special method is linted, expects 2 parameters
+   |         ^^^^^^^^^^^^^^^ PLE0302
+99 |         ...
+   |
+
+unexpected_special_method_signature.py:101:9: PLE0302 The special method `__release_buffer__` expects 2 parameters, 1 was given
+    |
+ 99 |         ...
+100 |
+101 |     def __release_buffer__(self): # #16217 assert special method is linted, expects 2 parameters
+    |         ^^^^^^^^^^^^^^^^^^ PLE0302
+102 |         ...
+    |
+
+unexpected_special_method_signature.py:104:9: PLE0302 The special method `__subclasshook__` expects 2 parameters, 1 was given
+    |
+102 |         ...
+103 |
+104 |     def __subclasshook__(self): # #16217 assert special method is linted, expects 2 parameters
+    |         ^^^^^^^^^^^^^^^^ PLE0302
+105 |         ...
+    |
+
+unexpected_special_method_signature.py:107:9: PLE0302 The special method `__setattr__` expects 3 parameters, 2 were given
+    |
+105 |         ...
+106 |
+107 |     def __setattr__(self, /, name): # #16217 assert positional-only special method is linted, expects 3 parameters
+    |         ^^^^^^^^^^^ PLE0302
+108 |         ...
+    |
+
+unexpected_special_method_signature.py:110:9: PLE0302 The special method `__setitem__` expects 3 parameters, 4 were given
+    |
+108 |         ...
+109 |
+110 |     def __setitem__(self, key, /, value, extra_value): # #16217 assert positional-only special method is linted, expects 3 parameters
+    |         ^^^^^^^^^^^ PLE0302
+111 |         ...
+    |

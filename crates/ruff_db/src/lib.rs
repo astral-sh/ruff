@@ -74,7 +74,6 @@ mod tests {
         ///
         /// ## Panics
         /// If there are pending database snapshots.
-        #[allow(unused)]
         pub(crate) fn take_salsa_events(&mut self) -> Vec<salsa::Event> {
             let inner = Arc::get_mut(&mut self.events)
                 .expect("expected no pending salsa database snapshots.");
@@ -86,7 +85,6 @@ mod tests {
         ///
         /// ## Panics
         /// If there are pending database snapshots.
-        #[allow(unused)]
         pub(crate) fn clear_salsa_events(&mut self) {
             self.take_salsa_events();
         }

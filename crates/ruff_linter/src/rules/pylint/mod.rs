@@ -9,13 +9,14 @@ mod tests {
 
     use anyhow::Result;
     use regex::Regex;
+    use ruff_python_ast::PythonVersion;
     use rustc_hash::FxHashSet;
     use test_case::test_case;
 
     use crate::registry::Rule;
     use crate::rules::{flake8_tidy_imports, pylint};
 
-    use crate::settings::types::{PreviewMode, PythonVersion};
+    use crate::settings::types::PreviewMode;
     use crate::settings::LinterSettings;
     use crate::test::test_path;
     use crate::{assert_messages, settings};
@@ -249,7 +250,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("pylint/continue_in_finally.py"),
             &LinterSettings::for_rule(Rule::ContinueInFinally)
-                .with_target_version(PythonVersion::Py37),
+                .with_target_version(PythonVersion::PY37),
         )?;
         assert_messages!(diagnostics);
         Ok(())

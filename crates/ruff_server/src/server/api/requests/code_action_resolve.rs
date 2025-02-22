@@ -50,6 +50,21 @@ impl super::BackgroundDocumentRequestHandler for CodeActionResolve {
             .with_failure_code(ErrorCode::InvalidParams);
         };
 
+        match action_kind {
+            SupportedCodeAction::SourceFixAll | SupportedCodeAction::SourceOrganizeImports
+                if snapshot.is_notebook_cell() =>
+            {
+                // This should never occur because we ignore generating these code actions for a
+                // notebook cell in the `textDocument/codeAction` request handler.
+                return Err(anyhow::anyhow!(
+                    "Code action resolver cannot resolve {:?} for a notebook cell",
+                    action_kind.to_kind().as_str()
+                ))
+                .with_failure_code(ErrorCode::InvalidParams);
+            }
+            _ => {}
+        }
+
         action.edit = match action_kind {
             SupportedCodeAction::SourceFixAll | SupportedCodeAction::NotebookSourceFixAll => Some(
                 resolve_edit_for_fix_all(

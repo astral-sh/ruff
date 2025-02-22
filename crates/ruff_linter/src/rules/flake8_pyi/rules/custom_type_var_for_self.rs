@@ -12,7 +12,7 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
 use crate::importer::{ImportRequest, ResolutionError};
-use crate::settings::types::PythonVersion;
+use ruff_python_ast::PythonVersion;
 
 /// ## What it does
 /// Checks for methods that use custom [`TypeVar`s][typing_TypeVar] in their
@@ -31,6 +31,10 @@ use crate::settings::types::PythonVersion;
 /// ## Example
 ///
 /// ```pyi
+/// from typing import TypeVar
+///
+/// _S = TypeVar("_S", bound="Foo")
+///
 /// class Foo:
 ///     def __new__(cls: type[_S], *args: str, **kwargs: int) -> _S: ...
 ///     def foo(self: _S, arg: bytes) -> _S: ...
@@ -51,13 +55,21 @@ use crate::settings::types::PythonVersion;
 /// ```
 ///
 /// ## Fix behaviour and safety
-/// The fix removes all usages and declarations of the custom type variable.
-/// [PEP-695]-style `TypeVar` declarations are also removed from the [type parameter list];
-/// however, old-style `TypeVar`s do not have their declarations removed. See
-/// [`unused-private-type-var`][PYI018] for a rule to clean up unused private type variables.
+/// The fix replaces all references to the custom type variable in the method's header and body
+/// with references to `Self`. The fix also adds an import of `Self` if neither `Self` nor `typing`
+/// is already imported in the module. If your [`target-version`] setting is set to Python 3.11 or
+/// newer, the fix imports `Self` from the standard-library `typing` module; otherwise, the fix
+/// imports `Self` from the third-party [`typing_extensions`][typing_extensions] backport package.
 ///
-/// If there are any comments within the fix ranges, it will be marked as unsafe.
-/// Otherwise, it will be marked as safe.
+/// If the custom type variable is a [PEP-695]-style `TypeVar`, the fix also removes the `TypeVar`
+/// declaration from the method's [type parameter list]. However, if the type variable is an
+/// old-style `TypeVar`, the declaration of the type variable will not be removed by this rule's
+/// fix, as the type variable could still be used by other functions, methods or classes. See
+/// [`unused-private-type-var`][PYI018] for a rule that will clean up unused private type
+/// variables.
+///
+/// The fix is only marked as unsafe if there is the possibility that it might delete a comment
+/// from your code.
 ///
 /// ## Preview-mode behaviour
 /// This rule's behaviour has several differences when [`preview`] mode is enabled:
@@ -77,6 +89,7 @@ use crate::settings::types::PythonVersion;
 /// [type parameter list]: https://docs.python.org/3/reference/compound_stmts.html#type-params
 /// [Self]: https://docs.python.org/3/library/typing.html#typing.Self
 /// [typing_TypeVar]: https://docs.python.org/3/library/typing.html#typing.TypeVar
+/// [typing_extensions]: https://typing-extensions.readthedocs.io/en/latest/
 #[derive(ViolationMetadata)]
 pub(crate) struct CustomTypeVarForSelf {
     typevar_name: String,
@@ -547,7 +560,7 @@ fn replace_custom_typevar_with_self(
 /// This is because it was added to the `typing` module on Python 3.11,
 /// but is available from the backport package `typing_extensions` on all versions.
 fn import_self(checker: &Checker, position: TextSize) -> Result<(Edit, String), ResolutionError> {
-    let source_module = if checker.settings.target_version >= PythonVersion::Py311 {
+    let source_module = if checker.settings.target_version >= PythonVersion::PY311 {
         "typing"
     } else {
         "typing_extensions"

@@ -13,9 +13,9 @@ mod tests {
     use crate::assert_messages;
     use crate::registry::Rule;
     use crate::rules::flake8_builtins;
-    use crate::settings::types::PythonVersion;
     use crate::settings::LinterSettings;
     use crate::test::{test_path, test_resource_path};
+    use ruff_python_ast::PythonVersion;
 
     #[test_case(Rule::BuiltinVariableShadowing, Path::new("A001.py"))]
     #[test_case(Rule::BuiltinArgumentShadowing, Path::new("A002.py"))]
@@ -217,7 +217,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_builtins").join(path).as_path(),
             &LinterSettings {
-                target_version: PythonVersion::Py38,
+                target_version: PythonVersion::PY38,
                 ..LinterSettings::for_rule(rule_code)
             },
         )?;

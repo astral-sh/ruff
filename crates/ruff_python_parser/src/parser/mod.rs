@@ -13,8 +13,11 @@ use crate::token_source::{TokenSource, TokenSourceCheckpoint};
 use crate::{Mode, ParseError, ParseErrorType, TokenKind};
 use crate::{Parsed, Tokens};
 
+pub use crate::parser::options::ParseOptions;
+
 mod expression;
 mod helpers;
+mod options;
 mod pattern;
 mod progress;
 mod recovery;
@@ -32,8 +35,8 @@ pub(crate) struct Parser<'src> {
     /// Stores all the syntax errors found during the parsing.
     errors: Vec<ParseError>,
 
-    /// Specify the mode in which the code will be parsed.
-    mode: Mode,
+    /// Options for how the code will be parsed.
+    options: ParseOptions,
 
     /// The ID of the current token. This is used to track the progress of the parser
     /// to avoid infinite loops when the parser is stuck.
@@ -51,16 +54,20 @@ pub(crate) struct Parser<'src> {
 
 impl<'src> Parser<'src> {
     /// Create a new parser for the given source code.
-    pub(crate) fn new(source: &'src str, mode: Mode) -> Self {
-        Parser::new_starts_at(source, mode, TextSize::new(0))
+    pub(crate) fn new(source: &'src str, options: ParseOptions) -> Self {
+        Parser::new_starts_at(source, TextSize::new(0), options)
     }
 
     /// Create a new parser for the given source code which starts parsing at the given offset.
-    pub(crate) fn new_starts_at(source: &'src str, mode: Mode, start_offset: TextSize) -> Self {
-        let tokens = TokenSource::from_source(source, mode, start_offset);
+    pub(crate) fn new_starts_at(
+        source: &'src str,
+        start_offset: TextSize,
+        options: ParseOptions,
+    ) -> Self {
+        let tokens = TokenSource::from_source(source, options.mode, start_offset);
 
         Parser {
-            mode,
+            options,
             source,
             errors: Vec::new(),
             tokens,
@@ -73,7 +80,7 @@ impl<'src> Parser<'src> {
 
     /// Consumes the [`Parser`] and returns the parsed [`Parsed`].
     pub(crate) fn parse(mut self) -> Parsed<Mod> {
-        let syntax = match self.mode {
+        let syntax = match self.options.mode {
             Mode::Expression | Mode::ParenthesizedExpression => {
                 Mod::Expression(self.parse_single_expression())
             }

@@ -651,6 +651,16 @@
             }
           ]
         },
+        "unsupported-bool-conversion": {
+          "title": "detects boolean conversion where the object incorrectly implements `__bool__`",
+          "description": "## What it does\nChecks for bool conversions where the object doesn't correctly implement `__bool__`.\n\n## Why is this bad?\nIf an exception is raised when you attempt to evaluate the truthiness of an object,\nusing the object in a boolean context will fail at runtime.\n\n## Examples\n\n```python\nclass NotBoolable:\n    __bool__ = None\n\nb1 = NotBoolable()\nb2 = NotBoolable()\n\nif b1:  # exception raised here\n    pass\n\nb1 and b2  # exception raised here\nnot b1  # exception raised here\nb1 < b2 < b1  # exception raised here\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "unsupported-operator": {
           "title": "detects binary, unary, or comparison expressions where the operands don't support the operator",
           "description": "## What it does\nChecks for binary expressions, comparisons, and unary expressions where the operands don't support the operator.\n\nTODO #14889",

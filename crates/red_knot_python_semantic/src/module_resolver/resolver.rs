@@ -6,7 +6,7 @@ use rustc_hash::{FxBuildHasher, FxHashSet};
 use ruff_db::files::{File, FilePath, FileRootKind};
 use ruff_db::system::{DirectoryEntry, System, SystemPath, SystemPathBuf};
 use ruff_db::vendored::{VendoredFileSystem, VendoredPath};
-use ruff_python_ast::python_version::PythonVersion;
+use ruff_python_ast::PythonVersion;
 
 use crate::db::Db;
 use crate::module_name::ModuleName;
@@ -725,7 +725,7 @@ mod tests {
         assert_const_function_query_was_not_run, assert_function_query_was_not_run,
     };
     use ruff_db::Db;
-    use ruff_python_ast::python_version::PythonVersion;
+    use ruff_python_ast::PythonVersion;
 
     use crate::db::tests::TestDb;
     use crate::module_name::ModuleName;
