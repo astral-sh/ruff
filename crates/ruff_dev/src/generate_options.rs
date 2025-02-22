@@ -2,6 +2,7 @@
 //!
 //! Used for <https://docs.astral.sh/ruff/settings/>.
 use itertools::Itertools;
+use ruff_server::ClientSettings;
 use std::fmt::Write;
 
 use ruff_python_trivia::textwrap;
@@ -15,12 +16,32 @@ pub(crate) fn generate() -> String {
         &mut output,
         Set::Toplevel(Options::metadata()),
         &mut Vec::new(),
+        SetKind::Ruff,
     );
 
     output
 }
 
-fn generate_set(output: &mut String, set: Set, parents: &mut Vec<Set>) {
+pub(crate) fn generate_server_options() -> String {
+    let mut output = String::new();
+
+    generate_set(
+        &mut output,
+        Set::Toplevel(ClientSettings::metadata()),
+        &mut Vec::new(),
+        SetKind::RuffServer,
+    );
+
+    output
+}
+
+#[derive(Copy, Clone)]
+enum SetKind {
+    Ruff,
+    RuffServer,
+}
+
+fn generate_set(output: &mut String, set: Set, parents: &mut Vec<Set>, set_kind: SetKind) {
     match &set {
         Set::Toplevel(_) => {
             output.push_str("### Top-level\n");
@@ -53,7 +74,7 @@ fn generate_set(output: &mut String, set: Set, parents: &mut Vec<Set>) {
 
     // Generate the fields.
     for (name, field) in &fields {
-        emit_field(output, name, field, parents.as_slice());
+        emit_field(output, name, field, parents.as_slice(), set_kind);
         output.push_str("---\n\n");
     }
 
@@ -66,6 +87,7 @@ fn generate_set(output: &mut String, set: Set, parents: &mut Vec<Set>) {
                 set: *sub_set,
             },
             parents,
+            set_kind,
         );
     }
 
@@ -93,7 +115,13 @@ impl Set {
     }
 }
 
-fn emit_field(output: &mut String, name: &str, field: &OptionField, parents: &[Set]) {
+fn emit_field(
+    output: &mut String,
+    name: &str,
+    field: &OptionField,
+    parents: &[Set],
+    set_kind: SetKind,
+) {
     let header_level = if parents.is_empty() { "####" } else { "#####" };
     let parents_anchor = parents.iter().filter_map(|parent| parent.name()).join("_");
 
@@ -137,25 +165,43 @@ fn emit_field(output: &mut String, name: &str, field: &OptionField, parents: &[S
     output.push_str(&format!("**Type**: `{}`\n", field.value_type));
     output.push('\n');
     output.push_str("**Example usage**:\n\n");
-    output.push_str(&format_tab(
-        "pyproject.toml",
-        &format_header(field.scope, parents, ConfigurationFile::PyprojectToml),
-        field.example,
-    ));
-    output.push_str(&format_tab(
-        "ruff.toml",
-        &format_header(field.scope, parents, ConfigurationFile::RuffToml),
-        field.example,
-    ));
+
+    match set_kind {
+        SetKind::Ruff => {
+            output.push_str(&format_tab(
+                "pyproject.toml",
+                &format_content(field, parents, ConfigurationFile::PyprojectToml),
+            ));
+            output.push_str(&format_tab(
+                "ruff.toml",
+                &format_content(field, parents, ConfigurationFile::RuffToml),
+            ));
+        }
+        SetKind::RuffServer => {}
+    }
+
     output.push('\n');
 }
 
-fn format_tab(tab_name: &str, header: &str, content: &str) -> String {
+fn format_tab(tab_name: &str, content: &str) -> String {
     format!(
-        "=== \"{}\"\n\n    ```toml\n    {}\n{}\n    ```\n",
+        "=== \"{}\"\n\n{}\n\n",
         tab_name,
-        header,
         textwrap::indent(content, "    ")
+    )
+}
+
+fn format_content(
+    field: &OptionField,
+    parents: &[Set],
+    configuration: ConfigurationFile,
+) -> String {
+    let header = format_header(field.scope, parents, configuration);
+
+    format!(
+        "```toml\n{}\n{}\n```",
+        header,
+        textwrap::indent(field.example, "    ")
     )
 }
 
@@ -185,6 +231,15 @@ fn format_header(scope: Option<&str>, parents: &[Set], configuration: Configurat
 enum ConfigurationFile {
     PyprojectToml,
     RuffToml,
+}
+
+fn format_server_content(field: &OptionField, editor: Editor) -> String {}
+
+#[derive(Debug, Copy, Clone)]
+enum Editor {
+    VSCode,
+    Neovim,
+    Zed,
 }
 
 #[derive(Default)]

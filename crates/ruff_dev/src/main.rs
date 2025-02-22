@@ -46,6 +46,8 @@ enum Command {
     GenerateRulesTable,
     /// Generate a Markdown-compatible listing of configuration options.
     GenerateOptions,
+    /// Generate a Markdown-compatible listing of server options.
+    GenerateServerOptions,
     /// Generate CLI help.
     GenerateCliHelp(generate_cli_help::Args),
     /// Generate Markdown docs.
@@ -89,6 +91,9 @@ fn main() -> Result<ExitCode> {
         Command::GenerateKnotSchema(args) => generate_knot_schema::main(&args)?,
         Command::GenerateRulesTable => println!("{}", generate_rules_table::generate()),
         Command::GenerateOptions => println!("{}", generate_options::generate()),
+        Command::GenerateServerOptions => {
+            println!("{}", generate_options::generate_server_options())
+        }
         Command::GenerateCliHelp(args) => generate_cli_help::main(&args)?,
         Command::GenerateDocs(args) => generate_docs::main(&args)?,
         Command::PrintAST(args) => print_ast::main(&args)?,

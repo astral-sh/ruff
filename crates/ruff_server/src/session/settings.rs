@@ -5,6 +5,8 @@ use rustc_hash::FxHashMap;
 use serde::Deserialize;
 
 use ruff_linter::{line_width::LineLength, RuleSelector};
+use ruff_macros::OptionsMetadata;
+use ruff_workspace::options_base::{OptionField, OptionsMetadata};
 
 /// Maps a workspace URI to its associated client settings. Used during server initialization.
 pub(crate) type WorkspaceSettingsMap = FxHashMap<Url, ClientSettings>;
@@ -57,26 +59,75 @@ pub(crate) enum ConfigurationPreference {
     EditorOnly,
 }
 
-/// This is a direct representation of the settings schema sent by the client.
-#[derive(Debug, Deserialize, Default)]
+#[derive(Debug, Deserialize, Default, OptionsMetadata)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[serde(rename_all = "camelCase")]
 pub struct ClientSettings {
+    /// Path to a `ruff.toml` or `pyproject.toml` file to use for configuration.
+    ///
+    /// By default, Ruff will discover configuration for each project from the filesystem,
+    /// mirroring the behavior of the Ruff CLI.
+    #[option(
+        default = r#"null"#,
+        value_type = "string",
+        example = r#""~/path/to/ruff.toml""#
+    )]
     configuration: Option<String>,
-    fix_all: Option<bool>,
-    organize_imports: Option<bool>,
-    lint: Option<LintOptions>,
-    format: Option<FormatOptions>,
-    code_action: Option<CodeActionOptions>,
-    exclude: Option<Vec<String>>,
-    line_length: Option<LineLength>,
+
+    /// The strategy to use when resolving settings across VS Code and the filesystem. By default,
+    /// editor configuration is prioritized over `ruff.toml` and `pyproject.toml` files.
+    ///
+    /// * `"editorFirst"`: Editor settings take priority over configuration files present in the
+    ///   workspace.
+    /// * `"filesystemFirst"`: Configuration files present in the workspace takes priority over
+    ///   editor settings.
+    /// * `"editorOnly"`: Ignore configuration files entirely i.e., only use editor settings.
+    #[option(
+        default = r#""editorFirst""#,
+        value_type = r#""editorFirst" | "filesystemFirst" | "editorOnly""#,
+        example = r#""filesystemFirst""#
+    )]
     configuration_preference: Option<ConfigurationPreference>,
 
-    /// If `true` or [`None`], show syntax errors as diagnostics.
+    /// A list of file patterns to exclude from linting and formatting. See [the
+    /// documentation](https://docs.astral.sh/ruff/settings/#exclude) for more details.
+    #[option(
+        default = r#"null"#,
+        value_type = "string[]",
+        example = r#"["**/tests/**"]"#
+    )]
+    exclude: Option<Vec<String>>,
+
+    /// The line length to use for the linter and formatter.
+    #[option(default = "null", value_type = "int", example = "100")]
+    line_length: Option<LineLength>,
+
+    /// Whether to register the server as capable of handling `source.fixAll` code actions.
+    #[option(default = "true", value_type = "bool", example = "false")]
+    fix_all: Option<bool>,
+
+    /// Whether to register the server as capable of handling `source.organizeImports` code
+    /// actions.
+    #[option(default = "true", value_type = "bool", example = "false")]
+    organize_imports: Option<bool>,
+
+    /// _New in Ruff [v0.5.0](https://astral.sh/blog/ruff-v0.5.0#changes-to-e999-and-reporting-of-syntax-errors)_
+    ///
+    /// Whether to show syntax error diagnostics.
     ///
     /// This is useful when using Ruff with other language servers, allowing the user to refer
     /// to syntax errors from only one source.
+    #[option(default = "true", value_type = "bool", example = "false")]
     show_syntax_errors: Option<bool>,
+
+    #[option_group]
+    lint: Option<LintOptions>,
+
+    #[option_group]
+    format: Option<FormatOptions>,
+
+    #[option_group]
+    code_action: Option<CodeActionOptions>,
 
     // These settings are only needed for tracing, and are only read from the global configuration.
     // These will not be in the resolved settings.
@@ -98,14 +149,26 @@ impl ClientSettings {
     }
 }
 
-/// Settings needed to initialize tracing. These will only be
-/// read from the global configuration.
-#[derive(Debug, Deserialize, Default)]
+#[derive(Debug, Deserialize, Default, OptionsMetadata)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct TracingSettings {
+    /// The log level to use for the server.
+    #[option(
+        default = r#""info""#,
+        value_type = r#""error" | "warn" | "info" | "debug" | "trace""#,
+        example = r#""debug""#
+    )]
     pub(crate) log_level: Option<crate::logging::LogLevel>,
-    /// Path to the log file - tildes and environment variables are supported.
+
+    /// Path to the log file to use for the server.
+    ///
+    /// If not set, logs will be written to stderr. Tildes and environment variables are expanded.
+    #[option(
+        default = r#"null"#,
+        value_type = "string",
+        example = r#""~/path/to/ruff.log""#
+    )]
     pub(crate) log_file: Option<PathBuf>,
 }
 
@@ -121,14 +184,31 @@ struct WorkspaceSettings {
     workspace: Url,
 }
 
-#[derive(Debug, Default, Deserialize)]
+/// Settings specific to the Ruff linter.
+#[derive(Debug, Default, Deserialize, OptionsMetadata)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[serde(rename_all = "camelCase")]
 struct LintOptions {
+    /// Whether to enable linting. Set to `false` to use Ruff exclusively as a formatter.
+    #[option(default = "true", value_type = "bool", example = "false")]
     enable: Option<bool>,
+
+    /// Whether to enable Ruff's preview mode when linting.
+    #[option(default = "null", value_type = "bool", example = "true")]
     preview: Option<bool>,
+
+    /// Rules to enable by default. See [the
+    /// documentation](https://docs.astral.sh/ruff/settings/#lint_select).
+    #[option(default = "null", value_type = "string[]", example = r#"["E", "F"]"#)]
     select: Option<Vec<String>>,
+
+    /// Rules to enable in addition to those in [`lint.select`](#select).
+    #[option(default = "null", value_type = "string[]", example = r#"["W"]"#)]
     extend_select: Option<Vec<String>>,
+
+    /// Rules to disable by default. See [the
+    /// documentation](https://docs.astral.sh/ruff/settings/#lint_ignore).
+    #[option(default = "null", value_type = "string[]", example = r#"["E4", "E7"]"#)]
     ignore: Option<Vec<String>>,
 }
 
@@ -143,10 +223,13 @@ impl LintOptions {
     }
 }
 
-#[derive(Debug, Default, Deserialize)]
+/// Settings specific to the Ruff formatter.
+#[derive(Debug, Default, Deserialize, OptionsMetadata)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[serde(rename_all = "camelCase")]
 struct FormatOptions {
+    /// Whether to enable Ruff's preview mode when formatting.
+    #[option(default = "null", value_type = "bool", example = "true")]
     preview: Option<bool>,
 }
 
@@ -174,6 +257,38 @@ struct CodeActionOptions {
 #[serde(rename_all = "camelCase")]
 struct CodeActionParameters {
     enable: Option<bool>,
+}
+
+impl OptionsMetadata for CodeActionOptions {
+    fn record(visit: &mut dyn ruff_workspace::options_base::Visit) {
+        visit.record_field(
+            "disableRuleComment.enable",
+            OptionField {
+                doc: "Whether to display Quick Fix actions to disable rules via `noqa` suppression comments.",
+                default: "true",
+                value_type: "bool",
+                scope: None,
+                example: "false",
+                deprecated: None,
+            },
+        );
+
+        visit.record_field(
+            "fixViolation.enable",
+            OptionField {
+                doc: "Whether to display Quick Fix actions to autofix violations.",
+                default: "true",
+                value_type: "bool",
+                scope: None,
+                example: "false",
+                deprecated: None,
+            },
+        );
+    }
+
+    fn documentation() -> Option<&'static str> {
+        Some("Enable or disable code actions provided by the server.")
+    }
 }
 
 /// This is the exact schema for initialization options sent in by the client

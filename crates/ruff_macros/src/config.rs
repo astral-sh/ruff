@@ -24,19 +24,22 @@ pub(crate) fn derive_impl(input: DeriveInput) -> syn::Result<TokenStream> {
         }) => {
             let mut output = vec![];
 
+            let rename_value =
+                RenameValue::from_attributes(struct_attributes.as_slice()).unwrap_or_default();
+
             for field in &fields.named {
                 if let Some(attr) = field
                     .attrs
                     .iter()
                     .find(|attr| attr.path().is_ident("option"))
                 {
-                    output.push(handle_option(field, attr)?);
+                    output.push(handle_option(field, attr, rename_value)?);
                 } else if field
                     .attrs
                     .iter()
                     .any(|attr| attr.path().is_ident("option_group"))
                 {
-                    output.push(handle_option_group(field)?);
+                    output.push(handle_option_group(field, rename_value)?);
                 } else if let Some(serde) = field
                     .attrs
                     .iter()
@@ -86,8 +89,8 @@ pub(crate) fn derive_impl(input: DeriveInput) -> syn::Result<TokenStream> {
 
             Ok(quote! {
                 #[automatically_derived]
-                impl crate::options_base::OptionsMetadata for #ident {
-                    fn record(visit: &mut dyn crate::options_base::Visit) {
+                impl ruff_workspace::options_base::OptionsMetadata for #ident {
+                    fn record(visit: &mut dyn ruff_workspace::options_base::Visit) {
                         #(#output);*
                     }
 
@@ -105,7 +108,10 @@ pub(crate) fn derive_impl(input: DeriveInput) -> syn::Result<TokenStream> {
 /// For a field with type `Option<Foobar>` where `Foobar` itself is a struct
 /// deriving `ConfigurationOptions`, create code that calls retrieves options
 /// from that group: `Foobar::get_available_options()`
-fn handle_option_group(field: &Field) -> syn::Result<proc_macro2::TokenStream> {
+fn handle_option_group(
+    field: &Field,
+    rename_value: RenameValue,
+) -> syn::Result<proc_macro2::TokenStream> {
     let ident = field
         .ident
         .as_ref()
@@ -122,10 +128,10 @@ fn handle_option_group(field: &Field) -> syn::Result<proc_macro2::TokenStream> {
                     PathArguments::AngleBracketed(AngleBracketedGenericArguments { args, .. }),
             }) if type_ident == "Option" => {
                 let path = &args[0];
-                let kebab_name = LitStr::new(&ident.to_string().replace('_', "-"), ident.span());
+                let renamed_field = rename_value.apply(ident);
 
                 Ok(quote_spanned!(
-                    ident.span() => (visit.record_set(#kebab_name, crate::options_base::OptionSet::of::<#path>()))
+                    ident.span() => (visit.record_set(#renamed_field, ruff_workspace::options_base::OptionSet::of::<#path>()))
                 ))
             }
             _ => Err(syn::Error::new(
@@ -154,7 +160,11 @@ fn parse_doc(doc: &Attribute) -> syn::Result<String> {
 
 /// Parse an `#[option(doc="...", default="...", value_type="...",
 /// example="...")]` attribute and return data in the form of an `OptionField`.
-fn handle_option(field: &Field, attr: &Attribute) -> syn::Result<proc_macro2::TokenStream> {
+fn handle_option(
+    field: &Field,
+    attr: &Attribute,
+    rename_value: RenameValue,
+) -> syn::Result<proc_macro2::TokenStream> {
     let docs: Vec<&Attribute> = field
         .attrs
         .iter()
@@ -190,8 +200,7 @@ fn handle_option(field: &Field, attr: &Attribute) -> syn::Result<proc_macro2::To
         example,
         scope,
     } = parse_field_attributes(attr)?;
-    let kebab_name = LitStr::new(&ident.to_string().replace('_', "-"), ident.span());
-
+    let renamed_field = rename_value.apply(ident);
     let scope = if let Some(scope) = scope {
         quote!(Some(#scope))
     } else {
@@ -214,14 +223,14 @@ fn handle_option(field: &Field, attr: &Attribute) -> syn::Result<proc_macro2::To
         let note = quote_option(deprecated.note);
         let since = quote_option(deprecated.since);
 
-        quote!(Some(crate::options_base::Deprecated { since: #since, message: #note }))
+        quote!(Some(ruff_workspace::options_base::Deprecated { since: #since, message: #note }))
     } else {
         quote!(None)
     };
 
     Ok(quote_spanned!(
         ident.span() => {
-            visit.record_field(#kebab_name, crate::options_base::OptionField{
+            visit.record_field(#renamed_field, ruff_workspace::options_base::OptionField{
                 doc: &#doc,
                 default: &#default,
                 value_type: &#value_type,
@@ -350,4 +359,67 @@ fn get_string_literal(
 struct DeprecatedAttribute {
     since: Option<String>,
     note: Option<String>,
+}
+
+#[derive(Copy, Clone, Default)]
+enum RenameValue {
+    #[default]
+    KebabCase,
+    CamelCase,
+}
+
+impl RenameValue {
+    fn from_attributes(attrs: &[Attribute]) -> Option<RenameValue> {
+        let serde = attrs.iter().find(|attr| attr.path().is_ident("serde"))?;
+
+        let Meta::List(list) = &serde.meta else {
+            return None;
+        };
+
+        let mut rename_value = None;
+
+        let _ = list.parse_nested_meta(|meta| {
+            if meta.path.is_ident("rename_all") {
+                let value = meta.value()?;
+                let s: LitStr = value.parse()?;
+                match s.value().as_str() {
+                    "kebab-case" => {
+                        rename_value = Some(RenameValue::KebabCase);
+                        Ok(())
+                    }
+                    "camelCase" => {
+                        rename_value = Some(RenameValue::CamelCase);
+                        Ok(())
+                    }
+                    _ => Err(meta.error("Expected `kebab-case` or `camelCase`")),
+                }
+            } else {
+                Err(meta.error("Expected `rename_all`"))
+            }
+        });
+
+        rename_value
+    }
+
+    fn apply(self, ident: &syn::Ident) -> syn::LitStr {
+        let renamed = match self {
+            RenameValue::KebabCase => ident.to_string().replace('_', "-"),
+            RenameValue::CamelCase => {
+                let mut result = String::new();
+                let mut capitalize = false;
+                for c in ident.to_string().chars() {
+                    if c == '_' {
+                        capitalize = true;
+                    } else if capitalize {
+                        result.push(c.to_ascii_uppercase());
+                        capitalize = false;
+                    } else {
+                        result.push(c);
+                    }
+                }
+                result
+            }
+        };
+        LitStr::new(&renamed, ident.span())
+    }
 }
