@@ -173,13 +173,13 @@ pub(super) fn load_options<P: AsRef<Path>>(path: P) -> Result<Options> {
             if ruff.target_version.is_none() {
                 debug!("No `target-version` found in `ruff.toml`");
                 if let Some(dir) = path.as_ref().parent() {
-                    let fallback = get_fallback_target_version(&dir);
+                    let fallback = get_fallback_target_version(dir);
                     if fallback.is_some() {
                         debug!(
                             "Deriving `target-version` from `requires-python` in `pyproject.toml`"
-                        )
+                        );
                     } else {
-                        debug!("No `pyproject.toml` with `requires-python` in same directory; `target-version` unspecified")
+                        debug!("No `pyproject.toml` with `requires-python` in same directory; `target-version` unspecified");
                     }
                     ruff.target_version = fallback;
                 }
