@@ -5,7 +5,7 @@ use log::debug;
 use path_absolutize::path_dedot;
 
 use ruff_workspace::configuration::Configuration;
-use ruff_workspace::pyproject;
+use ruff_workspace::pyproject::{self, find_fallback_target_version};
 use ruff_workspace::resolver::{
     resolve_root_settings, ConfigurationTransformer, PyprojectConfig, PyprojectDiscoveryStrategy,
     Relativity,
@@ -91,7 +91,18 @@ pub fn resolve(
     // "closest" `pyproject.toml` file for every Python file later on, so these act
     // as the "default" settings.)
     debug!("Using Ruff default settings");
-    let config = config_arguments.transform(Configuration::default());
+    let mut config = config_arguments.transform(Configuration::default());
+    if config.target_version.is_none() {
+        let fallback = find_fallback_target_version(
+            stdin_filename
+                .as_ref()
+                .unwrap_or(&path_dedot::CWD.as_path()),
+        );
+        if fallback.is_some() {
+            debug!("Deriving `target-version` from found `requires-python`.")
+        }
+        config.target_version = fallback.map(Into::into);
+    }
     let settings = config.into_settings(&path_dedot::CWD)?;
     Ok(PyprojectConfig::new(
         PyprojectDiscoveryStrategy::Hierarchical,
