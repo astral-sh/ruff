@@ -139,6 +139,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - uses: astral-sh/setup-uv@v5
       - uses: Swatinem/rust-cache@v2
       - name: "Install Rust toolchain"
         run: rustup show
@@ -185,6 +186,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - uses: astral-sh/setup-uv@v5
       - uses: Swatinem/rust-cache@v2
       - name: "Install Rust toolchain"
         run: rustup show
@@ -214,6 +216,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - uses: astral-sh/setup-uv@v5
       - uses: Swatinem/rust-cache@v2
       - name: "Install Rust toolchain"
         run: rustup show
@@ -241,6 +244,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - uses: astral-sh/setup-uv@v5
       - uses: Swatinem/rust-cache@v2
       - name: "Install Rust toolchain"
         run: rustup target add wasm32-unknown-unknown

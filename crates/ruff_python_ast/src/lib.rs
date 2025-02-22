@@ -149,7 +149,8 @@ mod tests {
         let original_content =
             fs::read_to_string(&generated_path).expect("Failed to read generated.rs");
         let generate_script = Path::new(env!("CARGO_MANIFEST_DIR")).join("generate.py");
-        let output = Command::new("python")
+        let output = Command::new("uv")
+            .arg("run")
             .arg(&generate_script)
             .output()
             .expect("Failed to run AST generator script");
