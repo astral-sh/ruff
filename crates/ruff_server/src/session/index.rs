@@ -427,12 +427,15 @@ impl WorkspaceSettingsIndex {
         let workspace_url = workspace.url();
         if workspace_url.scheme() != "file" {
             tracing::info!("Ignoring non-file workspace URL: {workspace_url}");
-            show_warn_msg!("Ruff does not support non-file workspaces; Ignoring {workspace_url}");
+            show_warn_msg!("Ruff does not support non-file workspaces; ignoring {workspace_url}");
             return Ok(());
         }
-        let workspace_path = workspace_url.to_file_path().map_err(|()| {
-            anyhow!("Failed to convert workspace URL to file path: {workspace_url}")
-        })?;
+        let Ok(workspace_path) = workspace_url.to_file_path() else {
+            tracing::warn!(
+                "Failed to convert workspace URL to file path; ignoring {workspace_url}"
+            );
+            return Ok(());
+        };
 
         let client_settings = if let Some(workspace_settings) = workspace.settings() {
             ResolvedClientSettings::with_workspace(workspace_settings, global_settings)

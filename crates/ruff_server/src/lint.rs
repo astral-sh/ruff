@@ -81,13 +81,17 @@ pub(crate) fn check(
             return DiagnosticsMap::default();
         }
 
-        detect_package_root(
-            document_path
-                .parent()
-                .expect("a path to a document should have a parent path"),
-            &settings.linter.namespace_packages,
-        )
-        .map(PackageRoot::root)
+        if let Some(parent) = document_path.parent() {
+            detect_package_root(parent, &settings.linter.namespace_packages).map(PackageRoot::root)
+        } else {
+            // Untitled documents in Neovim are represented using `file:///` URIs which have no
+            // parent. See https://github.com/astral-sh/ruff/issues/15392.
+            tracing::info!(
+                "Cannot detect package root for document with no parent: {:?}",
+                document_path
+            );
+            None
+        }
     } else {
         None
     };
