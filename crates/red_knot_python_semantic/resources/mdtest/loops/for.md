@@ -431,12 +431,12 @@ def _(flag: bool):
                 return Iterator()
         # invalid signature because it only accepts a `str`,
         # but the old-style iteration protocol will pass it an `int`
-        def __getitem__(self, key: str) -> int:
+        def __getitem__(self, key: str) -> bytes:
             return 42
 
     # error: [not-iterable]
     for x in Iterable():
-        reveal_type(x)  # revealed: int
+        reveal_type(x)  # revealed: int | bytes
 ```
 
 ## Possibly unbound `__iter__` and possibly unbound `__getitem__`
@@ -456,12 +456,12 @@ def _(flag1: bool, flag2: bool):
             def __iter__(self) -> Iterator:
                 return Iterator()
         if flag2:
-            def __getitem__(self, key: int) -> int:
+            def __getitem__(self, key: int) -> bytes:
                 return 42
 
     # error: [not-iterable]
     for x in Iterable():
-        reveal_type(x)  # revealed: int
+        reveal_type(x)  # revealed: int | bytes
 ```
 
 ## No `__iter__` method and `__getitem__` is not callable

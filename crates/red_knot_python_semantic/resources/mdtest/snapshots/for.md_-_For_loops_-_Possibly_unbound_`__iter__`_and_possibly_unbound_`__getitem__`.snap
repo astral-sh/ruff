@@ -24,12 +24,12 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/loops/for.md
 10 |             def __iter__(self) -> Iterator:
 11 |                 return Iterator()
 12 |         if flag2:
-13 |             def __getitem__(self, key: int) -> int:
+13 |             def __getitem__(self, key: int) -> bytes:
 14 |                 return 42
 15 | 
 16 |     # error: [not-iterable]
 17 |     for x in Iterable():
-18 |         reveal_type(x)  # revealed: int
+18 |         reveal_type(x)  # revealed: int | bytes
 ```
 
 # Diagnostics
@@ -41,7 +41,7 @@ error: lint:not-iterable
 16 |     # error: [not-iterable]
 17 |     for x in Iterable():
    |              ^^^^^^^^^^ Object of type `Iterable` may not be iterable because it may not have an `__iter__` method or a `__getitem__` method
-18 |         reveal_type(x)  # revealed: int
+18 |         reveal_type(x)  # revealed: int | bytes
    |
 
 ```
@@ -52,8 +52,8 @@ info: revealed-type
    |
 16 |     # error: [not-iterable]
 17 |     for x in Iterable():
-18 |         reveal_type(x)  # revealed: int
-   |         -------------- info: Revealed type is `int`
+18 |         reveal_type(x)  # revealed: int | bytes
+   |         -------------- info: Revealed type is `int | bytes`
    |
 
 ```
