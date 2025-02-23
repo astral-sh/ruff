@@ -31,13 +31,14 @@ use crate::checkers::ast::Checker;
 /// ## Fix safety
 /// This fix is marked unsafe if it would delete any comments within the replacement range.
 ///
-/// An example to illustrate where comments are preserved and where they are not.
+/// An example to illustrate where comments are preserved and where they are not:
+///
 /// ```pyi
 /// from typing import Literal
 ///
 /// field: (
 ///     # deleted comment
-///     Literal["a", "b"] # deleted comment
+///     Literal["a", "b"]  # deleted comment
 ///     # deleted comment
 ///     | Literal["c", "d"]  # preserved comment
 /// )
