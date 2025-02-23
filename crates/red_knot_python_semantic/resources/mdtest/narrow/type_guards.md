@@ -22,7 +22,6 @@ def _(
 
 def f(a) -> TypeGuard[str]: ...
 def g(a) -> TypeIs[str]: ...
-
 def _(a: object):
     reveal_type(f(a))  # revealed: TypeGuard[a, str]
     reveal_type(g(a))  # revealed: TypeIs[a, str]
@@ -43,12 +42,14 @@ def _() -> TypeGuard[str]: ...
 def _(**kwargs) -> TypeIs[str]: ...
 
 class _:
+    # fine
     def _(self, /, a) -> TypeGuard[str]: ...
     @classmethod
     def _(cls, a) -> TypeGuard[str]: ...
     @staticmethod
     def _(a) -> TypeIs[str]: ...
 
+    # errors
     def _(self) -> TypeGuard[str]: ...  # error: [invalid-type-guard-definition]
     def _(self, /, *, a) -> TypeGuard[str]: ...  # error: [invalid-type-guard-definition]
     @classmethod
@@ -74,6 +75,7 @@ def _(a) -> TypeIs[str]: ...
 
 # error: [invalid-type-guard-definition]
 def _(a: int) -> TypeIs[str]: ...
+
 # error: [invalid-type-guard-definition]
 def _(a: bool | str) -> TypeIs[int]: ...
 ```
@@ -89,6 +91,7 @@ a = 123
 
 # error: [invalid-type-form]
 def f(_) -> TypeGuard[int, str]: ...
+
 # error: [invalid-type-form]
 def g(_) -> TypeIs[a, str]: ...
 
@@ -109,14 +112,14 @@ def f(a: object, flag: bool) -> TypeGuard[str]:
         return 1
 
     # TODO: Emit a diagnostic
-    return ''
+    return ""
 
-def g(a: Literal['foo', 'bar']) -> TypeIs[Literal['foo']]:
+def g(a: Literal["foo", "bar"]) -> TypeIs[Literal["foo"]]:
     match a:
-        case 'foo':
+        case "foo":
             # Logically wrong, but allowed regardless
             return False
-        case 'bar':
+        case "bar":
             return False
         case _:
             assert_never(a)
@@ -130,10 +133,9 @@ from typing_extensions import TypeGuard, TypeIs
 
 def f(a: object) -> TypeGuard[str]: ...
 def g(a: object) -> TypeIs[int]: ...
-
 def _(d: Any):
     if f():  # error: [missing-argument]
-       ...
+        ...
 
     # TODO: Is this error correct?
     if g(*d):  # error: [missing-argument]
@@ -143,7 +145,7 @@ def _(d: Any):
         ...
 
     if g(a=d):  # error: [invalid-type-guard-call]
-       ...
+        ...
 
 def _(a: tuple[str, int] | tuple[int, str]):
     if g(a[0]):  # error: [invalid-type-guard-call]
@@ -159,7 +161,6 @@ from typing_extensions import TypeGuard, TypeIs
 
 def guard_str(a: object) -> TypeGuard[str]: ...
 def is_int(a: object) -> TypeIs[int]: ...
-
 def _(a: str | int):
     if guard_str(a):
         reveal_type(a)  # revealed: str
@@ -194,7 +195,7 @@ def _(x: str | int, flag: bool) -> None:
     reveal_type(b)  # revealed: TypeIs[x, int]
 
     if flag:
-        x = ''
+        x = ""
 
     if b:
         reveal_type(x)  # revealed: str | int
@@ -208,7 +209,6 @@ from typing_extensions import TypeGuard
 
 def guard_int(a: object) -> TypeGuard[int]: ...
 def is_int(a: object) -> TypeGuard[int]: ...
-
 def does_not_narrow_in_negative_case(a: str | int):
     if not guard_int(a):
         reveal_type(a)  # revealed: str | int

@@ -1171,7 +1171,7 @@ pub(crate) fn report_type_guard_function_with_incorrect_arity(
             "This type guard function must accept at least {} positional arguments",
             if is_non_static_method { 2 } else { 1 }
         ),
-    )
+    );
 }
 
 pub(crate) fn report_typeis_function_with_incorrect_types<'db>(
@@ -1189,5 +1189,5 @@ pub(crate) fn report_typeis_function_with_incorrect_types<'db>(
             return_ty.display(db),
             input_ty.display(db),
         ),
-    )
+    );
 }
