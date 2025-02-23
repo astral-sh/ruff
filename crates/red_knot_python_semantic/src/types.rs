@@ -2982,7 +2982,10 @@ enum IterationErrorKind<'db> {
     /// either isn't a `__getitem__` method to fall back to, or calling the `__getitem__`
     /// method returns some kind of error.
     PossiblyUnboundDunderIterAndErrorCallingGetitem {
+        /// The type of the object returned by the `__next__` method on the iterator.
+        /// (The iterator being the type returned by the `__iter__` method on the iterable.)
         dunder_next_return_type: Type<'db>,
+        /// The error we encountered when we tried to call `__getitem__` on the iterable.
         dunder_getitem_call_error: CallDunderError<'db>,
     },
 
