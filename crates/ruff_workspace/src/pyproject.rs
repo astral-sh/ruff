@@ -152,7 +152,10 @@ pub fn find_user_settings_toml() -> Option<PathBuf> {
 }
 
 /// Load `Options` from a `pyproject.toml` or `ruff.toml` file.
-pub(super) fn load_options<P: AsRef<Path>>(path: P) -> Result<Options> {
+pub(super) fn load_options<P: AsRef<Path>>(
+    path: P,
+    version_strategy: TargetVersionStrategy,
+) -> Result<Options> {
     if path.as_ref().ends_with("pyproject.toml") {
         let pyproject = parse_pyproject_toml(&path)?;
         let mut ruff = pyproject
@@ -172,16 +175,21 @@ pub(super) fn load_options<P: AsRef<Path>>(path: P) -> Result<Options> {
         if let Ok(ref mut ruff) = ruff {
             if ruff.target_version.is_none() {
                 debug!("No `target-version` found in `ruff.toml`");
-                if let Some(dir) = path.as_ref().parent() {
-                    let fallback = get_fallback_target_version(dir);
-                    if fallback.is_some() {
-                        debug!(
+                match version_strategy {
+                    TargetVersionStrategy::Standard => {}
+                    TargetVersionStrategy::RequiresPythonFallback => {
+                        if let Some(dir) = path.as_ref().parent() {
+                            let fallback = get_fallback_target_version(dir);
+                            if fallback.is_some() {
+                                debug!(
                             "Deriving `target-version` from `requires-python` in `pyproject.toml`"
                         );
-                    } else {
-                        debug!("No `pyproject.toml` with `requires-python` in same directory; `target-version` unspecified");
+                            } else {
+                                debug!("No `pyproject.toml` with `requires-python` in same directory; `target-version` unspecified");
+                            }
+                            ruff.target_version = fallback;
+                        }
                     }
-                    ruff.target_version = fallback;
                 }
             }
         }
@@ -234,6 +242,14 @@ fn get_minimum_supported_version(requires_version: &VersionSpecifiers) -> Option
 
     // Find the Python version that matches the minimum supported version.
     PythonVersion::iter().find(|version| Version::from(*version) == minimum_version)
+}
+
+/// Strategy for handling missing `target-version` in configuration.
+#[derive(Debug, Default)]
+pub(super) enum TargetVersionStrategy {
+    #[default]
+    Standard,
+    RequiresPythonFallback,
 }
 
 #[cfg(test)]
