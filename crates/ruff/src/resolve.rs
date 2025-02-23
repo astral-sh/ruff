@@ -39,7 +39,7 @@ pub fn resolve(
             pyproject,
             Relativity::Cwd,
             config_arguments,
-            ConfigurationProvenance::UserSpecified,
+            &ConfigurationProvenance::UserSpecified,
         )?;
         debug!(
             "Using user-specified configuration file at: {}",
@@ -70,7 +70,7 @@ pub fn resolve(
             &pyproject,
             Relativity::Parent,
             config_arguments,
-            ConfigurationProvenance::Ancestor,
+            &ConfigurationProvenance::Ancestor,
         )?;
         return Ok(PyprojectConfig::new(
             PyprojectDiscoveryStrategy::Hierarchical,
@@ -92,7 +92,7 @@ pub fn resolve(
             &pyproject,
             Relativity::Cwd,
             config_arguments,
-            ConfigurationProvenance::UserSettings,
+            &ConfigurationProvenance::UserSettings,
         )?;
         return Ok(PyprojectConfig::new(
             PyprojectDiscoveryStrategy::Hierarchical,

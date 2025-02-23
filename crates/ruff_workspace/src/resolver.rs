@@ -303,7 +303,7 @@ pub fn resolve_configuration(
     pyproject: &Path,
     relativity: Relativity,
     transformer: &dyn ConfigurationTransformer,
-    provenance: Option<ConfigurationProvenance>,
+    provenance: Option<&ConfigurationProvenance>,
 ) -> Result<Configuration> {
     let mut configurations = indexmap::IndexMap::new();
     let mut next = Some(fs::normalize_path(pyproject));
@@ -333,7 +333,7 @@ pub fn resolve_configuration(
             // we do not attempt to infer a missing `target-version`
             TargetVersionStrategy::Standard
         };
-        let options = pyproject::load_options(&path, version_strategy).with_context(|| {
+        let options = pyproject::load_options(&path, &version_strategy).with_context(|| {
             if configurations.is_empty() {
                 format!(
                     "Failed to load configuration `{path}`",
@@ -384,7 +384,7 @@ fn resolve_scoped_settings<'a>(
     pyproject: &'a Path,
     relativity: Relativity,
     transformer: &dyn ConfigurationTransformer,
-    provenance: Option<ConfigurationProvenance>,
+    provenance: Option<&ConfigurationProvenance>,
 ) -> Result<(&'a Path, Settings)> {
     let configuration = resolve_configuration(pyproject, relativity, transformer, provenance)?;
     let project_root = relativity.resolve(pyproject);
@@ -398,7 +398,7 @@ pub fn resolve_root_settings(
     pyproject: &Path,
     relativity: Relativity,
     transformer: &dyn ConfigurationTransformer,
-    provenance: ConfigurationProvenance,
+    provenance: &ConfigurationProvenance,
 ) -> Result<Settings> {
     let (_project_root, settings) =
         resolve_scoped_settings(pyproject, relativity, transformer, Some(provenance))?;
@@ -939,7 +939,7 @@ mod tests {
                 &find_settings_toml(&package_root)?.unwrap(),
                 Relativity::Parent,
                 &NoOpTransformer,
-                ConfigurationProvenance::Ancestor,
+                &ConfigurationProvenance::Ancestor,
             )?,
             None,
         );
