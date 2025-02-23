@@ -128,7 +128,7 @@ def _(flag: bool):
 
 ## Invalid iterable
 
-<!--snapshot-diagnostics -->
+<!-- snapshot-diagnostics -->
 
 ```py
 nonsense = 123

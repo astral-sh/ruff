@@ -3047,6 +3047,10 @@ impl<'db> IterationErrorKind<'db> {
             context.report_lint(&NOT_ITERABLE, iterable_node, arguments);
         };
 
+        // TODO: for all of these error variant, the "explanation" for the diagnostic
+        // (everything after the "because") should really be presented as a "help:", "note",
+        // or similar, rather than as part of the same sentence as the error message.
+
         match self {
             Self::IterCallError(dunder_iter_call_error) => match dunder_iter_call_error {
                 CallError::NotCallable { not_callable_ty } => report_not_iterable(format_args!(
