@@ -23,7 +23,7 @@ use ruff_linter::package::PackageRoot;
 use ruff_linter::packaging::is_package;
 
 use crate::configuration::Configuration;
-use crate::pyproject::settings_toml;
+use crate::pyproject::{settings_toml, TargetVersionStrategy};
 use crate::settings::Settings;
 use crate::{pyproject, FileResolverSettings};
 
@@ -303,6 +303,7 @@ pub fn resolve_configuration(
     pyproject: &Path,
     relativity: Relativity,
     transformer: &dyn ConfigurationTransformer,
+    provenance: Option<ConfigurationProvenance>,
 ) -> Result<Configuration> {
     let mut configurations = indexmap::IndexMap::new();
     let mut next = Some(fs::normalize_path(pyproject));
@@ -319,7 +320,20 @@ pub fn resolve_configuration(
         }
 
         // Resolve the current path.
-        let options = pyproject::load_options(&path).with_context(|| {
+        let version_strategy = if configurations.is_empty()
+            && matches!(provenance, Some(ConfigurationProvenance::Ancestor))
+        {
+            // For configurations that are discovered by
+            // walking back from a file, we will attempt to
+            // infer the `target-version` if it is missing
+            TargetVersionStrategy::RequiresPythonFallback
+        } else {
+            // In all other cases (e.g. for configurations
+            // inherited via `extend`, or user-level settings)
+            // we do not attempt to infer a missing `target-version`
+            TargetVersionStrategy::Standard
+        };
+        let options = pyproject::load_options(&path, version_strategy).with_context(|| {
             if configurations.is_empty() {
                 format!(
                     "Failed to load configuration `{path}`",
@@ -370,8 +384,9 @@ fn resolve_scoped_settings<'a>(
     pyproject: &'a Path,
     relativity: Relativity,
     transformer: &dyn ConfigurationTransformer,
+    provenance: Option<ConfigurationProvenance>,
 ) -> Result<(&'a Path, Settings)> {
-    let configuration = resolve_configuration(pyproject, relativity, transformer)?;
+    let configuration = resolve_configuration(pyproject, relativity, transformer, provenance)?;
     let project_root = relativity.resolve(pyproject);
     let settings = configuration.into_settings(project_root)?;
     Ok((project_root, settings))
@@ -383,9 +398,22 @@ pub fn resolve_root_settings(
     pyproject: &Path,
     relativity: Relativity,
     transformer: &dyn ConfigurationTransformer,
+    provenance: ConfigurationProvenance,
 ) -> Result<Settings> {
-    let (_project_root, settings) = resolve_scoped_settings(pyproject, relativity, transformer)?;
+    let (_project_root, settings) =
+        resolve_scoped_settings(pyproject, relativity, transformer, Some(provenance))?;
     Ok(settings)
+}
+
+#[derive(Debug)]
+/// How the configuration is provided.
+pub enum ConfigurationProvenance {
+    /// User specified path to specific configuration file
+    UserSpecified,
+    /// User-level configuration
+    UserSettings,
+    /// In parent or higher ancestor directory of path
+    Ancestor,
 }
 
 /// Find all Python (`.py`, `.pyi` and `.ipynb` files) in a set of paths.
@@ -411,8 +439,12 @@ pub fn python_files_in_path<'a>(
             for ancestor in path.ancestors() {
                 if seen.insert(ancestor) {
                     if let Some(pyproject) = settings_toml(ancestor)? {
-                        let (root, settings) =
-                            resolve_scoped_settings(&pyproject, Relativity::Parent, transformer)?;
+                        let (root, settings) = resolve_scoped_settings(
+                            &pyproject,
+                            Relativity::Parent,
+                            transformer,
+                            None,
+                        )?;
                         resolver.add(root, settings);
                         // We found the closest configuration.
                         break;
@@ -566,6 +598,7 @@ impl ParallelVisitor for PythonFilesVisitor<'_, '_> {
                             &pyproject,
                             Relativity::Parent,
                             self.transformer,
+                            None,
                         ) {
                             Ok((root, settings)) => {
                                 self.global.resolver.write().unwrap().add(root, settings);
@@ -699,7 +732,7 @@ pub fn python_file_at_path(
         for ancestor in path.ancestors() {
             if let Some(pyproject) = settings_toml(ancestor)? {
                 let (root, settings) =
-                    resolve_scoped_settings(&pyproject, Relativity::Parent, transformer)?;
+                    resolve_scoped_settings(&pyproject, Relativity::Parent, transformer, None)?;
                 resolver.add(root, settings);
                 break;
             }
@@ -883,8 +916,8 @@ mod tests {
     use crate::pyproject::find_settings_toml;
     use crate::resolver::{
         is_file_excluded, match_exclusion, python_files_in_path, resolve_root_settings,
-        ConfigurationTransformer, PyprojectConfig, PyprojectDiscoveryStrategy, Relativity,
-        ResolvedFile, Resolver,
+        ConfigurationProvenance, ConfigurationTransformer, PyprojectConfig,
+        PyprojectDiscoveryStrategy, Relativity, ResolvedFile, Resolver,
     };
     use crate::settings::Settings;
     use crate::tests::test_resource_path;
@@ -906,6 +939,7 @@ mod tests {
                 &find_settings_toml(&package_root)?.unwrap(),
                 Relativity::Parent,
                 &NoOpTransformer,
+                ConfigurationProvenance::Ancestor,
             )?,
             None,
         );
