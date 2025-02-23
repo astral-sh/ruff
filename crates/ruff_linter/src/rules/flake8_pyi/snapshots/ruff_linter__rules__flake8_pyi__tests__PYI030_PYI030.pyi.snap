@@ -518,7 +518,7 @@ PYI030.pyi:89:10: PYI030 [*] Multiple literal members in a union. Use a single l
 89 | field25: typing.Union[typing_extensions.Literal[1], typing.Union[Literal[2], typing.Union[Literal[3], Literal[4]]], str]  # Error
    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI030
 90 |
-91 | # Unsafe fix when comments are deleted
+91 | # Should use unsafe fix when comments are deleted
    |
    = help: Replace with a single `Literal`
 
@@ -529,270 +529,50 @@ PYI030.pyi:89:10: PYI030 [*] Multiple literal members in a union. Use a single l
 89    |-field25: typing.Union[typing_extensions.Literal[1], typing.Union[Literal[2], typing.Union[Literal[3], Literal[4]]], str]  # Error
    89 |+field25: typing.Union[typing_extensions.Literal[1, 2, 3, 4], str]  # Error
 90 90 | 
-91 91 | # Unsafe fix when comments are deleted
+91 91 | # Should use unsafe fix when comments are deleted
 92 92 | field26: (
 
-PYI030.pyi:94:9: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal["a", "b", "c", "d"]`
+PYI030.pyi:94:5: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal["a", "b", "c", "d"]`
    |
 92 |   field26: (
-93 |       # First group
-94 | /         Literal["a", "b"]
-95 | |         # Second group
-96 | |         | Literal["c", "d"]
-   | |___________________________^ PYI030
+93 |       # First comment
+94 | /     Literal["a", "b"]
+95 | |     # Second comment
+96 | |     | Literal["c", "d"]
+   | |_______________________^ PYI030
 97 |   )
 98 |   field27: (
    |
    = help: Replace with a single `Literal`
 
 ℹ Unsafe fix
-91 91 | # Unsafe fix when comments are deleted
+91 91 | # Should use unsafe fix when comments are deleted
 92 92 | field26: (
-93 93 |     # First group
-94    |-        Literal["a", "b"]
-95    |-        # Second group
-96    |-        | Literal["c", "d"]
-   94 |+        Literal["a", "b", "c", "d"]
+93 93 |     # First comment
+94    |-    Literal["a", "b"]
+95    |-    # Second comment
+96    |-    | Literal["c", "d"]
+   94 |+    Literal["a", "b", "c", "d"]
 97 95 | )
 98 96 | field27: (
-99 97 |         Literal["a", "b"]  # First group
+99 97 |     Literal["a", "b"]  # First comment
 
-PYI030.pyi:99:9: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal["a", "b", "c", "d"]`
+PYI030.pyi:99:5: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal["a", "b", "c", "d"]`
     |
  97 |   )
  98 |   field27: (
- 99 | /         Literal["a", "b"]  # First group
-100 | |         | Literal["c", "d"]  # Second group
-    | |___________________________^ PYI030
+ 99 | /     Literal["a", "b"]  # First comment
+100 | |     | Literal["c", "d"]  # Second comment
+    | |_______________________^ PYI030
 101 |   )
-102 |   field28: (
     |
     = help: Replace with a single `Literal`
 
 ℹ Unsafe fix
-96  96  |         | Literal["c", "d"]
+96  96  |     | Literal["c", "d"]
 97  97  | )
 98  98  | field27: (
-99      |-        Literal["a", "b"]  # First group
-100     |-        | Literal["c", "d"]  # Second group
-    99  |+        Literal["a", "b", "c", "d"]  # Second group
+99      |-    Literal["a", "b"]  # First comment
+100     |-    | Literal["c", "d"]  # Second comment
+    99  |+    Literal["a", "b", "c", "d"]  # Second comment
 101 100 | )
-102 101 | field28: (
-103 102 |     # First group
-
-PYI030.pyi:104:9: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2, 3]`
-    |
-102 |   field28: (
-103 |       # First group
-104 | /         Literal[1]
-105 | |         # Second group
-106 | |         | Literal[2]
-107 | |         # Third group
-108 | |         | str
-109 | |         # Fourth group
-110 | |         | Literal[3]
-    | |____________________^ PYI030
-111 |   )
-112 |   field29: (
-    |
-    = help: Replace with a single `Literal`
-
-ℹ Unsafe fix
-101 101 | )
-102 102 | field28: (
-103 103 |     # First group
-104     |-        Literal[1]
-105     |-        # Second group
-106     |-        | Literal[2]
-107     |-        # Third group
-108     |-        | str
-109     |-        # Fourth group
-110     |-        | Literal[3]
-    104 |+        Literal[1, 2, 3] | str
-111 105 | )
-112 106 | field29: (
-113 107 |         Literal[1]  # First group
-
-PYI030.pyi:113:9: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2, 3]`
-    |
-111 |   )
-112 |   field29: (
-113 | /         Literal[1]  # First group
-114 | |         | Literal[2]  # Second group
-115 | |         | str  # Third group
-116 | |         | Literal[3]  # Fourth group
-    | |____________________^ PYI030
-117 |   )
-118 |   field30: (
-    |
-    = help: Replace with a single `Literal`
-
-ℹ Unsafe fix
-110 110 |         | Literal[3]
-111 111 | )
-112 112 | field29: (
-113     |-        Literal[1]  # First group
-114     |-        | Literal[2]  # Second group
-115     |-        | str  # Third group
-116     |-        | Literal[3]  # Fourth group
-    113 |+        Literal[1, 2, 3] | str  # Fourth group
-117 114 | )
-118 115 | field30: (
-119 116 |     Literal[
-
-PYI030.pyi:119:5: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2, 3]`
-    |
-117 |   )
-118 |   field30: (
-119 | /     Literal[
-120 | |         # First group
-121 | |         1,
-122 | |             # Second group
-123 | |         2,
-124 | |     ]
-125 | |     # Third group
-126 | |     | Literal[3],
-    | |________________^ PYI030
-127 |   )
-128 |   field31: (
-    |
-    = help: Replace with a single `Literal`
-
-ℹ Unsafe fix
-116 116 |         | Literal[3]  # Fourth group
-117 117 | )
-118 118 | field30: (
-119     |-    Literal[
-120     |-        # First group
-121     |-        1,
-122     |-            # Second group
-123     |-        2,
-124     |-    ]
-125     |-    # Third group
-126     |-    | Literal[3],
-    119 |+    Literal[1, 2, 3],
-127 120 | )
-128 121 | field31: (
-129 122 |     Literal[
-
-PYI030.pyi:129:5: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2, 3]`
-    |
-127 |   )
-128 |   field31: (
-129 | /     Literal[
-130 | |         1,  # First group
-131 | |         2,  # Second group
-132 | |     ]
-133 | |     | Literal[3],  # Third group
-    | |________________^ PYI030
-134 |   )
-    |
-    = help: Replace with a single `Literal`
-
-ℹ Unsafe fix
-126 126 |     | Literal[3],
-127 127 | )
-128 128 | field31: (
-129     |-    Literal[
-130     |-        1,  # First group
-131     |-        2,  # Second group
-132     |-    ]
-133     |-    | Literal[3],  # Third group
-    129 |+    Literal[1, 2, 3],  # Third group
-134 130 | )
-135 131 | 
-136 132 | 
-
-PYI030.pyi:140:17: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2]`
-    |
-138 |           arg1: (
-139 |                   # First group
-140 | /                 Literal[1]
-141 | |                 # Second group
-142 | |                 | Literal[2]
-    | |____________________________^ PYI030
-143 |           )
-144 |   ):
-    |
-    = help: Replace with a single `Literal`
-
-ℹ Unsafe fix
-137 137 | def field32(
-138 138 |         arg1: (
-139 139 |                 # First group
-140     |-                Literal[1]
-141     |-                # Second group
-142     |-                | Literal[2]
-    140 |+                Literal[1, 2]
-143 141 |         )
-144 142 | ):
-145 143 |     print(arg1)
-
-PYI030.pyi:150:17: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2]`
-    |
-148 |   def field33(
-149 |           arg1: (
-150 | /                 Literal[1]  # First group
-151 | |                 | Literal[2]  # Second group
-    | |____________________________^ PYI030
-152 |           )
-153 |   ):
-    |
-    = help: Replace with a single `Literal`
-
-ℹ Unsafe fix
-147 147 | 
-148 148 | def field33(
-149 149 |         arg1: (
-150     |-                Literal[1]  # First group
-151     |-                | Literal[2]  # Second group
-    150 |+                Literal[1, 2]  # Second group
-152 151 |         )
-153 152 | ):
-154 153 |     print(arg1)
-
-PYI030.pyi:159:9: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2]`
-    |
-157 |   def field34() -> (
-158 |           # First group
-159 | /         Literal[1]
-160 | |         # Second group
-161 | |         | Literal[2]
-    | |____________________^ PYI030
-162 |   ):
-163 |       return "my Literal[1]ing"
-    |
-    = help: Replace with a single `Literal`
-
-ℹ Unsafe fix
-156 156 | 
-157 157 | def field34() -> (
-158 158 |         # First group
-159     |-        Literal[1]
-160     |-        # Second group
-161     |-        | Literal[2]
-    159 |+        Literal[1, 2]
-162 160 | ):
-163 161 |     return "my Literal[1]ing"
-164 162 | 
-
-PYI030.pyi:167:9: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2]`
-    |
-166 |   def field35() -> (
-167 | /         Literal[1]  # First group
-168 | |         | Literal[2]  # Second group
-    | |____________________^ PYI030
-169 |   ):
-170 |       return "my Literal[1]ing"
-    |
-    = help: Replace with a single `Literal`
-
-ℹ Unsafe fix
-164 164 | 
-165 165 | 
-166 166 | def field35() -> (
-167     |-        Literal[1]  # First group
-168     |-        | Literal[2]  # Second group
-    167 |+        Literal[1, 2]  # Second group
-169 168 | ):
-170 169 |     return "my Literal[1]ing"
