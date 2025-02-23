@@ -87,3 +87,15 @@ field24: typing.Union[Literal[1], typing.Union[Literal[2], typing.Union[Literal[
 
 # Should use the first literal subscript attribute when fixing
 field25: typing.Union[typing_extensions.Literal[1], typing.Union[Literal[2], typing.Union[Literal[3], Literal[4]]], str]  # Error
+
+# Should use unsafe fix when comments are deleted
+field26: (
+    # First comment
+    Literal["a", "b"]
+    # Second comment
+    | Literal["c", "d"]
+)
+field27: (
+    Literal["a", "b"]  # First comment
+    | Literal["c", "d"]  # Second comment
+)
