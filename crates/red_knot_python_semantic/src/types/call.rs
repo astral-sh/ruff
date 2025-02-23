@@ -192,7 +192,7 @@ impl<'db> CallDunderError<'db> {
     pub(super) fn return_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
         match self {
             Self::Call(error) => error.return_type(db),
-            Self::PossiblyUnbound(_) => None,
+            Self::PossiblyUnbound(call_outcome) => Some(call_outcome.return_type(db)),
             Self::MethodNotAvailable => None,
         }
     }
