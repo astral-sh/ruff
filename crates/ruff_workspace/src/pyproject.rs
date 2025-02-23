@@ -201,9 +201,19 @@ pub(super) fn load_options<P: AsRef<Path>>(
 /// if the file exists and has `requires-python`.
 fn get_fallback_target_version(dir: &Path) -> Option<PythonVersion> {
     let pyproject_path = dir.join("pyproject.toml");
-    let Ok(pyproject) = parse_pyproject_toml(pyproject_path) else {
+    if !pyproject_path.exists() {
         return None;
+    }
+    let parsed_pyproject = parse_pyproject_toml(&pyproject_path);
+
+    let pyproject = match parsed_pyproject {
+        Ok(pyproject) => pyproject,
+        Err(err) => {
+            debug!("Failed to find fallback `target-version` due to: {}", err);
+            return None;
+        }
     };
+
     if let Some(project) = pyproject.project {
         if let Some(requires_python) = project.requires_python {
             return get_minimum_supported_version(&requires_python);
