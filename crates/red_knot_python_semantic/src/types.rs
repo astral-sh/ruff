@@ -2944,14 +2944,17 @@ struct IterationError<'db> {
 }
 
 impl<'db> IterationError<'db> {
-    fn fallback_element_type(&self, db: &'db dyn Db) -> Type<'db> {
-        self.element_type(db).unwrap_or(Type::unknown())
-    }
-
+    /// Returns the element type if it is known, or `None` if the type is never iterable.
     fn element_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
         self.error_kind.element_type(db)
     }
 
+    /// Returns the element type if it is known, or `Type::unknown()` if it is not.
+    fn fallback_element_type(&self, db: &'db dyn Db) -> Type<'db> {
+        self.element_type(db).unwrap_or(Type::unknown())
+    }
+
+    /// Reports the diagnostic for this error.
     fn report_diagnostic(&self, context: &InferContext<'db>, iterable_node: ast::AnyNodeRef) {
         self.error_kind
             .report_diagnostic(context, self.iterable_type, iterable_node);
@@ -2992,6 +2995,7 @@ enum IterationErrorKind<'db> {
 }
 
 impl<'db> IterationErrorKind<'db> {
+    /// Returns the element type if it is known, or `None` if the type is never iterable.
     fn element_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
         match self {
             Self::DunderIterReturnsInvalidIterator {
@@ -3032,6 +3036,7 @@ impl<'db> IterationErrorKind<'db> {
         }
     }
 
+    /// Reports the diagnostic for this error.
     fn report_diagnostic(
         &self,
         context: &InferContext<'db>,
