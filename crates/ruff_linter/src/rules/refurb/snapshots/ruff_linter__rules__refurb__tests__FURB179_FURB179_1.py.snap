@@ -16,7 +16,7 @@ FURB179_1.py:22:12: FURB179 [*] Use `chain.from_iterable()` instead
 20 20 | 
 21 21 | def flatten_via_generator(rows):
 22    |-    return (col for row in rows for col in row)
-   22 |+    return itertools.chain.from_iterable(row)
+   22 |+    return itertools.chain.from_iterable(rows)
 23 23 | 
 24 24 | def flatten_via_list_comp(rows):
 25 25 |     return [col for row in rows for col in row]
@@ -36,7 +36,7 @@ FURB179_1.py:25:12: FURB179 [*] Use `chain.from_iterable()` instead
 23 23 | 
 24 24 | def flatten_via_list_comp(rows):
 25    |-    return [col for row in rows for col in row]
-   25 |+    return list(itertools.chain.from_iterable(row))
+   25 |+    return list(itertools.chain.from_iterable(rows))
 26 26 | 
 27 27 | def flatten_via_set_comp(rows):
 28 28 |     return {col for row in rows for col in row}
@@ -56,7 +56,7 @@ FURB179_1.py:28:12: FURB179 [*] Use `chain.from_iterable()` instead
 26 26 | 
 27 27 | def flatten_via_set_comp(rows):
 28    |-    return {col for row in rows for col in row}
-   28 |+    return set(itertools.chain.from_iterable(row))
+   28 |+    return set(itertools.chain.from_iterable(rows))
 29 29 | 
 30 30 | def flatten_with_function_source():
 31 31 |     return (col for row in f() for col in row)
@@ -76,7 +76,7 @@ FURB179_1.py:31:12: FURB179 [*] Use `chain.from_iterable()` instead
 29 29 | 
 30 30 | def flatten_with_function_source():
 31    |-    return (col for row in f() for col in row)
-   31 |+    return itertools.chain.from_iterable(row)
+   31 |+    return itertools.chain.from_iterable(f())
 32 32 | 
 33 33 | def flatten_via_sum(rows):
 34 34 |     return sum(rows, [])
