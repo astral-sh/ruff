@@ -116,7 +116,7 @@ pub(crate) fn reimplemented_chain_from_iterable_comprehension(
 
     diagnostic.try_set_optional_fix(|| {
         let wrapper = comprehension_kind.wrapper();
-        replace_with_chain_from_iterable(original, wrapper, &outer.target, checker)
+        replace_with_chain_from_iterable(original, wrapper, &outer.iter, checker)
     });
 
     checker.report_diagnostic(diagnostic);
