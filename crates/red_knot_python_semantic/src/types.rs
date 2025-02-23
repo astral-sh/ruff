@@ -3021,11 +3021,15 @@ impl<'db> IterationErrorKind<'db> {
                         [*dunder_next_return, dunder_getitem_outcome.return_type(db)],
                     ))
                 }
-                CallDunderError::Call(dunder_getitem_call_error) => dunder_getitem_call_error
-                    .return_type(db)
-                    .map(|dunder_getitem_return| {
-                        UnionType::from_elements(db, [*dunder_next_return, dunder_getitem_return])
-                    }),
+                CallDunderError::Call(dunder_getitem_call_error) => Some(
+                    dunder_getitem_call_error
+                        .return_type(db)
+                        .map(|dunder_getitem_return| {
+                            let elements = [*dunder_next_return, dunder_getitem_return];
+                            UnionType::from_elements(db, elements)
+                        })
+                        .unwrap_or(*dunder_next_return),
+                ),
             },
 
             Self::UnboundIterAndGetitemError {

@@ -439,6 +439,27 @@ def _(flag: bool):
         reveal_type(x)  # revealed: int | bytes
 ```
 
+## Possibly unbound `__iter__` and not-callable `__getitem__`
+
+```py
+from typing_extensions import reveal_type
+
+def _(flag: bool):
+    class Iterator:
+        def __next__(self) -> int:
+            return 42
+
+    class Iterable:
+        if flag:
+            def __iter__(self) -> Iterator:
+                return Iterator()
+        __getitem__: None = None
+
+    # error: [not-iterable]
+    for x in Iterable():
+        reveal_type(x)  # revealed: int
+```
+
 ## Possibly unbound `__iter__` and possibly unbound `__getitem__`
 
 <!-- snapshot-diagnostics -->
