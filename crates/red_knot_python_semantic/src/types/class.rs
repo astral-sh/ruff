@@ -670,6 +670,7 @@ impl<'db> From<InstanceType<'db>> for Type<'db> {
 /// places.
 /// Note: good candidates are any classes in `[crate::module_resolver::module::KnownModule]`
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(test, derive(strum_macros::EnumIter))]
 pub enum KnownClass {
     // To figure out where an stdlib symbol is defined, you can go into `crates/red_knot_vendored`
     // and grep for the symbol name in any `.pyi` file.
@@ -1026,10 +1027,13 @@ impl<'db> KnownClass {
         }
     }
 
-    pub fn try_from_file_and_name(db: &dyn Db, file: File, class_name: &str) -> Option<Self> {
-        // Note: if this becomes hard to maintain (as rust can't ensure at compile time that all
-        // variants of `Self` are covered), we might use a macro (in-house or dependency)
-        // See: https://stackoverflow.com/q/39070244
+    pub(super) fn try_from_file_and_name(
+        db: &dyn Db,
+        file: File,
+        class_name: &str,
+    ) -> Option<Self> {
+        // We assert that this match is exhaustive over the right-hand side in the unit test
+        // `known_class_roundtrip_from_str()`
         let candidate = match class_name {
             "bool" => Self::Bool,
             "object" => Self::Object,
@@ -1497,4 +1501,27 @@ pub(super) enum MetaclassErrorKind<'db> {
     NotCallable(Type<'db>),
     /// The metaclass is of a union type whose some members are not callable
     PartlyNotCallable(Type<'db>),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::tests::setup_db;
+    use crate::module_resolver::resolve_module;
+    use strum::IntoEnumIterator;
+
+    #[test]
+    fn known_class_roundtrip_from_str() {
+        let db = setup_db();
+        for class in KnownClass::iter() {
+            let class_name = class.as_str(&db);
+            let class_module = resolve_module(&db, &class.canonical_module(&db).name()).unwrap();
+
+            assert_eq!(
+                KnownClass::try_from_file_and_name(&db, class_module.file(), class_name),
+                Some(class),
+                "`KnownClass::candidate_from_str` appears to be missing a case for `{class_name}`"
+            );
+        }
+    }
 }
