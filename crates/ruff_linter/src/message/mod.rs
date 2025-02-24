@@ -125,7 +125,7 @@ impl Message {
     pub fn from_syntax_error(syntax_error: &SyntaxError, file: SourceFile) -> Message {
         match syntax_error.kind {
             SyntaxErrorKind::MatchBeforePy310 => Message::SyntaxError(SyntaxErrorMessage {
-                message: format!("SyntaxError: {}", syntax_error.message()),
+                message: format!("SyntaxError: {syntax_error}"),
                 range: syntax_error.range,
                 file,
             }),

@@ -1,4 +1,4 @@
-use std::fmt;
+use std::fmt::{self, Display};
 
 use ruff_python_ast::PythonVersion;
 use ruff_text_size::TextRange;
@@ -444,19 +444,22 @@ pub struct SyntaxError {
 }
 
 impl SyntaxError {
-    pub fn message(&self) -> String {
-        match self.kind {
-            SyntaxErrorKind::MatchBeforePy310 => format!(
-                "Cannot use `match` statement on Python {} (syntax was new in Python 3.10)",
-                self.target_version
-            ),
-        }
-    }
-
     /// The earliest allowed version for the syntax associated with this error.
     pub const fn version(&self) -> PythonVersion {
         match self.kind {
             SyntaxErrorKind::MatchBeforePy310 => PythonVersion::PY310,
+        }
+    }
+}
+
+impl Display for SyntaxError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.kind {
+            SyntaxErrorKind::MatchBeforePy310 => write!(
+                f,
+                "Cannot use `match` statement on Python {} (syntax was new in Python 3.10)",
+                self.target_version
+            ),
         }
     }
 }
