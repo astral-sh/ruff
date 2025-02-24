@@ -2409,6 +2409,7 @@ name = "red_knot"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "argfile",
  "chrono",
  "clap",
  "colored 3.0.0",
@@ -2433,6 +2434,7 @@ dependencies = [
  "tracing-flame",
  "tracing-subscriber",
  "tracing-tree",
+ "wild",
 ]
 
 [[package]]
