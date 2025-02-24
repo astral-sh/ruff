@@ -8,8 +8,8 @@ use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId, SymbolTable};
 use crate::semantic_index::symbol_table;
 use crate::types::infer::infer_same_file_expression_type;
 use crate::types::{
-    infer_expression_types, IntersectionBuilder, KnownClass, KnownFunction, SubclassOfType,
-    Truthiness, Type, UnionBuilder,
+    infer_expression_types, IntersectionBuilder, KnownClass, SubclassOfType, Truthiness, Type,
+    UnionBuilder,
 };
 use crate::Db;
 use itertools::Itertools;
@@ -429,9 +429,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         // and `issubclass`, for example `isinstance(x, str | (int | float))`.
         match callable_ty {
             Type::FunctionLiteral(function_type) if expr_call.arguments.keywords.is_empty() => {
-                let function = function_type
-                    .known(self.db)
-                    .and_then(KnownFunction::constraint_function)?;
+                let function = function_type.known(self.db)?.into_constraint_function()?;
 
                 let [ast::Expr::Name(ast::ExprName { id, .. }), class_info] =
                     &*expr_call.arguments.args

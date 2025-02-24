@@ -1,4 +1,5 @@
 use std::hash::Hash;
+use std::str::FromStr;
 
 use bitflags::bitflags;
 use call::{CallDunderError, CallError};
@@ -3234,9 +3235,16 @@ impl<'db> FunctionType<'db> {
 
 /// Non-exhaustive enumeration of known functions (e.g. `builtins.reveal_type`, ...) that might
 /// have special behavior.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, strum_macros::EnumString)]
+#[strum(serialize_all = "snake_case")]
+#[cfg_attr(test, derive(strum_macros::EnumIter, strum_macros::IntoStaticStr))]
 pub enum KnownFunction {
-    ConstraintFunction(KnownConstraintFunction),
+    /// `builtins.isinstance`
+    #[strum(serialize = "isinstance")]
+    IsInstance,
+    /// `builtins.issubclass`
+    #[strum(serialize = "issubclass")]
+    IsSubclass,
     /// `builtins.reveal_type`, `typing.reveal_type` or `typing_extensions.reveal_type`
     RevealType,
     /// `builtins.len`
@@ -3280,9 +3288,10 @@ pub enum KnownFunction {
 }
 
 impl KnownFunction {
-    pub fn constraint_function(self) -> Option<KnownConstraintFunction> {
+    pub fn into_constraint_function(self) -> Option<KnownConstraintFunction> {
         match self {
-            Self::ConstraintFunction(f) => Some(f),
+            Self::IsInstance => Some(KnownConstraintFunction::IsInstance),
+            Self::IsSubclass => Some(KnownConstraintFunction::IsSubclass),
             _ => None,
         }
     }
@@ -3292,30 +3301,7 @@ impl KnownFunction {
         definition: Definition<'db>,
         name: &str,
     ) -> Option<Self> {
-        let candidate = match name {
-            "isinstance" => Self::ConstraintFunction(KnownConstraintFunction::IsInstance),
-            "issubclass" => Self::ConstraintFunction(KnownConstraintFunction::IsSubclass),
-            "reveal_type" => Self::RevealType,
-            "len" => Self::Len,
-            "repr" => Self::Repr,
-            "final" => Self::Final,
-            "no_type_check" => Self::NoTypeCheck,
-            "assert_type" => Self::AssertType,
-            "cast" => Self::Cast,
-            "overload" => Self::Overload,
-            "getattr_static" => Self::GetattrStatic,
-            "static_assert" => Self::StaticAssert,
-            "is_subtype_of" => Self::IsSubtypeOf,
-            "is_disjoint_from" => Self::IsDisjointFrom,
-            "is_equivalent_to" => Self::IsEquivalentTo,
-            "is_assignable_to" => Self::IsAssignableTo,
-            "is_gradual_equivalent_to" => Self::IsGradualEquivalentTo,
-            "is_fully_static" => Self::IsFullyStatic,
-            "is_singleton" => Self::IsSingleton,
-            "is_single_valued" => Self::IsSingleValued,
-            _ => return None,
-        };
-
+        let candidate = Self::from_str(name).ok()?;
         candidate
             .check_module(file_to_module(db, definition.file(db))?.known()?)
             .then_some(candidate)
@@ -3324,12 +3310,7 @@ impl KnownFunction {
     /// Return `true` if `self` is defined in `module` at runtime.
     const fn check_module(self, module: KnownModule) -> bool {
         match self {
-            Self::ConstraintFunction(constraint_function) => match constraint_function {
-                KnownConstraintFunction::IsInstance | KnownConstraintFunction::IsSubclass => {
-                    module.is_builtins()
-                }
-            },
-            Self::Len | Self::Repr => module.is_builtins(),
+            Self::IsInstance | Self::IsSubclass | Self::Len | Self::Repr => module.is_builtins(),
             Self::AssertType
             | Self::Cast
             | Self::Overload
@@ -3338,9 +3319,7 @@ impl KnownFunction {
             | Self::NoTypeCheck => {
                 matches!(module, KnownModule::Typing | KnownModule::TypingExtensions)
             }
-            Self::GetattrStatic => {
-                matches!(module, KnownModule::Inspect)
-            }
+            Self::GetattrStatic => module.is_inspect(),
             Self::IsAssignableTo
             | Self::IsDisjointFrom
             | Self::IsEquivalentTo
@@ -3369,7 +3348,8 @@ impl KnownFunction {
             Self::AssertType => ParameterExpectations::ValueExpressionAndTypeExpression,
             Self::Cast => ParameterExpectations::TypeExpressionAndValueExpression,
 
-            Self::ConstraintFunction(_)
+            Self::IsInstance
+            | Self::IsSubclass
             | Self::Len
             | Self::Repr
             | Self::Overload
@@ -4026,12 +4006,15 @@ static_assertions::assert_eq_size!(Type, [u8; 16]);
 pub(crate) mod tests {
     use super::*;
     use crate::db::tests::{setup_db, TestDbBuilder};
-    use crate::symbol::{global_symbol, typing_extensions_symbol, typing_symbol};
+    use crate::symbol::{
+        global_symbol, known_module_symbol, typing_extensions_symbol, typing_symbol,
+    };
     use ruff_db::files::system_path_to_file;
     use ruff_db::parsed::parsed_module;
     use ruff_db::system::DbWithTestSystem;
     use ruff_db::testing::assert_function_query_was_not_run;
     use ruff_python_ast::PythonVersion;
+    use strum::IntoEnumIterator;
     use test_case::test_case;
 
     /// Explicitly test for Python version <3.13 and >=3.13, to ensure that
@@ -4175,5 +4158,56 @@ pub(crate) mod tests {
             .add_negative(todo4)
             .build()
             .is_todo());
+    }
+
+    #[test]
+    fn known_function_roundtrip_from_str() {
+        let db = setup_db();
+
+        for function in KnownFunction::iter() {
+            let function_name: &'static str = function.into();
+
+            let module = match function {
+                KnownFunction::Len
+                | KnownFunction::Repr
+                | KnownFunction::IsInstance
+                | KnownFunction::IsSubclass => KnownModule::Builtins,
+
+                KnownFunction::GetattrStatic => KnownModule::Inspect,
+
+                KnownFunction::Cast
+                | KnownFunction::Final
+                | KnownFunction::Overload
+                | KnownFunction::RevealType
+                | KnownFunction::AssertType
+                | KnownFunction::NoTypeCheck => KnownModule::TypingExtensions,
+
+                KnownFunction::IsSingleton
+                | KnownFunction::IsSubtypeOf
+                | KnownFunction::StaticAssert
+                | KnownFunction::IsFullyStatic
+                | KnownFunction::IsDisjointFrom
+                | KnownFunction::IsSingleValued
+                | KnownFunction::IsAssignableTo
+                | KnownFunction::IsEquivalentTo
+                | KnownFunction::IsGradualEquivalentTo => KnownModule::KnotExtensions,
+            };
+
+            let function_body_scope = known_module_symbol(&db, module, function_name)
+                .expect_type()
+                .expect_function_literal()
+                .body_scope(&db);
+
+            let function_node = function_body_scope.node(&db).expect_function();
+
+            let function_definition =
+                semantic_index(&db, function_body_scope.file(&db)).definition(function_node);
+
+            assert_eq!(
+                KnownFunction::try_from_definition_and_name(&db, function_definition, function_name),
+                Some(function),
+                "The strum `EnumString` implementation appears to be incorrect for `{function_name}`"
+            );
+        }
     }
 }
