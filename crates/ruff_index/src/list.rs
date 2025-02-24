@@ -7,12 +7,6 @@ use crate::Idx;
 #[derive(Debug, Eq, PartialEq)]
 struct ListCell<I, K, V>(K, V, Option<I>);
 
-impl<I: Idx, K, V> ListCell<I, K, V> {
-    fn tail(&self) -> Option<I> {
-        self.2
-    }
-}
-
 /// Stores one or more _association lists_, which are linked lists of key/value pairs. We
 /// additionally guarantee that the elements of an association list are sorted (by their keys), and
 /// that they do not contain any entries with duplicate keys.
@@ -219,7 +213,8 @@ impl<I: Idx, K: Clone + Ord, V: Clone> ListEntry<'_, I, K, V> {
         result
     }
 
-    /// Inserts a new key/value into the list if the key is not already present.
+    /// Inserts a new key/value into the list if the key is not already present. If the list
+    /// already contains `key`, we return the original list as-is, and do not invoke your closure.
     pub fn or_insert_with<F>(self, f: F) -> Option<I>
     where
         F: FnOnce() -> V,
@@ -250,32 +245,34 @@ impl<I: Idx, K: Clone + Ord, V: Clone> ListEntry<'_, I, K, V> {
 
     /// Sets the value of the entry, returning the resulting list. Overwrites any existing entry
     /// with the same key
-    pub fn replace_with<F>(self, f: F) -> Option<I>
+    pub fn replace(self, value: V) -> Option<I>
     where
-        F: FnOnce() -> V,
+        V: Eq,
     {
-        // If the list already contains key, skip past its entry before we add its replacement.
+        // If the list already contains `key`, skip past its entry before we add its replacement.
         let tail = match self.tail {
             ListTail::End => None,
-            ListTail::Occupied(index) => self.builder.cells[index].tail(),
+            ListTail::Occupied(index) => {
+                let ListCell(_, existing_value, tail) = &self.builder.cells[index];
+                if value == *existing_value {
+                    // As an optimization, if value isn't changed, there's no need to stitch up a
+                    // new list.
+                    return self.list;
+                }
+                *tail
+            }
             ListTail::Vacant(index) => Some(index),
         };
-        self.stitch_up(f(), tail)
-    }
-
-    /// Sets the value of the entry, returning the resulting list. Overwrites any existing entry
-    /// with the same key
-    pub fn replace(self, value: V) -> Option<I> {
-        self.replace_with(|| value)
+        self.stitch_up(value, tail)
     }
 
     /// Sets the value of the entry to the default value, returning the resulting list. Overwrites
     /// any existing entry with the same key
     pub fn replace_with_default(self) -> Option<I>
     where
-        V: Default,
+        V: Default + Eq,
     {
-        self.replace_with(V::default)
+        self.replace(V::default())
     }
 }
 
