@@ -332,4 +332,36 @@ The `owner` argument takes precedence over the `instance` argument:
 reveal_type(getattr_static(C, "f").__get__("dummy", C))  # revealed: <bound method `f` of `Literal[C]`>
 ```
 
+### Classmethods mixed with other decorators
+
+When a `@classmethod` is additionally decorated with another decorator, it is still treated as a
+class method:
+
+```py
+from __future__ import annotations
+
+def does_nothing[T](f: T) -> T:
+    return f
+
+class C:
+    @classmethod
+    @does_nothing
+    def f1(cls: type[C], x: int) -> str:
+        return "a"
+
+    @does_nothing
+    @classmethod
+    def f2(cls: type[C], x: int) -> str:
+        return "a"
+
+# TODO: We do not support decorators yet (only limited special cases). Eventually,
+# these should all return `str`:
+
+reveal_type(C.f1(1))  # revealed: @Todo(return type of decorated function)
+reveal_type(C().f1(1))  # revealed: @Todo(decorated method)
+
+reveal_type(C.f2(1))  # revealed: @Todo(return type of decorated function)
+reveal_type(C().f2(1))  # revealed: @Todo(decorated method)
+```
+
 [functions and methods]: https://docs.python.org/3/howto/descriptor.html#functions-and-methods
