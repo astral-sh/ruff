@@ -16,7 +16,7 @@ use red_knot_project::{watch, Db};
 use red_knot_project::{ProjectDatabase, ProjectMetadata};
 use red_knot_server::run_server;
 use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig, Severity};
-use ruff_db::system::{OsSystem, System, SystemPath, SystemPathBuf};
+use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
 use salsa::plumbing::ZalsaDatabase;
 
 mod args;
@@ -69,7 +69,7 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     let _guard = setup_tracing(verbosity)?;
 
     // The base path to which all CLI arguments are relative to.
-    let cli_base_path = {
+    let cwd = {
         let cwd = std::env::current_dir().context("Failed to get the current working directory")?;
         SystemPathBuf::from_path_buf(cwd)
             .map_err(|path| {
@@ -80,25 +80,27 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
             })?
     };
 
-    let cwd = args
+    let project_path = args
         .project
         .as_ref()
-        .map(|cwd| {
-            if cwd.as_std_path().is_dir() {
-                Ok(SystemPath::absolute(cwd, &cli_base_path))
+        .map(|project| {
+            if project.as_std_path().is_dir() {
+                Ok(SystemPath::absolute(project, &cwd))
             } else {
-                Err(anyhow!("Provided project path `{cwd}` is not a directory"))
+                Err(anyhow!(
+                    "Provided project path `{project}` is not a directory"
+                ))
             }
         })
         .transpose()?
-        .unwrap_or_else(|| cli_base_path.clone());
+        .unwrap_or_else(|| cwd.clone());
 
     let system = OsSystem::new(cwd);
     let watch = args.watch;
     let exit_zero = args.exit_zero;
 
     let cli_options = args.into_options();
-    let mut project_metadata = ProjectMetadata::discover(system.current_directory(), &system)?;
+    let mut project_metadata = ProjectMetadata::discover(&project_path, &system)?;
     project_metadata.apply_cli_options(cli_options.clone());
     project_metadata.apply_configuration_files(&system)?;
 
