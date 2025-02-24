@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-shallow_copy_environ.py:4:14: PLW1507 [*] Shallow copy of `os.environ` via `copy.copy(os.environ)`
+shallow_copy_environ_0.py:4:14: PLW1507 [*] Shallow copy of `os.environ` via `copy.copy(os.environ)`
   |
 2 | import os
 3 |
@@ -10,7 +10,7 @@ shallow_copy_environ.py:4:14: PLW1507 [*] Shallow copy of `os.environ` via `copy
   |
   = help: Replace with `os.environ.copy()`
 
-ℹ Safe fix
+ℹ Unsafe fix
 1 1 | import copy
 2 2 | import os
 3 3 | 

@@ -82,7 +82,7 @@ pub(crate) fn shallow_copy_environ(checker: &Checker, call: &ast::ExprCall) {
     }
 
     let mut diagnostic = Diagnostic::new(ShallowCopyEnviron, call.range());
-    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
         format!("{}.copy()", checker.locator().slice(arg)),
         call.range(),
     )));
