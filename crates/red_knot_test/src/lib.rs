@@ -3,6 +3,7 @@ use crate::parser::{BacktickOffsets, EmbeddedFileSourceMap};
 use camino::Utf8Path;
 use colored::Colorize;
 use parser as test_parser;
+use red_knot_python_semantic::syntax::SyntaxDiagnostic;
 use red_knot_python_semantic::types::check_types;
 use red_knot_python_semantic::{Program, ProgramSettings, SearchPathSettings, SitePackages};
 use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig, ParseDiagnostic};
@@ -205,6 +206,12 @@ fn run_test(
                     diagnostic
                 })
                 .collect();
+
+            diagnostics.extend(parsed.syntax_errors().iter().map(|error| {
+                let diagnostic: Box<dyn Diagnostic> =
+                    Box::new(SyntaxDiagnostic::from_syntax_error(error, test_file.file));
+                diagnostic
+            }));
 
             let type_diagnostics = match catch_unwind(|| check_types(db, test_file.file)) {
                 Ok(type_diagnostics) => type_diagnostics,
