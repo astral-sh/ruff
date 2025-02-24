@@ -3713,43 +3713,45 @@ impl<'db> TypeInferenceBuilder<'db> {
             .unwrap_with_diagnostic(|lookup_error| match lookup_error {
                 LookupError::Unbound => {
                     let bound_on_instance = match value_type {
-                    Type::ClassLiteral(class) => {
-                        !class.class().instance_member(db, attr).0.is_unbound()
-                    }
-                    Type::SubclassOf(subclass_of @ SubclassOfType { .. }) => {
-                        match subclass_of.subclass_of() {
-                            ClassBase::Class(class) => {
-                                !class.instance_member(db, attr).0.is_unbound()
-                            }
-                            ClassBase::Dynamic(_) => unreachable!("Attribute lookup on a dynamic `SubclassOf` type should always return a bound symbol"),
+                        Type::ClassLiteral(class) => {
+                            !class.class().instance_member(db, attr).0.is_unbound()
                         }
+                        Type::SubclassOf(subclass_of @ SubclassOfType { .. }) => {
+                            match subclass_of.subclass_of() {
+                                ClassBase::Class(class) => {
+                                    !class.instance_member(db, attr).0.is_unbound()
+                                }
+                                ClassBase::Dynamic(_) => unreachable!(
+                                    "Attribute lookup on a dynamic `SubclassOf` type should always return a bound symbol"
+                                ),
+                            }
+                        }
+                        _ => false,
+                    };
+
+                    if bound_on_instance {
+                        self.context.report_lint(
+                            &UNRESOLVED_ATTRIBUTE,
+                            attribute,
+                            format_args!(
+                                "Attribute `{}` can only be accessed on instances, not on the class object `{}` itself.",
+                                attr.id,
+                                value_type.display(db)
+                            ),
+                        );
+                    } else {
+                        self.context.report_lint(
+                            &UNRESOLVED_ATTRIBUTE,
+                            attribute,
+                            format_args!(
+                                "Type `{}` has no attribute `{}`",
+                                value_type.display(db),
+                                attr.id
+                            ),
+                        );
                     }
-                    _ => false,
-                };
 
-                if bound_on_instance {
-                    self.context.report_lint(
-                        &UNRESOLVED_ATTRIBUTE,
-                        attribute,
-                        format_args!(
-                            "Attribute `{}` can only be accessed on instances, not on the class object `{}` itself.",
-                            attr.id,
-                            value_type.display(db)
-                        ),
-                    );
-                } else {
-                    self.context.report_lint(
-                        &UNRESOLVED_ATTRIBUTE,
-                        attribute,
-                        format_args!(
-                            "Type `{}` has no attribute `{}`",
-                            value_type.display(db),
-                            attr.id
-                        ),
-                    );
-                }
-
-                Type::unknown()
+                    Type::unknown()
                 }
                 LookupError::PossiblyUnbound(type_when_bound) => {
                     self.context.report_lint(
@@ -3799,7 +3801,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         let class_member = value_ty.member(self.db(), attr);
 
                         if class_member.is_unbound() {
-                            if let Some(class) = match value_ty {
+                            let class = match value_ty {
                                 Type::ClassLiteral(class) => Some(class.class()),
                                 Type::SubclassOf(subclass_of @ SubclassOfType { .. }) => {
                                     match subclass_of.subclass_of() {
@@ -3808,7 +3810,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                                     }
                                 }
                                 _ => None,
-                            } {
+                            };
+                            if let Some(class) = class {
                                 let instance_member = class.instance_member(self.db(), attr);
 
                                 // Attribute is declared or bound on instance. Forbid access from the class object
