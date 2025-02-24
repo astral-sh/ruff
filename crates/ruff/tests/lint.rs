@@ -2630,6 +2630,30 @@ class A(Generic[T]):
 
 #[test]
 fn match_before_py310() {
+    // ok on 3.10
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--stdin-filename", "test.py"])
+        .arg("--target-version=py310")
+        .arg("-")
+        .pass_stdin(
+            r#"
+match 2:
+    case 1:
+        print("it's one")
+"#
+        ),
+        @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    "
+    );
+
+    // syntax error on 3.9
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
         .args(["--stdin-filename", "test.py"])
