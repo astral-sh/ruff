@@ -335,8 +335,8 @@ pub fn add_noqa_to_path(
     settings: &LinterSettings,
 ) -> Result<usize> {
     // Parse once.
-    // TODO(brent) resolve_target_version(path) here
-    let parsed = parse_unchecked_source(source_kind, source_type, settings.target_version);
+    let target_version = settings.resolve_target_version(path);
+    let parsed = parse_unchecked_source(source_kind, source_type, target_version);
 
     // Map row and column locations to byte slices (lazily).
     let locator = Locator::new(source_kind.source_code());
@@ -394,8 +394,8 @@ pub fn lint_only(
     source_type: PySourceType,
     source: ParseSource,
 ) -> LinterResult {
-    // TODO(brent) resolve_target_version(path) here
-    let parsed = source.into_parsed(source_kind, source_type, settings.target_version);
+    let target_version = settings.resolve_target_version(path);
+    let parsed = source.into_parsed(source_kind, source_type, target_version);
 
     // Map row and column locations to byte slices (lazily).
     let locator = Locator::new(source_kind.source_code());
@@ -503,8 +503,8 @@ pub fn lint_fix<'a>(
     // Continuously fix until the source code stabilizes.
     loop {
         // Parse once.
-        // TODO(brent) resolve_target_version(path) here
-        let parsed = parse_unchecked_source(&transformed, source_type, settings.target_version);
+        let target_version = settings.resolve_target_version(path);
+        let parsed = parse_unchecked_source(&transformed, source_type, target_version);
 
         // Map row and column locations to byte slices (lazily).
         let locator = Locator::new(transformed.source_code());

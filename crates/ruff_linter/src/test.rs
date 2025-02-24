@@ -110,7 +110,8 @@ pub(crate) fn test_contents<'a>(
     settings: &LinterSettings,
 ) -> (Vec<Message>, Cow<'a, SourceKind>) {
     let source_type = PySourceType::from(path);
-    let options = ParseOptions::from(source_type).with_target_version(settings.target_version);
+    let options =
+        ParseOptions::from(source_type).with_target_version(settings.resolve_target_version(path));
     let parsed = ruff_python_parser::parse_unchecked(source_kind.source_code(), options.clone())
         .try_into_module()
         .expect("PySourceType always parses into a module");

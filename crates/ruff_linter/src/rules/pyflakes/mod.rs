@@ -745,7 +745,8 @@ mod tests {
         let source_type = PySourceType::default();
         let source_kind = SourceKind::Python(contents.to_string());
         let settings = LinterSettings::for_rules(Linter::Pyflakes.rules());
-        let options = ParseOptions::from(source_type).with_target_version(settings.target_version);
+        let options =
+            ParseOptions::from(source_type).with_target_version(settings.unresolved_target_version);
         let parsed = ruff_python_parser::parse_unchecked(source_kind.source_code(), options)
             .try_into_module()
             .expect("PySourceType always parses into a module");
