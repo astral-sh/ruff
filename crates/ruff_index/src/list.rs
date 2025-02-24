@@ -41,13 +41,14 @@ impl<I: Idx, K, V> ListStorage<I, K, V> {
             curr: list,
         }
     }
-}
 
-impl<I: Idx, K: Ord, V> ListStorage<I, K, V> {
     /// Finds the entry in a list with a given key, and returns its value.
     ///
     /// **Performance**: Note that lookups are O(n), since we use a linked-list representation!
-    pub fn get(&self, list: Option<I>, key: &K) -> Option<&V> {
+    pub fn get(&self, list: Option<I>, key: &K) -> Option<&V>
+    where
+        K: Ord,
+    {
         self.iter(list).find(|(k, _)| *k == key).map(|(_, v)| v)
     }
 }
