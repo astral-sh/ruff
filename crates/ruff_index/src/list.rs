@@ -194,7 +194,12 @@ impl<I: Idx, K: Clone + Ord, V: Clone> ListBuilder<I, K, V> {
             match key.cmp(curr_key) {
                 // We found an existing entry in the input list with the desired key, which means
                 // we can return the original input as-is.
-                Ordering::Equal => return list,
+                Ordering::Equal => {
+                    // We might have built up some potential new list cells while iterating, but we
+                    // must always leave the scratch accumulator empty.
+                    self.scratch.clear();
+                    return list;
+                }
                 // The input list does not already contain this key, and this is where we should
                 // add it. Break out of the loop and start the stitch-up process.
                 Ordering::Less => break curr,
@@ -314,5 +319,302 @@ impl<I: Idx, K: Clone + Ord, V: Clone> ListBuilder<I, K, V> {
             result = self.add_cell(key, value, result);
         }
         result
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use std::fmt::Display;
+    use std::fmt::Write;
+
+    use crate::newtype_index;
+
+    // Allows the macro invocation below to work
+    use crate as ruff_index;
+
+    #[newtype_index]
+    struct TestIndex;
+
+    // ----
+    // Sets
+
+    impl<I, K> ListStorage<I, K, ()>
+    where
+        I: Idx,
+        K: Display,
+    {
+        fn display_set(&self, list: Option<I>) -> String {
+            let mut result = String::new();
+            result.push('[');
+            for (element, ()) in self.iter(list) {
+                if result.len() > 1 {
+                    result.push_str(", ");
+                }
+                write!(&mut result, "{}", element).unwrap();
+            }
+            result.push(']');
+            result
+        }
+    }
+
+    #[test]
+    fn can_insert_into_set() {
+        let mut builder = ListBuilder::<TestIndex, u16, ()>::default();
+
+        // Build up the set in order
+        let set1 = builder.insert(None, 1, ());
+        let set12 = builder.insert(set1, 2, ());
+        let set123 = builder.insert(set12, 3, ());
+        let set1232 = builder.insert(set123, 2, ());
+        assert_eq!(builder.display_set(None), "[]");
+        assert_eq!(builder.display_set(set1), "[1]");
+        assert_eq!(builder.display_set(set12), "[1, 2]");
+        assert_eq!(builder.display_set(set123), "[1, 2, 3]");
+        assert_eq!(builder.display_set(set1232), "[1, 2, 3]");
+
+        // And in reverse order
+        let set3 = builder.insert(None, 3, ());
+        let set32 = builder.insert(set3, 2, ());
+        let set321 = builder.insert(set32, 1, ());
+        let set3212 = builder.insert(set321, 2, ());
+        assert_eq!(builder.display_set(None), "[]");
+        assert_eq!(builder.display_set(set3), "[3]");
+        assert_eq!(builder.display_set(set32), "[2, 3]");
+        assert_eq!(builder.display_set(set321), "[1, 2, 3]");
+        assert_eq!(builder.display_set(set3212), "[1, 2, 3]");
+    }
+
+    #[test]
+    fn can_insert_if_needed_into_set() {
+        let mut builder = ListBuilder::<TestIndex, u16, ()>::default();
+
+        // Build up the set in order
+        let set1 = builder.insert_if_needed(None, 1, ());
+        let set12 = builder.insert_if_needed(set1, 2, ());
+        let set123 = builder.insert_if_needed(set12, 3, ());
+        let set1232 = builder.insert_if_needed(set123, 2, ());
+        assert_eq!(builder.display_set(None), "[]");
+        assert_eq!(builder.display_set(set1), "[1]");
+        assert_eq!(builder.display_set(set12), "[1, 2]");
+        assert_eq!(builder.display_set(set123), "[1, 2, 3]");
+        assert_eq!(builder.display_set(set1232), "[1, 2, 3]");
+
+        // And in reverse order
+        let set3 = builder.insert_if_needed(None, 3, ());
+        let set32 = builder.insert_if_needed(set3, 2, ());
+        let set321 = builder.insert_if_needed(set32, 1, ());
+        let set3212 = builder.insert_if_needed(set321, 2, ());
+        assert_eq!(builder.display_set(None), "[]");
+        assert_eq!(builder.display_set(set3), "[3]");
+        assert_eq!(builder.display_set(set32), "[2, 3]");
+        assert_eq!(builder.display_set(set321), "[1, 2, 3]");
+        assert_eq!(builder.display_set(set3212), "[1, 2, 3]");
+    }
+
+    #[test]
+    fn can_intersect_sets() {
+        let mut builder = ListBuilder::<TestIndex, u16, ()>::default();
+
+        let set1 = builder.insert_if_needed(None, 1, ());
+        let set12 = builder.insert_if_needed(set1, 2, ());
+        let set123 = builder.insert_if_needed(set12, 3, ());
+        let set1234 = builder.insert_if_needed(set123, 4, ());
+
+        let set2 = builder.insert_if_needed(None, 2, ());
+        let set24 = builder.insert_if_needed(set2, 4, ());
+        let set245 = builder.insert_if_needed(set24, 5, ());
+        let set2457 = builder.insert_if_needed(set245, 7, ());
+
+        let intersection = builder.intersect(None, None, |(), ()| ());
+        assert_eq!(builder.display_set(intersection), "[]");
+        let intersection = builder.intersect(None, set1234, |(), ()| ());
+        assert_eq!(builder.display_set(intersection), "[]");
+        let intersection = builder.intersect(None, set2457, |(), ()| ());
+        assert_eq!(builder.display_set(intersection), "[]");
+        let intersection = builder.intersect(set1, set1234, |(), ()| ());
+        assert_eq!(builder.display_set(intersection), "[1]");
+        let intersection = builder.intersect(set1, set2457, |(), ()| ());
+        assert_eq!(builder.display_set(intersection), "[]");
+        let intersection = builder.intersect(set2, set1234, |(), ()| ());
+        assert_eq!(builder.display_set(intersection), "[2]");
+        let intersection = builder.intersect(set2, set2457, |(), ()| ());
+        assert_eq!(builder.display_set(intersection), "[2]");
+        let intersection = builder.intersect(set1234, set2457, |(), ()| ());
+        assert_eq!(builder.display_set(intersection), "[2, 4]");
+    }
+
+    #[test]
+    fn can_union_sets() {
+        let mut builder = ListBuilder::<TestIndex, u16, ()>::default();
+
+        let set1 = builder.insert_if_needed(None, 1, ());
+        let set12 = builder.insert_if_needed(set1, 2, ());
+        let set123 = builder.insert_if_needed(set12, 3, ());
+        let set1234 = builder.insert_if_needed(set123, 4, ());
+
+        let set2 = builder.insert_if_needed(None, 2, ());
+        let set24 = builder.insert_if_needed(set2, 4, ());
+        let set245 = builder.insert_if_needed(set24, 5, ());
+        let set2457 = builder.insert_if_needed(set245, 7, ());
+
+        let union = builder.union(None, None, |(), ()| ());
+        assert_eq!(builder.display_set(union), "[]");
+        let union = builder.union(None, set1234, |(), ()| ());
+        assert_eq!(builder.display_set(union), "[1, 2, 3, 4]");
+        let union = builder.union(None, set2457, |(), ()| ());
+        assert_eq!(builder.display_set(union), "[2, 4, 5, 7]");
+        let union = builder.union(set1, set1234, |(), ()| ());
+        assert_eq!(builder.display_set(union), "[1, 2, 3, 4]");
+        let union = builder.union(set1, set2457, |(), ()| ());
+        assert_eq!(builder.display_set(union), "[1, 2, 4, 5, 7]");
+        let union = builder.union(set2, set1234, |(), ()| ());
+        assert_eq!(builder.display_set(union), "[1, 2, 3, 4]");
+        let union = builder.union(set2, set2457, |(), ()| ());
+        assert_eq!(builder.display_set(union), "[2, 4, 5, 7]");
+        let union = builder.union(set1234, set2457, |(), ()| ());
+        assert_eq!(builder.display_set(union), "[1, 2, 3, 4, 5, 7]");
+    }
+
+    // ----
+    // Maps
+
+    impl<I, K, V> ListStorage<I, K, V>
+    where
+        I: Idx,
+        K: Display,
+        V: Display,
+    {
+        fn display(&self, list: Option<I>) -> String {
+            let mut result = String::new();
+            result.push('[');
+            for (key, value) in self.iter(list) {
+                if result.len() > 1 {
+                    result.push_str(", ");
+                }
+                write!(&mut result, "{}:{}", key, value).unwrap();
+            }
+            result.push(']');
+            result
+        }
+    }
+
+    #[test]
+    fn can_insert_into_map() {
+        let mut builder = ListBuilder::<TestIndex, u16, u16>::default();
+
+        // Build up the map in order
+        let map1 = builder.insert(None, 1, 1);
+        let map12 = builder.insert(map1, 2, 2);
+        let map123 = builder.insert(map12, 3, 3);
+        let map1232 = builder.insert(map123, 2, 4);
+        assert_eq!(builder.display(None), "[]");
+        assert_eq!(builder.display(map1), "[1:1]");
+        assert_eq!(builder.display(map12), "[1:1, 2:2]");
+        assert_eq!(builder.display(map123), "[1:1, 2:2, 3:3]");
+        assert_eq!(builder.display(map1232), "[1:1, 2:4, 3:3]");
+
+        // And in reverse order
+        let map3 = builder.insert(None, 3, 3);
+        let map32 = builder.insert(map3, 2, 2);
+        let map321 = builder.insert(map32, 1, 1);
+        let map3212 = builder.insert(map321, 2, 4);
+        assert_eq!(builder.display(None), "[]");
+        assert_eq!(builder.display(map3), "[3:3]");
+        assert_eq!(builder.display(map32), "[2:2, 3:3]");
+        assert_eq!(builder.display(map321), "[1:1, 2:2, 3:3]");
+        assert_eq!(builder.display(map3212), "[1:1, 2:4, 3:3]");
+    }
+
+    #[test]
+    fn can_insert_if_needed_into_map() {
+        let mut builder = ListBuilder::<TestIndex, u16, u16>::default();
+
+        // Build up the map in order
+        let map1 = builder.insert_if_needed(None, 1, 1);
+        let map12 = builder.insert_if_needed(map1, 2, 2);
+        let map123 = builder.insert_if_needed(map12, 3, 3);
+        let map1232 = builder.insert_if_needed(map123, 2, 4);
+        assert_eq!(builder.display(None), "[]");
+        assert_eq!(builder.display(map1), "[1:1]");
+        assert_eq!(builder.display(map12), "[1:1, 2:2]");
+        assert_eq!(builder.display(map123), "[1:1, 2:2, 3:3]");
+        assert_eq!(builder.display(map1232), "[1:1, 2:2, 3:3]");
+
+        // And in reverse order
+        let map3 = builder.insert_if_needed(None, 3, 3);
+        let map32 = builder.insert_if_needed(map3, 2, 2);
+        let map321 = builder.insert_if_needed(map32, 1, 1);
+        let map3212 = builder.insert_if_needed(map321, 2, 4);
+        assert_eq!(builder.display(None), "[]");
+        assert_eq!(builder.display(map3), "[3:3]");
+        assert_eq!(builder.display(map32), "[2:2, 3:3]");
+        assert_eq!(builder.display(map321), "[1:1, 2:2, 3:3]");
+        assert_eq!(builder.display(map3212), "[1:1, 2:2, 3:3]");
+    }
+
+    #[test]
+    fn can_intersect_maps() {
+        let mut builder = ListBuilder::<TestIndex, u16, u16>::default();
+
+        let map1 = builder.insert_if_needed(None, 1, 1);
+        let map12 = builder.insert_if_needed(map1, 2, 2);
+        let map123 = builder.insert_if_needed(map12, 3, 3);
+        let map1234 = builder.insert_if_needed(map123, 4, 4);
+
+        let map2 = builder.insert_if_needed(None, 2, 20);
+        let map24 = builder.insert_if_needed(map2, 4, 40);
+        let map245 = builder.insert_if_needed(map24, 5, 50);
+        let map2457 = builder.insert_if_needed(map245, 7, 70);
+
+        let intersection = builder.intersect(None, None, |a, b| a + b);
+        assert_eq!(builder.display(intersection), "[]");
+        let intersection = builder.intersect(None, map1234, |a, b| a + b);
+        assert_eq!(builder.display(intersection), "[]");
+        let intersection = builder.intersect(None, map2457, |a, b| a + b);
+        assert_eq!(builder.display(intersection), "[]");
+        let intersection = builder.intersect(map1, map1234, |a, b| a + b);
+        assert_eq!(builder.display(intersection), "[1:2]");
+        let intersection = builder.intersect(map1, map2457, |a, b| a + b);
+        assert_eq!(builder.display(intersection), "[]");
+        let intersection = builder.intersect(map2, map1234, |a, b| a + b);
+        assert_eq!(builder.display(intersection), "[2:22]");
+        let intersection = builder.intersect(map2, map2457, |a, b| a + b);
+        assert_eq!(builder.display(intersection), "[2:40]");
+        let intersection = builder.intersect(map1234, map2457, |a, b| a + b);
+        assert_eq!(builder.display(intersection), "[2:22, 4:44]");
+    }
+
+    #[test]
+    fn can_union_maps() {
+        let mut builder = ListBuilder::<TestIndex, u16, u16>::default();
+
+        let map1 = builder.insert_if_needed(None, 1, 1);
+        let map12 = builder.insert_if_needed(map1, 2, 2);
+        let map123 = builder.insert_if_needed(map12, 3, 3);
+        let map1234 = builder.insert_if_needed(map123, 4, 4);
+
+        let map2 = builder.insert_if_needed(None, 2, 20);
+        let map24 = builder.insert_if_needed(map2, 4, 40);
+        let map245 = builder.insert_if_needed(map24, 5, 50);
+        let map2457 = builder.insert_if_needed(map245, 7, 70);
+
+        let union = builder.union(None, None, |a, b| a + b);
+        assert_eq!(builder.display(union), "[]");
+        let union = builder.union(None, map1234, |a, b| a + b);
+        assert_eq!(builder.display(union), "[1:1, 2:2, 3:3, 4:4]");
+        let union = builder.union(None, map2457, |a, b| a + b);
+        assert_eq!(builder.display(union), "[2:20, 4:40, 5:50, 7:70]");
+        let union = builder.union(map1, map1234, |a, b| a + b);
+        assert_eq!(builder.display(union), "[1:2, 2:2, 3:3, 4:4]");
+        let union = builder.union(map1, map2457, |a, b| a + b);
+        assert_eq!(builder.display(union), "[1:1, 2:20, 4:40, 5:50, 7:70]");
+        let union = builder.union(map2, map1234, |a, b| a + b);
+        assert_eq!(builder.display(union), "[1:1, 2:22, 3:3, 4:4]");
+        let union = builder.union(map2, map2457, |a, b| a + b);
+        assert_eq!(builder.display(union), "[2:40, 4:40, 5:50, 7:70]");
+        let union = builder.union(map1234, map2457, |a, b| a + b);
+        assert_eq!(builder.display(union), "[1:1, 2:22, 3:3, 4:44, 5:50, 7:70]");
     }
 }
