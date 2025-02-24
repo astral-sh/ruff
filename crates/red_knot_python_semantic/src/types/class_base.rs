@@ -8,28 +8,28 @@ use itertools::Either;
 /// all types that would be invalid to have as a class base are
 /// transformed into [`ClassBase::unknown`]
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, salsa::Update)]
-pub enum ClassBase<'db> {
+pub(crate) enum ClassBase<'db> {
     Dynamic(DynamicType),
     Class(Class<'db>),
 }
 
 impl<'db> ClassBase<'db> {
-    pub const fn any() -> Self {
+    pub(crate) const fn any() -> Self {
         Self::Dynamic(DynamicType::Any)
     }
 
-    pub const fn unknown() -> Self {
+    pub(crate) const fn unknown() -> Self {
         Self::Dynamic(DynamicType::Unknown)
     }
 
-    pub const fn is_dynamic(self) -> bool {
+    pub(crate) const fn is_dynamic(self) -> bool {
         match self {
             ClassBase::Dynamic(_) => true,
             ClassBase::Class(_) => false,
         }
     }
 
-    pub fn display(self, db: &'db dyn Db) -> impl std::fmt::Display + 'db {
+    pub(crate) fn display(self, db: &'db dyn Db) -> impl std::fmt::Display + 'db {
         struct Display<'db> {
             base: ClassBase<'db>,
             db: &'db dyn Db,
