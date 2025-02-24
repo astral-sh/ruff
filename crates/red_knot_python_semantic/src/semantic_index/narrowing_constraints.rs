@@ -19,6 +19,10 @@
 //! means that we can use a simple [_sorted association list_][ruff_index::list] as our data
 //! structure.
 //!
+//! Because we visit the contents of each scope in source-file order, and assign scoped IDs in
+//! source-file order, that means that we will tend to visit narrowing constraints in order by
+//! their IDs. This is exactly how to get the best performance from our alist implementation.
+//!
 //! [`Constraint`]: crate::semantic_index::constraint::Constraint
 
 use ruff_index::list::{ListBuilder, ListSetIterator, ListStorage};

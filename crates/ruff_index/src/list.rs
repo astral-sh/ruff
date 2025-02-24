@@ -27,6 +27,19 @@ struct ListCell<I, K, V>(K, V, Option<I>);
 /// That said, we don't guarantee that lists are canonical — it's entirely possible for two lists
 /// with identical contents to use different list cells and have different identifiers.
 ///
+/// Given all of this, association lists have the following benefits:
+///
+/// - Lists can be represented by a single 32-bit integer (the index into the arena of the head of
+///   the list).
+/// - Lists can be cloned in constant time, since the underlying cells are immutable.
+/// - Lists can be combined quickly (for both intersection and union), especially when you already
+///   have to zip through both input lists to combine each key's values in some way.
+///
+/// There is one remaining caveat:
+///
+/// - You should construct lists in key order; doing lets you insert each value in constant time.
+///   Inserting entries in reverse order results in _quadratic_ overall time to construct the list.
+///
 /// This type provides read-only access to the lists.  Use a [`ListBuilder`] to create lists.
 #[derive(Debug, Eq, PartialEq)]
 pub struct ListStorage<I, K, V = ()> {
@@ -140,7 +153,12 @@ impl<I: Idx, K, V> ListBuilder<I, K, V> {
     /// Note that when we add a new element to a list, we might have to clone the keys and values
     /// of some existing elements. This is because list cells are immutable once created, since
     /// they might be shared across multiple lists. We must therefore create new cells for every
-    /// element that appears before the new element.
+    /// element that appears after the new element.
+    ///
+    /// That means that you should construct lists in key order, since that means that there are no
+    /// entries to duplicate for each insertion. If you construct the list in reverse order, we
+    /// will have to duplicate O(n) entries for each insertion, making it _quadratic_ to construct
+    /// the entire list.
     pub fn entry(&mut self, list: Option<I>, key: K) -> ListEntry<I, K, V>
     where
         K: Clone + Ord,
