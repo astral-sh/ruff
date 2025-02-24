@@ -277,11 +277,7 @@ def _(flag: bool):
 
 ## Union type as iterator where one union element has no `__next__` method
 
-<!-- snapshot-diagnostics -->
-
 ```py
-from typing_extensions import reveal_type
-
 class TestIter:
     def __next__(self) -> int:
         return 42
@@ -290,18 +286,14 @@ class Test:
     def __iter__(self) -> TestIter | int:
         return TestIter()
 
-# error: [not-iterable]
+# error: [not-iterable] "Object of type `Test` may not be iterable because its `__iter__` method returns an object of type `TestIter | int`, which may not have a `__next__` method"
 for x in Test():
     reveal_type(x)  # revealed: int
 ```
 
 ## Possibly-not-callable `__iter__` method
 
-<!-- snapshot-diagnostics -->
-
 ```py
-from typing_extensions import reveal_type
-
 def _(flag: bool):
     class Iterator:
         def __next__(self) -> int:
@@ -324,12 +316,12 @@ def _(flag: bool):
         else:
             __iter__: None = None
 
-    # error: [not-iterable]
+    # error: [not-iterable] "Object of type `Iterable1` may not be iterable because its `__iter__` attribute (with type `CustomCallable`) may not be callable"
     for x in Iterable1():
         # TODO... `int` might be ideal here?
         reveal_type(x)  # revealed: int | Unknown
 
-    # error: [not-iterable]
+    # error: [not-iterable] "Object of type `Iterable2` may not be iterable because its `__iter__` attribute (with type `Literal[__iter__] | None`) may not be callable"
     for y in Iterable2():
         # TODO... `int` might be ideal here?
         reveal_type(y)  # revealed: int | Unknown
@@ -373,11 +365,7 @@ for x in Bad():
 
 ## `__iter__` returns an object with a possibly unbound `__next__` method
 
-<!-- snapshot-diagnostics -->
-
 ```py
-from typing_extensions import reveal_type
-
 def _(flag: bool):
     class Iterator:
         if flag:
@@ -388,7 +376,7 @@ def _(flag: bool):
         def __iter__(self) -> Iterator:
             return Iterator()
 
-    # error: [not-iterable]
+    # error: [not-iterable] "Object of type `Iterable` may not be iterable because its `__iter__` method returns an object of type `Iterator`, which may not have a `__next__` method"
     for x in Iterable():
         reveal_type(x)  # revealed: int
 ```
@@ -442,8 +430,6 @@ def _(flag: bool):
 ## Possibly unbound `__iter__` and not-callable `__getitem__`
 
 ```py
-from typing_extensions import reveal_type
-
 def _(flag: bool):
     class Iterator:
         def __next__(self) -> int:
