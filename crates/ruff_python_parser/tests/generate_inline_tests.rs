@@ -125,7 +125,7 @@ fn install_tests(tests: &HashMap<String, Test>, target_dir: &str) -> Result<Test
         if let Some(options) = &test.options {
             let path = tests_dir.join(name).with_extension("options.json");
             if !fs::read_to_string(&path).is_ok_and(|old_contents| &old_contents == options) {
-                fs::write(&path, &options)
+                fs::write(&path, options)
                     .with_context(|| format!("Failed to write to {:?}", path.display()))?;
                 updated_files.push(path);
             }
