@@ -1,6 +1,5 @@
 name: Rule request
 description: Anything related to lint rules (proposing new rules, changes to existing rules, auto-fixes, etc.)
-labels: ["rule"]
 body:
   - type: textarea
     attributes:

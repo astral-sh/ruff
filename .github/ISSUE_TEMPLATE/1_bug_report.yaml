@@ -1,6 +1,5 @@
 name: Bug report
 description: Report an error or unexpected behavior
-labels: ["bug"]
 body:
   - type: markdown
     attributes:
@@ -27,6 +26,6 @@ body:
     attributes:
       label: Version
       description: What version of ruff are you using? (see `ruff version`)
-      placeholder: e.g., ruff 0.5.0 (244b923f6 2024-06-27)
+      placeholder: e.g., ruff 0.9.3 (90589372d 2025-01-23)
     validations:
-      required: true
+      required: false
