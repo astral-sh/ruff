@@ -429,11 +429,17 @@ pub fn lint_only(
         &parsed,
     );
 
+    let syntax_errors = if settings.preview.is_enabled() {
+        parsed.syntax_errors()
+    } else {
+        &[]
+    };
+
     LinterResult {
         messages: diagnostics_to_messages(
             diagnostics,
             parsed.errors(),
-            parsed.syntax_errors(),
+            syntax_errors,
             path,
             &locator,
             &directives,
@@ -582,12 +588,18 @@ pub fn lint_fix<'a>(
             report_failed_to_converge_error(path, transformed.source_code(), &diagnostics);
         }
 
+        let syntax_errors = if settings.preview.is_enabled() {
+            parsed.syntax_errors()
+        } else {
+            &[]
+        };
+
         return Ok(FixerResult {
             result: LinterResult {
                 messages: diagnostics_to_messages(
                     diagnostics,
                     parsed.errors(),
-                    parsed.syntax_errors(),
+                    syntax_errors,
                     path,
                     &locator,
                     &directives,

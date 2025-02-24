@@ -2653,11 +2653,35 @@ match 2:
     "
     );
 
-    // syntax error on 3.9
+    // ok on 3.9 without preview
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
         .args(["--stdin-filename", "test.py"])
         .arg("--target-version=py39")
+        .arg("-")
+        .pass_stdin(
+            r#"
+match 2:
+    case 1:
+        print("it's one")
+"#
+        ),
+        @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    "
+    );
+
+    // syntax error on 3.9 with preview
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--stdin-filename", "test.py"])
+        .arg("--target-version=py39")
+        .arg("--preview")
         .arg("-")
         .pass_stdin(
             r#"
