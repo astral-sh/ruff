@@ -302,6 +302,19 @@ class D:
 D.f()
 ```
 
+When a class method is accessed on a derived class, it is bound to that derived class:
+
+```py
+class Derived(C):
+    pass
+
+reveal_type(Derived.f)  # revealed: <bound method `f` of `Literal[Derived]`>
+reveal_type(Derived().f)  # revealed: <bound method `f` of `type[Derived]`>
+
+reveal_type(Derived.f(1))  # revealed: str
+reveal_type(Derived().f(1))  # revealed: str
+```
+
 ### Accessing the classmethod as a static member
 
 Accessing a `@classmethod`-decorated function at runtime returns a `classmethod` object. We
