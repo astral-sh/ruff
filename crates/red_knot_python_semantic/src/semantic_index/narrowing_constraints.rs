@@ -51,14 +51,12 @@ pub(crate) struct ScopedNarrowingConstraintClause(ScopedConstraintId);
 
 impl ScopedNarrowingConstraintClause {
     /// Returns (the ID of) the `Constraint` for this clause
-    #[inline]
     pub(crate) fn constraint(self) -> ScopedConstraintId {
         self.0
     }
 }
 
 impl From<ScopedConstraintId> for ScopedNarrowingConstraintClause {
-    #[inline]
     fn from(constraint: ScopedConstraintId) -> ScopedNarrowingConstraintClause {
         ScopedNarrowingConstraintClause(constraint)
     }
@@ -128,7 +126,6 @@ impl NarrowingConstraints {
 impl Iterator for NarrowingConstraintsIterator<'_> {
     type Item = ScopedNarrowingConstraintClause;
 
-    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let (key, ()) = self.wrapped.next()?;
         Some(*key)
