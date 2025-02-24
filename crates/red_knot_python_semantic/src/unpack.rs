@@ -41,7 +41,6 @@ pub(crate) struct Unpack<'db> {
 
     /// The ingredient representing the value expression of the unpacking. For example, in
     /// `(a, b) = (1, 2)`, the value expression is `(1, 2)`.
-    #[no_eq]
     pub(crate) value: UnpackValue<'db>,
 
     count: countme::Count<Unpack<'static>>,
@@ -60,7 +59,7 @@ impl<'db> Unpack<'db> {
 }
 
 /// The expression that is being unpacked.
-#[derive(Clone, Copy, Debug, Hash)]
+#[derive(Clone, Copy, Debug, Hash, salsa::Update)]
 pub(crate) enum UnpackValue<'db> {
     /// An iterable expression like the one in a `for` loop or a comprehension.
     Iterable(Expression<'db>),
