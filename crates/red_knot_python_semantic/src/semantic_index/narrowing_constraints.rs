@@ -41,7 +41,7 @@ pub(crate) struct ScopedNarrowingConstraintId;
 /// One of the clauses in a narrowing constraint, which is a [`Constraint`] that constrains the
 /// type of the binding's symbol.
 ///
-/// Note that those [`Constraint`]s are stored in [their own
+/// Note that those [`Constraint`]s are stored in [their own per-scope
 /// arena][crate::semantic_index::constraint::Constraints], so internally we use a
 /// [`ScopedConstraintId`] to refer to the underlying constraint.
 ///
@@ -64,8 +64,7 @@ impl From<ScopedConstraintId> for ScopedNarrowingConstraintClause {
     }
 }
 
-/// A collection of narrowing constraints. This is currently stored in `UseDefMap`, which means
-/// that we maintain a separate set of narrowing constraints for each scope in a file.
+/// A collection of narrowing constraints for a given scope.
 #[derive(Debug, Eq, PartialEq)]
 pub(crate) struct NarrowingConstraints {
     lists: ListStorage<ScopedNarrowingConstraintId, ScopedNarrowingConstraintClause, ()>,
