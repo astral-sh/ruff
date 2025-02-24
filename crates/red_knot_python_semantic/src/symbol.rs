@@ -546,7 +546,9 @@ fn symbol_from_bindings_impl<'db>(
                 .collect();
 
             let binding_ty = binding_type(db, binding);
-            if !constraint_tys.is_empty() {
+            if constraint_tys.is_empty() {
+                Some(binding_ty)
+            } else {
                 let intersection_ty = constraint_tys
                     .into_iter()
                     .rev()
@@ -556,8 +558,6 @@ fn symbol_from_bindings_impl<'db>(
                     )
                     .build();
                 Some(intersection_ty)
-            } else {
-                Some(binding_ty)
             }
         },
     );
