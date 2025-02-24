@@ -89,9 +89,12 @@ c_instance = C()
 
 reveal_type(c_instance.declared_and_bound)  # revealed: str | None
 
+# Note that both mypy and pyright show no error in this case! So we may reconsider this in
+# the future, if it turns out to produce too many false positives. We currently emit:
 # error: [unresolved-attribute] "Attribute `declared_and_bound` can only be accessed on instances, not on the class object `Literal[C]` itself."
 reveal_type(C.declared_and_bound)  # revealed: Unknown
 
+# Same as above. Mypy and pyright do not show an error here.
 # error: [invalid-attribute-access] "Cannot assign to instance attribute `declared_and_bound` from the class object `Literal[C]`"
 C.declared_and_bound = "overwritten on class"
 
@@ -112,6 +115,7 @@ c_instance = C()
 
 reveal_type(c_instance.only_declared)  # revealed: str
 
+# Mypy and pyright do not show an error here. We treat this as a pure instance variable.
 # error: [unresolved-attribute] "Attribute `only_declared` can only be accessed on instances, not on the class object `Literal[C]` itself."
 reveal_type(C.only_declared)  # revealed: Unknown
 

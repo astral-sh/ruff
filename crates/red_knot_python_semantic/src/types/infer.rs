@@ -3714,14 +3714,14 @@ impl<'db> TypeInferenceBuilder<'db> {
                 LookupError::Unbound => {
                     let bound_on_instance = match value_type {
                     Type::ClassLiteral(class) => {
-                        !class.class().instance_member(self.db(), attr).0.is_unbound()
+                        !class.class().instance_member(db, attr).0.is_unbound()
                     }
                     Type::SubclassOf(subclass_of @ SubclassOfType { .. }) => {
                         match subclass_of.subclass_of() {
                             ClassBase::Class(class) => {
-                                !class.instance_member(self.db(), attr).0.is_unbound()
+                                !class.instance_member(db, attr).0.is_unbound()
                             }
-                            ClassBase::Dynamic(_) => unreachable!("For any symbol, lookup on a dynamic type will return a bound symbol of the same type"),
+                            ClassBase::Dynamic(_) => unreachable!("Attribute lookup on a dynamic `SubclassOf` type should always return a bound symbol"),
                         }
                     }
                     _ => false,
@@ -3729,21 +3729,21 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                 if bound_on_instance {
                     self.context.report_lint(
-                            &UNRESOLVED_ATTRIBUTE,
-                            attribute,
-                            format_args!(
-                                "Attribute `{}` can only be accessed on instances, not on the class object `{}` itself.",
-                                attr.id,
-                                value_type.display(self.db())
-                            ),
-                        );
+                        &UNRESOLVED_ATTRIBUTE,
+                        attribute,
+                        format_args!(
+                            "Attribute `{}` can only be accessed on instances, not on the class object `{}` itself.",
+                            attr.id,
+                            value_type.display(db)
+                        ),
+                    );
                 } else {
                     self.context.report_lint(
                         &UNRESOLVED_ATTRIBUTE,
                         attribute,
                         format_args!(
                             "Type `{}` has no attribute `{}`",
-                            value_type.display(self.db()),
+                            value_type.display(db),
                             attr.id
                         ),
                     );
@@ -3784,13 +3784,13 @@ impl<'db> TypeInferenceBuilder<'db> {
                         let instance_member = instance.class().instance_member(self.db(), attr);
                         if instance_member.is_class_var() {
                             self.context.report_lint(
-                            &INVALID_ATTRIBUTE_ACCESS,
-                            attribute,
-                            format_args!(
-                                "Cannot assign to ClassVar `{attr}` from an instance of type `{ty}`",
-                                ty = value_ty.display(self.db()),
-                            ),
-                        );
+                                &INVALID_ATTRIBUTE_ACCESS,
+                                attribute,
+                                format_args!(
+                                    "Cannot assign to ClassVar `{attr}` from an instance of type `{ty}`",
+                                    ty = value_ty.display(self.db()),
+                                ),
+                            );
                         }
 
                         instance_member.0
@@ -3804,7 +3804,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 Type::SubclassOf(subclass_of @ SubclassOfType { .. }) => {
                                     match subclass_of.subclass_of() {
                                         ClassBase::Class(class) => Some(class),
-                                        ClassBase::Dynamic(_) => unreachable!("For any symbol, lookup on a dynamic type will return a bound symbol of the same type"),
+                                        ClassBase::Dynamic(_) => unreachable!("Attribute lookup on a dynamic `SubclassOf` type should always return a bound symbol"),
                                     }
                                 }
                                 _ => None,
