@@ -115,13 +115,21 @@ fn install_tests(tests: &HashMap<String, Test>, target_dir: &str) -> Result<Test
             Some(path) => path.clone(),
             None => tests_dir.join(name).with_extension("py"),
         };
-        match fs::read_to_string(&path) {
-            Ok(old_contents) if old_contents == test.contents => continue,
-            _ => {}
+
+        if !fs::read_to_string(&path).is_ok_and(|old_contents| old_contents == test.contents) {
+            fs::write(&path, &test.contents)
+                .with_context(|| format!("Failed to write to {:?}", path.display()))?;
+            updated_files.push(path);
         }
-        fs::write(&path, &test.contents)
-            .with_context(|| format!("Failed to write to {:?}", path.display()))?;
-        updated_files.push(path);
+
+        if let Some(options) = &test.options {
+            let path = tests_dir.join(name).with_extension("options.json");
+            if !fs::read_to_string(&path).is_ok_and(|old_contents| &old_contents == options) {
+                fs::write(&path, &options)
+                    .with_context(|| format!("Failed to write to {:?}", path.display()))?;
+                updated_files.push(path);
+            }
+        }
     }
 
     Ok(TestFiles {
@@ -192,6 +200,7 @@ enum TestKind {
 struct Test {
     name: String,
     contents: String,
+    options: Option<String>,
     kind: TestKind,
 }
 
@@ -214,6 +223,11 @@ fn collect_tests(text: &str) -> Vec<Test> {
             _ => continue,
         };
 
+        let (name, options) = match name.split_once(' ') {
+            Some((name, options)) => (name, Some(options.to_string())),
+            None => (name, None),
+        };
+
         let text: String = comment_block[1..]
             .iter()
             .cloned()
@@ -226,6 +240,7 @@ fn collect_tests(text: &str) -> Vec<Test> {
         tests.push(Test {
             name: name.to_string(),
             contents: text,
+            options,
             kind,
         });
     }

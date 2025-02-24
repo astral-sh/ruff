@@ -1,0 +1,64 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/match_before_py310.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..34,
+        body: [
+            Match(
+                StmtMatch {
+                    range: 0..33,
+                    subject: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 6..7,
+                            value: Int(
+                                2,
+                            ),
+                        },
+                    ),
+                    cases: [
+                        MatchCase {
+                            range: 13..33,
+                            pattern: MatchValue(
+                                PatternMatchValue {
+                                    range: 18..19,
+                                    value: NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 18..19,
+                                            value: Int(
+                                                1,
+                                            ),
+                                        },
+                                    ),
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Pass(
+                                    StmtPass {
+                                        range: 29..33,
+                                    },
+                                ),
+                            ],
+                        },
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+## Version-Related Errors
+
+  |
+1 | / match 2:
+2 | |     case 1:
+3 | |         pass
+  | |____________^ Syntax Error: Cannot use `match` statement on Python 3.9 (syntax was new in Python 3.10)
+  |

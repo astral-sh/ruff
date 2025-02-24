@@ -5,7 +5,7 @@ use std::path::Path;
 
 use ruff_annotate_snippets::{Level, Renderer, Snippet};
 use ruff_python_ast::visitor::source_order::{walk_module, SourceOrderVisitor, TraversalSignal};
-use ruff_python_ast::{AnyNodeRef, Mod};
+use ruff_python_ast::{AnyNodeRef, Mod, PythonVersion};
 use ruff_python_parser::{parse_unchecked, Mode, ParseErrorType, ParseOptions, Token};
 use ruff_source_file::{LineIndex, OneIndexed, SourceCode};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
@@ -33,8 +33,13 @@ fn inline_err() {
 /// Asserts that the parser generates no syntax errors for a valid program.
 /// Snapshots the AST.
 fn test_valid_syntax(input_path: &Path) {
+    let options_path = input_path.with_extension("options.json");
+    let options = fs::read_to_string(options_path)
+        .ok()
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or_else(|| ParseOptions::from(Mode::Module));
     let source = fs::read_to_string(input_path).expect("Expected test file to exist");
-    let parsed = parse_unchecked(&source, ParseOptions::from(Mode::Module));
+    let parsed = parse_unchecked(&source, options);
 
     if !parsed.is_valid() {
         let line_index = LineIndex::from_source_text(&source);
@@ -77,11 +82,20 @@ fn test_valid_syntax(input_path: &Path) {
 /// Assert that the parser generates at least one syntax error for the given input file.
 /// Snapshots the AST and the error messages.
 fn test_invalid_syntax(input_path: &Path) {
+    let options_path = input_path.with_extension("options.json");
+    let options = fs::read_to_string(options_path)
+        .ok()
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or_else(|| {
+            ParseOptions::from(Mode::Module).with_target_version(PythonVersion::PY313)
+        });
     let source = fs::read_to_string(input_path).expect("Expected test file to exist");
-    let parsed = parse_unchecked(&source, ParseOptions::from(Mode::Module));
+    let parsed = parse_unchecked(&source, options);
+
+    let is_valid = parsed.is_valid() && parsed.unsupported_syntax_errors().is_empty();
 
     assert!(
-        !parsed.is_valid(),
+        !is_valid,
         "{input_path:?}: Expected parser to generate at least one syntax error for a program containing syntax errors."
     );
 
@@ -104,6 +118,23 @@ fn test_invalid_syntax(input_path: &Path) {
             CodeFrame {
                 range: error.location,
                 error,
+                source_code: &source_code,
+            }
+        )
+        .unwrap();
+    }
+
+    if !parsed.unsupported_syntax_errors().is_empty() {
+        writeln!(&mut output, "## Unsupported Syntax Errors\n").unwrap();
+    }
+
+    for error in parsed.unsupported_syntax_errors() {
+        writeln!(
+            &mut output,
+            "{}\n",
+            CodeFrame {
+                range: error.range,
+                error: &ParseErrorType::OtherError(error.to_string()),
                 source_code: &source_code,
             }
         )

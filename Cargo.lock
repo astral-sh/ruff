@@ -3094,6 +3094,8 @@ dependencies = [
  "ruff_source_file",
  "ruff_text_size",
  "rustc-hash 2.1.1",
+ "serde",
+ "serde_json",
  "static_assertions",
  "unicode-ident",
  "unicode-normalization",

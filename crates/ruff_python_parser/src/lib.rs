@@ -660,7 +660,8 @@ impl FusedIterator for TokenIterWithContext<'_> {}
 /// Control in the different modes by which a source file can be parsed.
 ///
 /// The mode argument specifies in what way code must be parsed.
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum Mode {
     /// The code consists of a sequence of statements.
     Module,

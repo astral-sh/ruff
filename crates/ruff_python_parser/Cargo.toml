@@ -13,7 +13,7 @@ license = { workspace = true }
 [lib]
 
 [dependencies]
-ruff_python_ast = { workspace = true }
+ruff_python_ast = { workspace = true, features = ["serde"] }
 ruff_python_trivia = { workspace = true }
 ruff_text_size = { workspace = true }
 
@@ -22,6 +22,7 @@ bstr = { workspace = true }
 compact_str = { workspace = true }
 memchr = { workspace = true }
 rustc-hash = { workspace = true }
+serde = { workspace = true }
 static_assertions = { workspace = true }
 unicode-ident = { workspace = true }
 unicode_names2 = { workspace = true }
@@ -33,6 +34,7 @@ ruff_source_file = { workspace = true }
 
 anyhow = { workspace = true }
 insta = { workspace = true, features = ["glob"] }
+serde_json = { workspace = true }
 walkdir = { workspace = true }
 
 [lints]

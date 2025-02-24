@@ -20,11 +20,13 @@ use crate::{AsMode, Mode};
 ///
 /// let options = ParseOptions::from(PySourceType::Python);
 /// ```
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Deserialize)]
 pub struct ParseOptions {
     /// Specify the mode in which the code will be parsed.
+    #[serde(default = "default_mode")]
     pub(crate) mode: Mode,
     /// Target version for detecting version-related syntax errors.
+    #[serde(default)]
     pub(crate) target_version: PythonVersion,
 }
 
@@ -52,4 +54,8 @@ impl From<PySourceType> for ParseOptions {
             target_version: PythonVersion::default(),
         }
     }
+}
+
+fn default_mode() -> Mode {
+    Mode::Module
 }
