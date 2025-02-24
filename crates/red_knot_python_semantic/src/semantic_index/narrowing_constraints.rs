@@ -93,7 +93,7 @@ impl NarrowingConstraintsBuilder {
         constraint: Option<ScopedNarrowingConstraintId>,
         clause: ScopedNarrowingConstraintClause,
     ) -> Option<ScopedNarrowingConstraintId> {
-        self.lists.insert_if_needed(constraint, clause, ())
+        self.lists.entry(constraint, clause).or_insert_default()
     }
 
     /// Returns the intersection of two narrowing constraints. The result contains the clauses that
