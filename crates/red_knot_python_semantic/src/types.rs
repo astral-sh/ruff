@@ -1948,13 +1948,29 @@ impl<'db> Type<'db> {
                             )
                         },
                     ]),
-                    Some(match arguments.first_argument() {
-                        Some(ty) if ty.is_none(db) => Type::FunctionLiteral(function),
-                        Some(instance) => Type::Callable(CallableType::BoundMethod(
-                            BoundMethodType::new(db, function, instance),
-                        )),
-                        _ => Type::unknown(),
-                    }),
+                    if function.has_known_class_decorator(db, KnownClass::Classmethod)
+                        && function.decorators(db).len() == 1
+                    {
+                        if let Some(owner) = arguments.second_argument() {
+                            Some(Type::Callable(CallableType::BoundMethod(
+                                BoundMethodType::new(db, function, owner),
+                            )))
+                        } else if let Some(instance) = arguments.first_argument() {
+                            Some(Type::Callable(CallableType::BoundMethod(
+                                BoundMethodType::new(db, function, instance.to_meta_type(db)),
+                            )))
+                        } else {
+                            Some(Type::unknown())
+                        }
+                    } else {
+                        Some(match arguments.first_argument() {
+                            Some(ty) if ty.is_none(db) => Type::FunctionLiteral(function),
+                            Some(instance) => Type::Callable(CallableType::BoundMethod(
+                                BoundMethodType::new(db, function, instance),
+                            )),
+                            _ => Type::unknown(),
+                        })
+                    },
                 );
 
                 let binding = bind_call(db, arguments, &signature, self);
@@ -2004,18 +2020,40 @@ impl<'db> Type<'db> {
                         },
                     ]),
                     Some(
-                        match (arguments.first_argument(), arguments.second_argument()) {
-                            (Some(function @ Type::FunctionLiteral(_)), Some(instance))
-                                if instance.is_none(db) =>
+                        if let Some(function_ty @ Type::FunctionLiteral(function)) =
+                            arguments.first_argument()
+                        {
+                            if function.has_known_class_decorator(db, KnownClass::Classmethod)
+                                && function.decorators(db).len() == 1
                             {
-                                function
+                                if let Some(owner) = arguments.third_argument() {
+                                    Type::Callable(CallableType::BoundMethod(BoundMethodType::new(
+                                        db, function, owner,
+                                    )))
+                                } else if let Some(instance) = arguments.second_argument() {
+                                    Type::Callable(CallableType::BoundMethod(BoundMethodType::new(
+                                        db,
+                                        function,
+                                        instance.to_meta_type(db),
+                                    )))
+                                } else {
+                                    Type::unknown()
+                                }
+                            } else {
+                                if let Some(instance) = arguments.second_argument() {
+                                    if instance.is_none(db) {
+                                        function_ty
+                                    } else {
+                                        Type::Callable(CallableType::BoundMethod(
+                                            BoundMethodType::new(db, function, instance),
+                                        ))
+                                    }
+                                } else {
+                                    Type::unknown()
+                                }
                             }
-                            (Some(Type::FunctionLiteral(function)), Some(instance)) => {
-                                Type::Callable(CallableType::BoundMethod(BoundMethodType::new(
-                                    db, function, instance,
-                                )))
-                            }
-                            _ => Type::unknown(),
+                        } else {
+                            Type::unknown()
                         },
                     ),
                 );
@@ -2106,6 +2144,10 @@ impl<'db> Type<'db> {
                                 binding.set_return_type(casted_ty);
                             }
                         };
+                    }
+
+                    Some(KnownFunction::Overload) => {
+                        binding.set_return_type(todo_type!("overload(..) return type"));
                     }
 
                     Some(KnownFunction::GetattrStatic) => {
@@ -2853,6 +2895,7 @@ pub enum KnownClass {
     Property,
     BaseException,
     BaseExceptionGroup,
+    Classmethod,
     // Types
     GenericAlias,
     ModuleType,
@@ -2937,7 +2980,8 @@ impl<'db> KnownClass {
             | Self::Counter
             | Self::DefaultDict
             | Self::Deque
-            | Self::Float => Truthiness::Ambiguous,
+            | Self::Float
+            | Self::Classmethod => Truthiness::Ambiguous,
         }
     }
 
@@ -2961,6 +3005,7 @@ impl<'db> KnownClass {
             Self::Property => "property",
             Self::BaseException => "BaseException",
             Self::BaseExceptionGroup => "BaseExceptionGroup",
+            Self::Classmethod => "classmethod",
             Self::GenericAlias => "GenericAlias",
             Self::ModuleType => "ModuleType",
             Self::FunctionType => "FunctionType",
@@ -3042,6 +3087,7 @@ impl<'db> KnownClass {
             | Self::Dict
             | Self::BaseException
             | Self::BaseExceptionGroup
+            | Self::Classmethod
             | Self::Slice
             | Self::Range
             | Self::Property => KnownModule::Builtins,
@@ -3114,6 +3160,7 @@ impl<'db> KnownClass {
             | KnownClass::Property
             | KnownClass::BaseException
             | KnownClass::BaseExceptionGroup
+            | KnownClass::Classmethod
             | KnownClass::GenericAlias
             | KnownClass::ModuleType
             | KnownClass::FunctionType
@@ -3176,6 +3223,7 @@ impl<'db> KnownClass {
             | Self::SupportsIndex
             | Self::BaseException
             | Self::BaseExceptionGroup
+            | Self::Classmethod
             | Self::TypeVar => false,
         }
     }
@@ -3200,8 +3248,10 @@ impl<'db> KnownClass {
             "list" => Self::List,
             "slice" => Self::Slice,
             "range" => Self::Range,
+            "property" => Self::Property,
             "BaseException" => Self::BaseException,
             "BaseExceptionGroup" => Self::BaseExceptionGroup,
+            "classmethod" => Self::Classmethod,
             "GenericAlias" => Self::GenericAlias,
             "NoneType" => Self::NoneType,
             "ModuleType" => Self::ModuleType,
@@ -3266,6 +3316,7 @@ impl<'db> KnownClass {
             | Self::BaseException
             | Self::EllipsisType
             | Self::BaseExceptionGroup
+            | Self::Classmethod
             | Self::FunctionType
             | Self::MethodType
             | Self::MethodWrapperType
@@ -3919,8 +3970,18 @@ pub struct FunctionType<'db> {
 
 #[salsa::tracked]
 impl<'db> FunctionType<'db> {
-    pub fn has_decorator(self, db: &dyn Db, decorator: Type<'_>) -> bool {
-        self.decorators(db).contains(&decorator)
+    pub fn has_known_class_decorator(self, db: &dyn Db, decorator: KnownClass) -> bool {
+        self.decorators(db).iter().any(|d| {
+            d.into_class_literal()
+                .is_some_and(|c| c.class.is_known(db, decorator))
+        })
+    }
+
+    pub fn has_known_function_decorator(self, db: &dyn Db, decorator: KnownFunction) -> bool {
+        self.decorators(db).iter().any(|d| {
+            d.into_function_literal()
+                .is_some_and(|f| f.is_known(db, decorator))
+        })
     }
 
     /// Typed externally-visible signature for this function.
@@ -3937,13 +3998,23 @@ impl<'db> FunctionType<'db> {
     /// would depend on the function's AST and rerun for every change in that file.
     #[salsa::tracked(return_ref)]
     pub fn signature(self, db: &'db dyn Db) -> Signature<'db> {
-        let function_stmt_node = self.body_scope(db).node(db).expect_function();
         let internal_signature = self.internal_signature(db);
-        if function_stmt_node.decorator_list.is_empty() {
-            return internal_signature;
+
+        let decorators = self.decorators(db);
+        let mut decorators = decorators.iter();
+
+        if let Some(d) = decorators.next() {
+            if d.into_class_literal()
+                .is_some_and(|c| c.class.is_known(db, KnownClass::Classmethod))
+                && decorators.next().is_none()
+            {
+                internal_signature
+            } else {
+                Signature::todo("return type of decorated function")
+            }
+        } else {
+            internal_signature
         }
-        // TODO process the effect of decorators on the signature
-        Signature::todo()
     }
 
     /// Typed internally-visible signature for this function.
@@ -3989,6 +4060,8 @@ pub enum KnownFunction {
     AssertType,
     /// `typing(_extensions).cast`
     Cast,
+    /// `typing(_extensions).overload`
+    Overload,
 
     /// `inspect.getattr_static`
     GetattrStatic,
@@ -4036,6 +4109,7 @@ impl KnownFunction {
             "no_type_check" => Self::NoTypeCheck,
             "assert_type" => Self::AssertType,
             "cast" => Self::Cast,
+            "overload" => Self::Overload,
             "getattr_static" => Self::GetattrStatic,
             "static_assert" => Self::StaticAssert,
             "is_subtype_of" => Self::IsSubtypeOf,
@@ -4063,7 +4137,12 @@ impl KnownFunction {
                 }
             },
             Self::Len | Self::Repr => module.is_builtins(),
-            Self::AssertType | Self::Cast | Self::RevealType | Self::Final | Self::NoTypeCheck => {
+            Self::AssertType
+            | Self::Cast
+            | Self::Overload
+            | Self::RevealType
+            | Self::Final
+            | Self::NoTypeCheck => {
                 matches!(module, KnownModule::Typing | KnownModule::TypingExtensions)
             }
             Self::GetattrStatic => {
@@ -4100,6 +4179,7 @@ impl KnownFunction {
             Self::ConstraintFunction(_)
             | Self::Len
             | Self::Repr
+            | Self::Overload
             | Self::Final
             | Self::NoTypeCheck
             | Self::RevealType
@@ -4767,10 +4847,17 @@ impl<'db> Class<'db> {
 
                     if let Some(function) = declared_ty.into_function_literal() {
                         // TODO: Eventually, we are going to process all decorators correctly. This is
-                        // just a temporary heuristic to provide a broad categorization into properties
-                        // and non-property methods.
-                        if function.has_decorator(db, KnownClass::Property.to_class_literal(db)) {
+                        // just a temporary heuristic to provide a broad categorization
+
+                        if function.has_known_class_decorator(db, KnownClass::Classmethod)
+                            && function.decorators(db).len() == 1
+                        {
+                            SymbolAndQualifiers(Symbol::bound(declared_ty), qualifiers)
+                        } else if function.has_known_class_decorator(db, KnownClass::Property) {
                             SymbolAndQualifiers::todo("@property")
+                        } else if function.has_known_function_decorator(db, KnownFunction::Overload)
+                        {
+                            SymbolAndQualifiers::todo("overloaded method")
                         } else if !function.decorators(db).is_empty() {
                             SymbolAndQualifiers::todo("decorated method")
                         } else {
