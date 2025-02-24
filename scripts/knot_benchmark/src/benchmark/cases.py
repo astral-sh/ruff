@@ -75,7 +75,7 @@ class Knot(Tool):
         if project.include:
             command.extend(["--project", project.include[0]])
 
-        command.extend(["--venv-path", str(venv.path)])
+        command.extend(["--python", str(venv.path)])
 
         return Command(
             name="knot",

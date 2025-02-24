@@ -4,7 +4,7 @@ use camino::Utf8Path;
 use colored::Colorize;
 use parser as test_parser;
 use red_knot_python_semantic::types::check_types;
-use red_knot_python_semantic::{Program, ProgramSettings, SearchPathSettings, SitePackages};
+use red_knot_python_semantic::{Program, ProgramSettings, PythonPath, SearchPathSettings};
 use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig, ParseDiagnostic};
 use ruff_db::files::{system_path_to_file, File, Files};
 use ruff_db::panic::catch_unwind;
@@ -180,7 +180,7 @@ fn run_test(
                     src_roots: vec![src_path],
                     extra_paths: vec![],
                     custom_typeshed: custom_typeshed_path,
-                    site_packages: SitePackages::Known(vec![]),
+                    python_path: PythonPath::Known(vec![]),
                 },
             },
         )

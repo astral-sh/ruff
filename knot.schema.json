@@ -62,6 +62,13 @@
             "type": "string"
           }
         },
+        "python": {
+          "description": "Path to the Python installation from which Red Knot resolves type information and third-party dependencies.\n\nRed Knot will search in the path's `site-packages` directories for type information and third-party imports.\n\nThis option is commonly used to specify the path to a virtual environment.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "python-platform": {
           "description": "Specifies the target platform that will be used to execute the source code. If specified, Red Knot will tailor its use of type stub files, which conditionalize type definitions based on the platform.\n\nIf no platform is specified, knot will use `all` or the current platform in the LSP use case.",
           "anyOf": [
@@ -86,13 +93,6 @@
         },
         "typeshed": {
           "description": "Optional path to a \"typeshed\" directory on disk for us to use for standard-library types. If this is not provided, we will fallback to our vendored typeshed stubs for the stdlib, bundled as a zip file in the binary",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "venv-path": {
-          "description": "The path to the user's `site-packages` directory, where third-party packages from ``PyPI`` are installed.",
           "type": [
             "string",
             "null"

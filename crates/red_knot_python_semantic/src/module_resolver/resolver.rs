@@ -12,7 +12,7 @@ use crate::db::Db;
 use crate::module_name::ModuleName;
 use crate::module_resolver::typeshed::{vendored_typeshed_versions, TypeshedVersions};
 use crate::site_packages::VirtualEnvironment;
-use crate::{Program, SearchPathSettings, SitePackages};
+use crate::{Program, PythonPath, SearchPathSettings};
 
 use super::module::{Module, ModuleKind};
 use super::path::{ModulePath, SearchPath, SearchPathValidationError};
@@ -171,7 +171,7 @@ impl SearchPaths {
             extra_paths,
             src_roots,
             custom_typeshed: typeshed,
-            site_packages: site_packages_paths,
+            python_path,
         } = settings;
 
         let system = db.system();
@@ -222,16 +222,16 @@ impl SearchPaths {
 
         static_paths.push(stdlib_path);
 
-        let site_packages_paths = match site_packages_paths {
-            SitePackages::Derived { venv_path } => {
+        let site_packages_paths = match python_path {
+            PythonPath::SysPrefix(sys_prefix) => {
                 // TODO: We may want to warn here if the venv's python version is older
                 //  than the one resolved in the program settings because it indicates
                 //  that the `target-version` is incorrectly configured or that the
                 //  venv is out of date.
-                VirtualEnvironment::new(venv_path, system)
+                VirtualEnvironment::new(sys_prefix, system)
                     .and_then(|venv| venv.site_packages_directories(system))?
             }
-            SitePackages::Known(paths) => paths
+            PythonPath::Known(paths) => paths
                 .iter()
                 .map(|path| canonicalize(path, system))
                 .collect(),
@@ -1310,7 +1310,7 @@ mod tests {
                     extra_paths: vec![],
                     src_roots: vec![src.clone()],
                     custom_typeshed: Some(custom_typeshed),
-                    site_packages: SitePackages::Known(vec![site_packages]),
+                    python_path: PythonPath::Known(vec![site_packages]),
                 },
             },
         )
@@ -1816,10 +1816,7 @@ not_a_directory
                     extra_paths: vec![],
                     src_roots: vec![SystemPathBuf::from("/src")],
                     custom_typeshed: None,
-                    site_packages: SitePackages::Known(vec![
-                        venv_site_packages,
-                        system_site_packages,
-                    ]),
+                    python_path: PythonPath::Known(vec![venv_site_packages, system_site_packages]),
                 },
             },
         )
