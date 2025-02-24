@@ -137,6 +137,11 @@ impl<I: Idx, K, V> ListBuilder<I, K, V> {
 
 impl<I: Idx, K: Clone + Ord, V: Clone> ListBuilder<I, K, V> {
     /// Returns an entry pointing at where `key` would be inserted into a list.
+    ///
+    /// Note that when we add a new element to a list, we might have to clone the keys and values
+    /// of some existing elements. This is because list cells are immutable once created, since
+    /// they might be shared across multiple lists. We must therefore create new cells for every
+    /// element that appears before the new element.
     pub fn entry(&mut self, list: Option<I>, key: K) -> ListEntry<I, K, V> {
         self.scratch.clear();
 
