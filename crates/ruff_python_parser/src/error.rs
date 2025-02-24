@@ -427,10 +427,19 @@ impl std::fmt::Display for LexicalErrorType {
     }
 }
 
+/// Represents a version-related syntax error detected during parsing.
+///
+/// An example of a version-related error is the use of a `match` statement before Python 3.10, when
+/// it was first introduced. See [`SyntaxErrorKind`] for other kinds of errors.
 #[derive(Debug, PartialEq, Clone)]
 pub struct SyntaxError {
     pub kind: SyntaxErrorKind,
     pub range: TextRange,
+    /// The target [`PythonVersion`] for which this error was detected.
+    ///
+    /// This is different from the version reported by the [`version`](SyntaxError::version) method,
+    /// which is the earliest allowed version for this piece of syntax. The `target_version` is
+    /// primarily used for user-facing error messages.
     pub target_version: PythonVersion,
 }
 
