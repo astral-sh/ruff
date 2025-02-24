@@ -123,6 +123,12 @@ impl<I: Idx, K, V> ListBuilder<I, K, V> {
         self.storage
     }
 
+    /// Adds a new cell to the list.
+    ///
+    /// Adding an element always returns a non-empty list, which means we could technically use `I`
+    /// as our return type, since we never return `None`. However, for consistency with our other
+    /// methods, we always use `Option<I>` as the return type for any method that can return a
+    /// list.
     #[allow(clippy::unnecessary_wraps)]
     fn add_cell(&mut self, key: K, value: V, tail: Option<I>) -> Option<I> {
         Some(self.storage.cells.push(ListCell(key, value, tail)))
