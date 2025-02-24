@@ -61,7 +61,7 @@ pub(crate) fn builtin_import_shadowing(checker: &Checker, alias: &Alias) {
         name.as_str(),
         checker.source_type,
         &checker.settings.flake8_builtins.builtins_ignorelist,
-        checker.settings.target_version,
+        checker.target_version(),
     ) {
         checker.report_diagnostic(Diagnostic::new(
             BuiltinImportShadowing {

@@ -104,6 +104,8 @@ pub fn check_path(
         ));
     }
 
+    let target_version = settings.resolve_target_version(path);
+
     // Run the filesystem-based rules.
     if settings
         .rules
@@ -116,6 +118,7 @@ pub fn check_path(
             locator,
             comment_ranges,
             settings,
+            target_version,
         ));
     }
 
@@ -158,6 +161,7 @@ pub fn check_path(
                     source_type,
                     cell_offsets,
                     notebook_index,
+                    target_version,
                 ));
             }
             if use_imports {
@@ -171,6 +175,7 @@ pub fn check_path(
                     package,
                     source_type,
                     cell_offsets,
+                    target_version,
                 );
 
                 diagnostics.extend(import_diagnostics);

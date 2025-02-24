@@ -44,7 +44,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_async").join(path),
             &LinterSettings {
-                target_version: PythonVersion::PY310,
+                unresolved_target_version: PythonVersion::PY310,
                 ..LinterSettings::for_rule(Rule::AsyncFunctionWithTimeout)
             },
         )?;

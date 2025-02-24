@@ -189,7 +189,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_pyi").join(path).as_path(),
             &settings::LinterSettings {
-                target_version: PythonVersion::PY38,
+                unresolved_target_version: PythonVersion::PY38,
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;

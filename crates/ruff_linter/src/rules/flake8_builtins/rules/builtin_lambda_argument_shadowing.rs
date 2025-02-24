@@ -44,7 +44,7 @@ pub(crate) fn builtin_lambda_argument_shadowing(checker: &Checker, lambda: &Expr
             name,
             checker.source_type,
             &checker.settings.flake8_builtins.builtins_ignorelist,
-            checker.settings.target_version,
+            checker.target_version(),
         ) {
             checker.report_diagnostic(Diagnostic::new(
                 BuiltinLambdaArgumentShadowing {

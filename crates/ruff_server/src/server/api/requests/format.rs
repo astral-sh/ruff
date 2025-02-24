@@ -85,9 +85,10 @@ fn format_text_document(
     let settings = query.settings();
 
     // If the document is excluded, return early.
-    if let Some(file_path) = query.file_path() {
+    let file_path = query.file_path();
+    if let Some(file_path) = &file_path {
         if is_document_excluded_for_formatting(
-            &file_path,
+            file_path,
             &settings.file_resolver,
             &settings.formatter,
             text_document.language_id(),
@@ -97,8 +98,13 @@ fn format_text_document(
     }
 
     let source = text_document.contents();
-    let formatted = crate::format::format(text_document, query.source_type(), &settings.formatter)
-        .with_failure_code(lsp_server::ErrorCode::InternalError)?;
+    let formatted = crate::format::format(
+        text_document,
+        query.source_type(),
+        &settings.formatter,
+        file_path.as_deref(),
+    )
+    .with_failure_code(lsp_server::ErrorCode::InternalError)?;
     let Some(mut formatted) = formatted else {
         return Ok(None);
     };
