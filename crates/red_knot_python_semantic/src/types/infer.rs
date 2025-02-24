@@ -52,7 +52,7 @@ use crate::semantic_index::SemanticIndex;
 use crate::symbol::{
     builtins_module_scope, builtins_symbol, explicit_global_symbol,
     module_type_implicit_global_symbol, symbol, symbol_from_bindings, symbol_from_declarations,
-    typing_extensions_symbol, LookupError,
+    typing_extensions_symbol, Boundness, LookupError,
 };
 use crate::types::call::{Argument, CallArguments, UnionCallError};
 use crate::types::diagnostic::{
@@ -68,18 +68,18 @@ use crate::types::diagnostic::{
 use crate::types::mro::MroErrorKind;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
-    class::MetaclassErrorKind, todo_type, Boundness, Class, DynamicType, FunctionType,
-    InstanceType, IntersectionBuilder, IntersectionType, KnownClass, KnownFunction,
-    KnownInstanceType, MetaclassCandidate, SliceLiteralType, SubclassOfType, Symbol,
-    SymbolAndQualifiers, Truthiness, TupleType, Type, TypeAliasType, TypeAndQualifiers,
-    TypeArrayDisplay, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarInstance, UnionBuilder,
-    UnionType,
+    class::MetaclassErrorKind, todo_type, Class, DynamicType, FunctionType, InstanceType,
+    IntersectionBuilder, IntersectionType, KnownClass, KnownFunction, KnownInstanceType,
+    MetaclassCandidate, SliceLiteralType, SubclassOfType, Symbol, SymbolAndQualifiers, Truthiness,
+    TupleType, Type, TypeAliasType, TypeAndQualifiers, TypeArrayDisplay, TypeQualifiers,
+    TypeVarBoundOrConstraints, TypeVarInstance, UnionBuilder, UnionType,
 };
 use crate::unpack::Unpack;
 use crate::util::subscript::{PyIndex, PySlice};
 use crate::Db;
 
 use super::call::CallError;
+use super::class_base::ClassBase;
 use super::context::{InNoTypeCheck, InferContext, WithDiagnostics};
 use super::diagnostic::{
     report_index_out_of_bounds, report_invalid_exception_caught, report_invalid_exception_cause,
@@ -3712,6 +3712,32 @@ impl<'db> TypeInferenceBuilder<'db> {
             .member(db, &attr.id)
             .unwrap_with_diagnostic(|lookup_error| match lookup_error {
                 LookupError::Unbound => {
+                    let bound_on_instance = match value_type {
+                    Type::ClassLiteral(class) => {
+                        !class.class().instance_member(db, attr).0.is_unbound()
+                    }
+                    Type::SubclassOf(subclass_of @ SubclassOfType { .. }) => {
+                        match subclass_of.subclass_of() {
+                            ClassBase::Class(class) => {
+                                !class.instance_member(db, attr).0.is_unbound()
+                            }
+                            ClassBase::Dynamic(_) => unreachable!("Attribute lookup on a dynamic `SubclassOf` type should always return a bound symbol"),
+                        }
+                    }
+                    _ => false,
+                };
+
+                if bound_on_instance {
+                    self.context.report_lint(
+                        &UNRESOLVED_ATTRIBUTE,
+                        attribute,
+                        format_args!(
+                            "Attribute `{}` can only be accessed on instances, not on the class object `{}` itself.",
+                            attr.id,
+                            value_type.display(db)
+                        ),
+                    );
+                } else {
                     self.context.report_lint(
                         &UNRESOLVED_ATTRIBUTE,
                         attribute,
@@ -3721,7 +3747,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                             attr.id
                         ),
                     );
-                    Type::unknown()
+                }
+
+                Type::unknown()
                 }
                 LookupError::PossiblyUnbound(type_when_bound) => {
                     self.context.report_lint(
@@ -3751,22 +3779,54 @@ impl<'db> TypeInferenceBuilder<'db> {
             ExprContext::Store => {
                 let value_ty = self.infer_expression(value);
 
-                let symbol = if let Type::Instance(instance) = value_ty {
-                    let instance_member = instance.class().instance_member(self.db(), attr);
-                    if instance_member.is_class_var() {
-                        self.context.report_lint(
-                            &INVALID_ATTRIBUTE_ACCESS,
-                            attribute,
-                            format_args!(
-                                "Cannot assign to ClassVar `{attr}` from an instance of type `{ty}`",
-                                ty = value_ty.display(self.db()),
-                            ),
-                        );
-                    }
+                let symbol = match value_ty {
+                    Type::Instance(instance) => {
+                        let instance_member = instance.class().instance_member(self.db(), attr);
+                        if instance_member.is_class_var() {
+                            self.context.report_lint(
+                                &INVALID_ATTRIBUTE_ACCESS,
+                                attribute,
+                                format_args!(
+                                    "Cannot assign to ClassVar `{attr}` from an instance of type `{ty}`",
+                                    ty = value_ty.display(self.db()),
+                                ),
+                            );
+                        }
 
-                    instance_member.0
-                } else {
-                    value_ty.member(self.db(), attr)
+                        instance_member.0
+                    }
+                    Type::ClassLiteral(_) | Type::SubclassOf(_) => {
+                        let class_member = value_ty.member(self.db(), attr);
+
+                        if class_member.is_unbound() {
+                            if let Some(class) = match value_ty {
+                                Type::ClassLiteral(class) => Some(class.class()),
+                                Type::SubclassOf(subclass_of @ SubclassOfType { .. }) => {
+                                    match subclass_of.subclass_of() {
+                                        ClassBase::Class(class) => Some(class),
+                                        ClassBase::Dynamic(_) => unreachable!("Attribute lookup on a dynamic `SubclassOf` type should always return a bound symbol"),
+                                    }
+                                }
+                                _ => None,
+                            } {
+                                let instance_member = class.instance_member(self.db(), attr);
+
+                                // Attribute is declared or bound on instance. Forbid access from the class object
+                                if !instance_member.0.is_unbound() {
+                                    self.context.report_lint(
+                                        &INVALID_ATTRIBUTE_ACCESS,
+                                        attribute,
+                                        format_args!(
+                                            "Cannot assign to instance attribute `{attr}` from the class object `{ty}`",
+                                            ty = value_ty.display(self.db()),
+                                    ));
+                                }
+                            }
+                        }
+
+                        class_member
+                    }
+                    _ => value_ty.member(self.db(), attr),
                 };
 
                 // TODO: The unbound-case might also yield a diagnostic, but we can not activate

@@ -341,10 +341,12 @@ annotation are looked up lazily, even if they occur in an eager scope.
 ### Eager annotations in a Python file
 
 ```py
+from typing import ClassVar
+
 x = int
 
 class C:
-    var: x
+    var: ClassVar[x]
 
 reveal_type(C.var)  # revealed: int
 
@@ -356,10 +358,12 @@ x = str
 ```py
 from __future__ import annotations
 
+from typing import ClassVar
+
 x = int
 
 class C:
-    var: x
+    var: ClassVar[x]
 
 reveal_type(C.var)  # revealed: Unknown | str
 
@@ -369,10 +373,12 @@ x = str
 ### Deferred annotations in a stub file
 
 ```pyi
+from typing import ClassVar
+
 x = int
 
 class C:
-    var: x
+    var: ClassVar[x]
 
 reveal_type(C.var)  # revealed: Unknown | str
 

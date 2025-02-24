@@ -184,6 +184,40 @@ pub(crate) fn symbol<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> S
     symbol_impl(db, scope, name, RequiresExplicitReExport::No)
 }
 
+/// Infer the public type of a class symbol (its type as seen from outside its scope) in the given
+/// `scope`.
+pub(crate) fn class_symbol<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Symbol<'db> {
+    symbol_table(db, scope)
+        .symbol_id_by_name(name)
+        .map(|symbol| {
+            let symbol_and_quals = symbol_by_id(db, scope, symbol, RequiresExplicitReExport::No);
+
+            if symbol_and_quals.is_class_var() {
+                // For declared class vars we do not need to check if they have bindings,
+                // we just trust the declaration.
+                return symbol_and_quals.0;
+            }
+
+            if let SymbolAndQualifiers(Symbol::Type(ty, _), _) = symbol_and_quals {
+                // Otherwise, we need to check if the symbol has bindings
+                let use_def = use_def_map(db, scope);
+                let bindings = use_def.public_bindings(symbol);
+                let inferred =
+                    symbol_from_bindings_impl(db, bindings, RequiresExplicitReExport::No);
+
+                // TODO: we should not need to calculate inferred type second time. This is a temporary
+                // solution until the notion of Boundness and Declaredness is split. See #16036, #16264
+                match inferred {
+                    Symbol::Unbound => Symbol::Unbound,
+                    Symbol::Type(_, boundness) => Symbol::Type(ty, boundness),
+                }
+            } else {
+                Symbol::Unbound
+            }
+        })
+        .unwrap_or(Symbol::Unbound)
+}
+
 /// Infers the public type of an explicit module-global symbol as seen from within the same file.
 ///
 /// Note that all global scopes also include various "implicit globals" such as `__name__`,
@@ -348,7 +382,7 @@ pub(crate) type SymbolFromDeclarationsResult<'db> =
 /// that this comes with a [`CLASS_VAR`] type qualifier.
 ///
 /// [`CLASS_VAR`]: crate::types::TypeQualifiers::CLASS_VAR
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq, salsa::Update)]
 pub(crate) struct SymbolAndQualifiers<'db>(pub(crate) Symbol<'db>, pub(crate) TypeQualifiers);
 
 impl SymbolAndQualifiers<'_> {
@@ -364,17 +398,97 @@ impl SymbolAndQualifiers<'_> {
     pub(crate) fn is_class_var(&self) -> bool {
         self.1.contains(TypeQualifiers::CLASS_VAR)
     }
-
-    /// Returns `true` if the symbol has a `Final` type qualifier.
-    pub(crate) fn is_final(&self) -> bool {
-        self.1.contains(TypeQualifiers::FINAL)
-    }
 }
 
 impl<'db> From<Symbol<'db>> for SymbolAndQualifiers<'db> {
     fn from(symbol: Symbol<'db>) -> Self {
         SymbolAndQualifiers(symbol, TypeQualifiers::empty())
     }
+}
+
+#[salsa::tracked]
+fn symbol_by_id<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    symbol_id: ScopedSymbolId,
+    requires_explicit_reexport: RequiresExplicitReExport,
+) -> SymbolAndQualifiers<'db> {
+    let use_def = use_def_map(db, scope);
+
+    // If the symbol is declared, the public type is based on declarations; otherwise, it's based
+    // on inference from bindings.
+
+    let declarations = use_def.public_declarations(symbol_id);
+    let declared = symbol_from_declarations_impl(db, declarations, requires_explicit_reexport);
+
+    match declared {
+        // Symbol is declared, trust the declared type
+        Ok(symbol_and_quals @ SymbolAndQualifiers(Symbol::Type(_, Boundness::Bound), _)) => {
+            symbol_and_quals
+        }
+        // Symbol is possibly declared
+        Ok(SymbolAndQualifiers(Symbol::Type(declared_ty, Boundness::PossiblyUnbound), quals)) => {
+            let bindings = use_def.public_bindings(symbol_id);
+            let inferred = symbol_from_bindings_impl(db, bindings, requires_explicit_reexport);
+
+            let symbol = match inferred {
+                // Symbol is possibly undeclared and definitely unbound
+                Symbol::Unbound => {
+                    // TODO: We probably don't want to report `Bound` here. This requires a bit of
+                    // design work though as we might want a different behavior for stubs and for
+                    // normal modules.
+                    Symbol::Type(declared_ty, Boundness::Bound)
+                }
+                // Symbol is possibly undeclared and (possibly) bound
+                Symbol::Type(inferred_ty, boundness) => Symbol::Type(
+                    UnionType::from_elements(db, [inferred_ty, declared_ty]),
+                    boundness,
+                ),
+            };
+
+            SymbolAndQualifiers(symbol, quals)
+        }
+        // Symbol is undeclared, return the union of `Unknown` with the inferred type
+        Ok(SymbolAndQualifiers(Symbol::Unbound, _)) => {
+            let bindings = use_def.public_bindings(symbol_id);
+            let inferred = symbol_from_bindings_impl(db, bindings, requires_explicit_reexport);
+
+            // `__slots__` is a symbol with special behavior in Python's runtime. It can be
+            // modified externally, but those changes do not take effect. We therefore issue
+            // a diagnostic if we see it being modified externally. In type inference, we
+            // can assign a "narrow" type to it even if it is not *declared*. This means, we
+            // do not have to call [`widen_type_for_undeclared_public_symbol`].
+            let is_considered_non_modifiable =
+                symbol_table(db, scope).symbol(symbol_id).name() == "__slots__";
+
+            widen_type_for_undeclared_public_symbol(db, inferred, is_considered_non_modifiable)
+                .into()
+        }
+        // Symbol has conflicting declared types
+        Err((declared_ty, _)) => {
+            // Intentionally ignore conflicting declared types; that's not our problem,
+            // it's the problem of the module we are importing from.
+            SymbolAndQualifiers(
+                Symbol::bound(declared_ty.inner_type()),
+                declared_ty.qualifiers(),
+            )
+        }
+    }
+
+    // TODO (ticket: https://github.com/astral-sh/ruff/issues/14297) Our handling of boundness
+    // currently only depends on bindings, and ignores declarations. This is inconsistent, since
+    // we only look at bindings if the symbol may be undeclared. Consider the following example:
+    // ```py
+    // x: int
+    //
+    // if flag:
+    //     y: int
+    // else
+    //     y = 3
+    // ```
+    // If we import from this module, we will currently report `x` as a definitely-bound symbol
+    // (even though it has no bindings at all!) but report `y` as possibly-unbound (even though
+    // every path has either a binding or a declaration for it.)
 }
 
 /// Implementation of [`symbol`].
@@ -384,85 +498,6 @@ fn symbol_impl<'db>(
     name: &str,
     requires_explicit_reexport: RequiresExplicitReExport,
 ) -> Symbol<'db> {
-    #[salsa::tracked]
-    fn symbol_by_id<'db>(
-        db: &'db dyn Db,
-        scope: ScopeId<'db>,
-        symbol_id: ScopedSymbolId,
-        requires_explicit_reexport: RequiresExplicitReExport,
-    ) -> Symbol<'db> {
-        let use_def = use_def_map(db, scope);
-
-        // If the symbol is declared, the public type is based on declarations; otherwise, it's based
-        // on inference from bindings.
-
-        let declarations = use_def.public_declarations(symbol_id);
-        let declared = symbol_from_declarations_impl(db, declarations, requires_explicit_reexport);
-        let is_final = declared.as_ref().is_ok_and(SymbolAndQualifiers::is_final);
-        let declared = declared.map(|SymbolAndQualifiers(symbol, _)| symbol);
-
-        match declared {
-            // Symbol is declared, trust the declared type
-            Ok(symbol @ Symbol::Type(_, Boundness::Bound)) => symbol,
-            // Symbol is possibly declared
-            Ok(Symbol::Type(declared_ty, Boundness::PossiblyUnbound)) => {
-                let bindings = use_def.public_bindings(symbol_id);
-                let inferred = symbol_from_bindings_impl(db, bindings, requires_explicit_reexport);
-
-                match inferred {
-                    // Symbol is possibly undeclared and definitely unbound
-                    Symbol::Unbound => {
-                        // TODO: We probably don't want to report `Bound` here. This requires a bit of
-                        // design work though as we might want a different behavior for stubs and for
-                        // normal modules.
-                        Symbol::Type(declared_ty, Boundness::Bound)
-                    }
-                    // Symbol is possibly undeclared and (possibly) bound
-                    Symbol::Type(inferred_ty, boundness) => Symbol::Type(
-                        UnionType::from_elements(db, [inferred_ty, declared_ty]),
-                        boundness,
-                    ),
-                }
-            }
-            // Symbol is undeclared, return the union of `Unknown` with the inferred type
-            Ok(Symbol::Unbound) => {
-                let bindings = use_def.public_bindings(symbol_id);
-                let inferred = symbol_from_bindings_impl(db, bindings, requires_explicit_reexport);
-
-                // `__slots__` is a symbol with special behavior in Python's runtime. It can be
-                // modified externally, but those changes do not take effect. We therefore issue
-                // a diagnostic if we see it being modified externally. In type inference, we
-                // can assign a "narrow" type to it even if it is not *declared*. This means, we
-                // do not have to call [`widen_type_for_undeclared_public_symbol`].
-                let is_considered_non_modifiable =
-                    is_final || symbol_table(db, scope).symbol(symbol_id).name() == "__slots__";
-
-                widen_type_for_undeclared_public_symbol(db, inferred, is_considered_non_modifiable)
-            }
-            // Symbol has conflicting declared types
-            Err((declared_ty, _)) => {
-                // Intentionally ignore conflicting declared types; that's not our problem,
-                // it's the problem of the module we are importing from.
-                Symbol::bound(declared_ty.inner_type())
-            }
-        }
-
-        // TODO (ticket: https://github.com/astral-sh/ruff/issues/14297) Our handling of boundness
-        // currently only depends on bindings, and ignores declarations. This is inconsistent, since
-        // we only look at bindings if the symbol may be undeclared. Consider the following example:
-        // ```py
-        // x: int
-        //
-        // if flag:
-        //     y: int
-        // else
-        //     y = 3
-        // ```
-        // If we import from this module, we will currently report `x` as a definitely-bound symbol
-        // (even though it has no bindings at all!) but report `y` as possibly-unbound (even though
-        // every path has either a binding or a declaration for it.)
-    }
-
     let _span = tracing::trace_span!("symbol", ?name).entered();
 
     // We don't need to check for `typing_extensions` here, because `typing_extensions.TYPE_CHECKING`
@@ -489,7 +524,7 @@ fn symbol_impl<'db>(
 
     symbol_table(db, scope)
         .symbol_id_by_name(name)
-        .map(|symbol| symbol_by_id(db, scope, symbol, requires_explicit_reexport))
+        .map(|symbol| symbol_by_id(db, scope, symbol, requires_explicit_reexport).0)
         .unwrap_or(Symbol::Unbound)
 }
 
