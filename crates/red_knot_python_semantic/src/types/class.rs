@@ -33,7 +33,7 @@ use super::{
 pub struct Class<'db> {
     /// Name of the class at definition
     #[return_ref]
-    pub name: ast::name::Name,
+    pub(crate) name: ast::name::Name,
 
     body_scope: ScopeId<'db>,
 
@@ -43,12 +43,12 @@ pub struct Class<'db> {
 #[salsa::tracked]
 impl<'db> Class<'db> {
     /// Return `true` if this class represents `known_class`
-    pub fn is_known(self, db: &'db dyn Db, known_class: KnownClass) -> bool {
+    pub(crate) fn is_known(self, db: &'db dyn Db, known_class: KnownClass) -> bool {
         self.known(db) == Some(known_class)
     }
 
     /// Return `true` if this class represents the builtin class `object`
-    pub fn is_object(self, db: &'db dyn Db) -> bool {
+    pub(crate) fn is_object(self, db: &'db dyn Db) -> bool {
         self.is_known(db, KnownClass::Object)
     }
 
@@ -156,7 +156,7 @@ impl<'db> Class<'db> {
     }
 
     /// Return `true` if `other` is present in this class's MRO.
-    pub fn is_subclass_of(self, db: &'db dyn Db, other: Class) -> bool {
+    pub(super) fn is_subclass_of(self, db: &'db dyn Db, other: Class) -> bool {
         // `is_subclass_of` is checking the subtype relation, in which gradual types do not
         // participate, so we should not return `True` if we find `Any/Unknown` in the MRO.
         self.iter_mro(db).contains(&ClassBase::Class(other))
@@ -180,14 +180,14 @@ impl<'db> Class<'db> {
     }
 
     /// Return the metaclass of this class, or `type[Unknown]` if the metaclass cannot be inferred.
-    pub(crate) fn metaclass(self, db: &'db dyn Db) -> Type<'db> {
+    pub(super) fn metaclass(self, db: &'db dyn Db) -> Type<'db> {
         self.try_metaclass(db)
             .unwrap_or_else(|_| SubclassOfType::subclass_of_unknown())
     }
 
     /// Return the metaclass of this class, or an error if the metaclass cannot be inferred.
     #[salsa::tracked]
-    pub(crate) fn try_metaclass(self, db: &'db dyn Db) -> Result<Type<'db>, MetaclassError<'db>> {
+    pub(super) fn try_metaclass(self, db: &'db dyn Db) -> Result<Type<'db>, MetaclassError<'db>> {
         // Identify the class's own metaclass (or take the first base class's metaclass).
         let mut base_classes = self.fully_static_explicit_bases(db).peekable();
 
@@ -316,7 +316,9 @@ impl<'db> Class<'db> {
     /// Returns the class member of this class named `name`.
     ///
     /// The member resolves to a member on the class itself or any of its proper superclasses.
-    pub(crate) fn class_member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
+    ///
+    /// TODO: Should this be made private...?
+    pub(super) fn class_member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
         if name == "__mro__" {
             let tuple_elements = self.iter_mro(db).map(Type::from);
             return Symbol::bound(TupleType::from_elements(db, tuple_elements));
@@ -369,7 +371,7 @@ impl<'db> Class<'db> {
     /// Returns [`Symbol::Unbound`] if `name` cannot be found in this class's scope
     /// directly. Use [`Class::class_member`] if you require a method that will
     /// traverse through the MRO until it finds the member.
-    pub(crate) fn own_class_member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
+    pub(super) fn own_class_member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
         let body_scope = self.body_scope(db);
         class_symbol(db, body_scope, name)
     }
@@ -380,7 +382,7 @@ impl<'db> Class<'db> {
     /// defined attribute that is only present in a method (typically `__init__`).
     ///
     /// The attribute might also be defined in a superclass of this class.
-    pub(crate) fn instance_member(self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
+    pub(super) fn instance_member(self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
         for superclass in self.iter_mro(db) {
             match superclass {
                 ClassBase::Dynamic(_) => {
@@ -611,7 +613,7 @@ pub(super) enum InheritanceCycle {
 }
 
 impl InheritanceCycle {
-    pub(crate) const fn is_participant(self) -> bool {
+    pub(super) const fn is_participant(self) -> bool {
         matches!(self, InheritanceCycle::Participant)
     }
 }
@@ -649,7 +651,7 @@ pub struct InstanceType<'db> {
 }
 
 impl<'db> InstanceType<'db> {
-    pub(crate) fn class(self) -> Class<'db> {
+    pub(super) fn class(self) -> Class<'db> {
         self.class
     }
 
@@ -727,13 +729,13 @@ pub enum KnownClass {
 }
 
 impl<'db> KnownClass {
-    pub const fn is_bool(self) -> bool {
+    pub(crate) const fn is_bool(self) -> bool {
         matches!(self, Self::Bool)
     }
 
     /// Determine whether instances of this class are always truthy, always falsy,
     /// or have an ambiguous truthiness.
-    pub(super) const fn bool(self) -> Truthiness {
+    pub(crate) const fn bool(self) -> Truthiness {
         match self {
             // N.B. It's only generally safe to infer `Truthiness::AlwaysTrue` for a `KnownClass`
             // variant if the class's `__bool__` method always returns the same thing *and* the
@@ -785,7 +787,7 @@ impl<'db> KnownClass {
         }
     }
 
-    pub fn as_str(self, db: &'db dyn Db) -> &'static str {
+    pub(crate) fn as_str(self, db: &'db dyn Db) -> &'static str {
         match self {
             Self::Bool => "bool",
             Self::Object => "object",
@@ -843,17 +845,17 @@ impl<'db> KnownClass {
         }
     }
 
-    pub fn to_instance(self, db: &'db dyn Db) -> Type<'db> {
+    pub(crate) fn to_instance(self, db: &'db dyn Db) -> Type<'db> {
         self.to_class_literal(db).to_instance(db)
     }
 
-    pub fn to_class_literal(self, db: &'db dyn Db) -> Type<'db> {
+    pub(crate) fn to_class_literal(self, db: &'db dyn Db) -> Type<'db> {
         known_module_symbol(db, self.canonical_module(db), self.as_str(db))
             .ignore_possibly_unbound()
             .unwrap_or(Type::unknown())
     }
 
-    pub fn to_subclass_of(self, db: &'db dyn Db) -> Type<'db> {
+    pub(crate) fn to_subclass_of(self, db: &'db dyn Db) -> Type<'db> {
         self.to_class_literal(db)
             .into_class_literal()
             .map(|ClassLiteralType { class }| SubclassOfType::from(db, class))
@@ -862,7 +864,7 @@ impl<'db> KnownClass {
 
     /// Return `true` if this symbol can be resolved to a class definition `class` in typeshed,
     /// *and* `class` is a subclass of `other`.
-    pub fn is_subclass_of(self, db: &'db dyn Db, other: Class<'db>) -> bool {
+    pub(super) fn is_subclass_of(self, db: &'db dyn Db, other: Class<'db>) -> bool {
         known_module_symbol(db, self.canonical_module(db), self.as_str(db))
             .ignore_possibly_unbound()
             .and_then(Type::into_class_literal)
@@ -870,7 +872,7 @@ impl<'db> KnownClass {
     }
 
     /// Return the module in which we should look up the definition for this class
-    pub(crate) fn canonical_module(self, db: &'db dyn Db) -> KnownModule {
+    fn canonical_module(self, db: &'db dyn Db) -> KnownModule {
         match self {
             Self::Bool
             | Self::Object
@@ -1348,16 +1350,16 @@ impl<'db> KnownInstanceType<'db> {
     /// For example, the symbol `typing.Literal` is an instance of `typing._SpecialForm`,
     /// so `KnownInstanceType::Literal.instance_fallback(db)`
     /// returns `Type::Instance(InstanceType { class: <typing._SpecialForm> })`.
-    pub(crate) fn instance_fallback(self, db: &dyn Db) -> Type {
+    pub(super) fn instance_fallback(self, db: &dyn Db) -> Type {
         self.class().to_instance(db)
     }
 
     /// Return `true` if this symbol is an instance of `class`.
-    pub(crate) fn is_instance_of(self, db: &'db dyn Db, class: Class<'db>) -> bool {
+    pub(super) fn is_instance_of(self, db: &'db dyn Db, class: Class<'db>) -> bool {
         self.class().is_subclass_of(db, class)
     }
 
-    pub(crate) fn try_from_file_and_name(
+    pub(super) fn try_from_file_and_name(
         db: &'db dyn Db,
         file: File,
         symbol_name: &str,
@@ -1412,7 +1414,7 @@ impl<'db> KnownInstanceType<'db> {
     ///
     /// Most variants can only exist in one module, which is the same as `self.class().canonical_module()`.
     /// Some variants could validly be defined in either `typing` or `typing_extensions`, however.
-    pub(crate) fn check_module(self, module: KnownModule) -> bool {
+    fn check_module(self, module: KnownModule) -> bool {
         match self {
             Self::Any
             | Self::ClassVar
