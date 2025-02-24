@@ -512,7 +512,7 @@ mod tests {
                 if result.len() > 1 {
                     result.push_str(", ");
                 }
-                write!(&mut result, "{}", element).unwrap();
+                write!(&mut result, "{element}").unwrap();
             }
             result.push(']');
             result
@@ -627,7 +627,7 @@ mod tests {
                 if result.len() > 1 {
                     result.push_str(", ");
                 }
-                write!(&mut result, "{}:{}", key, value).unwrap();
+                write!(&mut result, "{key}:{value}").unwrap();
             }
             result.push(']');
             result
