@@ -21,7 +21,7 @@
 //!
 //! [`Constraint`]: crate::semantic_index::constraint::Constraint
 
-use ruff_index::list::{ListBuilder, ListIterator, ListStorage};
+use ruff_index::list::{ListBuilder, ListSetIterator, ListStorage};
 use ruff_index::newtype_index;
 
 use crate::semantic_index::constraint::ScopedConstraintId;
@@ -65,7 +65,7 @@ impl From<ScopedConstraintId> for ScopedNarrowingConstraintClause {
 /// A collection of narrowing constraints for a given scope.
 #[derive(Debug, Eq, PartialEq)]
 pub(crate) struct NarrowingConstraints {
-    lists: ListStorage<ScopedNarrowingConstraintId, ScopedNarrowingConstraintClause, ()>,
+    lists: ListStorage<ScopedNarrowingConstraintId, ScopedNarrowingConstraintClause>,
 }
 
 // Building constraints
@@ -74,7 +74,7 @@ pub(crate) struct NarrowingConstraints {
 /// A builder for creating narrowing constraints.
 #[derive(Debug, Default, Eq, PartialEq)]
 pub(crate) struct NarrowingConstraintsBuilder {
-    lists: ListBuilder<ScopedNarrowingConstraintId, ScopedNarrowingConstraintClause, ()>,
+    lists: ListBuilder<ScopedNarrowingConstraintId, ScopedNarrowingConstraintClause>,
 }
 
 impl NarrowingConstraintsBuilder {
@@ -90,7 +90,7 @@ impl NarrowingConstraintsBuilder {
         constraint: Option<ScopedNarrowingConstraintId>,
         clause: ScopedNarrowingConstraintClause,
     ) -> Option<ScopedNarrowingConstraintId> {
-        self.lists.entry(constraint, clause).or_insert_default()
+        self.lists.insert(constraint, clause)
     }
 
     /// Returns the intersection of two narrowing constraints. The result contains the clauses that
@@ -100,16 +100,16 @@ impl NarrowingConstraintsBuilder {
         a: Option<ScopedNarrowingConstraintId>,
         b: Option<ScopedNarrowingConstraintId>,
     ) -> Option<ScopedNarrowingConstraintId> {
-        self.lists.intersect(a, b, |(), ()| ())
+        self.lists.intersect(a, b)
     }
 }
 
 // Iteration
 // ---------
 
-pub(crate) struct NarrowingConstraintsIterator<'a> {
-    wrapped: ListIterator<'a, ScopedNarrowingConstraintId, ScopedNarrowingConstraintClause, ()>,
-}
+pub(crate) type NarrowingConstraintsIterator<'a> = std::iter::Copied<
+    ListSetIterator<'a, ScopedNarrowingConstraintId, ScopedNarrowingConstraintClause>,
+>;
 
 impl NarrowingConstraints {
     /// Iterates over the clauses in a narrowing constraint.
@@ -117,18 +117,7 @@ impl NarrowingConstraints {
         &self,
         set: Option<ScopedNarrowingConstraintId>,
     ) -> NarrowingConstraintsIterator<'_> {
-        NarrowingConstraintsIterator {
-            wrapped: self.lists.iter(set),
-        }
-    }
-}
-
-impl Iterator for NarrowingConstraintsIterator<'_> {
-    type Item = ScopedNarrowingConstraintClause;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let (key, ()) = self.wrapped.next()?;
-        Some(*key)
+        self.lists.iter_set(set).copied()
     }
 }
 
@@ -150,9 +139,7 @@ mod tests {
             &self,
             set: Option<ScopedNarrowingConstraintId>,
         ) -> NarrowingConstraintsIterator<'_> {
-            NarrowingConstraintsIterator {
-                wrapped: self.lists.iter(set),
-            }
+            self.lists.iter_set(set).copied()
         }
     }
 }

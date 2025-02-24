@@ -298,7 +298,12 @@ impl<I: Idx, K, V> ListBuilder<I, K, V> {
     /// Returns the intersection of two lists. The result will contain an entry for any key that
     /// appears in both lists. The corresponding values will be combined using the `combine`
     /// function.
-    pub fn intersect<F>(&mut self, mut a: Option<I>, mut b: Option<I>, mut combine: F) -> Option<I>
+    pub fn intersect_with<F>(
+        &mut self,
+        mut a: Option<I>,
+        mut b: Option<I>,
+        mut combine: F,
+    ) -> Option<I>
     where
         K: Clone + Ord,
         V: Clone,
@@ -340,7 +345,7 @@ impl<I: Idx, K, V> ListBuilder<I, K, V> {
     /// Returns the union of two lists. The result will contain an entry for any key that appears
     /// in either list. For keys that appear in both lists, the corresponding values will be
     /// combined using the `combine` function.
-    pub fn union<F>(&mut self, mut a: Option<I>, mut b: Option<I>, mut combine: F) -> Option<I>
+    pub fn union_with<F>(&mut self, mut a: Option<I>, mut b: Option<I>, mut combine: F) -> Option<I>
     where
         K: Clone + Ord,
         V: Clone,
@@ -396,6 +401,65 @@ impl<I: Idx, K, V> ListBuilder<I, K, V> {
     }
 }
 
+// ----
+// Sets
+
+impl<I: Idx, K> ListStorage<I, K, ()> {
+    /// Iterates through the elements in a set.
+    pub fn iter_set(&self, set: Option<I>) -> ListSetIterator<'_, I, K> {
+        ListSetIterator {
+            storage: self,
+            curr: set,
+        }
+    }
+}
+
+pub struct ListSetIterator<'a, I, K> {
+    storage: &'a ListStorage<I, K, ()>,
+    curr: Option<I>,
+}
+
+impl<'a, I: Idx, K> Iterator for ListSetIterator<'a, I, K> {
+    type Item = &'a K;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let ListCell(key, (), tail) = &self.storage.cells[self.curr?];
+        self.curr = *tail;
+        Some(key)
+    }
+}
+
+impl<I: Idx, K> ListBuilder<I, K, ()> {
+    /// Adds an element to a set.
+    pub fn insert(&mut self, set: Option<I>, element: K) -> Option<I>
+    where
+        K: Clone + Ord,
+    {
+        self.entry(set, element).or_insert_default()
+    }
+
+    /// Returns the intersection of two sets. The result will contain any value that appears in
+    /// both sets.
+    pub fn intersect(&mut self, a: Option<I>, b: Option<I>) -> Option<I>
+    where
+        K: Clone + Ord,
+    {
+        self.intersect_with(a, b, |(), ()| ())
+    }
+
+    /// Returns the intersection of two sets. The result will contain any value that appears in
+    /// either set.
+    pub fn union(&mut self, a: Option<I>, b: Option<I>) -> Option<I>
+    where
+        K: Clone + Ord,
+    {
+        self.union_with(a, b, |(), ()| ())
+    }
+}
+
+// -----
+// Tests
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -438,10 +502,10 @@ mod tests {
         let mut builder = ListBuilder::<TestIndex, u16>::default();
 
         // Build up the set in order
-        let set1 = builder.entry(None, 1).replace_with_default();
-        let set12 = builder.entry(set1, 2).replace_with_default();
-        let set123 = builder.entry(set12, 3).replace_with_default();
-        let set1232 = builder.entry(set123, 2).replace_with_default();
+        let set1 = builder.insert(None, 1);
+        let set12 = builder.insert(set1, 2);
+        let set123 = builder.insert(set12, 3);
+        let set1232 = builder.insert(set123, 2);
         assert_eq!(builder.display_set(None), "[]");
         assert_eq!(builder.display_set(set1), "[1]");
         assert_eq!(builder.display_set(set12), "[1, 2]");
@@ -449,37 +513,10 @@ mod tests {
         assert_eq!(builder.display_set(set1232), "[1, 2, 3]");
 
         // And in reverse order
-        let set3 = builder.entry(None, 3).replace_with_default();
-        let set32 = builder.entry(set3, 2).replace_with_default();
-        let set321 = builder.entry(set32, 1).replace_with_default();
-        let set3212 = builder.entry(set321, 2).replace_with_default();
-        assert_eq!(builder.display_set(None), "[]");
-        assert_eq!(builder.display_set(set3), "[3]");
-        assert_eq!(builder.display_set(set32), "[2, 3]");
-        assert_eq!(builder.display_set(set321), "[1, 2, 3]");
-        assert_eq!(builder.display_set(set3212), "[1, 2, 3]");
-    }
-
-    #[test]
-    fn can_insert_if_needed_into_set() {
-        let mut builder = ListBuilder::<TestIndex, u16>::default();
-
-        // Build up the set in order
-        let set1 = builder.entry(None, 1).or_insert_default();
-        let set12 = builder.entry(set1, 2).or_insert_default();
-        let set123 = builder.entry(set12, 3).or_insert_default();
-        let set1232 = builder.entry(set123, 2).or_insert_default();
-        assert_eq!(builder.display_set(None), "[]");
-        assert_eq!(builder.display_set(set1), "[1]");
-        assert_eq!(builder.display_set(set12), "[1, 2]");
-        assert_eq!(builder.display_set(set123), "[1, 2, 3]");
-        assert_eq!(builder.display_set(set1232), "[1, 2, 3]");
-
-        // And in reverse order
-        let set3 = builder.entry(None, 3).or_insert_default();
-        let set32 = builder.entry(set3, 2).or_insert_default();
-        let set321 = builder.entry(set32, 1).or_insert_default();
-        let set3212 = builder.entry(set321, 2).or_insert_default();
+        let set3 = builder.insert(None, 3);
+        let set32 = builder.insert(set3, 2);
+        let set321 = builder.insert(set32, 1);
+        let set3212 = builder.insert(set321, 2);
         assert_eq!(builder.display_set(None), "[]");
         assert_eq!(builder.display_set(set3), "[3]");
         assert_eq!(builder.display_set(set32), "[2, 3]");
@@ -501,21 +538,21 @@ mod tests {
         let set245 = builder.entry(set24, 5).or_insert_default();
         let set2457 = builder.entry(set245, 7).or_insert_default();
 
-        let intersection = builder.intersect(None, None, |(), ()| ());
+        let intersection = builder.intersect(None, None);
         assert_eq!(builder.display_set(intersection), "[]");
-        let intersection = builder.intersect(None, set1234, |(), ()| ());
+        let intersection = builder.intersect(None, set1234);
         assert_eq!(builder.display_set(intersection), "[]");
-        let intersection = builder.intersect(None, set2457, |(), ()| ());
+        let intersection = builder.intersect(None, set2457);
         assert_eq!(builder.display_set(intersection), "[]");
-        let intersection = builder.intersect(set1, set1234, |(), ()| ());
+        let intersection = builder.intersect(set1, set1234);
         assert_eq!(builder.display_set(intersection), "[1]");
-        let intersection = builder.intersect(set1, set2457, |(), ()| ());
+        let intersection = builder.intersect(set1, set2457);
         assert_eq!(builder.display_set(intersection), "[]");
-        let intersection = builder.intersect(set2, set1234, |(), ()| ());
+        let intersection = builder.intersect(set2, set1234);
         assert_eq!(builder.display_set(intersection), "[2]");
-        let intersection = builder.intersect(set2, set2457, |(), ()| ());
+        let intersection = builder.intersect(set2, set2457);
         assert_eq!(builder.display_set(intersection), "[2]");
-        let intersection = builder.intersect(set1234, set2457, |(), ()| ());
+        let intersection = builder.intersect(set1234, set2457);
         assert_eq!(builder.display_set(intersection), "[2, 4]");
     }
 
@@ -533,21 +570,21 @@ mod tests {
         let set245 = builder.entry(set24, 5).or_insert_default();
         let set2457 = builder.entry(set245, 7).or_insert_default();
 
-        let union = builder.union(None, None, |(), ()| ());
+        let union = builder.union(None, None);
         assert_eq!(builder.display_set(union), "[]");
-        let union = builder.union(None, set1234, |(), ()| ());
+        let union = builder.union(None, set1234);
         assert_eq!(builder.display_set(union), "[1, 2, 3, 4]");
-        let union = builder.union(None, set2457, |(), ()| ());
+        let union = builder.union(None, set2457);
         assert_eq!(builder.display_set(union), "[2, 4, 5, 7]");
-        let union = builder.union(set1, set1234, |(), ()| ());
+        let union = builder.union(set1, set1234);
         assert_eq!(builder.display_set(union), "[1, 2, 3, 4]");
-        let union = builder.union(set1, set2457, |(), ()| ());
+        let union = builder.union(set1, set2457);
         assert_eq!(builder.display_set(union), "[1, 2, 4, 5, 7]");
-        let union = builder.union(set2, set1234, |(), ()| ());
+        let union = builder.union(set2, set1234);
         assert_eq!(builder.display_set(union), "[1, 2, 3, 4]");
-        let union = builder.union(set2, set2457, |(), ()| ());
+        let union = builder.union(set2, set2457);
         assert_eq!(builder.display_set(union), "[2, 4, 5, 7]");
-        let union = builder.union(set1234, set2457, |(), ()| ());
+        let union = builder.union(set1234, set2457);
         assert_eq!(builder.display_set(union), "[1, 2, 3, 4, 5, 7]");
     }
 
@@ -642,21 +679,21 @@ mod tests {
         let map245 = builder.entry(map24, 5).or_insert(50);
         let map2457 = builder.entry(map245, 7).or_insert(70);
 
-        let intersection = builder.intersect(None, None, |a, b| a + b);
+        let intersection = builder.intersect_with(None, None, |a, b| a + b);
         assert_eq!(builder.display(intersection), "[]");
-        let intersection = builder.intersect(None, map1234, |a, b| a + b);
+        let intersection = builder.intersect_with(None, map1234, |a, b| a + b);
         assert_eq!(builder.display(intersection), "[]");
-        let intersection = builder.intersect(None, map2457, |a, b| a + b);
+        let intersection = builder.intersect_with(None, map2457, |a, b| a + b);
         assert_eq!(builder.display(intersection), "[]");
-        let intersection = builder.intersect(map1, map1234, |a, b| a + b);
+        let intersection = builder.intersect_with(map1, map1234, |a, b| a + b);
         assert_eq!(builder.display(intersection), "[1:2]");
-        let intersection = builder.intersect(map1, map2457, |a, b| a + b);
+        let intersection = builder.intersect_with(map1, map2457, |a, b| a + b);
         assert_eq!(builder.display(intersection), "[]");
-        let intersection = builder.intersect(map2, map1234, |a, b| a + b);
+        let intersection = builder.intersect_with(map2, map1234, |a, b| a + b);
         assert_eq!(builder.display(intersection), "[2:22]");
-        let intersection = builder.intersect(map2, map2457, |a, b| a + b);
+        let intersection = builder.intersect_with(map2, map2457, |a, b| a + b);
         assert_eq!(builder.display(intersection), "[2:40]");
-        let intersection = builder.intersect(map1234, map2457, |a, b| a + b);
+        let intersection = builder.intersect_with(map1234, map2457, |a, b| a + b);
         assert_eq!(builder.display(intersection), "[2:22, 4:44]");
     }
 
@@ -674,21 +711,21 @@ mod tests {
         let map245 = builder.entry(map24, 5).or_insert(50);
         let map2457 = builder.entry(map245, 7).or_insert(70);
 
-        let union = builder.union(None, None, |a, b| a + b);
+        let union = builder.union_with(None, None, |a, b| a + b);
         assert_eq!(builder.display(union), "[]");
-        let union = builder.union(None, map1234, |a, b| a + b);
+        let union = builder.union_with(None, map1234, |a, b| a + b);
         assert_eq!(builder.display(union), "[1:1, 2:2, 3:3, 4:4]");
-        let union = builder.union(None, map2457, |a, b| a + b);
+        let union = builder.union_with(None, map2457, |a, b| a + b);
         assert_eq!(builder.display(union), "[2:20, 4:40, 5:50, 7:70]");
-        let union = builder.union(map1, map1234, |a, b| a + b);
+        let union = builder.union_with(map1, map1234, |a, b| a + b);
         assert_eq!(builder.display(union), "[1:2, 2:2, 3:3, 4:4]");
-        let union = builder.union(map1, map2457, |a, b| a + b);
+        let union = builder.union_with(map1, map2457, |a, b| a + b);
         assert_eq!(builder.display(union), "[1:1, 2:20, 4:40, 5:50, 7:70]");
-        let union = builder.union(map2, map1234, |a, b| a + b);
+        let union = builder.union_with(map2, map1234, |a, b| a + b);
         assert_eq!(builder.display(union), "[1:1, 2:22, 3:3, 4:4]");
-        let union = builder.union(map2, map2457, |a, b| a + b);
+        let union = builder.union_with(map2, map2457, |a, b| a + b);
         assert_eq!(builder.display(union), "[2:40, 4:40, 5:50, 7:70]");
-        let union = builder.union(map1234, map2457, |a, b| a + b);
+        let union = builder.union_with(map1234, map2457, |a, b| a + b);
         assert_eq!(builder.display(union), "[1:1, 2:22, 3:3, 4:44, 5:50, 7:70]");
     }
 }
