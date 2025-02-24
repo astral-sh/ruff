@@ -102,12 +102,19 @@ impl RuffSettingsIndex {
         editor_settings: &ResolvedEditorSettings,
         is_default_workspace: bool,
     ) -> Self {
-        tracing::debug!("Indexing settings for workspace: {}", root.display());
-
         let mut has_error = false;
         let mut index = BTreeMap::default();
         let mut respect_gitignore = None;
+        let fallback = Arc::new(RuffSettings::fallback(editor_settings, root));
 
+        if editor_settings.configuration_preference == ConfigurationPreference::EditorOnly {
+            tracing::debug!(
+                "Skipping indexing settings due to editorOnly configuration preference."
+            );
+            return RuffSettingsIndex { index, fallback };
+        }
+
+        tracing::debug!("Indexing settings for workspace: {}", root.display());
         // If this is *not* the default workspace, then we should skip the workspace root itself
         // because it will be resolved when walking the workspace directory tree. This is done by
         // the `WalkBuilder` below.
@@ -160,8 +167,6 @@ impl RuffSettingsIndex {
                 }
             }
         }
-
-        let fallback = Arc::new(RuffSettings::fallback(editor_settings, root));
 
         // If this is the default workspace, the server is running in single-file mode. What this
         // means is that the user opened a file directly (not the folder) in the editor and the
