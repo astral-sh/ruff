@@ -8,8 +8,8 @@ use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId, SymbolTable};
 use crate::semantic_index::symbol_table;
 use crate::types::infer::infer_same_file_expression_type;
 use crate::types::{
-    infer_expression_types, ClassLiteralType, IntersectionBuilder, KnownClass, KnownFunction,
-    SubclassOfType, Truthiness, Type, UnionBuilder,
+    infer_expression_types, IntersectionBuilder, KnownClass, KnownFunction, SubclassOfType,
+    Truthiness, Type, UnionBuilder,
 };
 use crate::Db;
 use itertools::Itertools;
@@ -111,7 +111,7 @@ impl KnownConstraintFunction {
                 }
                 Some(builder.build())
             }
-            Type::ClassLiteral(ClassLiteralType { class }) => Some(constraint_fn(class)),
+            Type::ClassLiteral(class_literal) => Some(constraint_fn(class_literal.class())),
             Type::SubclassOf(subclass_of_ty) => {
                 subclass_of_ty.subclass_of().into_class().map(constraint_fn)
             }
@@ -398,7 +398,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
 
                     if callable_ty
                         .into_class_literal()
-                        .is_some_and(|c| c.class.is_known(self.db, KnownClass::Type))
+                        .is_some_and(|c| c.class().is_known(self.db, KnownClass::Type))
                     {
                         let symbol = self
                             .symbols()
@@ -456,7 +456,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
             Type::ClassLiteral(class_type)
                 if expr_call.arguments.args.len() == 1
                     && expr_call.arguments.keywords.is_empty()
-                    && class_type.class.is_known(self.db, KnownClass::Bool) =>
+                    && class_type.class().is_known(self.db, KnownClass::Bool) =>
             {
                 self.evaluate_expression_node_constraint(
                     &expr_call.arguments.args[0],

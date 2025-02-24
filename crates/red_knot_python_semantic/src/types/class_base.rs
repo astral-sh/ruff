@@ -1,6 +1,4 @@
-use crate::types::{
-    todo_type, Class, ClassLiteralType, DynamicType, KnownClass, KnownInstanceType, Type,
-};
+use crate::types::{todo_type, Class, DynamicType, KnownClass, KnownInstanceType, Type};
 use crate::Db;
 use itertools::Either;
 
@@ -54,9 +52,7 @@ impl<'db> ClassBase<'db> {
         KnownClass::Object
             .to_class_literal(db)
             .into_class_literal()
-            .map_or(Self::unknown(), |ClassLiteralType { class }| {
-                Self::Class(class)
-            })
+            .map_or(Self::unknown(), |literal| Self::Class(literal.class()))
     }
 
     /// Attempt to resolve `ty` into a `ClassBase`.
@@ -65,7 +61,7 @@ impl<'db> ClassBase<'db> {
     pub(super) fn try_from_type(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
         match ty {
             Type::Dynamic(dynamic) => Some(Self::Dynamic(dynamic)),
-            Type::ClassLiteral(ClassLiteralType { class }) => Some(Self::Class(class)),
+            Type::ClassLiteral(literal) => Some(Self::Class(literal.class())),
             Type::Union(_) => None, // TODO -- forces consideration of multiple possible MROs?
             Type::Intersection(_) => None, // TODO -- probably incorrect?
             Type::Instance(_) => None, // TODO -- handle `__mro_entries__`?
