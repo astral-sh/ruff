@@ -30,6 +30,13 @@ use crate::checkers::ast::Checker;
 /// env = os.environ.copy()
 /// ```
 ///
+/// ## Fix safety
+///
+/// This rule's fix is marked as unsafe because replacing a shallow copy with a deep copy can lead
+/// to unintended side effects. If the program modifies the shallow copy at some point, changing it
+/// to a deep copy may prevent those modifications from affecting the original data, potentially
+/// altering the program's behavior.
+///
 /// ## References
 /// - [Python documentation: `copy` — Shallow and deep copy operations](https://docs.python.org/3/library/copy.html)
 /// - [Python documentation: `os.environ`](https://docs.python.org/3/library/os.html#os.environ)
