@@ -29,6 +29,7 @@ impl<'db> Signature<'db> {
     }
 
     /// Return a todo signature: (*args: Todo, **kwargs: Todo) -> Todo
+    #[allow(unused_variables)] // 'reason' only unused in debug builds
     pub(crate) fn todo(reason: &'static str) -> Self {
         Self {
             parameters: Parameters::todo(),
