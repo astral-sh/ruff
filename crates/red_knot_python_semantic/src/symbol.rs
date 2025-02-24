@@ -398,12 +398,6 @@ impl SymbolAndQualifiers<'_> {
     pub(crate) fn is_class_var(&self) -> bool {
         self.1.contains(TypeQualifiers::CLASS_VAR)
     }
-
-    /// Returns `true` if the symbol has a `Final` type qualifier.
-    #[allow(dead_code)]
-    pub(crate) fn is_final(&self) -> bool {
-        self.1.contains(TypeQualifiers::FINAL)
-    }
 }
 
 impl<'db> From<Symbol<'db>> for SymbolAndQualifiers<'db> {
