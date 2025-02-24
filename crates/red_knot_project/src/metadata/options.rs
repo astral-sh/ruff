@@ -108,7 +108,7 @@ impl Options {
                 .map(|python_path| {
                     PythonPath::SysPrefix(python_path.absolute(project_root, system))
                 })
-                .unwrap_or(PythonPath::Known(vec![])),
+                .unwrap_or(PythonPath::KnownSitePackages(vec![])),
         }
     }
 

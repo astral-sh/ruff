@@ -239,7 +239,7 @@ impl TestCaseBuilder<MockedTypeshed> {
                     extra_paths: vec![],
                     src_roots: vec![src.clone()],
                     custom_typeshed: Some(typeshed.clone()),
-                    python_path: PythonPath::Known(vec![site_packages.clone()]),
+                    python_path: PythonPath::KnownSitePackages(vec![site_packages.clone()]),
                 },
             },
         )
@@ -294,7 +294,7 @@ impl TestCaseBuilder<VendoredTypeshed> {
                 python_version,
                 python_platform,
                 search_paths: SearchPathSettings {
-                    python_path: PythonPath::Known(vec![site_packages.clone()]),
+                    python_path: PythonPath::KnownSitePackages(vec![site_packages.clone()]),
                     ..SearchPathSettings::new(vec![src.clone()])
                 },
             },

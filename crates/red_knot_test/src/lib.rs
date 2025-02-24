@@ -180,7 +180,7 @@ fn run_test(
                     src_roots: vec![src_path],
                     extra_paths: vec![],
                     custom_typeshed: custom_typeshed_path,
-                    python_path: PythonPath::Known(vec![]),
+                    python_path: PythonPath::KnownSitePackages(vec![]),
                 },
             },
         )

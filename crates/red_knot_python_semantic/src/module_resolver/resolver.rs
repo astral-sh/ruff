@@ -231,7 +231,7 @@ impl SearchPaths {
                 VirtualEnvironment::new(sys_prefix, system)
                     .and_then(|venv| venv.site_packages_directories(system))?
             }
-            PythonPath::Known(paths) => paths
+            PythonPath::KnownSitePackages(paths) => paths
                 .iter()
                 .map(|path| canonicalize(path, system))
                 .collect(),
@@ -1310,7 +1310,7 @@ mod tests {
                     extra_paths: vec![],
                     src_roots: vec![src.clone()],
                     custom_typeshed: Some(custom_typeshed),
-                    python_path: PythonPath::Known(vec![site_packages]),
+                    python_path: PythonPath::KnownSitePackages(vec![site_packages]),
                 },
             },
         )
@@ -1816,7 +1816,10 @@ not_a_directory
                     extra_paths: vec![],
                     src_roots: vec![SystemPathBuf::from("/src")],
                     custom_typeshed: None,
-                    python_path: PythonPath::Known(vec![venv_site_packages, system_site_packages]),
+                    python_path: PythonPath::KnownSitePackages(vec![
+                        venv_site_packages,
+                        system_site_packages,
+                    ]),
                 },
             },
         )
