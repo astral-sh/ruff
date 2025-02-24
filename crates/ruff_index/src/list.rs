@@ -4,9 +4,6 @@ use std::ops::Deref;
 use crate::vec::IndexVec;
 use crate::Idx;
 
-#[derive(Debug, Eq, PartialEq)]
-struct ListCell<I, K, V>(K, V, Option<I>);
-
 /// Stores one or more _association lists_, which are linked lists of key/value pairs. We
 /// additionally guarantee that the elements of an association list are sorted (by their keys), and
 /// that they do not contain any entries with duplicate keys.
@@ -46,10 +43,26 @@ pub struct ListStorage<I, K, V = ()> {
     cells: IndexVec<I, ListCell<I, K, V>>,
 }
 
+/// Each association list is represented by a sequence of snoc cells. A snoc cell is like the more
+/// familiar cons cell `(a : (b : (c : nil)))`, but in reverse `(((nil : a) : b) : c)`.
+///
+/// **Terminology**: The elements of a cons cell are usually called `head` and `tail` (assuming
+/// you're not in Lisp-land, where they're called `car` and `cdr`).  The elements of a snoc cell
+/// are usually called `rest` and `last`.
+///
+/// We use a tuple struct instead of named fields because we always unpack a cell into local
+/// variables:
+///
+/// ```no_run
+/// let ListCell(rest, last_key, last_value) = /* ... */;
+/// ```
+#[derive(Debug, Eq, PartialEq)]
+struct ListCell<I, K, V>(Option<I>, K, V);
+
 impl<I: Idx, K, V> ListStorage<I, K, V> {
-    /// Iterates through the entries in a list.
-    pub fn iter(&self, list: Option<I>) -> ListIterator<'_, I, K, V> {
-        ListIterator {
+    /// Iterates through the entries in a list _in reverse order by key_.
+    pub fn iter_reverse(&self, list: Option<I>) -> ListReverseIterator<'_, I, K, V> {
+        ListReverseIterator {
             storage: self,
             curr: list,
         }
@@ -62,21 +75,23 @@ impl<I: Idx, K, V> ListStorage<I, K, V> {
     where
         K: Ord,
     {
-        self.iter(list).find(|(k, _)| *k == key).map(|(_, v)| v)
+        self.iter_reverse(list)
+            .find(|(k, _)| *k == key)
+            .map(|(_, v)| v)
     }
 }
 
-pub struct ListIterator<'a, I, K, V> {
+pub struct ListReverseIterator<'a, I, K, V> {
     storage: &'a ListStorage<I, K, V>,
     curr: Option<I>,
 }
 
-impl<'a, I: Idx, K, V> Iterator for ListIterator<'a, I, K, V> {
+impl<'a, I: Idx, K, V> Iterator for ListReverseIterator<'a, I, K, V> {
     type Item = (&'a K, &'a V);
 
     fn next(&mut self) -> Option<Self::Item> {
-        let ListCell(key, value, tail) = &self.storage.cells[self.curr?];
-        self.curr = *tail;
+        let ListCell(rest, key, value) = &self.storage.cells[self.curr?];
+        self.curr = *rest;
         Some((key, value))
     }
 }
@@ -89,7 +104,7 @@ pub struct ListBuilder<I, K, V = ()> {
     /// Scratch space that lets us implement our list operations iteratively instead of
     /// recursively.
     ///
-    /// The cons-list representation that we use for alists is very common in functional
+    /// The snoc-list representation that we use for alists is very common in functional
     /// programming, and the simplest implementations of most of the operations are defined
     /// recursively on that data structure. However, they are not _tail_ recursive, which means
     /// that the call stack grows linearly with the size of the input, which can be a problem for
@@ -144,8 +159,8 @@ impl<I: Idx, K, V> ListBuilder<I, K, V> {
     /// methods, we always use `Option<I>` as the return type for any method that can return a
     /// list.
     #[allow(clippy::unnecessary_wraps)]
-    fn add_cell(&mut self, key: K, value: V, tail: Option<I>) -> Option<I> {
-        Some(self.storage.cells.push(ListCell(key, value, tail)))
+    fn add_cell(&mut self, rest: Option<I>, key: K, value: V) -> Option<I> {
+        Some(self.storage.cells.push(ListCell(rest, key, value)))
     }
 
     /// Returns an entry pointing at where `key` would be inserted into a list.
@@ -173,7 +188,7 @@ impl<I: Idx, K, V> ListBuilder<I, K, V> {
         // (and any preceding keys) onto.
         let mut curr = list;
         while let Some(curr_id) = curr {
-            let ListCell(curr_key, curr_value, tail) = &self.storage.cells[curr_id];
+            let ListCell(rest, curr_key, curr_value) = &self.storage.cells[curr_id];
             match key.cmp(curr_key) {
                 // We found an existing entry in the input list with the desired key.
                 Ordering::Equal => {
@@ -181,27 +196,27 @@ impl<I: Idx, K, V> ListBuilder<I, K, V> {
                         builder: self,
                         list,
                         key,
-                        tail: ListTail::Occupied(curr_id),
+                        rest: ListTail::Occupied(curr_id),
                     };
                 }
                 // The input list does not already contain this key, and this is where we should
                 // add it.
-                Ordering::Less => {
+                Ordering::Greater => {
                     return ListEntry {
                         builder: self,
                         list,
                         key,
-                        tail: ListTail::Vacant(curr_id),
+                        rest: ListTail::Vacant(curr_id),
                     };
                 }
                 // If this key is in the list, it's further along. We'll need to create a new cell
                 // for this entry into the result list, so add its contents to the scratch
                 // accumulator.
-                Ordering::Greater => {
+                Ordering::Less => {
                     let new_key = curr_key.clone();
                     let new_value = curr_value.clone();
                     self.scratch.push((new_key, new_value));
-                    curr = *tail;
+                    curr = *rest;
                 }
             }
         }
@@ -211,7 +226,7 @@ impl<I: Idx, K, V> ListBuilder<I, K, V> {
             builder: self,
             list,
             key,
-            tail: ListTail::End,
+            rest: ListTail::Beginning,
         }
     }
 }
@@ -222,13 +237,13 @@ pub struct ListEntry<'a, I, K, V> {
     list: Option<I>,
     key: K,
     /// Points at the element that already contains `key`, if there is one, or the element
-    /// immediately after where it would go, if not.
-    tail: ListTail<I>,
+    /// immediately before where it would go, if not.
+    rest: ListTail<I>,
 }
 
 enum ListTail<I> {
-    /// The list does not already contain `key`, and it would go at the end of the list.
-    End,
+    /// The list does not already contain `key`, and it would go at the beginning of the list.
+    Beginning,
     /// The list already contains `key`
     Occupied(I),
     /// The list does not already contain key
@@ -240,11 +255,11 @@ where
     K: Clone + Ord,
     V: Clone,
 {
-    fn stitch_up(self, value: V, tail: Option<I>) -> Option<I> {
-        let mut result = tail;
-        result = self.builder.add_cell(self.key, value, result);
+    fn stitch_up(self, rest: Option<I>, value: V) -> Option<I> {
+        let mut result = rest;
+        result = self.builder.add_cell(result, self.key, value);
         while let Some((key, value)) = self.builder.scratch.pop() {
-            result = self.builder.add_cell(key, value, result);
+            result = self.builder.add_cell(result, key, value);
         }
         result
     }
@@ -255,15 +270,15 @@ where
     where
         F: FnOnce() -> V,
     {
-        let tail = match self.tail {
+        let rest = match self.rest {
             // If the list already contains `key`, we don't need to replace anything, and can
             // return the original list unmodified.
             ListTail::Occupied(_) => return self.list,
             // Otherwise we have to create a new entry and stitch it onto the list.
-            ListTail::End => None,
+            ListTail::Beginning => None,
             ListTail::Vacant(index) => Some(index),
         };
-        self.stitch_up(f(), tail)
+        self.stitch_up(rest, f())
     }
 
     /// Inserts a new key/value into the list if the key is not already present.
@@ -286,20 +301,20 @@ where
         V: Eq,
     {
         // If the list already contains `key`, skip past its entry before we add its replacement.
-        let tail = match self.tail {
-            ListTail::End => None,
+        let rest = match self.rest {
+            ListTail::Beginning => None,
             ListTail::Occupied(index) => {
-                let ListCell(_, existing_value, tail) = &self.builder.cells[index];
+                let ListCell(rest, _, existing_value) = &self.builder.cells[index];
                 if value == *existing_value {
                     // As an optimization, if value isn't changed, there's no need to stitch up a
                     // new list.
                     return self.list;
                 }
-                *tail
+                *rest
             }
             ListTail::Vacant(index) => Some(index),
         };
-        self.stitch_up(value, tail)
+        self.stitch_up(rest, value)
     }
 
     /// Sets the value of the entry to the default value, returning the resulting list. Overwrites
@@ -333,21 +348,21 @@ impl<I: Idx, K, V> ListBuilder<I, K, V> {
         // vector. Continue until we run out of elements in either list. (Any remaining elements in
         // the other list cannot possibly be in the intersection.)
         while let (Some(a_id), Some(b_id)) = (a, b) {
-            let ListCell(a_key, a_value, a_tail) = &self.storage.cells[a_id];
-            let ListCell(b_key, b_value, b_tail) = &self.storage.cells[b_id];
+            let ListCell(a_rest, a_key, a_value) = &self.storage.cells[a_id];
+            let ListCell(b_rest, b_key, b_value) = &self.storage.cells[b_id];
             match a_key.cmp(b_key) {
                 // Both lists contain this key; combine their values
                 Ordering::Equal => {
                     let new_key = a_key.clone();
                     let new_value = combine(a_value, b_value);
                     self.scratch.push((new_key, new_value));
-                    a = *a_tail;
-                    b = *b_tail;
+                    a = *a_rest;
+                    b = *b_rest;
                 }
                 // a's key is only present in a, so it's not included in the result.
-                Ordering::Less => a = *a_tail,
+                Ordering::Greater => a = *a_rest,
                 // b's key is only present in b, so it's not included in the result.
-                Ordering::Greater => b = *b_tail,
+                Ordering::Less => b = *b_rest,
             }
         }
 
@@ -355,7 +370,7 @@ impl<I: Idx, K, V> ListBuilder<I, K, V> {
         // alist cells.
         let mut result = None;
         while let Some((key, value)) = self.scratch.pop() {
-            result = self.add_cell(key, value, result);
+            result = self.add_cell(result, key, value);
         }
         result
     }
@@ -382,30 +397,30 @@ impl<I: Idx, K, V> ListBuilder<I, K, V> {
                 (Some(a_id), Some(b_id)) => (a_id, b_id),
             };
 
-            let ListCell(a_key, a_value, a_tail) = &self.storage.cells[a_id];
-            let ListCell(b_key, b_value, b_tail) = &self.storage.cells[b_id];
+            let ListCell(a_rest, a_key, a_value) = &self.storage.cells[a_id];
+            let ListCell(b_rest, b_key, b_value) = &self.storage.cells[b_id];
             match a_key.cmp(b_key) {
                 // Both lists contain this key; combine their values
                 Ordering::Equal => {
                     let new_key = a_key.clone();
                     let new_value = combine(a_value, b_value);
                     self.scratch.push((new_key, new_value));
-                    a = *a_tail;
-                    b = *b_tail;
+                    a = *a_rest;
+                    b = *b_rest;
                 }
                 // a's key is lower, so it goes into the result next
-                Ordering::Less => {
+                Ordering::Greater => {
                     let new_key = a_key.clone();
                     let new_value = a_value.clone();
                     self.scratch.push((new_key, new_value));
-                    a = *a_tail;
+                    a = *a_rest;
                 }
                 // b's key is lower, so it goes into the result next
-                Ordering::Greater => {
+                Ordering::Less => {
                     let new_key = b_key.clone();
                     let new_value = b_value.clone();
                     self.scratch.push((new_key, new_value));
-                    b = *b_tail;
+                    b = *b_rest;
                 }
             }
         };
@@ -413,7 +428,7 @@ impl<I: Idx, K, V> ListBuilder<I, K, V> {
         // Once the iteration loop terminates, we stitch the new entries back together into proper
         // alist cells.
         while let Some((key, value)) = self.scratch.pop() {
-            result = self.add_cell(key, value, result);
+            result = self.add_cell(result, key, value);
         }
         result
     }
@@ -423,26 +438,26 @@ impl<I: Idx, K, V> ListBuilder<I, K, V> {
 // Sets
 
 impl<I: Idx, K> ListStorage<I, K, ()> {
-    /// Iterates through the elements in a set.
-    pub fn iter_set(&self, set: Option<I>) -> ListSetIterator<'_, I, K> {
-        ListSetIterator {
+    /// Iterates through the elements in a set _in reverse order_.
+    pub fn iter_set_reverse(&self, set: Option<I>) -> ListSetReverseIterator<'_, I, K> {
+        ListSetReverseIterator {
             storage: self,
             curr: set,
         }
     }
 }
 
-pub struct ListSetIterator<'a, I, K> {
+pub struct ListSetReverseIterator<'a, I, K> {
     storage: &'a ListStorage<I, K, ()>,
     curr: Option<I>,
 }
 
-impl<'a, I: Idx, K> Iterator for ListSetIterator<'a, I, K> {
+impl<'a, I: Idx, K> Iterator for ListSetReverseIterator<'a, I, K> {
     type Item = &'a K;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let ListCell(key, (), tail) = &self.storage.cells[self.curr?];
-        self.curr = *tail;
+        let ListCell(rest, key, ()) = &self.storage.cells[self.curr?];
+        self.curr = *rest;
         Some(key)
     }
 }
@@ -502,9 +517,10 @@ mod tests {
         K: Display,
     {
         fn display_set(&self, list: Option<I>) -> String {
+            let elements: Vec<_> = self.iter_set_reverse(list).collect();
             let mut result = String::new();
             result.push('[');
-            for (element, ()) in self.iter(list) {
+            for element in elements.into_iter().rev() {
                 if result.len() > 1 {
                     result.push_str(", ");
                 }
@@ -616,9 +632,10 @@ mod tests {
         V: Display,
     {
         fn display(&self, list: Option<I>) -> String {
+            let entries: Vec<_> = self.iter_reverse(list).collect();
             let mut result = String::new();
             result.push('[');
-            for (key, value) in self.iter(list) {
+            for (key, value) in entries.into_iter().rev() {
                 if result.len() > 1 {
                     result.push_str(", ");
                 }

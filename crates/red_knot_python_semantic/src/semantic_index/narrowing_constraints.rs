@@ -25,7 +25,7 @@
 //!
 //! [`Constraint`]: crate::semantic_index::constraint::Constraint
 
-use ruff_index::list::{ListBuilder, ListSetIterator, ListStorage};
+use ruff_index::list::{ListBuilder, ListSetReverseIterator, ListStorage};
 use ruff_index::newtype_index;
 
 use crate::semantic_index::constraint::ScopedConstraintId;
@@ -112,7 +112,7 @@ impl NarrowingConstraintsBuilder {
 // ---------
 
 pub(crate) type NarrowingConstraintsIterator<'a> = std::iter::Copied<
-    ListSetIterator<'a, ScopedNarrowingConstraintId, ScopedNarrowingConstraintClause>,
+    ListSetReverseIterator<'a, ScopedNarrowingConstraintId, ScopedNarrowingConstraintClause>,
 >;
 
 impl NarrowingConstraints {
@@ -121,7 +121,7 @@ impl NarrowingConstraints {
         &self,
         set: Option<ScopedNarrowingConstraintId>,
     ) -> NarrowingConstraintsIterator<'_> {
-        self.lists.iter_set(set).copied()
+        self.lists.iter_set_reverse(set).copied()
     }
 }
 
@@ -143,7 +143,7 @@ mod tests {
             &self,
             set: Option<ScopedNarrowingConstraintId>,
         ) -> NarrowingConstraintsIterator<'_> {
-            self.lists.iter_set(set).copied()
+            self.lists.iter_set_reverse(set).copied()
         }
     }
 }

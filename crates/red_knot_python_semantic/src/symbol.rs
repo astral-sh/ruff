@@ -541,13 +541,15 @@ fn symbol_from_bindings_impl<'db>(
                 return None;
             }
 
-            let mut constraint_tys = narrowing_constraint
+            let constraint_tys: Vec<_> = narrowing_constraint
                 .filter_map(|constraint| infer_narrowing_constraint(db, constraint, binding))
-                .peekable();
+                .collect();
 
             let binding_ty = binding_type(db, binding);
-            if constraint_tys.peek().is_some() {
+            if !constraint_tys.is_empty() {
                 let intersection_ty = constraint_tys
+                    .into_iter()
+                    .rev()
                     .fold(
                         IntersectionBuilder::new(db).add_positive(binding_ty),
                         IntersectionBuilder::add_positive,
