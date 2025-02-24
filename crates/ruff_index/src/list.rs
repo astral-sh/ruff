@@ -29,7 +29,7 @@ struct ListCell<I, K, V>(K, V, Option<I>);
 ///
 /// This type provides read-only access to the lists.  Use a [`ListBuilder`] to create lists.
 #[derive(Debug, Eq, PartialEq)]
-pub struct ListStorage<I, K, V> {
+pub struct ListStorage<I, K, V = ()> {
     cells: IndexVec<I, ListCell<I, K, V>>,
 }
 
@@ -69,7 +69,7 @@ impl<'a, I: Idx, K, V> Iterator for ListIterator<'a, I, K, V> {
 
 /// Constructs one or more association lists.
 #[derive(Debug, Eq, PartialEq)]
-pub struct ListBuilder<I, K, V> {
+pub struct ListBuilder<I, K, V = ()> {
     storage: ListStorage<I, K, V>,
 
     /// Scratch space that lets us implement our list operations iteratively instead of
@@ -405,7 +405,7 @@ mod tests {
     // ----
     // Sets
 
-    impl<I, K> ListStorage<I, K, ()>
+    impl<I, K> ListStorage<I, K>
     where
         I: Idx,
         K: Display,
@@ -426,7 +426,7 @@ mod tests {
 
     #[test]
     fn can_insert_into_set() {
-        let mut builder = ListBuilder::<TestIndex, u16, ()>::default();
+        let mut builder = ListBuilder::<TestIndex, u16>::default();
 
         // Build up the set in order
         let set1 = builder.entry(None, 1).replace_with_default();
@@ -453,7 +453,7 @@ mod tests {
 
     #[test]
     fn can_insert_if_needed_into_set() {
-        let mut builder = ListBuilder::<TestIndex, u16, ()>::default();
+        let mut builder = ListBuilder::<TestIndex, u16>::default();
 
         // Build up the set in order
         let set1 = builder.entry(None, 1).or_insert_default();
@@ -480,7 +480,7 @@ mod tests {
 
     #[test]
     fn can_intersect_sets() {
-        let mut builder = ListBuilder::<TestIndex, u16, ()>::default();
+        let mut builder = ListBuilder::<TestIndex, u16>::default();
 
         let set1 = builder.entry(None, 1).or_insert_default();
         let set12 = builder.entry(set1, 2).or_insert_default();
@@ -512,7 +512,7 @@ mod tests {
 
     #[test]
     fn can_union_sets() {
-        let mut builder = ListBuilder::<TestIndex, u16, ()>::default();
+        let mut builder = ListBuilder::<TestIndex, u16>::default();
 
         let set1 = builder.entry(None, 1).or_insert_default();
         let set12 = builder.entry(set1, 2).or_insert_default();
