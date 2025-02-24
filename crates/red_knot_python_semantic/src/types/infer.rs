@@ -52,7 +52,7 @@ use crate::semantic_index::SemanticIndex;
 use crate::symbol::{
     builtins_module_scope, builtins_symbol, explicit_global_symbol,
     module_type_implicit_global_symbol, symbol, symbol_from_bindings, symbol_from_declarations,
-    typing_extensions_symbol, LookupError,
+    typing_extensions_symbol, Boundness, LookupError,
 };
 use crate::types::call::{Argument, CallArguments, UnionCallError};
 use crate::types::diagnostic::{
@@ -68,12 +68,11 @@ use crate::types::diagnostic::{
 use crate::types::mro::MroErrorKind;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
-    todo_type, Boundness, Class, ClassLiteralType, DynamicType, FunctionType, InstanceType,
+    class::MetaclassErrorKind, todo_type, Class, DynamicType, FunctionType, InstanceType,
     IntersectionBuilder, IntersectionType, KnownClass, KnownFunction, KnownInstanceType,
-    MetaclassCandidate, MetaclassErrorKind, SliceLiteralType, SubclassOfType, Symbol,
-    SymbolAndQualifiers, Truthiness, TupleType, Type, TypeAliasType, TypeAndQualifiers,
-    TypeArrayDisplay, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarInstance, UnionBuilder,
-    UnionType,
+    MetaclassCandidate, SliceLiteralType, SubclassOfType, Symbol, SymbolAndQualifiers, Truthiness,
+    TupleType, Type, TypeAliasType, TypeAndQualifiers, TypeArrayDisplay, TypeQualifiers,
+    TypeVarBoundOrConstraints, TypeVarInstance, UnionBuilder, UnionType,
 };
 use crate::unpack::Unpack;
 use crate::util::subscript::{PyIndex, PySlice};
@@ -608,7 +607,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 if let DefinitionKind::Class(class) = definition.kind(self.db()) {
                     ty.inner_type()
                         .into_class_literal()
-                        .map(|ty| (ty.class, class.node()))
+                        .map(|ty| (ty.class(), class.node()))
                 } else {
                     None
                 }
@@ -636,7 +635,9 @@ impl<'db> TypeInferenceBuilder<'db> {
             // (2) Check for classes that inherit from `@final` classes
             for (i, base_class) in class.explicit_bases(self.db()).iter().enumerate() {
                 // dynamic/unknown bases are never `@final`
-                let Some(ClassLiteralType { class: base_class }) = base_class.into_class_literal()
+                let Some(base_class) = base_class
+                    .into_class_literal()
+                    .map(super::class::ClassLiteralType::class)
                 else {
                     continue;
                 };
@@ -876,9 +877,9 @@ impl<'db> TypeInferenceBuilder<'db> {
     fn check_division_by_zero(&mut self, expr: &ast::ExprBinOp, left: Type<'db>) {
         match left {
             Type::BooleanLiteral(_) | Type::IntLiteral(_) => {}
-            Type::Instance(InstanceType { class })
+            Type::Instance(instance)
                 if matches!(
-                    class.known(self.db()),
+                    instance.class().known(self.db()),
                     Some(KnownClass::Float | KnownClass::Int | KnownClass::Bool)
                 ) => {}
             _ => return,
@@ -2192,8 +2193,11 @@ impl<'db> TypeInferenceBuilder<'db> {
         );
 
         // Handle various singletons.
-        if let Type::Instance(InstanceType { class }) = declared_ty.inner_type() {
-            if class.is_known(self.db(), KnownClass::SpecialForm) {
+        if let Type::Instance(instance) = declared_ty.inner_type() {
+            if instance
+                .class()
+                .is_known(self.db(), KnownClass::SpecialForm)
+            {
                 if let Some(name_expr) = target.as_name_expr() {
                     if let Some(known_instance) = KnownInstanceType::try_from_file_and_name(
                         self.db(),
@@ -2252,9 +2256,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                     self.infer_augmented_op(assignment, target_type, value_type)
                 })
             }
-            Type::Instance(InstanceType { class }) => {
-                if let Symbol::Type(class_member, boundness) =
-                    class.class_member(self.db(), op.in_place_dunder())
+            Type::Instance(instance) => {
+                if let Symbol::Type(class_member, boundness) = instance
+                    .class()
+                    .class_member(self.db(), op.in_place_dunder())
                 {
                     let call = class_member.try_call(
                         self.db(),
@@ -3708,8 +3713,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             .unwrap_with_diagnostic(|lookup_error| match lookup_error {
                 LookupError::Unbound => {
                     let bound_on_instance = match value_type {
-                    Type::ClassLiteral(ClassLiteralType { class }) => {
-                        !class.instance_member(self.db(), attr).0.is_unbound()
+                    Type::ClassLiteral(class) => {
+                        !class.class().instance_member(self.db(), attr).0.is_unbound()
                     }
                     Type::SubclassOf(subclass_of @ SubclassOfType { .. }) => {
                         match subclass_of.subclass_of() {
@@ -3776,7 +3781,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                 let symbol = match value_ty {
                     Type::Instance(instance) => {
-                        let instance_member = instance.class.instance_member(self.db(), attr);
+                        let instance_member = instance.class().instance_member(self.db(), attr);
                         if instance_member.is_class_var() {
                             self.context.report_lint(
                             &INVALID_ATTRIBUTE_ACCESS,
@@ -3795,7 +3800,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                         if class_member.is_unbound() {
                             if let Some(class) = match value_ty {
-                                Type::ClassLiteral(ClassLiteralType { class }) => Some(class),
+                                Type::ClassLiteral(class) => Some(class.class()),
                                 Type::SubclassOf(subclass_of @ SubclassOfType { .. }) => {
                                     match subclass_of.subclass_of() {
                                         ClassBase::Class(class) => Some(class),
@@ -4683,8 +4688,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                 KnownClass::Bytes.to_instance(self.db()),
                 range,
             ),
-            (Type::Tuple(_), Type::Instance(InstanceType { class }))
-                if class.is_known(self.db(), KnownClass::VersionInfo) =>
+            (Type::Tuple(_), Type::Instance(instance))
+                if instance
+                    .class()
+                    .is_known(self.db(), KnownClass::VersionInfo) =>
             {
                 self.infer_binary_type_comparison(
                     left,
@@ -4693,8 +4700,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                     range,
                 )
             }
-            (Type::Instance(InstanceType { class }), Type::Tuple(_))
-                if class.is_known(self.db(), KnownClass::VersionInfo) =>
+            (Type::Instance(instance), Type::Tuple(_))
+                if instance
+                    .class()
+                    .is_known(self.db(), KnownClass::VersionInfo) =>
             {
                 self.infer_binary_type_comparison(
                     Type::version_info_tuple(self.db()),
@@ -4839,7 +4848,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let call_dunder = |op: RichCompareOperator,
                            left: InstanceType<'db>,
                            right: InstanceType<'db>| {
-            match left.class.class_member(db, op.dunder()) {
+            match left.class().class_member(db, op.dunder()) {
                 Symbol::Type(class_member_dunder, Boundness::Bound) => class_member_dunder
                     .try_call(
                         db,
@@ -4887,7 +4896,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     ) -> Result<Type<'db>, CompareUnsupportedError<'db>> {
         let db = self.db();
 
-        let contains_dunder = right.class.class_member(db, "__contains__");
+        let contains_dunder = right.class().class_member(db, "__contains__");
         let compare_result_opt = match contains_dunder {
             Symbol::Type(contains_dunder, Boundness::Bound) => {
                 // If `__contains__` is available, it is used directly for the membership test.
@@ -5032,14 +5041,18 @@ impl<'db> TypeInferenceBuilder<'db> {
     ) -> Type<'db> {
         match (value_ty, slice_ty) {
             (
-                Type::Instance(InstanceType { class }),
+                Type::Instance(instance),
                 Type::IntLiteral(_) | Type::BooleanLiteral(_) | Type::SliceLiteral(_),
-            ) if class.is_known(self.db(), KnownClass::VersionInfo) => self
-                .infer_subscript_expression_types(
+            ) if instance
+                .class()
+                .is_known(self.db(), KnownClass::VersionInfo) =>
+            {
+                self.infer_subscript_expression_types(
                     value_node,
                     Type::version_info_tuple(self.db()),
                     slice_ty,
-                ),
+                )
+            }
 
             // Ex) Given `("a", "b", "c", "d")[1]`, return `"b"`
             (Type::Tuple(tuple_ty), Type::IntLiteral(int)) if i32::try_from(int).is_ok() => {
@@ -5236,7 +5249,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         }
                     }
 
-                    if matches!(value_ty, Type::ClassLiteral(ClassLiteralType { class }) if class.is_known(self.db(), KnownClass::Type))
+                    if matches!(value_ty, Type::ClassLiteral(class_literal) if class_literal.class().is_known(self.db(), KnownClass::Type))
                     {
                         return KnownClass::GenericAlias.to_instance(self.db());
                     }
@@ -5284,8 +5297,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                 Err(_) => SliceArg::Unsupported,
             },
             Some(Type::BooleanLiteral(b)) => SliceArg::Arg(Some(i32::from(b))),
-            Some(Type::Instance(InstanceType { class }))
-                if class.is_known(self.db(), KnownClass::NoneType) =>
+            Some(Type::Instance(instance))
+                if instance.class().is_known(self.db(), KnownClass::NoneType) =>
             {
                 SliceArg::Arg(None)
             }
@@ -5722,7 +5735,8 @@ impl<'db> TypeInferenceBuilder<'db> {
         value_ty: Type<'db>,
     ) -> Type<'db> {
         match value_ty {
-            Type::ClassLiteral(class_literal_ty) => match class_literal_ty.class.known(self.db()) {
+            Type::ClassLiteral(class_literal_ty) => match class_literal_ty.class().known(self.db())
+            {
                 Some(KnownClass::Tuple) => self.infer_tuple_type_expression(slice),
                 Some(KnownClass::Type) => self.infer_subclass_of_type_expression(slice),
                 _ => self.infer_subscript_type_expression(subscript, value_ty),
@@ -5811,8 +5825,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             ast::Expr::Name(_) | ast::Expr::Attribute(_) => {
                 let name_ty = self.infer_expression(slice);
                 match name_ty {
-                    Type::ClassLiteral(ClassLiteralType { class }) => {
-                        SubclassOfType::from(self.db(), class)
+                    Type::ClassLiteral(class_literal_ty) => {
+                        SubclassOfType::from(self.db(), class_literal_ty.class())
                     }
                     Type::KnownInstance(KnownInstanceType::Any) => {
                         SubclassOfType::subclass_of_any()

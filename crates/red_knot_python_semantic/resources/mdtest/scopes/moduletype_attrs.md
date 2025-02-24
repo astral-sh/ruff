@@ -136,3 +136,42 @@ if returns_bool():
 reveal_type(__file__)  # revealed: Literal[42]
 reveal_type(__name__)  # revealed: Literal[1] | str
 ```
+
+## Implicit global attributes in the current module override implicit globals from builtins
+
+Here, we take the type of the implicit global symbol `__name__` from the `types.ModuleType` stub
+(which in this custom typeshed specifies the type as `bytes`). This is because the `main` module has
+an implicit `__name__` global that shadows the builtin `__name__` symbol.
+
+```toml
+[environment]
+typeshed = "/typeshed"
+```
+
+`/typeshed/stdlib/builtins.pyi`:
+
+```pyi
+class int: ...
+class bytes: ...
+
+__name__: int = 42
+```
+
+`/typeshed/stdlib/types.pyi`:
+
+```pyi
+class ModuleType:
+    __name__: bytes
+```
+
+`/typeshed/stdlib/typing_extensions.pyi`:
+
+```pyi
+def reveal_type(obj, /): ...
+```
+
+`main.py`:
+
+```py
+reveal_type(__name__)  # revealed: bytes
+```

@@ -377,7 +377,7 @@ PYI030.py:63:10: PYI030 [*] Multiple literal members in a union. Use a single li
    |
    = help: Replace with a single `Literal`
 
-ℹ Safe fix
+ℹ Unsafe fix
 60 60 | field19: typing.Literal[1] | typing.Literal[2]  # Error
 61 61 | 
 62 62 | # Should emit in cases with newlines
@@ -538,6 +538,8 @@ PYI030.py:93:16: PYI030 [*] Multiple literal members in a union. Use a single li
 92 |
 93 | InlineOption = Literal["a"] | Literal["b"] | IO[str]
    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI030
+94 |
+95 | # Should use unsafe fix when comments are deleted
    |
    = help: Replace with a single `Literal`
 
@@ -547,3 +549,51 @@ PYI030.py:93:16: PYI030 [*] Multiple literal members in a union. Use a single li
 92 92 | 
 93    |-InlineOption = Literal["a"] | Literal["b"] | IO[str]
    93 |+InlineOption = Literal["a", "b"] | IO[str]
+94 94 | 
+95 95 | # Should use unsafe fix when comments are deleted
+96 96 | field26: (
+
+PYI030.py:98:5: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal["a", "b", "c", "d"]`
+    |
+ 96 |   field26: (
+ 97 |       # First comment
+ 98 | /     Literal["a", "b"]
+ 99 | |     # Second comment
+100 | |     | Literal["c", "d"]
+    | |_______________________^ PYI030
+101 |   )
+102 |   field27: (
+    |
+    = help: Replace with a single `Literal`
+
+ℹ Unsafe fix
+95  95  | # Should use unsafe fix when comments are deleted
+96  96  | field26: (
+97  97  |     # First comment
+98      |-    Literal["a", "b"]
+99      |-    # Second comment
+100     |-    | Literal["c", "d"]
+    98  |+    Literal["a", "b", "c", "d"]
+101 99  | )
+102 100 | field27: (
+103 101 |     Literal["a", "b"]  # First comment
+
+PYI030.py:103:5: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal["a", "b", "c", "d"]`
+    |
+101 |   )
+102 |   field27: (
+103 | /     Literal["a", "b"]  # First comment
+104 | |     | Literal["c", "d"]  # Second comment
+    | |_______________________^ PYI030
+105 |   )
+    |
+    = help: Replace with a single `Literal`
+
+ℹ Unsafe fix
+100 100 |     | Literal["c", "d"]
+101 101 | )
+102 102 | field27: (
+103     |-    Literal["a", "b"]  # First comment
+104     |-    | Literal["c", "d"]  # Second comment
+    103 |+    Literal["a", "b", "c", "d"]  # Second comment
+105 104 | )

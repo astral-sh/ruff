@@ -203,7 +203,7 @@ impl<'db> CallBinding<'db> {
     fn callable_name(&self, db: &'db dyn Db) -> Option<&str> {
         match self.callable_ty {
             Type::FunctionLiteral(function) => Some(function.name(db)),
-            Type::ClassLiteral(class_type) => Some(class_type.class.name(db)),
+            Type::ClassLiteral(class_type) => Some(class_type.class().name(db)),
             _ => None,
         }
     }
