@@ -58,6 +58,19 @@ fn test_valid_syntax(input_path: &Path) {
             .unwrap();
         }
 
+        for error in parsed.unsupported_syntax_errors() {
+            writeln!(
+                &mut message,
+                "{}\n",
+                CodeFrame {
+                    range: error.range,
+                    error: &ParseErrorType::OtherError(error.to_string()),
+                    source_code: &source_code,
+                }
+            )
+            .unwrap();
+        }
+
         panic!("{input_path:?}: {message}");
     }
 
