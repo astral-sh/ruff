@@ -98,10 +98,12 @@ fn test_invalid_syntax(input_path: &Path) {
     writeln!(&mut output, "## AST").unwrap();
     writeln!(&mut output, "\n```\n{:#?}\n```", parsed.syntax()).unwrap();
 
-    writeln!(&mut output, "## Errors\n").unwrap();
-
     let line_index = LineIndex::from_source_text(&source);
     let source_code = SourceCode::new(&source, &line_index);
+
+    if !parsed.errors().is_empty() {
+        writeln!(&mut output, "## Errors\n").unwrap();
+    }
 
     for error in parsed.errors() {
         writeln!(
