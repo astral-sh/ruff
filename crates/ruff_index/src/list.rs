@@ -34,7 +34,7 @@ use crate::Idx;
 ///
 /// There is one remaining caveat:
 ///
-/// - You should construct lists in key order; doing lets you insert each value in constant time.
+/// - You should construct lists in key order; doing this lets you insert each value in constant time.
 ///   Inserting entries in reverse order results in _quadratic_ overall time to construct the list.
 ///
 /// This type provides read-only access to the lists.  Use a [`ListBuilder`] to create lists.
