@@ -170,10 +170,10 @@ impl<I: Idx, K, V> ListBuilder<I, K, V> {
         self.scratch.clear();
 
         // Iterate through the input list, looking for the position where the key should be
-        // inserted. We will need to create new list cells for any elements that appear before the
+        // inserted. We will need to create new list cells for any elements that appear after the
         // new key. Stash those away in our scratch accumulator as we step through the input. The
-        // result of the loop is that "tail" of the result list, which we will stitch the new key
-        // (and any preceding keys) onto.
+        // result of the loop is that "rest" of the result list, which we will stitch the new key
+        // (and any succeeding keys) onto.
         let mut curr = list;
         while let Some(curr_id) = curr {
             let ListCell(rest, curr_key, curr_value) = &self.storage.cells[curr_id];
@@ -198,7 +198,7 @@ impl<I: Idx, K, V> ListBuilder<I, K, V> {
                     };
                 }
                 // If this key is in the list, it's further along. We'll need to create a new cell
-                // for this entry into the result list, so add its contents to the scratch
+                // for this entry in the result list, so add its contents to the scratch
                 // accumulator.
                 Ordering::Less => {
                     let new_key = curr_key.clone();
@@ -209,7 +209,9 @@ impl<I: Idx, K, V> ListBuilder<I, K, V> {
             }
         }
 
-        // We made it all the way through the list without finding the desired key.
+        // We made it all the way through the list without finding the desired key, so it belongs
+        // at the beginning. (And we will unfortunately have to duplicate every existing cell if
+        // the caller proceeds with inserting the new key!)
         ListEntry {
             builder: self,
             list,
@@ -234,7 +236,7 @@ enum ListTail<I> {
     Beginning,
     /// The list already contains `key`
     Occupied(I),
-    /// The list does not already contain key
+    /// The list does not already contain key, and it would go immediately after the given element
     Vacant(I),
 }
 
@@ -269,12 +271,14 @@ where
         self.stitch_up(rest, f())
     }
 
-    /// Inserts a new key/value into the list if the key is not already present.
+    /// Inserts a new key/value into the list if the key is not already present. If the list
+    /// already contains `key`, we return the original list as-is.
     pub fn or_insert(self, value: V) -> Option<I> {
         self.or_insert_with(|| value)
     }
 
-    /// Inserts a new key and the default value into the list if the key is not already present.
+    /// Inserts a new key and the default value into the list if the key is not already present. If
+    /// the list already contains `key`, we return the original list as-is.
     pub fn or_insert_default(self) -> Option<I>
     where
         V: Default,
@@ -282,8 +286,9 @@ where
         self.or_insert_with(V::default)
     }
 
-    /// Sets the value of the entry, returning the resulting list. Overwrites any existing entry
-    /// with the same key
+    /// Ensures that the list contains an entry mapping the key to `value`, returning the resulting
+    /// list. Overwrites any existing entry with the same key. As an optimization, if the existing
+    /// entry has an equal _value_, as well, we return the original list as-is.
     pub fn replace(self, value: V) -> Option<I>
     where
         V: Eq,
@@ -305,8 +310,9 @@ where
         self.stitch_up(rest, value)
     }
 
-    /// Sets the value of the entry to the default value, returning the resulting list. Overwrites
-    /// any existing entry with the same key
+    /// Ensures that the list contains an entry mapping the key to the default, returning the
+    /// resulting list. Overwrites any existing entry with the same key. As an optimization, if the
+    /// existing entry has an equal _value_, as well, we return the original list as-is.
     pub fn replace_with_default(self) -> Option<I>
     where
         V: Default + Eq,
@@ -318,7 +324,7 @@ where
 impl<I: Idx, K, V> ListBuilder<I, K, V> {
     /// Returns the intersection of two lists. The result will contain an entry for any key that
     /// appears in both lists. The corresponding values will be combined using the `combine`
-    /// function.
+    /// function that you provide.
     pub fn intersect_with<F>(
         &mut self,
         mut a: Option<I>,
@@ -365,7 +371,7 @@ impl<I: Idx, K, V> ListBuilder<I, K, V> {
 
     /// Returns the union of two lists. The result will contain an entry for any key that appears
     /// in either list. For keys that appear in both lists, the corresponding values will be
-    /// combined using the `combine` function.
+    /// combined using the `combine` function that you provide.
     pub fn union_with<F>(&mut self, mut a: Option<I>, mut b: Option<I>, mut combine: F) -> Option<I>
     where
         K: Clone + Ord,
@@ -376,7 +382,8 @@ impl<I: Idx, K, V> ListBuilder<I, K, V> {
 
         // Zip through the lists, building up the keys/values of the new entries into our scratch
         // vector. Continue until we run out of elements in either list. (Any remaining elements in
-        // the other list cannot possibly be in the intersection.)
+        // the other list will be added to the result, but won't need to be combined with
+        // anything.)
         let mut result = loop {
             let (a_id, b_id) = match (a, b) {
                 // If we run out of elements in one of the lists, the non-empty list will appear in
@@ -396,14 +403,14 @@ impl<I: Idx, K, V> ListBuilder<I, K, V> {
                     a = *a_rest;
                     b = *b_rest;
                 }
-                // a's key is lower, so it goes into the result next
+                // a's key goes into the result next
                 Ordering::Greater => {
                     let new_key = a_key.clone();
                     let new_value = a_value.clone();
                     self.scratch.push((new_key, new_value));
                     a = *a_rest;
                 }
-                // b's key is lower, so it goes into the result next
+                // b's key goes into the result next
                 Ordering::Less => {
                     let new_key = b_key.clone();
                     let new_value = b_value.clone();
