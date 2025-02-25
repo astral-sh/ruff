@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity, Span};
 use ruff_db::files::File;
-use ruff_python_parser::SyntaxError;
+use ruff_python_parser::UnsupportedSyntaxError;
 use ruff_text_size::TextRange;
 
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -32,7 +32,7 @@ impl Diagnostic for SyntaxDiagnostic {
 }
 
 impl SyntaxDiagnostic {
-    pub fn from_syntax_error(value: &SyntaxError, file: File) -> Self {
+    pub fn from_syntax_error(value: &UnsupportedSyntaxError, file: File) -> Self {
         Self {
             id: DiagnosticId::InvalidSyntax,
             message: value.to_string(),

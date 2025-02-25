@@ -432,19 +432,19 @@ impl std::fmt::Display for LexicalErrorType {
 /// An example of a version-related error is the use of a `match` statement before Python 3.10, when
 /// it was first introduced. See [`SyntaxErrorKind`] for other kinds of errors.
 #[derive(Debug, PartialEq, Clone)]
-pub struct SyntaxError {
+pub struct UnsupportedSyntaxError {
     pub kind: SyntaxErrorKind,
     pub range: TextRange,
     /// The target [`PythonVersion`] for which this error was detected.
     ///
     /// This is different from the version reported by the
-    /// [`minimum_version`](SyntaxError::minimum_version) method, which is the earliest allowed
-    /// version for this piece of syntax. The `target_version` is primarily used for user-facing
-    /// error messages.
+    /// [`minimum_version`](UnsupportedSyntaxError::minimum_version) method, which is the earliest
+    /// allowed version for this piece of syntax. The `target_version` is primarily used for
+    /// user-facing error messages.
     pub target_version: PythonVersion,
 }
 
-impl SyntaxError {
+impl UnsupportedSyntaxError {
     /// The earliest allowed version for the syntax associated with this error.
     pub const fn minimum_version(&self) -> PythonVersion {
         match self.kind {
@@ -453,7 +453,7 @@ impl SyntaxError {
     }
 }
 
-impl Display for SyntaxError {
+impl Display for UnsupportedSyntaxError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.kind {
             SyntaxErrorKind::MatchBeforePy310 => write!(

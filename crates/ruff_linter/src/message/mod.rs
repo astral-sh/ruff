@@ -16,7 +16,7 @@ pub use pylint::PylintEmitter;
 pub use rdjson::RdjsonEmitter;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind, Fix};
 use ruff_notebook::NotebookIndex;
-use ruff_python_parser::{ParseError, SyntaxError};
+use ruff_python_parser::{ParseError, UnsupportedSyntaxError};
 use ruff_source_file::{SourceFile, SourceLocation};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 pub use sarif::SarifEmitter;
@@ -122,7 +122,7 @@ impl Message {
     }
 
     /// Create a [`Message`] from the given [`SyntaxError`].
-    pub fn from_syntax_error(syntax_error: &SyntaxError, file: SourceFile) -> Message {
+    pub fn from_syntax_error(syntax_error: &UnsupportedSyntaxError, file: SourceFile) -> Message {
         Message::SyntaxError(SyntaxErrorMessage {
             message: format!("SyntaxError: {syntax_error}"),
             range: syntax_error.range,

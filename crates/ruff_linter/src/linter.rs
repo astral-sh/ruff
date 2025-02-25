@@ -13,7 +13,7 @@ use ruff_notebook::Notebook;
 use ruff_python_ast::{ModModule, PySourceType, PythonVersion};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
-use ruff_python_parser::{ParseError, ParseOptions, Parsed, SyntaxError};
+use ruff_python_parser::{ParseError, ParseOptions, Parsed, UnsupportedSyntaxError};
 use ruff_source_file::SourceFileBuilder;
 use ruff_text_size::Ranged;
 
@@ -452,7 +452,7 @@ pub fn lint_only(
 fn diagnostics_to_messages(
     diagnostics: Vec<Diagnostic>,
     parse_errors: &[ParseError],
-    syntax_errors: &[SyntaxError],
+    syntax_errors: &[UnsupportedSyntaxError],
     path: &Path,
     locator: &Locator,
     directives: &Directives,

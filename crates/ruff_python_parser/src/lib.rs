@@ -68,7 +68,8 @@ use std::iter::FusedIterator;
 use std::ops::Deref;
 
 pub use crate::error::{
-    FStringErrorType, LexicalErrorType, ParseError, ParseErrorType, SyntaxError, SyntaxErrorKind,
+    FStringErrorType, LexicalErrorType, ParseError, ParseErrorType, SyntaxErrorKind,
+    UnsupportedSyntaxError,
 };
 pub use crate::parser::ParseOptions;
 pub use crate::token::{Token, TokenKind};
@@ -307,7 +308,7 @@ pub struct Parsed<T> {
     syntax: T,
     tokens: Tokens,
     errors: Vec<ParseError>,
-    syntax_errors: Vec<SyntaxError>,
+    syntax_errors: Vec<UnsupportedSyntaxError>,
 }
 
 impl<T> Parsed<T> {
@@ -327,7 +328,7 @@ impl<T> Parsed<T> {
     }
 
     /// Returns a list of version-related syntax errors found during parsing.
-    pub fn syntax_errors(&self) -> &[SyntaxError] {
+    pub fn syntax_errors(&self) -> &[UnsupportedSyntaxError] {
         &self.syntax_errors
     }
 

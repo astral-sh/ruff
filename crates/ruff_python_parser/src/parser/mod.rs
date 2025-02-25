@@ -5,7 +5,7 @@ use bitflags::bitflags;
 use ruff_python_ast::{Mod, ModExpression, ModModule};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
-use crate::error::SyntaxError;
+use crate::error::UnsupportedSyntaxError;
 use crate::parser::expression::ExpressionContext;
 use crate::parser::progress::{ParserProgress, TokenId};
 use crate::token::TokenValue;
@@ -37,7 +37,7 @@ pub(crate) struct Parser<'src> {
     errors: Vec<ParseError>,
 
     /// Stores non-fatal syntax errors found during parsing, such as version-related errors.
-    syntax_errors: Vec<SyntaxError>,
+    syntax_errors: Vec<UnsupportedSyntaxError>,
 
     /// Options for how the code will be parsed.
     options: ParseOptions,
