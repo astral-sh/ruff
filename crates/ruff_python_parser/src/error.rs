@@ -458,8 +458,9 @@ impl Display for SyntaxError {
         match self.kind {
             SyntaxErrorKind::MatchBeforePy310 => write!(
                 f,
-                "Cannot use `match` statement on Python {} (syntax was new in Python 3.10)",
-                self.target_version
+                "Cannot use `match` statement on Python {} (syntax was new in Python {})",
+                self.target_version,
+                self.minimum_version(),
             ),
         }
     }
