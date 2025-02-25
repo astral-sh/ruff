@@ -72,7 +72,7 @@ pub(crate) fn nan_comparison_match(checker: &Checker, cases: &[ast::MatchCase]) 
             continue;
         };
 
-        if let Some(nan) = Nan::from(&*pattern.value, checker.semantic()) {
+        if let Some(nan) = Nan::from(&pattern.value, checker.semantic()) {
             checker.report_diagnostic(Diagnostic::new(NanComparison { nan }, pattern.range));
         }
     }
