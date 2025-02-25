@@ -7,7 +7,6 @@ use red_knot_project::metadata::options::{EnvironmentOptions, Options};
 use red_knot_project::metadata::value::RangedValue;
 use red_knot_project::ProjectMetadata;
 use red_knot_project::{Db, ProjectDatabase};
-use red_knot_python_semantic::Program;
 use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig};
 use ruff_db::files::{system_path_to_file, File};
 use ruff_db::system::walk_directory::WalkDirectoryBuilder;
@@ -135,22 +134,14 @@ impl Workspace {
 
     /// Returns the parsed AST for `path`
     pub fn parsed(&self, file_id: &FileHandle) -> Result<String, Error> {
-        let parsed = ruff_db::parsed::parsed_module(
-            &self.db,
-            file_id.file,
-            Program::get(&self.db).python_version(&self.db),
-        );
+        let parsed = ruff_db::parsed::parsed_module(&self.db, file_id.file);
 
         Ok(format!("{:#?}", parsed.syntax()))
     }
 
     /// Returns the token stream for `path` serialized as a string.
     pub fn tokens(&self, file_id: &FileHandle) -> Result<String, Error> {
-        let parsed = ruff_db::parsed::parsed_module(
-            &self.db,
-            file_id.file,
-            Program::get(&self.db).python_version(&self.db),
-        );
+        let parsed = ruff_db::parsed::parsed_module(&self.db, file_id.file);
 
         Ok(format!("{:#?}", parsed.tokens()))
     }

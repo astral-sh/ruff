@@ -1,11 +1,5 @@
 # Narrowing for `match` statements
 
-```toml
-[environment]
-# require 3.10 for `match`
-python-version = "3.10"
-```
-
 ## Single `match` pattern
 
 ```py

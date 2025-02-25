@@ -68,7 +68,7 @@ pub enum DiagnosticId {
     /// Some I/O operation failed
     Io,
 
-    /// Some code contains a syntax error.
+    /// Some code contains a syntax error
     InvalidSyntax,
 
     /// A lint violation.

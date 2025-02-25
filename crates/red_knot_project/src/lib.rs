@@ -6,9 +6,8 @@ use files::{Index, Indexed, IndexedFiles};
 use metadata::settings::Settings;
 pub use metadata::{ProjectDiscoveryError, ProjectMetadata};
 use red_knot_python_semantic::lint::{LintRegistry, LintRegistryBuilder, RuleSelection};
-use red_knot_python_semantic::syntax::SyntaxDiagnostic;
+use red_knot_python_semantic::register_lints;
 use red_knot_python_semantic::types::check_types;
-use red_knot_python_semantic::{register_lints, Program};
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId, ParseDiagnostic, Severity, Span};
 use ruff_db::files::{system_path_to_file, File};
 use ruff_db::parsed::parsed_module;
@@ -334,15 +333,9 @@ fn check_file_impl(db: &dyn Db, file: File) -> Vec<Box<dyn Diagnostic>> {
         return diagnostics;
     }
 
-    let parsed = parsed_module(db.upcast(), file, Program::get(db).python_version(db));
+    let parsed = parsed_module(db.upcast(), file);
     diagnostics.extend(parsed.errors().iter().map(|error| {
         let diagnostic: Box<dyn Diagnostic> = Box::new(ParseDiagnostic::new(file, error.clone()));
-        diagnostic
-    }));
-
-    diagnostics.extend(parsed.unsupported_syntax_errors().iter().map(|error| {
-        let diagnostic: Box<dyn Diagnostic> =
-            Box::new(SyntaxDiagnostic::from_unsupported_syntax_error(error, file));
         diagnostic
     }));
 
@@ -484,30 +477,18 @@ mod tests {
     use crate::db::tests::TestDb;
     use crate::{check_file_impl, ProjectMetadata};
     use red_knot_python_semantic::types::check_types;
-    use red_knot_python_semantic::{Program, ProgramSettings, PythonPlatform, SearchPathSettings};
     use ruff_db::diagnostic::Diagnostic;
     use ruff_db::files::system_path_to_file;
     use ruff_db::source::source_text;
     use ruff_db::system::{DbWithTestSystem, SystemPath, SystemPathBuf};
     use ruff_db::testing::assert_function_query_was_not_run;
     use ruff_python_ast::name::Name;
-    use ruff_python_ast::PythonVersion;
 
     #[test]
     fn check_file_skips_type_checking_when_file_cant_be_read() -> ruff_db::system::Result<()> {
         let project = ProjectMetadata::new(Name::new_static("test"), SystemPathBuf::from("/"));
         let mut db = TestDb::new(project);
         let path = SystemPath::new("test.py");
-
-        Program::from_settings(
-            &db,
-            ProgramSettings {
-                python_version: PythonVersion::default(),
-                python_platform: PythonPlatform::default(),
-                search_paths: SearchPathSettings::new(vec![SystemPathBuf::from(".")]),
-            },
-        )
-        .expect("Failed to configure program settings");
 
         db.write_file(path, "x = 10")?;
         let file = system_path_to_file(&db, path).unwrap();

@@ -20,7 +20,6 @@ default = ["console_error_panic_hook"]
 
 [dependencies]
 red_knot_project = { workspace = true, default-features = false, features = ["deflate"] }
-red_knot_python_semantic = { workspace = true }
 
 ruff_db = { workspace = true, default-features = false, features = [] }
 ruff_python_ast = { workspace = true }

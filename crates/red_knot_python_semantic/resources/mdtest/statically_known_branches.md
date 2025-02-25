@@ -1,11 +1,5 @@
 # Statically-known branches
 
-```toml
-[environment]
-# require 3.10 for `match`
-python-version = "3.10"
-```
-
 ## Introduction
 
 We have the ability to infer precise types and boundness information for symbols that are defined in
@@ -1124,7 +1118,6 @@ def _(s: str):
 ```toml
 [environment]
 python-platform = "darwin"
-python-version = "3.10"
 ```
 
 ```py
