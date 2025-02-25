@@ -343,6 +343,9 @@ impl<T> Parsed<T> {
     }
 
     /// Returns `true` if the parsed source code is valid i.e., it has no syntax errors.
+    ///
+    /// Note that this does not include version-related
+    /// [`unsupported_syntax_errors`](Parsed::unsupported_syntax_errors).
     pub fn is_valid(&self) -> bool {
         self.errors.is_empty()
     }
