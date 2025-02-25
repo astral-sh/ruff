@@ -8,7 +8,7 @@ use crate::semantic_index::{
     symbol_table, BindingWithConstraints, BindingWithConstraintsIterator, DeclarationsIterator,
 };
 use crate::types::{
-    binding_type, declaration_type, narrowing_constraint, todo_type, IntersectionBuilder,
+    binding_type, declaration_type, infer_narrowing_constraint, todo_type, IntersectionBuilder,
     KnownClass, Truthiness, Type, TypeAndQualifiers, TypeQualifiers, UnionBuilder, UnionType,
 };
 use crate::{resolve_module, Db, KnownModule, Module, Program};
@@ -550,7 +550,7 @@ fn symbol_from_bindings_impl<'db>(
         Some(BindingWithConstraints {
             binding,
             visibility_constraint,
-            narrowing_constraints: _,
+            narrowing_constraint: _,
         }) if binding.map_or(true, is_non_exported) => {
             visibility_constraints.evaluate(db, constraints, *visibility_constraint)
         }
@@ -560,7 +560,7 @@ fn symbol_from_bindings_impl<'db>(
     let mut types = bindings_with_constraints.filter_map(
         |BindingWithConstraints {
              binding,
-             narrowing_constraints,
+             narrowing_constraint,
              visibility_constraint,
          }| {
             let binding = binding?;
@@ -576,21 +576,23 @@ fn symbol_from_bindings_impl<'db>(
                 return None;
             }
 
-            let mut constraint_tys = narrowing_constraints
-                .filter_map(|constraint| narrowing_constraint(db, constraint, binding))
-                .peekable();
+            let constraint_tys: Vec<_> = narrowing_constraint
+                .filter_map(|constraint| infer_narrowing_constraint(db, constraint, binding))
+                .collect();
 
             let binding_ty = binding_type(db, binding);
-            if constraint_tys.peek().is_some() {
+            if constraint_tys.is_empty() {
+                Some(binding_ty)
+            } else {
                 let intersection_ty = constraint_tys
+                    .into_iter()
+                    .rev()
                     .fold(
                         IntersectionBuilder::new(db).add_positive(binding_ty),
                         IntersectionBuilder::add_positive,
                     )
                     .build();
                 Some(intersection_ty)
-            } else {
-                Some(binding_ty)
             }
         },
     );

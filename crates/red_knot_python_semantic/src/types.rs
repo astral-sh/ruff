@@ -34,7 +34,7 @@ use crate::types::class_base::ClassBase;
 use crate::types::diagnostic::{INVALID_TYPE_FORM, UNSUPPORTED_BOOL_CONVERSION};
 use crate::types::infer::infer_unpack_types;
 use crate::types::mro::{Mro, MroError, MroIterator};
-pub(crate) use crate::types::narrow::narrowing_constraint;
+pub(crate) use crate::types::narrow::infer_narrowing_constraint;
 use crate::types::signatures::{Parameter, ParameterKind, Parameters};
 use crate::{Db, FxOrderSet, Module, Program};
 pub(crate) use class::{Class, ClassLiteralType, InstanceType, KnownClass, KnownInstanceType};

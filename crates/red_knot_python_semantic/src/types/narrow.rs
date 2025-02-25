@@ -35,7 +35,7 @@ use std::sync::Arc;
 ///
 /// But if we called this with the same `test` expression, but the `definition` of `y`, no
 /// constraint is applied to that definition, so we'd just return `None`.
-pub(crate) fn narrowing_constraint<'db>(
+pub(crate) fn infer_narrowing_constraint<'db>(
     db: &'db dyn Db,
     constraint: Constraint<'db>,
     definition: Definition<'db>,
