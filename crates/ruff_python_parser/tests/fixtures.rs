@@ -34,7 +34,9 @@ fn inline_err() {
 /// Snapshots the AST.
 fn test_valid_syntax(input_path: &Path) {
     let source = fs::read_to_string(input_path).expect("Expected test file to exist");
-    let options = extract_options(&source).unwrap_or_else(|| ParseOptions::from(Mode::Module));
+    let options = extract_options(&source).unwrap_or_else(|| {
+        ParseOptions::from(Mode::Module).with_target_version(PythonVersion::latest())
+    });
     let parsed = parse_unchecked(&source, options);
 
     let is_valid = parsed.is_valid() && parsed.unsupported_syntax_errors().is_empty();
