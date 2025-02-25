@@ -321,7 +321,7 @@ def _(flag: bool):
         # TODO... `int` might be ideal here?
         reveal_type(x)  # revealed: int | Unknown
 
-    # error: [not-iterable] "Object of type `Iterable2` may not be iterable because its `__iter__` attribute (with type `Literal[__iter__] | None`) may not be callable"
+    # error: [not-iterable] "Object of type `Iterable2` may not be iterable because its `__iter__` attribute (with type `<bound method `__iter__` of `Iterable2`> | None`) may not be callable"
     for y in Iterable2():
         # TODO... `int` might be ideal here?
         reveal_type(y)  # revealed: int | Unknown

@@ -48,7 +48,7 @@ error: lint:not-iterable
    |
 19 |     # error: [not-iterable]
 20 |     for x in Iterable1():
-   |              ^^^^^^^^^^^ Object of type `Iterable1` may not be iterable because it has no `__iter__` method and its `__getitem__` attribute (with type `Literal[__getitem__] | None`) may not be callable
+   |              ^^^^^^^^^^^ Object of type `Iterable1` may not be iterable because it has no `__iter__` method and its `__getitem__` attribute (with type `<bound method `__getitem__` of `Iterable1`> | None`) may not be callable
 21 |         # TODO: `str` might be better
 22 |         reveal_type(x)  # revealed: str | Unknown
    |
@@ -75,7 +75,7 @@ error: lint:not-iterable
    |
 24 |     # error: [not-iterable]
 25 |     for y in Iterable2():
-   |              ^^^^^^^^^^^ Object of type `Iterable2` may not be iterable because it has no `__iter__` method and its `__getitem__` method (with type `Literal[__getitem__, __getitem__]`) may have an incorrect signature for the old-style iteration protocol (expected a signature at least as permissive as `def __getitem__(self, key: int): ...`)
+   |              ^^^^^^^^^^^ Object of type `Iterable2` may not be iterable because it has no `__iter__` method and its `__getitem__` method (with type `<bound method `__getitem__` of `Iterable2`> | <bound method `__getitem__` of `Iterable2`>`) may have an incorrect signature for the old-style iteration protocol (expected a signature at least as permissive as `def __getitem__(self, key: int): ...`)
 26 |         reveal_type(y)  # revealed: str | int
    |
 
