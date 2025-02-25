@@ -340,13 +340,11 @@ fn check_file_impl(db: &dyn Db, file: File) -> Vec<Box<dyn Diagnostic>> {
         diagnostic
     }));
 
-    if parsed.is_valid() {
-        diagnostics.extend(parsed.unsupported_syntax_errors().iter().map(|error| {
-            let diagnostic: Box<dyn Diagnostic> =
-                Box::new(SyntaxDiagnostic::from_unsupported_syntax_error(error, file));
-            diagnostic
-        }));
-    }
+    diagnostics.extend(parsed.unsupported_syntax_errors().iter().map(|error| {
+        let diagnostic: Box<dyn Diagnostic> =
+            Box::new(SyntaxDiagnostic::from_unsupported_syntax_error(error, file));
+        diagnostic
+    }));
 
     diagnostics.extend(check_types(db.upcast(), file).iter().map(|diagnostic| {
         let boxed: Box<dyn Diagnostic> = Box::new(diagnostic.clone());
