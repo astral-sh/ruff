@@ -56,7 +56,10 @@ pub fn main() -> ExitStatus {
 }
 
 fn run() -> anyhow::Result<ExitStatus> {
-    let args = Args::parse_from(std::env::args());
+    let args = wild::args_os();
+    let args = argfile::expand_args_from(args, argfile::parse_fromfile, argfile::PREFIX)
+        .context("Failed to read CLI arguments from file")?;
+    let args = Args::parse_from(args);
 
     match args.command {
         Command::Server => run_server().map(|()| ExitStatus::Success),
