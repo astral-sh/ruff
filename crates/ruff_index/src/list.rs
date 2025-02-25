@@ -69,6 +69,7 @@ impl<I: Idx, K, V> ListStorage<I, K, V> {
     }
 }
 
+#[derive(Debug)]
 pub struct ListReverseIterator<'a, I, K, V> {
     storage: &'a ListStorage<I, K, V>,
     curr: Option<I>,
@@ -426,6 +427,20 @@ impl<I: Idx, K, V> ListBuilder<I, K, V> {
             result = self.add_cell(result, key, value);
         }
         result
+    }
+
+    /// Applies a function to each value in a list, returning a new list.
+    pub fn map<F>(&mut self, list: Option<I>, mut f: F) -> Option<I>
+    where
+        K: Clone,
+        F: FnMut(&V) -> V,
+    {
+        let list_id = list?;
+        let ListCell(rest, key, value) = &self.storage.cells[list_id];
+        let new_key = key.clone();
+        let new_value = f(value);
+        let new_rest = self.map(*rest, f);
+        self.add_cell(new_rest, new_key, new_value)
     }
 }
 

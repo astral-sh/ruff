@@ -260,8 +260,8 @@ use ruff_index::{newtype_index, IndexVec};
 use rustc_hash::FxHashMap;
 
 use self::symbol_state::{
-    LiveBindingsIterator, LiveDeclaration, LiveDeclarationsIterator, ScopedDefinitionId,
-    SymbolBindings, SymbolDeclarations, SymbolState,
+    LiveBindingsIterator, LiveDeclarationsIterator, ScopedDefinitionId, SymbolBindings,
+    SymbolDeclarations, SymbolState, SymbolStatesBuilder, SymbolStatesStorage,
 };
 use crate::semantic_index::ast_ids::ScopedUseId;
 use crate::semantic_index::definition::Definition;
@@ -284,6 +284,9 @@ pub(crate) struct UseDefMap<'db> {
     /// Array of [`Definition`] in this scope. Only the first entry should be `None`;
     /// this represents the implicit "unbound"/"undeclared" definition of every symbol.
     all_definitions: IndexVec<ScopedDefinitionId, Option<Definition<'db>>>,
+
+    /// Arena for [`SymbolState`] data.
+    symbol_states: SymbolStatesStorage,
 
     /// Array of predicates in this scope.
     predicates: Predicates<'db>,
@@ -327,7 +330,7 @@ impl<'db> UseDefMap<'db> {
         &self,
         use_id: ScopedUseId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
-        self.bindings_iterator(&self.bindings_by_use[use_id])
+        self.bindings_iterator(self.bindings_by_use[use_id])
     }
 
     pub(crate) fn public_bindings(
@@ -343,21 +346,21 @@ impl<'db> UseDefMap<'db> {
     ) -> Option<BindingWithConstraintsIterator<'_, 'db>> {
         self.eager_bindings
             .get(eager_bindings)
-            .map(|symbol_bindings| self.bindings_iterator(symbol_bindings))
+            .map(|symbol_bindings| self.bindings_iterator(*symbol_bindings))
     }
 
     pub(crate) fn bindings_at_declaration(
         &self,
         declaration: Definition<'db>,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
-        self.bindings_iterator(&self.bindings_by_declaration[&declaration])
+        self.bindings_iterator(self.bindings_by_declaration[&declaration])
     }
 
     pub(crate) fn declarations_at_binding(
         &self,
         binding: Definition<'db>,
     ) -> DeclarationsIterator<'_, 'db> {
-        self.declarations_iterator(&self.declarations_by_binding[&binding])
+        self.declarations_iterator(self.declarations_by_binding[&binding])
     }
 
     pub(crate) fn public_declarations<'map>(
@@ -370,26 +373,26 @@ impl<'db> UseDefMap<'db> {
 
     fn bindings_iterator<'map>(
         &'map self,
-        bindings: &'map SymbolBindings,
+        bindings: SymbolBindings,
     ) -> BindingWithConstraintsIterator<'map, 'db> {
         BindingWithConstraintsIterator {
             all_definitions: &self.all_definitions,
             predicates: &self.predicates,
             narrowing_constraints: &self.narrowing_constraints,
             visibility_constraints: &self.visibility_constraints,
-            inner: bindings.iter(),
+            inner: bindings.iter_reverse(&self.symbol_states),
         }
     }
 
     fn declarations_iterator<'map>(
         &'map self,
-        declarations: &'map SymbolDeclarations,
+        declarations: SymbolDeclarations,
     ) -> DeclarationsIterator<'map, 'db> {
         DeclarationsIterator {
             all_definitions: &self.all_definitions,
             predicates: &self.predicates,
             visibility_constraints: &self.visibility_constraints,
-            inner: declarations.iter(),
+            inner: declarations.iter_reverse(&self.symbol_states),
         }
     }
 }
@@ -436,8 +439,8 @@ impl<'map, 'db> Iterator for BindingWithConstraintsIterator<'map, 'db> {
 
         self.inner
             .next()
-            .map(|live_binding| BindingWithConstraints {
-                binding: self.all_definitions[live_binding.binding],
+            .map(|(binding, live_binding)| BindingWithConstraints {
+                binding: self.all_definitions[*binding],
                 narrowing_constraint: ConstraintsIterator {
                     predicates,
                     constraint_ids: narrowing_constraints
@@ -490,14 +493,9 @@ impl<'db> Iterator for DeclarationsIterator<'_, 'db> {
 
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next().map(
-            |LiveDeclaration {
-                 declaration,
-                 visibility_constraint,
-             }| {
-                DeclarationWithConstraint {
-                    declaration: self.all_definitions[*declaration],
-                    visibility_constraint: *visibility_constraint,
-                }
+            |(declaration, live_declaration)| DeclarationWithConstraint {
+                declaration: self.all_definitions[*declaration],
+                visibility_constraint: live_declaration.visibility_constraint,
             },
         )
     }
@@ -516,6 +514,9 @@ pub(super) struct FlowSnapshot {
 pub(super) struct UseDefMapBuilder<'db> {
     /// Append-only array of [`Definition`].
     all_definitions: IndexVec<ScopedDefinitionId, Option<Definition<'db>>>,
+
+    /// Arena for [`SymbolState`] data.
+    symbol_states_builder: SymbolStatesBuilder,
 
     /// Builder of predicates.
     pub(super) predicates: PredicatesBuilder<'db>,
@@ -553,6 +554,7 @@ impl Default for UseDefMapBuilder<'_> {
     fn default() -> Self {
         Self {
             all_definitions: IndexVec::from_iter([None]),
+            symbol_states_builder: SymbolStatesBuilder::default(),
             predicates: PredicatesBuilder::default(),
             narrowing_constraints: NarrowingConstraintsBuilder::default(),
             visibility_constraints: VisibilityConstraintsBuilder::default(),
@@ -572,9 +574,10 @@ impl<'db> UseDefMapBuilder<'db> {
     }
 
     pub(super) fn add_symbol(&mut self, symbol: ScopedSymbolId) {
-        let new_symbol = self
-            .symbol_states
-            .push(SymbolState::undefined(self.scope_start_visibility));
+        let new_symbol = self.symbol_states.push(SymbolState::undefined(
+            &mut self.symbol_states_builder,
+            self.scope_start_visibility,
+        ));
         debug_assert_eq!(symbol, new_symbol);
     }
 
@@ -582,8 +585,12 @@ impl<'db> UseDefMapBuilder<'db> {
         let def_id = self.all_definitions.push(Some(binding));
         let symbol_state = &mut self.symbol_states[symbol];
         self.declarations_by_binding
-            .insert(binding, symbol_state.declarations().clone());
-        symbol_state.record_binding(def_id, self.scope_start_visibility);
+            .insert(binding, symbol_state.declarations());
+        symbol_state.record_binding(
+            &mut self.symbol_states_builder,
+            def_id,
+            self.scope_start_visibility,
+        );
     }
 
     pub(super) fn add_predicate(&mut self, predicate: Predicate<'db>) -> ScopedPredicateId {
@@ -593,8 +600,11 @@ impl<'db> UseDefMapBuilder<'db> {
     pub(super) fn record_narrowing_constraint(&mut self, predicate: ScopedPredicateId) {
         let narrowing_constraint = predicate.into();
         for state in &mut self.symbol_states {
-            state
-                .record_narrowing_constraint(&mut self.narrowing_constraints, narrowing_constraint);
+            state.record_narrowing_constraint(
+                &mut self.symbol_states_builder,
+                &mut self.narrowing_constraints,
+                narrowing_constraint,
+            );
         }
     }
 
@@ -603,7 +613,11 @@ impl<'db> UseDefMapBuilder<'db> {
         constraint: ScopedVisibilityConstraintId,
     ) {
         for state in &mut self.symbol_states {
-            state.record_visibility_constraint(&mut self.visibility_constraints, constraint);
+            state.record_visibility_constraint(
+                &mut self.symbol_states_builder,
+                &mut self.visibility_constraints,
+                constraint,
+            );
         }
         self.scope_start_visibility = self
             .visibility_constraints
@@ -628,7 +642,7 @@ impl<'db> UseDefMapBuilder<'db> {
     /// We build a complex visibility constraint for the `y = 0` binding. We build the same
     /// constraint for the `x = 0` binding as well, but at the `RESET` point, we can get rid
     /// of it, as the `if`-`elif`-`elif` chain doesn't include any new bindings of `x`.
-    pub(super) fn simplify_visibility_constraints(&mut self, snapshot: FlowSnapshot) {
+    pub(super) fn simplify_visibility_constraints(&mut self, snapshot: &FlowSnapshot) {
         debug_assert!(self.symbol_states.len() >= snapshot.symbol_states.len());
 
         // If there are any control flow paths that have become unreachable between `snapshot` and
@@ -643,8 +657,8 @@ impl<'db> UseDefMapBuilder<'db> {
         // be subject to visibility constraints. We only simplify/reset visibility constraints
         // for symbols that have the same bindings and declarations present compared to the
         // snapshot.
-        for (current, snapshot) in self.symbol_states.iter_mut().zip(snapshot.symbol_states) {
-            current.simplify_visibility_constraints(snapshot);
+        for (current, snapshot) in self.symbol_states.iter_mut().zip(&snapshot.symbol_states) {
+            current.simplify_visibility_constraints(&mut self.symbol_states_builder, snapshot);
         }
     }
 
@@ -656,8 +670,8 @@ impl<'db> UseDefMapBuilder<'db> {
         let def_id = self.all_definitions.push(Some(declaration));
         let symbol_state = &mut self.symbol_states[symbol];
         self.bindings_by_declaration
-            .insert(declaration, symbol_state.bindings().clone());
-        symbol_state.record_declaration(def_id);
+            .insert(declaration, symbol_state.bindings());
+        symbol_state.record_declaration(&mut self.symbol_states_builder, def_id);
     }
 
     pub(super) fn record_declaration_and_binding(
@@ -669,8 +683,12 @@ impl<'db> UseDefMapBuilder<'db> {
         // self.declarations_by_binding.
         let def_id = self.all_definitions.push(Some(definition));
         let symbol_state = &mut self.symbol_states[symbol];
-        symbol_state.record_declaration(def_id);
-        symbol_state.record_binding(def_id, self.scope_start_visibility);
+        symbol_state.record_declaration(&mut self.symbol_states_builder, def_id);
+        symbol_state.record_binding(
+            &mut self.symbol_states_builder,
+            def_id,
+            self.scope_start_visibility,
+        );
     }
 
     pub(super) fn record_use(&mut self, symbol: ScopedSymbolId, use_id: ScopedUseId) {
@@ -678,7 +696,7 @@ impl<'db> UseDefMapBuilder<'db> {
         // as the live bindings for this use.
         let new_use = self
             .bindings_by_use
-            .push(self.symbol_states[symbol].bindings().clone());
+            .push(self.symbol_states[symbol].bindings());
         debug_assert_eq!(use_id, new_use);
     }
 
@@ -687,7 +705,7 @@ impl<'db> UseDefMapBuilder<'db> {
         enclosing_symbol: ScopedSymbolId,
     ) -> ScopedEagerBindingsId {
         self.eager_bindings
-            .push(self.symbol_states[enclosing_symbol].bindings().clone())
+            .push(self.symbol_states[enclosing_symbol].bindings())
     }
 
     /// Take a snapshot of the current visible-symbols state.
@@ -699,7 +717,7 @@ impl<'db> UseDefMapBuilder<'db> {
     }
 
     /// Restore the current builder symbols state to the given snapshot.
-    pub(super) fn restore(&mut self, snapshot: FlowSnapshot) {
+    pub(super) fn restore(&mut self, snapshot: &FlowSnapshot) {
         // We never remove symbols from `symbol_states` (it's an IndexVec, and the symbol
         // IDs must line up), so the current number of known symbols must always be equal to or
         // greater than the number of known symbols in a previously-taken snapshot.
@@ -707,7 +725,7 @@ impl<'db> UseDefMapBuilder<'db> {
         debug_assert!(num_symbols >= snapshot.symbol_states.len());
 
         // Restore the current visible-definitions state to the given snapshot.
-        self.symbol_states = snapshot.symbol_states;
+        self.symbol_states = snapshot.symbol_states.clone();
         self.scope_start_visibility = snapshot.scope_start_visibility;
 
         // If the snapshot we are restoring is missing some symbols we've recorded since, we need
@@ -715,14 +733,14 @@ impl<'db> UseDefMapBuilder<'db> {
         // snapshot, the correct state to fill them in with is "undefined".
         self.symbol_states.resize(
             num_symbols,
-            SymbolState::undefined(self.scope_start_visibility),
+            SymbolState::undefined(&mut self.symbol_states_builder, self.scope_start_visibility),
         );
     }
 
     /// Merge the given snapshot into the current state, reflecting that we might have taken either
     /// path to get here. The new state for each symbol should include definitions from both the
     /// prior state and the snapshot.
-    pub(super) fn merge(&mut self, snapshot: FlowSnapshot) {
+    pub(super) fn merge(&mut self, snapshot: &FlowSnapshot) {
         // As an optimization, if we know statically that either of the snapshots is always
         // unreachable, we can leave it out of the merged result entirely. Note that we cannot
         // perform any type inference at this point, so this is largely limited to unreachability
@@ -743,21 +761,27 @@ impl<'db> UseDefMapBuilder<'db> {
         // greater than the number of known symbols in a previously-taken snapshot.
         debug_assert!(self.symbol_states.len() >= snapshot.symbol_states.len());
 
-        let mut snapshot_definitions_iter = snapshot.symbol_states.into_iter();
+        let mut snapshot_definitions_iter = snapshot.symbol_states.iter();
+        let undefined = SymbolState::undefined(
+            &mut self.symbol_states_builder,
+            snapshot.scope_start_visibility,
+        );
         for current in &mut self.symbol_states {
             if let Some(snapshot) = snapshot_definitions_iter.next() {
                 current.merge(
-                    snapshot,
+                    &mut self.symbol_states_builder,
                     &mut self.narrowing_constraints,
                     &mut self.visibility_constraints,
+                    snapshot,
                 );
             } else {
+                // Symbol not present in snapshot, so it's unbound/undeclared from that path.
                 current.merge(
-                    SymbolState::undefined(snapshot.scope_start_visibility),
+                    &mut self.symbol_states_builder,
                     &mut self.narrowing_constraints,
                     &mut self.visibility_constraints,
+                    &undefined,
                 );
-                // Symbol not present in snapshot, so it's unbound/undeclared from that path.
             }
         }
 
@@ -776,6 +800,7 @@ impl<'db> UseDefMapBuilder<'db> {
 
         UseDefMap {
             all_definitions: self.all_definitions,
+            symbol_states: self.symbol_states_builder.build(),
             predicates: self.predicates.build(),
             narrowing_constraints: self.narrowing_constraints.build(),
             visibility_constraints: self.visibility_constraints.build(),
