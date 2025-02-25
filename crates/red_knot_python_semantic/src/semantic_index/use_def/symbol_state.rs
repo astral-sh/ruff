@@ -123,7 +123,7 @@ impl SymbolDeclarations {
         self.live_declarations =
             symbol_states
                 .declarations
-                .map(self.live_declarations, |declaration| LiveDeclaration {
+                .map_with(self.live_declarations, |declaration| LiveDeclaration {
                     visibility_constraint: visibility_constraints
                         .add_and_constraint(declaration.visibility_constraint, constraint),
                 });
@@ -240,14 +240,13 @@ impl SymbolBindings {
         narrowing_constraints: &mut NarrowingConstraintsBuilder,
         predicate: ScopedNarrowingConstraintPredicate,
     ) {
-        self.live_bindings =
-            symbol_states
-                .bindings
-                .map(self.live_bindings, |binding| LiveBinding {
-                    narrowing_constraint: narrowing_constraints
-                        .add_predicate_to_constraint(binding.narrowing_constraint, predicate),
-                    visibility_constraint: binding.visibility_constraint,
-                });
+        self.live_bindings = symbol_states
+            .bindings
+            .map_with(self.live_bindings, |binding| LiveBinding {
+                narrowing_constraint: narrowing_constraints
+                    .add_predicate_to_constraint(binding.narrowing_constraint, predicate),
+                visibility_constraint: binding.visibility_constraint,
+            });
     }
 
     /// Add given visibility constraint to all live bindings.
@@ -257,14 +256,13 @@ impl SymbolBindings {
         visibility_constraints: &mut VisibilityConstraintsBuilder,
         constraint: ScopedVisibilityConstraintId,
     ) {
-        self.live_bindings =
-            symbol_states
-                .bindings
-                .map(self.live_bindings, |binding| LiveBinding {
-                    narrowing_constraint: binding.narrowing_constraint,
-                    visibility_constraint: visibility_constraints
-                        .add_and_constraint(binding.visibility_constraint, constraint),
-                });
+        self.live_bindings = symbol_states
+            .bindings
+            .map_with(self.live_bindings, |binding| LiveBinding {
+                narrowing_constraint: binding.narrowing_constraint,
+                visibility_constraint: visibility_constraints
+                    .add_and_constraint(binding.visibility_constraint, constraint),
+            });
     }
 
     /// Iterate over currently live bindings for this symbol in reverse

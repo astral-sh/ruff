@@ -430,17 +430,27 @@ impl<I: Idx, K, V> ListBuilder<I, K, V> {
     }
 
     /// Applies a function to each value in a list, returning a new list.
-    pub fn map<F>(&mut self, list: Option<I>, mut f: F) -> Option<I>
+    pub fn map_with<F>(&mut self, list: Option<I>, mut f: F) -> Option<I>
     where
         K: Clone,
         F: FnMut(&V) -> V,
     {
-        let list_id = list?;
-        let ListCell(rest, key, value) = &self.storage.cells[list_id];
-        let new_key = key.clone();
-        let new_value = f(value);
-        let new_rest = self.map(*rest, f);
-        self.add_cell(new_rest, new_key, new_value)
+        self.scratch.clear();
+
+        let mut curr = list;
+        while let Some(curr_id) = curr {
+            let ListCell(rest, key, value) = &self.storage.cells[curr_id];
+            let new_key = key.clone();
+            let new_value = f(value);
+            self.scratch.push((new_key, new_value));
+            curr = *rest;
+        }
+
+        let mut result = None;
+        while let Some((key, value)) = self.scratch.pop() {
+            result = self.add_cell(result, key, value);
+        }
+        result
     }
 }
 
