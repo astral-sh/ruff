@@ -49,29 +49,31 @@ impl Violation for NanComparison {
 /// PLW0177
 pub(crate) fn nan_comparison(checker: &Checker, left: &Expr, comparators: &[Expr]) {
     for expr in std::iter::once(left).chain(comparators) {
-        if let Some(qualified_name) = checker.semantic().resolve_qualified_name(expr) {
-            match qualified_name.segments() {
-                ["numpy", "nan" | "NAN" | "NaN"] => {
-                    checker.report_diagnostic(Diagnostic::new(
-                        NanComparison { nan: Nan::NumPy },
-                        expr.range(),
-                    ));
-                }
-                ["math", "nan"] => {
-                    checker.report_diagnostic(Diagnostic::new(
-                        NanComparison { nan: Nan::Math },
-                        expr.range(),
-                    ));
-                }
-                _ => continue,
+        if expr.is_call_expr() {
+            if is_nan_float(expr, checker.semantic()) {
+                checker.report_diagnostic(Diagnostic::new(
+                    NanComparison { nan: Nan::Math },
+                    expr.range(),
+                ));
             }
+            continue;
         }
 
-        if is_nan_float(expr, checker.semantic()) {
-            checker.report_diagnostic(Diagnostic::new(
-                NanComparison { nan: Nan::Math },
-                expr.range(),
-            ));
+        if let Some(nan) = Nan::from(expr, checker.semantic()) {
+            checker.report_diagnostic(Diagnostic::new(NanComparison { nan }, expr.range()));
+        }
+    }
+}
+
+/// PLW0177
+pub(crate) fn nan_comparison_match(checker: &Checker, cases: &[ast::MatchCase]) {
+    for case in cases {
+        let ast::Pattern::MatchValue(pattern) = &case.pattern else {
+            continue;
+        };
+
+        if let Some(nan) = Nan::from(&*pattern.value, checker.semantic()) {
+            checker.report_diagnostic(Diagnostic::new(NanComparison { nan }, pattern.range));
         }
     }
 }
@@ -82,6 +84,18 @@ enum Nan {
     Math,
     /// `np.isnan`
     NumPy,
+}
+
+impl Nan {
+    fn from(expr: &Expr, semantic: &SemanticModel) -> Option<Self> {
+        let qualified_name = semantic.resolve_qualified_name(expr)?;
+
+        match qualified_name.segments() {
+            ["numpy", "nan" | "NAN" | "NaN"] => Some(Self::NumPy),
+            ["math", "nan"] => Some(Self::Math),
+            _ => None,
+        }
+    }
 }
 
 impl std::fmt::Display for Nan {
