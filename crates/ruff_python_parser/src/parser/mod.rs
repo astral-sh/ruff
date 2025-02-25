@@ -665,6 +665,7 @@ impl<'src> Parser<'src> {
         ParserCheckpoint {
             tokens: self.tokens.checkpoint(),
             errors_position: self.errors.len(),
+            unsupported_syntax_errors_position: self.unsupported_syntax_errors.len(),
             current_token_id: self.current_token_id,
             prev_token_end: self.prev_token_end,
             recovery_context: self.recovery_context,
@@ -676,6 +677,7 @@ impl<'src> Parser<'src> {
         let ParserCheckpoint {
             tokens,
             errors_position,
+            unsupported_syntax_errors_position,
             current_token_id,
             prev_token_end,
             recovery_context,
@@ -683,6 +685,8 @@ impl<'src> Parser<'src> {
 
         self.tokens.rewind(tokens);
         self.errors.truncate(errors_position);
+        self.unsupported_syntax_errors
+            .truncate(unsupported_syntax_errors_position);
         self.current_token_id = current_token_id;
         self.prev_token_end = prev_token_end;
         self.recovery_context = recovery_context;
@@ -692,6 +696,7 @@ impl<'src> Parser<'src> {
 struct ParserCheckpoint {
     tokens: TokenSourceCheckpoint,
     errors_position: usize,
+    unsupported_syntax_errors_position: usize,
     current_token_id: TokenId,
     prev_token_end: TextSize,
     recovery_context: RecoveryContext,
