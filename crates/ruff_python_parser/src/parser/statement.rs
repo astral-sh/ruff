@@ -5,7 +5,8 @@ use rustc_hash::{FxBuildHasher, FxHashSet};
 
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{
-    self as ast, ExceptHandler, Expr, ExprContext, IpyEscapeKind, Operator, Stmt, WithItem,
+    self as ast, ExceptHandler, Expr, ExprContext, IpyEscapeKind, Operator, PythonVersion, Stmt,
+    WithItem,
 };
 use ruff_text_size::{Ranged, TextSize};
 
@@ -2533,6 +2534,31 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// Try to parse a decorator list from before Python 3.9.
+    ///
+    /// See: <https://docs.python.org/3.8/reference/compound_stmts.html#grammar-token-decorators>
+    fn try_parse_old_decorators(&mut self) -> Option<ParsedExpr> {
+        let errors = self.errors.len();
+        let start = self.node_start();
+        let name = self.parse_name();
+        if name.ctx.is_invalid() {
+            return None;
+        }
+        let name = Expr::from(name);
+        let parsed = match self.current_token_kind() {
+            TokenKind::Lpar => Some(Expr::Call(self.parse_call_expression(name, start)).into()),
+            TokenKind::Newline => Some(name.into()),
+            _ => None,
+        };
+
+        // ignore version-related errors if there are more serious errors when parsing this way
+        if self.errors.len() > errors {
+            return None;
+        }
+
+        parsed
+    }
+
     /// Parses a decorator list followed by a class, function or async function definition.
     ///
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-decorators>
@@ -2581,6 +2607,27 @@ impl<'src> Parser<'src> {
             let decorator_start = self.node_start();
             self.bump(TokenKind::At);
 
+            let checkpoint = self.checkpoint();
+            let parsed_expr = if self.options.target_version < PythonVersion::PY39 {
+                match self.try_parse_old_decorators() {
+                    Some(parsed) => parsed,
+                    None => {
+                        self.rewind(checkpoint);
+                        let parsed =
+                            self.parse_named_expression_or_higher(ExpressionContext::default());
+
+                        self.add_unsupported_syntax_error(
+                            UnsupportedSyntaxErrorKind::RelaxedDecorator,
+                            self.node_range(decorator_start),
+                        );
+
+                        parsed
+                    }
+                }
+            } else {
+                self.parse_named_expression_or_higher(ExpressionContext::default())
+            };
+
             // test_err decorator_invalid_expression
             // @*x
             // @(*x)
@@ -2588,7 +2635,6 @@ impl<'src> Parser<'src> {
             // @yield x
             // @yield from x
             // def foo(): ...
-            let parsed_expr = self.parse_named_expression_or_higher(ExpressionContext::default());
 
             decorators.push(ast::Decorator {
                 expression: parsed_expr.expr,
