@@ -1,6 +1,5 @@
 ---
 source: crates/red_knot_test/src/lib.rs
-assertion_line: 272
 expression: snapshot
 ---
 ---
