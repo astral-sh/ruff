@@ -109,8 +109,8 @@ pub struct ListBuilder<I, K, V = ()> {
     /// So, that's what we do! However, as one last optimization, we don't build up alist cells in
     /// our accumulator, since that would add wasteful cruft to our list storage. Instead, we use a
     /// normal Vec as our accumulator, holding the key/value pairs that should be stitched onto the
-    /// beginning of whatever result list we are creating. For our fix-up step, we can consume a
-    /// Vec in reverse order by `pop`ping the elements off one by one.
+    /// end of whatever result list we are creating. For our fix-up step, we can consume a Vec in
+    /// reverse order by `pop`ping the elements off one by one.
     scratch: Vec<(K, V)>,
 }
 
