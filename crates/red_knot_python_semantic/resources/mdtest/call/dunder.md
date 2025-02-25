@@ -16,9 +16,12 @@ as the `instance` argument to `__get__`. A desugared version of `obj[key]` is ro
 ```py
 from typing import Any
 
-def find_in_mro(typ: type, name: str) -> Any: ...
+def find_name_in_mro(typ: type, name: str) -> Any:
+    # See implementation in https://docs.python.org/3/howto/descriptor.html#invocation-from-an-instance
+    pass
+
 def getitem_desugared(obj: object, key: object) -> object:
-    getitem_callable = find_in_mro(type(obj), "__getitem__")
+    getitem_callable = find_name_in_mro(type(obj), "__getitem__")
     if hasattr(getitem_callable, "__get__"):
         getitem_callable = getitem_callable.__get__(obj, type(obj))
 
