@@ -7,7 +7,7 @@ use rustc_hash::{FxBuildHasher, FxHashSet};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{
     self as ast, BoolOp, CmpOp, ConversionFlag, Expr, ExprContext, FStringElement, FStringElements,
-    IpyEscapeKind, Number, Operator, StringFlags, UnaryOp,
+    IpyEscapeKind, Number, Operator, PythonVersion, StringFlags, UnaryOp,
 };
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
@@ -16,7 +16,7 @@ use crate::parser::{helpers, FunctionKind, Parser};
 use crate::string::{parse_fstring_literal_element, parse_string_literal, StringType};
 use crate::token::{TokenKind, TokenValue};
 use crate::token_set::TokenSet;
-use crate::{FStringErrorType, Mode, ParseErrorType};
+use crate::{FStringErrorType, Mode, ParseErrorType, UnsupportedSyntaxErrorKind};
 
 use super::{FStringElementsKind, Parenthesized, RecoveryContextKind};
 
@@ -2161,10 +2161,24 @@ impl<'src> Parser<'src> {
 
         let value = self.parse_conditional_expression_or_higher();
 
+        let range = self.node_range(start);
+
+        // test_err walrus_before_py38
+        // # parse_options: { "target_version": "3.7" }
+        // if x := 1: ...
+
+        // test_ok walrus_after_py38
+        // # parse_options: { "target_version": "3.8" }
+        // if x := 1: ...
+
+        if self.options.target_version < PythonVersion::PY38 {
+            self.add_unsupported_syntax_error(UnsupportedSyntaxErrorKind::WalrusBeforePy38, range);
+        }
+
         ast::ExprNamed {
             target: Box::new(target),
             value: Box::new(value.expr),
-            range: self.node_range(start),
+            range,
         }
     }
 
