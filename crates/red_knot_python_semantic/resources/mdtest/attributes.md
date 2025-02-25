@@ -783,6 +783,9 @@ def _(flag1: bool, flag2: bool):
 
     # error: [possibly-unbound-attribute] "Attribute `x` on type `Literal[C1, C2, C3]` is possibly unbound"
     reveal_type(C.x)  # revealed: Unknown | Literal[1, 3]
+
+    # error: [possibly-unbound-attribute] "Attribute `x` on type `C1 | C2 | C3` is possibly unbound"
+    reveal_type(C().x)  # revealed: Unknown | Literal[1, 3]
 ```
 
 ### Possibly-unbound within a class
@@ -806,6 +809,9 @@ def _(flag: bool, flag1: bool, flag2: bool):
 
     # error: [possibly-unbound-attribute] "Attribute `x` on type `Literal[C1, C2, C3]` is possibly unbound"
     reveal_type(C.x)  # revealed: Unknown | Literal[1, 2, 3]
+
+    # error: [possibly-unbound-attribute] "Attribute `x` on type `C1 | C2 | C3` is possibly unbound"
+    reveal_type(C().x)  # revealed: Unknown | Literal[1, 2, 3]
 ```
 
 ### Attribute possibly unbound on a subclass but not on a superclass
@@ -820,6 +826,8 @@ def _(flag: bool):
             x = 2
 
     reveal_type(Bar.x)  # revealed: Unknown | Literal[2, 1]
+
+    reveal_type(Bar().x)  # revealed: Unknown | Literal[2, 1]
 ```
 
 ### Attribute possibly unbound on a subclass and on a superclass
@@ -836,6 +844,41 @@ def _(flag: bool):
 
     # error: [possibly-unbound-attribute]
     reveal_type(Bar.x)  # revealed: Unknown | Literal[2, 1]
+
+    # error: [possibly-unbound-attribute]
+    reveal_type(Bar().x)  # revealed: Unknown | Literal[2, 1]
+```
+
+### Possibly unbound/undeclared instance attribute
+
+#### Possibly unbound and undeclared
+
+```py
+def _(flag: bool):
+    class Foo:
+        if flag:
+            x: int
+
+        def __init(self):
+            if flag:
+                self.x = 1
+
+    # error: [possibly-unbound-attribute]
+    reveal_type(Foo().x)  # revealed: int
+```
+
+#### Possibly unbound
+
+```py
+def _(flag: bool):
+    class Foo:
+        def __init(self):
+            if flag:
+                self.x = 1
+
+    # Emitting a diagnostic in a case like this is not something we support, and it's unclear
+    # if we ever will (or want to)
+    reveal_type(Foo().x)  # revealed: Unknown | Literal[1]
 ```
 
 ### Attribute access on `Any`
