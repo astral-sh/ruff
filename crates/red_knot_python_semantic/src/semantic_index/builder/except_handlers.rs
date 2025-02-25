@@ -41,7 +41,7 @@ impl TryNodeContextStackManager {
 
     /// Retrieve the stack that is at the top of our stack of stacks.
     /// For each `try` block on that stack, push the snapshot onto the `try` block
-    pub(super) fn record_definition(&mut self, builder: &SemanticIndexBuilder) {
+    pub(super) fn record_definition(&mut self, builder: &mut SemanticIndexBuilder) {
         self.current_try_context_stack().record_definition(builder);
     }
 
@@ -77,7 +77,7 @@ impl TryNodeContextStack {
     }
 
     /// For each `try` block on the stack, push the snapshot onto the `try` block
-    fn record_definition(&mut self, builder: &SemanticIndexBuilder) {
+    fn record_definition(&mut self, builder: &mut SemanticIndexBuilder) {
         for context in &mut self.0 {
             context.record_definition(builder.flow_snapshot());
         }

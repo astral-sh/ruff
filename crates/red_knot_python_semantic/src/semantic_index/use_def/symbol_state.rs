@@ -47,7 +47,7 @@ use ruff_index::newtype_index;
 use smallvec::{smallvec, SmallVec};
 
 use crate::semantic_index::narrowing_constraints::{
-    NarrowingConstraintsBuilder, ScopedNarrowingConstraintId, ScopedNarrowingConstraintPredicate,
+    NarrowingConstraintsBuilder, ScopedNarrowingConstraint, ScopedNarrowingConstraintPredicate,
 };
 use crate::semantic_index::visibility_constraints::{
     ScopedVisibilityConstraintId, VisibilityConstraintsBuilder,
@@ -179,17 +179,17 @@ impl SymbolDeclarations {
 
 /// Live bindings for a single symbol at some point in control flow. Each live binding comes
 /// with a set of narrowing constraints and a visibility constraint.
-#[derive(Clone, Debug, Default, PartialEq, Eq, salsa::Update)]
+#[derive(Debug, Default, PartialEq, Eq, salsa::Update)]
 pub(super) struct SymbolBindings {
     /// A list of live bindings for this symbol, sorted by their `ScopedDefinitionId`
     live_bindings: SmallVec<[LiveBinding; INLINE_DEFINITIONS_PER_SYMBOL]>,
 }
 
 /// One of the live bindings for a single symbol at some point in control flow.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub(super) struct LiveBinding {
     pub(super) binding: ScopedDefinitionId,
-    pub(super) narrowing_constraint: Option<ScopedNarrowingConstraintId>,
+    pub(super) narrowing_constraint: ScopedNarrowingConstraint,
     pub(super) visibility_constraint: ScopedVisibilityConstraintId,
 }
 
@@ -199,11 +199,26 @@ impl SymbolBindings {
     fn unbound(scope_start_visibility: ScopedVisibilityConstraintId) -> Self {
         let initial_binding = LiveBinding {
             binding: ScopedDefinitionId::UNBOUND,
-            narrowing_constraint: None,
+            narrowing_constraint: ScopedNarrowingConstraint::empty(),
             visibility_constraint: scope_start_visibility,
         };
         Self {
             live_bindings: smallvec![initial_binding],
+        }
+    }
+
+    pub(super) fn clone(&self, narrowing_constraints: &mut NarrowingConstraintsBuilder) -> Self {
+        Self {
+            live_bindings: self
+                .live_bindings
+                .iter()
+                .map(|live_binding| LiveBinding {
+                    binding: live_binding.binding,
+                    narrowing_constraint: narrowing_constraints
+                        .clone_constraint(&live_binding.narrowing_constraint),
+                    visibility_constraint: live_binding.visibility_constraint,
+                })
+                .collect(),
         }
     }
 
@@ -218,7 +233,7 @@ impl SymbolBindings {
         self.live_bindings.clear();
         self.live_bindings.push(LiveBinding {
             binding,
-            narrowing_constraint: None,
+            narrowing_constraint: ScopedNarrowingConstraint::empty(),
             visibility_constraint,
         });
     }
@@ -230,8 +245,8 @@ impl SymbolBindings {
         predicate: ScopedNarrowingConstraintPredicate,
     ) {
         for binding in &mut self.live_bindings {
-            binding.narrowing_constraint = narrowing_constraints
-                .add_predicate_to_constraint(binding.narrowing_constraint, predicate);
+            narrowing_constraints
+                .add_predicate_to_constraint(&mut binding.narrowing_constraint, predicate);
         }
     }
 
@@ -313,7 +328,7 @@ impl SymbolBindings {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub(super) struct SymbolState {
     declarations: SymbolDeclarations,
     bindings: SymbolBindings,
@@ -325,6 +340,13 @@ impl SymbolState {
         Self {
             declarations: SymbolDeclarations::undeclared(scope_start_visibility),
             bindings: SymbolBindings::unbound(scope_start_visibility),
+        }
+    }
+
+    pub(super) fn clone(&self, narrowing_constraints: &mut NarrowingConstraintsBuilder) -> Self {
+        Self {
+            declarations: self.declarations.clone(),
+            bindings: self.bindings.clone(narrowing_constraints),
         }
     }
 
@@ -421,7 +443,7 @@ mod tests {
                     def_id.as_u32().to_string()
                 };
                 let predicates = narrowing_constraints
-                    .iter_predicates(live_binding.narrowing_constraint)
+                    .iter_predicates(&live_binding.narrowing_constraint)
                     .map(|idx| idx.as_u32().to_string())
                     .collect::<Vec<_>>()
                     .join(", ");

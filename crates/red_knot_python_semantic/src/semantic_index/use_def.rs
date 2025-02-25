@@ -441,7 +441,7 @@ impl<'map, 'db> Iterator for BindingWithConstraintsIterator<'map, 'db> {
                 narrowing_constraint: ConstraintsIterator {
                     predicates,
                     constraint_ids: narrowing_constraints
-                        .iter_predicates(live_binding.narrowing_constraint),
+                        .iter_predicates(&live_binding.narrowing_constraint),
                 },
                 visibility_constraint: live_binding.visibility_constraint,
             })
@@ -506,10 +506,23 @@ impl<'db> Iterator for DeclarationsIterator<'_, 'db> {
 impl std::iter::FusedIterator for DeclarationsIterator<'_, '_> {}
 
 /// A snapshot of the definitions and constraints state at a particular point in control flow.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub(super) struct FlowSnapshot {
     symbol_states: IndexVec<ScopedSymbolId, SymbolState>,
     scope_start_visibility: ScopedVisibilityConstraintId,
+}
+
+impl FlowSnapshot {
+    pub(super) fn clone(&self, narrowing_constraints: &mut NarrowingConstraintsBuilder) -> Self {
+        Self {
+            symbol_states: self
+                .symbol_states
+                .iter()
+                .map(|state| state.clone(narrowing_constraints))
+                .collect(),
+            scope_start_visibility: self.scope_start_visibility,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -655,8 +668,12 @@ impl<'db> UseDefMapBuilder<'db> {
     ) {
         let def_id = self.all_definitions.push(Some(declaration));
         let symbol_state = &mut self.symbol_states[symbol];
-        self.bindings_by_declaration
-            .insert(declaration, symbol_state.bindings().clone());
+        self.bindings_by_declaration.insert(
+            declaration,
+            symbol_state
+                .bindings()
+                .clone(&mut self.narrowing_constraints),
+        );
         symbol_state.record_declaration(def_id);
     }
 
@@ -676,9 +693,11 @@ impl<'db> UseDefMapBuilder<'db> {
     pub(super) fn record_use(&mut self, symbol: ScopedSymbolId, use_id: ScopedUseId) {
         // We have a use of a symbol; clone the current bindings for that symbol, and record them
         // as the live bindings for this use.
-        let new_use = self
-            .bindings_by_use
-            .push(self.symbol_states[symbol].bindings().clone());
+        let new_use = self.bindings_by_use.push(
+            self.symbol_states[symbol]
+                .bindings()
+                .clone(&mut self.narrowing_constraints),
+        );
         debug_assert_eq!(use_id, new_use);
     }
 
@@ -686,14 +705,21 @@ impl<'db> UseDefMapBuilder<'db> {
         &mut self,
         enclosing_symbol: ScopedSymbolId,
     ) -> ScopedEagerBindingsId {
-        self.eager_bindings
-            .push(self.symbol_states[enclosing_symbol].bindings().clone())
+        self.eager_bindings.push(
+            self.symbol_states[enclosing_symbol]
+                .bindings()
+                .clone(&mut self.narrowing_constraints),
+        )
     }
 
     /// Take a snapshot of the current visible-symbols state.
-    pub(super) fn snapshot(&self) -> FlowSnapshot {
+    pub(super) fn snapshot(&mut self) -> FlowSnapshot {
         FlowSnapshot {
-            symbol_states: self.symbol_states.clone(),
+            symbol_states: self
+                .symbol_states
+                .iter()
+                .map(|state| state.clone(&mut self.narrowing_constraints))
+                .collect(),
             scope_start_visibility: self.scope_start_visibility,
         }
     }
@@ -713,10 +739,9 @@ impl<'db> UseDefMapBuilder<'db> {
         // If the snapshot we are restoring is missing some symbols we've recorded since, we need
         // to fill them in so the symbol IDs continue to line up. Since they don't exist in the
         // snapshot, the correct state to fill them in with is "undefined".
-        self.symbol_states.resize(
-            num_symbols,
-            SymbolState::undefined(self.scope_start_visibility),
-        );
+        self.symbol_states.resize_with(num_symbols, || {
+            SymbolState::undefined(self.scope_start_visibility)
+        });
     }
 
     /// Merge the given snapshot into the current state, reflecting that we might have taken either

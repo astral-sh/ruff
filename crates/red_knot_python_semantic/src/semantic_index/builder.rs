@@ -22,6 +22,7 @@ use crate::semantic_index::definition::{
     WithItemDefinitionNodeRef,
 };
 use crate::semantic_index::expression::{Expression, ExpressionKind};
+use crate::semantic_index::narrowing_constraints::NarrowingConstraintsBuilder;
 use crate::semantic_index::predicate::{
     PatternPredicate, PatternPredicateKind, Predicate, PredicateNode, ScopedPredicateId,
 };
@@ -289,9 +290,9 @@ impl<'db> SemanticIndexBuilder<'db> {
         &mut self.use_def_maps[scope_id]
     }
 
-    fn current_use_def_map(&self) -> &UseDefMapBuilder<'db> {
+    fn current_narrowing_constraints_mut(&mut self) -> &mut NarrowingConstraintsBuilder {
         let scope_id = self.current_scope();
-        &self.use_def_maps[scope_id]
+        &mut self.use_def_maps[scope_id].narrowing_constraints
     }
 
     fn current_visibility_constraints_mut(&mut self) -> &mut VisibilityConstraintsBuilder {
@@ -304,11 +305,20 @@ impl<'db> SemanticIndexBuilder<'db> {
         &mut self.ast_ids[scope_id]
     }
 
-    fn flow_snapshot(&self) -> FlowSnapshot {
-        self.current_use_def_map().snapshot()
+    fn flow_clone(&mut self, state: &FlowSnapshot) -> FlowSnapshot {
+        state.clone(self.current_narrowing_constraints_mut())
+    }
+
+    fn flow_snapshot(&mut self) -> FlowSnapshot {
+        self.current_use_def_map_mut().snapshot()
     }
 
     fn flow_restore(&mut self, state: FlowSnapshot) {
+        self.current_use_def_map_mut().restore(state);
+    }
+
+    fn flow_restore_clone(&mut self, state: &FlowSnapshot) {
+        let state = self.flow_clone(state);
         self.current_use_def_map_mut().restore(state);
     }
 
@@ -1154,7 +1164,7 @@ where
                     post_clauses.push(self.flow_snapshot());
                     // we can only take an elif/else branch if none of the previous ones were
                     // taken
-                    self.flow_restore(no_branch_taken.clone());
+                    self.flow_restore_clone(&no_branch_taken);
                     self.record_negated_narrowing_constraint(last_predicate);
 
                     let elif_predicate = if let Some(elif_test) = clause_test {
@@ -1241,7 +1251,7 @@ where
                 // To model this correctly, we need two copies of the while condition constraint,
                 // since the first and later evaluations might produce different results.
                 let post_body = self.flow_snapshot();
-                self.flow_restore(pre_loop.clone());
+                self.flow_restore_clone(&pre_loop);
                 self.record_negated_visibility_constraint(first_vis_constraint_id);
                 self.flow_merge(post_body);
                 self.record_negated_narrowing_constraint(predicate);
@@ -1387,7 +1397,7 @@ where
                 for (i, case) in cases.iter().enumerate() {
                     if i != 0 {
                         post_case_snapshots.push(self.flow_snapshot());
-                        self.flow_restore(after_subject.clone());
+                        self.flow_restore_clone(&after_subject);
                     }
 
                     self.current_match_case = Some(CurrentMatchCase::new(&case.pattern));
@@ -1416,7 +1426,7 @@ where
                     .is_some_and(|case| case.guard.is_none() && case.pattern.is_wildcard())
                 {
                     post_case_snapshots.push(self.flow_snapshot());
-                    self.flow_restore(after_subject.clone());
+                    self.flow_restore_clone(&after_subject);
 
                     for id in &vis_constraints {
                         self.record_negated_visibility_constraint(*id);
@@ -1512,7 +1522,7 @@ where
                         // as we'll immediately call `self.flow_restore()` to a different state
                         // as soon as this loop over the handlers terminates.
                         if i < (num_handlers - 1) {
-                            self.flow_restore(pre_except_state.clone());
+                            self.flow_restore_clone(&pre_except_state);
                         }
                     }
 
@@ -1548,7 +1558,8 @@ where
 
             ast::Stmt::Break(_) => {
                 if self.loop_state().is_inside() {
-                    self.loop_break_states.push(self.flow_snapshot());
+                    let snapshot = self.flow_snapshot();
+                    self.loop_break_states.push(snapshot);
                 }
                 // Everything in the current block after a terminal statement is unreachable.
                 self.mark_unreachable();
@@ -1708,7 +1719,7 @@ where
                 self.visit_expr(body);
                 let visibility_constraint = self.record_visibility_constraint(predicate);
                 let post_body = self.flow_snapshot();
-                self.flow_restore(pre_if.clone());
+                self.flow_restore_clone(&pre_if);
 
                 self.record_negated_narrowing_constraint(predicate);
                 self.visit_expr(orelse);

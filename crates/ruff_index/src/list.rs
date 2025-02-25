@@ -1,12 +1,16 @@
 use std::cmp::Ordering;
+use std::marker::PhantomData;
 use std::ops::Deref;
 
+use crate::newtype_index;
 use crate::vec::IndexVec;
-use crate::Idx;
 
-/// Stores one or more _association lists_, which are linked lists of key/value pairs. We
-/// additionally guarantee that the elements of an association list are sorted (by their keys), and
-/// that they do not contain any entries with duplicate keys.
+// Allows the macro invocation below to work
+use crate as ruff_index;
+
+/// An [_association list_][alist], which is a linked list of key/value pairs. We additionally
+/// guarantee that the elements of an association list are sorted (by their keys), and that they do
+/// not contain any entries with duplicate keys.
 ///
 /// Association lists have fallen out of favor in recent decades, since you often need operations
 /// that are inefficient on them. In particular, looking up a random element by index is O(n), just
@@ -37,10 +41,45 @@ use crate::Idx;
 /// - You should construct lists in key order; doing this lets you insert each value in constant time.
 ///   Inserting entries in reverse order results in _quadratic_ overall time to construct the list.
 ///
-/// This type provides read-only access to the lists.  Use a [`ListBuilder`] to create lists.
+/// Lists are created using a [`ListBuilder`], and once created are accessed via a [`ListStorage`].
+///
+/// [alist]: https://en.wikipedia.org/wiki/Association_list
+#[derive(Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub struct List<K, V = ()> {
+    last: Option<ListCellId>,
+    _phantom_key: PhantomData<K>,
+    _phantom_value: PhantomData<V>,
+}
+
+impl<K, V> List<K, V> {
+    pub const fn empty() -> List<K, V> {
+        List::new(None)
+    }
+
+    const fn new(last: Option<ListCellId>) -> List<K, V> {
+        List {
+            last,
+            _phantom_key: PhantomData,
+            _phantom_value: PhantomData,
+        }
+    }
+}
+
+impl<K, V> Default for List<K, V> {
+    fn default() -> Self {
+        List::empty()
+    }
+}
+
+#[newtype_index]
+#[derive(PartialOrd, Ord)]
+struct ListCellId;
+
+/// Stores one or more association lists. This type provides read-only access to the lists.  Use a
+/// [`ListBuilder`] to create lists.
 #[derive(Debug, Eq, PartialEq)]
-pub struct ListStorage<I, K, V = ()> {
-    cells: IndexVec<I, ListCell<I, K, V>>,
+pub struct ListStorage<K, V = ()> {
+    cells: IndexVec<ListCellId, ListCell<K, V>>,
 }
 
 /// Each association list is represented by a sequence of snoc cells. A snoc cell is like the more
@@ -50,28 +89,28 @@ pub struct ListStorage<I, K, V = ()> {
 /// you're not in Lisp-land, where they're called `car` and `cdr`).  The elements of a snoc cell
 /// are usually called `rest` and `last`.
 #[derive(Debug, Eq, PartialEq)]
-struct ListCell<I, K, V> {
-    rest: Option<I>,
+struct ListCell<K, V> {
+    rest: Option<ListCellId>,
     key: K,
     value: V,
 }
 
-impl<I: Idx, K, V> ListStorage<I, K, V> {
+impl<K, V> ListStorage<K, V> {
     /// Iterates through the entries in a list _in reverse order by key_.
-    pub fn iter_reverse(&self, list: Option<I>) -> ListReverseIterator<'_, I, K, V> {
+    pub fn iter_reverse(&self, list: &List<K, V>) -> ListReverseIterator<'_, K, V> {
         ListReverseIterator {
             storage: self,
-            curr: list,
+            curr: list.last,
         }
     }
 }
 
-pub struct ListReverseIterator<'a, I, K, V> {
-    storage: &'a ListStorage<I, K, V>,
-    curr: Option<I>,
+pub struct ListReverseIterator<'a, K, V> {
+    storage: &'a ListStorage<K, V>,
+    curr: Option<ListCellId>,
 }
 
-impl<'a, I: Idx, K, V> Iterator for ListReverseIterator<'a, I, K, V> {
+impl<'a, K, V> Iterator for ListReverseIterator<'a, K, V> {
     type Item = (&'a K, &'a V);
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -83,8 +122,8 @@ impl<'a, I: Idx, K, V> Iterator for ListReverseIterator<'a, I, K, V> {
 
 /// Constructs one or more association lists.
 #[derive(Debug, Eq, PartialEq)]
-pub struct ListBuilder<I, K, V = ()> {
-    storage: ListStorage<I, K, V>,
+pub struct ListBuilder<K, V = ()> {
+    storage: ListStorage<K, V>,
 
     /// Scratch space that lets us implement our list operations iteratively instead of
     /// recursively.
@@ -111,7 +150,7 @@ pub struct ListBuilder<I, K, V = ()> {
     scratch: Vec<(K, V)>,
 }
 
-impl<I: Idx, K, V> Default for ListBuilder<I, K, V> {
+impl<K, V> Default for ListBuilder<K, V> {
     fn default() -> Self {
         ListBuilder {
             storage: ListStorage {
@@ -122,17 +161,17 @@ impl<I: Idx, K, V> Default for ListBuilder<I, K, V> {
     }
 }
 
-impl<I, K, V> Deref for ListBuilder<I, K, V> {
-    type Target = ListStorage<I, K, V>;
-    fn deref(&self) -> &ListStorage<I, K, V> {
+impl<K, V> Deref for ListBuilder<K, V> {
+    type Target = ListStorage<K, V>;
+    fn deref(&self) -> &ListStorage<K, V> {
         &self.storage
     }
 }
 
-impl<I: Idx, K, V> ListBuilder<I, K, V> {
+impl<K, V> ListBuilder<K, V> {
     /// Finalizes a `ListBuilder`. After calling this, you cannot create any new lists managed by
     /// this storage.
-    pub fn build(mut self) -> ListStorage<I, K, V> {
+    pub fn build(mut self) -> ListStorage<K, V> {
         self.storage.cells.shrink_to_fit();
         self.storage
     }
@@ -144,8 +183,13 @@ impl<I: Idx, K, V> ListBuilder<I, K, V> {
     /// methods, we always use `Option<I>` as the return type for any method that can return a
     /// list.
     #[allow(clippy::unnecessary_wraps)]
-    fn add_cell(&mut self, rest: Option<I>, key: K, value: V) -> Option<I> {
+    fn add_cell(&mut self, rest: Option<ListCellId>, key: K, value: V) -> Option<ListCellId> {
         Some(self.storage.cells.push(ListCell { rest, key, value }))
+    }
+
+    /// Clones an existing list.
+    pub fn clone_list(&mut self, list: &List<K, V>) -> List<K, V> {
+        List::new(list.last)
     }
 
     /// Returns an entry pointing at where `key` would be inserted into a list.
@@ -159,7 +203,7 @@ impl<I: Idx, K, V> ListBuilder<I, K, V> {
     /// entries to duplicate for each insertion. If you construct the list in reverse order, we
     /// will have to duplicate O(n) entries for each insertion, making it _quadratic_ to construct
     /// the entire list.
-    pub fn entry(&mut self, list: Option<I>, key: K) -> ListEntry<I, K, V>
+    pub fn entry(&mut self, list: List<K, V>, key: K) -> ListEntry<K, V>
     where
         K: Clone + Ord,
         V: Clone,
@@ -171,7 +215,7 @@ impl<I: Idx, K, V> ListBuilder<I, K, V> {
         // new key. Stash those away in our scratch accumulator as we step through the input. The
         // result of the loop is that "rest" of the result list, which we will stitch the new key
         // (and any succeeding keys) onto.
-        let mut curr = list;
+        let mut curr = list.last;
         while let Some(curr_id) = curr {
             let cell = &self.storage.cells[curr_id];
             match key.cmp(&cell.key) {
@@ -219,13 +263,13 @@ impl<I: Idx, K, V> ListBuilder<I, K, V> {
 }
 
 /// A view into a list, indicating where a key would be inserted.
-pub struct ListEntry<'a, I, K, V> {
-    builder: &'a mut ListBuilder<I, K, V>,
-    list: Option<I>,
+pub struct ListEntry<'a, K, V = ()> {
+    builder: &'a mut ListBuilder<K, V>,
+    list: List<K, V>,
     key: K,
     /// Points at the element that already contains `key`, if there is one, or the element
     /// immediately before where it would go, if not.
-    rest: ListTail<I>,
+    rest: ListTail<ListCellId>,
 }
 
 enum ListTail<I> {
@@ -237,23 +281,23 @@ enum ListTail<I> {
     Vacant(I),
 }
 
-impl<I: Idx, K, V> ListEntry<'_, I, K, V>
+impl<K, V> ListEntry<'_, K, V>
 where
     K: Clone + Ord,
     V: Clone,
 {
-    fn stitch_up(self, rest: Option<I>, value: V) -> Option<I> {
-        let mut result = rest;
-        result = self.builder.add_cell(result, self.key, value);
+    fn stitch_up(self, rest: Option<ListCellId>, value: V) -> List<K, V> {
+        let mut last = rest;
+        last = self.builder.add_cell(last, self.key, value);
         while let Some((key, value)) = self.builder.scratch.pop() {
-            result = self.builder.add_cell(result, key, value);
+            last = self.builder.add_cell(last, key, value);
         }
-        result
+        List::new(last)
     }
 
     /// Inserts a new key/value into the list if the key is not already present. If the list
     /// already contains `key`, we return the original list as-is, and do not invoke your closure.
-    pub fn or_insert_with<F>(self, f: F) -> Option<I>
+    pub fn or_insert_with<F>(self, f: F) -> List<K, V>
     where
         F: FnOnce() -> V,
     {
@@ -270,13 +314,13 @@ where
 
     /// Inserts a new key/value into the list if the key is not already present. If the list
     /// already contains `key`, we return the original list as-is.
-    pub fn or_insert(self, value: V) -> Option<I> {
+    pub fn or_insert(self, value: V) -> List<K, V> {
         self.or_insert_with(|| value)
     }
 
     /// Inserts a new key and the default value into the list if the key is not already present. If
     /// the list already contains `key`, we return the original list as-is.
-    pub fn or_insert_default(self) -> Option<I>
+    pub fn or_insert_default(self) -> List<K, V>
     where
         V: Default,
     {
@@ -286,7 +330,7 @@ where
     /// Ensures that the list contains an entry mapping the key to `value`, returning the resulting
     /// list. Overwrites any existing entry with the same key. As an optimization, if the existing
     /// entry has an equal _value_, as well, we return the original list as-is.
-    pub fn replace(self, value: V) -> Option<I>
+    pub fn replace(self, value: V) -> List<K, V>
     where
         V: Eq,
     {
@@ -310,7 +354,7 @@ where
     /// Ensures that the list contains an entry mapping the key to the default, returning the
     /// resulting list. Overwrites any existing entry with the same key. As an optimization, if the
     /// existing entry has an equal _value_, as well, we return the original list as-is.
-    pub fn replace_with_default(self) -> Option<I>
+    pub fn replace_with_default(self) -> List<K, V>
     where
         V: Default + Eq,
     {
@@ -318,16 +362,12 @@ where
     }
 }
 
-impl<I: Idx, K, V> ListBuilder<I, K, V> {
+impl<K, V> ListBuilder<K, V> {
     /// Returns the intersection of two lists. The result will contain an entry for any key that
     /// appears in both lists. The corresponding values will be combined using the `combine`
     /// function that you provide.
-    pub fn intersect_with<F>(
-        &mut self,
-        mut a: Option<I>,
-        mut b: Option<I>,
-        mut combine: F,
-    ) -> Option<I>
+    #[allow(clippy::needless_pass_by_value)]
+    pub fn intersect_with<F>(&mut self, a: List<K, V>, b: List<K, V>, mut combine: F) -> List<K, V>
     where
         K: Clone + Ord,
         V: Clone,
@@ -338,6 +378,8 @@ impl<I: Idx, K, V> ListBuilder<I, K, V> {
         // Zip through the lists, building up the keys/values of the new entries into our scratch
         // vector. Continue until we run out of elements in either list. (Any remaining elements in
         // the other list cannot possibly be in the intersection.)
+        let mut a = a.last;
+        let mut b = b.last;
         while let (Some(a_id), Some(b_id)) = (a, b) {
             let a_cell = &self.storage.cells[a_id];
             let b_cell = &self.storage.cells[b_id];
@@ -359,17 +401,18 @@ impl<I: Idx, K, V> ListBuilder<I, K, V> {
 
         // Once the iteration loop terminates, we stitch the new entries back together into proper
         // alist cells.
-        let mut result = None;
+        let mut last = None;
         while let Some((key, value)) = self.scratch.pop() {
-            result = self.add_cell(result, key, value);
+            last = self.add_cell(last, key, value);
         }
-        result
+        List::new(last)
     }
 
     /// Returns the union of two lists. The result will contain an entry for any key that appears
     /// in either list. For keys that appear in both lists, the corresponding values will be
     /// combined using the `combine` function that you provide.
-    pub fn union_with<F>(&mut self, mut a: Option<I>, mut b: Option<I>, mut combine: F) -> Option<I>
+    #[allow(clippy::needless_pass_by_value)]
+    pub fn union_with<F>(&mut self, a: List<K, V>, b: List<K, V>, mut combine: F) -> List<K, V>
     where
         K: Clone + Ord,
         V: Clone,
@@ -381,7 +424,9 @@ impl<I: Idx, K, V> ListBuilder<I, K, V> {
         // vector. Continue until we run out of elements in either list. (Any remaining elements in
         // the other list will be added to the result, but won't need to be combined with
         // anything.)
-        let mut result = loop {
+        let mut a = a.last;
+        let mut b = b.last;
+        let mut last = loop {
             let (a_id, b_id) = match (a, b) {
                 // If we run out of elements in one of the lists, the non-empty list will appear in
                 // the output unchanged.
@@ -420,31 +465,31 @@ impl<I: Idx, K, V> ListBuilder<I, K, V> {
         // Once the iteration loop terminates, we stitch the new entries back together into proper
         // alist cells.
         while let Some((key, value)) = self.scratch.pop() {
-            result = self.add_cell(result, key, value);
+            last = self.add_cell(last, key, value);
         }
-        result
+        List::new(last)
     }
 }
 
 // ----
 // Sets
 
-impl<I: Idx, K> ListStorage<I, K, ()> {
+impl<K> ListStorage<K, ()> {
     /// Iterates through the elements in a set _in reverse order_.
-    pub fn iter_set_reverse(&self, set: Option<I>) -> ListSetReverseIterator<'_, I, K> {
+    pub fn iter_set_reverse(&self, set: &List<K, ()>) -> ListSetReverseIterator<K> {
         ListSetReverseIterator {
             storage: self,
-            curr: set,
+            curr: set.last,
         }
     }
 }
 
-pub struct ListSetReverseIterator<'a, I, K> {
-    storage: &'a ListStorage<I, K, ()>,
-    curr: Option<I>,
+pub struct ListSetReverseIterator<'a, K> {
+    storage: &'a ListStorage<K, ()>,
+    curr: Option<ListCellId>,
 }
 
-impl<'a, I: Idx, K> Iterator for ListSetReverseIterator<'a, I, K> {
+impl<'a, K> Iterator for ListSetReverseIterator<'a, K> {
     type Item = &'a K;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -454,9 +499,9 @@ impl<'a, I: Idx, K> Iterator for ListSetReverseIterator<'a, I, K> {
     }
 }
 
-impl<I: Idx, K> ListBuilder<I, K, ()> {
+impl<K> ListBuilder<K, ()> {
     /// Adds an element to a set.
-    pub fn insert(&mut self, set: Option<I>, element: K) -> Option<I>
+    pub fn insert(&mut self, set: List<K, ()>, element: K) -> List<K, ()>
     where
         K: Clone + Ord,
     {
@@ -465,7 +510,7 @@ impl<I: Idx, K> ListBuilder<I, K, ()> {
 
     /// Returns the intersection of two sets. The result will contain any value that appears in
     /// both sets.
-    pub fn intersect(&mut self, a: Option<I>, b: Option<I>) -> Option<I>
+    pub fn intersect(&mut self, a: List<K, ()>, b: List<K, ()>) -> List<K, ()>
     where
         K: Clone + Ord,
     {
@@ -474,7 +519,7 @@ impl<I: Idx, K> ListBuilder<I, K, ()> {
 
     /// Returns the intersection of two sets. The result will contain any value that appears in
     /// either set.
-    pub fn union(&mut self, a: Option<I>, b: Option<I>) -> Option<I>
+    pub fn union(&mut self, a: List<K, ()>, b: List<K, ()>) -> List<K, ()>
     where
         K: Clone + Ord,
     {
@@ -492,23 +537,14 @@ mod tests {
     use std::fmt::Display;
     use std::fmt::Write;
 
-    use crate::newtype_index;
-
-    // Allows the macro invocation below to work
-    use crate as ruff_index;
-
-    #[newtype_index]
-    struct TestIndex;
-
     // ----
     // Sets
 
-    impl<I, K> ListStorage<I, K>
+    impl<K> ListStorage<K>
     where
-        I: Idx,
         K: Display,
     {
-        fn display_set(&self, list: Option<I>) -> String {
+        fn display_set(&self, list: &List<K, ()>) -> String {
             let elements: Vec<_> = self.iter_set_reverse(list).collect();
             let mut result = String::new();
             result.push('[');
@@ -523,107 +559,128 @@ mod tests {
         }
     }
 
+    fn insert(builder: &mut ListBuilder<u16>, list: &List<u16>, element: u16) -> List<u16> {
+        let list = builder.clone_list(list);
+        builder.insert(list, element)
+    }
+
     #[test]
     fn can_insert_into_set() {
-        let mut builder = ListBuilder::<TestIndex, u16>::default();
+        let mut builder = ListBuilder::<u16>::default();
 
         // Build up the set in order
-        let set1 = builder.insert(None, 1);
-        let set12 = builder.insert(set1, 2);
-        let set123 = builder.insert(set12, 3);
-        let set1232 = builder.insert(set123, 2);
-        assert_eq!(builder.display_set(None), "[]");
-        assert_eq!(builder.display_set(set1), "[1]");
-        assert_eq!(builder.display_set(set12), "[1, 2]");
-        assert_eq!(builder.display_set(set123), "[1, 2, 3]");
-        assert_eq!(builder.display_set(set1232), "[1, 2, 3]");
+        let empty = List::empty();
+        let set1 = insert(&mut builder, &empty, 1);
+        let set12 = insert(&mut builder, &set1, 2);
+        let set123 = insert(&mut builder, &set12, 3);
+        let set1232 = insert(&mut builder, &set123, 2);
+        assert_eq!(builder.display_set(&empty), "[]");
+        assert_eq!(builder.display_set(&set1), "[1]");
+        assert_eq!(builder.display_set(&set12), "[1, 2]");
+        assert_eq!(builder.display_set(&set123), "[1, 2, 3]");
+        assert_eq!(builder.display_set(&set1232), "[1, 2, 3]");
 
         // And in reverse order
-        let set3 = builder.insert(None, 3);
-        let set32 = builder.insert(set3, 2);
-        let set321 = builder.insert(set32, 1);
-        let set3212 = builder.insert(set321, 2);
-        assert_eq!(builder.display_set(None), "[]");
-        assert_eq!(builder.display_set(set3), "[3]");
-        assert_eq!(builder.display_set(set32), "[2, 3]");
-        assert_eq!(builder.display_set(set321), "[1, 2, 3]");
-        assert_eq!(builder.display_set(set3212), "[1, 2, 3]");
+        let set3 = insert(&mut builder, &empty, 3);
+        let set32 = insert(&mut builder, &set3, 2);
+        let set321 = insert(&mut builder, &set32, 1);
+        let set3212 = insert(&mut builder, &set321, 2);
+        assert_eq!(builder.display_set(&empty), "[]");
+        assert_eq!(builder.display_set(&set3), "[3]");
+        assert_eq!(builder.display_set(&set32), "[2, 3]");
+        assert_eq!(builder.display_set(&set321), "[1, 2, 3]");
+        assert_eq!(builder.display_set(&set3212), "[1, 2, 3]");
     }
 
     #[test]
     fn can_intersect_sets() {
-        let mut builder = ListBuilder::<TestIndex, u16>::default();
+        let mut builder = ListBuilder::<u16>::default();
 
-        let set1 = builder.entry(None, 1).or_insert_default();
-        let set12 = builder.entry(set1, 2).or_insert_default();
-        let set123 = builder.entry(set12, 3).or_insert_default();
-        let set1234 = builder.entry(set123, 4).or_insert_default();
+        let empty = List::empty();
+        let set1 = insert(&mut builder, &empty, 1);
+        let set12 = insert(&mut builder, &set1, 2);
+        let set123 = insert(&mut builder, &set12, 3);
+        let set1234 = insert(&mut builder, &set123, 4);
 
-        let set2 = builder.entry(None, 2).or_insert_default();
-        let set24 = builder.entry(set2, 4).or_insert_default();
-        let set245 = builder.entry(set24, 5).or_insert_default();
-        let set2457 = builder.entry(set245, 7).or_insert_default();
+        let set2 = insert(&mut builder, &empty, 2);
+        let set24 = insert(&mut builder, &set2, 4);
+        let set245 = insert(&mut builder, &set24, 5);
+        let set2457 = insert(&mut builder, &set245, 7);
 
-        let intersection = builder.intersect(None, None);
-        assert_eq!(builder.display_set(intersection), "[]");
-        let intersection = builder.intersect(None, set1234);
-        assert_eq!(builder.display_set(intersection), "[]");
-        let intersection = builder.intersect(None, set2457);
-        assert_eq!(builder.display_set(intersection), "[]");
-        let intersection = builder.intersect(set1, set1234);
-        assert_eq!(builder.display_set(intersection), "[1]");
-        let intersection = builder.intersect(set1, set2457);
-        assert_eq!(builder.display_set(intersection), "[]");
-        let intersection = builder.intersect(set2, set1234);
-        assert_eq!(builder.display_set(intersection), "[2]");
-        let intersection = builder.intersect(set2, set2457);
-        assert_eq!(builder.display_set(intersection), "[2]");
-        let intersection = builder.intersect(set1234, set2457);
-        assert_eq!(builder.display_set(intersection), "[2, 4]");
+        #[allow(clippy::items_after_statements)]
+        fn intersect(builder: &mut ListBuilder<u16>, a: &List<u16>, b: &List<u16>) -> List<u16> {
+            let a = builder.clone_list(a);
+            let b = builder.clone_list(b);
+            builder.intersect(a, b)
+        }
+
+        let result = intersect(&mut builder, &empty, &empty);
+        assert_eq!(builder.display_set(&result), "[]");
+        let result = intersect(&mut builder, &empty, &set1234);
+        assert_eq!(builder.display_set(&result), "[]");
+        let result = intersect(&mut builder, &empty, &set2457);
+        assert_eq!(builder.display_set(&result), "[]");
+        let result = intersect(&mut builder, &set1, &set1234);
+        assert_eq!(builder.display_set(&result), "[1]");
+        let result = intersect(&mut builder, &set1, &set2457);
+        assert_eq!(builder.display_set(&result), "[]");
+        let result = intersect(&mut builder, &set2, &set1234);
+        assert_eq!(builder.display_set(&result), "[2]");
+        let result = intersect(&mut builder, &set2, &set2457);
+        assert_eq!(builder.display_set(&result), "[2]");
+        let result = intersect(&mut builder, &set1234, &set2457);
+        assert_eq!(builder.display_set(&result), "[2, 4]");
     }
 
     #[test]
     fn can_union_sets() {
-        let mut builder = ListBuilder::<TestIndex, u16>::default();
+        let mut builder = ListBuilder::<u16>::default();
 
-        let set1 = builder.entry(None, 1).or_insert_default();
-        let set12 = builder.entry(set1, 2).or_insert_default();
-        let set123 = builder.entry(set12, 3).or_insert_default();
-        let set1234 = builder.entry(set123, 4).or_insert_default();
+        let empty = List::empty();
+        let set1 = insert(&mut builder, &empty, 1);
+        let set12 = insert(&mut builder, &set1, 2);
+        let set123 = insert(&mut builder, &set12, 3);
+        let set1234 = insert(&mut builder, &set123, 4);
 
-        let set2 = builder.entry(None, 2).or_insert_default();
-        let set24 = builder.entry(set2, 4).or_insert_default();
-        let set245 = builder.entry(set24, 5).or_insert_default();
-        let set2457 = builder.entry(set245, 7).or_insert_default();
+        let set2 = insert(&mut builder, &empty, 2);
+        let set24 = insert(&mut builder, &set2, 4);
+        let set245 = insert(&mut builder, &set24, 5);
+        let set2457 = insert(&mut builder, &set245, 7);
 
-        let union = builder.union(None, None);
-        assert_eq!(builder.display_set(union), "[]");
-        let union = builder.union(None, set1234);
-        assert_eq!(builder.display_set(union), "[1, 2, 3, 4]");
-        let union = builder.union(None, set2457);
-        assert_eq!(builder.display_set(union), "[2, 4, 5, 7]");
-        let union = builder.union(set1, set1234);
-        assert_eq!(builder.display_set(union), "[1, 2, 3, 4]");
-        let union = builder.union(set1, set2457);
-        assert_eq!(builder.display_set(union), "[1, 2, 4, 5, 7]");
-        let union = builder.union(set2, set1234);
-        assert_eq!(builder.display_set(union), "[1, 2, 3, 4]");
-        let union = builder.union(set2, set2457);
-        assert_eq!(builder.display_set(union), "[2, 4, 5, 7]");
-        let union = builder.union(set1234, set2457);
-        assert_eq!(builder.display_set(union), "[1, 2, 3, 4, 5, 7]");
+        #[allow(clippy::items_after_statements)]
+        fn union(builder: &mut ListBuilder<u16>, a: &List<u16>, b: &List<u16>) -> List<u16> {
+            let a = builder.clone_list(a);
+            let b = builder.clone_list(b);
+            builder.union(a, b)
+        }
+
+        let result = union(&mut builder, &empty, &empty);
+        assert_eq!(builder.display_set(&result), "[]");
+        let result = union(&mut builder, &empty, &set1234);
+        assert_eq!(builder.display_set(&result), "[1, 2, 3, 4]");
+        let result = union(&mut builder, &empty, &set2457);
+        assert_eq!(builder.display_set(&result), "[2, 4, 5, 7]");
+        let result = union(&mut builder, &set1, &set1234);
+        assert_eq!(builder.display_set(&result), "[1, 2, 3, 4]");
+        let result = union(&mut builder, &set1, &set2457);
+        assert_eq!(builder.display_set(&result), "[1, 2, 4, 5, 7]");
+        let result = union(&mut builder, &set2, &set1234);
+        assert_eq!(builder.display_set(&result), "[1, 2, 3, 4]");
+        let result = union(&mut builder, &set2, &set2457);
+        assert_eq!(builder.display_set(&result), "[2, 4, 5, 7]");
+        let result = union(&mut builder, &set1234, &set2457);
+        assert_eq!(builder.display_set(&result), "[1, 2, 3, 4, 5, 7]");
     }
 
     // ----
     // Maps
 
-    impl<I, K, V> ListStorage<I, K, V>
+    impl<K, V> ListStorage<K, V>
     where
-        I: Idx,
         K: Display,
         V: Display,
     {
-        fn display(&self, list: Option<I>) -> String {
+        fn display(&self, list: &List<K, V>) -> String {
             let entries: Vec<_> = self.iter_reverse(list).collect();
             let mut result = String::new();
             result.push('[');
@@ -638,121 +695,159 @@ mod tests {
         }
     }
 
+    fn entry<'a>(
+        builder: &'a mut ListBuilder<u16, u16>,
+        list: &List<u16, u16>,
+        key: u16,
+    ) -> ListEntry<'a, u16, u16> {
+        let list = builder.clone_list(list);
+        builder.entry(list, key)
+    }
+
     #[test]
     fn can_insert_into_map() {
-        let mut builder = ListBuilder::<TestIndex, u16, u16>::default();
+        let mut builder = ListBuilder::<u16, u16>::default();
 
         // Build up the map in order
-        let map1 = builder.entry(None, 1).replace(1);
-        let map12 = builder.entry(map1, 2).replace(2);
-        let map123 = builder.entry(map12, 3).replace(3);
-        let map1232 = builder.entry(map123, 2).replace(4);
-        assert_eq!(builder.display(None), "[]");
-        assert_eq!(builder.display(map1), "[1:1]");
-        assert_eq!(builder.display(map12), "[1:1, 2:2]");
-        assert_eq!(builder.display(map123), "[1:1, 2:2, 3:3]");
-        assert_eq!(builder.display(map1232), "[1:1, 2:4, 3:3]");
+        let empty = List::empty();
+        let map1 = entry(&mut builder, &empty, 1).replace(1);
+        let map12 = entry(&mut builder, &map1, 2).replace(2);
+        let map123 = entry(&mut builder, &map12, 3).replace(3);
+        let map1232 = entry(&mut builder, &map123, 2).replace(4);
+        assert_eq!(builder.display(&empty), "[]");
+        assert_eq!(builder.display(&map1), "[1:1]");
+        assert_eq!(builder.display(&map12), "[1:1, 2:2]");
+        assert_eq!(builder.display(&map123), "[1:1, 2:2, 3:3]");
+        assert_eq!(builder.display(&map1232), "[1:1, 2:4, 3:3]");
 
         // And in reverse order
-        let map3 = builder.entry(None, 3).replace(3);
-        let map32 = builder.entry(map3, 2).replace(2);
-        let map321 = builder.entry(map32, 1).replace(1);
-        let map3212 = builder.entry(map321, 2).replace(4);
-        assert_eq!(builder.display(None), "[]");
-        assert_eq!(builder.display(map3), "[3:3]");
-        assert_eq!(builder.display(map32), "[2:2, 3:3]");
-        assert_eq!(builder.display(map321), "[1:1, 2:2, 3:3]");
-        assert_eq!(builder.display(map3212), "[1:1, 2:4, 3:3]");
+        let map3 = entry(&mut builder, &empty, 3).replace(3);
+        let map32 = entry(&mut builder, &map3, 2).replace(2);
+        let map321 = entry(&mut builder, &map32, 1).replace(1);
+        let map3212 = entry(&mut builder, &map321, 2).replace(4);
+        assert_eq!(builder.display(&empty), "[]");
+        assert_eq!(builder.display(&map3), "[3:3]");
+        assert_eq!(builder.display(&map32), "[2:2, 3:3]");
+        assert_eq!(builder.display(&map321), "[1:1, 2:2, 3:3]");
+        assert_eq!(builder.display(&map3212), "[1:1, 2:4, 3:3]");
     }
 
     #[test]
     fn can_insert_if_needed_into_map() {
-        let mut builder = ListBuilder::<TestIndex, u16, u16>::default();
+        let mut builder = ListBuilder::<u16, u16>::default();
 
         // Build up the map in order
-        let map1 = builder.entry(None, 1).or_insert(1);
-        let map12 = builder.entry(map1, 2).or_insert(2);
-        let map123 = builder.entry(map12, 3).or_insert(3);
-        let map1232 = builder.entry(map123, 2).or_insert(4);
-        assert_eq!(builder.display(None), "[]");
-        assert_eq!(builder.display(map1), "[1:1]");
-        assert_eq!(builder.display(map12), "[1:1, 2:2]");
-        assert_eq!(builder.display(map123), "[1:1, 2:2, 3:3]");
-        assert_eq!(builder.display(map1232), "[1:1, 2:2, 3:3]");
+        let empty = List::empty();
+        let map1 = entry(&mut builder, &empty, 1).or_insert(1);
+        let map12 = entry(&mut builder, &map1, 2).or_insert(2);
+        let map123 = entry(&mut builder, &map12, 3).or_insert(3);
+        let map1232 = entry(&mut builder, &map123, 2).or_insert(4);
+        assert_eq!(builder.display(&empty), "[]");
+        assert_eq!(builder.display(&map1), "[1:1]");
+        assert_eq!(builder.display(&map12), "[1:1, 2:2]");
+        assert_eq!(builder.display(&map123), "[1:1, 2:2, 3:3]");
+        assert_eq!(builder.display(&map1232), "[1:1, 2:2, 3:3]");
 
         // And in reverse order
-        let map3 = builder.entry(None, 3).or_insert(3);
-        let map32 = builder.entry(map3, 2).or_insert(2);
-        let map321 = builder.entry(map32, 1).or_insert(1);
-        let map3212 = builder.entry(map321, 2).or_insert(4);
-        assert_eq!(builder.display(None), "[]");
-        assert_eq!(builder.display(map3), "[3:3]");
-        assert_eq!(builder.display(map32), "[2:2, 3:3]");
-        assert_eq!(builder.display(map321), "[1:1, 2:2, 3:3]");
-        assert_eq!(builder.display(map3212), "[1:1, 2:2, 3:3]");
+        let map3 = entry(&mut builder, &empty, 3).or_insert(3);
+        let map32 = entry(&mut builder, &map3, 2).or_insert(2);
+        let map321 = entry(&mut builder, &map32, 1).or_insert(1);
+        let map3212 = entry(&mut builder, &map321, 2).or_insert(4);
+        assert_eq!(builder.display(&empty), "[]");
+        assert_eq!(builder.display(&map3), "[3:3]");
+        assert_eq!(builder.display(&map32), "[2:2, 3:3]");
+        assert_eq!(builder.display(&map321), "[1:1, 2:2, 3:3]");
+        assert_eq!(builder.display(&map3212), "[1:1, 2:2, 3:3]");
     }
 
     #[test]
     fn can_intersect_maps() {
-        let mut builder = ListBuilder::<TestIndex, u16, u16>::default();
+        let mut builder = ListBuilder::<u16, u16>::default();
 
-        let map1 = builder.entry(None, 1).or_insert(1);
-        let map12 = builder.entry(map1, 2).or_insert(2);
-        let map123 = builder.entry(map12, 3).or_insert(3);
-        let map1234 = builder.entry(map123, 4).or_insert(4);
+        let empty = List::empty();
+        let map1 = entry(&mut builder, &empty, 1).or_insert(1);
+        let map12 = entry(&mut builder, &map1, 2).or_insert(2);
+        let map123 = entry(&mut builder, &map12, 3).or_insert(3);
+        let map1234 = entry(&mut builder, &map123, 4).or_insert(4);
 
-        let map2 = builder.entry(None, 2).or_insert(20);
-        let map24 = builder.entry(map2, 4).or_insert(40);
-        let map245 = builder.entry(map24, 5).or_insert(50);
-        let map2457 = builder.entry(map245, 7).or_insert(70);
+        let map2 = entry(&mut builder, &empty, 2).or_insert(20);
+        let map24 = entry(&mut builder, &map2, 4).or_insert(40);
+        let map245 = entry(&mut builder, &map24, 5).or_insert(50);
+        let map2457 = entry(&mut builder, &map245, 7).or_insert(70);
 
-        let intersection = builder.intersect_with(None, None, |a, b| a + b);
-        assert_eq!(builder.display(intersection), "[]");
-        let intersection = builder.intersect_with(None, map1234, |a, b| a + b);
-        assert_eq!(builder.display(intersection), "[]");
-        let intersection = builder.intersect_with(None, map2457, |a, b| a + b);
-        assert_eq!(builder.display(intersection), "[]");
-        let intersection = builder.intersect_with(map1, map1234, |a, b| a + b);
-        assert_eq!(builder.display(intersection), "[1:2]");
-        let intersection = builder.intersect_with(map1, map2457, |a, b| a + b);
-        assert_eq!(builder.display(intersection), "[]");
-        let intersection = builder.intersect_with(map2, map1234, |a, b| a + b);
-        assert_eq!(builder.display(intersection), "[2:22]");
-        let intersection = builder.intersect_with(map2, map2457, |a, b| a + b);
-        assert_eq!(builder.display(intersection), "[2:40]");
-        let intersection = builder.intersect_with(map1234, map2457, |a, b| a + b);
-        assert_eq!(builder.display(intersection), "[2:22, 4:44]");
+        #[allow(clippy::items_after_statements)]
+        fn intersect(
+            builder: &mut ListBuilder<u16, u16>,
+            a: &List<u16, u16>,
+            b: &List<u16, u16>,
+        ) -> List<u16, u16> {
+            let a = builder.clone_list(a);
+            let b = builder.clone_list(b);
+            builder.intersect_with(a, b, |a, b| a + b)
+        }
+
+        let result = intersect(&mut builder, &empty, &empty);
+        assert_eq!(builder.display(&result), "[]");
+        let result = intersect(&mut builder, &empty, &map1234);
+        assert_eq!(builder.display(&result), "[]");
+        let result = intersect(&mut builder, &empty, &map2457);
+        assert_eq!(builder.display(&result), "[]");
+        let result = intersect(&mut builder, &map1, &map1234);
+        assert_eq!(builder.display(&result), "[1:2]");
+        let result = intersect(&mut builder, &map1, &map2457);
+        assert_eq!(builder.display(&result), "[]");
+        let result = intersect(&mut builder, &map2, &map1234);
+        assert_eq!(builder.display(&result), "[2:22]");
+        let result = intersect(&mut builder, &map2, &map2457);
+        assert_eq!(builder.display(&result), "[2:40]");
+        let result = intersect(&mut builder, &map1234, &map2457);
+        assert_eq!(builder.display(&result), "[2:22, 4:44]");
     }
 
     #[test]
     fn can_union_maps() {
-        let mut builder = ListBuilder::<TestIndex, u16, u16>::default();
+        let mut builder = ListBuilder::<u16, u16>::default();
 
-        let map1 = builder.entry(None, 1).or_insert(1);
-        let map12 = builder.entry(map1, 2).or_insert(2);
-        let map123 = builder.entry(map12, 3).or_insert(3);
-        let map1234 = builder.entry(map123, 4).or_insert(4);
+        let empty = List::empty();
+        let map1 = entry(&mut builder, &empty, 1).or_insert(1);
+        let map12 = entry(&mut builder, &map1, 2).or_insert(2);
+        let map123 = entry(&mut builder, &map12, 3).or_insert(3);
+        let map1234 = entry(&mut builder, &map123, 4).or_insert(4);
 
-        let map2 = builder.entry(None, 2).or_insert(20);
-        let map24 = builder.entry(map2, 4).or_insert(40);
-        let map245 = builder.entry(map24, 5).or_insert(50);
-        let map2457 = builder.entry(map245, 7).or_insert(70);
+        let map2 = entry(&mut builder, &empty, 2).or_insert(20);
+        let map24 = entry(&mut builder, &map2, 4).or_insert(40);
+        let map245 = entry(&mut builder, &map24, 5).or_insert(50);
+        let map2457 = entry(&mut builder, &map245, 7).or_insert(70);
 
-        let union = builder.union_with(None, None, |a, b| a + b);
-        assert_eq!(builder.display(union), "[]");
-        let union = builder.union_with(None, map1234, |a, b| a + b);
-        assert_eq!(builder.display(union), "[1:1, 2:2, 3:3, 4:4]");
-        let union = builder.union_with(None, map2457, |a, b| a + b);
-        assert_eq!(builder.display(union), "[2:20, 4:40, 5:50, 7:70]");
-        let union = builder.union_with(map1, map1234, |a, b| a + b);
-        assert_eq!(builder.display(union), "[1:2, 2:2, 3:3, 4:4]");
-        let union = builder.union_with(map1, map2457, |a, b| a + b);
-        assert_eq!(builder.display(union), "[1:1, 2:20, 4:40, 5:50, 7:70]");
-        let union = builder.union_with(map2, map1234, |a, b| a + b);
-        assert_eq!(builder.display(union), "[1:1, 2:22, 3:3, 4:4]");
-        let union = builder.union_with(map2, map2457, |a, b| a + b);
-        assert_eq!(builder.display(union), "[2:40, 4:40, 5:50, 7:70]");
-        let union = builder.union_with(map1234, map2457, |a, b| a + b);
-        assert_eq!(builder.display(union), "[1:1, 2:22, 3:3, 4:44, 5:50, 7:70]");
+        #[allow(clippy::items_after_statements)]
+        fn union(
+            builder: &mut ListBuilder<u16, u16>,
+            a: &List<u16, u16>,
+            b: &List<u16, u16>,
+        ) -> List<u16, u16> {
+            let a = builder.clone_list(a);
+            let b = builder.clone_list(b);
+            builder.union_with(a, b, |a, b| a + b)
+        }
+
+        let result = union(&mut builder, &empty, &empty);
+        assert_eq!(builder.display(&result), "[]");
+        let result = union(&mut builder, &empty, &map1234);
+        assert_eq!(builder.display(&result), "[1:1, 2:2, 3:3, 4:4]");
+        let result = union(&mut builder, &empty, &map2457);
+        assert_eq!(builder.display(&result), "[2:20, 4:40, 5:50, 7:70]");
+        let result = union(&mut builder, &map1, &map1234);
+        assert_eq!(builder.display(&result), "[1:2, 2:2, 3:3, 4:4]");
+        let result = union(&mut builder, &map1, &map2457);
+        assert_eq!(builder.display(&result), "[1:1, 2:20, 4:40, 5:50, 7:70]");
+        let result = union(&mut builder, &map2, &map1234);
+        assert_eq!(builder.display(&result), "[1:1, 2:22, 3:3, 4:4]");
+        let result = union(&mut builder, &map2, &map2457);
+        assert_eq!(builder.display(&result), "[2:40, 4:40, 5:50, 7:70]");
+        let result = union(&mut builder, &map1234, &map2457);
+        assert_eq!(
+            builder.display(&result),
+            "[1:1, 2:22, 3:3, 4:44, 5:50, 7:70]"
+        );
     }
 }
