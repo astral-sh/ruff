@@ -2542,6 +2542,33 @@ impl<'src> Parser<'src> {
         let mut decorators = vec![];
         let mut progress = ParserProgress::default();
 
+        // these examples are adapted from [PEP 614](https://peps.python.org/pep-0614/), which
+        // relaxed the restriction that "decorators consist of a dotted name, optionally followed by
+        // a single call" in Python 3.9. we want to catch decorators that don't meet these criteria
+        // before 3.9 but avoid false positives on examples like the `@_` "identity function hack"
+        // or the "eval hack" called out in the PEP.
+
+        // test_ok decorator_expression_identity_hack_before_py39
+        // # parse_options: { "target-version": "3.8" }
+        // def _(x): return x
+        // @_(buttons[0].clicked.connect)
+        // def spam(): ...
+
+        // test_ok decorator_expression_eval_hack_before_py39
+        // # parse_options: { "target-version": "3.8" }
+        // @eval("buttons[0].clicked.connect")
+        // def spam(): ...
+
+        // test_ok decorator_expression_after_py39
+        // # parse_options: { "target-version": "3.9" }
+        // @buttons[0].clicked.connect
+        // def spam(): ...
+
+        // test_err decorator_expression_before_py39
+        // # parse_options: { "target-version": "3.8" }
+        // @buttons[0].clicked.connect
+        // def spam(): ...
+
         // test_err decorator_missing_expression
         // @def foo(): ...
         // @
