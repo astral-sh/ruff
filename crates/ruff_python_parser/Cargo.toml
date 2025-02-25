@@ -22,6 +22,7 @@ bstr = { workspace = true }
 compact_str = { workspace = true }
 memchr = { workspace = true }
 rustc-hash = { workspace = true }
+serde = { workspace = true, optional = true }
 static_assertions = { workspace = true }
 unicode-ident = { workspace = true }
 unicode_names2 = { workspace = true }
@@ -33,7 +34,11 @@ ruff_source_file = { workspace = true }
 
 anyhow = { workspace = true }
 insta = { workspace = true, features = ["glob"] }
+serde_json = { workspace = true }
 walkdir = { workspace = true }
+
+[features]
+serde = ["dep:serde", "ruff_python_ast/serde"]
 
 [lints]
 workspace = true
