@@ -165,7 +165,7 @@
 //! don't actually store these "list of visible definitions" as a vector of [`Definition`].
 //! Instead, [`SymbolBindings`] and [`SymbolDeclarations`] are structs which use bit-sets to track
 //! definitions (and constraints, in the case of bindings) in terms of [`ScopedDefinitionId`] and
-//! [`ScopedConstraintId`], which are indices into the `all_definitions` and `constraints`
+//! [`ScopedPredicateId`], which are indices into the `all_definitions` and `predicates`
 //! indexvecs in the [`UseDefMap`].
 //!
 //! There is another special kind of possible "definition" for a symbol: there might be a path from
@@ -264,12 +264,12 @@ use self::symbol_state::{
     SymbolDeclarations, SymbolState, SymbolStatesBuilder, SymbolStatesStorage,
 };
 use crate::semantic_index::ast_ids::ScopedUseId;
-use crate::semantic_index::constraint::{
-    Constraint, Constraints, ConstraintsBuilder, ScopedConstraintId,
-};
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::narrowing_constraints::{
     NarrowingConstraints, NarrowingConstraintsBuilder, NarrowingConstraintsIterator,
+};
+use crate::semantic_index::predicate::{
+    Predicate, Predicates, PredicatesBuilder, ScopedPredicateId,
 };
 use crate::semantic_index::symbol::{FileScopeId, ScopedSymbolId};
 use crate::semantic_index::visibility_constraints::{
@@ -288,8 +288,8 @@ pub(crate) struct UseDefMap<'db> {
     /// Arena for [`SymbolState`] data.
     symbol_states: SymbolStatesStorage,
 
-    /// Array of [`Constraint`] in this scope.
-    constraints: Constraints<'db>,
+    /// Array of predicates in this scope.
+    predicates: Predicates<'db>,
 
     /// Array of narrowing constraints in this scope.
     narrowing_constraints: NarrowingConstraints,
@@ -377,7 +377,7 @@ impl<'db> UseDefMap<'db> {
     ) -> BindingWithConstraintsIterator<'map, 'db> {
         BindingWithConstraintsIterator {
             all_definitions: &self.all_definitions,
-            constraints: &self.constraints,
+            predicates: &self.predicates,
             narrowing_constraints: &self.narrowing_constraints,
             visibility_constraints: &self.visibility_constraints,
             inner: bindings.iter(&self.symbol_states),
@@ -390,7 +390,7 @@ impl<'db> UseDefMap<'db> {
     ) -> DeclarationsIterator<'map, 'db> {
         DeclarationsIterator {
             all_definitions: &self.all_definitions,
-            constraints: &self.constraints,
+            predicates: &self.predicates,
             visibility_constraints: &self.visibility_constraints,
             inner: declarations.iter(&self.symbol_states),
         }
@@ -424,7 +424,7 @@ type EagerBindings = IndexVec<ScopedEagerBindingsId, SymbolBindings>;
 #[derive(Debug)]
 pub(crate) struct BindingWithConstraintsIterator<'map, 'db> {
     all_definitions: &'map IndexVec<ScopedDefinitionId, Option<Definition<'db>>>,
-    pub(crate) constraints: &'map Constraints<'db>,
+    pub(crate) predicates: &'map Predicates<'db>,
     pub(crate) narrowing_constraints: &'map NarrowingConstraints,
     pub(crate) visibility_constraints: &'map VisibilityConstraints,
     inner: LiveBindingsIterator<'map>,
@@ -434,7 +434,7 @@ impl<'map, 'db> Iterator for BindingWithConstraintsIterator<'map, 'db> {
     type Item = BindingWithConstraints<'map, 'db>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let constraints = self.constraints;
+        let predicates = self.predicates;
         let narrowing_constraints = self.narrowing_constraints;
 
         self.inner
@@ -442,9 +442,9 @@ impl<'map, 'db> Iterator for BindingWithConstraintsIterator<'map, 'db> {
             .map(|(binding, live_binding)| BindingWithConstraints {
                 binding: self.all_definitions[*binding],
                 narrowing_constraint: ConstraintsIterator {
-                    constraints,
+                    predicates,
                     constraint_ids: narrowing_constraints
-                        .iter_clauses(live_binding.narrowing_constraint),
+                        .iter_predicates(live_binding.narrowing_constraint),
                 },
                 visibility_constraint: live_binding.visibility_constraint,
             })
@@ -460,17 +460,17 @@ pub(crate) struct BindingWithConstraints<'map, 'db> {
 }
 
 pub(crate) struct ConstraintsIterator<'map, 'db> {
-    constraints: &'map Constraints<'db>,
+    predicates: &'map Predicates<'db>,
     constraint_ids: NarrowingConstraintsIterator<'map>,
 }
 
 impl<'db> Iterator for ConstraintsIterator<'_, 'db> {
-    type Item = Constraint<'db>;
+    type Item = Predicate<'db>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.constraint_ids
             .next()
-            .map(|narrowing_constraint| self.constraints[narrowing_constraint.constraint()])
+            .map(|narrowing_constraint| self.predicates[narrowing_constraint.predicate()])
     }
 }
 
@@ -478,7 +478,7 @@ impl std::iter::FusedIterator for ConstraintsIterator<'_, '_> {}
 
 pub(crate) struct DeclarationsIterator<'map, 'db> {
     all_definitions: &'map IndexVec<ScopedDefinitionId, Option<Definition<'db>>>,
-    pub(crate) constraints: &'map Constraints<'db>,
+    pub(crate) predicates: &'map Predicates<'db>,
     pub(crate) visibility_constraints: &'map VisibilityConstraints,
     inner: LiveDeclarationsIterator<'map>,
 }
@@ -518,8 +518,8 @@ pub(super) struct UseDefMapBuilder<'db> {
     /// Arena for [`SymbolState`] data.
     symbol_states_builder: SymbolStatesBuilder,
 
-    /// Builder of constraints.
-    pub(super) constraints: ConstraintsBuilder<'db>,
+    /// Builder of predicates.
+    pub(super) predicates: PredicatesBuilder<'db>,
 
     /// Builder of narrowing constraints.
     pub(super) narrowing_constraints: NarrowingConstraintsBuilder,
@@ -555,7 +555,7 @@ impl Default for UseDefMapBuilder<'_> {
         Self {
             all_definitions: IndexVec::from_iter([None]),
             symbol_states_builder: SymbolStatesBuilder::default(),
-            constraints: ConstraintsBuilder::default(),
+            predicates: PredicatesBuilder::default(),
             narrowing_constraints: NarrowingConstraintsBuilder::default(),
             visibility_constraints: VisibilityConstraintsBuilder::default(),
             scope_start_visibility: ScopedVisibilityConstraintId::ALWAYS_TRUE,
@@ -593,25 +593,19 @@ impl<'db> UseDefMapBuilder<'db> {
         );
     }
 
-    pub(super) fn add_constraint(&mut self, constraint: Constraint<'db>) -> ScopedConstraintId {
-        self.constraints.add_constraint(constraint)
+    pub(super) fn add_predicate(&mut self, predicate: Predicate<'db>) -> ScopedPredicateId {
+        self.predicates.add_predicate(predicate)
     }
 
-    pub(super) fn record_constraint_id(&mut self, constraint: ScopedConstraintId) {
-        let narrowing_constraint = constraint.into();
+    pub(super) fn record_narrowing_constraint(&mut self, predicate: ScopedPredicateId) {
+        let narrowing_constraint = predicate.into();
         for state in &mut self.symbol_states {
-            state.record_constraint(
+            state.record_narrowing_constraint(
                 &mut self.symbol_states_builder,
                 &mut self.narrowing_constraints,
                 narrowing_constraint,
             );
         }
-    }
-
-    pub(super) fn record_constraint(&mut self, constraint: Constraint<'db>) -> ScopedConstraintId {
-        let new_constraint_id = self.add_constraint(constraint);
-        self.record_constraint_id(new_constraint_id);
-        new_constraint_id
     }
 
     pub(super) fn record_visibility_constraint(
@@ -807,7 +801,7 @@ impl<'db> UseDefMapBuilder<'db> {
         UseDefMap {
             all_definitions: self.all_definitions,
             symbol_states: self.symbol_states_builder.build(),
-            constraints: self.constraints.build(),
+            predicates: self.predicates.build(),
             narrowing_constraints: self.narrowing_constraints.build(),
             visibility_constraints: self.visibility_constraints.build(),
             bindings_by_use: self.bindings_by_use,
