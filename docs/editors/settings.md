@@ -11,28 +11,25 @@ as per the editor.
 
 ### `configuration`
 
-The `configuration` setting allows you to configure Ruff's behavior directly from an editor. This
-can be done in one of the following ways:
+The `configuration` setting allows you to configure editor-specific Ruff behavior. This can be done
+in one of the following ways:
 
 1. **Configuration file path:** Specify the path to a `ruff.toml` or `pyproject.toml` file that
     contains the configuration. User home directory and environment variables will be expanded.
-1. **Inline JSON configuration:** Directly provide the configuration as a JSON object. This is
-    similar to how the configuration is specified in the settings tab on the
-    [playground](https://play.ruff.sh/).
+1. **Inline JSON configuration:** Directly provide the configuration as a JSON object.
 
 !!! note "Added in Ruff `0.9.8`"
 
-    The **Inline JSON configuration** option was introduced in Ruff `0.9.8`, allowing you to define
-    settings directly in your editor without relying on an external file.
+    The **Inline JSON configuration** option was introduced in Ruff `0.9.8`.
 
-By default, if no `configuration` is specified, Ruff will automatically detect and load settings
-from a configuration file in the project's filesystem, consistent with the behavior of the Ruff CLI.
+The default behavior, if `configuration` is unset, is to load the settings from the project's
+configuration (a `ruff.toml` or `pyproject.toml` in the project's directory), consistent with when
+running Ruff on the command-line.
 
-When both an editor-provided configuration and a local configuration file are present, you can
-control how Ruff resolves conflicts between them using the
-[`configurationPreference`](#configurationpreference) setting.
+The [`configurationPreference`](#configurationpreference) setting controls the precedence if both an
+editor-provided configuration (`configuration`) and a project level configuration file are present.
 
-#### Resolution order
+#### Resolution order {: #configuration_resolution_order }
 
 In an editor, Ruff supports three sources of configuration, prioritized as follows (from highest to
 lowest):
@@ -43,10 +40,10 @@ lowest):
     [`configuration`](#configuration) field (either a path to a configuration file or an inline
     configuration object)
 1. **Configuration file:** Settings defined in a `ruff.toml` or `pyproject.toml` file in the
-    project's filesystem (if present)
+    project's directory (if present)
 
 For example, if the line length is specified in all three sources, Ruff will use the value from the
-specific settings in the editor i.e., the [`lineLength`](#linelength) setting.
+[`lineLength`](#linelength) setting.
 
 **Default value**: `null`
 
@@ -54,120 +51,118 @@ specific settings in the editor i.e., the [`lineLength`](#linelength) setting.
 
 **Example usage**:
 
+_Using configuration file path:_
+
 === "VS Code"
 
-    === "Using a configuration file"
-
-        ```json
-        {
-            "ruff.configuration": "~/path/to/ruff.toml"
-        }
-        ```
-
-    === "Using inline configuration"
-
-        ```json
-        {
-            "ruff.configuration": {
-                "lint": {
-                    "unfixable": ["F401"],
-                    "extend-select": ["TID251"],
-                    "flake8-tidy-imports": {
-                        "banned-api": {
-                            "typing.TypedDict": {
-                                "msg": "Use `typing_extensions.TypedDict` instead",
-                            }
-                        }
-                    }
-                },
-                "format": {
-                    "quote-style": "single"
-                }
-            }
-        }
-        ```
+    ```json
+    {
+        "ruff.configuration": "~/path/to/ruff.toml"
+    }
+    ```
 
 === "Neovim"
 
-    === "Using a configuration file"
+    ```lua
+    require('lspconfig').ruff.setup {
+      init_options = {
+        configuration = "~/path/to/ruff.toml"
+      }
+    }
+    ```
 
-        ```lua
-        require('lspconfig').ruff.setup {
-          init_options = {
-            configuration = "~/path/to/ruff.toml"
+=== "Zed"
+
+    ```json
+    {
+      "lsp": {
+        "ruff": {
+          "initialization_options": {
+            "configuration": "~/path/to/ruff.toml"
           }
         }
-        ```
+      }
+    }
+    ```
 
-    === "Using inline configuration"
+_Using inline configuration:_
 
-        ```lua
-        require('lspconfig').ruff.setup {
-          init_options = {
-            configuration = {
-              lint = {
-                unfixable = {"F401"},
-                ["extend-select"] = {"TID251"},
-                ["flake8-tidy-imports"] = {
-                  ["banned-api"] = {
-                    ["typing.TypedDict"] = {
-                      msg = "Use `typing_extensions.TypedDict` instead"
+=== "VS Code"
+
+    ```json
+    {
+        "ruff.configuration": {
+            "lint": {
+                "unfixable": ["F401"],
+                "extend-select": ["TID251"],
+                "flake8-tidy-imports": {
+                    "banned-api": {
+                        "typing.TypedDict": {
+                            "msg": "Use `typing_extensions.TypedDict` instead",
+                        }
+                    }
+                }
+            },
+            "format": {
+                "quote-style": "single"
+            }
+        }
+    }
+    ```
+
+=== "Neovim"
+
+    ```lua
+    require('lspconfig').ruff.setup {
+      init_options = {
+        configuration = {
+          lint = {
+            unfixable = {"F401"},
+            ["extend-select"] = {"TID251"},
+            ["flake8-tidy-imports"] = {
+              ["banned-api"] = {
+                ["typing.TypedDict"] = {
+                  msg = "Use `typing_extensions.TypedDict` instead"
+                }
+              }
+            }
+          },
+          format = {
+            ["quote-style"] = "single"
+          }
+        }
+      }
+    }
+    ```
+
+=== "Zed"
+
+    ```json
+    {
+      "lsp": {
+        "ruff": {
+          "initialization_options": {
+            "configuration": {
+              "lint": {
+                "unfixable": ["F401"],
+                "extend-select": ["TID251"],
+                "flake8-tidy-imports": {
+                  "banned-api": {
+                    "typing.TypedDict": {
+                      "msg": "Use `typing_extensions.TypedDict` instead"
                     }
                   }
                 }
               },
-              format = {
-                ["quote-style"] = "single"
+              "format": {
+                "quote-style": "single"
               }
             }
           }
         }
-        ```
-
-=== "Zed"
-
-    === "Using a configuration file"
-
-        ```json
-        {
-          "lsp": {
-            "ruff": {
-              "initialization_options": {
-                "configuration": "~/path/to/ruff.toml"
-              }
-            }
-          }
-        }
-        ```
-
-    === "Using inline configuration"
-
-        ```json
-        {
-          "lsp": {
-            "ruff": {
-              "initialization_options": {
-                "configuration": {
-                  "lint": {
-                    "unfixable": ["F401"],
-                    "extend-select": ["TID251"],
-                    "flake8-tidy-imports": {
-                      "banned-api": {
-                        "typing.TypedDict": {
-                          "msg": "Use `typing_extensions.TypedDict` instead"
-                        }
-                      }
-                    }
-                  },
-                  "format": {
-                    "quote-style": "single"
-                  }
-                }
-              }
-            }
-          }
-        }
-        ```
+      }
+    }
+    ```
 
 ### `configurationPreference`
 

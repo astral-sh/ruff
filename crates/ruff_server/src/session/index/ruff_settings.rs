@@ -391,11 +391,9 @@ impl ConfigurationTransformer for EditorConfigurationTransformer<'_> {
                     );
                     match Configuration::from_options(options, None, project_root) {
                         Ok(configuration) => editor_configuration.combine(configuration),
-                        err => {
+                        Err(err) => {
                             tracing::error!(
-                                "{:?}",
-                                err.context("Unable to load editor-specified inline configuration")
-                                    .unwrap_err()
+                                "Unable to load editor-specified inline configuration: {err:?}",
                             );
                             editor_configuration
                         }

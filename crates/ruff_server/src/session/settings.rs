@@ -366,7 +366,9 @@ impl ResolvedClientSettings {
                         match ResolvedConfiguration::try_from(configuration) {
                             Ok(configuration) => Some(configuration),
                             Err(err) => {
-                                tracing::error!("Failed to resolve configuration: {err}");
+                                tracing::error!(
+                                    "Failed to load settings from `configuration`: {err}"
+                                );
                                 None
                             }
                         }
