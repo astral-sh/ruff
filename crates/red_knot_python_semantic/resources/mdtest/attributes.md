@@ -810,6 +810,8 @@ def _(flag: bool, flag1: bool, flag2: bool):
     # error: [possibly-unbound-attribute] "Attribute `x` on type `Literal[C1, C2, C3]` is possibly unbound"
     reveal_type(C.x)  # revealed: Unknown | Literal[1, 2, 3]
 
+    # Note: we might want to consider ignoring possibly-unbound diagnostics for instance attributes eventually,
+    # see the "Possibly unbound/undeclared instance attribute" section below.
     # error: [possibly-unbound-attribute] "Attribute `x` on type `C1 | C2 | C3` is possibly unbound"
     reveal_type(C().x)  # revealed: Unknown | Literal[1, 2, 3]
 ```
