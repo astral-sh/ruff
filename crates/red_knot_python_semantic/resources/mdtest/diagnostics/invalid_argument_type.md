@@ -182,3 +182,16 @@ class C:
 c = C()
 c("wrong")  # error: [invalid-argument-type]
 ```
+
+## Calls to methods
+
+Tests that we also see a reference to a function if the callable is a bound method.
+
+```py
+class C:
+    def square(self, x: int) -> int:
+        return x * x
+
+c = C()
+c.square("hello")  # error: [invalid-argument-type]
+```
