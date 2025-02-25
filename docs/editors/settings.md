@@ -67,10 +67,11 @@ configuration is prioritized over `ruff.toml` and `pyproject.toml` files.
 - `"filesystemFirst"`: Configuration files present in the workspace takes priority over editor
     settings.
 - `"editorOnly"`: Ignore configuration files entirely i.e., only use editor settings.
+- `"filesystemOnly"`: Ignore editor settings entirely i.e., only use configuration files.
 
 **Default value**: `"editorFirst"`
 
-**Type**: `"editorFirst" | "filesystemFirst" | "editorOnly"`
+**Type**: `"editorFirst" | "filesystemFirst" | "editorOnly" | "filesystemOnly"`
 
 **Example usage**:
 
