@@ -41,7 +41,7 @@ error: lint:not-iterable
    |
 17 |     # error: [not-iterable]
 18 |     for x in Iterable():
-   |              ^^^^^^^^^^ Object of type `Iterable` may not be iterable because it may not have an `__iter__` method and its `__getitem__` method does not support the old-style iteration protocol
+   |              ^^^^^^^^^^ Object of type `Iterable` may not be iterable because it may not have an `__iter__` method and its `__getitem__` method has an incorrect signature for the old-style iteration protocol (expected a signature at least as permissive as `def __getitem__(self, key: int): ...`)
 19 |         reveal_type(x)  # revealed: int | bytes
    |
 

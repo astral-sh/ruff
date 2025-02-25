@@ -3436,13 +3436,13 @@ impl<'db> TypeInferenceBuilder<'db> {
                     call_expression: &ast::ExprCall,
                 ) {
                     match err {
-                        CallError::NotCallable { not_callable_ty } => {
+                        CallError::NotCallable { not_callable_type } => {
                             context.report_lint(
                                 &CALL_NON_CALLABLE,
                                 call_expression,
                                 format_args!(
                                     "Object of type `{}` is not callable",
-                                    not_callable_ty.display(context.db())
+                                    not_callable_type.display(context.db())
                                 ),
                             );
                         }

@@ -224,12 +224,12 @@ impl<'db> Class<'db> {
             let return_ty_result = match metaclass.try_call(db, &arguments) {
                 Ok(outcome) => Ok(outcome.return_type(db)),
 
-                Err(CallError::NotCallable { not_callable_ty }) => Err(MetaclassError {
-                    kind: MetaclassErrorKind::NotCallable(not_callable_ty),
+                Err(CallError::NotCallable { not_callable_type }) => Err(MetaclassError {
+                    kind: MetaclassErrorKind::NotCallable(not_callable_type),
                 }),
 
                 Err(CallError::Union(UnionCallError {
-                    called_ty,
+                    called_type,
                     errors,
                     bindings,
                 })) => {
@@ -259,7 +259,7 @@ impl<'db> Class<'db> {
 
                     if partly_not_callable {
                         Err(MetaclassError {
-                            kind: MetaclassErrorKind::PartlyNotCallable(called_ty),
+                            kind: MetaclassErrorKind::PartlyNotCallable(called_type),
                         })
                     } else {
                         Ok(return_ty.unwrap_or(Type::unknown()))

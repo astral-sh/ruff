@@ -54,13 +54,13 @@ impl<'db> CallOutcome<'db> {
             Ok(CallOutcome::Union(bindings.into()))
         } else if bindings.is_empty() && not_callable {
             Err(CallError::NotCallable {
-                not_callable_ty: Type::Union(union),
+                not_callable_type: Type::Union(union),
             })
         } else {
             Err(CallError::Union(UnionCallError {
                 errors: errors.into(),
                 bindings: bindings.into(),
-                called_ty: Type::Union(union),
+                called_type: Type::Union(union),
             }))
         }
     }
@@ -89,7 +89,7 @@ pub(super) enum CallError<'db> {
     /// The type is not callable.
     NotCallable {
         /// The type that can't be called.
-        not_callable_ty: Type<'db>,
+        not_callable_type: Type<'db>,
     },
 
     /// A call to a union failed because at least one variant
@@ -147,10 +147,10 @@ impl<'db> CallError<'db> {
     pub(super) fn called_type(&self) -> Type<'db> {
         match self {
             Self::NotCallable {
-                not_callable_ty, ..
-            } => *not_callable_ty,
-            Self::Union(UnionCallError { called_ty, .. }) => *called_ty,
-            Self::PossiblyUnboundDunderCall { called_type, .. } => *called_type,
+                not_callable_type, ..
+            } => *not_callable_type,
+            Self::Union(UnionCallError { called_type, .. })
+            | Self::PossiblyUnboundDunderCall { called_type, .. } => *called_type,
             Self::BindingError { binding } => binding.callable_type(),
         }
     }
@@ -169,7 +169,29 @@ pub(super) struct UnionCallError<'db> {
     pub(super) bindings: Box<[CallBinding<'db>]>,
 
     /// The union type that we tried calling.
-    pub(super) called_ty: Type<'db>,
+    pub(super) called_type: Type<'db>,
+}
+
+impl UnionCallError<'_> {
+    /// Return `true` if this `UnionCallError` indicates that the union might not be callable at all.
+    /// Otherwise, return `false`.
+    ///
+    /// For example, the union type `Callable[[int], int] | None` may not be callable at all,
+    /// because the `None` element in this union has no `__call__` method. Calling an object that
+    /// inhabited this union type would lead to a `UnionCallError` that would indicate that the
+    /// union might not be callable at all.
+    ///
+    /// On the other hand, the union type `Callable[[int], int] | Callable[[str], str]` is always
+    /// *callable*, but it would still lead to a `UnionCallError` if an inhabitant of this type was
+    /// called with a single `int` argument passed in. That's because the second element in the
+    /// union doesn't accept an `int` when it's called: it only accepts a `str`.
+    pub(crate) fn indicates_type_possibly_not_callable(&self) -> bool {
+        self.errors.iter().any(|error| match error {
+            CallError::BindingError { .. } => false,
+            CallError::NotCallable { .. } | CallError::PossiblyUnboundDunderCall { .. } => true,
+            CallError::Union(union_error) => union_error.indicates_type_possibly_not_callable(),
+        })
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

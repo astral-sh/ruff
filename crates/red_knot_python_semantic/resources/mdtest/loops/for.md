@@ -388,17 +388,28 @@ def _(flag: bool):
 ```py
 from typing_extensions import reveal_type
 
-class Iterator:
+class Iterator1:
     def __next__(self, extra_arg) -> int:
         return 42
 
-class Iterable:
-    def __iter__(self) -> Iterator:
-        return Iterator()
+class Iterator2:
+    __next__: None = None
+
+class Iterable1:
+    def __iter__(self) -> Iterator1:
+        return Iterator1()
+
+class Iterable2:
+    def __iter__(self) -> Iterator2:
+        return Iterator2()
 
 # error: [not-iterable]
-for x in Iterable():
+for x in Iterable1():
     reveal_type(x)  # revealed: int
+
+# error: [not-iterable]
+for y in Iterable2():
+    reveal_type(y)  # revealed: Unknown
 ```
 
 ## Possibly unbound `__iter__` and bad `__getitem__` method
@@ -430,6 +441,7 @@ def _(flag: bool):
 ## Possibly unbound `__iter__` and not-callable `__getitem__`
 
 This snippet tests that we infer the element type correctly in the following edge case:
+
 - `__iter__` is a method with the correct parameter spec that returns a valid iterator; BUT
 - `__iter__` is possibly unbound; AND
 - `__getitem__` is set to a non-callable type
@@ -449,7 +461,7 @@ def _(flag: bool):
                 return Iterator()
         __getitem__: None = None
 
-    # error: [not-iterable] "Object of type `Iterable` may not be iterable because it may not have an `__iter__` method and its `__getitem__` method does not support the old-style iteration protocol"
+    # error: [not-iterable] "Object of type `Iterable` may not be iterable because it may not have an `__iter__` method and its `__getitem__` attribute has type `None`, which is not callable"
     for x in Iterable():
         reveal_type(x)  # revealed: int
 ```
@@ -569,4 +581,159 @@ def _(flag: bool):
 
     for x in Iterable():
         reveal_type(x)  # revealed: str | bytes
+```
+
+## Possibly invalid `__iter__` methods
+
+<!-- snapshot-diagnostics -->
+
+```py
+from typing_extensions import reveal_type
+
+class Iterator:
+    def __next__(self) -> int:
+        return 42
+
+def _(flag: bool):
+    class Iterable1:
+        if flag:
+            def __iter__(self) -> Iterator:
+                return Iterator()
+        else:
+            def __iter__(self, invalid_extra_arg) -> Iterator:
+                return Iterator()
+
+    # error: [not-iterable]
+    for x in Iterable1():
+        reveal_type(x)  # revealed: int
+
+    class Iterable2:
+        if flag:
+            def __iter__(self) -> Iterator:
+                return Iterator()
+        else:
+            __iter__: None = None
+
+    # error: [not-iterable]
+    for x in Iterable2():
+        # TODO: `int` would probably be better here:
+        reveal_type(x)  # revealed: int | Unknown
+```
+
+## Possibly invalid `__next__` method
+
+<!-- snapshot-diagnostics -->
+
+```py
+from typing_extensions import reveal_type
+
+def _(flag: bool):
+    class Iterator1:
+        if flag:
+            def __next__(self) -> int:
+                return 42
+        else:
+            def __next__(self, invalid_extra_arg) -> str:
+                return "foo"
+
+    class Iterator2:
+        if flag:
+            def __next__(self) -> int:
+                return 42
+        else:
+            __next__: None = None
+
+    class Iterable1:
+        def __iter__(self) -> Iterator1:
+            return Iterator1()
+
+    class Iterable2:
+        def __iter__(self) -> Iterator2:
+            return Iterator2()
+
+    # error: [not-iterable]
+    for x in Iterable1():
+        reveal_type(x)  # revealed: int | str
+
+    # error: [not-iterable]
+    for y in Iterable2():
+        # TODO: `int` would probably be better here:
+        reveal_type(y)  # revealed: int | Unknown
+```
+
+## Possibly invalid `__getitem__` methods
+
+<!-- snapshot-diagnostics -->
+
+```py
+from typing_extensions import reveal_type
+
+def _(flag: bool):
+    class Iterable1:
+        if flag:
+            def __getitem__(self, item: int) -> str:
+                return "foo"
+        else:
+            __getitem__: None = None
+
+    class Iterable2:
+        if flag:
+            def __getitem__(self, item: int) -> str:
+                return "foo"
+        else:
+            def __getitem__(self, item: str) -> int:
+                return "foo"
+
+    # error: [not-iterable]
+    for x in Iterable1():
+        # TODO: `str` might be better
+        reveal_type(x)  # revealed: str | Unknown
+
+    # error: [not-iterable]
+    for y in Iterable2():
+        reveal_type(y)  # revealed: str | int
+```
+
+## Possibly unbound `__iter__` and possibly invalid `__getitem__`
+
+<!-- snapshot-diagnostics -->
+
+```py
+from typing_extensions import reveal_type
+
+class Iterator:
+    def __next__(self) -> bytes:
+        return b"foo"
+
+def _(flag: bool, flag2: bool):
+    class Iterable1:
+        if flag:
+            def __getitem__(self, item: int) -> str:
+                return "foo"
+        else:
+            __getitem__: None = None
+
+        if flag2:
+            def __iter__(self) -> Iterator:
+                return Iterator()
+
+    class Iterable2:
+        if flag:
+            def __getitem__(self, item: int) -> str:
+                return "foo"
+        else:
+            def __getitem__(self, item: str) -> int:
+                return "foo"
+        if flag2:
+            def __iter__(self) -> Iterator:
+                return Iterator()
+
+    # error: [not-iterable]
+    for x in Iterable1():
+        # TODO: `bytes | str` might be better
+        reveal_type(x)  # revealed: bytes | str | Unknown
+
+    # error: [not-iterable]
+    for y in Iterable2():
+        reveal_type(y)  # revealed: bytes | str | int
 ```
