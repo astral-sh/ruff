@@ -106,7 +106,7 @@ impl Violation for NonPEP695GenericClass {
 /// UP046
 pub(crate) fn non_pep695_generic_class(checker: &Checker, class_def: &StmtClassDef) {
     // PEP-695 syntax is only available on Python 3.12+
-    if checker.settings.target_version < PythonVersion::PY312 {
+    if checker.target_version() < PythonVersion::PY312 {
         return;
     }
 

@@ -57,9 +57,10 @@ impl<'db> Unpacker<'db> {
         if value.is_iterable() {
             // If the value is an iterable, then the type that needs to be unpacked is the iterator
             // type.
-            value_ty = value_ty
-                .iterate(self.db())
-                .unwrap_with_diagnostic(&self.context, value.as_any_node_ref(self.db()));
+            value_ty = value_ty.try_iterate(self.db()).unwrap_or_else(|err| {
+                err.report_diagnostic(&self.context, value.as_any_node_ref(self.db()));
+                err.fallback_element_type(self.db())
+            });
         }
 
         self.unpack_inner(target, value.as_any_node_ref(self.db()), value_ty);
@@ -155,8 +156,10 @@ impl<'db> Unpacker<'db> {
                         let ty = if ty.is_literal_string() {
                             Type::LiteralString
                         } else {
-                            ty.iterate(self.db())
-                                .unwrap_with_diagnostic(&self.context, value_expr)
+                            ty.try_iterate(self.db()).unwrap_or_else(|err| {
+                                err.report_diagnostic(&self.context, value_expr);
+                                err.fallback_element_type(self.db())
+                            })
                         };
                         for target_type in &mut target_types {
                             target_type.push(ty);

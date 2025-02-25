@@ -16,7 +16,7 @@ use super::helpers;
 /// ## Why is this bad?
 /// It is redundant to use a `list()` call around a list comprehension.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// list([f(x) for x in foo])
 /// ```

@@ -17,7 +17,7 @@ use super::helpers;
 /// It's unnecessary to use a list comprehension inside a call to `set()`,
 /// since there is an equivalent comprehension for this type.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// set([f(x) for x in foo])
 /// ```

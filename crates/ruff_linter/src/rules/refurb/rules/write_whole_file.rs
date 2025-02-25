@@ -59,12 +59,7 @@ pub(crate) fn write_whole_file(checker: &Checker, with: &ast::StmtWith) {
     }
 
     // First we go through all the items in the statement and find all `open` operations.
-    let candidates = find_file_opens(
-        with,
-        checker.semantic(),
-        false,
-        checker.settings.target_version,
-    );
+    let candidates = find_file_opens(with, checker.semantic(), false, checker.target_version());
     if candidates.is_empty() {
         return;
     }

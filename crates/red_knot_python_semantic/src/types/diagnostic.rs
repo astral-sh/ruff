@@ -44,6 +44,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&MISSING_ARGUMENT);
     registry.register_lint(&NON_SUBSCRIPTABLE);
     registry.register_lint(&NOT_ITERABLE);
+    registry.register_lint(&UNSUPPORTED_BOOL_CONVERSION);
     registry.register_lint(&PARAMETER_ALREADY_ASSIGNED);
     registry.register_lint(&POSSIBLY_UNBOUND_ATTRIBUTE);
     registry.register_lint(&POSSIBLY_UNBOUND_IMPORT);
@@ -492,6 +493,37 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
+    /// Checks for bool conversions where the object doesn't correctly implement `__bool__`.
+    ///
+    /// ## Why is this bad?
+    /// If an exception is raised when you attempt to evaluate the truthiness of an object,
+    /// using the object in a boolean context will fail at runtime.
+    ///
+    /// ## Examples
+    ///
+    /// ```python
+    /// class NotBoolable:
+    ///     __bool__ = None
+    ///
+    /// b1 = NotBoolable()
+    /// b2 = NotBoolable()
+    ///
+    /// if b1:  # exception raised here
+    ///     pass
+    ///
+    /// b1 and b2  # exception raised here
+    /// not b1  # exception raised here
+    /// b1 < b2 < b1  # exception raised here
+    /// ```
+    pub(crate) static UNSUPPORTED_BOOL_CONVERSION = {
+        summary: "detects boolean conversion where the object incorrectly implements `__bool__`",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
     /// Checks for calls which provide more than one argument for a single parameter.
     ///
     /// ## Why is this bad?
@@ -887,35 +919,6 @@ impl<'a> IntoIterator for &'a TypeCheckDiagnostics {
     fn into_iter(self) -> Self::IntoIter {
         self.diagnostics.iter()
     }
-}
-
-/// Emit a diagnostic declaring that the object represented by `node` is not iterable
-pub(super) fn report_not_iterable(context: &InferContext, node: AnyNodeRef, not_iterable_ty: Type) {
-    context.report_lint(
-        &NOT_ITERABLE,
-        node,
-        format_args!(
-            "Object of type `{}` is not iterable",
-            not_iterable_ty.display(context.db())
-        ),
-    );
-}
-
-/// Emit a diagnostic declaring that the object represented by `node` is not iterable
-/// because its `__iter__` method is possibly unbound.
-pub(super) fn report_not_iterable_possibly_unbound(
-    context: &InferContext,
-    node: AnyNodeRef,
-    element_ty: Type,
-) {
-    context.report_lint(
-        &NOT_ITERABLE,
-        node,
-        format_args!(
-            "Object of type `{}` is not iterable because its `__iter__` method is possibly unbound",
-            element_ty.display(context.db())
-        ),
-    );
 }
 
 /// Emit a diagnostic declaring that an index is out of bounds for a tuple.

@@ -17,11 +17,17 @@
 //!
 //! In particular, note that we do not need random access to the clauses in a constraint. That
 //! means that we can use a simple [_sorted association list_][ruff_index::list] as our data
-//! structure.
+//! structure. That lets us use a single 32-bit integer to store each narrowing constraint, no
+//! matter how many clauses it contains. It also makes merging two narrowing constraints fast,
+//! since alists support fast intersection.
+//!
+//! Because we visit the contents of each scope in source-file order, and assign scoped IDs in
+//! source-file order, that means that we will tend to visit narrowing constraints in order by
+//! their IDs. This is exactly how to get the best performance from our alist implementation.
 //!
 //! [`Constraint`]: crate::semantic_index::constraint::Constraint
 
-use ruff_index::list::{ListBuilder, ListIterator, ListStorage};
+use ruff_index::list::{ListBuilder, ListSetReverseIterator, ListStorage};
 use ruff_index::newtype_index;
 
 use crate::semantic_index::constraint::ScopedConstraintId;
@@ -41,7 +47,7 @@ pub(crate) struct ScopedNarrowingConstraintId;
 /// One of the clauses in a narrowing constraint, which is a [`Constraint`] that constrains the
 /// type of the binding's symbol.
 ///
-/// Note that those [`Constraint`]s are stored in [their own
+/// Note that those [`Constraint`]s are stored in [their own per-scope
 /// arena][crate::semantic_index::constraint::Constraints], so internally we use a
 /// [`ScopedConstraintId`] to refer to the underlying constraint.
 ///
@@ -51,24 +57,21 @@ pub(crate) struct ScopedNarrowingConstraintClause(ScopedConstraintId);
 
 impl ScopedNarrowingConstraintClause {
     /// Returns (the ID of) the `Constraint` for this clause
-    #[inline]
     pub(crate) fn constraint(self) -> ScopedConstraintId {
         self.0
     }
 }
 
 impl From<ScopedConstraintId> for ScopedNarrowingConstraintClause {
-    #[inline]
     fn from(constraint: ScopedConstraintId) -> ScopedNarrowingConstraintClause {
         ScopedNarrowingConstraintClause(constraint)
     }
 }
 
-/// A collection of narrowing constraints. This is currently stored in `UseDefMap`, which means
-/// that we maintain a separate set of narrowing constraints for each scope in a file.
+/// A collection of narrowing constraints for a given scope.
 #[derive(Debug, Eq, PartialEq)]
 pub(crate) struct NarrowingConstraints {
-    lists: ListStorage<ScopedNarrowingConstraintId, ScopedNarrowingConstraintClause, ()>,
+    lists: ListStorage<ScopedNarrowingConstraintId, ScopedNarrowingConstraintClause>,
 }
 
 // Building constraints
@@ -77,7 +80,7 @@ pub(crate) struct NarrowingConstraints {
 /// A builder for creating narrowing constraints.
 #[derive(Debug, Default, Eq, PartialEq)]
 pub(crate) struct NarrowingConstraintsBuilder {
-    lists: ListBuilder<ScopedNarrowingConstraintId, ScopedNarrowingConstraintClause, ()>,
+    lists: ListBuilder<ScopedNarrowingConstraintId, ScopedNarrowingConstraintClause>,
 }
 
 impl NarrowingConstraintsBuilder {
@@ -93,7 +96,7 @@ impl NarrowingConstraintsBuilder {
         constraint: Option<ScopedNarrowingConstraintId>,
         clause: ScopedNarrowingConstraintClause,
     ) -> Option<ScopedNarrowingConstraintId> {
-        self.lists.insert_if_needed(constraint, clause, ())
+        self.lists.insert(constraint, clause)
     }
 
     /// Returns the intersection of two narrowing constraints. The result contains the clauses that
@@ -103,16 +106,16 @@ impl NarrowingConstraintsBuilder {
         a: Option<ScopedNarrowingConstraintId>,
         b: Option<ScopedNarrowingConstraintId>,
     ) -> Option<ScopedNarrowingConstraintId> {
-        self.lists.intersect(a, b, |(), ()| ())
+        self.lists.intersect(a, b)
     }
 }
 
 // Iteration
 // ---------
 
-pub(crate) struct NarrowingConstraintsIterator<'a> {
-    wrapped: ListIterator<'a, ScopedNarrowingConstraintId, ScopedNarrowingConstraintClause, ()>,
-}
+pub(crate) type NarrowingConstraintsIterator<'a> = std::iter::Copied<
+    ListSetReverseIterator<'a, ScopedNarrowingConstraintId, ScopedNarrowingConstraintClause>,
+>;
 
 impl NarrowingConstraints {
     /// Iterates over the clauses in a narrowing constraint.
@@ -120,19 +123,7 @@ impl NarrowingConstraints {
         &self,
         set: Option<ScopedNarrowingConstraintId>,
     ) -> NarrowingConstraintsIterator<'_> {
-        NarrowingConstraintsIterator {
-            wrapped: self.lists.iter(set),
-        }
-    }
-}
-
-impl Iterator for NarrowingConstraintsIterator<'_> {
-    type Item = ScopedNarrowingConstraintClause;
-
-    #[inline]
-    fn next(&mut self) -> Option<Self::Item> {
-        let (key, ()) = self.wrapped.next()?;
-        Some(*key)
+        self.lists.iter_set_reverse(set).copied()
     }
 }
 
@@ -154,9 +145,7 @@ mod tests {
             &self,
             set: Option<ScopedNarrowingConstraintId>,
         ) -> NarrowingConstraintsIterator<'_> {
-            NarrowingConstraintsIterator {
-                wrapped: self.lists.iter(set),
-            }
+            self.lists.iter_set_reverse(set).copied()
         }
     }
 }

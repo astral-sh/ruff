@@ -88,7 +88,7 @@ pub(crate) fn subscript_with_parenthesized_tuple(checker: &Checker, subscript: &
     // to a syntax error in Python 3.10.
     // This is no longer a syntax error starting in Python 3.11
     // see https://peps.python.org/pep-0646/#change-1-star-expressions-in-indexes
-    if checker.settings.target_version <= PythonVersion::PY310
+    if checker.target_version() <= PythonVersion::PY310
         && !prefer_parentheses
         && tuple_subscript.iter().any(Expr::is_starred_expr)
     {

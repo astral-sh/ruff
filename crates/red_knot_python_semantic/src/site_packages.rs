@@ -205,11 +205,11 @@ System site-packages will not be used for module resolution.",
 
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum SitePackagesDiscoveryError {
-    #[error("Invalid --venv-path argument: {0} could not be canonicalized")]
+    #[error("Invalid --python argument: `{0}` could not be canonicalized")]
     VenvDirCanonicalizationError(SystemPathBuf, #[source] io::Error),
-    #[error("Invalid --venv-path argument: {0} does not point to a directory on disk")]
+    #[error("Invalid --python argument: `{0}` does not point to a directory on disk")]
     VenvDirIsNotADirectory(SystemPathBuf),
-    #[error("--venv-path points to a broken venv with no pyvenv.cfg file")]
+    #[error("--python points to a broken venv with no pyvenv.cfg file")]
     NoPyvenvCfgFile(#[source] io::Error),
     #[error("Failed to parse the pyvenv.cfg file at {0} because {1}")]
     PyvenvCfgParseError(SystemPathBuf, PyvenvCfgParseErrorKind),

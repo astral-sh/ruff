@@ -54,14 +54,14 @@ impl<'db> CallOutcome<'db> {
             Ok(CallOutcome::Union(bindings.into()))
         } else if bindings.is_empty() && not_callable {
             Err(CallError::NotCallable {
-                not_callable_ty: Type::Union(union),
+                not_callable_type: Type::Union(union),
             })
         } else {
-            Err(CallError::Union {
+            Err(CallError::Union(UnionCallError {
                 errors: errors.into(),
                 bindings: bindings.into(),
-                called_ty: Type::Union(union),
-            })
+                called_type: Type::Union(union),
+            }))
         }
     }
 
@@ -89,23 +89,14 @@ pub(super) enum CallError<'db> {
     /// The type is not callable.
     NotCallable {
         /// The type that can't be called.
-        not_callable_ty: Type<'db>,
+        not_callable_type: Type<'db>,
     },
 
     /// A call to a union failed because at least one variant
     /// can't be called with the given arguments.
     ///
     /// A union where all variants are not callable is represented as a `NotCallable` error.
-    Union {
-        /// The variants that can't be called with the given arguments.
-        errors: Box<[CallError<'db>]>,
-
-        /// The bindings for the callable variants (that have no binding errors).
-        bindings: Box<[CallBinding<'db>]>,
-
-        /// The union type that we tried calling.
-        called_ty: Type<'db>,
-    },
+    Union(UnionCallError<'db>),
 
     /// The type has a `__call__` method but it isn't always bound.
     PossiblyUnboundDunderCall {
@@ -126,9 +117,9 @@ impl<'db> CallError<'db> {
             CallError::NotCallable { .. } => None,
             // If some variants are callable, and some are not, return the union of the return types of the callable variants
             // combined with `Type::Unknown`
-            CallError::Union {
-                errors, bindings, ..
-            } => Some(UnionType::from_elements(
+            CallError::Union(UnionCallError {
+                bindings, errors, ..
+            }) => Some(UnionType::from_elements(
                 db,
                 bindings
                     .iter()
@@ -156,16 +147,50 @@ impl<'db> CallError<'db> {
     pub(super) fn called_type(&self) -> Type<'db> {
         match self {
             Self::NotCallable {
-                not_callable_ty, ..
-            } => *not_callable_ty,
-            Self::Union { called_ty, .. } => *called_ty,
-            Self::PossiblyUnboundDunderCall { called_type, .. } => *called_type,
+                not_callable_type, ..
+            } => *not_callable_type,
+            Self::Union(UnionCallError { called_type, .. })
+            | Self::PossiblyUnboundDunderCall { called_type, .. } => *called_type,
             Self::BindingError { binding } => binding.callable_type(),
         }
     }
 
     pub(super) const fn is_not_callable(&self) -> bool {
         matches!(self, Self::NotCallable { .. })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct UnionCallError<'db> {
+    /// The variants that can't be called with the given arguments.
+    pub(super) errors: Box<[CallError<'db>]>,
+
+    /// The bindings for the callable variants (that have no binding errors).
+    pub(super) bindings: Box<[CallBinding<'db>]>,
+
+    /// The union type that we tried calling.
+    pub(super) called_type: Type<'db>,
+}
+
+impl UnionCallError<'_> {
+    /// Return `true` if this `UnionCallError` indicates that the union might not be callable at all.
+    /// Otherwise, return `false`.
+    ///
+    /// For example, the union type `Callable[[int], int] | None` may not be callable at all,
+    /// because the `None` element in this union has no `__call__` method. Calling an object that
+    /// inhabited this union type would lead to a `UnionCallError` that would indicate that the
+    /// union might not be callable at all.
+    ///
+    /// On the other hand, the union type `Callable[[int], int] | Callable[[str], str]` is always
+    /// *callable*, but it would still lead to a `UnionCallError` if an inhabitant of this type was
+    /// called with a single `int` argument passed in. That's because the second element in the
+    /// union doesn't accept an `int` when it's called: it only accepts a `str`.
+    pub(crate) fn indicates_type_possibly_not_callable(&self) -> bool {
+        self.errors.iter().any(|error| match error {
+            CallError::BindingError { .. } => false,
+            CallError::NotCallable { .. } | CallError::PossiblyUnboundDunderCall { .. } => true,
+            CallError::Union(union_error) => union_error.indicates_type_possibly_not_callable(),
+        })
     }
 }
 
@@ -189,7 +214,7 @@ impl<'db> CallDunderError<'db> {
     pub(super) fn return_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
         match self {
             Self::Call(error) => error.return_type(db),
-            Self::PossiblyUnbound(_) => None,
+            Self::PossiblyUnbound(call_outcome) => Some(call_outcome.return_type(db)),
             Self::MethodNotAvailable => None,
         }
     }

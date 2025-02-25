@@ -128,7 +128,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_annotations/auto_return_type.py"),
             &LinterSettings {
-                target_version: PythonVersion::PY38,
+                unresolved_target_version: PythonVersion::PY38,
                 ..LinterSettings::for_rules(vec![
                     Rule::MissingReturnTypeUndocumentedPublicFunction,
                     Rule::MissingReturnTypePrivateFunction,

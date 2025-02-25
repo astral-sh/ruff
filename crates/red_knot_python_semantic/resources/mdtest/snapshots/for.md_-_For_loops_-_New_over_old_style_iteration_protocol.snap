@@ -1,0 +1,37 @@
+---
+source: crates/red_knot_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: for.md - For loops - New over old style iteration protocol
+mdtest path: crates/red_knot_python_semantic/resources/mdtest/loops/for.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | class NotIterable:
+2 |     def __getitem__(self, key: int) -> int:
+3 |         return 42
+4 |     __iter__: None = None
+5 | 
+6 | for x in NotIterable():  # error: [not-iterable]
+7 |     pass
+```
+
+# Diagnostics
+
+```
+error: lint:not-iterable
+ --> /src/mdtest_snippet.py:6:10
+  |
+4 |     __iter__: None = None
+5 |
+6 | for x in NotIterable():  # error: [not-iterable]
+  |          ^^^^^^^^^^^^^ Object of type `NotIterable` is not iterable because its `__iter__` attribute has type `None`, which is not callable
+7 |     pass
+  |
+
+```

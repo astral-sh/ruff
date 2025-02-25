@@ -160,3 +160,45 @@ reveal_type(42 in A())  # revealed: bool
 # error: [unsupported-operator] "Operator `in` is not supported for types `str` and `A`, in comparing `Literal["hello"]` with `A`"
 reveal_type("hello" in A())  # revealed: bool
 ```
+
+## Return type that doesn't implement `__bool__` correctly
+
+`in` and `not in` operations will fail at runtime if the object on the right-hand side of the
+operation has a `__contains__` method that returns a type which is not convertible to `bool`. This
+is because of the way these operations are handled by the Python interpreter at runtime. If we
+assume that `y` is an object that has a `__contains__` method, the Python expression `x in y`
+desugars to a `contains(y, x)` call, where `contains` looks something like this:
+
+```ignore
+def contains(y, x):
+    return bool(type(y).__contains__(y, x))
+```
+
+where the `bool()` conversion itself implicitly calls `__bool__` under the hood.
+
+TODO: Ideally the message would explain to the user what's wrong. E.g,
+
+```ignore
+error: [operator] cannot use `in` operator on object of type `WithContains`
+    note: This is because the `in` operator implicitly calls `WithContains.__contains__`, but `WithContains.__contains__` is invalidly defined
+    note: `WithContains.__contains__` is invalidly defined because it returns an instance of `NotBoolable`, which cannot be evaluated in a boolean context
+    note: `NotBoolable` cannot be evaluated in a boolean context because its `__bool__` attribute is not callable
+```
+
+It may also be more appropriate to use `unsupported-operator` as the error code.
+
+<!-- snapshot-diagnostics -->
+
+```py
+class NotBoolable:
+    __bool__ = 3
+
+class WithContains:
+    def __contains__(self, item) -> NotBoolable:
+        return NotBoolable()
+
+# error: [unsupported-bool-conversion]
+10 in WithContains()
+# error: [unsupported-bool-conversion]
+10 not in WithContains()
+```

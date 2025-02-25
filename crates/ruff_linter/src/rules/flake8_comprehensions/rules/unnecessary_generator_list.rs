@@ -24,7 +24,7 @@ use super::helpers;
 /// `list(x for x in foo)`, it's better to use `list(foo)` directly, since it's
 /// even more direct.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// list(f(x) for x in foo)
 /// list(x for x in foo)

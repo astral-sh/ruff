@@ -10,9 +10,29 @@ shallow_copy_environ.py:4:14: PLW1507 [*] Shallow copy of `os.environ` via `copy
   |
   = help: Replace with `os.environ.copy()`
 
-ℹ Safe fix
+ℹ Unsafe fix
 1 1 | import copy
 2 2 | import os
 3 3 | 
 4   |-copied_env = copy.copy(os.environ)  # [shallow-copy-environ]
   4 |+copied_env = os.environ.copy()  # [shallow-copy-environ]
+5 5 | 
+6 6 | 
+7 7 | # Test case where the proposed fix is wrong, i.e., unsafe fix
+
+shallow_copy_environ.py:11:7: PLW1507 [*] Shallow copy of `os.environ` via `copy.copy(os.environ)`
+   |
+10 | os.environ["X"] = "0"
+11 | env = copy.copy(os.environ)
+   |       ^^^^^^^^^^^^^^^^^^^^^ PLW1507
+12 | os.environ["X"] = "1"
+   |
+   = help: Replace with `os.environ.copy()`
+
+ℹ Unsafe fix
+8  8  | # Ref: https://github.com/astral-sh/ruff/issues/16274#event-16423475135
+9  9  | 
+10 10 | os.environ["X"] = "0"
+11    |-env = copy.copy(os.environ)
+   11 |+env = os.environ.copy()
+12 12 | os.environ["X"] = "1"

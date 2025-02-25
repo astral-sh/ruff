@@ -201,14 +201,11 @@ class C:
 
 c1 = C.factory("test")  # okay
 
-# TODO: should be `C`
-reveal_type(c1)  # revealed: @Todo(return type)
+reveal_type(c1)  # revealed: C
 
-# TODO: should be `str`
-reveal_type(C.get_name())  # revealed: @Todo(return type)
+reveal_type(C.get_name())  # revealed: str
 
-# TODO: should be `str`
-reveal_type(C("42").get_name())  # revealed: @Todo(decorated method)
+reveal_type(C("42").get_name())  # revealed: str
 ```
 
 ## Descriptors only work when used as class variables
@@ -283,6 +280,31 @@ C.descriptor = "something else"
 
 # This could also be `Literal["something else"]` if we support narrowing of attribute types based on assignments
 reveal_type(C.descriptor)  # revealed: Unknown | int
+```
+
+## `__get__` is called with correct arguments
+
+```py
+from __future__ import annotations
+
+class TailoredForClassObjectAccess:
+    def __get__(self, instance: None, owner: type[C]) -> int:
+        return 1
+
+class TailoredForInstanceAccess:
+    def __get__(self, instance: C, owner: type[C] | None = None) -> str:
+        return "a"
+
+class C:
+    class_object_access: TailoredForClassObjectAccess = TailoredForClassObjectAccess()
+    instance_access: TailoredForInstanceAccess = TailoredForInstanceAccess()
+
+reveal_type(C.class_object_access)  # revealed: int
+reveal_type(C().instance_access)  # revealed: str
+
+# TODO: These should emit a diagnostic
+reveal_type(C().class_object_access)  # revealed: TailoredForClassObjectAccess
+reveal_type(C.instance_access)  # revealed: TailoredForInstanceAccess
 ```
 
 ## Descriptors with incorrect `__get__` signature
@@ -403,15 +425,15 @@ wrapper_descriptor(f, None)
 wrapper_descriptor(f, C())
 
 # Calling it with something that is not a `FunctionType` as the first argument is an
-# error: [invalid-argument-type] "Object of type `Literal[1]` cannot be assigned to parameter 1 (`self`); expected type `FunctionType`"
+# error: [invalid-argument-type] "Object of type `Literal[1]` cannot be assigned to parameter 1 (`self`) of wrapper descriptor `FunctionType.__get__`; expected type `FunctionType`"
 wrapper_descriptor(1, None, type(f))
 
 # Calling it with something that is not a `type` as the `owner` argument is an
-# error: [invalid-argument-type] "Object of type `Literal[f]` cannot be assigned to parameter 3 (`owner`); expected type `type`"
+# error: [invalid-argument-type] "Object of type `Literal[f]` cannot be assigned to parameter 3 (`owner`) of wrapper descriptor `FunctionType.__get__`; expected type `type`"
 wrapper_descriptor(f, None, f)
 
 # Calling it with too many positional arguments is an
-# error: [too-many-positional-arguments] "Too many positional arguments: expected 3, got 4"
+# error: [too-many-positional-arguments] "Too many positional arguments to wrapper descriptor `FunctionType.__get__`: expected 3, got 4"
 wrapper_descriptor(f, None, type(f), "one too many")
 ```
 

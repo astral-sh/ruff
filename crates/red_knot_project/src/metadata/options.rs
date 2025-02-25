@@ -1,7 +1,7 @@
 use crate::metadata::value::{RangedValue, RelativePathBuf, ValueSource, ValueSourceGuard};
 use crate::Db;
 use red_knot_python_semantic::lint::{GetLintError, Level, LintSource, RuleSelection};
-use red_knot_python_semantic::{ProgramSettings, PythonPlatform, SearchPathSettings, SitePackages};
+use red_knot_python_semantic::{ProgramSettings, PythonPath, PythonPlatform, SearchPathSettings};
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity, Span};
 use ruff_db::files::system_path_to_file;
 use ruff_db::system::{System, SystemPath};
@@ -90,7 +90,7 @@ impl Options {
             .map(|env| {
                 (
                     env.extra_paths.clone(),
-                    env.venv_path.clone(),
+                    env.python.clone(),
                     env.typeshed.clone(),
                 )
             })
@@ -104,11 +104,11 @@ impl Options {
                 .collect(),
             src_roots,
             custom_typeshed: typeshed.map(|path| path.absolute(project_root, system)),
-            site_packages: python
-                .map(|venv_path| SitePackages::Derived {
-                    venv_path: venv_path.absolute(project_root, system),
+            python_path: python
+                .map(|python_path| {
+                    PythonPath::SysPrefix(python_path.absolute(project_root, system))
                 })
-                .unwrap_or(SitePackages::Known(vec![])),
+                .unwrap_or(PythonPath::KnownSitePackages(vec![])),
         }
     }
 
@@ -236,10 +236,14 @@ pub struct EnvironmentOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub typeshed: Option<RelativePathBuf>,
 
-    // TODO: Rename to python, see https://github.com/astral-sh/ruff/issues/15530
-    /// The path to the user's `site-packages` directory, where third-party packages from ``PyPI`` are installed.
+    /// Path to the Python installation from which Red Knot resolves type information and third-party dependencies.
+    ///
+    /// Red Knot will search in the path's `site-packages` directories for type information and
+    /// third-party imports.
+    ///
+    /// This option is commonly used to specify the path to a virtual environment.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub venv_path: Option<RelativePathBuf>,
+    pub python: Option<RelativePathBuf>,
 }
 
 #[derive(Debug, Default, Clone, Eq, PartialEq, Combine, Serialize, Deserialize)]
