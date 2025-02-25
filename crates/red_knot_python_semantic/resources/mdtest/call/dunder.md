@@ -32,7 +32,8 @@ In the following tests, we demonstrate that we implement this behavior correctly
 
 ## Operating on class objects
 
-If we invoke a dunder method on a class, it is looked up on the *meta* class:
+If we invoke a dunder method on a class, it is looked up on the *meta* class, since any class is an
+instance of its metaclass:
 
 ```py
 class Meta(type):
