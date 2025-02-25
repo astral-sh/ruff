@@ -32,7 +32,7 @@ pub(crate) struct ResolvedClientSettings {
 /// LSP client settings. These fields are optional because we don't want to override file-based linter/formatting settings
 /// if these were un-set.
 #[derive(Clone, Debug)]
-#[cfg_attr(test, derive(PartialEq, Eq))]
+#[cfg_attr(test, derive(Default, PartialEq, Eq))]
 pub(crate) struct ResolvedEditorSettings {
     pub(super) configuration: Option<ResolvedConfiguration>,
     pub(super) lint_preview: Option<bool>,

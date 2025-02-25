@@ -433,3 +433,47 @@ impl ConfigurationTransformer for IdentityTransformer {
         config
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use ruff_linter::line_width::LineLength;
+    use ruff_workspace::options::Options;
+
+    use super::*;
+
+    /// This test ensures that the inline configuration is correctly applied to the configuration.
+    #[test]
+    fn inline_settings() {
+        let editor_settings = ResolvedEditorSettings {
+            configuration: Some(ResolvedConfiguration::Inline(Options {
+                line_length: Some(LineLength::try_from(120).unwrap()),
+                ..Default::default()
+            })),
+            ..Default::default()
+        };
+
+        let config = EditorConfigurationTransformer(&editor_settings, Path::new("/src/project"))
+            .transform(Configuration::default());
+
+        assert_eq!(config.line_length.unwrap().value(), 120);
+    }
+
+    /// This test ensures that between the inline configuration and specific settings, the specific
+    /// settings is prioritized.
+    #[test]
+    fn inline_and_specific_settings_resolution_order() {
+        let editor_settings = ResolvedEditorSettings {
+            configuration: Some(ResolvedConfiguration::Inline(Options {
+                line_length: Some(LineLength::try_from(120).unwrap()),
+                ..Default::default()
+            })),
+            line_length: Some(LineLength::try_from(100).unwrap()),
+            ..Default::default()
+        };
+
+        let config = EditorConfigurationTransformer(&editor_settings, Path::new("/src/project"))
+            .transform(Configuration::default());
+
+        assert_eq!(config.line_length.unwrap().value(), 100);
+    }
+}
