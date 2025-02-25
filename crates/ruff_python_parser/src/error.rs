@@ -444,31 +444,41 @@ pub struct UnsupportedSyntaxError {
     pub target_version: PythonVersion,
 }
 
-impl UnsupportedSyntaxError {
-    /// The earliest allowed version for the syntax associated with this error.
-    pub const fn minimum_version(&self) -> PythonVersion {
-        match self.kind {
-            UnsupportedSyntaxErrorKind::MatchBeforePy310 => PythonVersion::PY310,
+macro_rules! syntax_errors {
+    ($(($variant:ident, $version:ident, $error_msg:expr)$(,)?)*) => {
+        #[derive(Debug, PartialEq, Clone, Copy)]
+        pub enum UnsupportedSyntaxErrorKind {
+            $($variant,)*
         }
-    }
+
+        impl Display for UnsupportedSyntaxError {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                let kind = match self.kind {
+                    $(UnsupportedSyntaxErrorKind::$variant => $error_msg,)*
+                };
+
+                write!(
+                    f,
+                    "Cannot use {kind} on Python {} (syntax was added in Python {})",
+                    self.target_version,
+                    self.minimum_version(),
+                )
+            }
+        }
+
+        impl UnsupportedSyntaxError {
+            /// The earliest allowed version for the syntax associated with this error.
+            pub const fn minimum_version(&self) -> PythonVersion {
+                match self.kind {
+                    $(UnsupportedSyntaxErrorKind::$variant => PythonVersion::$version,)*
+                }
+            }
+        }
+    };
 }
 
-impl Display for UnsupportedSyntaxError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.kind {
-            UnsupportedSyntaxErrorKind::MatchBeforePy310 => write!(
-                f,
-                "Cannot use `match` statement on Python {} (syntax was added in Python {})",
-                self.target_version,
-                self.minimum_version(),
-            ),
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, Clone, Copy)]
-pub enum UnsupportedSyntaxErrorKind {
-    MatchBeforePy310,
+syntax_errors! {
+    (MatchBeforePy310, PY310, "`match` statement"),
 }
 
 #[cfg(target_pointer_width = "64")]
