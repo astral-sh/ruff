@@ -14,6 +14,16 @@ from typing import Any
 
 import tomllib
 
+imports = ["crate::name::Name"]
+
+
+def requires_crate_prefix(ty: str) -> bool:
+    no_crate_prefix_types = [
+        "Name",  # Imported at the top
+        "bool",
+    ]
+    return not (ty in no_crate_prefix_types or ty.startswith("Box"))
+
 
 def rustfmt(code: str) -> str:
     return check_output(["rustfmt", "--emit=stdout"], input=code, text=True)
@@ -90,11 +100,34 @@ class Node:
     name: str
     variant: str
     ty: str
+    rustdoc: str | None
+    fields: list[Field] | None
+    derives: list[str]
 
     def __init__(self, group: Group, node_name: str, node: dict[str, Any]) -> None:
         self.name = node_name
         self.variant = node.get("variant", node_name.removeprefix(group.name))
         self.ty = f"crate::{node_name}"
+        self.fields = None
+        fields = node.get("fields")
+        if fields is not None:
+            self.fields = [Field(f) for f in fields]
+        self.derives = node.get("derives", [])
+        self.rustdoc = node.get("rustdoc")
+
+
+@dataclass
+class Field:
+    name: str
+    ty: str
+    seq: bool
+    optional: bool
+
+    def __init__(self, field: dict[str, Any]) -> None:
+        self.name = field["name"]
+        self.ty = field["type"]
+        self.seq = field.get("seq", False)
+        self.optional = field.get("optional", False)
 
 
 # ------------------------------------------------------------------------------
@@ -102,9 +135,12 @@ class Node:
 
 
 def write_preamble(out: list[str]) -> None:
-    out.append("""
+    import_section = "\n".join(f"use {im};" for im in imports)
+    out.append(f"""
     // This is a generated file. Don't modify it by hand!
     // Run `crates/ruff_python_ast/generate.py` to re-generate the file.
+
+    {import_section}
     """)
 
 
@@ -548,6 +584,46 @@ def write_nodekind(out: list[str], ast: Ast) -> None:
 
 
 # ------------------------------------------------------------------------------
+# Node structs
+
+
+def write_node(out: list[str], ast: Ast) -> None:
+    group_names = [group.name for group in ast.groups]
+    for group in ast.groups:
+        for node in group.nodes:
+            if node.fields is None:
+                continue
+            if node.rustdoc is not None:
+                out.append(node.rustdoc)
+            out.append(
+                "#[derive(Clone, Debug, PartialEq"
+                + "".join(f", {derive}" for derive in node.derives)
+                + ")]"
+            )
+            name = node.name
+            out.append(f"pub struct {name} {{")
+            out.append("pub range: ruff_text_size::TextRange,")
+            for field in node.fields:
+                field_str = f"pub {field.name}: "
+
+                inner = f"{field.ty}"
+                if requires_crate_prefix(field.ty):
+                    inner = f"crate::{inner}"
+                if field.ty in group_names and field.seq is False:
+                    inner = f"Box<{inner}>"
+
+                if field.seq:
+                    field_str += f"Vec<{inner}>,"
+                elif field.optional:
+                    field_str += f"Option<{inner}>,"
+                else:
+                    field_str += f"{inner},"
+                out.append(field_str)
+            out.append("}")
+            out.append("")
+
+
+# ------------------------------------------------------------------------------
 # Format and write output
 
 
@@ -558,6 +634,7 @@ def generate(ast: Ast) -> list[str]:
     write_ref_enum(out, ast)
     write_anynoderef(out, ast)
     write_nodekind(out, ast)
+    write_node(out, ast)
     return out
 
 
