@@ -1,2 +1,8 @@
-# This file cannot use the extension `.yaml`.
-blank_issues_enabled: false
+blank_issues_enabled: true
+contact_links:
+  - name: Documentation
+    url: https://docs.astral.sh/ruff
+    about: Please consult the documentation before creating an issue.
+  - name: Community
+    url: https://discord.com/invite/astral-sh
+    about: Join our Discord community to ask questions and collaborate.

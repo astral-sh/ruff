@@ -1,0 +1,31 @@
+name: Bug report
+description: Report an error or unexpected behavior
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for taking the time to report an issue! We're glad to have you involved with Ruff.
+
+        **Before reporting, please make sure to search through [existing issues](https://github.com/astral-sh/ruff/issues?q=is:issue+is:open+label:bug) (including [closed](https://github.com/astral-sh/ruff/issues?q=is:issue%20state:closed%20label:bug)).**
+
+  - type: textarea
+    attributes:
+      label: Summary
+      description: |
+        A clear and concise description of the bug, including a minimal reproducible example.
+
+        Be sure to include the command you invoked (e.g., `ruff check /path/to/file.py --fix`), ideally including the `--isolated` flag and
+        the current Ruff settings (e.g., relevant sections from your `pyproject.toml`).
+
+        If possible, try to include the [playground](https://play.ruff.rs) link that reproduces this issue.
+
+    validations:
+      required: true
+
+  - type: input
+    attributes:
+      label: Version
+      description: What version of ruff are you using? (see `ruff version`)
+      placeholder: e.g., ruff 0.9.3 (90589372d 2025-01-23)
+    validations:
+      required: false
