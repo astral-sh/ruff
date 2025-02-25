@@ -2694,7 +2694,7 @@ match 2:
     success: false
     exit_code: 1
     ----- stdout -----
-    test.py:2:1: SyntaxError: Cannot use `match` statement on Python 3.9 (syntax was new in Python 3.10)
+    test.py:2:1: SyntaxError: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
     Found 1 error.
 
     ----- stderr -----

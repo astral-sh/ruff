@@ -458,7 +458,7 @@ impl Display for UnsupportedSyntaxError {
         match self.kind {
             UnsupportedSyntaxErrorKind::MatchBeforePy310 => write!(
                 f,
-                "Cannot use `match` statement on Python {} (syntax was new in Python {})",
+                "Cannot use `match` statement on Python {} (syntax was added in Python {})",
                 self.target_version,
                 self.minimum_version(),
             ),
