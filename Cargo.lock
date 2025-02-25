@@ -3190,6 +3190,7 @@ dependencies = [
  "serde_json",
  "shellexpand",
  "thiserror 2.0.11",
+ "toml",
  "tracing",
  "tracing-subscriber",
 ]
