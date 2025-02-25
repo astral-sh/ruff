@@ -15,7 +15,7 @@ use crate::checkers::ast::Checker;
 /// the use of `from_float` and `from_decimal` methods is unnecessary, and
 /// should be avoided in favor of the more concise constructor syntax.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// Decimal.from_float(4.2)
 /// Decimal.from_float(float("inf"))

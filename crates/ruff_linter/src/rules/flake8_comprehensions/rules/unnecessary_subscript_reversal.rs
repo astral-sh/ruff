@@ -13,7 +13,7 @@ use crate::checkers::ast::Checker;
 /// into `reversed()`, `set()` or `sorted()` functions as they will change
 /// the order of the elements again.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// sorted(iterable[::-1])
 /// set(iterable[::-1])

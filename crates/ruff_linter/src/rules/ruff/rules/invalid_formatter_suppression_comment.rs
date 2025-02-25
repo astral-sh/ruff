@@ -26,7 +26,7 @@ use super::suppression_comment_visitor::{
 /// Suppression comments that do not actually prevent formatting could cause unintended changes
 /// when the formatter is run.
 ///
-/// ## Examples
+/// ## Example
 /// In the following example, all suppression comments would cause
 /// a rule violation.
 ///

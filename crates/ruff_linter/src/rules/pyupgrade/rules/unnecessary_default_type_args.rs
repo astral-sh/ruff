@@ -20,7 +20,7 @@ use crate::checkers::ast::Checker;
 /// Omitting type arguments that match the default values can make the code
 /// more concise and easier to read.
 ///
-/// ## Examples
+/// ## Example
 ///
 /// ```python
 /// from collections.abc import Generator, AsyncGenerator

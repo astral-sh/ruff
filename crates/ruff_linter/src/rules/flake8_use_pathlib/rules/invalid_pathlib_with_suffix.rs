@@ -16,7 +16,7 @@ use ruff_text_size::Ranged;
 /// if the given suffix is not prefixed with a dot
 /// or it is a single dot `"."`.
 ///
-/// ## Examples
+/// ## Example
 ///
 /// ```python
 /// path.with_suffix("py")

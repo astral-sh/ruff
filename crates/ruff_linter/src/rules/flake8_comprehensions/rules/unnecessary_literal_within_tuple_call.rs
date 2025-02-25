@@ -27,7 +27,7 @@ use super::helpers;
 /// calls. If a list comprehension is found, it should be rewritten as a
 /// generator expression.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// tuple([1, 2])
 /// tuple((1, 2))
