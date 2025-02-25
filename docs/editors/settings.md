@@ -15,12 +15,13 @@ The `configuration` setting allows you to configure Ruff's behavior directly fro
 can be done in one of the following ways:
 
 1. **Configuration file path:** Specify the path to a `ruff.toml` or `pyproject.toml` file that
-   contains the configuration. User home directory and environment variables will be expanded.
-2. **Inline JSON configuration:** Directly provide the configuration as a JSON object. This is
-   similar to how the configuration is specified in the settings tab on the
-   [playground](https://play.ruff.sh/).
+    contains the configuration. User home directory and environment variables will be expanded.
+1. **Inline JSON configuration:** Directly provide the configuration as a JSON object. This is
+    similar to how the configuration is specified in the settings tab on the
+    [playground](https://play.ruff.sh/).
 
 !!! note "Added in Ruff `0.9.8`"
+
     The **Inline JSON configuration** option was introduced in Ruff `0.9.8`, allowing you to define
     settings directly in your editor without relying on an external file.
 
@@ -37,12 +38,12 @@ In an editor, Ruff supports three sources of configuration, prioritized as follo
 lowest):
 
 1. **Specific settings:** Individual settings like [`lineLength`](#linelength) or
-   [`lint.select`](#select) defined in the editor
-2. [**`ruff.configuration`**](#configuration): Settings provided via the
-   [`configuration`](#configuration) field (either a path to a configuration file or an inline
-   configuration object)
-3. **Configuration file:** Settings defined in a `ruff.toml` or `pyproject.toml` file in the
-   project's filesystem (if present)
+    [`lint.select`](#select) defined in the editor
+1. [**`ruff.configuration`**](#configuration): Settings provided via the
+    [`configuration`](#configuration) field (either a path to a configuration file or an inline
+    configuration object)
+1. **Configuration file:** Settings defined in a `ruff.toml` or `pyproject.toml` file in the
+    project's filesystem (if present)
 
 For example, if the line length is specified in all three sources, Ruff will use the value from the
 specific settings in the editor i.e., the [`lineLength`](#linelength) setting.
@@ -86,7 +87,6 @@ specific settings in the editor i.e., the [`lineLength`](#linelength) setting.
         }
         ```
 
-
 === "Neovim"
 
     === "Using a configuration file"
@@ -123,7 +123,6 @@ specific settings in the editor i.e., the [`lineLength`](#linelength) setting.
           }
         }
         ```
-
 
 === "Zed"
 
