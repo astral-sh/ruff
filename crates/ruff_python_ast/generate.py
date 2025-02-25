@@ -100,6 +100,7 @@ class Node:
     name: str
     variant: str
     ty: str
+    rustdoc: str | None
     fields: list[Field] | None
     derives: list[str]
 
@@ -112,6 +113,7 @@ class Node:
         if fields is not None:
             self.fields = [Field(f) for f in fields]
         self.derives = node.get("derives", [])
+        self.rustdoc = node.get("rustdoc")
 
 
 @dataclass
@@ -138,7 +140,7 @@ def write_preamble(out: list[str]) -> None:
     // This is a generated file. Don't modify it by hand!
     // Run `crates/ruff_python_ast/generate.py` to re-generate the file.
 
-    { import_section }
+    {import_section}
     """)
 
 
@@ -591,6 +593,8 @@ def write_node(out: list[str], ast: Ast) -> None:
         for node in group.nodes:
             if node.fields is None:
                 continue
+            if node.rustdoc is not None:
+                out.append(node.rustdoc)
             out.append(
                 "#[derive(Clone, Debug, PartialEq"
                 + "".join(f", {derive}" for derive in node.derives)
