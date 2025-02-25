@@ -14,6 +14,16 @@ from typing import Any
 
 import tomllib
 
+imports = ["crate::name::Name"]
+
+
+def requires_crate_prefix(ty: str) -> bool:
+    no_crate_prefix_types = [
+        "Name",  # Imported at the top
+        "bool",
+    ]
+    return not (ty in no_crate_prefix_types or ty.startswith("Box"))
+
 
 def rustfmt(code: str) -> str:
     return check_output(["rustfmt", "--emit=stdout"], input=code, text=True)
@@ -91,7 +101,7 @@ class Node:
     variant: str
     ty: str
     fields: list[Field] | None
-    derives: list[str] | None
+    derives: list[str]
 
     def __init__(self, group: Group, node_name: str, node: dict[str, Any]) -> None:
         self.name = node_name
@@ -123,9 +133,12 @@ class Field:
 
 
 def write_preamble(out: list[str]) -> None:
-    out.append("""
+    import_section = "\n".join(f"use {im};" for im in imports)
+    out.append(f"""
     // This is a generated file. Don't modify it by hand!
     // Run `crates/ruff_python_ast/generate.py` to re-generate the file.
+
+    { import_section }
     """)
 
 
@@ -569,9 +582,11 @@ def write_nodekind(out: list[str], ast: Ast) -> None:
 
 
 # ------------------------------------------------------------------------------
+# Node structs
 
 
 def write_node(out: list[str], ast: Ast) -> None:
+    group_names = [group.name for group in ast.groups]
     for group in ast.groups:
         for node in group.nodes:
             if node.fields is None:
@@ -586,10 +601,11 @@ def write_node(out: list[str], ast: Ast) -> None:
             out.append("pub range: ruff_text_size::TextRange,")
             for field in node.fields:
                 field_str = f"pub {field.name}: "
-                inner = f"crate::{field.ty}"
-                if field.ty == "bool" or field.ty.startswith("Box"):
-                    inner = field.ty
-                if field.ty == group.name and field.seq is False:
+
+                inner = f"{field.ty}"
+                if requires_crate_prefix(field.ty):
+                    inner = f"crate::{inner}"
+                if field.ty in group_names and field.seq is False:
                     inner = f"Box<{inner}>"
 
                 if field.seq:
