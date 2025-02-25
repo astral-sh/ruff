@@ -15,7 +15,7 @@ impl ProjectDatabase {
     #[tracing::instrument(level = "debug", skip(self, changes, cli_options))]
     pub fn apply_changes(&mut self, changes: Vec<ChangeEvent>, cli_options: Option<&Options>) {
         let mut project = self.project();
-        let project_path = project.root(self).to_path_buf();
+        let project_root = project.root(self).to_path_buf();
         let program = Program::get(self);
         let custom_stdlib_versions_path = program
             .custom_stdlib_search_path(self)
@@ -74,12 +74,21 @@ impl ProjectDatabase {
                         }
                     }
 
-                    if self.system().is_file(&path) {
-                        // Add the parent directory because `walkdir` always visits explicitly passed files
-                        // even if they match an exclude filter.
-                        added_paths.insert(path.parent().unwrap().to_path_buf());
-                    } else {
-                        added_paths.insert(path);
+                    // Unlike other files, it's not only important to update the status of existing
+                    // and known `File`s, it's also important to discover new files that were added
+                    // for files that belong to the current project. That is because we want to
+                    // include those files in the next check run. So we'll need to traverse
+                    // the enclosing directory to discover all added files.
+                    // We can skip step for non-project files or files that don't match
+                    // any path passed to `knot check <path>`
+                    if project.is_path_included(self, &path) {
+                        if self.system().is_file(&path) {
+                            // Add the parent directory because `walkdir` always visits explicitly passed files
+                            // even if they match an exclude filter.
+                            added_paths.insert(path.parent().unwrap().to_path_buf());
+                        } else {
+                            added_paths.insert(path);
+                        }
                     }
                 }
 
@@ -112,6 +121,7 @@ impl ProjectDatabase {
                             custom_stdlib_change = true;
                         }
 
+                        // TODO: Is this still necessary now that we don't have packages anymore?
                         // Perform a full-reload in case the deleted directory contained the pyproject.toml.
                         // We may want to make this more clever in the future, to e.g. iterate over the
                         // indexed files and remove the once that start with the same path, unless
@@ -139,7 +149,7 @@ impl ProjectDatabase {
         }
 
         if project_changed {
-            match ProjectMetadata::discover(&project_path, self.system()) {
+            match ProjectMetadata::discover(&project_root, self.system()) {
                 Ok(mut metadata) => {
                     if let Some(cli_options) = cli_options {
                         metadata.apply_cli_options(cli_options.clone());
