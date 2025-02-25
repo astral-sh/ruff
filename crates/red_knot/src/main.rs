@@ -107,6 +107,12 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         .transpose()?
         .unwrap_or_else(|| cwd.clone());
 
+    let check_paths: Vec<_> = args
+        .paths
+        .iter()
+        .map(|path| SystemPath::absolute(path, &cwd))
+        .collect();
+
     let system = OsSystem::new(cwd);
     let watch = args.watch;
     let exit_zero = args.exit_zero;
@@ -117,6 +123,11 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     project_metadata.apply_configuration_files(&system)?;
 
     let mut db = ProjectDatabase::new(project_metadata, system)?;
+
+    if !check_paths.is_empty() {
+        // TODO: What happens if a path gets deleted? What if it is later recreated?
+        db.project().set_check_paths(&mut db, check_paths);
+    }
 
     let (main_loop, main_loop_cancellation_token) = MainLoop::new(cli_options);
 

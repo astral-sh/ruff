@@ -13,7 +13,7 @@ use ruff_db::files::{system_path_to_file, File};
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::{source_text, SourceTextError};
 use ruff_db::system::walk_directory::WalkState;
-use ruff_db::system::{FileType, SystemPath};
+use ruff_db::system::{FileType, SystemPath, SystemPathBuf};
 use ruff_python_ast::PySourceType;
 use rustc_hash::{FxBuildHasher, FxHashSet};
 use salsa::Durability;
@@ -71,6 +71,17 @@ pub struct Project {
     #[return_ref]
     pub settings: Settings,
 
+    /// The paths that should be checked in the project.
+    ///
+    /// The default (when this list is empty) is to check all files in the project root (that satisfy the configured include and exclude patterns).
+    /// However, it's sometimes desired to only check a subset of the project, e.g. to see
+    /// the diagnostics for a single file or a folder.
+    ///
+    /// This list gets initialized by the paths passed to `knot check <paths>`
+    #[default]
+    #[return_ref]
+    check_path_list: Vec<SystemPathBuf>,
+
     /// Diagnostics that were generated when resolving the project settings.
     #[return_ref]
     settings_diagnostics: Vec<OptionDiagnostic>,
@@ -104,6 +115,22 @@ impl Project {
     #[salsa::tracked]
     pub fn rules(self, db: &dyn Db) -> Arc<RuleSelection> {
         self.settings(db).to_rules()
+    }
+
+    /// Returns `true` if `path` is included in the project and one of the paths that should be checked.
+    ///
+    /// This is an over approximation compared to [Self::files] because it returns `true` for files
+    /// that are excluded by `.gitignore`.
+    pub fn is_path_included(self, db: &dyn Db, path: &SystemPath) -> bool {
+        let check_paths = self.check_paths(db);
+
+        if check_paths.is_empty() {
+            path.starts_with(self.root(db))
+        } else {
+            check_paths
+                .iter()
+                .any(|check_path| path.starts_with(check_path))
+        }
     }
 
     pub fn reload(self, db: &mut dyn Db, metadata: ProjectMetadata) {
@@ -207,6 +234,21 @@ impl Project {
         removed
     }
 
+    pub fn set_check_paths(self, db: &mut dyn Db, paths: Vec<SystemPathBuf>) {
+        tracing::debug!("Setting check paths: {paths}", paths = paths.len());
+
+        self.set_check_path_list(db).to(paths);
+        self.reload_files(db);
+    }
+
+    fn check_paths(self, db: &dyn Db) -> &[SystemPathBuf] {
+        if self.check_paths(db).is_empty() {
+            std::slice::from_ref(&self.metadata(db).root)
+        } else {
+            &*self.check_path_list(db)
+        }
+    }
+
     /// Returns the open files in the project or `None` if the entire project should be checked.
     pub fn open_files(self, db: &dyn Db) -> Option<&FxHashSet<File>> {
         self.open_fileset(db).as_deref()
@@ -296,7 +338,7 @@ impl Project {
         let indexed = match files.get() {
             Index::Lazy(vacant) => {
                 let _entered =
-                    tracing::debug_span!("Project::index_files", package = %self.name(db))
+                    tracing::debug_span!("Project::index_files", project = %self.name(db))
                         .entered();
 
                 let files = discover_project_files(db, self);
@@ -358,7 +400,19 @@ fn check_file_impl(db: &dyn Db, file: File) -> Vec<Box<dyn Diagnostic>> {
 fn discover_project_files(db: &dyn Db, project: Project) -> FxHashSet<File> {
     let paths = std::sync::Mutex::new(Vec::new());
 
-    db.system().walk_directory(project.root(db)).run(|| {
+    let (first, rest) = match project.check_paths(db).split_first() {
+        Some((first, rest)) => (&**first, rest),
+        None => (project.root(db), &[] as &[SystemPathBuf]),
+    };
+
+    // TODO: Error if no files were found?
+    let mut walker = db.system().walk_directory(first);
+
+    for path in rest {
+        walker = walker.add(path);
+    }
+
+    walker.run(|| {
         Box::new(|entry| {
             match entry {
                 Ok(entry) => {

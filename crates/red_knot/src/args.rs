@@ -32,6 +32,13 @@ pub(crate) enum Command {
 
 #[derive(Debug, Parser)]
 pub(crate) struct CheckCommand {
+    /// List of files or directories to check.
+    #[clap(
+        help = "List of files or directories to check [default: the project root]",
+        value_name = "PATH"
+    )]
+    pub paths: Vec<SystemPathBuf>,
+
     /// Run the command within the given project directory.
     ///
     /// All `pyproject.toml` files will be discovered by walking up the directory tree from the given project directory,
