@@ -78,7 +78,7 @@ error: lint:not-iterable
    |
 26 |     # error: [not-iterable]
 27 |     for y in Iterable2():
-   |              ^^^^^^^^^^^ Object of type `Iterable2` may not be iterable because it has no `__iter__` method and its `__getitem__` attribute (with type `Literal[__getitem__] | None`) may not be callable
+   |              ^^^^^^^^^^^ Object of type `Iterable2` may not be iterable because it has no `__iter__` method and its `__getitem__` attribute (with type `<bound method `__getitem__` of `Iterable2`> | None`) may not be callable
 28 |         # TODO... `int` might be ideal here?
 29 |         reveal_type(y)  # revealed: int | Unknown
    |

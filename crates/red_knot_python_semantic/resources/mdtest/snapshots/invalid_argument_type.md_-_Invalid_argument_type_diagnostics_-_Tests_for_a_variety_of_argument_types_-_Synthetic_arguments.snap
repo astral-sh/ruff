@@ -28,7 +28,7 @@ error: lint:invalid-argument-type
   |
 5 | c = C()
 6 | c("wrong")  # error: [invalid-argument-type]
-  |   ^^^^^^^ Object of type `Literal["wrong"]` cannot be assigned to parameter 2 (`x`) of function `__call__`; expected type `int`
+  |   ^^^^^^^ Object of type `Literal["wrong"]` cannot be assigned to parameter 2 (`x`) of bound method `__call__`; expected type `int`
   |
  ::: /src/mdtest_snippet.py:2:24
   |

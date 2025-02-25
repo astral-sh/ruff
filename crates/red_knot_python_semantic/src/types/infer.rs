@@ -4177,36 +4177,27 @@ impl<'db> TypeInferenceBuilder<'db> {
                     }
                 }
 
-                // TODO: Use `call_dunder`?
-                let call_on_left_instance = if let Symbol::Type(class_member, _) =
-                    left_class.member(self.db(), op.dunder())
-                {
-                    class_member
-                        .try_call(self.db(), &CallArguments::positional([left_ty, right_ty]))
-                        .map(|outcome| outcome.return_type(self.db()))
-                        .ok()
-                } else {
-                    None
-                };
+                let call_on_left_instance = left_ty
+                    .try_call_dunder(
+                        self.db(),
+                        op.dunder(),
+                        &CallArguments::positional([right_ty]),
+                    )
+                    .map(|outcome| outcome.return_type(self.db()))
+                    .ok();
 
                 call_on_left_instance.or_else(|| {
                     if left_ty == right_ty {
                         None
                     } else {
-                        if let Symbol::Type(class_member, _) =
-                            right_class.member(self.db(), op.reflected_dunder())
-                        {
-                            // TODO: Use `call_dunder`
-                            class_member
-                                .try_call(
-                                    self.db(),
-                                    &CallArguments::positional([right_ty, left_ty]),
-                                )
-                                .map(|outcome| outcome.return_type(self.db()))
-                                .ok()
-                        } else {
-                            None
-                        }
+                        right_ty
+                            .try_call_dunder(
+                                self.db(),
+                                op.reflected_dunder(),
+                                &CallArguments::positional([left_ty]),
+                            )
+                            .map(|outcome| outcome.return_type(self.db()))
+                            .ok()
                     }
                 })
             }
@@ -4848,20 +4839,17 @@ impl<'db> TypeInferenceBuilder<'db> {
         let db = self.db();
         // The following resource has details about the rich comparison algorithm:
         // https://snarky.ca/unravelling-rich-comparison-operators/
-        let call_dunder = |op: RichCompareOperator,
-                           left: InstanceType<'db>,
-                           right: InstanceType<'db>| {
-            match left.class().class_member(db, op.dunder()) {
-                Symbol::Type(class_member_dunder, Boundness::Bound) => class_member_dunder
-                    .try_call(
+        let call_dunder =
+            |op: RichCompareOperator, left: InstanceType<'db>, right: InstanceType<'db>| {
+                Type::Instance(left)
+                    .try_call_dunder(
                         db,
-                        &CallArguments::positional([Type::Instance(left), Type::Instance(right)]),
+                        op.dunder(),
+                        &CallArguments::positional([Type::Instance(right)]),
                     )
                     .map(|outcome| outcome.return_type(db))
-                    .ok(),
-                _ => None,
-            }
-        };
+                    .ok()
+            };
 
         // The reflected dunder has priority if the right-hand side is a strict subclass of the left-hand side.
         if left != right && right.is_subtype_of(db, left) {

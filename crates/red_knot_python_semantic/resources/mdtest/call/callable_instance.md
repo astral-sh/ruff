@@ -82,7 +82,7 @@ class C:
 
 c = C()
 
-# error: 15 [invalid-argument-type] "Object of type `Literal["foo"]` cannot be assigned to parameter 2 (`x`) of function `__call__`; expected type `int`"
+# error: 15 [invalid-argument-type] "Object of type `Literal["foo"]` cannot be assigned to parameter 2 (`x`) of bound method `__call__`; expected type `int`"
 reveal_type(c("foo"))  # revealed: int
 ```
 
@@ -96,7 +96,7 @@ class C:
 
 c = C()
 
-# error: 13 [invalid-argument-type] "Object of type `C` cannot be assigned to parameter 1 (`self`) of function `__call__`; expected type `int`"
+# error: 13 [invalid-argument-type] "Object of type `C` cannot be assigned to parameter 1 (`self`) of bound method `__call__`; expected type `int`"
 reveal_type(c())  # revealed: int
 ```
 

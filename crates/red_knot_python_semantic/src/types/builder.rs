@@ -43,6 +43,10 @@ impl<'db> UnionBuilder<'db> {
         }
     }
 
+    pub(crate) fn is_empty(&self) -> bool {
+        self.elements.is_empty()
+    }
+
     /// Collapse the union to a single type: `object`.
     fn collapse_to_object(mut self) -> Self {
         self.elements.clear();
