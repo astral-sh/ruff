@@ -485,6 +485,10 @@ impl Default for InitializationOptions {
 #[cfg(test)]
 mod tests {
     use insta::assert_debug_snapshot;
+    use ruff_python_formatter::QuoteStyle;
+    use ruff_workspace::options::{
+        FormatOptions as RuffFormatOptions, LintCommonOptions, LintOptions,
+    };
     use serde::de::DeserializeOwned;
 
     #[cfg(not(windows))]
@@ -931,187 +935,35 @@ mod tests {
             panic!("Expected global settings only");
         };
 
-        let settings = ResolvedClientSettings::global(&global_settings);
-
-        assert_debug_snapshot!(settings.editor_settings, @r"
-        ResolvedEditorSettings {
-            configuration: Some(
-                Inline(
-                    Options {
-                        cache_dir: None,
-                        extend: None,
-                        output_format: None,
-                        fix: None,
-                        unsafe_fixes: None,
-                        fix_only: None,
-                        show_fixes: None,
-                        required_version: None,
-                        preview: None,
-                        exclude: None,
-                        extend_exclude: None,
-                        extend_include: None,
-                        force_exclude: None,
-                        include: None,
-                        respect_gitignore: None,
-                        builtins: None,
-                        namespace_packages: None,
-                        target_version: None,
-                        src: None,
-                        line_length: Some(
-                            LineLength(
-                                100,
-                            ),
-                        ),
-                        indent_width: None,
-                        lint: Some(
-                            LintOptions {
-                                common: LintCommonOptions {
-                                    allowed_confusables: None,
-                                    dummy_variable_rgx: None,
-                                    extend_ignore: None,
-                                    extend_select: Some(
-                                        [
-                                            Rule {
-                                                prefix: Isort(
-                                                    _001,
-                                                ),
-                                                redirected_from: None,
-                                            },
-                                        ],
-                                    ),
-                                    extend_fixable: None,
-                                    extend_unfixable: None,
-                                    external: None,
-                                    fixable: None,
-                                    ignore: None,
-                                    extend_safe_fixes: None,
-                                    extend_unsafe_fixes: None,
-                                    ignore_init_module_imports: None,
-                                    logger_objects: None,
-                                    select: None,
-                                    explicit_preview_rules: None,
-                                    task_tags: None,
-                                    typing_modules: None,
-                                    unfixable: None,
-                                    flake8_annotations: None,
-                                    flake8_bandit: None,
-                                    flake8_boolean_trap: None,
-                                    flake8_bugbear: None,
-                                    flake8_builtins: None,
-                                    flake8_comprehensions: None,
-                                    flake8_copyright: None,
-                                    flake8_errmsg: None,
-                                    flake8_quotes: None,
-                                    flake8_self: None,
-                                    flake8_tidy_imports: None,
-                                    flake8_type_checking: None,
-                                    flake8_gettext: None,
-                                    flake8_implicit_str_concat: None,
-                                    flake8_import_conventions: None,
-                                    flake8_pytest_style: None,
-                                    flake8_unused_arguments: None,
-                                    isort: None,
-                                    mccabe: None,
-                                    pep8_naming: None,
-                                    pycodestyle: None,
-                                    pydocstyle: None,
-                                    pyflakes: None,
-                                    pylint: None,
-                                    pyupgrade: None,
-                                    per_file_ignores: None,
-                                    extend_per_file_ignores: None,
-                                },
-                                exclude: None,
-                                pydoclint: None,
-                                ruff: None,
-                                preview: None,
+        assert_eq!(
+            ResolvedClientSettings::global(&global_settings),
+            ResolvedClientSettings {
+                fix_all: true,
+                organize_imports: true,
+                lint_enable: true,
+                disable_rule_comment_enable: true,
+                fix_violation_enable: true,
+                show_syntax_errors: true,
+                editor_settings: ResolvedEditorSettings {
+                    configuration: Some(ResolvedConfiguration::Inline(Options {
+                        line_length: Some(LineLength::try_from(100).unwrap()),
+                        lint: Some(LintOptions {
+                            common: LintCommonOptions {
+                                extend_select: Some(vec![RuleSelector::from_str("I001").unwrap()]),
+                                ..Default::default()
                             },
-                        ),
-                        lint_top_level: DeprecatedTopLevelLintOptions(
-                            LintCommonOptions {
-                                allowed_confusables: None,
-                                dummy_variable_rgx: None,
-                                extend_ignore: None,
-                                extend_select: None,
-                                extend_fixable: None,
-                                extend_unfixable: None,
-                                external: None,
-                                fixable: None,
-                                ignore: None,
-                                extend_safe_fixes: None,
-                                extend_unsafe_fixes: None,
-                                ignore_init_module_imports: None,
-                                logger_objects: None,
-                                select: None,
-                                explicit_preview_rules: None,
-                                task_tags: None,
-                                typing_modules: None,
-                                unfixable: None,
-                                flake8_annotations: None,
-                                flake8_bandit: None,
-                                flake8_boolean_trap: None,
-                                flake8_bugbear: None,
-                                flake8_builtins: None,
-                                flake8_comprehensions: None,
-                                flake8_copyright: None,
-                                flake8_errmsg: None,
-                                flake8_quotes: None,
-                                flake8_self: None,
-                                flake8_tidy_imports: None,
-                                flake8_type_checking: None,
-                                flake8_gettext: None,
-                                flake8_implicit_str_concat: None,
-                                flake8_import_conventions: None,
-                                flake8_pytest_style: None,
-                                flake8_unused_arguments: None,
-                                isort: None,
-                                mccabe: None,
-                                pep8_naming: None,
-                                pycodestyle: None,
-                                pydocstyle: None,
-                                pyflakes: None,
-                                pylint: None,
-                                pyupgrade: None,
-                                per_file_ignores: None,
-                                extend_per_file_ignores: None,
-                            },
-                        ),
-                        format: Some(
-                            FormatOptions {
-                                exclude: None,
-                                preview: None,
-                                indent_style: None,
-                                quote_style: Some(
-                                    Single,
-                                ),
-                                skip_magic_trailing_comma: None,
-                                line_ending: None,
-                                docstring_code_format: None,
-                                docstring_code_line_length: None,
-                            },
-                        ),
-                        analyze: None,
-                    },
-                ),
-            ),
-            lint_preview: None,
-            format_preview: None,
-            select: None,
-            extend_select: Some(
-                [
-                    Rule {
-                        prefix: Ruff(
-                            _001,
-                        ),
-                        redirected_from: None,
-                    },
-                ],
-            ),
-            ignore: None,
-            exclude: None,
-            line_length: None,
-            configuration_preference: EditorFirst,
-        }
-        ");
+                            ..Default::default()
+                        }),
+                        format: Some(RuffFormatOptions {
+                            quote_style: Some(QuoteStyle::Single),
+                            ..Default::default()
+                        }),
+                        ..Default::default()
+                    })),
+                    extend_select: Some(vec![RuleSelector::from_str("RUF001").unwrap()]),
+                    ..Default::default()
+                }
+            }
+        );
     }
 }
