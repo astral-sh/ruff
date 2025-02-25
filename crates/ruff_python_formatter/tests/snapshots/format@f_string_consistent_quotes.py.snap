@@ -1,0 +1,89 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+assertion_line: 267
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/f_string_consistent_quotes.py
+---
+## Input
+```python
+# Test consistent quotes in f-strings with PEP 701 (Python 3.12+)
+
+# Basic cases
+basic_double = f"Value: {x}"
+basic_single = f'Value: {x}'
+
+# Nested quotes
+nested_single_in_double = f"He said: '{greeting}'"
+nested_double_in_single = f'She replied: "{response}"'
+
+# Double quotes within expressions
+expr_with_double = f"Value: {f"nested {x}"}"
+expr_with_single = f"Value: {f'nested {x}'}"
+
+# Complex nested expressions
+complex_nested = f"Outer: {f'Middle: {f"Inner: {x}"}'}"
+
+# Quotes that would need to be escaped without PEP 701
+would_need_escape = f"Contains a double quote: {word} says \"{quote}\""
+
+# String with quotes in expression
+quoted_in_expr = f"Result: {get_value(key="test", default="none")}"
+
+# Multiple f-strings in one expression
+multiple = f"First: {x}" + f"Second: {y}"
+
+# Mix of raw and regular f-strings
+raw_mix = rf"Raw: {x}\n" + f"Regular: {y}"
+
+# Multiline f-strings
+multiline = f"""
+Multiple
+lines
+with {value}
+"""
+
+# Complex real-world example
+complex_example = f"User {user['name']} logged in at {format_time(timestamp, fmt="HH:MM:SS")}"```
+
+## Output
+```python
+# Test consistent quotes in f-strings with PEP 701 (Python 3.12+)
+
+# Basic cases
+basic_double = f"Value: {x}"
+basic_single = f"Value: {x}"
+
+# Nested quotes
+nested_single_in_double = f"He said: '{greeting}'"
+nested_double_in_single = f'She replied: "{response}"'
+
+# Double quotes within expressions
+expr_with_double = f"Value: {f'nested {x}'}"
+expr_with_single = f"Value: {f'nested {x}'}"
+
+# Complex nested expressions
+complex_nested = f"Outer: {f'Middle: {f"Inner: {x}"}'}"
+
+# Quotes that would need to be escaped without PEP 701
+would_need_escape = f'Contains a double quote: {word} says "{quote}"'
+
+# String with quotes in expression
+quoted_in_expr = f"Result: {get_value(key='test', default='none')}"
+
+# Multiple f-strings in one expression
+multiple = f"First: {x}" + f"Second: {y}"
+
+# Mix of raw and regular f-strings
+raw_mix = rf"Raw: {x}\n" + f"Regular: {y}"
+
+# Multiline f-strings
+multiline = f"""
+Multiple
+lines
+with {value}
+"""
+
+# Complex real-world example
+complex_example = (
+    f"User {user['name']} logged in at {format_time(timestamp, fmt='HH:MM:SS')}"
+)
+```

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
+assertion_line: 267
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/docstring_tab_indentation.py
 ---
 ## Input
@@ -92,6 +93,7 @@ docstring-code-line-width  = "dynamic"
 preview                    = Disabled
 target_version             = 3.9
 source_type                = Python
+f-string-consistent-quotes = Disabled
 ```
 
 ```python
@@ -186,6 +188,7 @@ docstring-code-line-width  = "dynamic"
 preview                    = Disabled
 target_version             = 3.9
 source_type                = Python
+f-string-consistent-quotes = Disabled
 ```
 
 ```python

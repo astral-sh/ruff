@@ -3429,6 +3429,36 @@ pub struct FormatOptions {
     )]
     pub quote_style: Option<QuoteStyle>,
 
+    /// Controls the quote style for f-strings in Python 3.12+. When enabled,
+    /// f-strings will use consistent quotes (following quote-style) even when nesting strings inside
+    /// f-string expressions, leveraging Python 3.12's PEP 701 which allows using the same quote character
+    /// in expressions as the outer f-string.
+    /// When disabled (default), Ruff will alternate quotes inside f-strings for compatibility with
+    /// older Python versions.
+    ///
+    /// For example, with `f-string-consistent-quotes = true` and `quote-style = "double"` in Python 3.12+:
+    ///
+    /// ```python
+    /// f"Result: {data["key"]}"  # Same quotes in f-string and expression
+    /// ```
+    ///
+    /// With `f-string-consistent-quotes = false` (default):
+    ///
+    /// ```python
+    /// f"Result: {data['key']}"  # Alternate quotes for compatibility
+    /// ```
+    ///
+    /// Note: This setting has no effect when targeting Python versions below 3.12.
+    #[option(
+        default = "false",
+        value_type = "bool",
+        example = r#"
+            # Use consistent quotes in f-strings (Python 3.12+ only).
+            f-string-consistent-quotes = true
+        "#
+    )]
+    pub f_string_consistent_quotes: Option<bool>,
+
     /// Ruff uses existing trailing commas as an indication that short lines should be left separate.
     /// If this option is set to `true`, the magic trailing comma is ignored.
     ///

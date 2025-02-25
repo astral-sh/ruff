@@ -200,6 +200,16 @@ impl Configuration {
                     ruff_formatter::IndentWidth::from(NonZeroU8::from(tab_size))
                 }),
             quote_style,
+            f_string_consistent_quotes: format
+                .f_string_consistent_quotes
+                .map(|enabled| {
+                    if enabled {
+                        ruff_python_formatter::FStringConsistentQuotes::Enabled
+                    } else {
+                        ruff_python_formatter::FStringConsistentQuotes::Disabled
+                    }
+                })
+                .unwrap_or(format_defaults.f_string_consistent_quotes),
             magic_trailing_comma: format
                 .magic_trailing_comma
                 .unwrap_or(format_defaults.magic_trailing_comma),
@@ -1186,6 +1196,7 @@ pub struct FormatConfiguration {
 
     pub indent_style: Option<IndentStyle>,
     pub quote_style: Option<QuoteStyle>,
+    pub f_string_consistent_quotes: Option<bool>,
     pub magic_trailing_comma: Option<MagicTrailingComma>,
     pub line_ending: Option<LineEnding>,
     pub docstring_code_format: Option<DocstringCode>,
@@ -1211,6 +1222,7 @@ impl FormatConfiguration {
             preview: options.preview.map(PreviewMode::from),
             indent_style: options.indent_style,
             quote_style: options.quote_style,
+            f_string_consistent_quotes: options.f_string_consistent_quotes,
             magic_trailing_comma: options.skip_magic_trailing_comma.map(|skip| {
                 if skip {
                     MagicTrailingComma::Ignore
@@ -1239,6 +1251,9 @@ impl FormatConfiguration {
             extension: self.extension.or(config.extension),
             indent_style: self.indent_style.or(config.indent_style),
             quote_style: self.quote_style.or(config.quote_style),
+            f_string_consistent_quotes: self
+                .f_string_consistent_quotes
+                .or(config.f_string_consistent_quotes),
             magic_trailing_comma: self.magic_trailing_comma.or(config.magic_trailing_comma),
             line_ending: self.line_ending.or(config.line_ending),
             docstring_code_format: self.docstring_code_format.or(config.docstring_code_format),

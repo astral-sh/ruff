@@ -11,8 +11,8 @@ use ruff_linter::settings::LinterSettings;
 use ruff_macros::CacheKey;
 use ruff_python_ast::{PySourceType, PythonVersion};
 use ruff_python_formatter::{
-    DocstringCode, DocstringCodeLineWidth, MagicTrailingComma, PreviewMode, PyFormatOptions,
-    QuoteStyle,
+    DocstringCode, DocstringCodeLineWidth, FStringConsistentQuotes, MagicTrailingComma,
+    PreviewMode, PyFormatOptions, QuoteStyle,
 };
 use ruff_source_file::find_newline;
 use std::fmt;
@@ -184,6 +184,8 @@ pub struct FormatterSettings {
 
     pub quote_style: QuoteStyle,
 
+    pub f_string_consistent_quotes: FStringConsistentQuotes,
+
     pub magic_trailing_comma: MagicTrailingComma,
 
     pub line_ending: LineEnding,
@@ -229,6 +231,7 @@ impl FormatterSettings {
             .with_indent_style(self.indent_style)
             .with_indent_width(self.indent_width)
             .with_quote_style(self.quote_style)
+            .with_f_string_consistent_quotes(self.f_string_consistent_quotes)
             .with_magic_trailing_comma(self.magic_trailing_comma)
             .with_preview(self.preview)
             .with_line_ending(line_ending)
@@ -264,6 +267,7 @@ impl Default for FormatterSettings {
             indent_style: default_options.indent_style(),
             indent_width: default_options.indent_width(),
             quote_style: default_options.quote_style(),
+            f_string_consistent_quotes: default_options.f_string_consistent_quotes(),
             magic_trailing_comma: default_options.magic_trailing_comma(),
             docstring_code_format: default_options.docstring_code(),
             docstring_code_line_width: default_options.docstring_code_line_width(),
@@ -287,6 +291,7 @@ impl fmt::Display for FormatterSettings {
                 self.indent_style,
                 self.indent_width,
                 self.quote_style,
+                self.f_string_consistent_quotes,
                 self.magic_trailing_comma,
                 self.docstring_code_format,
                 self.docstring_code_line_width,
