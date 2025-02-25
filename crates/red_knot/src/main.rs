@@ -1,4 +1,4 @@
-use std::io::{self, BufWriter, Write};
+use std::io::{self, stdout, BufWriter, Write};
 use std::process::{ExitCode, Termination};
 
 use anyhow::Result;
@@ -39,6 +39,15 @@ pub fn main() -> ExitStatus {
         // the configuration it is help to chain errors ("resolving configuration failed" ->
         // "failed to read file: subdir/pyproject.toml")
         for cause in error.chain() {
+            // Exit "gracefully" on broken pipe errors.
+            //
+            // See: https://github.com/BurntSushi/ripgrep/blob/bf63fe8f258afc09bae6caa48f0ae35eaf115005/crates/core/main.rs#L47C1-L61C14
+            if let Some(ioerr) = cause.downcast_ref::<io::Error>() {
+                if ioerr.kind() == io::ErrorKind::BrokenPipe {
+                    return ExitStatus::Success;
+                }
+            }
+
             writeln!(stderr, "  {} {cause}", "Cause:".bold()).ok();
         }
 
@@ -121,7 +130,7 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     let exit_status = if watch {
         main_loop.watch(&mut db)?
     } else {
-        main_loop.run(&mut db)
+        main_loop.run(&mut db)?
     };
 
     tracing::trace!("Counts for entire CLI run:\n{}", countme::get_all());
@@ -181,7 +190,7 @@ impl MainLoop {
         )
     }
 
-    fn watch(mut self, db: &mut ProjectDatabase) -> anyhow::Result<ExitStatus> {
+    fn watch(mut self, db: &mut ProjectDatabase) -> Result<ExitStatus> {
         tracing::debug!("Starting watch mode");
         let sender = self.sender.clone();
         let watcher = watch::directory_watcher(move |event| {
@@ -190,12 +199,12 @@ impl MainLoop {
 
         self.watcher = Some(ProjectWatcher::new(watcher, db));
 
-        self.run(db);
+        self.run(db)?;
 
         Ok(ExitStatus::Success)
     }
 
-    fn run(mut self, db: &mut ProjectDatabase) -> ExitStatus {
+    fn run(mut self, db: &mut ProjectDatabase) -> Result<ExitStatus> {
         self.sender.send(MainLoopMessage::CheckWorkspace).unwrap();
 
         let result = self.main_loop(db);
@@ -205,7 +214,7 @@ impl MainLoop {
         result
     }
 
-    fn main_loop(&mut self, db: &mut ProjectDatabase) -> ExitStatus {
+    fn main_loop(&mut self, db: &mut ProjectDatabase) -> Result<ExitStatus> {
         // Schedule the first check.
         tracing::debug!("Starting main loop");
 
@@ -248,9 +257,9 @@ impl MainLoop {
                         .any(|diagnostic| diagnostic.severity() >= min_error_severity);
 
                     if check_revision == revision {
-                        #[allow(clippy::print_stdout)]
+                        let mut stdout = stdout().lock();
                         for diagnostic in result {
-                            println!("{}", diagnostic.display(db, &display_config));
+                            writeln!(stdout, "{}", diagnostic.display(db, &display_config))?;
                         }
                     } else {
                         tracing::debug!(
@@ -259,11 +268,11 @@ impl MainLoop {
                     }
 
                     if self.watcher.is_none() {
-                        return if failed {
+                        return Ok(if failed {
                             ExitStatus::Failure
                         } else {
                             ExitStatus::Success
-                        };
+                        });
                     }
 
                     tracing::trace!("Counts after last check:\n{}", countme::get_all());
@@ -283,14 +292,14 @@ impl MainLoop {
                     // TODO: Don't use Salsa internal APIs
                     //  [Zulip-Thread](https://salsa.zulipchat.com/#narrow/stream/333573-salsa-3.2E0/topic/Expose.20an.20API.20to.20cancel.20other.20queries)
                     let _ = db.zalsa_mut();
-                    return ExitStatus::Success;
+                    return Ok(ExitStatus::Success);
                 }
             }
 
             tracing::debug!("Waiting for next main loop message.");
         }
 
-        ExitStatus::Success
+        Ok(ExitStatus::Success)
     }
 }
 
