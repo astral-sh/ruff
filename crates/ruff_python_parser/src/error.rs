@@ -471,14 +471,6 @@ pub enum SyntaxErrorKind {
     MatchBeforePy310,
 }
 
-impl SyntaxErrorKind {
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            SyntaxErrorKind::MatchBeforePy310 => "match-before-python-310",
-        }
-    }
-}
-
 #[cfg(target_pointer_width = "64")]
 mod sizes {
     use crate::error::{LexicalError, LexicalErrorType};
