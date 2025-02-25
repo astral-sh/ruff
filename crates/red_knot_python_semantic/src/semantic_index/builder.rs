@@ -15,9 +15,6 @@ use crate::module_name::ModuleName;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::ast_ids::AstIdsBuilder;
 use crate::semantic_index::attribute_assignment::{AttributeAssignment, AttributeAssignments};
-use crate::semantic_index::constraint::{
-    Constraint, ConstraintNode, PatternConstraint, PatternConstraintKind, ScopedConstraintId,
-};
 use crate::semantic_index::definition::{
     AssignmentDefinitionNodeRef, ComprehensionDefinitionNodeRef, Definition, DefinitionCategory,
     DefinitionNodeKey, DefinitionNodeRef, ExceptHandlerDefinitionNodeRef, ForStmtDefinitionNodeRef,
@@ -25,6 +22,9 @@ use crate::semantic_index::definition::{
     WithItemDefinitionNodeRef,
 };
 use crate::semantic_index::expression::{Expression, ExpressionKind};
+use crate::semantic_index::predicate::{
+    PatternPredicate, PatternPredicateKind, Predicate, PredicateNode, ScopedPredicateId,
+};
 use crate::semantic_index::symbol::{
     FileScopeId, NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopeKind, ScopedSymbolId,
     SymbolTableBuilder,
@@ -385,50 +385,60 @@ impl<'db> SemanticIndexBuilder<'db> {
         definition
     }
 
-    fn record_expression_constraint(&mut self, constraint_node: &ast::Expr) -> Constraint<'db> {
-        let constraint = self.build_constraint(constraint_node);
-        self.record_constraint(constraint);
-        constraint
+    fn record_expression_narrowing_constraint(
+        &mut self,
+        precide_node: &ast::Expr,
+    ) -> Predicate<'db> {
+        let predicate = self.build_predicate(precide_node);
+        self.record_narrowing_constraint(predicate);
+        predicate
     }
 
-    fn build_constraint(&mut self, constraint_node: &ast::Expr) -> Constraint<'db> {
-        let expression = self.add_standalone_expression(constraint_node);
-        Constraint {
-            node: ConstraintNode::Expression(expression),
+    fn build_predicate(&mut self, predicate_node: &ast::Expr) -> Predicate<'db> {
+        let expression = self.add_standalone_expression(predicate_node);
+        Predicate {
+            node: PredicateNode::Expression(expression),
             is_positive: true,
         }
     }
 
-    /// Adds a new constraint to the list of all constraints, but does not record it. Returns the
-    /// constraint ID for later recording using [`SemanticIndexBuilder::record_constraint_id`].
-    fn add_constraint(&mut self, constraint: Constraint<'db>) -> ScopedConstraintId {
-        self.current_use_def_map_mut().add_constraint(constraint)
+    /// Adds a new predicate to the list of all predicates, but does not record it. Returns the
+    /// predicate ID for later recording using
+    /// [`SemanticIndexBuilder::record_narrowing_constraint_id`].
+    fn add_predicate(&mut self, predicate: Predicate<'db>) -> ScopedPredicateId {
+        self.current_use_def_map_mut().add_predicate(predicate)
     }
 
-    /// Negates a constraint and adds it to the list of all constraints, does not record it.
-    fn add_negated_constraint(&mut self, constraint: Constraint<'db>) -> ScopedConstraintId {
-        let negated = Constraint {
-            node: constraint.node,
+    /// Negates a predicate and adds it to the list of all predicates, does not record it.
+    fn add_negated_predicate(&mut self, predicate: Predicate<'db>) -> ScopedPredicateId {
+        let negated = Predicate {
+            node: predicate.node,
             is_positive: false,
         };
-        self.current_use_def_map_mut().add_constraint(negated)
+        self.current_use_def_map_mut().add_predicate(negated)
     }
 
-    /// Records a previously added constraint by adding it to all live bindings.
-    fn record_constraint_id(&mut self, constraint: ScopedConstraintId) {
+    /// Records a previously added narrowing constraint by adding it to all live bindings.
+    fn record_narrowing_constraint_id(&mut self, predicate: ScopedPredicateId) {
         self.current_use_def_map_mut()
-            .record_constraint_id(constraint);
+            .record_narrowing_constraint(predicate);
     }
 
-    /// Adds and records a constraint, i.e. adds it to all live bindings.
-    fn record_constraint(&mut self, constraint: Constraint<'db>) {
-        self.current_use_def_map_mut().record_constraint(constraint);
+    /// Adds and records a narrowing constraint, i.e. adds it to all live bindings.
+    fn record_narrowing_constraint(&mut self, predicate: Predicate<'db>) {
+        let use_def = self.current_use_def_map_mut();
+        let predicate_id = use_def.add_predicate(predicate);
+        use_def.record_narrowing_constraint(predicate_id);
     }
 
-    /// Negates the given constraint and then adds it to all live bindings.
-    fn record_negated_constraint(&mut self, constraint: Constraint<'db>) -> ScopedConstraintId {
-        let id = self.add_negated_constraint(constraint);
-        self.record_constraint_id(id);
+    /// Negates the given predicate and then adds it as a narrowing constraint to all live
+    /// bindings.
+    fn record_negated_narrowing_constraint(
+        &mut self,
+        predicate: Predicate<'db>,
+    ) -> ScopedPredicateId {
+        let id = self.add_negated_predicate(predicate);
+        self.record_narrowing_constraint_id(id);
         id
     }
 
@@ -454,12 +464,12 @@ impl<'db> SemanticIndexBuilder<'db> {
     /// Records a visibility constraint by applying it to all live bindings and declarations.
     fn record_visibility_constraint(
         &mut self,
-        constraint: Constraint<'db>,
+        predicate: Predicate<'db>,
     ) -> ScopedVisibilityConstraintId {
-        let constraint_id = self.current_use_def_map_mut().add_constraint(constraint);
+        let predicate_id = self.current_use_def_map_mut().add_predicate(predicate);
         let id = self
             .current_visibility_constraints_mut()
-            .add_atom(constraint_id);
+            .add_atom(predicate_id);
         self.record_visibility_constraint_id(id);
         id
     }
@@ -526,12 +536,12 @@ impl<'db> SemanticIndexBuilder<'db> {
         }
     }
 
-    fn add_pattern_constraint(
+    fn add_pattern_narrowing_constraint(
         &mut self,
         subject: Expression<'db>,
         pattern: &ast::Pattern,
         guard: Option<&ast::Expr>,
-    ) -> Constraint<'db> {
+    ) -> Predicate<'db> {
         // This is called for the top-level pattern of each match arm. We need to create a
         // standalone expression for each arm of a match statement, since they can introduce
         // constraints on the match subject. (Or more accurately, for the match arm's pattern,
@@ -548,19 +558,19 @@ impl<'db> SemanticIndexBuilder<'db> {
         let kind = match pattern {
             ast::Pattern::MatchValue(pattern) => {
                 let value = self.add_standalone_expression(&pattern.value);
-                PatternConstraintKind::Value(value, guard)
+                PatternPredicateKind::Value(value, guard)
             }
             ast::Pattern::MatchSingleton(singleton) => {
-                PatternConstraintKind::Singleton(singleton.value, guard)
+                PatternPredicateKind::Singleton(singleton.value, guard)
             }
             ast::Pattern::MatchClass(pattern) => {
                 let cls = self.add_standalone_expression(&pattern.cls);
-                PatternConstraintKind::Class(cls, guard)
+                PatternPredicateKind::Class(cls, guard)
             }
-            _ => PatternConstraintKind::Unsupported,
+            _ => PatternPredicateKind::Unsupported,
         };
 
-        let pattern_constraint = PatternConstraint::new(
+        let pattern_predicate = PatternPredicate::new(
             self.db,
             self.file,
             self.current_scope(),
@@ -568,12 +578,12 @@ impl<'db> SemanticIndexBuilder<'db> {
             kind,
             countme::Count::default(),
         );
-        let constraint = Constraint {
-            node: ConstraintNode::Pattern(pattern_constraint),
+        let predicate = Predicate {
+            node: PredicateNode::Pattern(pattern_predicate),
             is_positive: true,
         };
-        self.current_use_def_map_mut().record_constraint(constraint);
-        constraint
+        self.record_narrowing_constraint(predicate);
+        predicate
     }
 
     /// Record an expression that needs to be a Salsa ingredient, because we need to infer its type
@@ -1116,10 +1126,10 @@ where
             ast::Stmt::If(node) => {
                 self.visit_expr(&node.test);
                 let mut no_branch_taken = self.flow_snapshot();
-                let mut last_constraint = self.record_expression_constraint(&node.test);
+                let mut last_predicate = self.record_expression_narrowing_constraint(&node.test);
                 self.visit_body(&node.body);
 
-                let visibility_constraint_id = self.record_visibility_constraint(last_constraint);
+                let visibility_constraint_id = self.record_visibility_constraint(last_predicate);
                 let mut vis_constraints = vec![visibility_constraint_id];
 
                 let mut post_clauses: Vec<FlowSnapshot> = vec![];
@@ -1145,14 +1155,14 @@ where
                     // we can only take an elif/else branch if none of the previous ones were
                     // taken
                     self.flow_restore(no_branch_taken.clone());
-                    self.record_negated_constraint(last_constraint);
+                    self.record_negated_narrowing_constraint(last_predicate);
 
-                    let elif_constraint = if let Some(elif_test) = clause_test {
+                    let elif_predicate = if let Some(elif_test) = clause_test {
                         self.visit_expr(elif_test);
                         // A test expression is evaluated whether the branch is taken or not
                         no_branch_taken = self.flow_snapshot();
-                        let constraint = self.record_expression_constraint(elif_test);
-                        Some(constraint)
+                        let predicate = self.record_expression_narrowing_constraint(elif_test);
+                        Some(predicate)
                     } else {
                         None
                     };
@@ -1162,9 +1172,9 @@ where
                     for id in &vis_constraints {
                         self.record_negated_visibility_constraint(*id);
                     }
-                    if let Some(elif_constraint) = elif_constraint {
-                        last_constraint = elif_constraint;
-                        let id = self.record_visibility_constraint(elif_constraint);
+                    if let Some(elif_predicate) = elif_predicate {
+                        last_predicate = elif_predicate;
+                        let id = self.record_visibility_constraint(elif_predicate);
                         vis_constraints.push(id);
                     }
                 }
@@ -1184,19 +1194,19 @@ where
                 self.visit_expr(test);
 
                 let pre_loop = self.flow_snapshot();
-                let constraint = self.record_expression_constraint(test);
+                let predicate = self.record_expression_narrowing_constraint(test);
 
                 // We need multiple copies of the visibility constraint for the while condition,
                 // since we need to model situations where the first evaluation of the condition
                 // returns True, but a later evaluation returns False.
-                let first_constraint_id = self.current_use_def_map_mut().add_constraint(constraint);
-                let later_constraint_id = self.current_use_def_map_mut().add_constraint(constraint);
+                let first_predicate_id = self.current_use_def_map_mut().add_predicate(predicate);
+                let later_predicate_id = self.current_use_def_map_mut().add_predicate(predicate);
                 let first_vis_constraint_id = self
                     .current_visibility_constraints_mut()
-                    .add_atom(first_constraint_id);
+                    .add_atom(first_predicate_id);
                 let later_vis_constraint_id = self
                     .current_visibility_constraints_mut()
-                    .add_atom(later_constraint_id);
+                    .add_atom(later_predicate_id);
 
                 // Save aside any break states from an outer loop
                 let saved_break_states = std::mem::take(&mut self.loop_break_states);
@@ -1234,7 +1244,7 @@ where
                 self.flow_restore(pre_loop.clone());
                 self.record_negated_visibility_constraint(first_vis_constraint_id);
                 self.flow_merge(post_body);
-                self.record_negated_constraint(constraint);
+                self.record_negated_narrowing_constraint(predicate);
                 self.visit_body(orelse);
                 self.record_negated_visibility_constraint(later_vis_constraint_id);
 
@@ -1383,7 +1393,7 @@ where
                     self.current_match_case = Some(CurrentMatchCase::new(&case.pattern));
                     self.visit_pattern(&case.pattern);
                     self.current_match_case = None;
-                    let constraint_id = self.add_pattern_constraint(
+                    let predicate = self.add_pattern_narrowing_constraint(
                         subject_expr,
                         &case.pattern,
                         case.guard.as_deref(),
@@ -1395,7 +1405,7 @@ where
                     for id in &vis_constraints {
                         self.record_negated_visibility_constraint(*id);
                     }
-                    let vis_constraint_id = self.record_visibility_constraint(constraint_id);
+                    let vis_constraint_id = self.record_visibility_constraint(predicate);
                     vis_constraints.push(vis_constraint_id);
                 }
 
@@ -1694,13 +1704,13 @@ where
             }) => {
                 self.visit_expr(test);
                 let pre_if = self.flow_snapshot();
-                let constraint = self.record_expression_constraint(test);
+                let predicate = self.record_expression_narrowing_constraint(test);
                 self.visit_expr(body);
-                let visibility_constraint = self.record_visibility_constraint(constraint);
+                let visibility_constraint = self.record_visibility_constraint(predicate);
                 let post_body = self.flow_snapshot();
                 self.flow_restore(pre_if.clone());
 
-                self.record_negated_constraint(constraint);
+                self.record_negated_narrowing_constraint(predicate);
                 self.visit_expr(orelse);
                 self.record_negated_visibility_constraint(visibility_constraint);
                 self.flow_merge(post_body);
@@ -1776,14 +1786,14 @@ where
                     // For the last value, we don't need to model control flow. There is short-circuiting
                     // anymore.
                     if index < values.len() - 1 {
-                        let constraint = self.build_constraint(value);
-                        let constraint_id = match op {
-                            ast::BoolOp::And => self.add_constraint(constraint),
-                            ast::BoolOp::Or => self.add_negated_constraint(constraint),
+                        let predicate = self.build_predicate(value);
+                        let predicate_id = match op {
+                            ast::BoolOp::And => self.add_predicate(predicate),
+                            ast::BoolOp::Or => self.add_negated_predicate(predicate),
                         };
                         let visibility_constraint = self
                             .current_visibility_constraints_mut()
-                            .add_atom(constraint_id);
+                            .add_atom(predicate_id);
 
                         let after_expr = self.flow_snapshot();
 
@@ -1801,7 +1811,7 @@ where
                         // the application of the visibility constraint until after the expression
                         // has been evaluated, so we only push it onto the stack here.
                         self.flow_restore(after_expr);
-                        self.record_constraint_id(constraint_id);
+                        self.record_narrowing_constraint_id(predicate_id);
                         visibility_constraints.push(visibility_constraint);
                     }
                 }
