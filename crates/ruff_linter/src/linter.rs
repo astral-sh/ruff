@@ -504,10 +504,11 @@ pub fn lint_fix<'a>(
     // Track whether the _initial_ source code is valid syntax.
     let mut is_valid_syntax = false;
 
+    let target_version = settings.resolve_target_version(path);
+
     // Continuously fix until the source code stabilizes.
     loop {
         // Parse once.
-        let target_version = settings.resolve_target_version(path);
         let parsed = parse_unchecked_source(&transformed, source_type, target_version);
 
         // Map row and column locations to byte slices (lazily).
