@@ -430,10 +430,10 @@ impl std::fmt::Display for LexicalErrorType {
 /// Represents a version-related syntax error detected during parsing.
 ///
 /// An example of a version-related error is the use of a `match` statement before Python 3.10, when
-/// it was first introduced. See [`SyntaxErrorKind`] for other kinds of errors.
+/// it was first introduced. See [`UnsupportedSyntaxErrorKind`] for other kinds of errors.
 #[derive(Debug, PartialEq, Clone)]
 pub struct UnsupportedSyntaxError {
-    pub kind: SyntaxErrorKind,
+    pub kind: UnsupportedSyntaxErrorKind,
     pub range: TextRange,
     /// The target [`PythonVersion`] for which this error was detected.
     ///
@@ -448,7 +448,7 @@ impl UnsupportedSyntaxError {
     /// The earliest allowed version for the syntax associated with this error.
     pub const fn minimum_version(&self) -> PythonVersion {
         match self.kind {
-            SyntaxErrorKind::MatchBeforePy310 => PythonVersion::PY310,
+            UnsupportedSyntaxErrorKind::MatchBeforePy310 => PythonVersion::PY310,
         }
     }
 }
@@ -456,7 +456,7 @@ impl UnsupportedSyntaxError {
 impl Display for UnsupportedSyntaxError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.kind {
-            SyntaxErrorKind::MatchBeforePy310 => write!(
+            UnsupportedSyntaxErrorKind::MatchBeforePy310 => write!(
                 f,
                 "Cannot use `match` statement on Python {} (syntax was new in Python {})",
                 self.target_version,
@@ -467,7 +467,7 @@ impl Display for UnsupportedSyntaxError {
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
-pub enum SyntaxErrorKind {
+pub enum UnsupportedSyntaxErrorKind {
     MatchBeforePy310,
 }
 
