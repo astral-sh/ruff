@@ -6,7 +6,7 @@ use crate::{
     },
     symbol::{
         class_symbol, known_module_symbol, symbol_from_bindings, symbol_from_declarations,
-        LookupError, LookupResult, Symbol, SymbolAndQualifiers,
+        Boundness, LookupError, LookupResult, Symbol, SymbolAndQualifiers,
     },
     types::{
         definition_expression_type, CallArguments, CallError, MetaclassCandidate, TupleType,
@@ -383,6 +383,9 @@ impl<'db> Class<'db> {
     ///
     /// The attribute might also be defined in a superclass of this class.
     pub(super) fn instance_member(self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
+        let mut union = UnionBuilder::new(db);
+        let mut union_qualifiers = TypeQualifiers::empty();
+
         for superclass in self.iter_mro(db) {
             match superclass {
                 ClassBase::Dynamic(_) => {
@@ -391,16 +394,43 @@ impl<'db> Class<'db> {
                     );
                 }
                 ClassBase::Class(class) => {
-                    if let member @ SymbolAndQualifiers(Symbol::Type(_, _), _) =
+                    if let member @ SymbolAndQualifiers(Symbol::Type(ty, boundness), qualifiers) =
                         class.own_instance_member(db, name)
                     {
-                        return member;
+                        // TODO: We could raise a diagnostic here if there are conflicting type qualifiers
+                        union_qualifiers = union_qualifiers.union(qualifiers);
+
+                        if boundness == Boundness::Bound {
+                            if union.is_empty() {
+                                // Short-circuit, no need to allocate inside the union builder
+                                return member;
+                            }
+
+                            return SymbolAndQualifiers(
+                                Symbol::bound(union.add(ty).build()),
+                                union_qualifiers,
+                            );
+                        }
+
+                        // If we see a possibly-unbound symbol, we need to keep looking
+                        // higher up in the MRO.
+                        union = union.add(ty);
                     }
                 }
             }
         }
 
-        SymbolAndQualifiers(Symbol::Unbound, TypeQualifiers::empty())
+        if union.is_empty() {
+            SymbolAndQualifiers(Symbol::Unbound, TypeQualifiers::empty())
+        } else {
+            // If we have reached this point, we know that we have only seen possibly-unbound symbols.
+            // This means that the final result is still possibly-unbound.
+
+            SymbolAndQualifiers(
+                Symbol::Type(union.build(), Boundness::PossiblyUnbound),
+                union_qualifiers,
+            )
+        }
     }
 
     /// Tries to find declarations/bindings of an instance attribute named `name` that are only
@@ -409,16 +439,18 @@ impl<'db> Class<'db> {
         db: &'db dyn Db,
         class_body_scope: ScopeId<'db>,
         name: &str,
-        inferred_type_from_class_body: Option<Type<'db>>,
+        inferred_from_class_body: &Symbol<'db>,
     ) -> Symbol<'db> {
         // If we do not see any declarations of an attribute, neither in the class body nor in
         // any method, we build a union of `Unknown` with the inferred types of all bindings of
         // that attribute. We include `Unknown` in that union to account for the fact that the
         // attribute might be externally modified.
         let mut union_of_inferred_types = UnionBuilder::new(db).add(Type::unknown());
+        let mut union_boundness = Boundness::Bound;
 
-        if let Some(ty) = inferred_type_from_class_body {
-            union_of_inferred_types = union_of_inferred_types.add(ty);
+        if let Symbol::Type(ty, boundness) = inferred_from_class_body {
+            union_of_inferred_types = union_of_inferred_types.add(*ty);
+            union_boundness = *boundness;
         }
 
         let attribute_assignments = attribute_assignments(db, class_body_scope);
@@ -427,10 +459,10 @@ impl<'db> Class<'db> {
             .as_deref()
             .and_then(|assignments| assignments.get(name))
         else {
-            if inferred_type_from_class_body.is_some() {
-                return Symbol::bound(union_of_inferred_types.build());
+            if inferred_from_class_body.is_unbound() {
+                return Symbol::Unbound;
             }
-            return Symbol::Unbound;
+            return Symbol::Type(union_of_inferred_types.build(), union_boundness);
         };
 
         for attribute_assignment in attribute_assignments {
@@ -484,7 +516,7 @@ impl<'db> Class<'db> {
             }
         }
 
-        Symbol::bound(union_of_inferred_types.build())
+        Symbol::Type(union_of_inferred_types.build(), union_boundness)
     }
 
     /// A helper function for `instance_member` that looks up the `name` attribute only on
@@ -493,7 +525,6 @@ impl<'db> Class<'db> {
         // TODO: There are many things that are not yet implemented here:
         // - `typing.Final`
         // - Proper diagnostics
-        // - Handling of possibly-undeclared/possibly-unbound attributes
 
         let body_scope = self.body_scope(db);
         let table = symbol_table(db, body_scope);
@@ -504,7 +535,7 @@ impl<'db> Class<'db> {
             let declarations = use_def.public_declarations(symbol_id);
 
             match symbol_from_declarations(db, declarations) {
-                Ok(SymbolAndQualifiers(Symbol::Type(declared_ty, _), qualifiers)) => {
+                Ok(SymbolAndQualifiers(declared @ Symbol::Type(declared_ty, _), qualifiers)) => {
                     // The attribute is declared in the class body.
 
                     if let Some(function) = declared_ty.into_function_literal() {
@@ -514,7 +545,7 @@ impl<'db> Class<'db> {
                         if function.has_known_class_decorator(db, KnownClass::Classmethod)
                             && function.decorators(db).len() == 1
                         {
-                            SymbolAndQualifiers(Symbol::bound(declared_ty), qualifiers)
+                            SymbolAndQualifiers(declared, qualifiers)
                         } else if function.has_known_class_decorator(db, KnownClass::Property) {
                             SymbolAndQualifiers::todo("@property")
                         } else if function.has_known_function_decorator(db, KnownFunction::Overload)
@@ -523,10 +554,10 @@ impl<'db> Class<'db> {
                         } else if !function.decorators(db).is_empty() {
                             SymbolAndQualifiers::todo("decorated method")
                         } else {
-                            SymbolAndQualifiers(Symbol::bound(declared_ty), qualifiers)
+                            SymbolAndQualifiers(declared, qualifiers)
                         }
                     } else {
-                        SymbolAndQualifiers(Symbol::bound(declared_ty), qualifiers)
+                        SymbolAndQualifiers(declared, qualifiers)
                     }
                 }
                 Ok(SymbolAndQualifiers(Symbol::Unbound, _)) => {
@@ -535,9 +566,8 @@ impl<'db> Class<'db> {
 
                     let bindings = use_def.public_bindings(symbol_id);
                     let inferred = symbol_from_bindings(db, bindings);
-                    let inferred_ty = inferred.ignore_possibly_unbound();
 
-                    Self::implicit_instance_attribute(db, body_scope, name, inferred_ty).into()
+                    Self::implicit_instance_attribute(db, body_scope, name, &inferred).into()
                 }
                 Err((declared_ty, _conflicting_declarations)) => {
                     // There are conflicting declarations for this attribute in the class body.
@@ -551,7 +581,7 @@ impl<'db> Class<'db> {
             // This attribute is neither declared nor bound in the class body.
             // It could still be implicitly defined in a method.
 
-            Self::implicit_instance_attribute(db, body_scope, name, None).into()
+            Self::implicit_instance_attribute(db, body_scope, name, &Symbol::Unbound).into()
         }
     }
 
