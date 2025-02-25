@@ -429,6 +429,14 @@ def _(flag: bool):
 
 ## Possibly unbound `__iter__` and not-callable `__getitem__`
 
+This snippet tests that we infer the element type correctly in the following edge case:
+- `__iter__` is a method with the correct parameter spec that returns a valid iterator; BUT
+- `__iter__` is possibly unbound; AND
+- `__getitem__` is set to a non-callable type
+
+It's important that we emit a diagnostic here, but it's also important that we still use the return
+type of the iterator's `__next__` method as the inferred type of `x` in the `for` loop:
+
 ```py
 def _(flag: bool):
     class Iterator:
@@ -441,7 +449,7 @@ def _(flag: bool):
                 return Iterator()
         __getitem__: None = None
 
-    # error: [not-iterable]
+    # error: [not-iterable] "Object of type `Iterable` may not be iterable because it may not have an `__iter__` method and its `__getitem__` method does not support the old-style iteration protocol"
     for x in Iterable():
         reveal_type(x)  # revealed: int
 ```
