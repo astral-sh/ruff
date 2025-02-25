@@ -6698,7 +6698,8 @@ mod tests {
         let scope = global_scope(db, file);
         use_def_map(db, scope)
             .public_bindings(symbol_table(db, scope).symbol_id_by_name(name).unwrap())
-            .find_map(|b| b.binding)
+            .filter_map(|b| b.binding)
+            .last()
             .expect("no binding found")
     }
 

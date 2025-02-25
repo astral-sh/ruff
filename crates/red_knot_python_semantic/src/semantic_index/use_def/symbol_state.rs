@@ -485,7 +485,7 @@ mod tests {
         symbol: &SymbolState,
         expected: &[&str],
     ) {
-        let actual = symbol_states
+        let mut actual = symbol_states
             .bindings
             .iter_reverse(symbol.bindings.live_bindings)
             .map(|(def_id, live_binding)| {
@@ -502,6 +502,7 @@ mod tests {
                 format!("{def}<{constraints}>")
             })
             .collect::<Vec<_>>();
+        actual.reverse();
         assert_eq!(actual, expected);
     }
 
@@ -511,7 +512,7 @@ mod tests {
         symbol: &SymbolState,
         expected: &[&str],
     ) {
-        let actual = symbol_states
+        let mut actual = symbol_states
             .declarations
             .iter_reverse(symbol.declarations.live_declarations)
             .map(|(declaration, _)| {
@@ -522,6 +523,7 @@ mod tests {
                 }
             })
             .collect::<Vec<_>>();
+        actual.reverse();
         assert_eq!(actual, expected);
     }
 
