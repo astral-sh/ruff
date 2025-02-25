@@ -77,7 +77,7 @@ use crate::types::{
 };
 use crate::unpack::Unpack;
 use crate::util::subscript::{PyIndex, PySlice};
-use crate::Db;
+use crate::{Db, Program};
 
 use super::call::CallError;
 use super::context::{InNoTypeCheck, InferContext, WithDiagnostics};
@@ -538,10 +538,15 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn infer_region_scope(&mut self, scope: ScopeId<'db>) {
-        let node = scope.node(self.db());
+        let db = self.db();
+        let node = scope.node(db);
         match node {
             NodeWithScopeKind::Module => {
-                let parsed = parsed_module(self.db().upcast(), self.file());
+                let parsed = parsed_module(
+                    db.upcast(),
+                    self.file(),
+                    Program::get(db).python_version(db),
+                );
                 self.infer_module(parsed.syntax());
             }
             NodeWithScopeKind::Function(function) => self.infer_function_body(function.node()),
@@ -576,7 +581,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         // Infer the deferred types for the definitions here to consider the end-of-scope
         // semantics.
         for definition in std::mem::take(&mut self.types.deferred) {
-            self.extend(infer_deferred_types(self.db(), definition));
+            self.extend(infer_deferred_types(db, definition));
         }
         assert!(
             self.types.deferred.is_empty(),
@@ -6409,6 +6414,7 @@ mod tests {
     use ruff_db::files::{system_path_to_file, File};
     use ruff_db::system::DbWithTestSystem;
     use ruff_db::testing::{assert_function_query_was_not_run, assert_function_query_was_run};
+    use ruff_python_ast::PythonVersion;
 
     use super::*;
 
@@ -6740,7 +6746,7 @@ mod tests {
     fn dependency_implicit_instance_attribute() -> anyhow::Result<()> {
         fn x_rhs_expression(db: &TestDb) -> Expression<'_> {
             let file_main = system_path_to_file(db, "/src/main.py").unwrap();
-            let ast = parsed_module(db, file_main);
+            let ast = parsed_module(db, file_main, PythonVersion::default());
             // Get the second statement in `main.py` (x = …) and extract the expression
             // node on the right-hand side:
             let x_rhs_node = &ast.syntax().body[1].as_assign_stmt().unwrap().value;
@@ -6823,7 +6829,7 @@ mod tests {
     fn dependency_own_instance_member() -> anyhow::Result<()> {
         fn x_rhs_expression(db: &TestDb) -> Expression<'_> {
             let file_main = system_path_to_file(db, "/src/main.py").unwrap();
-            let ast = parsed_module(db, file_main);
+            let ast = parsed_module(db, file_main, PythonVersion::default());
             // Get the second statement in `main.py` (x = …) and extract the expression
             // node on the right-hand side:
             let x_rhs_node = &ast.syntax().body[1].as_assign_stmt().unwrap().value;

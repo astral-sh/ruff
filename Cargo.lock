@@ -2576,6 +2576,7 @@ dependencies = [
  "js-sys",
  "log",
  "red_knot_project",
+ "red_knot_python_semantic",
  "ruff_db",
  "ruff_notebook",
  "ruff_python_ast",
