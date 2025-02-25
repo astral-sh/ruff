@@ -1,7 +1,7 @@
 use crate::find_node::covering_node;
 use crate::{Db, HasNavigationTargets, NavigationTargets, RangedValue};
 use red_knot_python_semantic::types::Type;
-use red_knot_python_semantic::{HasType, SemanticModel};
+use red_knot_python_semantic::{HasType, Program, SemanticModel};
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::{parsed_module, ParsedModule};
 use ruff_python_ast::{self as ast, AnyNodeRef};
@@ -13,7 +13,8 @@ pub fn goto_type_definition(
     file: File,
     offset: TextSize,
 ) -> Option<RangedValue<NavigationTargets>> {
-    let parsed = parsed_module(db.upcast(), file);
+    let python_version = Program::get(db).python_version(db);
+    let parsed = parsed_module(db.upcast(), file, python_version);
     let goto_target = find_goto_target(parsed, offset)?;
 
     let model = SemanticModel::new(db.upcast(), file);

@@ -35,6 +35,7 @@
 //! ```
 
 use crate::db::Db;
+use red_knot_python_semantic::Program;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::{line_index, source_text, SourceText};
@@ -57,7 +58,7 @@ impl InlineFileAssertions {
     pub(crate) fn from_file(db: &Db, file: File) -> Self {
         let source = source_text(db, file);
         let lines = line_index(db, file);
-        let parsed = parsed_module(db, file);
+        let parsed = parsed_module(db, file, Program::get(db).python_version(db));
         let comment_ranges = CommentRanges::from(parsed.tokens());
         Self {
             comment_ranges,

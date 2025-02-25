@@ -20,7 +20,7 @@ use crate::semantic_index::symbol::{
     FileScopeId, NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopedSymbolId, SymbolTable,
 };
 use crate::semantic_index::use_def::{EagerBindingsKey, ScopedEagerBindingsId, UseDefMap};
-use crate::Db;
+use crate::{Db, Program};
 
 pub mod ast_ids;
 mod builder;
@@ -47,7 +47,7 @@ type SymbolMap = hashbrown::HashMap<ScopedSymbolId, (), FxBuildHasher>;
 pub(crate) fn semantic_index(db: &dyn Db, file: File) -> SemanticIndex<'_> {
     let _span = tracing::trace_span!("semantic_index", ?file).entered();
 
-    let parsed = parsed_module(db.upcast(), file);
+    let parsed = parsed_module(db.upcast(), file, Program::get(db).python_version(db));
 
     SemanticIndexBuilder::new(db, file, parsed).build()
 }
@@ -497,11 +497,10 @@ impl FusedIterator for ChildrenIter<'_> {}
 mod tests {
     use ruff_db::files::{system_path_to_file, File};
     use ruff_db::parsed::parsed_module;
-    use ruff_db::system::DbWithWritableSystem as _;
-    use ruff_python_ast as ast;
+    use ruff_python_ast::{self as ast, PythonVersion};
     use ruff_text_size::{Ranged, TextRange};
 
-    use crate::db::tests::TestDb;
+    use crate::db::tests::{TestDb, TestDbBuilder};
     use crate::semantic_index::ast_ids::{HasScopedUseId, ScopedUseId};
     use crate::semantic_index::definition::{Definition, DefinitionKind};
     use crate::semantic_index::symbol::{
@@ -528,11 +527,15 @@ mod tests {
         file: File,
     }
 
-    fn test_case(content: impl AsRef<str>) -> TestCase {
-        let mut db = TestDb::new();
-        db.write_file("test.py", content).unwrap();
+    fn test_case(content: &str) -> TestCase {
+        const FILENAME: &str = "test.py";
 
-        let file = system_path_to_file(&db, "test.py").unwrap();
+        let db = TestDbBuilder::new()
+            .with_file(FILENAME, content)
+            .build()
+            .unwrap();
+
+        let file = system_path_to_file(&db, FILENAME).unwrap();
 
         TestCase { db, file }
     }
@@ -919,7 +922,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
 
         let use_def = index.use_def_map(comprehension_scope_id);
 
-        let module = parsed_module(&db, file).syntax();
+        let module = parsed_module(&db, file, PythonVersion::default()).syntax();
         let element = module.body[0]
             .as_expr_stmt()
             .unwrap()
@@ -1168,7 +1171,7 @@ class C[T]:
     #[test]
     fn reachability_trivial() {
         let TestCase { db, file } = test_case("x = 1; x");
-        let parsed = parsed_module(&db, file);
+        let parsed = parsed_module(&db, file, PythonVersion::default());
         let scope = global_scope(&db, file);
         let ast = parsed.syntax();
         let ast::Stmt::Expr(ast::StmtExpr {
@@ -1201,7 +1204,7 @@ class C[T]:
         let TestCase { db, file } = test_case("x = 1;\ndef test():\n  y = 4");
 
         let index = semantic_index(&db, file);
-        let parsed = parsed_module(&db, file);
+        let parsed = parsed_module(&db, file, PythonVersion::default());
         let ast = parsed.syntax();
 
         let x_stmt = ast.body[0].as_assign_stmt().unwrap();

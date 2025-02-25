@@ -4,12 +4,13 @@ use red_knot_python_semantic::types::Type;
 use red_knot_python_semantic::SemanticModel;
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::parsed_module;
+use ruff_python_ast::PythonVersion;
 use ruff_text_size::{Ranged, TextSize};
 use std::fmt;
 use std::fmt::Formatter;
 
 pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Hover>> {
-    let parsed = parsed_module(db.upcast(), file);
+    let parsed = parsed_module(db.upcast(), file, PythonVersion::default());
     let goto_target = find_goto_target(parsed, offset)?;
 
     if let GotoTarget::Expression(expr) = goto_target {

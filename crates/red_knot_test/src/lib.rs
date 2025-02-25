@@ -8,7 +8,9 @@ use red_knot_python_semantic::types::check_types;
 use red_knot_python_semantic::{
     Program, ProgramSettings, PythonPath, PythonPlatform, SearchPathSettings, SysPrefixPathOrigin,
 };
-use ruff_db::diagnostic::{create_parse_diagnostic, Diagnostic, DisplayDiagnosticConfig};
+use ruff_db::diagnostic::{
+    create_parse_diagnostic, Annotation, Diagnostic, DisplayDiagnosticConfig, Span,
+};
 use ruff_db::files::{system_path_to_file, File};
 use ruff_db::panic::catch_unwind;
 use ruff_db::parsed::parsed_module;
@@ -297,13 +299,24 @@ fn run_test(
     let failures: Failures = test_files
         .into_iter()
         .filter_map(|test_file| {
-            let parsed = parsed_module(db, test_file.file);
+            let parsed = parsed_module(db, test_file.file, Program::get(db).python_version(db));
 
             let mut diagnostics: Vec<Diagnostic> = parsed
                 .errors()
                 .iter()
                 .map(|error| create_parse_diagnostic(test_file.file, error))
                 .collect();
+
+            diagnostics.extend(parsed.unsupported_syntax_errors().iter().map(|error| {
+                let mut diag = Diagnostic::new(
+                    ruff_db::diagnostic::DiagnosticId::InvalidSyntax,
+                    ruff_db::diagnostic::Severity::Error,
+                    "",
+                );
+                let span = Span::from(test_file.file).with_range(error.range);
+                diag.annotate(Annotation::primary(span).message(error.to_string()));
+                diag
+            }));
 
             let type_diagnostics = match catch_unwind(|| check_types(db, test_file.file)) {
                 Ok(type_diagnostics) => type_diagnostics,
