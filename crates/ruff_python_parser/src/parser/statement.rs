@@ -2540,11 +2540,25 @@ impl<'src> Parser<'src> {
     fn try_parse_old_decorators(&mut self) -> Option<ParsedExpr> {
         let errors = self.errors.len();
         let start = self.node_start();
-        let name = self.parse_name();
-        if name.ctx.is_invalid() {
+        // initial identifier
+        let ident = self.parse_identifier();
+        if !ident.is_valid() {
             return None;
         }
-        let name = Expr::from(name);
+        let mut name = Expr::from(ast::ExprName {
+            range: self.node_range(start),
+            id: ident.id,
+            ctx: ExprContext::Load,
+        });
+        // ("." identifier)*
+        while self.at(TokenKind::Dot) {
+            let attr = self.parse_attribute_expression(name, start);
+            if !attr.attr.is_valid() {
+                return None;
+            }
+            name = Expr::from(attr);
+        }
+        // ["(" [argument_list [","]] ")"] NEWLINE
         let parsed = match self.current_token_kind() {
             TokenKind::Lpar => Some(Expr::Call(self.parse_call_expression(name, start)).into()),
             TokenKind::Newline => Some(name.into()),
@@ -2573,6 +2587,11 @@ impl<'src> Parser<'src> {
         // a single call" in Python 3.9. we want to catch decorators that don't meet these criteria
         // before 3.9 but avoid false positives on examples like the `@_` "identity function hack"
         // or the "eval hack" called out in the PEP.
+
+        // test_ok decorator_expression_dotted_ident_before_py39
+        // # parse_options: { "target-version": "3.8" }
+        // @buttons.clicked.connect
+        // def spam(): ...
 
         // test_ok decorator_expression_identity_hack_before_py39
         // # parse_options: { "target-version": "3.8" }
