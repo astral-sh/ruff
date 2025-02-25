@@ -80,130 +80,314 @@ add_suffix_to_is_methods = true
 anynode_is_label = "expression"
 rustdoc = "/// See also [expr](https://docs.python.org/3/library/ast.html#ast.expr)"
 
-[Expr.nodes]
-ExprBoolOp = { fields = [
-    { name = "op", type = "BoolOp" },
-    { name = "values", type = "Expr", seq = true }
-]}
-ExprNamed = { fields = [
-    { name = "target", type = "Expr" },
-    { name = "value", type = "Expr" }
-]}
-ExprBinOp = { fields = [
-    { name = "left", type = "Expr" },
-    { name = "op", type = "Operator" },
-    { name = "right", type = "Expr" }
-]}
-ExprUnaryOp = { fields = [
-    { name = "op", type = "UnaryOp" },
-    { name = "operand", type = "Expr" }
-]}
-ExprLambda = { fields = [
-    { name = "parameters", type = "Box<crate::Parameters>", optional = true },
-    { name = "body", type = "Expr" }
-]}
-ExprIf = { fields = [
-    { name = "test", type = "Expr" },
-    { name = "body", type = "Expr" },
-    { name = "orelse", type = "Expr" }
-]}
-ExprDict = { fields = [
-    { name = "items", type = "DictItem", seq = true },
-]}
-ExprSet = { fields = [
-    { name = "elts", type = "Expr", seq = true }
-]}
-ExprListComp = { fields = [
-    { name = "elt", type = "Expr" },
-    { name = "generators", type = "Comprehension", seq = true }
-]}
-ExprSetComp = { fields = [
-    { name = "elt", type = "Expr" },
-    { name = "generators", type = "Comprehension", seq = true }
-]}
-ExprDictComp = { fields = [
-    { name = "key", type = "Expr" },
-    { name = "value", type = "Expr" },
-    { name = "generators", type = "Comprehension", seq = true }
-]}
-ExprGenerator = { fields = [
-    { name = "elt", type = "Expr" },
-    { name = "generators", type = "Comprehension", seq = true },
-    { name = "parenthesized", type = "bool" }
-]}
-ExprAwait = { fields = [
-    { name = "value", type = "Expr" }
-]}
-ExprYield = { fields = [
-    { name = "value", type = "Expr", optional = true }
-]}
-ExprYieldFrom = { fields = [
-    { name = "value", type = "Expr" }
-]}
-ExprCompare = { fields = [
-    { name = "left", type = "Expr" },
-    # TODO: We don't want this field to be a vec hence the seq is not enabled.
-    { name = "ops", type = "Box<[crate::CmpOp]>"},
-    { name = "comparators", type = "Box<[Expr]>"}
-]}
-ExprCall = { fields = [
-    { name = "func", type = "Expr" },
-    { name = "arguments", type = "Arguments"}
-]}
-ExprFString = { fields = [
-    { name = "value", type = "FStringValue" }
-]}
-ExprStringLiteral = { fields = [
-    { name = "value", type = "StringLiteralValue" }
-]}
-ExprBytesLiteral = { fields = [
-    { name = "value", type = "BytesLiteralValue" }
-]}
-ExprNumberLiteral = { fields = [
-    { name = "value", type = "Number" }
-]}
-ExprBooleanLiteral = { fields = [
-    { name = "value", type = "bool" }
-], derives = ["Default"]}
-ExprNoneLiteral = { fields = [], derives = ["Default"]}
-ExprEllipsisLiteral = { fields = [], derives = ["Default"]}
-ExprAttribute = { fields = [
-    { name = "value", type = "Expr" },
-    { name = "attr", type = "Identifier" },
-    { name = "ctx", type = "ExprContext" }
-]}
-ExprSubscript = { fields = [
-    { name = "value", type = "Expr" },
-    { name = "slice", type = "Expr" },
-    { name = "ctx", type = "ExprContext" }
-]}
-ExprStarred = { fields = [
-    { name = "value", type = "Expr" },
-    { name = "ctx", type = "ExprContext" }
-]}
-ExprName = { fields = [
-    { name = "id", type = "name::Name" },
-    { name = "ctx", type = "ExprContext" }
-]}
-ExprList = { fields = [
-    { name = "elts", type = "Expr", seq = true },
-    { name = "ctx", type = "ExprContext" }
-]}
-ExprTuple = { fields = [
-    { name = "elts", type = "Expr", seq = true },
-    { name = "ctx", type = "ExprContext" },
-    { name = "parenthesized", type = "bool" }
-]}
-ExprSlice = { fields = [
-    { name = "lower", type = "Expr", optional = true },
-    { name = "upper", type = "Expr", optional = true },
-    { name = "step", type = "Expr", optional = true }
-]}
-ExprIpyEscapeCommand = { fields = [
-    { name = "kind", type = "IpyEscapeKind" },
-    { name = "value", type = "Box<str>" }
+# See also [BoolOp](https://docs.python.org/3/library/ast.html#ast.BoolOp)
+[[Expr.nodes.ExprBoolOp.fields]]
+name = "op"
+type = "BoolOp"
 
-]}
+[[Expr.nodes.ExprBoolOp.fields]]
+name = "values"
+type = "Expr"
+seq = true
+
+# See also [NamedExpr](https://docs.python.org/3/library/ast.html#ast.NamedExpr)
+[[Expr.nodes.ExprNamed.fields]]
+name = "target"
+type = "Expr"
+
+[[Expr.nodes.ExprNamed.fields]]
+name = "value"
+type = "Expr"
+
+# See also [BinOp](https://docs.python.org/3/library/ast.html#ast.BinOp)
+[[Expr.nodes.ExprBinOp.fields]]
+name = "left"
+type = "Expr"
+
+[[Expr.nodes.ExprBinOp.fields]]
+name = "op"
+type = "Operator"
+
+[[Expr.nodes.ExprBinOp.fields]]
+name = "right"
+type = "Expr"
+
+# See also [UnaryOp](https://docs.python.org/3/library/ast.html#ast.UnaryOp)
+[[Expr.nodes.ExprUnaryOp.fields]]
+name = "op"
+type = "UnaryOp"
+
+[[Expr.nodes.ExprUnaryOp.fields]]
+name = "operand"
+type = "Expr"
+
+# See also [Lambda](https://docs.python.org/3/library/ast.html#ast.Lambda)
+[[Expr.nodes.ExprLambda.fields]]
+name = "parameters"
+type = "Box<crate::Parameters>"
+optional = true
+
+[[Expr.nodes.ExprLambda.fields]]
+name = "body"
+type = "Expr"
+
+# See also [IfExp](https://docs.python.org/3/library/ast.html#ast.IfExp)
+[[Expr.nodes.ExprIf.fields]]
+name = "test"
+type = "Expr"
+
+[[Expr.nodes.ExprIf.fields]]
+name = "body"
+type = "Expr"
+
+[[Expr.nodes.ExprIf.fields]]
+name = "orelse"
+type = "Expr"
+
+# See also [Dict](https://docs.python.org/3/library/ast.html#ast.Dict)
+[[Expr.nodes.ExprDict.fields]]
+name = "items"
+type = "DictItem"
+seq = true
+
+# See also [Set](https://docs.python.org/3/library/ast.html#ast.Set)
+[[Expr.nodes.ExprSet.fields]]
+name = "elts"
+type = "Expr"
+seq = true
+
+# See also [ListComp](https://docs.python.org/3/library/ast.html#ast.ListComp)
+[[Expr.nodes.ExprListComp.fields]]
+name = "elt"
+type = "Expr"
+
+[[Expr.nodes.ExprListComp.fields]]
+name = "generators"
+type = "Comprehension"
+seq = true
+
+# See also [SetComp](https://docs.python.org/3/library/ast.html#ast.SetComp)
+[[Expr.nodes.ExprSetComp.fields]]
+name = "elt"
+type = "Expr"
+
+[[Expr.nodes.ExprSetComp.fields]]
+name = "generators"
+type = "Comprehension"
+seq = true
+
+# See also [DictComp](https://docs.python.org/3/library/ast.html#ast.DictComp)
+[[Expr.nodes.ExprDictComp.fields]]
+name = "key"
+type = "Expr"
+
+[[Expr.nodes.ExprDictComp.fields]]
+name = "value"
+type = "Expr"
+
+[[Expr.nodes.ExprDictComp.fields]]
+name = "generators"
+type = "Comprehension"
+seq = true
+
+# See also [GeneratorExp](https://docs.python.org/3/library/ast.html#ast.GeneratorExp)
+[[Expr.nodes.ExprGenerator.fields]]
+name = "elt"
+type = "Expr"
+
+[[Expr.nodes.ExprGenerator.fields]]
+name = "generators"
+type = "Comprehension"
+seq = true
+
+[[Expr.nodes.ExprGenerator.fields]]
+name = "parenthesized"
+type = "bool"
+
+# See also [Await](https://docs.python.org/3/library/ast.html#ast.Await)
+[[Expr.nodes.ExprAwait.fields]]
+name = "value"
+type = "Expr"
+
+# See also [Yield](https://docs.python.org/3/library/ast.html#ast.Yield)
+[[Expr.nodes.ExprYield.fields]]
+name = "value"
+type = "Expr"
+optional = true
+
+# See also [YieldFrom](https://docs.python.org/3/library/ast.html#ast.YieldFrom)
+[[Expr.nodes.ExprYieldFrom.fields]]
+name = "value"
+type = "Expr"
+
+# See also [Compare](https://docs.python.org/3/library/ast.html#ast.Compare)
+[[Expr.nodes.ExprCompare.fields]]
+name = "left"
+type = "Expr"
+
+[[Expr.nodes.ExprCompare.fields]]
+name = "ops"
+type = "Box<[crate::CmpOp]>"
+
+[[Expr.nodes.ExprCompare.fields]]
+name = "comparators"
+type = "Box<[Expr]>"
+
+# See also [Call](https://docs.python.org/3/library/ast.html#ast.Call)
+[[Expr.nodes.ExprCall.fields]]
+name = "func"
+type = "Expr"
+
+[[Expr.nodes.ExprCall.fields]]
+name = "arguments"
+type = "Arguments"
+
+# An AST node that represents either a single-part f-string literal
+# or an implicitly concatenated f-string literal.
+#
+# This type differs from the original Python AST ([JoinedStr]) in that it
+# doesn't join the implicitly concatenated parts into a single string. Instead,
+# it keeps them separate and provide various methods to access the parts.
+#
+# [JoinedStr]: https://docs.python.org/3/library/ast.html#ast.JoinedStr
+[[Expr.nodes.ExprFString.fields]]
+name = "value"
+type = "FStringValue"
+
+# An AST node that represents either a single-part string literal
+# or an implicitly concatenated string literal.
+[[Expr.nodes.ExprStringLiteral.fields]]
+name = "value"
+type = "StringLiteralValue"
+
+# An AST node that represents either a single-part bytestring literal
+# or an implicitly concatenated bytestring literal.
+[[Expr.nodes.ExprBytesLiteral.fields]]
+name = "value"
+type = "BytesLiteralValue"
+
+[[Expr.nodes.ExprNumberLiteral.fields]]
+name = "value"
+type = "Number"
+
+[[Expr.nodes.ExprBooleanLiteral.fields]]
+name = "value"
+type = "bool"
+
+[Expr.nodes.ExprBooleanLiteral]
+derives = ["Default"]
+
+[Expr.nodes.ExprNoneLiteral]
+fields = []
+derives = ["Default"]
+
+[Expr.nodes.ExprEllipsisLiteral]
+fields = []
+derives = ["Default"]
+
+# See also [Attribute](https://docs.python.org/3/library/ast.html#ast.Attribute)
+[[Expr.nodes.ExprAttribute.fields]]
+name = "value"
+type = "Expr"
+
+[[Expr.nodes.ExprAttribute.fields]]
+name = "attr"
+type = "Identifier"
+
+[[Expr.nodes.ExprAttribute.fields]]
+name = "ctx"
+type = "ExprContext"
+
+# See also [Subscript](https://docs.python.org/3/library/ast.html#ast.Subscript)
+[[Expr.nodes.ExprSubscript.fields]]
+name = "value"
+type = "Expr"
+
+[[Expr.nodes.ExprSubscript.fields]]
+name = "slice"
+type = "Expr"
+
+[[Expr.nodes.ExprSubscript.fields]]
+name = "ctx"
+type = "ExprContext"
+
+# See also [Starred](https://docs.python.org/3/library/ast.html#ast.Starred)
+[[Expr.nodes.ExprStarred.fields]]
+name = "value"
+type = "Expr"
+
+[[Expr.nodes.ExprStarred.fields]]
+name = "ctx"
+type = "ExprContext"
+
+# See also [Name](https://docs.python.org/3/library/ast.html#ast.Name)
+[[Expr.nodes.ExprName.fields]]
+name = "id"
+type = "Name"
+
+[[Expr.nodes.ExprName.fields]]
+name = "ctx"
+type = "ExprContext"
+
+# See also [List](https://docs.python.org/3/library/ast.html#ast.List)
+[[Expr.nodes.ExprList.fields]]
+name = "elts"
+type = "Expr"
+seq = true
+
+[[Expr.nodes.ExprList.fields]]
+name = "ctx"
+type = "ExprContext"
+
+# See also [Tuple](https://docs.python.org/3/library/ast.html#ast.Tuple)
+[[Expr.nodes.ExprTuple.fields]]
+name = "elts"
+type = "Expr"
+seq = true
+
+[[Expr.nodes.ExprTuple.fields]]
+name = "ctx"
+type = "ExprContext"
+
+[[Expr.nodes.ExprTuple.fields]]
+name = "parenthesized"
+type = "bool"
+
+# See also [Slice](https://docs.python.org/3/library/ast.html#ast.Slice)
+[[Expr.nodes.ExprSlice.fields]]
+name = "lower"
+type = "Expr"
+optional = true
+
+[[Expr.nodes.ExprSlice.fields]]
+name = "upper"
+type = "Expr"
+optional = true
+
+[[Expr.nodes.ExprSlice.fields]]
+name = "step"
+type = "Expr"
+optional = true
+
+#  An AST node used to represent a IPython escape command at the expression level.
+#
+#  For example,
+#  ```python
+#  dir = !pwd
+#  ```
+#
+#  Here, the escape kind can only be `!` or `%` otherwise it is a syntax error.
+#
+#  For more information related to terminology and syntax of escape commands,
+#  see [`StmtIpyEscapeCommand`].
+[[Expr.nodes.ExprIpyEscapeCommand.fields]]
+name = "kind"
+type = "IpyEscapeKind"
+
+[[Expr.nodes.ExprIpyEscapeCommand.fields]]
+name = "value"
+type = "Box<str>"
+
 
 [ExceptHandler]
 rustdoc = "/// See also [excepthandler](https://docs.python.org/3/library/ast.html#ast.excepthandler)"

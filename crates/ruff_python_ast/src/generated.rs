@@ -1,6 +1,8 @@
 // This is a generated file. Don't modify it by hand!
 // Run `crates/ruff_python_ast/generate.py` to re-generate the file.
 
+use crate::name::Name;
+
 /// See also [mod](https://docs.python.org/3/library/ast.html#ast.mod)
 #[derive(Clone, Debug, PartialEq)]
 pub enum Mod {
@@ -6631,7 +6633,7 @@ pub struct ExprStarred {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprName {
     pub range: ruff_text_size::TextRange,
-    pub id: crate::name::Name,
+    pub id: Name,
     pub ctx: crate::ExprContext,
 }
 
