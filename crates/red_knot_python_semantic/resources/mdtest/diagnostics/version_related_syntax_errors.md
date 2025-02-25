@@ -16,7 +16,7 @@ python-version = "3.9"
 ```
 
 ```py
-match 2:  # error: "Cannot use `match` statement on Python 3.9 (syntax was new in Python 3.10)"
+match 2:  # error: 1 [invalid-syntax] "Cannot use `match` statement on Python 3.9 (syntax was new in Python 3.10)"
     case 1:
         print("it's one")
 ```

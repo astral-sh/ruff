@@ -34,7 +34,7 @@ impl Diagnostic for SyntaxDiagnostic {
 impl SyntaxDiagnostic {
     pub fn from_syntax_error(value: &SyntaxError, file: File) -> Self {
         Self {
-            id: DiagnosticId::invalid_syntax(Some(value.kind.as_str())),
+            id: DiagnosticId::InvalidSyntax,
             message: value.to_string(),
             file,
             range: value.range,
