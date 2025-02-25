@@ -816,6 +816,23 @@ def _(flag: bool, flag1: bool, flag2: bool):
     reveal_type(C().x)  # revealed: Unknown | Literal[1, 2, 3]
 ```
 
+### Possibly-unbound within gradual types
+
+```py
+from typing import Any
+
+def _(flag: bool):
+    class Base:
+        x: Any
+
+    class Derived(Base):
+        if flag:
+            # Redeclaring `x` with a more static type is okay in terms of LSP.
+            x: int
+
+    reveal_type(Derived().x)  # revealed: int | Any
+```
+
 ### Attribute possibly unbound on a subclass but not on a superclass
 
 ```py
