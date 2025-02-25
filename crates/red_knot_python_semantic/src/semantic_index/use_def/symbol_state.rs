@@ -42,7 +42,7 @@
 //! Tracking live declarations is simpler, since constraints are not involved, but otherwise very
 //! similar to tracking live bindings.
 
-use ruff_index::list::{ListBuilder, ListIterator, ListStorage};
+use ruff_index::list::{ListBuilder, ListReverseIterator, ListStorage};
 use ruff_index::newtype_index;
 
 use crate::semantic_index::narrowing_constraints::{
@@ -81,20 +81,19 @@ pub(super) struct LiveDeclaration {
 }
 
 pub(super) type LiveDeclarationsIterator<'a> =
-    ListIterator<'a, LiveDeclarationsId, ScopedDefinitionId, LiveDeclaration>;
+    ListReverseIterator<'a, LiveDeclarationsId, ScopedDefinitionId, LiveDeclaration>;
 
 impl SymbolDeclarations {
     fn undeclared(
         symbol_states: &mut SymbolStatesBuilder,
         scope_start_visibility: ScopedVisibilityConstraintId,
     ) -> Self {
-        let live_declarations = symbol_states.declarations.insert(
-            None,
-            ScopedDefinitionId::UNBOUND,
-            LiveDeclaration {
+        let live_declarations = symbol_states
+            .declarations
+            .entry(None, ScopedDefinitionId::UNBOUND)
+            .replace(LiveDeclaration {
                 visibility_constraint: scope_start_visibility,
-            },
-        );
+            });
         Self { live_declarations }
     }
 
@@ -105,13 +104,13 @@ impl SymbolDeclarations {
         declaration: ScopedDefinitionId,
     ) {
         // The new declaration replaces all previous live declaration in this path.
-        self.live_declarations = symbol_states.declarations.insert(
-            None,
-            declaration,
-            LiveDeclaration {
-                visibility_constraint: ScopedVisibilityConstraintId::ALWAYS_TRUE,
-            },
-        );
+        self.live_declarations =
+            symbol_states
+                .declarations
+                .entry(None, declaration)
+                .replace(LiveDeclaration {
+                    visibility_constraint: ScopedVisibilityConstraintId::ALWAYS_TRUE,
+                });
     }
 
     /// Add given visibility constraint to all live declarations.
@@ -132,7 +131,9 @@ impl SymbolDeclarations {
 
     /// Return an iterator over live declarations for this symbol.
     pub(super) fn iter(self, symbol_states: &SymbolStatesStorage) -> LiveDeclarationsIterator<'_> {
-        symbol_states.declarations.iter(self.live_declarations)
+        symbol_states
+            .declarations
+            .iter_reverse(self.live_declarations)
     }
 
     fn simplify_visibility_constraints(
@@ -143,11 +144,11 @@ impl SymbolDeclarations {
         // If the set of live declarations hasn't changed, don't simplify.
         let self_declarations = symbol_states
             .declarations
-            .iter(self.live_declarations)
+            .iter_reverse(self.live_declarations)
             .map(|(declaration, _)| *declaration);
         let other_declarations = symbol_states
             .declarations
-            .iter(other.live_declarations)
+            .iter_reverse(other.live_declarations)
             .map(|(declaration, _)| *declaration);
         if !self_declarations.eq(other_declarations) {
             return;
@@ -164,7 +165,7 @@ impl SymbolDeclarations {
         visibility_constraints: &mut VisibilityConstraintsBuilder,
         other: Self,
     ) {
-        self.live_declarations = symbol_states.declarations.union(
+        self.live_declarations = symbol_states.declarations.union_with(
             self.live_declarations,
             other.live_declarations,
             |a, b| {
@@ -194,21 +195,20 @@ pub(super) struct LiveBinding {
 }
 
 pub(super) type LiveBindingsIterator<'a> =
-    ListIterator<'a, LiveBindingsId, ScopedDefinitionId, LiveBinding>;
+    ListReverseIterator<'a, LiveBindingsId, ScopedDefinitionId, LiveBinding>;
 
 impl SymbolBindings {
     fn unbound(
         symbol_states: &mut SymbolStatesBuilder,
         scope_start_visibility: ScopedVisibilityConstraintId,
     ) -> Self {
-        let live_bindings = symbol_states.bindings.insert(
-            None,
-            ScopedDefinitionId::UNBOUND,
-            LiveBinding {
+        let live_bindings = symbol_states
+            .bindings
+            .entry(None, ScopedDefinitionId::UNBOUND)
+            .replace(LiveBinding {
                 narrowing_constraint: None,
                 visibility_constraint: scope_start_visibility,
-            },
-        );
+            });
         Self { live_bindings }
     }
 
@@ -221,14 +221,13 @@ impl SymbolBindings {
     ) {
         // The new binding replaces all previous live bindings in this path, and has no
         // constraints.
-        self.live_bindings = symbol_states.bindings.insert(
-            None,
-            binding,
-            LiveBinding {
+        self.live_bindings = symbol_states
+            .bindings
+            .entry(None, binding)
+            .replace(LiveBinding {
                 narrowing_constraint: None,
                 visibility_constraint,
-            },
-        );
+            });
     }
 
     /// Add given constraint to all live bindings.
@@ -267,7 +266,7 @@ impl SymbolBindings {
 
     /// Iterate over currently live bindings for this symbol
     pub(super) fn iter(self, symbol_states: &SymbolStatesStorage) -> LiveBindingsIterator<'_> {
-        symbol_states.bindings.iter(self.live_bindings)
+        symbol_states.bindings.iter_reverse(self.live_bindings)
     }
 
     fn simplify_visibility_constraints(
@@ -278,11 +277,11 @@ impl SymbolBindings {
         // If the set of live bindings hasn't changed, don't simplify.
         let self_bindings = symbol_states
             .bindings
-            .iter(self.live_bindings)
+            .iter_reverse(self.live_bindings)
             .map(|(binding, _)| *binding);
         let other_bindings = symbol_states
             .bindings
-            .iter(other.live_bindings)
+            .iter_reverse(other.live_bindings)
             .map(|(binding, _)| *binding);
         if !self_bindings.eq(other_bindings) {
             return;
@@ -290,7 +289,7 @@ impl SymbolBindings {
 
         // We can't just copy other.live_bindings, since the narrowing constraints might be
         // different.
-        self.live_bindings = symbol_states.bindings.intersect(
+        self.live_bindings = symbol_states.bindings.intersect_with(
             self.live_bindings,
             other.live_bindings,
             |binding, other_binding| LiveBinding {
@@ -310,7 +309,7 @@ impl SymbolBindings {
         self.live_bindings =
             symbol_states
                 .bindings
-                .union(self.live_bindings, other.live_bindings, |a, b| {
+                .union_with(self.live_bindings, other.live_bindings, |a, b| {
                     // If the same definition is visible through both paths, any constraint
                     // that applies on only one path is irrelevant to the resulting type from
                     // unioning the two paths, so we intersect the constraints.
@@ -488,7 +487,7 @@ mod tests {
     ) {
         let actual = symbol_states
             .bindings
-            .iter(symbol.bindings.live_bindings)
+            .iter_reverse(symbol.bindings.live_bindings)
             .map(|(def_id, live_binding)| {
                 let def = if *def_id == ScopedDefinitionId::UNBOUND {
                     "unbound".into()
@@ -514,7 +513,7 @@ mod tests {
     ) {
         let actual = symbol_states
             .declarations
-            .iter(symbol.declarations.live_declarations)
+            .iter_reverse(symbol.declarations.live_declarations)
             .map(|(declaration, _)| {
                 if *declaration == ScopedDefinitionId::UNBOUND {
                     "undeclared".into()
