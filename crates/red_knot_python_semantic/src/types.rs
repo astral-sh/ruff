@@ -2284,44 +2284,6 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Return the outcome of calling an class/instance attribute of this type
-    /// using descriptor protocol.
-    ///
-    /// `receiver_ty` must be `Type::Instance(_)` or `Type::ClassLiteral`.
-    ///
-    /// TODO: handle `super()` objects properly
-    fn try_call_bound(
-        self,
-        db: &'db dyn Db,
-        receiver_ty: &Type<'db>,
-        arguments: &CallArguments<'_, 'db>,
-    ) -> Result<CallOutcome<'db>, CallError<'db>> {
-        match self {
-            Type::FunctionLiteral(..) => {
-                // Functions are always descriptors, so this would effectively call
-                // the function with the instance as the first argument
-                self.try_call(db, &arguments.with_self(*receiver_ty))
-            }
-
-            Type::Instance(_) | Type::ClassLiteral(_) => self.try_call(db, arguments),
-
-            Type::Union(union) => CallOutcome::try_call_union(db, union, |element| {
-                element.try_call_bound(db, receiver_ty, arguments)
-            }),
-
-            Type::Intersection(_) => Ok(CallOutcome::Single(CallBinding::from_return_type(
-                todo_type!("Type::Intersection.call_bound()"),
-            ))),
-
-            // Cases that duplicate, and thus must be kept in sync with, `Type::call()`
-            Type::Dynamic(_) => Ok(CallOutcome::Single(CallBinding::from_return_type(self))),
-
-            _ => Err(CallError::NotCallable {
-                not_callable_type: self,
-            }),
-        }
-    }
-
     /// Look up a dunder method on the meta type of `self` and call it.
     ///
     /// Returns an `Err` if the dunder method can't be called,
@@ -2332,13 +2294,24 @@ impl<'db> Type<'db> {
         name: &str,
         arguments: &CallArguments<'_, 'db>,
     ) -> Result<CallOutcome<'db>, CallDunderError<'db>> {
-        match self.to_meta_type(db).member(db, name) {
-            Symbol::Type(callable_ty, Boundness::Bound) => {
-                Ok(callable_ty.try_call_bound(db, &self, arguments)?)
-            }
-            Symbol::Type(callable_ty, Boundness::PossiblyUnbound) => {
-                let call = callable_ty.try_call_bound(db, &self, arguments)?;
-                Err(CallDunderError::PossiblyUnbound(call))
+        let meta_type = self.to_meta_type(db);
+
+        match meta_type.static_member(db, name) {
+            Symbol::Type(callable_ty, boundness) => {
+                // Dunder methods are looked up on the meta type, but they invoke the descriptor
+                // protocol *as if they had been called on the instance itself*. This is why we
+                // pass `Some(self)` for the `instance` argument here.
+                let callable_ty = callable_ty
+                    .try_call_dunder_get(db, Some(self), meta_type)
+                    .unwrap_or(callable_ty);
+
+                let result = callable_ty.try_call(db, arguments)?;
+
+                if boundness == Boundness::Bound {
+                    Ok(result)
+                } else {
+                    Err(CallDunderError::PossiblyUnbound(result))
+                }
             }
             Symbol::Unbound => Err(CallDunderError::MethodNotAvailable),
         }
