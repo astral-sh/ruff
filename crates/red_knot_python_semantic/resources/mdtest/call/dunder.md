@@ -63,13 +63,12 @@ reveal_type(class_with_normal_dunder[0])  # revealed: str
 Which can be demonstrated by trying to attach a dunder method to an instance, which will not work:
 
 ```py
-def some_function(instance, key: int) -> str:
+def external_getitem(instance, key: int) -> str:
     return str(key)
 
 class ThisFails:
     def __init__(self):
-        self.__getitem__ = some_function
-        self.function = some_function
+        self.__getitem__ = external_getitem
 
 this_fails = ThisFails()
 
@@ -77,14 +76,14 @@ this_fails = ThisFails()
 reveal_type(this_fails[0])  # revealed: Unknown
 ```
 
-This is in contrast to regular functions, which *can* be attached to instances:
+However, the attached dunder method *can* be called if accessed directly:
 
 ```py
-# TODO: `this_fails.function` is incorrectly treated as a bound method. This
+# TODO: `this_fails.__getitem__` is incorrectly treated as a bound method. This
 # should be fixed with https://github.com/astral-sh/ruff/issues/16367
 # error: [too-many-positional-arguments]
 # error: [invalid-argument-type]
-reveal_type(this_fails.function(this_fails, 0))  # revealed: Unknown | str
+reveal_type(this_fails.__getitem__(this_fails, 0))  # revealed: Unknown | str
 ```
 
 ## When the dunder is not a method
