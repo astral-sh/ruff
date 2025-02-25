@@ -430,7 +430,7 @@ pub fn lint_only(
     );
 
     let syntax_errors = if settings.preview.is_enabled() {
-        parsed.syntax_errors()
+        parsed.unsupported_syntax_errors()
     } else {
         &[]
     };
@@ -452,7 +452,7 @@ pub fn lint_only(
 fn diagnostics_to_messages(
     diagnostics: Vec<Diagnostic>,
     parse_errors: &[ParseError],
-    syntax_errors: &[UnsupportedSyntaxError],
+    unsupported_syntax_errors: &[UnsupportedSyntaxError],
     path: &Path,
     locator: &Locator,
     directives: &Directives,
@@ -471,11 +471,9 @@ fn diagnostics_to_messages(
     parse_errors
         .iter()
         .map(|parse_error| Message::from_parse_error(parse_error, locator, file.deref().clone()))
-        .chain(
-            syntax_errors
-                .iter()
-                .map(|syntax_error| Message::from_syntax_error(syntax_error, file.deref().clone())),
-        )
+        .chain(unsupported_syntax_errors.iter().map(|syntax_error| {
+            Message::from_unsupported_syntax_error(syntax_error, file.deref().clone())
+        }))
         .chain(diagnostics.into_iter().map(|diagnostic| {
             let noqa_offset = directives.noqa_line_for.resolve(diagnostic.start());
             Message::from_diagnostic(diagnostic, file.deref().clone(), noqa_offset)
@@ -589,7 +587,7 @@ pub fn lint_fix<'a>(
         }
 
         let syntax_errors = if settings.preview.is_enabled() {
-            parsed.syntax_errors()
+            parsed.unsupported_syntax_errors()
         } else {
             &[]
         };

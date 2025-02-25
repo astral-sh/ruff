@@ -2266,7 +2266,7 @@ impl<'src> Parser<'src> {
         let range = self.node_range(start);
 
         if self.options.target_version < PythonVersion::PY310 {
-            self.syntax_errors.push(UnsupportedSyntaxError {
+            self.unsupported_syntax_errors.push(UnsupportedSyntaxError {
                 kind: UnsupportedSyntaxErrorKind::MatchBeforePy310,
                 range,
                 target_version: self.options.target_version,

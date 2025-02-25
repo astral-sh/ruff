@@ -121,11 +121,14 @@ impl Message {
         })
     }
 
-    /// Create a [`Message`] from the given [`SyntaxError`].
-    pub fn from_syntax_error(syntax_error: &UnsupportedSyntaxError, file: SourceFile) -> Message {
+    /// Create a [`Message`] from the given [`UnsupportedSyntaxError`].
+    pub fn from_unsupported_syntax_error(
+        unsupported_syntax_error: &UnsupportedSyntaxError,
+        file: SourceFile,
+    ) -> Message {
         Message::SyntaxError(SyntaxErrorMessage {
-            message: format!("SyntaxError: {syntax_error}"),
-            range: syntax_error.range,
+            message: format!("SyntaxError: {unsupported_syntax_error}"),
+            range: unsupported_syntax_error.range,
             file,
         })
     }

@@ -37,7 +37,7 @@ pub(crate) struct Parser<'src> {
     errors: Vec<ParseError>,
 
     /// Stores non-fatal syntax errors found during parsing, such as version-related errors.
-    syntax_errors: Vec<UnsupportedSyntaxError>,
+    unsupported_syntax_errors: Vec<UnsupportedSyntaxError>,
 
     /// Options for how the code will be parsed.
     options: ParseOptions,
@@ -74,7 +74,7 @@ impl<'src> Parser<'src> {
             options,
             source,
             errors: Vec::new(),
-            syntax_errors: Vec::new(),
+            unsupported_syntax_errors: Vec::new(),
             tokens,
             recovery_context: RecoveryContext::empty(),
             prev_token_end: TextSize::new(0),
@@ -171,7 +171,7 @@ impl<'src> Parser<'src> {
                 syntax,
                 tokens: Tokens::new(tokens),
                 errors: parse_errors,
-                syntax_errors: self.syntax_errors,
+                unsupported_syntax_errors: self.unsupported_syntax_errors,
             };
         }
 
@@ -203,7 +203,7 @@ impl<'src> Parser<'src> {
             syntax,
             tokens: Tokens::new(tokens),
             errors: merged,
-            syntax_errors: self.syntax_errors,
+            unsupported_syntax_errors: self.unsupported_syntax_errors,
         }
     }
 

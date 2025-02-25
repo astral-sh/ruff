@@ -207,9 +207,10 @@ fn run_test(
                 })
                 .collect();
 
-            diagnostics.extend(parsed.syntax_errors().iter().map(|error| {
-                let diagnostic: Box<dyn Diagnostic> =
-                    Box::new(SyntaxDiagnostic::from_syntax_error(error, test_file.file));
+            diagnostics.extend(parsed.unsupported_syntax_errors().iter().map(|error| {
+                let diagnostic: Box<dyn Diagnostic> = Box::new(
+                    SyntaxDiagnostic::from_unsupported_syntax_error(error, test_file.file),
+                );
                 diagnostic
             }));
 

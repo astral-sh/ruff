@@ -308,7 +308,7 @@ pub struct Parsed<T> {
     syntax: T,
     tokens: Tokens,
     errors: Vec<ParseError>,
-    syntax_errors: Vec<UnsupportedSyntaxError>,
+    unsupported_syntax_errors: Vec<UnsupportedSyntaxError>,
 }
 
 impl<T> Parsed<T> {
@@ -328,8 +328,8 @@ impl<T> Parsed<T> {
     }
 
     /// Returns a list of version-related syntax errors found during parsing.
-    pub fn syntax_errors(&self) -> &[UnsupportedSyntaxError] {
-        &self.syntax_errors
+    pub fn unsupported_syntax_errors(&self) -> &[UnsupportedSyntaxError] {
+        &self.unsupported_syntax_errors
     }
 
     /// Consumes the [`Parsed`] output and returns the contained syntax node.
@@ -382,7 +382,7 @@ impl Parsed<Mod> {
                 syntax: module,
                 tokens: self.tokens,
                 errors: self.errors,
-                syntax_errors: self.syntax_errors,
+                unsupported_syntax_errors: self.unsupported_syntax_errors,
             }),
             Mod::Expression(_) => None,
         }
@@ -402,7 +402,7 @@ impl Parsed<Mod> {
                 syntax: expression,
                 tokens: self.tokens,
                 errors: self.errors,
-                syntax_errors: self.syntax_errors,
+                unsupported_syntax_errors: self.unsupported_syntax_errors,
             }),
         }
     }

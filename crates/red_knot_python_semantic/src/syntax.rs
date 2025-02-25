@@ -32,7 +32,7 @@ impl Diagnostic for SyntaxDiagnostic {
 }
 
 impl SyntaxDiagnostic {
-    pub fn from_syntax_error(value: &UnsupportedSyntaxError, file: File) -> Self {
+    pub fn from_unsupported_syntax_error(value: &UnsupportedSyntaxError, file: File) -> Self {
         Self {
             id: DiagnosticId::InvalidSyntax,
             message: value.to_string(),
