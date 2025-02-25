@@ -16,7 +16,7 @@ use super::helpers;
 /// It's unnecessary to use a list or tuple literal within a call to `dict()`.
 /// It can be rewritten as a dict literal (`{}`).
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// dict([(1, 2), (3, 4)])
 /// dict(((1, 2), (3, 4)))

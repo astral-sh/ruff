@@ -19,7 +19,7 @@ use crate::checkers::ast::Checker;
 /// Note, however, that `np.bool` and `np.long` were reintroduced in 2.0 with
 /// different semantics, and are thus omitted from this rule.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// import numpy as np
 ///

@@ -25,7 +25,7 @@ use super::helpers;
 /// `set(x for x in foo)`, it's better to use `set(foo)` directly, since it's
 /// even more direct.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// set(f(x) for x in foo)
 /// set(x for x in foo)

@@ -17,7 +17,7 @@ use crate::checkers::ast::Checker;
 /// without having to check if the dictionary contains the relevant key,
 /// returning `None` if the key is not present.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// if "key" in dct and dct["key"]:
 ///     ...

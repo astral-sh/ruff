@@ -15,7 +15,7 @@ use crate::checkers::ast::Checker;
 /// Using the generator more than once will do nothing on the second usage.
 /// If that data is needed later, it should be stored as a list.
 ///
-/// ## Examples:
+/// ## Example:
 /// ```python
 /// import itertools
 ///
