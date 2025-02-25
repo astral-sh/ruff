@@ -540,13 +540,13 @@ fn symbol_from_bindings_impl<'db>(
 ) -> Symbol<'db> {
     let predicates = bindings_with_constraints.predicates;
     let visibility_constraints = bindings_with_constraints.visibility_constraints;
-    let mut bindings_with_constraints = bindings_with_constraints.peekable();
+    let bindings_with_constraints: Vec<_> = bindings_with_constraints.collect();
 
     let is_non_exported = |binding: Definition<'db>| {
         requires_explicit_reexport.is_yes() && !binding.is_reexported(db)
     };
 
-    let unbound_visibility = match bindings_with_constraints.peek() {
+    let unbound_visibility = match bindings_with_constraints.last() {
         Some(BindingWithConstraints {
             binding,
             visibility_constraint,
@@ -557,76 +557,66 @@ fn symbol_from_bindings_impl<'db>(
         _ => Truthiness::AlwaysFalse,
     };
 
-    let mut types: Vec<_> = bindings_with_constraints
-        .filter_map(
-            |BindingWithConstraints {
-                 binding,
-                 narrowing_constraint,
-                 visibility_constraint,
-             }| {
-                let binding = binding?;
+    let mut types = bindings_with_constraints.into_iter().rev().filter_map(
+        |BindingWithConstraints {
+             binding,
+             narrowing_constraint,
+             visibility_constraint,
+         }| {
+            let binding = binding?;
 
-                if is_non_exported(binding) {
-                    return None;
-                }
+            if is_non_exported(binding) {
+                return None;
+            }
 
-                let static_visibility =
-                    visibility_constraints.evaluate(db, predicates, visibility_constraint);
+            let static_visibility =
+                visibility_constraints.evaluate(db, predicates, visibility_constraint);
 
-                if static_visibility.is_always_false() {
-                    return None;
-                }
+            if static_visibility.is_always_false() {
+                return None;
+            }
 
-                let constraint_tys: Vec<_> = narrowing_constraint
-                    .filter_map(|predicate| infer_narrowing_constraint(db, predicate, binding))
-                    .collect();
+            let constraint_tys: Vec<_> = narrowing_constraint
+                .filter_map(|constraint| infer_narrowing_constraint(db, constraint, binding))
+                .collect();
 
-                let binding_ty = binding_type(db, binding);
-                if constraint_tys.is_empty() {
-                    Some(binding_ty)
-                } else {
-                    let intersection_ty = constraint_tys
-                        .into_iter()
-                        .rev()
-                        .fold(
-                            IntersectionBuilder::new(db).add_positive(binding_ty),
-                            IntersectionBuilder::add_positive,
-                        )
-                        .build();
-                    Some(intersection_ty)
-                }
-            },
-        )
-        .collect();
+            let binding_ty = binding_type(db, binding);
+            if constraint_tys.is_empty() {
+                Some(binding_ty)
+            } else {
+                let intersection_ty = constraint_tys
+                    .into_iter()
+                    .rev()
+                    .fold(
+                        IntersectionBuilder::new(db).add_positive(binding_ty),
+                        IntersectionBuilder::add_positive,
+                    )
+                    .build();
+                Some(intersection_ty)
+            }
+        },
+    );
 
-    // The bindings iterator is in reverse order, so popping the last element from the collected
-    // vector gives us (the type of) the first binding.
-    let Some(first) = types.pop() else {
-        return Symbol::Unbound;
-    };
+    if let Some(first) = types.next() {
+        let boundness = match unbound_visibility {
+            Truthiness::AlwaysTrue => {
+                unreachable!("If we have at least one binding, the scope-start should not be definitely visible")
+            }
+            Truthiness::AlwaysFalse => Boundness::Bound,
+            Truthiness::Ambiguous => Boundness::PossiblyUnbound,
+        };
 
-    let boundness = match unbound_visibility {
-        Truthiness::AlwaysTrue => {
-            unreachable!(
-                "If we have at least one binding, the scope-start should not be definitely visible"
+        if let Some(second) = types.next() {
+            Symbol::Type(
+                UnionType::from_elements(db, [first, second].into_iter().chain(types)),
+                boundness,
             )
+        } else {
+            Symbol::Type(first, boundness)
         }
-        Truthiness::AlwaysFalse => Boundness::Bound,
-        Truthiness::Ambiguous => Boundness::PossiblyUnbound,
-    };
-
-    if types.is_empty() {
-        return Symbol::Type(first, boundness);
+    } else {
+        Symbol::Unbound
     }
-
-    Symbol::Type(
-        types
-            .into_iter()
-            .rev()
-            .fold(UnionBuilder::new(db).add(first), UnionBuilder::add)
-            .build(),
-        boundness,
-    )
 }
 
 /// Implementation of [`symbol_from_declarations`].
@@ -641,13 +631,13 @@ fn symbol_from_declarations_impl<'db>(
 ) -> SymbolFromDeclarationsResult<'db> {
     let predicates = declarations.predicates;
     let visibility_constraints = declarations.visibility_constraints;
-    let mut declarations = declarations.peekable();
+    let declarations: Vec<_> = declarations.collect();
 
     let is_non_exported = |declaration: Definition<'db>| {
         requires_explicit_reexport.is_yes() && !declaration.is_reexported(db)
     };
 
-    let undeclared_visibility = match declarations.peek() {
+    let undeclared_visibility = match declarations.last() {
         Some(DeclarationWithConstraint {
             declaration,
             visibility_constraint,
@@ -657,77 +647,70 @@ fn symbol_from_declarations_impl<'db>(
         _ => Truthiness::AlwaysFalse,
     };
 
-    let mut types: Vec<_> = declarations
-        .filter_map(
-            |DeclarationWithConstraint {
-                 declaration,
-                 visibility_constraint,
-             }| {
-                let declaration = declaration?;
+    let mut types = declarations.into_iter().rev().filter_map(
+        |DeclarationWithConstraint {
+             declaration,
+             visibility_constraint,
+         }| {
+            let declaration = declaration?;
 
-                if is_non_exported(declaration) {
-                    return None;
+            if is_non_exported(declaration) {
+                return None;
+            }
+
+            let static_visibility =
+                visibility_constraints.evaluate(db, predicates, visibility_constraint);
+
+            if static_visibility.is_always_false() {
+                None
+            } else {
+                Some(declaration_type(db, declaration))
+            }
+        },
+    );
+
+    if let Some(first) = types.next() {
+        let mut conflicting: Vec<Type<'db>> = vec![];
+        let declared_ty = if let Some(second) = types.next() {
+            let ty_first = first.inner_type();
+            let mut qualifiers = first.qualifiers();
+
+            let mut builder = UnionBuilder::new(db).add(ty_first);
+            for other in std::iter::once(second).chain(types) {
+                let other_ty = other.inner_type();
+                if !ty_first.is_equivalent_to(db, other_ty) {
+                    conflicting.push(other_ty);
                 }
-
-                let static_visibility =
-                    visibility_constraints.evaluate(db, predicates, visibility_constraint);
-
-                if static_visibility.is_always_false() {
-                    None
-                } else {
-                    Some(declaration_type(db, declaration))
+                builder = builder.add(other_ty);
+                qualifiers = qualifiers.union(other.qualifiers());
+            }
+            TypeAndQualifiers::new(builder.build(), qualifiers)
+        } else {
+            first
+        };
+        if conflicting.is_empty() {
+            let boundness = match undeclared_visibility {
+                Truthiness::AlwaysTrue => {
+                    unreachable!("If we have at least one declaration, the scope-start should not be definitely visible")
                 }
-            },
-        )
-        .collect();
+                Truthiness::AlwaysFalse => Boundness::Bound,
+                Truthiness::Ambiguous => Boundness::PossiblyUnbound,
+            };
 
-    // The bindings iterator is in reverse order, so popping the last element from the collected
-    // vector gives us the first binding.
-    let Some(first) = types.pop() else {
-        return Ok(Symbol::Unbound.into());
-    };
-
-    let boundness = match undeclared_visibility {
-        Truthiness::AlwaysTrue => {
-            unreachable!("If we have at least one declaration, the scope-start should not be definitely visible")
+            Ok(SymbolAndQualifiers(
+                Symbol::Type(declared_ty.inner_type(), boundness),
+                declared_ty.qualifiers(),
+            ))
+        } else {
+            Err((
+                declared_ty,
+                std::iter::once(first.inner_type())
+                    .chain(conflicting)
+                    .collect(),
+            ))
         }
-        Truthiness::AlwaysFalse => Boundness::Bound,
-        Truthiness::Ambiguous => Boundness::PossiblyUnbound,
-    };
-
-    if types.is_empty() {
-        return Ok(SymbolAndQualifiers(
-            Symbol::Type(first.inner_type(), boundness),
-            first.qualifiers(),
-        ));
-    }
-
-    let mut conflicting: Vec<Type<'db>> = vec![];
-    let ty_first = first.inner_type();
-    let mut qualifiers = first.qualifiers();
-
-    let mut builder = UnionBuilder::new(db).add(ty_first);
-    for other in types.into_iter().rev() {
-        let other_ty = other.inner_type();
-        if !ty_first.is_equivalent_to(db, other_ty) {
-            conflicting.push(other_ty);
-        }
-        builder = builder.add(other_ty);
-        qualifiers = qualifiers.union(other.qualifiers());
-    }
-    let declared_ty = builder.build();
-
-    if conflicting.is_empty() {
-        Ok(SymbolAndQualifiers(
-            Symbol::Type(declared_ty, boundness),
-            qualifiers,
-        ))
     } else {
-        conflicting.insert(0, ty_first);
-        Err((
-            TypeAndQualifiers::new(declared_ty, qualifiers),
-            conflicting.into(),
-        ))
+        Ok(Symbol::Unbound.into())
     }
 }
 
