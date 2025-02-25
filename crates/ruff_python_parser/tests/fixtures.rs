@@ -33,12 +33,8 @@ fn inline_err() {
 /// Asserts that the parser generates no syntax errors for a valid program.
 /// Snapshots the AST.
 fn test_valid_syntax(input_path: &Path) {
-    let options_path = input_path.with_extension("options.json");
-    let options = fs::read_to_string(options_path)
-        .ok()
-        .and_then(|s| serde_json::from_str(&s).ok())
-        .unwrap_or_else(|| ParseOptions::from(Mode::Module));
     let source = fs::read_to_string(input_path).expect("Expected test file to exist");
+    let options = extract_options(&source).unwrap_or_else(|| ParseOptions::from(Mode::Module));
     let parsed = parse_unchecked(&source, options);
 
     if !parsed.is_valid() {
@@ -82,14 +78,10 @@ fn test_valid_syntax(input_path: &Path) {
 /// Assert that the parser generates at least one syntax error for the given input file.
 /// Snapshots the AST and the error messages.
 fn test_invalid_syntax(input_path: &Path) {
-    let options_path = input_path.with_extension("options.json");
-    let options = fs::read_to_string(options_path)
-        .ok()
-        .and_then(|s| serde_json::from_str(&s).ok())
-        .unwrap_or_else(|| {
-            ParseOptions::from(Mode::Module).with_target_version(PythonVersion::PY313)
-        });
     let source = fs::read_to_string(input_path).expect("Expected test file to exist");
+    let options = extract_options(&source).unwrap_or_else(|| {
+        ParseOptions::from(Mode::Module).with_target_version(PythonVersion::PY313)
+    });
     let parsed = parse_unchecked(&source, options);
 
     let is_valid = parsed.is_valid() && parsed.unsupported_syntax_errors().is_empty();
@@ -148,6 +140,20 @@ fn test_invalid_syntax(input_path: &Path) {
     }, {
         insta::assert_snapshot!(output);
     });
+}
+
+/// Extract [`ParseOptions`] from an initial pragma line, if present.
+///
+/// For example,
+///
+/// ```python
+/// # parse_options: { "target_version": "3.10" }
+/// def f(): ...
+fn extract_options(source: &str) -> Option<ParseOptions> {
+    // extract options from pragma on the first line
+    let header = source.lines().next()?;
+    let (_label, options) = header.split_once("# parse_options: ")?;
+    serde_json::from_str(options.trim()).ok()
 }
 
 // Test that is intentionally ignored by default.

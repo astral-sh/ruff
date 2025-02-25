@@ -7,14 +7,14 @@ input_file: crates/ruff_python_parser/resources/inline/ok/match_after_py310.py
 ```
 Module(
     ModModule {
-        range: 0..34,
+        range: 0..80,
         body: [
             Match(
                 StmtMatch {
-                    range: 0..33,
+                    range: 46..79,
                     subject: NumberLiteral(
                         ExprNumberLiteral {
-                            range: 6..7,
+                            range: 52..53,
                             value: Int(
                                 2,
                             ),
@@ -22,13 +22,13 @@ Module(
                     ),
                     cases: [
                         MatchCase {
-                            range: 13..33,
+                            range: 59..79,
                             pattern: MatchValue(
                                 PatternMatchValue {
-                                    range: 18..19,
+                                    range: 64..65,
                                     value: NumberLiteral(
                                         ExprNumberLiteral {
-                                            range: 18..19,
+                                            range: 64..65,
                                             value: Int(
                                                 1,
                                             ),
@@ -40,7 +40,7 @@ Module(
                             body: [
                                 Pass(
                                     StmtPass {
-                                        range: 29..33,
+                                        range: 75..79,
                                     },
                                 ),
                             ],
