@@ -771,6 +771,7 @@ mod tests {
             &source_kind,
             source_type,
             &parsed,
+            settings.unresolved_target_version,
         );
         diagnostics.sort_by_key(Ranged::start);
         let actual = diagnostics

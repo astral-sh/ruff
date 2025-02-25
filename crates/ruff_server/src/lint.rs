@@ -95,7 +95,7 @@ pub(crate) fn check(
     let source_type = query.source_type();
 
     let target_version = if let Some(path) = &document_path {
-        settings.linter.resolve_target_version(&path)
+        settings.linter.resolve_target_version(path)
     } else {
         settings.linter.unresolved_target_version
     };
@@ -132,6 +132,7 @@ pub(crate) fn check(
         &source_kind,
         source_type,
         &parsed,
+        target_version,
     );
 
     let noqa_edits = generate_noqa_edits(

@@ -71,6 +71,7 @@ pub fn check_path(
     source_kind: &SourceKind,
     source_type: PySourceType,
     parsed: &Parsed<ModModule>,
+    target_version: PythonVersion,
 ) -> Vec<Diagnostic> {
     // Aggregate all diagnostics.
     let mut diagnostics = vec![];
@@ -103,8 +104,6 @@ pub fn check_path(
             source_kind.as_ipy_notebook().map(Notebook::cell_offsets),
         ));
     }
-
-    let target_version = settings.resolve_target_version(path);
 
     // Run the filesystem-based rules.
     if settings
@@ -368,6 +367,7 @@ pub fn add_noqa_to_path(
         source_kind,
         source_type,
         &parsed,
+        target_version,
     );
 
     // Add any missing `# noqa` pragmas.
@@ -427,6 +427,7 @@ pub fn lint_only(
         source_kind,
         source_type,
         &parsed,
+        target_version,
     );
 
     let syntax_errors = if settings.preview.is_enabled() {
@@ -541,6 +542,7 @@ pub fn lint_fix<'a>(
             &transformed,
             source_type,
             &parsed,
+            target_version,
         );
 
         if iterations == 0 {
