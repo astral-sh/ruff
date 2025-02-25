@@ -5,7 +5,7 @@ use crate::types::diagnostic::{
     TOO_MANY_POSITIONAL_ARGUMENTS, UNKNOWN_ARGUMENT,
 };
 use crate::types::signatures::Parameter;
-use crate::types::{todo_type, UnionType};
+use crate::types::{todo_type, CallableType, UnionType};
 use ruff_db::diagnostic::{SecondaryDiagnosticMessage, Span};
 use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
@@ -137,6 +137,13 @@ pub(crate) fn bind_call<'db>(
     }
 }
 
+/// Describes a callable for the purposes of diagnostics.
+#[derive(Debug)]
+pub(crate) struct CallableDescriptor<'a> {
+    name: &'a str,
+    kind: &'a str,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct CallBinding<'db> {
     /// Type of the callable object (function, class...)
@@ -200,18 +207,43 @@ impl<'db> CallBinding<'db> {
         }
     }
 
-    fn callable_name(&self, db: &'db dyn Db) -> Option<&str> {
+    fn callable_descriptor(&self, db: &'db dyn Db) -> Option<CallableDescriptor> {
         match self.callable_ty {
-            Type::FunctionLiteral(function) => Some(function.name(db)),
-            Type::ClassLiteral(class_type) => Some(class_type.class().name(db)),
+            Type::FunctionLiteral(function) => Some(CallableDescriptor {
+                kind: "function",
+                name: function.name(db),
+            }),
+            Type::ClassLiteral(class_type) => Some(CallableDescriptor {
+                kind: "class",
+                name: class_type.class().name(db),
+            }),
+            Type::Callable(CallableType::BoundMethod(bound_method)) => Some(CallableDescriptor {
+                kind: "bound method",
+                name: bound_method.function(db).name(db),
+            }),
+            Type::Callable(CallableType::MethodWrapperDunderGet(function)) => {
+                Some(CallableDescriptor {
+                    kind: "method wrapper `__get__` of function",
+                    name: function.name(db),
+                })
+            }
+            Type::Callable(CallableType::WrapperDescriptorDunderGet) => Some(CallableDescriptor {
+                kind: "wrapper descriptor",
+                name: "FunctionType.__get__",
+            }),
             _ => None,
         }
     }
 
     pub(crate) fn report_diagnostics(&self, context: &InferContext<'db>, node: ast::AnyNodeRef) {
-        let callable_name = self.callable_name(context.db());
+        let callable_descriptor = self.callable_descriptor(context.db());
         for error in &self.errors {
-            error.report_diagnostic(context, node, self.callable_ty, callable_name);
+            error.report_diagnostic(
+                context,
+                node,
+                self.callable_ty,
+                callable_descriptor.as_ref(),
+            );
         }
     }
 
@@ -309,7 +341,7 @@ impl<'db> CallBindingError<'db> {
         context: &InferContext<'db>,
         node: ast::AnyNodeRef,
         callable_ty: Type<'db>,
-        callable_name: Option<&str>,
+        callable_descriptor: Option<&CallableDescriptor>,
     ) {
         match self {
             Self::InvalidArgumentType {
@@ -346,8 +378,8 @@ impl<'db> CallBindingError<'db> {
                     format_args!(
                         "Object of type `{provided_ty_display}` cannot be assigned to \
                         parameter {parameter}{}; expected type `{expected_ty_display}`",
-                        if let Some(callable_name) = callable_name {
-                            format!(" of function `{callable_name}`")
+                        if let Some(CallableDescriptor { kind, name }) = callable_descriptor {
+                            format!(" of {kind} `{name}`")
                         } else {
                             String::new()
                         }
@@ -367,8 +399,8 @@ impl<'db> CallBindingError<'db> {
                     format_args!(
                         "Too many positional arguments{}: expected \
                         {expected_positional_count}, got {provided_positional_count}",
-                        if let Some(callable_name) = callable_name {
-                            format!(" to function `{callable_name}`")
+                        if let Some(CallableDescriptor { kind, name }) = callable_descriptor {
+                            format!(" to {kind} `{name}`")
                         } else {
                             String::new()
                         }
@@ -383,8 +415,8 @@ impl<'db> CallBindingError<'db> {
                     node,
                     format_args!(
                         "No argument{s} provided for required parameter{s} {parameters}{}",
-                        if let Some(callable_name) = callable_name {
-                            format!(" of function `{callable_name}`")
+                        if let Some(CallableDescriptor { kind, name }) = callable_descriptor {
+                            format!(" of {kind} `{name}`")
                         } else {
                             String::new()
                         }
@@ -401,8 +433,8 @@ impl<'db> CallBindingError<'db> {
                     Self::get_node(node, *argument_index),
                     format_args!(
                         "Argument `{argument_name}` does not match any known parameter{}",
-                        if let Some(callable_name) = callable_name {
-                            format!(" of function `{callable_name}`")
+                        if let Some(CallableDescriptor { kind, name }) = callable_descriptor {
+                            format!(" of {kind} `{name}`")
                         } else {
                             String::new()
                         }
@@ -419,8 +451,8 @@ impl<'db> CallBindingError<'db> {
                     Self::get_node(node, *argument_index),
                     format_args!(
                         "Multiple values provided for parameter {parameter}{}",
-                        if let Some(callable_name) = callable_name {
-                            format!(" of function `{callable_name}`")
+                        if let Some(CallableDescriptor { kind, name }) = callable_descriptor {
+                            format!(" of {kind} `{name}`")
                         } else {
                             String::new()
                         }
