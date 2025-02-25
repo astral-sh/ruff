@@ -6448,6 +6448,7 @@ impl AnyNodeRef<'_> {
     }
 }
 
+/// See also [BoolOp](https://docs.python.org/3/library/ast.html#ast.BoolOp)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprBoolOp {
     pub range: ruff_text_size::TextRange,
@@ -6455,6 +6456,7 @@ pub struct ExprBoolOp {
     pub values: Vec<crate::Expr>,
 }
 
+/// See also [NamedExpr](https://docs.python.org/3/library/ast.html#ast.NamedExpr)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprNamed {
     pub range: ruff_text_size::TextRange,
@@ -6462,6 +6464,7 @@ pub struct ExprNamed {
     pub value: Box<crate::Expr>,
 }
 
+/// See also [BinOp](https://docs.python.org/3/library/ast.html#ast.BinOp)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprBinOp {
     pub range: ruff_text_size::TextRange,
@@ -6470,6 +6473,7 @@ pub struct ExprBinOp {
     pub right: Box<crate::Expr>,
 }
 
+/// See also [UnaryOp](https://docs.python.org/3/library/ast.html#ast.UnaryOp)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprUnaryOp {
     pub range: ruff_text_size::TextRange,
@@ -6477,6 +6481,7 @@ pub struct ExprUnaryOp {
     pub operand: Box<crate::Expr>,
 }
 
+/// See also [Lambda](https://docs.python.org/3/library/ast.html#ast.Lambda)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprLambda {
     pub range: ruff_text_size::TextRange,
@@ -6484,6 +6489,7 @@ pub struct ExprLambda {
     pub body: Box<crate::Expr>,
 }
 
+/// See also [IfExp](https://docs.python.org/3/library/ast.html#ast.IfExp)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprIf {
     pub range: ruff_text_size::TextRange,
@@ -6492,18 +6498,21 @@ pub struct ExprIf {
     pub orelse: Box<crate::Expr>,
 }
 
+/// See also [Dict](https://docs.python.org/3/library/ast.html#ast.Dict)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprDict {
     pub range: ruff_text_size::TextRange,
     pub items: Vec<crate::DictItem>,
 }
 
+/// See also [Set](https://docs.python.org/3/library/ast.html#ast.Set)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprSet {
     pub range: ruff_text_size::TextRange,
     pub elts: Vec<crate::Expr>,
 }
 
+/// See also [ListComp](https://docs.python.org/3/library/ast.html#ast.ListComp)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprListComp {
     pub range: ruff_text_size::TextRange,
@@ -6511,6 +6520,7 @@ pub struct ExprListComp {
     pub generators: Vec<crate::Comprehension>,
 }
 
+/// See also [SetComp](https://docs.python.org/3/library/ast.html#ast.SetComp)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprSetComp {
     pub range: ruff_text_size::TextRange,
@@ -6518,6 +6528,7 @@ pub struct ExprSetComp {
     pub generators: Vec<crate::Comprehension>,
 }
 
+/// See also [DictComp](https://docs.python.org/3/library/ast.html#ast.DictComp)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprDictComp {
     pub range: ruff_text_size::TextRange,
@@ -6526,6 +6537,7 @@ pub struct ExprDictComp {
     pub generators: Vec<crate::Comprehension>,
 }
 
+/// See also [GeneratorExp](https://docs.python.org/3/library/ast.html#ast.GeneratorExp)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprGenerator {
     pub range: ruff_text_size::TextRange,
@@ -6534,24 +6546,28 @@ pub struct ExprGenerator {
     pub parenthesized: bool,
 }
 
+/// See also [Await](https://docs.python.org/3/library/ast.html#ast.Await)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprAwait {
     pub range: ruff_text_size::TextRange,
     pub value: Box<crate::Expr>,
 }
 
+/// See also [Yield](https://docs.python.org/3/library/ast.html#ast.Yield)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprYield {
     pub range: ruff_text_size::TextRange,
     pub value: Option<Box<crate::Expr>>,
 }
 
+/// See also [YieldFrom](https://docs.python.org/3/library/ast.html#ast.YieldFrom)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprYieldFrom {
     pub range: ruff_text_size::TextRange,
     pub value: Box<crate::Expr>,
 }
 
+/// See also [Compare](https://docs.python.org/3/library/ast.html#ast.Compare)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprCompare {
     pub range: ruff_text_size::TextRange,
@@ -6560,6 +6576,7 @@ pub struct ExprCompare {
     pub comparators: Box<[Expr]>,
 }
 
+/// See also [Call](https://docs.python.org/3/library/ast.html#ast.Call)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprCall {
     pub range: ruff_text_size::TextRange,
@@ -6567,18 +6584,30 @@ pub struct ExprCall {
     pub arguments: crate::Arguments,
 }
 
+/// An AST node that represents either a single-part f-string literal
+/// or an implicitly concatenated f-string literal.
+///
+/// This type differs from the original Python AST ([JoinedStr]) in that it
+/// doesn't join the implicitly concatenated parts into a single string. Instead,
+/// it keeps them separate and provide various methods to access the parts.
+///
+/// [JoinedStr]: https://docs.python.org/3/library/ast.html#ast.JoinedStr
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprFString {
     pub range: ruff_text_size::TextRange,
     pub value: crate::FStringValue,
 }
 
+/// An AST node that represents either a single-part string literal
+/// or an implicitly concatenated string literal.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprStringLiteral {
     pub range: ruff_text_size::TextRange,
     pub value: crate::StringLiteralValue,
 }
 
+/// An AST node that represents either a single-part bytestring literal
+/// or an implicitly concatenated bytestring literal.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprBytesLiteral {
     pub range: ruff_text_size::TextRange,
@@ -6607,6 +6636,7 @@ pub struct ExprEllipsisLiteral {
     pub range: ruff_text_size::TextRange,
 }
 
+/// See also [Attribute](https://docs.python.org/3/library/ast.html#ast.Attribute)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprAttribute {
     pub range: ruff_text_size::TextRange,
@@ -6615,6 +6645,7 @@ pub struct ExprAttribute {
     pub ctx: crate::ExprContext,
 }
 
+/// See also [Subscript](https://docs.python.org/3/library/ast.html#ast.Subscript)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprSubscript {
     pub range: ruff_text_size::TextRange,
@@ -6623,6 +6654,7 @@ pub struct ExprSubscript {
     pub ctx: crate::ExprContext,
 }
 
+/// See also [Starred](https://docs.python.org/3/library/ast.html#ast.Starred)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprStarred {
     pub range: ruff_text_size::TextRange,
@@ -6630,6 +6662,7 @@ pub struct ExprStarred {
     pub ctx: crate::ExprContext,
 }
 
+/// See also [Name](https://docs.python.org/3/library/ast.html#ast.Name)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprName {
     pub range: ruff_text_size::TextRange,
@@ -6637,6 +6670,7 @@ pub struct ExprName {
     pub ctx: crate::ExprContext,
 }
 
+/// See also [List](https://docs.python.org/3/library/ast.html#ast.List)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprList {
     pub range: ruff_text_size::TextRange,
@@ -6644,6 +6678,7 @@ pub struct ExprList {
     pub ctx: crate::ExprContext,
 }
 
+/// See also [Tuple](https://docs.python.org/3/library/ast.html#ast.Tuple)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprTuple {
     pub range: ruff_text_size::TextRange,
@@ -6652,6 +6687,7 @@ pub struct ExprTuple {
     pub parenthesized: bool,
 }
 
+/// See also [Slice](https://docs.python.org/3/library/ast.html#ast.Slice)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprSlice {
     pub range: ruff_text_size::TextRange,
@@ -6660,6 +6696,14 @@ pub struct ExprSlice {
     pub step: Option<Box<crate::Expr>>,
 }
 
+/// An AST node used to represent a IPython escape command at the expression level.
+///
+/// For example,
+/// ```python
+/// dir = !pwd
+///
+/// For more information related to terminology and syntax of escape commands,
+///  see [`StmtIpyEscapeCommand`].
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprIpyEscapeCommand {
     pub range: ruff_text_size::TextRange,
