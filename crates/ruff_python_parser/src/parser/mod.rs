@@ -11,7 +11,7 @@ use crate::parser::progress::{ParserProgress, TokenId};
 use crate::token::TokenValue;
 use crate::token_set::TokenSet;
 use crate::token_source::{TokenSource, TokenSourceCheckpoint};
-use crate::{Mode, ParseError, ParseErrorType, TokenKind};
+use crate::{Mode, ParseError, ParseErrorType, TokenKind, UnsupportedSyntaxErrorKind};
 use crate::{Parsed, Tokens};
 
 pub use crate::parser::options::ParseOptions;
@@ -436,6 +436,16 @@ impl<'src> Parser<'src> {
         }
 
         inner(&mut self.errors, error, ranged.range());
+    }
+
+    /// Add an [`UnsupportedSyntaxError`] with the given [`UnsupportedSyntaxErrorKind`] and
+    /// [`TextRange`].
+    fn add_unsupported_syntax_error(&mut self, kind: UnsupportedSyntaxErrorKind, range: TextRange) {
+        self.unsupported_syntax_errors.push(UnsupportedSyntaxError {
+            kind,
+            range,
+            target_version: self.options.target_version,
+        });
     }
 
     /// Returns `true` if the current token is of the given kind.
