@@ -262,6 +262,16 @@ class B:
 reveal_type(B() + B())  # revealed: Unknown | int
 ```
 
+Note that we union with `Unknown` here because `__add__` is not declared. We do infer just `int` if
+the callable is declared:
+
+```py
+class B2:
+    __add__: A = A()
+
+reveal_type(B2() + B2())  # revealed: int
+```
+
 ## Integration test: numbers from typeshed
 
 We get less precise results from binary operations on float/complex literals due to the special case
