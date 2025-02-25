@@ -52,12 +52,12 @@ Module(
     },
 )
 ```
-## Version-Related Errors
+## Unsupported Syntax Errors
 
   |
-1 |   # parse_options: { "target_version": "3.9" }
-2 | / match 2:
-3 | |     case 1:
-4 | |         pass
-  | |____________^ Syntax Error: Cannot use `match` statement on Python 3.9 (syntax was new in Python 3.10)
+1 | # parse_options: { "target_version": "3.9" }
+2 | match 2:
+  | ^^^^^ Syntax Error: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
+3 |     case 1:
+4 |         pass
   |
