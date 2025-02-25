@@ -336,6 +336,40 @@ pub(crate) enum CallBindingError<'db> {
 }
 
 impl<'db> CallBindingError<'db> {
+    fn parameter_span_from_index(
+        db: &'db dyn Db,
+        callable_ty: Type<'db>,
+        parameter_index: usize,
+    ) -> Option<Span> {
+        match callable_ty {
+            Type::FunctionLiteral(function) => {
+                let function_scope = function.body_scope(db);
+                let mut span = Span::from(function_scope.file(db));
+                let node = function_scope.node(db);
+                if let Some(func_def) = node.as_function() {
+                    let range = func_def
+                        .parameters
+                        .iter()
+                        .nth(parameter_index)
+                        .map(|param| param.range())
+                        .unwrap_or(func_def.parameters.range);
+                    span = span.with_range(range);
+                    Some(span)
+                } else {
+                    None
+                }
+            }
+            Type::Callable(CallableType::BoundMethod(bound_method)) => {
+                Self::parameter_span_from_index(
+                    db,
+                    Type::FunctionLiteral(bound_method.function(db)),
+                    parameter_index,
+                )
+            }
+            _ => None,
+        }
+    }
+
     pub(super) fn report_diagnostic(
         &self,
         context: &InferContext<'db>,
@@ -351,23 +385,13 @@ impl<'db> CallBindingError<'db> {
                 provided_ty,
             } => {
                 let mut messages = vec![];
-                if let Some(func_lit) = callable_ty.into_function_literal() {
-                    let func_lit_scope = func_lit.body_scope(context.db());
-                    let mut span = Span::from(func_lit_scope.file(context.db()));
-                    let node = func_lit_scope.node(context.db());
-                    if let Some(func_def) = node.as_function() {
-                        let range = func_def
-                            .parameters
-                            .iter()
-                            .nth(parameter.index)
-                            .map(|param| param.range())
-                            .unwrap_or(func_def.parameters.range);
-                        span = span.with_range(range);
-                        messages.push(SecondaryDiagnosticMessage::new(
-                            span,
-                            "parameter declared in function definition here",
-                        ));
-                    }
+                if let Some(span) =
+                    Self::parameter_span_from_index(context.db(), callable_ty, parameter.index)
+                {
+                    messages.push(SecondaryDiagnosticMessage::new(
+                        span,
+                        "parameter declared in function definition here",
+                    ));
                 }
 
                 let provided_ty_display = provided_ty.display(context.db());

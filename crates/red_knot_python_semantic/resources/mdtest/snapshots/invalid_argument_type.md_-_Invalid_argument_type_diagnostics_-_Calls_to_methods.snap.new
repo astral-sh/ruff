@@ -31,5 +31,12 @@ error: lint:invalid-argument-type
 6 | c.square("hello")  # error: [invalid-argument-type]
   |          ^^^^^^^ Object of type `Literal["hello"]` cannot be assigned to parameter 2 (`x`) of bound method `square`; expected type `int`
   |
+ ::: /src/mdtest_snippet.py:2:22
+  |
+1 | class C:
+2 |     def square(self, x: int) -> int:
+  |                      ------ info: parameter declared in function definition here
+3 |         return x * x
+  |
 
 ```
