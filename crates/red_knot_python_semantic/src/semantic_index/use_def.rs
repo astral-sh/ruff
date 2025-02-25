@@ -380,7 +380,7 @@ impl<'db> UseDefMap<'db> {
             predicates: &self.predicates,
             narrowing_constraints: &self.narrowing_constraints,
             visibility_constraints: &self.visibility_constraints,
-            inner: bindings.iter(&self.symbol_states),
+            inner: bindings.iter_reverse(&self.symbol_states),
         }
     }
 
@@ -392,7 +392,7 @@ impl<'db> UseDefMap<'db> {
             all_definitions: &self.all_definitions,
             predicates: &self.predicates,
             visibility_constraints: &self.visibility_constraints,
-            inner: declarations.iter(&self.symbol_states),
+            inner: declarations.iter_reverse(&self.symbol_states),
         }
     }
 }

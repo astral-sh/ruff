@@ -129,8 +129,11 @@ impl SymbolDeclarations {
                 });
     }
 
-    /// Return an iterator over live declarations for this symbol.
-    pub(super) fn iter(self, symbol_states: &SymbolStatesStorage) -> LiveDeclarationsIterator<'_> {
+    /// Return an iterator over live declarations for this symbol in reverse.
+    pub(super) fn iter_reverse(
+        self,
+        symbol_states: &SymbolStatesStorage,
+    ) -> LiveDeclarationsIterator<'_> {
         symbol_states
             .declarations
             .iter_reverse(self.live_declarations)
@@ -264,8 +267,11 @@ impl SymbolBindings {
                 });
     }
 
-    /// Iterate over currently live bindings for this symbol
-    pub(super) fn iter(self, symbol_states: &SymbolStatesStorage) -> LiveBindingsIterator<'_> {
+    /// Iterate over currently live bindings for this symbol in reverse
+    pub(super) fn iter_reverse(
+        self,
+        symbol_states: &SymbolStatesStorage,
+    ) -> LiveBindingsIterator<'_> {
         symbol_states.bindings.iter_reverse(self.live_bindings)
     }
 

@@ -578,7 +578,7 @@ fn symbol_from_bindings_impl<'db>(
                 }
 
                 let constraint_tys: Vec<_> = narrowing_constraint
-                    .filter_map(|constraint| infer_narrowing_constraint(db, constraint, binding))
+                    .filter_map(|predicate| infer_narrowing_constraint(db, predicate, binding))
                     .collect();
 
                 let binding_ty = binding_type(db, binding);
@@ -600,7 +600,7 @@ fn symbol_from_bindings_impl<'db>(
         .collect();
 
     // The bindings iterator is in reverse order, so popping the last element from the collected
-    // vector gives us the first binding.
+    // vector gives us (the type of) the first binding.
     let Some(first) = types.pop() else {
         return Symbol::Unbound;
     };
@@ -623,9 +623,7 @@ fn symbol_from_bindings_impl<'db>(
         types
             .into_iter()
             .rev()
-            .fold(UnionBuilder::new(db).add(first), |builder, element| {
-                builder.add(element)
-            })
+            .fold(UnionBuilder::new(db).add(first), UnionBuilder::add)
             .build(),
         boundness,
     )
