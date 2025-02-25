@@ -37,7 +37,9 @@ fn test_valid_syntax(input_path: &Path) {
     let options = extract_options(&source).unwrap_or_else(|| ParseOptions::from(Mode::Module));
     let parsed = parse_unchecked(&source, options);
 
-    if !parsed.is_valid() {
+    let is_valid = parsed.is_valid() && parsed.unsupported_syntax_errors().is_empty();
+
+    if !is_valid {
         let line_index = LineIndex::from_source_text(&source);
         let source_code = SourceCode::new(&source, &line_index);
 
