@@ -62,6 +62,13 @@ pub struct PyFormatOptions {
 
     /// Whether preview style formatting is enabled or not
     preview: PreviewMode,
+
+    /// Controls the quote style for f-strings in Python 3.12+. When enabled,
+    /// f-strings will use consistent quotes (following quote-style) even when nesting quotes,
+    /// leveraging Python 3.12's enhanced string handling capabilities.
+    /// When disabled (default), Ruff will alternate quotes inside f-strings for compatibility with
+    /// older Python versions.
+    f_string_consistent_quotes: FStringConsistentQuotes,
 }
 
 fn default_line_width() -> LineWidth {
@@ -91,6 +98,7 @@ impl Default for PyFormatOptions {
             docstring_code: DocstringCode::default(),
             docstring_code_line_width: DocstringCodeLineWidth::default(),
             preview: PreviewMode::default(),
+            f_string_consistent_quotes: FStringConsistentQuotes::default(),
         }
     }
 }
@@ -142,6 +150,10 @@ impl PyFormatOptions {
 
     pub const fn preview(&self) -> PreviewMode {
         self.preview
+    }
+
+    pub const fn f_string_consistent_quotes(&self) -> FStringConsistentQuotes {
+        self.f_string_consistent_quotes
     }
 
     #[must_use]
@@ -201,6 +213,15 @@ impl PyFormatOptions {
     #[must_use]
     pub fn with_preview(mut self, preview: PreviewMode) -> Self {
         self.preview = preview;
+        self
+    }
+
+    #[must_use]
+    pub fn with_f_string_consistent_quotes(
+        mut self,
+        consistent_quotes: FStringConsistentQuotes,
+    ) -> Self {
+        self.f_string_consistent_quotes = consistent_quotes;
         self
     }
 
@@ -339,6 +360,31 @@ impl PreviewMode {
 }
 
 impl fmt::Display for PreviewMode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Disabled => write!(f, "disabled"),
+            Self::Enabled => write!(f, "enabled"),
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Default, CacheKey)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub enum FStringConsistentQuotes {
+    #[default]
+    Disabled,
+    Enabled,
+}
+
+impl FStringConsistentQuotes {
+    pub const fn is_enabled(self) -> bool {
+        matches!(self, FStringConsistentQuotes::Enabled)
+    }
+}
+
+impl fmt::Display for FStringConsistentQuotes {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Disabled => write!(f, "disabled"),

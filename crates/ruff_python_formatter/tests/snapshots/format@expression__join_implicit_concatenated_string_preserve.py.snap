@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
+assertion_line: 267
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/join_implicit_concatenated_string_preserve.py
 ---
 ## Input
@@ -42,6 +43,7 @@ docstring-code-line-width  = "dynamic"
 preview                    = Disabled
 target_version             = 3.9
 source_type                = Python
+f-string-consistent-quotes = Disabled
 ```
 
 ```python
@@ -83,6 +85,7 @@ docstring-code-line-width  = "dynamic"
 preview                    = Disabled
 target_version             = 3.12
 source_type                = Python
+f-string-consistent-quotes = Disabled
 ```
 
 ```python

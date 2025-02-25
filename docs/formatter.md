@@ -225,6 +225,26 @@ def f(x):
 [literal blocks]: https://docutils.sourceforge.io/docs/ref/rst/restructuredtext.html#literal-blocks
 [`code-block` and `sourcecode` directives]: https://www.sphinx-doc.org/en/master/usage/restructuredtext/directives.html#directive-code-block
 
+## F-string quotes
+
+Ruff supports consistent quoting in f-strings when targeting Python 3.12 or later, which introduced [PEP 701](https://peps.python.org/pep-0701/). This enhancement allows the same quote character to be used both in the outer f-string and inside expressions - something that wasn't possible before Python 3.12.
+
+With `f-string-consistent-quotes = true` and assuming `quote-style = "double"`:
+
+```python
+# In Python 3.12+ with f-string-consistent-quotes enabled:
+f"User {data["name"]} logged in at {time}"  # Same quotes in f-string and expression
+```
+
+With `f-string-consistent-quotes = false` (default) or in Python versions before 3.12:
+
+```python
+# Default behavior for compatibility:
+f"User {data['name']} logged in at {time}"  # Alternate quotes for compatibility
+```
+
+This setting has no effect when targeting Python versions below 3.12. When enabled, this feature produces more consistent and readable code by following your preferred quote style throughout f-strings, even in nested expressions.
+
 ## Format suppression
 
 Like Black, Ruff supports `# fmt: on`, `# fmt: off`, and `# fmt: skip` pragma comments, which can
@@ -443,8 +463,7 @@ f'{1=:"foo}'
 f"{1=:"foo}"
 ```
 
-For nested f-strings, Ruff alternates quote styles, starting with the [configured quote style] for the
-outermost f-string. For example, consider the following f-string:
+By default, or when targeting Python versions below 3.12, Ruff alternates quote styles for nested f-strings, starting with the [configured quote style] for the outermost f-string. For example, consider the following f-string:
 
 ```python
 # format.quote-style = "double"
@@ -452,10 +471,16 @@ outermost f-string. For example, consider the following f-string:
 f"outer f-string {f"nested f-string {f"another nested f-string"} end"} end"
 ```
 
-Ruff formats it as:
+With default settings, Ruff formats it as:
 
 ```python
 f"outer f-string {f'nested f-string {f"another nested f-string"} end'} end"
+```
+
+When targeting Python 3.12+ and with `f-string-consistent-quotes = true`, Ruff will maintain consistent quote styles:
+
+```python
+f"outer f-string {f"nested f-string {f"another nested f-string"} end"} end"
 ```
 
 #### Line breaks

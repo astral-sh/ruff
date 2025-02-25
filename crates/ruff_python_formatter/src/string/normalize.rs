@@ -47,16 +47,28 @@ impl<'a, 'src> StringNormalizer<'a, 'src> {
             .unwrap_or(self.context.options().quote_style());
         let supports_pep_701 = self.context.options().target_version().supports_pep_701();
 
-        // For f-strings prefer alternating the quotes unless The outer string is triple quoted and the inner isn't.
+        // For f-strings in Python 3.12+, use consistent quotes if enabled.
+        // Otherwise, alternate quotes for compatibility with older Python versions.
         if let FStringState::InsideExpressionElement(parent_context) = self.context.f_string_state()
         {
             let parent_flags = parent_context.f_string().flags();
+            let consistent_quotes = self
+                .context
+                .options()
+                .f_string_consistent_quotes()
+                .is_enabled();
 
             if !parent_flags.is_triple_quoted() || string.flags().is_triple_quoted() {
+                // When f_string_consistent_quotes is enabled AND we're targeting Python 3.12+,
+                // use the preferred quote style consistently
+                if supports_pep_701 && consistent_quotes && !preferred_quote_style.is_preserve() {
+                    return preferred_quote_style;
+                }
+                // Otherwise, use alternating quotes for compatibility
                 // This logic is even necessary when using preserve and the target python version doesn't support PEP701 because
                 // we might end up joining two f-strings that have different quote styles, in which case we need to alternate the quotes
                 // for inner strings to avoid a syntax error: `string = "this is my string with " f'"{params.get("mine")}"'`
-                if !preferred_quote_style.is_preserve() || !supports_pep_701 {
+                else if !preferred_quote_style.is_preserve() || !supports_pep_701 {
                     return QuoteStyle::from(parent_flags.quote_style().opposite());
                 }
             }
