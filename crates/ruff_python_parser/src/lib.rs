@@ -352,6 +352,9 @@ impl<T> Parsed<T> {
 
     /// Returns the [`Parsed`] output as a [`Result`], returning [`Ok`] if it has no syntax errors,
     /// or [`Err`] containing the first [`ParseError`] encountered.
+    ///
+    /// Note that any [`unsupported_syntax_errors`](Parsed::unsupported_syntax_errors) will not
+    /// cause [`Err`] to be returned.
     pub fn as_result(&self) -> Result<&Parsed<T>, &[ParseError]> {
         if self.is_valid() {
             Ok(self)
@@ -362,6 +365,9 @@ impl<T> Parsed<T> {
 
     /// Consumes the [`Parsed`] output and returns a [`Result`] which is [`Ok`] if it has no syntax
     /// errors, or [`Err`] containing the first [`ParseError`] encountered.
+    ///
+    /// Note that any [`unsupported_syntax_errors`](Parsed::unsupported_syntax_errors) will not
+    /// cause [`Err`] to be returned.
     pub(crate) fn into_result(self) -> Result<Parsed<T>, ParseError> {
         if self.is_valid() {
             Ok(self)
