@@ -538,7 +538,7 @@ fn symbol_from_bindings_impl<'db>(
     bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
     requires_explicit_reexport: RequiresExplicitReExport,
 ) -> Symbol<'db> {
-    let constraints = bindings_with_constraints.constraints;
+    let predicates = bindings_with_constraints.predicates;
     let visibility_constraints = bindings_with_constraints.visibility_constraints;
     let mut bindings_with_constraints = bindings_with_constraints.peekable();
 
@@ -552,7 +552,7 @@ fn symbol_from_bindings_impl<'db>(
             visibility_constraint,
             narrowing_constraint: _,
         }) if binding.map_or(true, is_non_exported) => {
-            visibility_constraints.evaluate(db, constraints, *visibility_constraint)
+            visibility_constraints.evaluate(db, predicates, *visibility_constraint)
         }
         _ => Truthiness::AlwaysFalse,
     };
@@ -570,7 +570,7 @@ fn symbol_from_bindings_impl<'db>(
             }
 
             let static_visibility =
-                visibility_constraints.evaluate(db, constraints, visibility_constraint);
+                visibility_constraints.evaluate(db, predicates, visibility_constraint);
 
             if static_visibility.is_always_false() {
                 return None;
@@ -629,7 +629,7 @@ fn symbol_from_declarations_impl<'db>(
     declarations: DeclarationsIterator<'_, 'db>,
     requires_explicit_reexport: RequiresExplicitReExport,
 ) -> SymbolFromDeclarationsResult<'db> {
-    let constraints = declarations.constraints;
+    let predicates = declarations.predicates;
     let visibility_constraints = declarations.visibility_constraints;
     let mut declarations = declarations.peekable();
 
@@ -642,7 +642,7 @@ fn symbol_from_declarations_impl<'db>(
             declaration,
             visibility_constraint,
         }) if declaration.map_or(true, is_non_exported) => {
-            visibility_constraints.evaluate(db, constraints, *visibility_constraint)
+            visibility_constraints.evaluate(db, predicates, *visibility_constraint)
         }
         _ => Truthiness::AlwaysFalse,
     };
@@ -659,7 +659,7 @@ fn symbol_from_declarations_impl<'db>(
             }
 
             let static_visibility =
-                visibility_constraints.evaluate(db, constraints, visibility_constraint);
+                visibility_constraints.evaluate(db, predicates, visibility_constraint);
 
             if static_visibility.is_always_false() {
                 None

@@ -178,8 +178,8 @@ use std::cmp::Ordering;
 use ruff_index::{Idx, IndexVec};
 use rustc_hash::FxHashMap;
 
-use crate::semantic_index::constraint::{
-    Constraint, ConstraintNode, Constraints, PatternConstraintKind, ScopedConstraintId,
+use crate::semantic_index::predicate::{
+    PatternPredicateKind, Predicate, PredicateNode, Predicates, ScopedPredicateId,
 };
 use crate::types::{infer_expression_type, Truthiness};
 use crate::Db;
@@ -188,7 +188,7 @@ use crate::Db;
 /// is just like a boolean formula, but with `Ambiguous` as a third potential result. See the
 /// module documentation for more details.)
 ///
-/// The primitive atoms of the formula are [`Constraint`]s, which express some property of the
+/// The primitive atoms of the formula are [`Predicate`]s, which express some property of the
 /// runtime state of the code that we are analyzing.
 ///
 /// We assume that each atom has a stable value each time that the formula is evaluated. An atom
@@ -197,7 +197,7 @@ use crate::Db;
 /// allows us to perform simplifications like `A ∨ !A → true` and `A ∧ !A → false`.
 ///
 /// That means that when you are constructing a formula, you might need to create distinct atoms
-/// for a particular [`Constraint`], if your formula needs to consider how a particular runtime
+/// for a particular [`Predicate`], if your formula needs to consider how a particular runtime
 /// property might be different at different points in the execution of the program.
 ///
 /// Visibility constraints are normalized, so equivalent constraints are guaranteed to have equal
@@ -225,7 +225,7 @@ impl std::fmt::Debug for ScopedVisibilityConstraintId {
 //
 // There are 3 terminals, with hard-coded constraint IDs: true, ambiguous, and false.
 //
-// _Atoms_ are the underlying Constraints, which are the variables that are evaluated by the
+// _Atoms_ are the underlying Predicates, which are the variables that are evaluated by the
 // ternary function.
 //
 // _Interior nodes_ provide the TDD structure for the formula. Interior nodes are stored in an
@@ -234,9 +234,9 @@ impl std::fmt::Debug for ScopedVisibilityConstraintId {
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 struct InteriorNode {
     /// A "variable" that is evaluated as part of a TDD ternary function. For visibility
-    /// constraints, this is a `Constraint` that represents some runtime property of the Python
+    /// constraints, this is a `Predicate` that represents some runtime property of the Python
     /// code that we are evaluating.
-    atom: ScopedConstraintId,
+    atom: ScopedPredicateId,
     if_true: ScopedVisibilityConstraintId,
     if_ambiguous: ScopedVisibilityConstraintId,
     if_false: ScopedVisibilityConstraintId,
@@ -349,17 +349,17 @@ impl VisibilityConstraintsBuilder {
     /// the same value no matter how many times it appears in the ternary formula that the TDD
     /// represents.
     ///
-    /// However, we sometimes have to model how a `Constraint` can have a different runtime
+    /// However, we sometimes have to model how a `Predicate` can have a different runtime
     /// value at different points in the execution of the program. To handle this, you can take
-    /// advantage of the fact that the [`Constraints`] arena does not deduplicate `Constraint`s.
-    /// You can add a `Constraint` multiple times, yielding different `ScopedConstraintId`s, which
+    /// advantage of the fact that the [`Predicates`] arena does not deduplicate `Predicate`s.
+    /// You can add a `Predicate` multiple times, yielding different `ScopedPredicateId`s, which
     /// you can then create separate TDD atoms for.
     pub(crate) fn add_atom(
         &mut self,
-        constraint: ScopedConstraintId,
+        predicate: ScopedPredicateId,
     ) -> ScopedVisibilityConstraintId {
         self.add_interior(InteriorNode {
-            atom: constraint,
+            atom: predicate,
             if_true: ALWAYS_TRUE,
             if_ambiguous: AMBIGUOUS,
             if_false: ALWAYS_FALSE,
@@ -534,7 +534,7 @@ impl VisibilityConstraints {
     pub(crate) fn evaluate<'db>(
         &self,
         db: &'db dyn Db,
-        constraints: &Constraints<'db>,
+        predicates: &Predicates<'db>,
         mut id: ScopedVisibilityConstraintId,
     ) -> Truthiness {
         loop {
@@ -544,8 +544,8 @@ impl VisibilityConstraints {
                 ALWAYS_FALSE => return Truthiness::AlwaysFalse,
                 _ => self.interiors[id],
             };
-            let constraint = &constraints[node.atom];
-            match Self::analyze_single(db, constraint) {
+            let predicate = &predicates[node.atom];
+            match Self::analyze_single(db, predicate) {
                 Truthiness::AlwaysTrue => id = node.if_true,
                 Truthiness::Ambiguous => id = node.if_ambiguous,
                 Truthiness::AlwaysFalse => id = node.if_false,
@@ -553,14 +553,14 @@ impl VisibilityConstraints {
         }
     }
 
-    fn analyze_single(db: &dyn Db, constraint: &Constraint) -> Truthiness {
-        match constraint.node {
-            ConstraintNode::Expression(test_expr) => {
+    fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
+        match predicate.node {
+            PredicateNode::Expression(test_expr) => {
                 let ty = infer_expression_type(db, test_expr);
-                ty.bool(db).negate_if(!constraint.is_positive)
+                ty.bool(db).negate_if(!predicate.is_positive)
             }
-            ConstraintNode::Pattern(inner) => match inner.kind(db) {
-                PatternConstraintKind::Value(value, guard) => {
+            PredicateNode::Pattern(inner) => match inner.kind(db) {
+                PatternPredicateKind::Value(value, guard) => {
                     let subject_expression = inner.subject(db);
                     let subject_ty = infer_expression_type(db, subject_expression);
                     let value_ty = infer_expression_type(db, *value);
@@ -579,9 +579,9 @@ impl VisibilityConstraints {
                         Truthiness::Ambiguous
                     }
                 }
-                PatternConstraintKind::Singleton(..)
-                | PatternConstraintKind::Class(..)
-                | PatternConstraintKind::Unsupported => Truthiness::Ambiguous,
+                PatternPredicateKind::Singleton(..)
+                | PatternPredicateKind::Class(..)
+                | PatternPredicateKind::Unsupported => Truthiness::Ambiguous,
             },
         }
     }
