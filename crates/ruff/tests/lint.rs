@@ -2556,11 +2556,7 @@ fn a005_module_shadowing_strict_default() -> Result<()> {
         ----- stdout -----
         abc/__init__.py:1:1: A005 Module `abc` shadows a Python standard-library module
         collections/__init__.py:1:1: A005 Module `collections` shadows a Python standard-library module
-        collections/abc/__init__.py:1:1: A005 Module `abc` shadows a Python standard-library module
-        foobar/abc/__init__.py:1:1: A005 Module `abc` shadows a Python standard-library module
-        foobar/collections/__init__.py:1:1: A005 Module `collections` shadows a Python standard-library module
-        foobar/collections/abc/__init__.py:1:1: A005 Module `abc` shadows a Python standard-library module
-        Found 6 errors.
+        Found 2 errors.
 
         ----- stderr -----
         ");
