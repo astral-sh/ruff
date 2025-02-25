@@ -577,8 +577,8 @@ def write_node(out: list[str], ast: Ast) -> None:
             if node.fields is None:
                 continue
             out.append(
-                "#[derive(Clone, Debug, PartialEq, "
-                + ", ".join(node.derives or [])
+                "#[derive(Clone, Debug, PartialEq"
+                + "".join(f", {derive}" for derive in node.derives)
                 + ")]"
             )
             name = node.name
