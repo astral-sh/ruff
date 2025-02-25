@@ -64,6 +64,24 @@ c = C()
 c.a = 2
 ```
 
+and similarly here:
+
+```py
+class Base:
+    a: ClassVar[int] = 1
+
+class Derived(Base):
+    if flag():
+        a: int
+
+reveal_type(Derived.a)  # revealed: int
+
+d = Derived()
+
+# error: [invalid-attribute-access]
+d.a = 2
+```
+
 ## Too many arguments
 
 ```py

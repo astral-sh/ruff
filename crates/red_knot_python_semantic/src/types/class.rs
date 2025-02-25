@@ -384,6 +384,7 @@ impl<'db> Class<'db> {
     /// The attribute might also be defined in a superclass of this class.
     pub(super) fn instance_member(self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
         let mut union = UnionBuilder::new(db);
+        let mut union_qualifiers = TypeQualifiers::empty();
 
         for superclass in self.iter_mro(db) {
             match superclass {
@@ -393,9 +394,12 @@ impl<'db> Class<'db> {
                     );
                 }
                 ClassBase::Class(class) => {
-                    if let member @ SymbolAndQualifiers(Symbol::Type(ty, boundness), _) =
+                    if let member @ SymbolAndQualifiers(Symbol::Type(ty, boundness), qualifiers) =
                         class.own_instance_member(db, name)
                     {
+                        // TODO: We could raise a diagnostic here if there are conflicting type qualifiers
+                        union_qualifiers = union_qualifiers.union(qualifiers);
+
                         if boundness == Boundness::Bound {
                             if union.is_empty() {
                                 // Short-circuit, no need to allocate inside the union builder
@@ -404,7 +408,7 @@ impl<'db> Class<'db> {
 
                             return SymbolAndQualifiers(
                                 Symbol::bound(union.add(ty).build()),
-                                TypeQualifiers::empty(),
+                                union_qualifiers,
                             );
                         }
 
@@ -424,7 +428,7 @@ impl<'db> Class<'db> {
 
             SymbolAndQualifiers(
                 Symbol::Type(union.build(), Boundness::PossiblyUnbound),
-                TypeQualifiers::empty(),
+                union_qualifiers,
             )
         }
     }
