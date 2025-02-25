@@ -97,6 +97,17 @@ pub fn find_settings_toml<P: AsRef<Path>>(path: P) -> Result<Option<PathBuf>> {
     Ok(None)
 }
 
+/// Derive target version from `required-version` in `pyproject.toml`, if
+/// such a file exists in an ancestor directory.
+pub fn find_fallback_target_version<P: AsRef<Path>>(path: P) -> Option<PythonVersion> {
+    for directory in path.as_ref().ancestors() {
+        if let Some(fallback) = get_fallback_target_version(directory) {
+            return Some(fallback);
+        }
+    }
+    None
+}
+
 /// Find the path to the user-specific `pyproject.toml` or `ruff.toml`, if it
 /// exists.
 #[cfg(not(target_arch = "wasm32"))]
@@ -141,7 +152,10 @@ pub fn find_user_settings_toml() -> Option<PathBuf> {
 }
 
 /// Load `Options` from a `pyproject.toml` or `ruff.toml` file.
-pub(super) fn load_options<P: AsRef<Path>>(path: P) -> Result<Options> {
+pub(super) fn load_options<P: AsRef<Path>>(
+    path: P,
+    version_strategy: &TargetVersionStrategy,
+) -> Result<Options> {
     if path.as_ref().ends_with("pyproject.toml") {
         let pyproject = parse_pyproject_toml(&path)?;
         let mut ruff = pyproject
@@ -157,14 +171,55 @@ pub(super) fn load_options<P: AsRef<Path>>(path: P) -> Result<Options> {
         }
         Ok(ruff)
     } else {
-        let ruff = parse_ruff_toml(path);
-        if let Ok(ruff) = &ruff {
+        let mut ruff = parse_ruff_toml(&path);
+        if let Ok(ref mut ruff) = ruff {
             if ruff.target_version.is_none() {
-                debug!("`project.requires_python` in `pyproject.toml` will not be used to set `target_version` when using `ruff.toml`.");
+                debug!("No `target-version` found in `ruff.toml`");
+                match version_strategy {
+                    TargetVersionStrategy::Standard => {}
+                    TargetVersionStrategy::RequiresPythonFallback => {
+                        if let Some(dir) = path.as_ref().parent() {
+                            let fallback = get_fallback_target_version(dir);
+                            if fallback.is_some() {
+                                debug!(
+                            "Deriving `target-version` from `requires-python` in `pyproject.toml`"
+                        );
+                            } else {
+                                debug!("No `pyproject.toml` with `requires-python` in same directory; `target-version` unspecified");
+                            }
+                            ruff.target_version = fallback;
+                        }
+                    }
+                }
             }
         }
         ruff
     }
+}
+
+/// Extract `target-version` from `pyproject.toml` in the given directory
+/// if the file exists and has `requires-python`.
+fn get_fallback_target_version(dir: &Path) -> Option<PythonVersion> {
+    let pyproject_path = dir.join("pyproject.toml");
+    if !pyproject_path.exists() {
+        return None;
+    }
+    let parsed_pyproject = parse_pyproject_toml(&pyproject_path);
+
+    let pyproject = match parsed_pyproject {
+        Ok(pyproject) => pyproject,
+        Err(err) => {
+            debug!("Failed to find fallback `target-version` due to: {}", err);
+            return None;
+        }
+    };
+
+    if let Some(project) = pyproject.project {
+        if let Some(requires_python) = project.requires_python {
+            return get_minimum_supported_version(&requires_python);
+        }
+    }
+    None
 }
 
 /// Infer the minimum supported [`PythonVersion`] from a `requires-python` specifier.
@@ -197,6 +252,14 @@ fn get_minimum_supported_version(requires_version: &VersionSpecifiers) -> Option
 
     // Find the Python version that matches the minimum supported version.
     PythonVersion::iter().find(|version| Version::from(*version) == minimum_version)
+}
+
+/// Strategy for handling missing `target-version` in configuration.
+#[derive(Debug, Default)]
+pub(super) enum TargetVersionStrategy {
+    #[default]
+    Standard,
+    RequiresPythonFallback,
 }
 
 #[cfg(test)]
