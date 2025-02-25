@@ -23,10 +23,10 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/diagnostics/versio
 error: invalid-syntax
  --> /src/mdtest_snippet.py:1:1
   |
-1 | / match 2:  # error: 1 [invalid-syntax] "Cannot use `match` statement on Python 3.9 (syntax was new in Python 3.10)"
-2 | |     case 1:
-3 | |         print("it's one")
-  | |_________________________^ Cannot use `match` statement on Python 3.9 (syntax was new in Python 3.10)
+1 | match 2:  # error: 1 [invalid-syntax] "Cannot use `match` statement on Python 3.9 (syntax was new in Python 3.10)"
+  | ^^^^^ Cannot use `match` statement on Python 3.9 (syntax was new in Python 3.10)
+2 |     case 1:
+3 |         print("it's one")
   |
 
 ```
