@@ -1256,7 +1256,7 @@ impl<'src> Lexer<'src> {
                     // `IpyEscapeKind::Magic` and `IpyEscapeKind::Help` because of the initial `%` and `??`
                     // tokens.
                     if question_count > 2
-                        || value.chars().last().map_or(true, is_python_whitespace)
+                        || value.chars().last().is_none_or(is_python_whitespace)
                         || !matches!(self.cursor.first(), '\n' | '\r' | EOF_CHAR)
                     {
                         // Not a help end escape command, so continue with the lexing.

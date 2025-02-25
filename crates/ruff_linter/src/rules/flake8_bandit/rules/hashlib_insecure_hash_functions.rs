@@ -199,7 +199,7 @@ fn detect_insecure_crypt_calls(checker: &Checker, call: &ast::ExprCall) {
 fn is_used_for_security(arguments: &Arguments) -> bool {
     arguments
         .find_keyword("usedforsecurity")
-        .map_or(true, |keyword| !is_const_false(&keyword.value))
+        .is_none_or(|keyword| !is_const_false(&keyword.value))
 }
 
 #[derive(Debug, Copy, Clone)]

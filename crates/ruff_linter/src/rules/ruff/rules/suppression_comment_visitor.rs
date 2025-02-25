@@ -59,7 +59,7 @@ where
     fn can_skip(&mut self, node_end: TextSize) -> bool {
         self.comments
             .peek()
-            .map_or(true, |next| next.range.start() >= node_end)
+            .is_none_or(|next| next.range.start() >= node_end)
     }
 }
 

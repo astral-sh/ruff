@@ -102,7 +102,7 @@ impl IgnoreNames {
     ) -> Result<Self, SettingsError> {
         // If the user is not customizing the set of ignored names, use the default matcher,
         // which is hard-coded to avoid expensive regex matching.
-        if ignore_names.is_none() && extend_ignore_names.as_ref().map_or(true, Vec::is_empty) {
+        if ignore_names.is_none() && extend_ignore_names.as_ref().is_none_or(Vec::is_empty) {
             return Ok(IgnoreNames::Default);
         }
 

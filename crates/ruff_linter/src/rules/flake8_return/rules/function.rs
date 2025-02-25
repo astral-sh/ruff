@@ -817,7 +817,7 @@ pub(crate) fn function(checker: &Checker, function_def: &ast::StmtFunctionDef) {
     } else {
         if checker.enabled(Rule::UnnecessaryReturnNone) {
             // Skip functions that have a return annotation that is not `None`.
-            if returns.as_deref().map_or(true, Expr::is_none_literal_expr) {
+            if returns.as_deref().is_none_or(Expr::is_none_literal_expr) {
                 unnecessary_return_none(checker, decorator_list, &stack);
             }
         }

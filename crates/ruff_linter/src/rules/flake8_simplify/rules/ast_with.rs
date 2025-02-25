@@ -177,7 +177,7 @@ pub(crate) fn multiple_with_statements(
                     with_stmt,
                 ) {
                     Ok(edit) => {
-                        if edit.content().map_or(true, |content| {
+                        if edit.content().is_none_or(|content| {
                             fits(
                                 content,
                                 with_stmt.into(),

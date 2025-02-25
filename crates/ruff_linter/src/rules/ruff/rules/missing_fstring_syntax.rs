@@ -224,7 +224,7 @@ fn should_be_fstring(
                         semantic.scope_id,
                         TypingOnlyBindingsStatus::Disallowed,
                     )
-                    .map_or(true, |id| semantic.binding(id).kind.is_builtin())
+                    .is_none_or(|id| semantic.binding(id).kind.is_builtin())
                 {
                     return false;
                 }

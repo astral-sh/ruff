@@ -178,25 +178,20 @@ impl<'a> TypingTarget<'a> {
             TypingTarget::Union(slice) => slice.is_some_and(|slice| {
                 resolve_slice_value(slice).any(|element| {
                     TypingTarget::try_from_expr(element, checker, version)
-                        .map_or(true, |new_target| {
-                            new_target.contains_none(checker, version)
-                        })
+                        .is_none_or(|new_target| new_target.contains_none(checker, version))
                 })
             }),
             TypingTarget::PEP604Union(left, right) => [left, right].iter().any(|element| {
-                TypingTarget::try_from_expr(element, checker, version).map_or(true, |new_target| {
-                    new_target.contains_none(checker, version)
-                })
+                TypingTarget::try_from_expr(element, checker, version)
+                    .is_none_or(|new_target| new_target.contains_none(checker, version))
             }),
             TypingTarget::Annotated(expr) => expr.is_some_and(|expr| {
-                TypingTarget::try_from_expr(expr, checker, version).map_or(true, |new_target| {
-                    new_target.contains_none(checker, version)
-                })
+                TypingTarget::try_from_expr(expr, checker, version)
+                    .is_none_or(|new_target| new_target.contains_none(checker, version))
             }),
             TypingTarget::ForwardReference(expr) => {
-                TypingTarget::try_from_expr(expr, checker, version).map_or(true, |new_target| {
-                    new_target.contains_none(checker, version)
-                })
+                TypingTarget::try_from_expr(expr, checker, version)
+                    .is_none_or(|new_target| new_target.contains_none(checker, version))
             }
         }
     }
@@ -215,22 +210,22 @@ impl<'a> TypingTarget<'a> {
             TypingTarget::Union(slice) => slice.is_some_and(|slice| {
                 resolve_slice_value(slice).any(|element| {
                     TypingTarget::try_from_expr(element, checker, version)
-                        .map_or(true, |new_target| new_target.contains_any(checker, version))
+                        .is_none_or(|new_target| new_target.contains_any(checker, version))
                 })
             }),
             TypingTarget::PEP604Union(left, right) => [left, right].iter().any(|element| {
                 TypingTarget::try_from_expr(element, checker, version)
-                    .map_or(true, |new_target| new_target.contains_any(checker, version))
+                    .is_none_or(|new_target| new_target.contains_any(checker, version))
             }),
             TypingTarget::Annotated(expr) | TypingTarget::Optional(expr) => {
                 expr.is_some_and(|expr| {
                     TypingTarget::try_from_expr(expr, checker, version)
-                        .map_or(true, |new_target| new_target.contains_any(checker, version))
+                        .is_none_or(|new_target| new_target.contains_any(checker, version))
                 })
             }
             TypingTarget::ForwardReference(expr) => {
                 TypingTarget::try_from_expr(expr, checker, version)
-                    .map_or(true, |new_target| new_target.contains_any(checker, version))
+                    .is_none_or(|new_target| new_target.contains_any(checker, version))
             }
         }
     }

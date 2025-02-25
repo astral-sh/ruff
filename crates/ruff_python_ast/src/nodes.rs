@@ -2800,7 +2800,7 @@ impl Pattern {
     pub fn is_wildcard(&self) -> bool {
         match self {
             Pattern::MatchAs(PatternMatchAs { pattern, .. }) => {
-                pattern.as_deref().map_or(true, Pattern::is_wildcard)
+                pattern.as_deref().is_none_or(Pattern::is_wildcard)
             }
             Pattern::MatchOr(PatternMatchOr { patterns, .. }) => {
                 patterns.iter().all(Pattern::is_wildcard)

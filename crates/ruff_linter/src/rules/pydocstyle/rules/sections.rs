@@ -1871,7 +1871,7 @@ fn args_section(context: &SectionContext) -> FxHashSet<String> {
     // Reformat each section.
     let mut args_sections: Vec<String> = vec![];
     for line in args_content.trim().lines() {
-        if line.chars().next().map_or(true, char::is_whitespace) {
+        if line.chars().next().is_none_or(char::is_whitespace) {
             // This is a continuation of the documentation for the previous parameter,
             // because it starts with whitespace.
             if let Some(last) = args_sections.last_mut() {

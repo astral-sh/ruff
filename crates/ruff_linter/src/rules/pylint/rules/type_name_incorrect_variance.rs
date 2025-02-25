@@ -140,9 +140,9 @@ pub(crate) fn type_name_incorrect_variance(checker: &Checker, value: &Expr) {
 /// Returns `true` if the parameter name does not match its type variance.
 fn mismatch(param_name: &str, covariant: Option<&Expr>, contravariant: Option<&Expr>) -> bool {
     if param_name.ends_with("_co") {
-        covariant.map_or(true, |covariant| !is_const_true(covariant))
+        covariant.is_none_or(|covariant| !is_const_true(covariant))
     } else if param_name.ends_with("_contra") {
-        contravariant.map_or(true, |contravariant| !is_const_true(contravariant))
+        contravariant.is_none_or(|contravariant| !is_const_true(contravariant))
     } else {
         covariant.is_some_and(is_const_true) || contravariant.is_some_and(is_const_true)
     }

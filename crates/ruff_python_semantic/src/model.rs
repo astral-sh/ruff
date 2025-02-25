@@ -344,14 +344,14 @@ impl<'a> SemanticModel<'a> {
     pub fn is_available_in_scope(&self, member: &str, scope_id: ScopeId) -> bool {
         self.lookup_symbol_in_scope(member, scope_id, false)
             .map(|binding_id| &self.bindings[binding_id])
-            .map_or(true, |binding| binding.kind.is_builtin())
+            .is_none_or(|binding| binding.kind.is_builtin())
     }
 
     /// Resolve a `del` reference to `symbol` at `range`.
     pub fn resolve_del(&mut self, symbol: &str, range: TextRange) {
         let is_unbound = self.scopes[self.scope_id]
             .get(symbol)
-            .map_or(true, |binding_id| {
+            .is_none_or(|binding_id| {
                 // Treat the deletion of a name as a reference to that name.
                 self.add_local_reference(binding_id, ExprContext::Del, range);
                 self.bindings[binding_id].is_unbound()
@@ -1508,7 +1508,7 @@ impl<'a> SemanticModel<'a> {
             if self
                 .global_scope()
                 .get(name)
-                .map_or(true, |binding_id| self.bindings[binding_id].is_unbound())
+                .is_none_or(|binding_id| self.bindings[binding_id].is_unbound())
             {
                 let id = self.bindings.push(Binding {
                     kind: BindingKind::Assignment,

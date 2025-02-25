@@ -794,7 +794,7 @@ impl<'a> GeneratorOrIteratorArguments<'a> {
         match self {
             Self::Unparameterized => true,
             Self::Single(_) => true,
-            Self::Several(elements) => elements.get(2).map_or(true, Expr::is_none_literal_expr),
+            Self::Several(elements) => elements.get(2).is_none_or(Expr::is_none_literal_expr),
         }
     }
 }
@@ -947,7 +947,7 @@ pub(crate) fn check_docstring(
                 match function_def.returns.as_deref() {
                     Some(returns)
                         if !generator_annotation_arguments(returns, semantic).is_some_and(
-                            |arguments| arguments.first().map_or(true, Expr::is_none_literal_expr),
+                            |arguments| arguments.first().is_none_or(Expr::is_none_literal_expr),
                         ) =>
                     {
                         diagnostics

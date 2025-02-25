@@ -177,10 +177,10 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
                     }
 
                     // If the bindings are in different forks, abort.
-                    if shadowed.source.map_or(true, |left| {
+                    if shadowed.source.is_none_or(|left| {
                         binding
                             .source
-                            .map_or(true, |right| !checker.semantic.same_branch(left, right))
+                            .is_none_or(|right| !checker.semantic.same_branch(left, right))
                     }) {
                         continue;
                     }
@@ -269,10 +269,10 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
                     }
 
                     // If the bindings are in different forks, abort.
-                    if shadowed.source.map_or(true, |left| {
+                    if shadowed.source.is_none_or(|left| {
                         binding
                             .source
-                            .map_or(true, |right| !checker.semantic.same_branch(left, right))
+                            .is_none_or(|right| !checker.semantic.same_branch(left, right))
                     }) {
                         continue;
                     }
