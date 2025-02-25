@@ -58,7 +58,16 @@ def redknot_contains_bug(code: str, *, red_knot_executable: Path) -> bool:
 def ruff_contains_bug(code: str, *, ruff_executable: Path) -> bool:
     """Return `True` if the code triggers a parser error."""
     completed_process = subprocess.run(
-        [ruff_executable, "check", "--config", "lint.select=[]", "--no-cache", "-"],
+        [
+            ruff_executable,
+            "check",
+            "--config",
+            "lint.select=[]",
+            "--no-cache",
+            "--target-version",
+            "py313",
+            "-",
+        ],
         capture_output=True,
         text=True,
         input=code,

@@ -5,7 +5,8 @@ use rustc_hash::{FxBuildHasher, FxHashSet};
 
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{
-    self as ast, ExceptHandler, Expr, ExprContext, IpyEscapeKind, Operator, Stmt, WithItem,
+    self as ast, ExceptHandler, Expr, ExprContext, IpyEscapeKind, Operator, PythonVersion, Stmt,
+    WithItem,
 };
 use ruff_text_size::{Ranged, TextSize};
 
@@ -16,7 +17,7 @@ use crate::parser::{
 };
 use crate::token::{TokenKind, TokenValue};
 use crate::token_set::TokenSet;
-use crate::{Mode, ParseErrorType};
+use crate::{Mode, ParseErrorType, UnsupportedSyntaxError, UnsupportedSyntaxErrorKind};
 
 use super::expression::ExpressionContext;
 use super::Parenthesized;
@@ -2257,10 +2258,20 @@ impl<'src> Parser<'src> {
         let start = self.node_start();
         self.bump(TokenKind::Match);
 
+        let match_range = self.node_range(start);
+
         let subject = self.parse_match_subject_expression();
         self.expect(TokenKind::Colon);
 
         let cases = self.parse_match_body();
+
+        if self.options.target_version < PythonVersion::PY310 {
+            self.unsupported_syntax_errors.push(UnsupportedSyntaxError {
+                kind: UnsupportedSyntaxErrorKind::MatchBeforePy310,
+                range: match_range,
+                target_version: self.options.target_version,
+            });
+        }
 
         ast::StmtMatch {
             subject: Box::new(subject),

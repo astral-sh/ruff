@@ -67,7 +67,10 @@
 use std::iter::FusedIterator;
 use std::ops::Deref;
 
-pub use crate::error::{FStringErrorType, LexicalErrorType, ParseError, ParseErrorType};
+pub use crate::error::{
+    FStringErrorType, LexicalErrorType, ParseError, ParseErrorType, UnsupportedSyntaxError,
+    UnsupportedSyntaxErrorKind,
+};
 pub use crate::parser::ParseOptions;
 pub use crate::token::{Token, TokenKind};
 
@@ -305,6 +308,7 @@ pub struct Parsed<T> {
     syntax: T,
     tokens: Tokens,
     errors: Vec<ParseError>,
+    unsupported_syntax_errors: Vec<UnsupportedSyntaxError>,
 }
 
 impl<T> Parsed<T> {
@@ -323,6 +327,11 @@ impl<T> Parsed<T> {
         &self.errors
     }
 
+    /// Returns a list of version-related syntax errors found during parsing.
+    pub fn unsupported_syntax_errors(&self) -> &[UnsupportedSyntaxError] {
+        &self.unsupported_syntax_errors
+    }
+
     /// Consumes the [`Parsed`] output and returns the contained syntax node.
     pub fn into_syntax(self) -> T {
         self.syntax
@@ -334,12 +343,18 @@ impl<T> Parsed<T> {
     }
 
     /// Returns `true` if the parsed source code is valid i.e., it has no syntax errors.
+    ///
+    /// Note that this does not include version-related
+    /// [`unsupported_syntax_errors`](Parsed::unsupported_syntax_errors).
     pub fn is_valid(&self) -> bool {
         self.errors.is_empty()
     }
 
     /// Returns the [`Parsed`] output as a [`Result`], returning [`Ok`] if it has no syntax errors,
     /// or [`Err`] containing the first [`ParseError`] encountered.
+    ///
+    /// Note that any [`unsupported_syntax_errors`](Parsed::unsupported_syntax_errors) will not
+    /// cause [`Err`] to be returned.
     pub fn as_result(&self) -> Result<&Parsed<T>, &[ParseError]> {
         if self.is_valid() {
             Ok(self)
@@ -350,6 +365,9 @@ impl<T> Parsed<T> {
 
     /// Consumes the [`Parsed`] output and returns a [`Result`] which is [`Ok`] if it has no syntax
     /// errors, or [`Err`] containing the first [`ParseError`] encountered.
+    ///
+    /// Note that any [`unsupported_syntax_errors`](Parsed::unsupported_syntax_errors) will not
+    /// cause [`Err`] to be returned.
     pub(crate) fn into_result(self) -> Result<Parsed<T>, ParseError> {
         if self.is_valid() {
             Ok(self)
@@ -373,6 +391,7 @@ impl Parsed<Mod> {
                 syntax: module,
                 tokens: self.tokens,
                 errors: self.errors,
+                unsupported_syntax_errors: self.unsupported_syntax_errors,
             }),
             Mod::Expression(_) => None,
         }
@@ -392,6 +411,7 @@ impl Parsed<Mod> {
                 syntax: expression,
                 tokens: self.tokens,
                 errors: self.errors,
+                unsupported_syntax_errors: self.unsupported_syntax_errors,
             }),
         }
     }

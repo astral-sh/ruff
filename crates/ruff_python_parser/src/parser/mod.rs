@@ -5,6 +5,7 @@ use bitflags::bitflags;
 use ruff_python_ast::{Mod, ModExpression, ModModule};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
+use crate::error::UnsupportedSyntaxError;
 use crate::parser::expression::ExpressionContext;
 use crate::parser::progress::{ParserProgress, TokenId};
 use crate::token::TokenValue;
@@ -34,6 +35,9 @@ pub(crate) struct Parser<'src> {
 
     /// Stores all the syntax errors found during the parsing.
     errors: Vec<ParseError>,
+
+    /// Stores non-fatal syntax errors found during parsing, such as version-related errors.
+    unsupported_syntax_errors: Vec<UnsupportedSyntaxError>,
 
     /// Options for how the code will be parsed.
     options: ParseOptions,
@@ -70,6 +74,7 @@ impl<'src> Parser<'src> {
             options,
             source,
             errors: Vec::new(),
+            unsupported_syntax_errors: Vec::new(),
             tokens,
             recovery_context: RecoveryContext::empty(),
             prev_token_end: TextSize::new(0),
@@ -166,6 +171,7 @@ impl<'src> Parser<'src> {
                 syntax,
                 tokens: Tokens::new(tokens),
                 errors: parse_errors,
+                unsupported_syntax_errors: self.unsupported_syntax_errors,
             };
         }
 
@@ -197,6 +203,7 @@ impl<'src> Parser<'src> {
             syntax,
             tokens: Tokens::new(tokens),
             errors: merged,
+            unsupported_syntax_errors: self.unsupported_syntax_errors,
         }
     }
 
@@ -658,6 +665,7 @@ impl<'src> Parser<'src> {
         ParserCheckpoint {
             tokens: self.tokens.checkpoint(),
             errors_position: self.errors.len(),
+            unsupported_syntax_errors_position: self.unsupported_syntax_errors.len(),
             current_token_id: self.current_token_id,
             prev_token_end: self.prev_token_end,
             recovery_context: self.recovery_context,
@@ -669,6 +677,7 @@ impl<'src> Parser<'src> {
         let ParserCheckpoint {
             tokens,
             errors_position,
+            unsupported_syntax_errors_position,
             current_token_id,
             prev_token_end,
             recovery_context,
@@ -676,6 +685,8 @@ impl<'src> Parser<'src> {
 
         self.tokens.rewind(tokens);
         self.errors.truncate(errors_position);
+        self.unsupported_syntax_errors
+            .truncate(unsupported_syntax_errors_position);
         self.current_token_id = current_token_id;
         self.prev_token_end = prev_token_end;
         self.recovery_context = recovery_context;
@@ -685,6 +696,7 @@ impl<'src> Parser<'src> {
 struct ParserCheckpoint {
     tokens: TokenSourceCheckpoint,
     errors_position: usize,
+    unsupported_syntax_errors_position: usize,
     current_token_id: TokenId,
     prev_token_end: TextSize,
     recovery_context: RecoveryContext,

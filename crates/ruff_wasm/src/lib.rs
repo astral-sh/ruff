@@ -196,6 +196,7 @@ impl Workspace {
             &source_kind,
             source_type,
             &parsed,
+            self.settings.linter.unresolved_target_version,
         );
 
         let source_code = locator.to_source_code();
