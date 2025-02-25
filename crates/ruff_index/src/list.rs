@@ -53,7 +53,7 @@ pub struct ListStorage<I, K, V = ()> {
 /// We use a tuple struct instead of named fields because we always unpack a cell into local
 /// variables:
 ///
-/// ```no_run
+/// ```ignore
 /// let ListCell(rest, last_key, last_value) = /* ... */;
 /// ```
 #[derive(Debug, Eq, PartialEq)]
