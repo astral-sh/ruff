@@ -6,4 +6,4 @@ Markup(clean(content))
 
 # indirect assignments are currently not supported
 cleaned = clean(content)
-Markup(cleaned)  # RUF035
+Markup(cleaned)  # S704
