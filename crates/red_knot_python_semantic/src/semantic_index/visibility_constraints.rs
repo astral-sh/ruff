@@ -343,9 +343,9 @@ impl VisibilityConstraintsBuilder {
             .or_insert_with(|| self.interiors.push(node))
     }
 
-    /// Adds a new visibility constraint that checks a single [`Constraint`].
+    /// Adds a new visibility constraint that checks a single [`Predicate`].
     ///
-    /// [`ScopedConstraintId`]s are the “variables” that are evaluated by a TDD. A TDD variable has
+    /// [`ScopedPredicateId`]s are the “variables” that are evaluated by a TDD. A TDD variable has
     /// the same value no matter how many times it appears in the ternary formula that the TDD
     /// represents.
     ///

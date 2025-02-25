@@ -403,7 +403,8 @@ impl<'db> SemanticIndexBuilder<'db> {
     }
 
     /// Adds a new predicate to the list of all predicates, but does not record it. Returns the
-    /// predicate ID for later recording using [`SemanticIndexBuilder::record_predicate_id`].
+    /// predicate ID for later recording using
+    /// [`SemanticIndexBuilder::record_narrowing_constraint_id`].
     fn add_predicate(&mut self, predicate: Predicate<'db>) -> ScopedPredicateId {
         self.current_use_def_map_mut().add_predicate(predicate)
     }
