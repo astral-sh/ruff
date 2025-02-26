@@ -2164,11 +2164,11 @@ impl<'src> Parser<'src> {
         let range = self.node_range(start);
 
         // test_err walrus_before_py38
-        // # parse_options: { "target_version": "3.7" }
+        // # parse_options: { "target-version": "3.7" }
         // if x := 1: ...
 
         // test_ok walrus_after_py38
-        // # parse_options: { "target_version": "3.8" }
+        // # parse_options: { "target-version": "3.8" }
         // if x := 1: ...
 
         if self.options.target_version < PythonVersion::PY38 {
