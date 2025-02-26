@@ -2,7 +2,7 @@ use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{ExprStringLiteral, Stmt};
+use ruff_python_ast::ExprStringLiteral;
 use ruff_text_size::TextRange;
 
 /// ## What it does
@@ -49,9 +49,7 @@ impl AlwaysFixableViolation for HardcodedStringCharset {
 /// FURB156
 pub(crate) fn hardcoded_string_charset_literal(checker: &Checker, expr: &ExprStringLiteral) {
     // if the string literal is a docstring, the rule is not applied
-    if !matches!(checker.semantic().current_statement(), &Stmt::Assign(_))
-        && !matches!(checker.semantic().current_statement(), &Stmt::AugAssign(_))
-    {
+    if checker.semantic().in_pep_257_docstring() {
         return;
     }
 
