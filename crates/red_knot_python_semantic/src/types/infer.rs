@@ -114,26 +114,9 @@ pub(crate) fn infer_scope_types<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Ty
     TypeInferenceBuilder::new(db, InferenceRegion::Scope(scope), index).finish()
 }
 
-/// TODO temporary cycle recovery for [`infer_definition_types()`], pending fixpoint iteration
-fn infer_definition_types_cycle_recovery<'db>(
-    db: &'db dyn Db,
-    _cycle: &salsa::Cycle,
-    input: Definition<'db>,
-) -> TypeInference<'db> {
-    let file = input.file(db);
-    let _span = tracing::trace_span!(
-        "infer_definition_types_cycle_recovery",
-        range = ?input.kind(db).target_range(),
-        file = %file.path(db)
-    )
-    .entered();
-
-    TypeInference::cycle_fallback(input.scope(db), todo_type!("cycle recovery"))
-}
-
 /// Infer all types for a [`Definition`] (including sub-expressions).
 /// Use when resolving a symbol name use or public type of a symbol.
-#[salsa::tracked(return_ref, recovery_fn=infer_definition_types_cycle_recovery)]
+#[salsa::tracked(return_ref, cycle_fn=definition_cycle_recover, cycle_initial=definition_cycle_initial)]
 pub(crate) fn infer_definition_types<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
@@ -149,6 +132,23 @@ pub(crate) fn infer_definition_types<'db>(
     let index = semantic_index(db, file);
 
     TypeInferenceBuilder::new(db, InferenceRegion::Definition(definition), index).finish()
+}
+
+fn definition_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &TypeInference<'db>,
+    count: u32,
+    _definition: Definition<'db>,
+) -> salsa::CycleRecoveryAction<TypeInference<'db>> {
+    assert!(count < 10, "cycle did not converge within 10 iterations");
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn definition_cycle_initial<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> TypeInference<'db> {
+    TypeInference::cycle_fallback(definition.scope(db), Type::Never)
 }
 
 /// Infer types for all deferred type expressions in a [`Definition`].
@@ -178,7 +178,7 @@ pub(crate) fn infer_deferred_types<'db>(
 /// Use rarely; only for cases where we'd otherwise risk double-inferring an expression: RHS of an
 /// assignment, which might be unpacking/multi-target and thus part of multiple definitions, or a
 /// type narrowing guard expression (e.g. if statement test node).
-#[salsa::tracked(return_ref)]
+#[salsa::tracked(return_ref, cycle_fn=expression_cycle_recover, cycle_initial=expression_cycle_initial)]
 pub(crate) fn infer_expression_types<'db>(
     db: &'db dyn Db,
     expression: Expression<'db>,
@@ -195,6 +195,23 @@ pub(crate) fn infer_expression_types<'db>(
     let index = semantic_index(db, file);
 
     TypeInferenceBuilder::new(db, InferenceRegion::Expression(expression), index).finish()
+}
+
+fn expression_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &TypeInference<'db>,
+    count: u32,
+    _expression: Expression<'db>,
+) -> salsa::CycleRecoveryAction<TypeInference<'db>> {
+    assert!(count < 10, "cycle did not converge within 10 iterations");
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn expression_cycle_initial<'db>(
+    db: &'db dyn Db,
+    expression: Expression<'db>,
+) -> TypeInference<'db> {
+    TypeInference::cycle_fallback(expression.scope(db), Type::Never)
 }
 
 /// Infers the type of an `expression` that is guaranteed to be in the same file as the calling query.
