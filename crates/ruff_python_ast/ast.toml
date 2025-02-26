@@ -37,7 +37,7 @@
 
 [Mod]
 anynode_is_label = "module"
-rustdoc = "/// See also [mod](https://docs.python.org/3/library/ast.html#ast.mod)"
+doc = "See also [mod](https://docs.python.org/3/library/ast.html#ast.mod)"
 
 [Mod.nodes]
 ModModule = {}
@@ -46,7 +46,7 @@ ModExpression = {}
 [Stmt]
 add_suffix_to_is_methods = true
 anynode_is_label = "statement"
-rustdoc = "/// See also [stmt](https://docs.python.org/3/library/ast.html#ast.stmt)"
+doc = "See also [stmt](https://docs.python.org/3/library/ast.html#ast.stmt)"
 
 [Stmt.nodes]
 StmtFunctionDef = {}
@@ -78,10 +78,10 @@ StmtIpyEscapeCommand = {}
 [Expr]
 add_suffix_to_is_methods = true
 anynode_is_label = "expression"
-rustdoc = "/// See also [expr](https://docs.python.org/3/library/ast.html#ast.expr)"
+doc = "See also [expr](https://docs.python.org/3/library/ast.html#ast.expr)"
 
 [Expr.nodes.ExprBoolOp]
-rustdoc = "/// See also [BoolOp](https://docs.python.org/3/library/ast.html#ast.BoolOp)"
+doc = "See also [BoolOp](https://docs.python.org/3/library/ast.html#ast.BoolOp)"
 
 [[Expr.nodes.ExprBoolOp.fields]]
 name = "op"
@@ -93,7 +93,7 @@ type = "Expr"
 seq = true
 
 [Expr.nodes.ExprNamed]
-rustdoc = "/// See also [NamedExpr](https://docs.python.org/3/library/ast.html#ast.NamedExpr)"
+doc = "See also [NamedExpr](https://docs.python.org/3/library/ast.html#ast.NamedExpr)"
 
 [[Expr.nodes.ExprNamed.fields]]
 name = "target"
@@ -104,7 +104,7 @@ name = "value"
 type = "Expr"
 
 [Expr.nodes.ExprBinOp]
-rustdoc = "/// See also [BinOp](https://docs.python.org/3/library/ast.html#ast.BinOp)"
+doc = "See also [BinOp](https://docs.python.org/3/library/ast.html#ast.BinOp)"
 
 [[Expr.nodes.ExprBinOp.fields]]
 name = "left"
@@ -119,7 +119,7 @@ name = "right"
 type = "Expr"
 
 [Expr.nodes.ExprUnaryOp]
-rustdoc = "/// See also [UnaryOp](https://docs.python.org/3/library/ast.html#ast.UnaryOp)"
+doc = "See also [UnaryOp](https://docs.python.org/3/library/ast.html#ast.UnaryOp)"
 
 [[Expr.nodes.ExprUnaryOp.fields]]
 name = "op"
@@ -130,7 +130,7 @@ name = "operand"
 type = "Expr"
 
 [Expr.nodes.ExprLambda]
-rustdoc = "/// See also [Lambda](https://docs.python.org/3/library/ast.html#ast.Lambda)"
+doc = "See also [Lambda](https://docs.python.org/3/library/ast.html#ast.Lambda)"
 
 [[Expr.nodes.ExprLambda.fields]]
 name = "parameters"
@@ -142,7 +142,7 @@ name = "body"
 type = "Expr"
 
 [Expr.nodes.ExprIf]
-rustdoc = "/// See also [IfExp](https://docs.python.org/3/library/ast.html#ast.IfExp)"
+doc = "See also [IfExp](https://docs.python.org/3/library/ast.html#ast.IfExp)"
 
 [[Expr.nodes.ExprIf.fields]]
 name = "test"
@@ -157,7 +157,7 @@ name = "orelse"
 type = "Expr"
 
 [Expr.nodes.ExprDict]
-rustdoc = "/// See also [Dict](https://docs.python.org/3/library/ast.html#ast.Dict)"
+doc = "See also [Dict](https://docs.python.org/3/library/ast.html#ast.Dict)"
 
 [[Expr.nodes.ExprDict.fields]]
 name = "items"
@@ -165,7 +165,7 @@ type = "DictItem"
 seq = true
 
 [Expr.nodes.ExprSet]
-rustdoc = "/// See also [Set](https://docs.python.org/3/library/ast.html#ast.Set)"
+doc = "See also [Set](https://docs.python.org/3/library/ast.html#ast.Set)"
 
 [[Expr.nodes.ExprSet.fields]]
 name = "elts"
@@ -173,7 +173,7 @@ type = "Expr"
 seq = true
 
 [Expr.nodes.ExprListComp]
-rustdoc = "/// See also [ListComp](https://docs.python.org/3/library/ast.html#ast.ListComp)"
+doc = "See also [ListComp](https://docs.python.org/3/library/ast.html#ast.ListComp)"
 
 [[Expr.nodes.ExprListComp.fields]]
 name = "elt"
@@ -185,7 +185,7 @@ type = "Comprehension"
 seq = true
 
 [Expr.nodes.ExprSetComp]
-rustdoc = "/// See also [SetComp](https://docs.python.org/3/library/ast.html#ast.SetComp)"
+doc = "See also [SetComp](https://docs.python.org/3/library/ast.html#ast.SetComp)"
 
 [[Expr.nodes.ExprSetComp.fields]]
 name = "elt"
@@ -197,7 +197,7 @@ type = "Comprehension"
 seq = true
 
 [Expr.nodes.ExprDictComp]
-rustdoc = "/// See also [DictComp](https://docs.python.org/3/library/ast.html#ast.DictComp)"
+doc = "See also [DictComp](https://docs.python.org/3/library/ast.html#ast.DictComp)"
 
 [[Expr.nodes.ExprDictComp.fields]]
 name = "key"
@@ -213,7 +213,7 @@ type = "Comprehension"
 seq = true
 
 [Expr.nodes.ExprGenerator]
-rustdoc = "/// See also [GeneratorExp](https://docs.python.org/3/library/ast.html#ast.GeneratorExp)"
+doc = "See also [GeneratorExp](https://docs.python.org/3/library/ast.html#ast.GeneratorExp)"
 
 [[Expr.nodes.ExprGenerator.fields]]
 name = "elt"
@@ -229,14 +229,14 @@ name = "parenthesized"
 type = "bool"
 
 [Expr.nodes.ExprAwait]
-rustdoc = "/// See also [Await](https://docs.python.org/3/library/ast.html#ast.Await)"
+doc = "See also [Await](https://docs.python.org/3/library/ast.html#ast.Await)"
 
 [[Expr.nodes.ExprAwait.fields]]
 name = "value"
 type = "Expr"
 
 [Expr.nodes.ExprYield]
-rustdoc = "/// See also [Yield](https://docs.python.org/3/library/ast.html#ast.Yield)"
+doc = "See also [Yield](https://docs.python.org/3/library/ast.html#ast.Yield)"
 
 [[Expr.nodes.ExprYield.fields]]
 name = "value"
@@ -244,14 +244,14 @@ type = "Expr"
 optional = true
 
 [Expr.nodes.ExprYieldFrom]
-rustdoc = "/// See also [YieldFrom](https://docs.python.org/3/library/ast.html#ast.YieldFrom)"
+doc = "See also [YieldFrom](https://docs.python.org/3/library/ast.html#ast.YieldFrom)"
 
 [[Expr.nodes.ExprYieldFrom.fields]]
 name = "value"
 type = "Expr"
 
 [Expr.nodes.ExprCompare]
-rustdoc = "/// See also [Compare](https://docs.python.org/3/library/ast.html#ast.Compare)"
+doc = "See also [Compare](https://docs.python.org/3/library/ast.html#ast.Compare)"
 
 [[Expr.nodes.ExprCompare.fields]]
 name = "left"
@@ -266,7 +266,7 @@ name = "comparators"
 type = "Box<[Expr]>"
 
 [Expr.nodes.ExprCall]
-rustdoc = "/// See also [Call](https://docs.python.org/3/library/ast.html#ast.Call)"
+doc = "See also [Call](https://docs.python.org/3/library/ast.html#ast.Call)"
 
 [[Expr.nodes.ExprCall.fields]]
 name = "func"
@@ -277,31 +277,30 @@ name = "arguments"
 type = "Arguments"
 
 [Expr.nodes.ExprFString]
-rustdoc = """
-An AST node that represents either a single-part f-string literal
+doc = """An AST node that represents either a single-part f-string literal
 or an implicitly concatenated f-string literal.
 
 This type differs from the original Python AST ([JoinedStr]) in that it
 doesn't join the implicitly concatenated parts into a single string. Instead,
 it keeps them separate and provide various methods to access the parts.
 
-[JoinedStr]: https://docs.python.org/3/library/ast.html#ast.JoinedStr"""
+See also [JoinedStr](https://docs.python.org/3/library/ast.html#ast.JoinedStr)"""
 
 [[Expr.nodes.ExprFString.fields]]
 name = "value"
 type = "FStringValue"
 
 [Expr.nodes.ExprStringLiteral]
-rustdoc = """/// An AST node that represents either a single-part string literal
-/// or an implicitly concatenated string literal."""
+doc = """An AST node that represents either a single-part string literal
+or an implicitly concatenated string literal."""
 
 [[Expr.nodes.ExprStringLiteral.fields]]
 name = "value"
 type = "StringLiteralValue"
 
 [Expr.nodes.ExprBytesLiteral]
-rustdoc = """/// An AST node that represents either a single-part bytestring literal
-/// or an implicitly concatenated bytestring literal."""
+doc = """An AST node that represents either a single-part bytestring literal
+or an implicitly concatenated bytestring literal."""
 
 [[Expr.nodes.ExprBytesLiteral.fields]]
 name = "value"
@@ -327,7 +326,7 @@ fields = []
 derives = ["Default"]
 
 [Expr.nodes.ExprAttribute]
-rustdoc = "/// See also [Attribute](https://docs.python.org/3/library/ast.html#ast.Attribute)"
+doc = "See also [Attribute](https://docs.python.org/3/library/ast.html#ast.Attribute)"
 
 [[Expr.nodes.ExprAttribute.fields]]
 name = "value"
@@ -342,7 +341,7 @@ name = "ctx"
 type = "ExprContext"
 
 [Expr.nodes.ExprSubscript]
-rustdoc = "/// See also [Subscript](https://docs.python.org/3/library/ast.html#ast.Subscript)"
+doc = "See also [Subscript](https://docs.python.org/3/library/ast.html#ast.Subscript)"
 
 [[Expr.nodes.ExprSubscript.fields]]
 name = "value"
@@ -357,7 +356,7 @@ name = "ctx"
 type = "ExprContext"
 
 [Expr.nodes.ExprStarred]
-rustdoc = "/// See also [Starred](https://docs.python.org/3/library/ast.html#ast.Starred)"
+doc = "See also [Starred](https://docs.python.org/3/library/ast.html#ast.Starred)"
 
 [[Expr.nodes.ExprStarred.fields]]
 name = "value"
@@ -368,7 +367,7 @@ name = "ctx"
 type = "ExprContext"
 
 [Expr.nodes.ExprName]
-rustdoc = "/// See also [Name](https://docs.python.org/3/library/ast.html#ast.Name)"
+doc = "See also [Name](https://docs.python.org/3/library/ast.html#ast.Name)"
 
 [[Expr.nodes.ExprName.fields]]
 name = "id"
@@ -379,7 +378,7 @@ name = "ctx"
 type = "ExprContext"
 
 [Expr.nodes.ExprList]
-rustdoc = "/// See also [List](https://docs.python.org/3/library/ast.html#ast.List)"
+doc = "See also [List](https://docs.python.org/3/library/ast.html#ast.List)"
 
 [[Expr.nodes.ExprList.fields]]
 name = "elts"
@@ -391,7 +390,7 @@ name = "ctx"
 type = "ExprContext"
 
 [Expr.nodes.ExprTuple]
-rustdoc = "/// See also [Tuple](https://docs.python.org/3/library/ast.html#ast.Tuple)"
+doc = "See also [Tuple](https://docs.python.org/3/library/ast.html#ast.Tuple)"
 
 [[Expr.nodes.ExprTuple.fields]]
 name = "elts"
@@ -407,7 +406,7 @@ name = "parenthesized"
 type = "bool"
 
 [Expr.nodes.ExprSlice]
-rustdoc = "/// See also [Slice](https://docs.python.org/3/library/ast.html#ast.Slice)"
+doc = "See also [Slice](https://docs.python.org/3/library/ast.html#ast.Slice)"
 
 [[Expr.nodes.ExprSlice.fields]]
 name = "lower"
@@ -425,14 +424,17 @@ type = "Expr"
 optional = true
 
 [Expr.nodes.ExprIpyEscapeCommand]
-rustdoc = """/// An AST node used to represent a IPython escape command at the expression level.
-///
-/// For example,
-/// ```python
-/// dir = !pwd
-///
-/// For more information related to terminology and syntax of escape commands,
-///  see [`StmtIpyEscapeCommand`]."""
+doc = """An AST node used to represent a IPython escape command at the expression level.
+
+For example,
+```python
+dir = !pwd
+```
+
+Here, the escape kind can only be `!` or `%` otherwise it is a syntax error.
+
+For more information related to terminology and syntax of escape commands,
+see [`StmtIpyEscapeCommand`]."""
 
 [[Expr.nodes.ExprIpyEscapeCommand.fields]]
 name = "kind"
@@ -444,7 +446,7 @@ type = "Box<str>"
 
 
 [ExceptHandler]
-rustdoc = "/// See also [excepthandler](https://docs.python.org/3/library/ast.html#ast.excepthandler)"
+doc = "See also [excepthandler](https://docs.python.org/3/library/ast.html#ast.excepthandler)"
 
 [ExceptHandler.nodes]
 ExceptHandlerExceptHandler = {}
@@ -454,7 +456,7 @@ FStringExpressionElement = {variant = "Expression"}
 FStringLiteralElement = {variant = "Literal"}
 
 [Pattern]
-rustdoc = "/// See also [pattern](https://docs.python.org/3/library/ast.html#ast.pattern)"
+doc = "See also [pattern](https://docs.python.org/3/library/ast.html#ast.pattern)"
 
 [Pattern.nodes]
 PatternMatchValue = {}
@@ -467,7 +469,7 @@ PatternMatchAs = {}
 PatternMatchOr = {}
 
 [TypeParam]
-rustdoc = "/// See also [type_param](https://docs.python.org/3/library/ast.html#ast.type_param)"
+doc = "See also [type_param](https://docs.python.org/3/library/ast.html#ast.type_param)"
 
 [TypeParam.nodes]
 TypeParamTypeVar = {}
