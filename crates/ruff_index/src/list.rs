@@ -158,6 +158,10 @@ impl<'a, K, V> Iterator for ListReverseIterator<'a, K, V> {
 pub struct ListBuilder<K, V = ()> {
     storage: ListStorage<K, V>,
 
+    /// Tracks which list cells are referenced by other cells more than once. This allows us to
+    /// modify cells in-place in some situations.
+    aliased: IndexVec<ListCellId, bool>,
+
     /// Scratch space that lets us implement our list operations iteratively instead of
     /// recursively.
     ///
@@ -189,6 +193,7 @@ impl<K, V> Default for ListBuilder<K, V> {
             storage: ListStorage {
                 cells: IndexVec::default(),
             },
+            aliased: IndexVec::default(),
             scratch: Vec::default(),
         }
     }
@@ -217,11 +222,15 @@ impl<K, V> ListBuilder<K, V> {
     /// list.
     #[allow(clippy::unnecessary_wraps)]
     fn add_cell(&mut self, rest: Option<ListCellId>, key: K, value: V) -> Option<ListCellId> {
+        self.aliased.push(false);
         Some(self.storage.cells.push(ListCell { rest, key, value }))
     }
 
     /// Clones an existing list.
     pub fn clone_list(&mut self, list: &List<K, V>) -> List<K, V> {
+        if let Some(cell_id) = list.last {
+            self.aliased[cell_id] = true;
+        }
         List::new(list.last)
     }
 
@@ -248,9 +257,11 @@ impl<K, V> ListBuilder<K, V> {
         // new key. Stash those away in our scratch accumulator as we step through the input. The
         // result of the loop is that "rest" of the result list, which we will stitch the new key
         // (and any succeeding keys) onto.
+        let mut aliased = false;
         let mut prev = None;
         let mut curr = list.last;
         while let Some(curr_id) = curr {
+            aliased = aliased || self.aliased[curr_id];
             let cell = &self.storage.cells[curr_id];
             match key.cmp(&cell.key) {
                 // We found an existing entry in the input list with the desired key.
@@ -260,6 +271,7 @@ impl<K, V> ListBuilder<K, V> {
                         builder: self,
                         list,
                         key,
+                        aliased,
                         existing_cell: curr,
                         insertion_point,
                         predecessor: prev,
@@ -272,6 +284,7 @@ impl<K, V> ListBuilder<K, V> {
                         builder: self,
                         list,
                         key,
+                        aliased,
                         existing_cell: None,
                         insertion_point: curr,
                         predecessor: prev,
@@ -292,6 +305,7 @@ impl<K, V> ListBuilder<K, V> {
             builder: self,
             list,
             key,
+            aliased,
             existing_cell: None,
             insertion_point: None,
             predecessor: prev,
@@ -304,6 +318,9 @@ pub struct ListEntry<'a, K, V = ()> {
     builder: &'a mut ListBuilder<K, V>,
     list: List<K, V>,
     key: K,
+    /// If none of the cells from the end of the list to the insertion point are aliased, we can
+    /// edit them in place.
+    aliased: bool,
     /// The cell of the element containing `key`, if there is one.
     existing_cell: Option<ListCellId>,
     /// The cell of the element immediately before where `key` would go in the list.
@@ -319,31 +336,56 @@ where
     V: Clone,
 {
     fn stitch_up(self, value: V) -> List<K, V> {
-        // Make copies of the keys/values of any cells that will appear after the new element.
-        self.builder.scratch.clear();
-        if self.predecessor.is_some() {
-            let mut curr = self.list.last;
-            loop {
-                let cell_id = curr.expect("cell should not be empty");
-                let cell = &self.builder.cells[cell_id];
-                let new_key = cell.key.clone();
-                let new_value = cell.value.clone();
-                let next = cell.rest;
-                self.builder.scratch.push((new_key, new_value));
-                if curr == self.predecessor {
-                    break;
-                } else {
-                    curr = next;
+        // If any of the cells from the end of the list to the insertion point are aliased, we have
+        // to create a new node and stitch it into place.
+        if self.aliased {
+            // Make copies of the keys/values of any cells that will appear after the new element.
+            self.builder.scratch.clear();
+            if self.predecessor.is_some() {
+                let mut curr = self.list.last;
+                loop {
+                    let cell_id = curr.expect("cell should not be empty");
+                    let cell = &self.builder.cells[cell_id];
+                    let new_key = cell.key.clone();
+                    let new_value = cell.value.clone();
+                    let next = cell.rest;
+                    self.builder.scratch.push((new_key, new_value));
+                    if curr == self.predecessor {
+                        break;
+                    } else {
+                        curr = next;
+                    }
                 }
             }
+
+            let mut last = self.insertion_point;
+            if let Some(insertion_point) = self.insertion_point {
+                self.builder.aliased[insertion_point] = true;
+            }
+            last = self.builder.add_cell(last, self.key, value);
+            while let Some((key, value)) = self.builder.scratch.pop() {
+                last = self.builder.add_cell(last, key, value);
+            }
+            return List::new(last);
         }
 
-        let mut last = self.insertion_point;
-        last = self.builder.add_cell(last, self.key, value);
-        while let Some((key, value)) = self.builder.scratch.pop() {
-            last = self.builder.add_cell(last, key, value);
+        // If not, we can edit the cells in-place. If the list already contained the key in
+        // question, then there's an existing cell we can use.
+        if let Some(existing) = self.existing_cell {
+            let cell = &mut self.builder.storage.cells[existing];
+            cell.value = value;
+            return self.list;
         }
-        List::new(last)
+
+        // Otherwise, we have to create a cell for the new key, but only have to edit two nodes to
+        // insert it into the middle of the list.
+        let new_cell = self.builder.add_cell(self.insertion_point, self.key, value);
+        let Some(predecessor) = self.predecessor else {
+            return List::new(new_cell);
+        };
+        let cell = &mut self.builder.storage.cells[predecessor];
+        cell.rest = new_cell;
+        self.list
     }
 
     /// Inserts a new key/value into the list if the key is not already present. If the list
