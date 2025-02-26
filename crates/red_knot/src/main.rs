@@ -266,27 +266,47 @@ impl MainLoop {
                             Severity::Error
                         };
 
-                    let failed = result
-                        .iter()
-                        .any(|diagnostic| diagnostic.severity() >= min_error_severity);
-
                     if check_revision == revision {
                         let mut stdout = stdout().lock();
-                        for diagnostic in result {
-                            writeln!(stdout, "{}", diagnostic.display(db, &display_config))?;
+                        if result.is_empty() {
+                            if db.project().files(db).is_empty() {
+                                tracing::warn!("No python files found under the given path(s)");
+                            }
+
+                            writeln!(stdout, "All checks passed!")?;
+
+                            if self.watcher.is_none() {
+                                return Ok(ExitStatus::Success);
+                            }
+                        } else {
+                            let mut failed = false;
+                            let diagnostics_count = result.len();
+
+                            for diagnostic in result {
+                                writeln!(stdout, "{}", diagnostic.display(db, &display_config))?;
+
+                                failed |= diagnostic.severity() >= min_error_severity;
+                            }
+
+                            writeln!(
+                                stdout,
+                                "Found {} diagnostic{}",
+                                diagnostics_count,
+                                if diagnostics_count > 1 { "s" } else { "" }
+                            )?;
+
+                            if self.watcher.is_none() {
+                                return Ok(if failed {
+                                    ExitStatus::Failure
+                                } else {
+                                    ExitStatus::Success
+                                });
+                            }
                         }
                     } else {
                         tracing::debug!(
                             "Discarding check result for outdated revision: current: {revision}, result revision: {check_revision}"
                         );
-                    }
-
-                    if self.watcher.is_none() {
-                        return Ok(if failed {
-                            ExitStatus::Failure
-                        } else {
-                            ExitStatus::Success
-                        });
                     }
 
                     tracing::trace!("Counts after last check:\n{}", countme::get_all());
@@ -333,7 +353,9 @@ impl MainLoopCancellationToken {
 enum MainLoopMessage {
     CheckWorkspace,
     CheckCompleted {
+        /// The diagnostics that were found during the check.
         result: Vec<Box<dyn Diagnostic>>,
+
         revision: u64,
     },
     ApplyChanges(Vec<watch::ChangeEvent>),

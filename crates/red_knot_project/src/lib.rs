@@ -1,6 +1,7 @@
 #![allow(clippy::ref_option)]
 
 use crate::metadata::options::OptionDiagnostic;
+use crate::walk::ProjectFilesWalker;
 pub use db::{Db, ProjectDatabase};
 use files::{Index, Indexed, IndexedFiles};
 use metadata::settings::Settings;
@@ -9,13 +10,11 @@ use red_knot_python_semantic::lint::{LintRegistry, LintRegistryBuilder, RuleSele
 use red_knot_python_semantic::register_lints;
 use red_knot_python_semantic::types::check_types;
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId, ParseDiagnostic, Severity, Span};
-use ruff_db::files::{system_path_to_file, File};
+use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::{source_text, SourceTextError};
-use ruff_db::system::walk_directory::WalkState;
-use ruff_db::system::{FileType, SystemPath, SystemPathBuf};
-use ruff_python_ast::PySourceType;
-use rustc_hash::{FxBuildHasher, FxHashSet};
+use ruff_db::system::{SystemPath, SystemPathBuf};
+use rustc_hash::FxHashSet;
 use salsa::Durability;
 use salsa::Setter;
 use std::borrow::Cow;
@@ -26,6 +25,7 @@ pub mod combine;
 mod db;
 mod files;
 pub mod metadata;
+mod walk;
 pub mod watch;
 
 pub static DEFAULT_LINT_REGISTRY: std::sync::LazyLock<LintRegistry> =
@@ -175,6 +175,7 @@ impl Project {
 
         rayon::scope(move |scope| {
             let files = ProjectFiles::new(&db, self);
+
             for file in &files {
                 let result = inner_result.clone();
                 let db = db.clone();
@@ -242,10 +243,11 @@ impl Project {
     }
 
     fn check_paths(self, db: &dyn Db) -> &[SystemPathBuf] {
-        if self.check_paths(db).is_empty() {
+        let list = self.check_path_list(db);
+        if list.is_empty() {
             std::slice::from_ref(&self.metadata(db).root)
         } else {
-            &*self.check_path_list(db)
+            &*list
         }
     }
 
@@ -341,7 +343,9 @@ impl Project {
                     tracing::debug_span!("Project::index_files", project = %self.name(db))
                         .entered();
 
-                let files = discover_project_files(db, self);
+                let walker = ProjectFilesWalker::new(db.system(), self.check_paths(db));
+                let files = walker.into_files_set(db);
+
                 tracing::info!("Found {} files in project `{}`", files.len(), self.name(db));
                 vacant.set(files)
             }
@@ -395,65 +399,6 @@ fn check_file_impl(db: &dyn Db, file: File) -> Vec<Box<dyn Diagnostic>> {
     });
 
     diagnostics
-}
-
-fn discover_project_files(db: &dyn Db, project: Project) -> FxHashSet<File> {
-    let paths = std::sync::Mutex::new(Vec::new());
-
-    let (first, rest) = match project.check_paths(db).split_first() {
-        Some((first, rest)) => (&**first, rest),
-        None => (project.root(db), &[] as &[SystemPathBuf]),
-    };
-
-    // TODO: Error if no files were found?
-    let mut walker = db.system().walk_directory(first);
-
-    for path in rest {
-        walker = walker.add(path);
-    }
-
-    walker.run(|| {
-        Box::new(|entry| {
-            match entry {
-                Ok(entry) => {
-                    // Skip over any non python files to avoid creating too many entries in `Files`.
-                    match entry.file_type() {
-                        FileType::File => {
-                            if entry
-                                .path()
-                                .extension()
-                                .and_then(PySourceType::try_from_extension)
-                                .is_some()
-                            {
-                                let mut paths = paths.lock().unwrap();
-                                paths.push(entry.into_path());
-                            }
-                        }
-                        FileType::Directory | FileType::Symlink => {}
-                    }
-                }
-                Err(error) => {
-                    // TODO Handle error
-                    tracing::error!("Failed to walk path: {error}");
-                }
-            }
-
-            WalkState::Continue
-        })
-    });
-
-    let paths = paths.into_inner().unwrap();
-    let mut files = FxHashSet::with_capacity_and_hasher(paths.len(), FxBuildHasher);
-
-    for path in paths {
-        // If this returns `None`, then the file was deleted between the `walk_directory` call and now.
-        // We can ignore this.
-        if let Ok(file) = system_path_to_file(db.upcast(), &path) {
-            files.insert(file);
-        }
-    }
-
-    files
 }
 
 #[derive(Debug)]

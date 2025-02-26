@@ -3,12 +3,11 @@ use crate::metadata::options::Options;
 use crate::watch::{ChangeEvent, CreatedKind, DeletedKind};
 use crate::{Project, ProjectMetadata};
 
+use crate::walk::ProjectFilesWalker;
 use red_knot_python_semantic::Program;
 use ruff_db::files::{system_path_to_file, File, Files};
-use ruff_db::system::walk_directory::WalkState;
 use ruff_db::system::SystemPath;
 use ruff_db::Db as _;
-use ruff_python_ast::PySourceType;
 use rustc_hash::FxHashSet;
 
 impl ProjectDatabase {
@@ -196,50 +195,16 @@ impl ProjectDatabase {
             }
         }
 
-        let mut added_paths = added_paths.into_iter();
-
         // Use directory walking to discover newly added files.
-        if let Some(path) = added_paths.next() {
-            let mut walker = self.system().walk_directory(&path);
 
-            for extra_path in added_paths {
-                walker = walker.add(&extra_path);
-            }
+        let added_paths: Vec<_> = added_paths.into_iter().collect();
+        let walker = ProjectFilesWalker::new(self.system(), &*added_paths);
 
-            let added_paths = std::sync::Mutex::new(Vec::default());
+        for path in walker.walk() {
+            let file = system_path_to_file(self, &path);
 
-            walker.run(|| {
-                Box::new(|entry| {
-                    let Ok(entry) = entry else {
-                        return WalkState::Continue;
-                    };
-
-                    if !entry.file_type().is_file() {
-                        return WalkState::Continue;
-                    }
-
-                    if entry.path().starts_with(&project_path)
-                        && entry
-                            .path()
-                            .extension()
-                            .and_then(PySourceType::try_from_extension)
-                            .is_some()
-                    {
-                        let mut paths = added_paths.lock().unwrap();
-
-                        paths.push(entry.into_path());
-                    }
-
-                    WalkState::Continue
-                })
-            });
-
-            for path in added_paths.into_inner().unwrap() {
-                let file = system_path_to_file(self, &path);
-
-                if let Ok(file) = file {
-                    project.add_file(self, file);
-                }
+            if let Ok(file) = file {
+                project.add_file(self, file);
             }
         }
     }

@@ -28,7 +28,7 @@ fn config_override() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -40,16 +40,18 @@ fn config_override() -> anyhow::Result<()> {
       |       ^^^^^^^^^^^^ Type `<module 'sys'>` has no attribute `last_exc`
       |
 
+    Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     assert_cmd_snapshot!(case.command().arg("--python-version").arg("3.12"), @r"
-        success: true
-        exit_code: 0
-        ----- stdout -----
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
 
-        ----- stderr -----
+    ----- stderr -----
     ");
 
     Ok(())
@@ -98,7 +100,7 @@ fn cli_arguments_are_relative_to_the_current_directory() -> anyhow::Result<()> {
     ])?;
 
     // Make sure that the CLI fails when the `libs` directory is not in the search path.
-    assert_cmd_snapshot!(case.command().current_dir(case.root().join("child")), @r###"
+    assert_cmd_snapshot!(case.command().current_dir(case.root().join("child")), @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -111,16 +113,18 @@ fn cli_arguments_are_relative_to_the_current_directory() -> anyhow::Result<()> {
     4 | stat = add(10, 15)
       |
 
+    Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     assert_cmd_snapshot!(case.command().current_dir(case.root().join("child")).arg("--extra-search-path").arg("../libs"), @r"
-        success: true
-        exit_code: 0
-        ----- stdout -----
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
 
-        ----- stderr -----
+    ----- stderr -----
     ");
 
     Ok(())
@@ -168,11 +172,12 @@ fn paths_in_configuration_files_are_relative_to_the_project_root() -> anyhow::Re
     ])?;
 
     assert_cmd_snapshot!(case.command().current_dir(case.root().join("child")), @r"
-        success: true
-        exit_code: 0
-        ----- stdout -----
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
 
-        ----- stderr -----
+    ----- stderr -----
     ");
 
     Ok(())
@@ -195,7 +200,7 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
 
     // Assert that there's a possibly unresolved reference diagnostic
     // and that division-by-zero has a severity of error by default.
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -217,9 +222,10 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
       |       - Name `x` used when possibly not defined
       |
 
+    Found 2 diagnostics
 
     ----- stderr -----
-    "###);
+    ");
 
     case.write_file(
         "pyproject.toml",
@@ -230,7 +236,7 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
     "#,
     )?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -243,9 +249,10 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
     4 | for a in range(0, y):
       |
 
+    Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -269,7 +276,7 @@ fn cli_rule_severity() -> anyhow::Result<()> {
 
     // Assert that there's a possibly unresolved reference diagnostic
     // and that division-by-zero has a severity of error by default.
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -302,9 +309,10 @@ fn cli_rule_severity() -> anyhow::Result<()> {
       |       - Name `x` used when possibly not defined
       |
 
+    Found 3 diagnostics
 
     ----- stderr -----
-    "###);
+    ");
 
     assert_cmd_snapshot!(
         case
@@ -315,7 +323,7 @@ fn cli_rule_severity() -> anyhow::Result<()> {
             .arg("division-by-zero")
             .arg("--warn")
             .arg("unresolved-import"),
-        @r###"
+        @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -339,9 +347,10 @@ fn cli_rule_severity() -> anyhow::Result<()> {
     6 | for a in range(0, y):
       |
 
+    Found 2 diagnostics
 
     ----- stderr -----
-    "###
+    "
     );
 
     Ok(())
@@ -365,7 +374,7 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
 
     // Assert that there's a possibly unresolved reference diagnostic
     // and that division-by-zero has a severity of error by default.
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -387,9 +396,10 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
       |       - Name `x` used when possibly not defined
       |
 
+    Found 2 diagnostics
 
     ----- stderr -----
-    "###);
+    ");
 
     assert_cmd_snapshot!(
         case
@@ -401,7 +411,7 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
             // Override the error severity with warning
             .arg("--ignore")
             .arg("possibly-unresolved-reference"),
-        @r###"
+        @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -414,9 +424,10 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
     4 | for a in range(0, y):
       |
 
+    Found 1 diagnostic
 
     ----- stderr -----
-    "###
+    "
     );
 
     Ok(())
@@ -436,7 +447,7 @@ fn configuration_unknown_rules() -> anyhow::Result<()> {
         ("test.py", "print(10)"),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @r#"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -448,9 +459,10 @@ fn configuration_unknown_rules() -> anyhow::Result<()> {
       | --------------- Unknown lint rule `division-by-zer`
       |
 
+    Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    "#);
 
     Ok(())
 }
@@ -460,15 +472,16 @@ fn configuration_unknown_rules() -> anyhow::Result<()> {
 fn cli_unknown_rules() -> anyhow::Result<()> {
     let case = TestCase::with_file("test.py", "print(10)")?;
 
-    assert_cmd_snapshot!(case.command().arg("--ignore").arg("division-by-zer"), @r###"
+    assert_cmd_snapshot!(case.command().arg("--ignore").arg("division-by-zer"), @r"
     success: true
     exit_code: 0
     ----- stdout -----
     warning: unknown-rule: Unknown lint rule `division-by-zer`
 
+    Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -477,7 +490,7 @@ fn cli_unknown_rules() -> anyhow::Result<()> {
 fn exit_code_only_warnings() -> anyhow::Result<()> {
     let case = TestCase::with_file("test.py", r"print(x)  # [unresolved-reference]")?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -488,9 +501,10 @@ fn exit_code_only_warnings() -> anyhow::Result<()> {
       |       - Name `x` used when not defined
       |
 
+    Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -505,7 +519,7 @@ fn exit_code_only_info() -> anyhow::Result<()> {
         "#,
     )?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -517,9 +531,10 @@ fn exit_code_only_info() -> anyhow::Result<()> {
       | -------------- info: Revealed type is `Literal[1]`
       |
 
+    Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -534,7 +549,7 @@ fn exit_code_only_info_and_error_on_warning_is_true() -> anyhow::Result<()> {
         "#,
     )?;
 
-    assert_cmd_snapshot!(case.command().arg("--error-on-warning"), @r###"
+    assert_cmd_snapshot!(case.command().arg("--error-on-warning"), @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -546,9 +561,10 @@ fn exit_code_only_info_and_error_on_warning_is_true() -> anyhow::Result<()> {
       | -------------- info: Revealed type is `Literal[1]`
       |
 
+    Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -557,7 +573,7 @@ fn exit_code_only_info_and_error_on_warning_is_true() -> anyhow::Result<()> {
 fn exit_code_no_errors_but_error_on_warning_is_true() -> anyhow::Result<()> {
     let case = TestCase::with_file("test.py", r"print(x)  # [unresolved-reference]")?;
 
-    assert_cmd_snapshot!(case.command().arg("--error-on-warning"), @r###"
+    assert_cmd_snapshot!(case.command().arg("--error-on-warning"), @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -568,9 +584,10 @@ fn exit_code_no_errors_but_error_on_warning_is_true() -> anyhow::Result<()> {
       |       - Name `x` used when not defined
       |
 
+    Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -588,7 +605,7 @@ fn exit_code_no_errors_but_error_on_warning_is_enabled_in_configuration() -> any
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -599,9 +616,10 @@ fn exit_code_no_errors_but_error_on_warning_is_enabled_in_configuration() -> any
       |       - Name `x` used when not defined
       |
 
+    Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -616,7 +634,7 @@ fn exit_code_both_warnings_and_errors() -> anyhow::Result<()> {
         "#,
     )?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -636,9 +654,10 @@ fn exit_code_both_warnings_and_errors() -> anyhow::Result<()> {
       |       ^ Cannot subscript object of type `Literal[4]` with no `__getitem__` method
       |
 
+    Found 2 diagnostics
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -653,7 +672,7 @@ fn exit_code_both_warnings_and_errors_and_error_on_warning_is_true() -> anyhow::
         "###,
     )?;
 
-    assert_cmd_snapshot!(case.command().arg("--error-on-warning"), @r###"
+    assert_cmd_snapshot!(case.command().arg("--error-on-warning"), @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -673,9 +692,10 @@ fn exit_code_both_warnings_and_errors_and_error_on_warning_is_true() -> anyhow::
       |       ^ Cannot subscript object of type `Literal[4]` with no `__getitem__` method
       |
 
+    Found 2 diagnostics
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -690,7 +710,7 @@ fn exit_code_exit_zero_is_true() -> anyhow::Result<()> {
         "#,
     )?;
 
-    assert_cmd_snapshot!(case.command().arg("--exit-zero"), @r###"
+    assert_cmd_snapshot!(case.command().arg("--exit-zero"), @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -710,9 +730,10 @@ fn exit_code_exit_zero_is_true() -> anyhow::Result<()> {
       |       ^ Cannot subscript object of type `Literal[4]` with no `__getitem__` method
       |
 
+    Found 2 diagnostics
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -749,7 +770,7 @@ fn user_configuration() -> anyhow::Result<()> {
 
     assert_cmd_snapshot!(
         case.command().current_dir(case.root().join("project")).env(config_env_var, config_directory.as_os_str()),
-        @r###"
+        @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -771,9 +792,10 @@ fn user_configuration() -> anyhow::Result<()> {
       |       - Name `x` used when possibly not defined
       |
 
+    Found 2 diagnostics
 
     ----- stderr -----
-    "###
+    "
     );
 
     // The user-level configuration promotes `possibly-unresolved-reference` to an error.
@@ -790,7 +812,7 @@ fn user_configuration() -> anyhow::Result<()> {
 
     assert_cmd_snapshot!(
         case.command().current_dir(case.root().join("project")).env(config_env_var, config_directory.as_os_str()),
-        @r###"
+        @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -812,9 +834,10 @@ fn user_configuration() -> anyhow::Result<()> {
       |       ^ Name `x` used when possibly not defined
       |
 
+    Found 2 diagnostics
 
     ----- stderr -----
-    "###
+    "
     );
 
     Ok(())
