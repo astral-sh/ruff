@@ -216,9 +216,10 @@ from typing import Iterable
 
 def f[T](x: T, y: T) -> None:
     class Ok[S]: ...
-    # TODO: error
+    # TODO: error for reuse of typevar
     class Bad1[T]: ...
-    # TODO: error
+    # TODO: no non-subscriptable error, error for reuse of typevar
+    # error: [non-subscriptable]
     class Bad2(Iterable[T]): ...
 ```
 
@@ -232,6 +233,7 @@ class C[T]:
     # TODO: error
     class Bad1[T]: ...
     # TODO: error
+    # error: [non-subscriptable]
     class Bad2(Iterable[T]): ...
 ```
 
