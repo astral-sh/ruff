@@ -87,5 +87,5 @@ Module(
   |
 1 | # parse_options: {"target-version": "3.9"}
 2 | {last := x for x in range(3)}
-  | ^^^^^^^^^^ Syntax Error: Cannot use unparenthesized assignment expression on Python 3.9 (syntax was added in Python 3.10)
+  |  ^^^^^^^^^ Syntax Error: Cannot use unparenthesized assignment expression on Python 3.9 (syntax was added in Python 3.10)
   |

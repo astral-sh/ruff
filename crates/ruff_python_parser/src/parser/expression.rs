@@ -879,7 +879,7 @@ impl<'src> Parser<'src> {
             {
                 self.add_unsupported_syntax_error(
                     UnsupportedSyntaxErrorKind::UnparWalrusBefore310,
-                    self.node_range(start),
+                    lower.range(),
                 );
             }
 
@@ -1660,8 +1660,8 @@ impl<'src> Parser<'src> {
                 // {last := x for x in range(3)}
                 if key_or_element.is_unparenthesized_named_expr() {
                     self.add_unsupported_syntax_error(
-                        UnsupportedSyntaxErrorKind::UnparWalrusBefore310,
-                        self.node_range(start),
+                        UnsupportedSyntaxErrorKind::UnparWalrus,
+                        key_or_element.range(),
                     );
                 }
 
@@ -1710,8 +1710,8 @@ impl<'src> Parser<'src> {
 
                 if key_or_element.is_unparenthesized_named_expr() {
                     self.add_unsupported_syntax_error(
-                        UnsupportedSyntaxErrorKind::UnparWalrusBefore310,
-                        self.node_range(start),
+                        UnsupportedSyntaxErrorKind::UnparWalrus,
+                        key_or_element.range(),
                     );
                 }
                 Expr::Set(self.parse_set_expression(key_or_element.expr, start))
@@ -1878,8 +1878,8 @@ impl<'src> Parser<'src> {
 
             if parsed_expr.is_unparenthesized_named_expr() {
                 parser.add_unsupported_syntax_error(
-                    UnsupportedSyntaxErrorKind::UnparWalrusBefore310,
-                    parser.node_range(start),
+                    UnsupportedSyntaxErrorKind::UnparWalrus,
+                    parsed_expr.range(),
                 );
             }
 
