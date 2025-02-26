@@ -2713,16 +2713,21 @@ fn cookiecutter_globbing() -> Result<()> {
     let tempdir = TempDir::new()?;
     let cookiecutter = tempdir.path().join("{{cookiecutter.repo_name}}");
     let cookiecutter_toml = cookiecutter.join("pyproject.toml");
-    fs::create_dir(&cookiecutter)?;
+    let tests = cookiecutter.join("tests");
+    fs::create_dir_all(&tests)?;
     fs::write(
-        cookiecutter_toml,
+        &cookiecutter_toml,
         r#"tool.ruff.lint.per-file-ignores = { "tests/*" = ["F811"] }"#,
     )?;
+    // F811 example from the docs to ensure the glob still works
+    let maintest = tests.join("maintest.py");
+    fs::write(maintest, "import foo\nimport bar\nimport foo")?;
     insta::with_settings!({
         filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/"), (r"\\", "/")]
     }, {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
+        .arg("--select=F811")
         .current_dir(tempdir.path()), @r#"
     success: true
     exit_code: 0
@@ -2732,6 +2737,27 @@ fn cookiecutter_globbing() -> Result<()> {
     ----- stderr -----
     warning: Error parsing original glob: `"[TMP]/{{cookiecutter.repo_name}}/tests/*"`, trying with escaped braces (`{}`)
     "#);
+    });
+
+    // after removing the config file with the ignore, F811 applies, so the glob worked above
+    fs::remove_file(cookiecutter_toml)?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/"), (r"\\", "/")]
+    }, {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .arg("--select=F811")
+        .current_dir(tempdir.path()), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    {{cookiecutter.repo_name}}/tests/maintest.py:3:8: F811 [*] Redefinition of unused `foo` from line 1
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    ");
     });
 
     Ok(())
