@@ -35,7 +35,7 @@ impl<'db> CallOutcome<'db> {
         let elements = union.elements(db);
         let mut bindings = Vec::with_capacity(elements.len());
         let mut errors = Vec::new();
-        let mut not_callable = true;
+        let mut not_callable = false;
 
         for element in elements {
             match call(*element) {
