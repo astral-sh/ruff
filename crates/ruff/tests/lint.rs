@@ -2668,6 +2668,69 @@ fn walrus_before_py38() {
 }
 
 #[test]
+fn unparenthesized_walrus_before_py310() {
+    let stdin = r#"
+# okay on 3.10 but not on 3.9
+{x := 1, 2, 3}  # set literal
+{last := x for x in range(3)}  # set comprehension
+# sequence indexes
+lst[x := 1]
+dct[x := 1]
+
+# never okay
+l[x:=1:-1]
+
+# always okay
+{(x := 1), 2, 3}
+{(last := x) for x in range(3)}
+lst[(x := 1)]
+dct[(x := 1)]
+l[(x:=1):-1]
+"#;
+
+    // 1 error from "never okay" slice
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--stdin-filename", "test.py"])
+        .arg("--target-version=py310")
+        .arg("-")
+        .pass_stdin(stdin),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:10:3: SyntaxError: Unparenthesized named expression cannot be used here
+    Found 1 error.
+
+    ----- stderr -----
+    "
+    );
+
+    // 5 errors on 3.9 with preview - 4 from 3.9, 1 from above
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--stdin-filename", "test.py"])
+        .arg("--target-version=py39")
+        .arg("--preview")
+        .arg("-")
+        .pass_stdin(stdin),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:3:2: SyntaxError: Cannot use unparenthesized assignment expression on Python 3.9 (syntax was added in Python 3.10)
+    test.py:4:2: SyntaxError: Cannot use unparenthesized assignment expression on Python 3.9 (syntax was added in Python 3.10)
+    test.py:6:5: SyntaxError: Cannot use unparenthesized assignment expression on Python 3.9 (syntax was added in Python 3.10)
+    test.py:7:5: SyntaxError: Cannot use unparenthesized assignment expression on Python 3.9 (syntax was added in Python 3.10)
+    test.py:10:3: SyntaxError: Unparenthesized named expression cannot be used here
+    Found 5 errors.
+
+    ----- stderr -----
+    "
+    );
+}
+
+#[test]
 fn match_before_py310() {
     // ok on 3.10
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
