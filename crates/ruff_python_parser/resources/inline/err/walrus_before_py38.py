@@ -1,2 +1,2 @@
-# parse_options: { "target_version": "3.7" }
+# parse_options: { "target-version": "3.7" }
 if x := 1: ...

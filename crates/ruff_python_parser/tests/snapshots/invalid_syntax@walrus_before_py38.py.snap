@@ -54,7 +54,7 @@ Module(
 ## Unsupported Syntax Errors
 
   |
-1 | # parse_options: { "target_version": "3.7" }
+1 | # parse_options: { "target-version": "3.7" }
 2 | if x := 1: ...
   |    ^^^^^^ Syntax Error: Cannot use named assignment expression (`:=`) on Python 3.7 (syntax was added in Python 3.8)
   |
