@@ -463,6 +463,41 @@ fn new_ignored_file() -> anyhow::Result<()> {
 }
 
 #[test]
+fn new_non_project_file() -> anyhow::Result<()> {
+    let mut case = setup_with_options([("bar.py", "")], |context| {
+        Some(Options {
+            environment: Some(EnvironmentOptions {
+                extra_paths: Some(vec![RelativePathBuf::cli(
+                    context.join_root_path("site_packages"),
+                )]),
+                ..EnvironmentOptions::default()
+            }),
+            ..Options::default()
+        })
+    })?;
+
+    let bar_path = case.project_path("bar.py");
+    let bar_file = case.system_file(&bar_path).unwrap();
+
+    assert_eq!(&case.collect_project_files(), &[bar_file]);
+
+    // Add a file to site packages
+    let black_path = case.root_path().join("site_packages/black.py");
+    std::fs::write(black_path.as_std_path(), "print('Hello')")?;
+
+    let changes = case.stop_watch(event_for_file("black.py"));
+
+    case.apply_changes(changes);
+
+    assert!(case.system_file(&black_path).is_ok());
+
+    // The file should not have been added to the project files
+    assert_eq!(&case.collect_project_files(), &[bar_file]);
+
+    Ok(())
+}
+
+#[test]
 fn changed_file() -> anyhow::Result<()> {
     let foo_source = "print('Hello, world!')";
     let mut case = setup([("foo.py", foo_source)])?;
@@ -1075,6 +1110,7 @@ fn hard_links_in_project() -> anyhow::Result<()> {
 
     assert_eq!(source_text(case.db(), foo).as_str(), "print('Version 1')");
     assert_eq!(source_text(case.db(), bar).as_str(), "print('Version 1')");
+    assert_eq!(case.collect_project_files(), &[bar, foo]);
 
     // Write to the hard link target.
     update_file(foo_path, "print('Version 2')").context("Failed to update foo.py")?;
@@ -1354,6 +1390,8 @@ mod unix {
         );
         assert_eq!(baz.file().path(case.db()).as_system_path(), Some(&*bar_baz));
 
+        assert_eq!(case.collect_project_files(), &[patched_bar_baz_file]);
+
         // Write to the symlink target.
         update_file(&patched_bar_baz, "def baz(): print('Version 2')")
             .context("Failed to update bar/baz.py")?;
@@ -1389,6 +1427,7 @@ mod unix {
             bar_baz_text = bar_baz_text.as_str()
         );
 
+        assert_eq!(case.collect_project_files(), &[patched_bar_baz_file]);
         Ok(())
     }
 
@@ -1469,6 +1508,8 @@ mod unix {
             Some(&*baz_original)
         );
 
+        assert_eq!(case.collect_project_files(), &[]);
+
         // Write to the symlink target.
         update_file(&baz_original, "def baz(): print('Version 2')")
             .context("Failed to update bar/baz.py")?;
@@ -1493,6 +1534,8 @@ mod unix {
             source_text(case.db(), baz_site_packages).as_str(),
             "def baz(): print('Version 2')"
         );
+
+        assert_eq!(case.collect_project_files(), &[]);
 
         Ok(())
     }
