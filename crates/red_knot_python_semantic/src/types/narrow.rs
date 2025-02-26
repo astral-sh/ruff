@@ -210,7 +210,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
         match expression_node {
-            ast::Expr::Name(name) => Some(self.evaluate_expr_name(name, is_positive)),
+            ast::Expr::Name(name) => Some(self.evaluate_expr_name(name, expression, is_positive)),
             ast::Expr::Compare(expr_compare) => {
                 self.evaluate_expr_compare(expr_compare, expression, is_positive)
             }
@@ -257,15 +257,49 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
     fn evaluate_expr_name(
         &mut self,
         expr_name: &ast::ExprName,
+        expression: Expression<'db>,
         is_positive: bool,
     ) -> NarrowingConstraints<'db> {
         let ast::ExprName { id, .. } = expr_name;
+        let inference = infer_expression_types(self.db, expression);
 
         let symbol = self
             .symbols()
             .symbol_id_by_name(id)
             .expect("Should always have a symbol for every Name node");
+        let ty = inference.expression_type(expr_name.scoped_expression_id(self.db, self.scope()));
+
         let mut constraints = NarrowingConstraints::default();
+
+        // TODO: Handle unions and intersections
+        let mut narrow_by_typeguards = || match ty {
+            Type::TypeGuard(type_guard) => {
+                let (_, guarded_symbol, _) = type_guard.symbol_info(self.db)?;
+
+                if !is_positive {
+                    return None;
+                }
+
+                constraints.insert(
+                    guarded_symbol,
+                    type_guard.ty(self.db).negate_if(self.db, !is_positive),
+                );
+
+                Some(())
+            }
+            Type::TypeIs(type_is) => {
+                let (_, guarded_symbol, _) = type_is.symbol_info(self.db)?;
+
+                constraints.insert(
+                    guarded_symbol,
+                    type_is.ty(self.db).negate_if(self.db, !is_positive),
+                );
+
+                Some(())
+            }
+            _ => None,
+        };
+        narrow_by_typeguards();
 
         constraints.insert(
             symbol,

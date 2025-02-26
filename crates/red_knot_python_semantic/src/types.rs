@@ -3583,6 +3583,7 @@ pub enum KnownFunction {
     Repr,
     /// `typing(_extensions).final`
     Final,
+    // TODO: Move this to `KnownClass`
     /// `builtins.staticmethod`
     StaticMethod,
 
@@ -3642,7 +3643,9 @@ impl KnownFunction {
     /// Return `true` if `self` is defined in `module` at runtime.
     const fn check_module(self, module: KnownModule) -> bool {
         match self {
-            Self::IsInstance | Self::IsSubclass | Self::Len | Self::Repr | Self::StaticMethod => module.is_builtins(),
+            Self::IsInstance | Self::IsSubclass | Self::Len | Self::Repr | Self::StaticMethod => {
+                module.is_builtins()
+            }
             Self::AssertType
             | Self::Cast
             | Self::Overload
@@ -4562,7 +4565,8 @@ pub(crate) mod tests {
                 KnownFunction::Len
                 | KnownFunction::Repr
                 | KnownFunction::IsInstance
-                | KnownFunction::IsSubclass => KnownModule::Builtins,
+                | KnownFunction::IsSubclass
+                | KnownFunction::StaticMethod => KnownModule::Builtins,
 
                 KnownFunction::GetattrStatic => KnownModule::Inspect,
 
