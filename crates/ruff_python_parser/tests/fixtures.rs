@@ -169,7 +169,6 @@ fn test_invalid_syntax(input_path: &Path) {
 /// # parse_options: { "target-version": "3.10" }
 /// def f(): ...
 fn extract_options(source: &str) -> Option<ParseOptions> {
-    // extract options from pragma on the first line
     let header = source.lines().next()?;
     let (_label, options) = header.split_once("# parse_options: ")?;
     serde_json::from_str(options.trim()).ok()
