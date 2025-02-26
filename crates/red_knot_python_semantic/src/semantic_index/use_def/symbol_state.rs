@@ -112,12 +112,12 @@ impl SymbolDeclarations {
         declaration: ScopedDefinitionId,
     ) {
         // The new declaration replaces all previous live declaration in this path.
-        self.live_declarations = symbol_states
-            .declarations
-            .entry(List::empty(), declaration)
-            .replace(LiveDeclaration {
+        self.live_declarations = symbol_states.declarations.singleton(
+            declaration,
+            LiveDeclaration {
                 visibility_constraint: ScopedVisibilityConstraintId::ALWAYS_TRUE,
-            });
+            },
+        );
     }
 
     /// Add given visibility constraint to all live declarations.
