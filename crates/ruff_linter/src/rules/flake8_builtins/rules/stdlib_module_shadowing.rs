@@ -120,10 +120,7 @@ pub(crate) fn stdlib_module_shadowing(
 fn get_prefix<'a>(settings: &'a LinterSettings, path: &Path) -> Option<&'a PathBuf> {
     let mut prefix = None;
     for dir in settings.src.iter().chain([&settings.project_root]) {
-        if path.starts_with(dir)
-            // TODO `is_none_or` when MSRV >= 1.82
-            && (prefix.is_none() || prefix.is_some_and(|existing| existing < dir))
-        {
+        if path.starts_with(dir) && prefix.is_none_or(|existing| existing < dir) {
             prefix = Some(dir);
         }
     }
