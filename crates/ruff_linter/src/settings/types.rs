@@ -169,15 +169,15 @@ impl FilePattern {
     pub fn add_to(self, builder: &mut GlobSetBuilder) -> Result<()> {
         match self {
             FilePattern::Builtin(pattern) => {
-                builder.add(Glob::from_str(pattern)?);
+                builder.add(try_glob_new(pattern)?);
             }
             FilePattern::User(pattern, absolute) => {
                 // Add the absolute path.
-                builder.add(Glob::new(&absolute.to_string_lossy())?);
+                builder.add(try_glob_new(&absolute.to_string_lossy())?);
 
                 // Add basename path.
                 if !pattern.contains(std::path::MAIN_SEPARATOR) {
-                    builder.add(Glob::new(&pattern)?);
+                    builder.add(try_glob_new(&pattern)?);
                 }
             }
         }
@@ -653,7 +653,7 @@ where
 /// For example, the `cookiecutter` package generates paths like `{{cookiecutter.repo_name}}`, which
 /// look like nested glob alternate expressions like `{foo,bar}`. The nested version is not
 /// supported by `globset`, causing an error.
-fn try_glob_new(s: &str) -> Result<Glob> {
+pub fn try_glob_new(s: &str) -> Result<Glob> {
     match Glob::new(s) {
         Err(e) if *e.kind() == globset::ErrorKind::NestedAlternates => {
             log::warn!("Error parsing original glob: `{s:?}`, trying with escaped braces (`{{}}`)");

@@ -4,12 +4,12 @@ use std::error::Error;
 use std::fmt;
 use std::fmt::Formatter;
 
-use globset::{Glob, GlobSet, GlobSetBuilder};
+use globset::{GlobSet, GlobSetBuilder};
 
 use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_macros::CacheKey;
 
-use crate::display_settings;
+use crate::{display_settings, settings::types::try_glob_new};
 
 #[derive(Debug, Clone, CacheKey)]
 pub struct Settings {
@@ -46,7 +46,7 @@ impl fmt::Display for Settings {
 /// Error returned by the [`TryFrom`] implementation of [`Settings`].
 #[derive(Debug)]
 pub enum SettingsError {
-    InvalidIgnoreName(globset::Error),
+    InvalidIgnoreName(anyhow::Error),
 }
 
 impl fmt::Display for SettingsError {
@@ -62,7 +62,7 @@ impl fmt::Display for SettingsError {
 impl Error for SettingsError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
-            SettingsError::InvalidIgnoreName(err) => Some(err),
+            SettingsError::InvalidIgnoreName(err) => Some(err.as_ref()),
         }
     }
 }
@@ -113,12 +113,12 @@ impl IgnoreNames {
         // defaults
         if let Some(names) = ignore_names {
             for name in names {
-                builder.add(Glob::new(&name).map_err(SettingsError::InvalidIgnoreName)?);
+                builder.add(try_glob_new(&name).map_err(SettingsError::InvalidIgnoreName)?);
                 literals.push(name);
             }
         } else {
             for name in DEFAULTS {
-                builder.add(Glob::new(name).unwrap());
+                builder.add(try_glob_new(name).unwrap());
                 literals.push((*name).to_string());
             }
         }
@@ -126,12 +126,14 @@ impl IgnoreNames {
         // Add the ignored names from the `extend-ignore-names` option.
         if let Some(names) = extend_ignore_names {
             for name in names {
-                builder.add(Glob::new(&name).map_err(SettingsError::InvalidIgnoreName)?);
+                builder.add(try_glob_new(&name).map_err(SettingsError::InvalidIgnoreName)?);
                 literals.push(name);
             }
         }
 
-        let matcher = builder.build().map_err(SettingsError::InvalidIgnoreName)?;
+        let matcher = builder
+            .build()
+            .map_err(|e| SettingsError::InvalidIgnoreName(e.into()))?;
 
         Ok(IgnoreNames::UserProvided { matcher, literals })
     }
@@ -166,11 +168,13 @@ impl IgnoreNames {
         let mut literals = Vec::new();
 
         for name in patterns {
-            builder.add(Glob::new(&name).map_err(SettingsError::InvalidIgnoreName)?);
+            builder.add(try_glob_new(&name).map_err(SettingsError::InvalidIgnoreName)?);
             literals.push(name);
         }
 
-        let matcher = builder.build().map_err(SettingsError::InvalidIgnoreName)?;
+        let matcher = builder
+            .build()
+            .map_err(|e| SettingsError::InvalidIgnoreName(e.into()))?;
 
         Ok(IgnoreNames::UserProvided { matcher, literals })
     }
