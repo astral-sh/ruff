@@ -55,11 +55,9 @@ pub(crate) fn nan_comparison(checker: &Checker, left: &Expr, comparators: &[Expr
 pub(crate) fn nan_comparison_match(checker: &Checker, cases: &[ast::MatchCase]) {
     nan_comparison_impl(
         checker,
-        cases.iter().filter_map(|case| {
-            case.pattern
-                .as_match_value()
-                .and_then(|pattern| Some(&*pattern.value))
-        }),
+        cases
+            .iter()
+            .filter_map(|case| case.pattern.as_match_value().map(|pattern| &*pattern.value)),
     );
 }
 
