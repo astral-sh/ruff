@@ -55,7 +55,7 @@ impl Loop {
 
 struct ScopeInfo {
     file_scope_id: FileScopeId,
-    /// Current loop state; None if this scope is currently not in a loop
+    /// Current loop state; None if we are not currently visiting a loop
     current_loop: Option<Loop>,
 }
 
