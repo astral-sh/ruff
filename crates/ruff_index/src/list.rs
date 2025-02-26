@@ -465,8 +465,52 @@ impl<K, V> ListBuilder<K, V> {
         // Zip through the lists, building up the keys/values of the new entries into our scratch
         // vector. Continue until we run out of elements in either list. (Any remaining elements in
         // the other list cannot possibly be in the intersection.)
+        //
+        // We reuse any unaliased cells at the end of `a`, since we consume both inputs and those
+        // cells are not used by any other lists. Once we encounter an aliased cell in `a`, we have
+        // to fall through to the lower loop, which creates new cells.
         let mut a = a.last;
         let mut b = b.last;
+        // The start and end of the range of cells that we're able to reuse, if any.
+        let mut unaliased_bounds: Option<(Option<ListCellId>, ListCellId)> = None;
+        while let (Some(a_id), Some(b_id)) = (a, b) {
+            // We've reached an aliased cell in `a`, so we have to switch over to creating new
+            // cells instead of reusing existing ones.
+            if self.aliased[a_id] {
+                break;
+            }
+
+            let a_cell = &self.storage.cells[a_id];
+            let b_cell = &self.storage.cells[b_id];
+            match a_cell.key.cmp(&b_cell.key) {
+                // Both lists contain this key; combine their values
+                Ordering::Equal => {
+                    let a_rest = a_cell.rest;
+                    let b_rest = b_cell.rest;
+                    let new_value = combine(&a_cell.value, &b_cell.value);
+                    // Update the `a` cell to contain the combined value.
+                    self.storage.cells[a_id].value = new_value;
+                    if let Some((_, unaliased_end)) = unaliased_bounds.as_mut() {
+                        // Connect the previous reused unaliased cell to this one, and update the
+                        // unaliased bounds to include this cell.
+                        self.storage.cells[*unaliased_end].rest = a;
+                        *unaliased_end = a_id;
+                    } else {
+                        // This is the first unaliased cell that we've been able to reuse.
+                        unaliased_bounds = Some((a, a_id));
+                    }
+                    a = a_rest;
+                    b = b_rest;
+                }
+                // a's key is only present in a, so it's not included in the result.
+                Ordering::Greater => a = a_cell.rest,
+                // b's key is only present in b, so it's not included in the result.
+                Ordering::Less => b = b_cell.rest,
+            }
+        }
+
+        // We have to build new cells from this point on. First add the new keys/values to the
+        // scratch accumulator.
         while let (Some(a_id), Some(b_id)) = (a, b) {
             let a_cell = &self.storage.cells[a_id];
             let b_cell = &self.storage.cells[b_id];
@@ -492,6 +536,14 @@ impl<K, V> ListBuilder<K, V> {
         while let Some((key, value)) = self.scratch.pop() {
             last = self.add_cell(last, key, value);
         }
+
+        // If we were able to reuse any unaliased cells, append them to any new cells we had to
+        // create.
+        if let Some((unaliased_start, unaliased_end)) = unaliased_bounds {
+            self.storage.cells[unaliased_end].rest = last;
+            last = unaliased_start;
+        }
+
         List::new(last)
     }
 
