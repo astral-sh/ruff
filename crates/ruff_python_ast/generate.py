@@ -34,6 +34,11 @@ def to_snake_case(node: str) -> str:
     return re.sub("([A-Z])", r"_\1", node).lower().lstrip("_")
 
 
+def write_rustdoc(out: list[str], doc: str) -> None:
+    for line in doc.split("\n"):
+        out.append(f"/// {line}")
+
+
 # ------------------------------------------------------------------------------
 # Read AST description
 
@@ -81,7 +86,7 @@ class Group:
 
     add_suffix_to_is_methods: bool
     anynode_is_label: str
-    rustdoc: str | None
+    doc: str | None
 
     def __init__(self, group_name: str, group: dict[str, Any]) -> None:
         self.name = group_name
@@ -89,7 +94,7 @@ class Group:
         self.ref_enum_ty = group_name + "Ref"
         self.add_suffix_to_is_methods = group.get("add_suffix_to_is_methods", False)
         self.anynode_is_label = group.get("anynode_is_label", to_snake_case(group_name))
-        self.rustdoc = group.get("rustdoc")
+        self.doc = group.get("doc")
         self.nodes = [
             Node(self, node_name, node) for node_name, node in group["nodes"].items()
         ]
@@ -100,7 +105,7 @@ class Node:
     name: str
     variant: str
     ty: str
-    rustdoc: str | None
+    doc: str | None
     fields: list[Field] | None
     derives: list[str]
 
@@ -113,7 +118,7 @@ class Node:
         if fields is not None:
             self.fields = [Field(f) for f in fields]
         self.derives = node.get("derives", [])
-        self.rustdoc = node.get("rustdoc")
+        self.doc = node.get("doc")
 
 
 @dataclass
@@ -173,8 +178,8 @@ def write_owned_enum(out: list[str], ast: Ast) -> None:
 
     for group in ast.groups:
         out.append("")
-        if group.rustdoc is not None:
-            out.append(group.rustdoc)
+        if group.doc is not None:
+            write_rustdoc(out, group.doc)
         out.append("#[derive(Clone, Debug, PartialEq)]")
         out.append(f"pub enum {group.owned_enum_ty} {{")
         for node in group.nodes:
@@ -349,8 +354,8 @@ def write_ref_enum(out: list[str], ast: Ast) -> None:
 
     for group in ast.groups:
         out.append("")
-        if group.rustdoc is not None:
-            out.append(group.rustdoc)
+        if group.doc is not None:
+            write_rustdoc(out, group.doc)
         out.append("""#[derive(Clone, Copy, Debug, PartialEq, is_macro::Is)]""")
         out.append(f"""pub enum {group.ref_enum_ty}<'a> {{""")
         for node in group.nodes:
@@ -593,8 +598,8 @@ def write_node(out: list[str], ast: Ast) -> None:
         for node in group.nodes:
             if node.fields is None:
                 continue
-            if node.rustdoc is not None:
-                out.append(node.rustdoc)
+            if node.doc is not None:
+                write_rustdoc(out, node.doc)
             out.append(
                 "#[derive(Clone, Debug, PartialEq"
                 + "".join(f", {derive}" for derive in node.derives)

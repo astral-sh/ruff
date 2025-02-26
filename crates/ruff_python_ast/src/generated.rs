@@ -6591,7 +6591,7 @@ pub struct ExprCall {
 /// doesn't join the implicitly concatenated parts into a single string. Instead,
 /// it keeps them separate and provide various methods to access the parts.
 ///
-/// [JoinedStr]: https://docs.python.org/3/library/ast.html#ast.JoinedStr
+/// See also [JoinedStr](https://docs.python.org/3/library/ast.html#ast.JoinedStr)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprFString {
     pub range: ruff_text_size::TextRange,
@@ -6674,7 +6674,7 @@ pub struct ExprName {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprList {
     pub range: ruff_text_size::TextRange,
-    pub elts: Vec<crate::Expr>,
+    pub elts: Option<Vec<crate::Expr>>,
     pub ctx: crate::ExprContext,
 }
 
@@ -6701,9 +6701,12 @@ pub struct ExprSlice {
 /// For example,
 /// ```python
 /// dir = !pwd
+/// ```
+///
+/// Here, the escape kind can only be `!` or `%` otherwise it is a syntax error.
 ///
 /// For more information related to terminology and syntax of escape commands,
-///  see [`StmtIpyEscapeCommand`].
+/// see [`StmtIpyEscapeCommand`].
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprIpyEscapeCommand {
     pub range: ruff_text_size::TextRange,
