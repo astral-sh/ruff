@@ -199,22 +199,6 @@ pub(crate) fn check(
             .flatten(),
     );
 
-    let lsp_diagnostics = lsp_diagnostics.chain(
-        show_syntax_errors
-            .then(|| {
-                parsed.unsupported_syntax_errors().iter().map(|error| {
-                    unsupported_syntax_error_to_lsp_diagnostic(
-                        error,
-                        &source_kind,
-                        locator.to_index(),
-                        encoding,
-                    )
-                })
-            })
-            .into_iter()
-            .flatten(),
-    );
-
     if let Some(notebook) = query.as_notebook() {
         for (index, diagnostic) in lsp_diagnostics {
             let Some(uri) = notebook.cell_uri_by_index(index) else {
