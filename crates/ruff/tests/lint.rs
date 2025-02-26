@@ -2725,18 +2725,18 @@ fn cookiecutter_globbing() -> Result<()> {
     insta::with_settings!({
         filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/"), (r"\\", "/")]
     }, {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
-        .arg("--select=F811")
-        .current_dir(tempdir.path()), @r#"
-    success: true
-    exit_code: 0
-    ----- stdout -----
-    All checks passed!
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .arg("--select=F811")
+            .current_dir(tempdir.path()), @r#"
+		success: true
+		exit_code: 0
+		----- stdout -----
+		All checks passed!
 
-    ----- stderr -----
-    warning: Error parsing original glob: `"[TMP]/{{cookiecutter.repo_name}}/tests/*"`, trying with escaped braces (`{}`)
-    "#);
+		----- stderr -----
+		warning: Error parsing original glob: `"[TMP]/{{cookiecutter.repo_name}}/tests/*"`, trying with escaped braces (`{}`)
+		"#);
     });
 
     // after removing the config file with the ignore, F811 applies, so the glob worked above
@@ -2745,19 +2745,19 @@ fn cookiecutter_globbing() -> Result<()> {
     insta::with_settings!({
         filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/"), (r"\\", "/")]
     }, {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
-        .arg("--select=F811")
-        .current_dir(tempdir.path()), @r"
-    success: false
-    exit_code: 1
-    ----- stdout -----
-    {{cookiecutter.repo_name}}/tests/maintest.py:3:8: F811 [*] Redefinition of unused `foo` from line 1
-    Found 1 error.
-    [*] 1 fixable with the `--fix` option.
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .arg("--select=F811")
+            .current_dir(tempdir.path()), @r"
+		success: false
+		exit_code: 1
+		----- stdout -----
+		{{cookiecutter.repo_name}}/tests/maintest.py:3:8: F811 [*] Redefinition of unused `foo` from line 1
+		Found 1 error.
+		[*] 1 fixable with the `--fix` option.
 
-    ----- stderr -----
-    ");
+		----- stderr -----
+		");
     });
 
     Ok(())

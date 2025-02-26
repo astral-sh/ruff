@@ -2156,26 +2156,26 @@ fn cookiecutter_globbing() -> Result<()> {
     insta::with_settings!({
         filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/"), (r"\\", "/")]
     }, {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["format", "--no-cache", "--diff"])
-        .current_dir(tempdir.path()), @r#"
-    success: false
-    exit_code: 1
-    ----- stdout -----
-    --- {{cookiecutter.repo_name}}/tests/maintest.py
-    +++ {{cookiecutter.repo_name}}/tests/maintest.py
-    @@ -1,3 +1,3 @@
-     import foo
-     import bar
-    -import foo
-    / No newline at end of file
-    +import foo
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .args(["format", "--no-cache", "--diff"])
+            .current_dir(tempdir.path()), @r#"
+        success: false
+        exit_code: 1
+        ----- stdout -----
+        --- {{cookiecutter.repo_name}}/tests/maintest.py
+        +++ {{cookiecutter.repo_name}}/tests/maintest.py
+        @@ -1,3 +1,3 @@
+        import foo
+        import bar
+        -import foo
+        / No newline at end of file
+        +import foo
 
 
-    ----- stderr -----
-    warning: Error parsing original glob: `"[TMP]/{{cookiecutter.repo_name}}/tests/*"`, trying with escaped braces (`{}`)
-    1 file would be reformatted
-    "#);
+        ----- stderr -----
+        warning: Error parsing original glob: `"[TMP]/{{cookiecutter.repo_name}}/tests/*"`, trying with escaped braces (`{}`)
+        1 file would be reformatted
+        "#);
     });
 
     Ok(())
