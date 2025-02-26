@@ -910,15 +910,26 @@ mod property_tests {
     where
         K: Clone + Ord,
     {
-        fn set_from_elements<'a>(&mut self, elements: impl IntoIterator<Item = &'a K>) -> List<K>
+        fn append_from_elements<'a>(
+            &mut self,
+            rest: List<K>,
+            elements: impl IntoIterator<Item = &'a K>,
+        ) -> List<K>
         where
             K: 'a,
         {
-            let mut set = List::empty();
+            let mut set = rest;
             for element in elements {
                 set = self.insert(set, element.clone());
             }
             set
+        }
+
+        fn set_from_elements<'a>(&mut self, elements: impl IntoIterator<Item = &'a K>) -> List<K>
+        where
+            K: 'a,
+        {
+            self.append_from_elements(List::empty(), elements)
         }
     }
 
@@ -933,6 +944,29 @@ mod property_tests {
         let expected: BTreeSet<_> = elements.iter().copied().collect();
         let actual = builder.iter_set_reverse(&set).copied();
         actual.eq(expected.into_iter().rev())
+    }
+
+    #[quickcheck_macros::quickcheck]
+    #[ignore]
+    fn roundtrip_shared_sets(a_elements: Vec<u16>, b_elements: Vec<u16>) -> bool {
+        // Create sets for `a` and `a ∪ b` in a way that induces structural sharing between the
+        // two.
+        let mut builder = ListBuilder::default();
+        let a = builder.set_from_elements(&a_elements);
+        let a_copy = builder.clone_list(&a);
+        let union = builder.append_from_elements(a_copy, &b_elements);
+
+        // Verify that the structural sharing did not change the contents of either set.
+        let a_expected: BTreeSet<_> = a_elements.iter().copied().collect();
+        let a_actual = builder.iter_set_reverse(&a).copied();
+        let union_expected: BTreeSet<_> = a_elements
+            .iter()
+            .copied()
+            .chain(b_elements.iter().copied())
+            .collect();
+        let union_actual = builder.iter_set_reverse(&union).copied();
+        a_actual.eq(a_expected.into_iter().rev())
+            && union_actual.eq(union_expected.into_iter().rev())
     }
 
     #[quickcheck_macros::quickcheck]
@@ -968,16 +1002,28 @@ mod property_tests {
         K: Clone + Ord,
         V: Clone + Eq,
     {
-        fn set_from_pairs<'a>(&mut self, pairs: impl IntoIterator<Item = &'a (K, V)>) -> List<K, V>
+        fn append_from_pairs<'a>(
+            &mut self,
+            rest: List<K, V>,
+            pairs: impl IntoIterator<Item = &'a (K, V)>,
+        ) -> List<K, V>
         where
             K: 'a,
             V: 'a,
         {
-            let mut list = List::empty();
+            let mut list = rest;
             for (key, value) in pairs {
                 list = self.entry(list, key.clone()).replace(value.clone());
             }
             list
+        }
+
+        fn list_from_pairs<'a>(&mut self, pairs: impl IntoIterator<Item = &'a (K, V)>) -> List<K, V>
+        where
+            K: 'a,
+            V: 'a,
+        {
+            self.append_from_pairs(List::empty(), pairs)
         }
     }
 
@@ -1000,10 +1046,33 @@ mod property_tests {
     #[ignore]
     fn roundtrip_list_from_vec(pairs: Vec<(u16, u16)>) -> bool {
         let mut builder = ListBuilder::default();
-        let list = builder.set_from_pairs(&pairs);
+        let list = builder.list_from_pairs(&pairs);
         let expected: BTreeMap<_, _> = pairs.iter().copied().collect();
         let actual = builder.iter_reverse(&list).map(|(k, v)| (*k, *v));
         actual.eq(expected.into_iter().rev())
+    }
+
+    #[quickcheck_macros::quickcheck]
+    #[ignore]
+    fn roundtrip_shared_lists(a_pairs: Vec<(u16, u16)>, b_pairs: Vec<(u16, u16)>) -> bool {
+        // Create lists for `a` and `a ∪ b` in a way that induces structural sharing between the
+        // two.
+        let mut builder = ListBuilder::default();
+        let a = builder.list_from_pairs(&a_pairs);
+        let a_copy = builder.clone_list(&a);
+        let union = builder.append_from_pairs(a_copy, &b_pairs);
+
+        // Verify that the structural sharing did not change the contents of either list.
+        let a_expected: BTreeMap<_, _> = a_pairs.iter().copied().collect();
+        let a_actual = builder.iter_reverse(&a).map(|(k, v)| (*k, *v));
+        let union_expected: BTreeMap<_, _> = a_pairs
+            .iter()
+            .copied()
+            .chain(b_pairs.iter().copied())
+            .collect();
+        let union_actual = builder.iter_reverse(&union).map(|(k, v)| (*k, *v));
+        a_actual.eq(a_expected.into_iter().rev())
+            && union_actual.eq(union_expected.into_iter().rev())
     }
 
     #[quickcheck_macros::quickcheck]
@@ -1013,8 +1082,8 @@ mod property_tests {
         b_elements: Vec<(u16, u16)>,
     ) -> bool {
         let mut builder = ListBuilder::default();
-        let a = builder.set_from_pairs(&a_elements);
-        let b = builder.set_from_pairs(&b_elements);
+        let a = builder.list_from_pairs(&a_elements);
+        let b = builder.list_from_pairs(&b_elements);
         let intersection = builder.intersect_with(a, b, |a, b| a + b);
         let a_map: BTreeMap<_, _> = a_elements.iter().copied().collect();
         let b_map: BTreeMap<_, _> = b_elements.iter().copied().collect();
@@ -1031,8 +1100,8 @@ mod property_tests {
     #[ignore]
     fn roundtrip_list_union(a_elements: Vec<(u16, u16)>, b_elements: Vec<(u16, u16)>) -> bool {
         let mut builder = ListBuilder::default();
-        let a = builder.set_from_pairs(&a_elements);
-        let b = builder.set_from_pairs(&b_elements);
+        let a = builder.list_from_pairs(&a_elements);
+        let b = builder.list_from_pairs(&b_elements);
         let union = builder.union_with(a, b, |a, b| a + b);
         let a_map: BTreeMap<_, _> = a_elements.iter().copied().collect();
         let b_map: BTreeMap<_, _> = b_elements.iter().copied().collect();
