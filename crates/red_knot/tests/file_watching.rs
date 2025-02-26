@@ -1298,6 +1298,31 @@ mod unix {
 
         Ok(())
     }
+}
+
+#[cfg(any(windows, unix))]
+mod symlink {
+    use crate::{event_for_file, setup, setup_with_options, update_file, SetupContext};
+    use anyhow::Context;
+    use red_knot_project::metadata::options::{EnvironmentOptions, Options};
+    use red_knot_project::metadata::value::{RangedValue, RelativePathBuf};
+    use red_knot_python_semantic::{resolve_module, ModuleName};
+    use ruff_db::source::source_text;
+    use ruff_db::system::SystemPath;
+    use ruff_db::Upcast;
+    use ruff_python_ast::PythonVersion;
+
+    #[cfg(unix)]
+    fn symlink_file(original: &SystemPath, target: &SystemPath) -> anyhow::Result<()> {
+        std::os::unix::fs::symlink(original.as_std_path(), target.as_std_path())
+            .context("Failed to create symlink")
+    }
+
+    #[cfg(windows)]
+    fn symlink_file(original: &SystemPath, target: &SystemPath) -> anyhow::Result<()> {
+        std::os::windows::fs::symlink_file(original.as_std_path(), target.as_std_path())
+            .context("Failed to create symlink")
+    }
 
     /// Project contains a symlink to another directory inside the project.
     /// Changes to files in the symlinked directory should be reflected
@@ -1327,7 +1352,7 @@ mod unix {
 
             // Create a symlink inside site-packages
             let bar_in_project = context.join_project_path("bar");
-            std::os::unix::fs::symlink(link_target.as_std_path(), bar_in_project.as_std_path())
+            symlink_file(&link_target, &bar_in_project)
                 .context("Failed to create symlink to bar package")?;
 
             Ok(())
@@ -1422,11 +1447,8 @@ mod unix {
                     context.join_project_path(".venv/lib/python3.12/site-packages");
                 std::fs::create_dir_all(venv_site_packages.parent().unwrap())
                     .context("Failed to create .venv directory")?;
-                std::os::unix::fs::symlink(
-                    site_packages.as_std_path(),
-                    venv_site_packages.as_std_path(),
-                )
-                .context("Failed to create symlink to site-packages")?;
+                symlink_file(&site_packages, &venv_site_packages)
+                    .context("Failed to create symlink to site-packages")?;
 
                 Ok(())
             },
