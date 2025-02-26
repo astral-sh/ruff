@@ -8,8 +8,6 @@ use ruff_text_size::TextRange;
 /// ## What it does
 /// Checks for uses of hardcoded charsets, which are defined in Python string module.
 ///
-/// Note that the rule doesn't apply to docstring.
-///
 /// ## Why is this bad?
 /// Usage of named charsets from the standard library is more readable and less error-prone.
 ///
