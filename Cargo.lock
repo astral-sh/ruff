@@ -2889,6 +2889,8 @@ dependencies = [
 name = "ruff_index"
 version = "0.0.0"
 dependencies = [
+ "quickcheck",
+ "quickcheck_macros",
  "ruff_macros",
  "salsa",
  "static_assertions",

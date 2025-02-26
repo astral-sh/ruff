@@ -1,3 +1,70 @@
+//! Sorted, arena-allocated association lists
+//!
+//! An [_association list_][alist], which is a linked list of key/value pairs. We additionally
+//! guarantee that the elements of an association list are sorted (by their keys), and that they do
+//! not contain any entries with duplicate keys.
+//!
+//! Association lists have fallen out of favor in recent decades, since you often need operations
+//! that are inefficient on them. In particular, looking up a random element by index is O(n), just
+//! like a linked list; and looking up an element by key is also O(n), since you must do a linear
+//! scan of the list to find the matching element. The typical implementation also suffers from
+//! poor cache locality and high memory allocation overhead, since individual list cells are
+//! typically allocated separately from the heap.
+//!
+//! We solve that last problem by storing the cells of an association list in an [`IndexVec`]
+//! arena. You provide the index type (`I`) that you want to use with this arena. That means that
+//! an individual association list is represented by an `Option<I>`, with `None` representing an
+//! empty list.
+//!
+//! We exploit structural sharing where possible, reusing cells across multiple lists when we can.
+//! That said, we don't guarantee that lists are canonical — it's entirely possible for two lists
+//! with identical contents to use different list cells and have different identifiers.
+//!
+//! Given all of this, association lists have the following benefits:
+//!
+//! - Lists can be represented by a single 32-bit integer (the index into the arena of the head of
+//!   the list).
+//! - Lists can be cloned in constant time, since the underlying cells are immutable.
+//! - Lists can be combined quickly (for both intersection and union), especially when you already
+//!   have to zip through both input lists to combine each key's values in some way.
+//!
+//! There is one remaining caveat:
+//!
+//! - You should construct lists in key order; doing this lets you insert each value in constant time.
+//!   Inserting entries in reverse order results in _quadratic_ overall time to construct the list.
+//!
+//! Lists are created using a [`ListBuilder`], and once created are accessed via a [`ListStorage`].
+//!
+//! ## Tests
+//!
+//! This module contains quickcheck-based property tests.
+//!
+//! These tests are disabled by default, as they are non-deterministic and slow. You can run them
+//! explicitly using:
+//!
+//! ```sh
+//! cargo test -p ruff_index -- --ignored list::property_tests
+//! ```
+//!
+//! The number of tests (default: 100) can be controlled by setting the `QUICKCHECK_TESTS`
+//! environment variable. For example:
+//!
+//! ```sh
+//! QUICKCHECK_TESTS=10000 cargo test …
+//! ```
+//!
+//! If you want to run these tests for a longer period of time, it's advisable to run them in
+//! release mode. As some tests are slower than others, it's advisable to run them in a loop until
+//! they fail:
+//!
+//! ```sh
+//! export QUICKCHECK_TESTS=100000
+//! while cargo test --release -p ruff_index -- \
+//!   --ignored list::property_tests; do :; done
+//! ```
+//!
+//! [alist]: https://en.wikipedia.org/wiki/Association_list
+
 use std::cmp::Ordering;
 use std::marker::PhantomData;
 use std::ops::Deref;
@@ -8,42 +75,8 @@ use crate::vec::IndexVec;
 // Allows the macro invocation below to work
 use crate as ruff_index;
 
-/// An [_association list_][alist], which is a linked list of key/value pairs. We additionally
-/// guarantee that the elements of an association list are sorted (by their keys), and that they do
-/// not contain any entries with duplicate keys.
-///
-/// Association lists have fallen out of favor in recent decades, since you often need operations
-/// that are inefficient on them. In particular, looking up a random element by index is O(n), just
-/// like a linked list; and looking up an element by key is also O(n), since you must do a linear
-/// scan of the list to find the matching element. The typical implementation also suffers from
-/// poor cache locality and high memory allocation overhead, since individual list cells are
-/// typically allocated separately from the heap.
-///
-/// We solve that last problem by storing the cells of an association list in an [`IndexVec`]
-/// arena. You provide the index type (`I`) that you want to use with this arena. That means that
-/// an individual association list is represented by an `Option<I>`, with `None` representing an
-/// empty list.
-///
-/// We exploit structural sharing where possible, reusing cells across multiple lists when we can.
-/// That said, we don't guarantee that lists are canonical — it's entirely possible for two lists
-/// with identical contents to use different list cells and have different identifiers.
-///
-/// Given all of this, association lists have the following benefits:
-///
-/// - Lists can be represented by a single 32-bit integer (the index into the arena of the head of
-///   the list).
-/// - Lists can be cloned in constant time, since the underlying cells are immutable.
-/// - Lists can be combined quickly (for both intersection and union), especially when you already
-///   have to zip through both input lists to combine each key's values in some way.
-///
-/// There is one remaining caveat:
-///
-/// - You should construct lists in key order; doing this lets you insert each value in constant time.
-///   Inserting entries in reverse order results in _quadratic_ overall time to construct the list.
-///
-/// Lists are created using a [`ListBuilder`], and once created are accessed via a [`ListStorage`].
-///
-/// [alist]: https://en.wikipedia.org/wiki/Association_list
+/// A handle to an association list. Use [`ListStorage`] to access its elements, and
+/// [`ListBuilder`] to construct other lists based on this one.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct List<K, V = ()> {
     last: Option<ListCellId>,
@@ -279,7 +312,7 @@ enum ListTail<I> {
 
 impl<K, V> ListEntry<'_, K, V>
 where
-    K: Clone + Ord,
+    K: Clone,
     V: Clone,
 {
     fn stitch_up(self, rest: Option<ListCellId>, value: V) -> List<K, V> {
@@ -793,5 +826,160 @@ mod tests {
         assert_eq!(builder.display(union), "[2:40, 4:40, 5:50, 7:70]");
         let union = builder.union_with(map1234, map2457, |a, b| a + b);
         assert_eq!(builder.display(union), "[1:1, 2:22, 3:3, 4:44, 5:50, 7:70]");
+    }
+}
+
+// --------------
+// Property tests
+
+#[cfg(test)]
+mod property_tests {
+    use super::*;
+
+    use std::collections::{BTreeMap, BTreeSet};
+
+    impl<K> ListBuilder<K>
+    where
+        K: Clone + Ord,
+    {
+        fn set_from_elements<'a>(&mut self, elements: impl IntoIterator<Item = &'a K>) -> List<K>
+        where
+            K: 'a,
+        {
+            let mut set = List::empty();
+            for element in elements {
+                set = self.insert(set, element.clone());
+            }
+            set
+        }
+    }
+
+    // For most of the tests below, we use a vec as our input, instead of a HashSet or BTreeSet,
+    // since we want to test the behavior of adding duplicate elements to the set.
+
+    #[quickcheck_macros::quickcheck]
+    #[ignore]
+    #[allow(clippy::needless_pass_by_value)]
+    fn roundtrip_set_from_vec(elements: Vec<u16>) -> bool {
+        let mut builder = ListBuilder::default();
+        let set = builder.set_from_elements(&elements);
+        let expected: BTreeSet<_> = elements.iter().copied().collect();
+        let actual = builder.iter_set_reverse(set).copied();
+        actual.eq(expected.into_iter().rev())
+    }
+
+    #[quickcheck_macros::quickcheck]
+    #[ignore]
+    #[allow(clippy::needless_pass_by_value)]
+    fn roundtrip_set_intersection(a_elements: Vec<u16>, b_elements: Vec<u16>) -> bool {
+        let mut builder = ListBuilder::default();
+        let a = builder.set_from_elements(&a_elements);
+        let b = builder.set_from_elements(&b_elements);
+        let intersection = builder.intersect(a, b);
+        let a_set: BTreeSet<_> = a_elements.iter().copied().collect();
+        let b_set: BTreeSet<_> = b_elements.iter().copied().collect();
+        let expected: Vec<_> = a_set.intersection(&b_set).copied().collect();
+        let actual = builder.iter_set_reverse(intersection).copied();
+        actual.eq(expected.into_iter().rev())
+    }
+
+    #[quickcheck_macros::quickcheck]
+    #[ignore]
+    #[allow(clippy::needless_pass_by_value)]
+    fn roundtrip_set_union(a_elements: Vec<u16>, b_elements: Vec<u16>) -> bool {
+        let mut builder = ListBuilder::default();
+        let a = builder.set_from_elements(&a_elements);
+        let b = builder.set_from_elements(&b_elements);
+        let union = builder.union(a, b);
+        let a_set: BTreeSet<_> = a_elements.iter().copied().collect();
+        let b_set: BTreeSet<_> = b_elements.iter().copied().collect();
+        let expected: Vec<_> = a_set.union(&b_set).copied().collect();
+        let actual = builder.iter_set_reverse(union).copied();
+        actual.eq(expected.into_iter().rev())
+    }
+
+    impl<K, V> ListBuilder<K, V>
+    where
+        K: Clone + Ord,
+        V: Clone + Eq,
+    {
+        fn set_from_pairs<'a>(&mut self, pairs: impl IntoIterator<Item = &'a (K, V)>) -> List<K, V>
+        where
+            K: 'a,
+            V: 'a,
+        {
+            let mut list = List::empty();
+            for (key, value) in pairs {
+                list = self.entry(list, key.clone()).replace(value.clone());
+            }
+            list
+        }
+    }
+
+    fn join<K, V>(a: &BTreeMap<K, V>, b: &BTreeMap<K, V>) -> BTreeMap<K, (Option<V>, Option<V>)>
+    where
+        K: Clone + Ord,
+        V: Clone + Ord,
+    {
+        let mut joined: BTreeMap<K, (Option<V>, Option<V>)> = BTreeMap::new();
+        for (k, v) in a {
+            joined.entry(k.clone()).or_default().0 = Some(v.clone());
+        }
+        for (k, v) in b {
+            joined.entry(k.clone()).or_default().1 = Some(v.clone());
+        }
+        joined
+    }
+
+    #[quickcheck_macros::quickcheck]
+    #[ignore]
+    #[allow(clippy::needless_pass_by_value)]
+    fn roundtrip_list_from_vec(pairs: Vec<(u16, u16)>) -> bool {
+        let mut builder = ListBuilder::default();
+        let list = builder.set_from_pairs(&pairs);
+        let expected: BTreeMap<_, _> = pairs.iter().copied().collect();
+        let actual = builder.iter_reverse(list).map(|(k, v)| (*k, *v));
+        actual.eq(expected.into_iter().rev())
+    }
+
+    #[quickcheck_macros::quickcheck]
+    #[ignore]
+    #[allow(clippy::needless_pass_by_value)]
+    fn roundtrip_list_intersection(
+        a_elements: Vec<(u16, u16)>,
+        b_elements: Vec<(u16, u16)>,
+    ) -> bool {
+        let mut builder = ListBuilder::default();
+        let a = builder.set_from_pairs(&a_elements);
+        let b = builder.set_from_pairs(&b_elements);
+        let intersection = builder.intersect_with(a, b, |a, b| a + b);
+        let a_map: BTreeMap<_, _> = a_elements.iter().copied().collect();
+        let b_map: BTreeMap<_, _> = b_elements.iter().copied().collect();
+        let intersection_map = join(&a_map, &b_map);
+        let expected: Vec<_> = intersection_map
+            .into_iter()
+            .filter_map(|(k, (v1, v2))| Some((k, v1? + v2?)))
+            .collect();
+        let actual = builder.iter_reverse(intersection).map(|(k, v)| (*k, *v));
+        actual.eq(expected.into_iter().rev())
+    }
+
+    #[quickcheck_macros::quickcheck]
+    #[ignore]
+    #[allow(clippy::needless_pass_by_value)]
+    fn roundtrip_list_union(a_elements: Vec<(u16, u16)>, b_elements: Vec<(u16, u16)>) -> bool {
+        let mut builder = ListBuilder::default();
+        let a = builder.set_from_pairs(&a_elements);
+        let b = builder.set_from_pairs(&b_elements);
+        let union = builder.union_with(a, b, |a, b| a + b);
+        let a_map: BTreeMap<_, _> = a_elements.iter().copied().collect();
+        let b_map: BTreeMap<_, _> = b_elements.iter().copied().collect();
+        let union_map = join(&a_map, &b_map);
+        let expected: Vec<_> = union_map
+            .into_iter()
+            .map(|(k, (v1, v2))| (k, v1.unwrap_or_default() + v2.unwrap_or_default()))
+            .collect();
+        let actual = builder.iter_reverse(union).map(|(k, v)| (*k, *v));
+        actual.eq(expected.into_iter().rev())
     }
 }
