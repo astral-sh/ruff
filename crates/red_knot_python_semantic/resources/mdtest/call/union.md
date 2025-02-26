@@ -126,3 +126,21 @@ def _(flag: bool):
     x = f(3)
     reveal_type(x)  # revealed: Unknown
 ```
+
+## One not-callable, one wrong argument
+
+```py
+class C: ...
+
+def f1(): ...
+def _(flag: bool):
+    if flag:
+        f = f1
+    else:
+        f = C()
+
+    # TODO: we should either show all union errors here, or prioritize the not-callable error
+    # error: [too-many-positional-arguments] "Too many positional arguments to function `f1`: expected 0, got 1"
+    x = f(3)
+    reveal_type(x)  # revealed: Unknown
+```
