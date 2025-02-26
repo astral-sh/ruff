@@ -2724,14 +2724,13 @@ fn cookiecutter_globbing() -> Result<()> {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
         .current_dir(tempdir.path()), @r#"
-    success: false
-    exit_code: 2
+    success: true
+    exit_code: 0
     ----- stdout -----
+    All checks passed!
 
     ----- stderr -----
-    ruff failed
-      Cause: invalid glob "[TMP]/{{cookiecutter.repo_name}}/tests/*"
-      Cause: error parsing glob '[TMP]/{{cookiecutter.repo_name}}/tests/*': nested alternate groups are not allowed
+    warning: Error parsing original glob: `"[TMP]/{{cookiecutter.repo_name}}/tests/*"`, trying with escaped braces (`{}`)
     "#);
     });
 
