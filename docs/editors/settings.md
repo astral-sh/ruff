@@ -78,7 +78,9 @@ _Using configuration file path:_
       "lsp": {
         "ruff": {
           "initialization_options": {
-            "configuration": "~/path/to/ruff.toml"
+            "settings": {
+              "configuration": "~/path/to/ruff.toml"
+            }
           }
         }
       }
@@ -142,20 +144,22 @@ _Using inline configuration:_
       "lsp": {
         "ruff": {
           "initialization_options": {
-            "configuration": {
-              "lint": {
-                "unfixable": ["F401"],
-                "extend-select": ["TID251"],
-                "flake8-tidy-imports": {
-                  "banned-api": {
-                    "typing.TypedDict": {
-                      "msg": "Use `typing_extensions.TypedDict` instead"
+            "settings": {
+              "configuration": {
+                "lint": {
+                  "unfixable": ["F401"],
+                  "extend-select": ["TID251"],
+                  "flake8-tidy-imports": {
+                    "banned-api": {
+                      "typing.TypedDict": {
+                        "msg": "Use `typing_extensions.TypedDict` instead"
+                      }
                     }
                   }
+                },
+                "format": {
+                  "quote-style": "single"
                 }
-              },
-              "format": {
-                "quote-style": "single"
               }
             }
           }
@@ -700,9 +704,7 @@ Whether to enable linting. Set to `false` to use Ruff exclusively as a formatter
           "initialization_options": {
             "settings": {
               "lint": {
-                "enable" = {
-                  "enable": false
-                }
+                "enable": false
               }
             }
           }
