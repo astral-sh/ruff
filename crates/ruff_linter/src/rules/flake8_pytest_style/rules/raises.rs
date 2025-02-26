@@ -188,7 +188,7 @@ pub(crate) fn raises_call(checker: &Checker, call: &ast::ExprCall) {
                 if call
                     .arguments
                     .find_keyword("match")
-                    .map_or(true, |k| is_empty_or_null_string(&k.value))
+                    .is_none_or(|k| is_empty_or_null_string(&k.value))
                 {
                     exception_needs_match(checker, exception);
                 }
