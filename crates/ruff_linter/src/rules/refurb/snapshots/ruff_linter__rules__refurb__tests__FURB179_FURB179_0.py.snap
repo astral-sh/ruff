@@ -3,7 +3,6 @@ source: crates/ruff_linter/src/rules/refurb/mod.rs
 ---
 FURB179_0.py:18:7: FURB179 [*] Use `chain.from_iterable()` instead
    |
-17 | # Safe: Immutable iterable
 18 | chain(*s)
    |       ^^ FURB179
 19 | chain(*b)
@@ -14,33 +13,32 @@ FURB179_0.py:18:7: FURB179 [*] Use `chain.from_iterable()` instead
 ℹ Safe fix
 15 15 | ### Errors
 16 16 | 
-17 17 | # Safe: Immutable iterable
+17 17 | 
 18    |-chain(*s)
    18 |+chain.from_iterable(s)
 19 19 | chain(*b)
 20 20 | chain(*t)
-21 21 | reduce(add, s)
+21 21 | reduce(add, s, ())
 
 FURB179_0.py:19:7: FURB179 [*] Use `chain.from_iterable()` instead
    |
-17 | # Safe: Immutable iterable
 18 | chain(*s)
 19 | chain(*b)
    |       ^^ FURB179
 20 | chain(*t)
-21 | reduce(add, s)
+21 | reduce(add, s, ())
    |
    = help: Replace with `chain.from_iterable()`
 
 ℹ Safe fix
 16 16 | 
-17 17 | # Safe: Immutable iterable
+17 17 | 
 18 18 | chain(*s)
 19    |-chain(*b)
    19 |+chain.from_iterable(b)
 20 20 | chain(*t)
-21 21 | reduce(add, s)
-22 22 | reduce(concat, b)
+21 21 | reduce(add, s, ())
+22 22 | reduce(concat, b, tuple[str, int, list[bytes]]())
 
 FURB179_0.py:20:7: FURB179 [*] Use `chain.from_iterable()` instead
    |
@@ -48,86 +46,83 @@ FURB179_0.py:20:7: FURB179 [*] Use `chain.from_iterable()` instead
 19 | chain(*b)
 20 | chain(*t)
    |       ^^ FURB179
-21 | reduce(add, s)
-22 | reduce(concat, b)
+21 | reduce(add, s, ())
+22 | reduce(concat, b, tuple[str, int, list[bytes]]())
    |
    = help: Replace with `chain.from_iterable()`
 
 ℹ Safe fix
-17 17 | # Safe: Immutable iterable
+17 17 | 
 18 18 | chain(*s)
 19 19 | chain(*b)
 20    |-chain(*t)
    20 |+chain.from_iterable(t)
-21 21 | reduce(add, s)
-22 22 | reduce(concat, b)
+21 21 | reduce(add, s, ())
+22 22 | reduce(concat, b, tuple[str, int, list[bytes]]())
 23 23 | reduce(add, t, [])
 
 FURB179_0.py:21:1: FURB179 [*] Use `chain.from_iterable()` instead
    |
 19 | chain(*b)
 20 | chain(*t)
-21 | reduce(add, s)
-   | ^^^^^^^^^^^^^^ FURB179
-22 | reduce(concat, b)
+21 | reduce(add, s, ())
+   | ^^^^^^^^^^^^^^^^^^ FURB179
+22 | reduce(concat, b, tuple[str, int, list[bytes]]())
 23 | reduce(add, t, [])
    |
    = help: Replace with `chain.from_iterable()`
 
-ℹ Safe fix
+ℹ Unsafe fix
 18 18 | chain(*s)
 19 19 | chain(*b)
 20 20 | chain(*t)
-21    |-reduce(add, s)
+21    |-reduce(add, s, ())
    21 |+chain.from_iterable(s)
-22 22 | reduce(concat, b)
+22 22 | reduce(concat, b, tuple[str, int, list[bytes]]())
 23 23 | reduce(add, t, [])
 24 24 | 
 
 FURB179_0.py:22:1: FURB179 [*] Use `chain.from_iterable()` instead
    |
 20 | chain(*t)
-21 | reduce(add, s)
-22 | reduce(concat, b)
-   | ^^^^^^^^^^^^^^^^^ FURB179
+21 | reduce(add, s, ())
+22 | reduce(concat, b, tuple[str, int, list[bytes]]())
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB179
 23 | reduce(add, t, [])
    |
    = help: Replace with `chain.from_iterable()`
 
-ℹ Safe fix
+ℹ Unsafe fix
 19 19 | chain(*b)
 20 20 | chain(*t)
-21 21 | reduce(add, s)
-22    |-reduce(concat, b)
+21 21 | reduce(add, s, ())
+22    |-reduce(concat, b, tuple[str, int, list[bytes]]())
    22 |+chain.from_iterable(b)
 23 23 | reduce(add, t, [])
 24 24 | 
-25 25 | # Unsafe: Mutable iterable
+25 25 | 
 
 FURB179_0.py:23:1: FURB179 [*] Use `chain.from_iterable()` instead
    |
-21 | reduce(add, s)
-22 | reduce(concat, b)
+21 | reduce(add, s, ())
+22 | reduce(concat, b, tuple[str, int, list[bytes]]())
 23 | reduce(add, t, [])
    | ^^^^^^^^^^^^^^^^^^ FURB179
-24 |
-25 | # Unsafe: Mutable iterable
    |
    = help: Replace with `chain.from_iterable()`
 
-ℹ Safe fix
+ℹ Unsafe fix
 20 20 | chain(*t)
-21 21 | reduce(add, s)
-22 22 | reduce(concat, b)
+21 21 | reduce(add, s, ())
+22 22 | reduce(concat, b, tuple[str, int, list[bytes]]())
 23    |-reduce(add, t, [])
    23 |+chain.from_iterable(t)
 24 24 | 
-25 25 | # Unsafe: Mutable iterable
+25 25 | 
 26 26 | chain(*l)
 
 FURB179_0.py:26:7: FURB179 [*] Use `chain.from_iterable()` instead
    |
-25 | # Unsafe: Mutable iterable
 26 | chain(*l)
    |       ^^ FURB179
 27 | chain(*e)
@@ -138,7 +133,7 @@ FURB179_0.py:26:7: FURB179 [*] Use `chain.from_iterable()` instead
 ℹ Unsafe fix
 23 23 | reduce(add, t, [])
 24 24 | 
-25 25 | # Unsafe: Mutable iterable
+25 25 | 
 26    |-chain(*l)
    26 |+chain.from_iterable(l)
 27 27 | chain(*e)
@@ -147,7 +142,6 @@ FURB179_0.py:26:7: FURB179 [*] Use `chain.from_iterable()` instead
 
 FURB179_0.py:27:7: FURB179 [*] Use `chain.from_iterable()` instead
    |
-25 | # Unsafe: Mutable iterable
 26 | chain(*l)
 27 | chain(*e)
    |       ^^ FURB179
@@ -158,7 +152,7 @@ FURB179_0.py:27:7: FURB179 [*] Use `chain.from_iterable()` instead
 
 ℹ Unsafe fix
 24 24 | 
-25 25 | # Unsafe: Mutable iterable
+25 25 | 
 26 26 | chain(*l)
 27    |-chain(*e)
    27 |+chain.from_iterable(e)
@@ -178,14 +172,14 @@ FURB179_0.py:28:7: FURB179 [*] Use `chain.from_iterable()` instead
    = help: Replace with `chain.from_iterable()`
 
 ℹ Unsafe fix
-25 25 | # Unsafe: Mutable iterable
+25 25 | 
 26 26 | chain(*l)
 27 27 | chain(*e)
 28    |-chain(*d)
    28 |+chain.from_iterable(d)
 29 29 | chain(*i)
 30 30 | reduce(concat, l, [])
-31 31 | reduce(add, e)
+31 31 | reduce(add, e, ())
 
 FURB179_0.py:29:7: FURB179 [*] Use `chain.from_iterable()` instead
    |
@@ -194,7 +188,7 @@ FURB179_0.py:29:7: FURB179 [*] Use `chain.from_iterable()` instead
 29 | chain(*i)
    |       ^^ FURB179
 30 | reduce(concat, l, [])
-31 | reduce(add, e)
+31 | reduce(add, e, ())
    |
    = help: Replace with `chain.from_iterable()`
 
@@ -205,8 +199,8 @@ FURB179_0.py:29:7: FURB179 [*] Use `chain.from_iterable()` instead
 29    |-chain(*i)
    29 |+chain.from_iterable(i)
 30 30 | reduce(concat, l, [])
-31 31 | reduce(add, e)
-32 32 | reduce(concat, d)
+31 31 | reduce(add, e, ())
+32 32 | reduce(concat, d, tuple())
 
 FURB179_0.py:30:1: FURB179 [*] Use `chain.from_iterable()` instead
    |
@@ -214,8 +208,8 @@ FURB179_0.py:30:1: FURB179 [*] Use `chain.from_iterable()` instead
 29 | chain(*i)
 30 | reduce(concat, l, [])
    | ^^^^^^^^^^^^^^^^^^^^^ FURB179
-31 | reduce(add, e)
-32 | reduce(concat, d)
+31 | reduce(add, e, ())
+32 | reduce(concat, d, tuple())
    |
    = help: Replace with `chain.from_iterable()`
 
@@ -225,18 +219,18 @@ FURB179_0.py:30:1: FURB179 [*] Use `chain.from_iterable()` instead
 29 29 | chain(*i)
 30    |-reduce(concat, l, [])
    30 |+chain.from_iterable(l)
-31 31 | reduce(add, e)
-32 32 | reduce(concat, d)
-33 33 | reduce(add, i)
+31 31 | reduce(add, e, ())
+32 32 | reduce(concat, d, tuple())
+33 33 | reduce(add, i, list[str]())
 
 FURB179_0.py:31:1: FURB179 [*] Use `chain.from_iterable()` instead
    |
 29 | chain(*i)
 30 | reduce(concat, l, [])
-31 | reduce(add, e)
-   | ^^^^^^^^^^^^^^ FURB179
-32 | reduce(concat, d)
-33 | reduce(add, i)
+31 | reduce(add, e, ())
+   | ^^^^^^^^^^^^^^^^^^ FURB179
+32 | reduce(concat, d, tuple())
+33 | reduce(add, i, list[str]())
    |
    = help: Replace with `chain.from_iterable()`
 
@@ -244,46 +238,46 @@ FURB179_0.py:31:1: FURB179 [*] Use `chain.from_iterable()` instead
 28 28 | chain(*d)
 29 29 | chain(*i)
 30 30 | reduce(concat, l, [])
-31    |-reduce(add, e)
+31    |-reduce(add, e, ())
    31 |+chain.from_iterable(e)
-32 32 | reduce(concat, d)
-33 33 | reduce(add, i)
+32 32 | reduce(concat, d, tuple())
+33 33 | reduce(add, i, list[str]())
 34 34 | 
 
 FURB179_0.py:32:1: FURB179 [*] Use `chain.from_iterable()` instead
    |
 30 | reduce(concat, l, [])
-31 | reduce(add, e)
-32 | reduce(concat, d)
-   | ^^^^^^^^^^^^^^^^^ FURB179
-33 | reduce(add, i)
+31 | reduce(add, e, ())
+32 | reduce(concat, d, tuple())
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB179
+33 | reduce(add, i, list[str]())
    |
    = help: Replace with `chain.from_iterable()`
 
 ℹ Unsafe fix
 29 29 | chain(*i)
 30 30 | reduce(concat, l, [])
-31 31 | reduce(add, e)
-32    |-reduce(concat, d)
+31 31 | reduce(add, e, ())
+32    |-reduce(concat, d, tuple())
    32 |+chain.from_iterable(d)
-33 33 | reduce(add, i)
+33 33 | reduce(add, i, list[str]())
 34 34 | 
 35 35 | 
 
 FURB179_0.py:33:1: FURB179 [*] Use `chain.from_iterable()` instead
    |
-31 | reduce(add, e)
-32 | reduce(concat, d)
-33 | reduce(add, i)
-   | ^^^^^^^^^^^^^^ FURB179
+31 | reduce(add, e, ())
+32 | reduce(concat, d, tuple())
+33 | reduce(add, i, list[str]())
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB179
    |
    = help: Replace with `chain.from_iterable()`
 
 ℹ Unsafe fix
 30 30 | reduce(concat, l, [])
-31 31 | reduce(add, e)
-32 32 | reduce(concat, d)
-33    |-reduce(add, i)
+31 31 | reduce(add, e, ())
+32 32 | reduce(concat, d, tuple())
+33    |-reduce(add, i, list[str]())
    33 |+chain.from_iterable(i)
 34 34 | 
 35 35 | 

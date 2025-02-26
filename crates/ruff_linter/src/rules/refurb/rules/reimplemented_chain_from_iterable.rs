@@ -1,6 +1,7 @@
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::comparable::ComparableExpr;
+use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{
@@ -8,6 +9,7 @@ use ruff_python_ast::{
     ExprEllipsisLiteral, ExprGenerator, ExprListComp, ExprName, ExprSetComp, ExprStarred,
     Identifier,
 };
+use ruff_python_ast::{ExprList, ExprTuple};
 use ruff_python_semantic::analyze::typing;
 use ruff_python_semantic::{Binding, SemanticModel};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
@@ -116,7 +118,7 @@ pub(crate) fn reimplemented_chain_from_iterable_comprehension(
 
     diagnostic.try_set_optional_fix(|| {
         let wrapper = comprehension_kind.wrapper();
-        replace_with_chain_from_iterable(original, wrapper, &outer.iter, checker)
+        replace_with_chain_from_iterable(original, wrapper, None, &outer.iter, checker)
     });
 
     checker.report_diagnostic(diagnostic);
@@ -148,8 +150,33 @@ pub(crate) fn reimplemented_chain_from_iterable_call(checker: &Checker, call: &E
 
         ["functools", "reduce"] => {
             let (op, iterable) = match &arguments.args[..] {
-                [op, iterable] => (op, iterable),
-                [op, iterable, Expr::List(list)] if list.elts.is_empty() => (op, iterable),
+                [op, iterable, Expr::List(ExprList { elts, .. }) | Expr::Tuple(ExprTuple { elts, .. })]
+                    if elts.is_empty() =>
+                {
+                    (op, iterable)
+                }
+
+                [op, iterable, Expr::Call(start)] => {
+                    if !start.arguments.is_empty() {
+                        return;
+                    }
+
+                    let Some(qualified_name) =
+                        semantic.resolve_qualified_name(map_subscript(&start.func))
+                    else {
+                        return;
+                    };
+
+                    if !matches!(
+                        qualified_name.segments(),
+                        ["" | "builtins", "list" | "tuple"]
+                    ) {
+                        return;
+                    }
+
+                    (op, iterable)
+                }
+
                 _ => return,
             };
 
@@ -164,7 +191,13 @@ pub(crate) fn reimplemented_chain_from_iterable_call(checker: &Checker, call: &E
             let mut diagnostic = Diagnostic::new(ReimplementedChainFromIterable, call.range);
 
             diagnostic.try_set_optional_fix(|| {
-                replace_with_chain_from_iterable(call.into(), None, iterable, checker)
+                replace_with_chain_from_iterable(
+                    call.into(),
+                    None,
+                    Some(Applicability::Unsafe),
+                    iterable,
+                    checker,
+                )
             });
 
             diagnostic
@@ -230,6 +263,7 @@ fn add_from_iterable(
 fn replace_with_chain_from_iterable(
     to_be_replaced: AnyNodeRef,
     wrapper: Option<&str>,
+    applicability: Option<Applicability>,
     iterable: &Expr,
     checker: &Checker,
 ) -> anyhow::Result<Option<Fix>> {
@@ -287,7 +321,9 @@ fn replace_with_chain_from_iterable(
 
     let replace = Edit::range_replacement(new_content, to_be_replaced.range());
 
-    let applicability = if comment_ranges.intersects(to_be_replaced.range()) {
+    let applicability = if let Some(applicability) = applicability {
+        applicability
+    } else if comment_ranges.intersects(to_be_replaced.range()) {
         Applicability::Unsafe
     } else {
         applicability_based_on_iterable_type(iterable, semantic)

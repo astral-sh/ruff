@@ -14,23 +14,23 @@ i = iter(l)
 
 ### Errors
 
-# Safe: Immutable iterable
+
 chain(*s)
 chain(*b)
 chain(*t)
-reduce(add, s)
-reduce(concat, b)
+reduce(add, s, ())
+reduce(concat, b, tuple[str, int, list[bytes]]())
 reduce(add, t, [])
 
-# Unsafe: Mutable iterable
+
 chain(*l)
 chain(*e)
 chain(*d)
 chain(*i)
 reduce(concat, l, [])
-reduce(add, e)
-reduce(concat, d)
-reduce(add, i)
+reduce(add, e, ())
+reduce(concat, d, tuple())
+reduce(add, i, list[str]())
 
 
 ((  # Comment
@@ -71,6 +71,8 @@ def _():
 
 ### No errors
 
+from typing_extensions import Annotated
+
 sum(l, [])  # Already caught by RUF017
 
 chain(s)
@@ -79,5 +81,5 @@ chain.from_iterable(*t)
 chain(*s, *b)
 
 reduce(sub, l)
-reduce(add, b, ())
 reduce(concat)
+reduce(add, b, Annotated[tuple[str], ...]())

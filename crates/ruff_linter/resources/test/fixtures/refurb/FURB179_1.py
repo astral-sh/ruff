@@ -16,7 +16,7 @@ rows = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
 def f():
     return rows
 
-# these should match
+
 
 def flatten_via_generator(rows):
     return (col for row in rows for col in row)
@@ -55,7 +55,7 @@ def flatten_via_reduce_full_namespace(rows):
     return functools.reduce(operator.add, rows)
 
 
-# these should not
+
 
 def flatten_via_generator_modified(rows):
     return (col + 1 for row in rows for col in row)
