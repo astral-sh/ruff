@@ -2701,3 +2701,39 @@ match 2:
     "
     );
 }
+
+/// Regression test for <https://github.com/astral-sh/ruff/issues/9381> with very helpful
+/// reproduction repo here: <https://github.com/lucasfijen/example_ruff_glob_bug>
+#[test]
+fn cookiecutter_globbing() -> Result<()> {
+    // This is a simplified directory structure from the repo linked above. The essence of the
+    // problem is this `{{cookiecutter.repo_name}}` directory containing a config file with a glob.
+    // The absolute path of the glob contains the glob metacharacters `{{` and `}}` even though the
+    // user's glob does not.
+    let tempdir = TempDir::new()?;
+    let cookiecutter = tempdir.path().join("{{cookiecutter.repo_name}}");
+    let cookiecutter_toml = cookiecutter.join("pyproject.toml");
+    fs::create_dir(&cookiecutter)?;
+    fs::write(
+        cookiecutter_toml,
+        r#"tool.ruff.lint.per-file-ignores = { "tests/*" = ["F811"] }"#,
+    )?;
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/"), (r"\\", "/")]
+    }, {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .current_dir(tempdir.path()), @r#"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: invalid glob "[TMP]/{{cookiecutter.repo_name}}/tests/*"
+      Cause: error parsing glob '[TMP]/{{cookiecutter.repo_name}}/tests/*': nested alternate groups are not allowed
+    "#);
+    });
+
+    Ok(())
+}
