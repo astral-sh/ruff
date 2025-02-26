@@ -563,8 +563,84 @@ impl<K, V> ListBuilder<K, V> {
         // vector. Continue until we run out of elements in either list. (Any remaining elements in
         // the other list will be added to the result, but won't need to be combined with
         // anything.)
+        //
+        // We reuse any unaliased cells at the end of `a` and `b`, since we consume both inputs and
+        // those cells are not used by any other lists. Once we encounter an aliased cell in `a` or
+        // `b`, we have to fall through to the lower loop, which creates new cells.
         let mut a = a.last;
         let mut b = b.last;
+        // The start and end of the range of cells that we're able to reuse, if any.
+        let mut unaliased_bounds: Option<(Option<ListCellId>, ListCellId)> = None;
+        loop {
+            let (a_id, b_id) = match (a, b) {
+                // If we run out of elements in one of the lists, fall through to the next loop.
+                (None, _) | (_, None) => break,
+                (Some(a_id), Some(b_id)) => (a_id, b_id),
+            };
+
+            // We've reached an aliased cell in `a` or `b`, so we have to switch over to creating
+            // new cells instead of reusing existing ones.
+            if self.aliased[a_id] || self.aliased[b_id] {
+                break;
+            }
+
+            let a_cell = &self.storage.cells[a_id];
+            let b_cell = &self.storage.cells[b_id];
+            match a_cell.key.cmp(&b_cell.key) {
+                // Both lists contain this key; combine their values
+                Ordering::Equal => {
+                    let a_rest = a_cell.rest;
+                    let b_rest = b_cell.rest;
+                    let new_value = combine(&a_cell.value, &b_cell.value);
+                    // Update the `a` cell to contain the combined value.
+                    self.storage.cells[a_id].value = new_value;
+                    if let Some((_, unaliased_end)) = unaliased_bounds.as_mut() {
+                        // Connect the previous reused unaliased cell to this one, and update the
+                        // unaliased bounds to include this cell.
+                        self.storage.cells[*unaliased_end].rest = a;
+                        *unaliased_end = a_id;
+                    } else {
+                        // This is the first unaliased cell that we've been able to reuse.
+                        unaliased_bounds = Some((a, a_id));
+                    }
+                    a = a_rest;
+                    b = b_rest;
+                }
+                // a's key goes into the result next
+                Ordering::Greater => {
+                    // We can reuse the `a` cell without having to update its value.
+                    let a_rest = a_cell.rest;
+                    if let Some((_, unaliased_end)) = unaliased_bounds.as_mut() {
+                        // Connect the previous reused unaliased cell to this one, and update the
+                        // unaliased bounds to include this cell.
+                        self.storage.cells[*unaliased_end].rest = a;
+                        *unaliased_end = a_id;
+                    } else {
+                        // This is the first unaliased cell that we've been able to reuse.
+                        unaliased_bounds = Some((a, a_id));
+                    }
+                    a = a_rest;
+                }
+                // b's key goes into the result next
+                Ordering::Less => {
+                    // We can reuse the `b` cell without having to update its value.
+                    let b_rest = b_cell.rest;
+                    if let Some((_, unaliased_end)) = unaliased_bounds.as_mut() {
+                        // Connect the previous reused unaliased cell to this one, and update the
+                        // unaliased bounds to include this cell.
+                        self.storage.cells[*unaliased_end].rest = b;
+                        *unaliased_end = b_id;
+                    } else {
+                        // This is the first unaliased cell that we've been able to reuse.
+                        unaliased_bounds = Some((b, b_id));
+                    }
+                    b = b_rest;
+                }
+            }
+        }
+
+        // We have to build new cells from this point on. First add the new keys/values to the
+        // scratch accumulator.
         let mut last = loop {
             let (a_id, b_id) = match (a, b) {
                 // If we run out of elements in one of the lists, the non-empty list will appear in
@@ -606,6 +682,14 @@ impl<K, V> ListBuilder<K, V> {
         while let Some((key, value)) = self.scratch.pop() {
             last = self.add_cell(last, key, value);
         }
+
+        // If we were able to reuse any unaliased cells, append them to any new cells we had to
+        // create.
+        if let Some((unaliased_start, unaliased_end)) = unaliased_bounds {
+            self.storage.cells[unaliased_end].rest = last;
+            last = unaliased_start;
+        }
+
         List::new(last)
     }
 }
