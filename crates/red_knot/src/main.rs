@@ -107,6 +107,7 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         .transpose()?
         .unwrap_or_else(|| cwd.clone());
 
+    // TODO: Validate that these paths at least exist now?
     let check_paths: Vec<_> = args
         .paths
         .iter()

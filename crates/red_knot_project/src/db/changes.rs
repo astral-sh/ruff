@@ -5,7 +5,7 @@ use crate::{Project, ProjectMetadata};
 
 use crate::walk::ProjectFilesWalker;
 use red_knot_python_semantic::Program;
-use ruff_db::files::{system_path_to_file, File, Files};
+use ruff_db::files::{File, Files};
 use ruff_db::system::SystemPath;
 use ruff_db::Db as _;
 use rustc_hash::FxHashSet;
@@ -198,14 +198,11 @@ impl ProjectDatabase {
         // Use directory walking to discover newly added files.
 
         let added_paths: Vec<_> = added_paths.into_iter().collect();
-        let walker = ProjectFilesWalker::new(self.system(), &*added_paths);
+        let walker = ProjectFilesWalker::new_with_paths(self, &*added_paths);
+        let files: Vec<_> = walker.into_files_iter(self).collect();
 
-        for path in walker.walk() {
-            let file = system_path_to_file(self, &path);
-
-            if let Ok(file) = file {
-                project.add_file(self, file);
-            }
+        for file in files {
+            project.add_file(self, file);
         }
     }
 }

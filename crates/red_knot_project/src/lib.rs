@@ -1,7 +1,7 @@
 #![allow(clippy::ref_option)]
 
 use crate::metadata::options::OptionDiagnostic;
-use crate::walk::ProjectFilesWalker;
+use crate::walk::{ProjectFilesFilter, ProjectFilesWalker};
 pub use db::{Db, ProjectDatabase};
 use files::{Index, Indexed, IndexedFiles};
 use metadata::settings::Settings;
@@ -71,6 +71,7 @@ pub struct Project {
     #[return_ref]
     pub settings: Settings,
 
+    /// TODO: Should we use `matchit` for this?
     /// The paths that should be checked in the project.
     ///
     /// The default (when this list is empty) is to check all files in the project root (that satisfy the configured include and exclude patterns).
@@ -122,15 +123,7 @@ impl Project {
     /// This is an over approximation compared to [Self::files] because it returns `true` for files
     /// that are excluded by `.gitignore`.
     pub fn is_path_included(self, db: &dyn Db, path: &SystemPath) -> bool {
-        let check_paths = self.check_paths(db);
-
-        if check_paths.is_empty() {
-            path.starts_with(self.root(db))
-        } else {
-            check_paths
-                .iter()
-                .any(|check_path| path.starts_with(check_path))
-        }
+        ProjectFilesFilter::from_project(db, self).is_included(path)
     }
 
     pub fn reload(self, db: &mut dyn Db, metadata: ProjectMetadata) {
@@ -242,12 +235,23 @@ impl Project {
         self.reload_files(db);
     }
 
-    fn check_paths(self, db: &dyn Db) -> &[SystemPathBuf] {
-        let list = self.check_path_list(db);
-        if list.is_empty() {
-            std::slice::from_ref(&self.metadata(db).root)
-        } else {
-            &*list
+    /// Returns the paths that should be checked.
+    ///
+    /// The default is to check the entire project in which case this method returns
+    /// the project root. However, users can specify to only check specific sub-folders or
+    /// even files of a project by using `knot check <paths>`. In that case, this method
+    /// returns the provided absolute paths.
+    ///
+    /// Note: The CLI doesn't prohibit that users specify paths outside the project.
+    /// This allows users to check arbitrary files but it is generally not recommended.
+    /// However, it does mean that there's no guarantee that all files are a sub-path
+    /// of the project root. Our goal is to not catastrophically fail for such paths
+    /// but it's okay to not provide the same level of support as for real project paths. For example,
+    /// Red Knot doesn't support watching files for changes that are outside the project root.
+    fn check_paths_or_root(self, db: &dyn Db) -> &[SystemPathBuf] {
+        match &**self.check_path_list(db) {
+            [] => std::slice::from_ref(&self.metadata(db).root),
+            paths => paths,
         }
     }
 
@@ -343,7 +347,7 @@ impl Project {
                     tracing::debug_span!("Project::index_files", project = %self.name(db))
                         .entered();
 
-                let walker = ProjectFilesWalker::new(db.system(), self.check_paths(db));
+                let walker = ProjectFilesWalker::new(db);
                 let files = walker.into_files_set(db);
 
                 tracing::info!("Found {} files in project `{}`", files.len(), self.name(db));
