@@ -2729,14 +2729,14 @@ fn cookiecutter_globbing() -> Result<()> {
             .args(STDIN_BASE_OPTIONS)
             .arg("--select=F811")
             .current_dir(tempdir.path()), @r#"
-		success: true
-		exit_code: 0
-		----- stdout -----
-		All checks passed!
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        All checks passed!
 
-		----- stderr -----
-		warning: Error parsing original glob: `"[TMP]/{{cookiecutter.repo_name}}/tests/*"`, trying with escaped braces (`{}`)
-		"#);
+        ----- stderr -----
+        warning: Error parsing original glob: `"[TMP]/{{cookiecutter.repo_name}}/tests/*"`, trying with escaped braces: `"[TMP]/[{][{]cookiecutter.repo_name[}][}]/tests/*"`
+        "#);
     });
 
     // after removing the config file with the ignore, F811 applies, so the glob worked above

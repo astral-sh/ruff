@@ -2165,15 +2165,15 @@ fn cookiecutter_globbing() -> Result<()> {
         --- {{cookiecutter.repo_name}}/tests/maintest.py
         +++ {{cookiecutter.repo_name}}/tests/maintest.py
         @@ -1,3 +1,3 @@
-        import foo
-        import bar
+         import foo
+         import bar
         -import foo
         / No newline at end of file
         +import foo
 
 
         ----- stderr -----
-        warning: Error parsing original glob: `"[TMP]/{{cookiecutter.repo_name}}/tests/*"`, trying with escaped braces (`{}`)
+        warning: Error parsing original glob: `"[TMP]/{{cookiecutter.repo_name}}/tests/*"`, trying with escaped braces: `"[TMP]/[{][{]cookiecutter.repo_name[}][}]/tests/*"`
         1 file would be reformatted
         "#);
     });

@@ -656,9 +656,11 @@ where
 pub fn try_glob_new(s: &str) -> Result<Glob> {
     match Glob::new(s) {
         Err(e) if *e.kind() == globset::ErrorKind::NestedAlternates => {
-            log::warn!("Error parsing original glob: `{s:?}`, trying with escaped braces (`{{}}`)");
-            let s = s.replace("{{", "[{][{]").replace("}}", "[}][}]");
-            Ok(Glob::new(&s)?)
+            let new = s.replace("{{", "[{][{]").replace("}}", "[}][}]");
+            log::warn!(
+                "Error parsing original glob: `{s:?}`, trying with escaped braces: `{new:?}`"
+            );
+            Ok(Glob::new(&new)?)
         }
         glob => Ok(glob?),
     }
