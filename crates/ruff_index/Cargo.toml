@@ -18,6 +18,8 @@ ruff_macros = { workspace = true }
 salsa = { workspace = true, optional = true }
 
 [dev-dependencies]
+quickcheck = { workspace = true }
+quickcheck_macros = { workspace = true }
 static_assertions = { workspace = true }
 
 [lints]
