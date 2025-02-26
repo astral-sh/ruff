@@ -371,10 +371,10 @@ class C:
 # these should all return `str`:
 
 reveal_type(C.f1(1))  # revealed: @Todo(return type of decorated function)
-reveal_type(C().f1(1))  # revealed: @Todo(decorated method)
+reveal_type(C().f1(1))  # revealed: @Todo(return type of decorated function)
 
 reveal_type(C.f2(1))  # revealed: @Todo(return type of decorated function)
-reveal_type(C().f2(1))  # revealed: @Todo(decorated method)
+reveal_type(C().f2(1))  # revealed: @Todo(return type of decorated function)
 ```
 
 [functions and methods]: https://docs.python.org/3/howto/descriptor.html#functions-and-methods
