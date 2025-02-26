@@ -22,7 +22,6 @@ use crate::semantic_index::definition::{
     WithItemDefinitionNodeRef,
 };
 use crate::semantic_index::expression::{Expression, ExpressionKind};
-use crate::semantic_index::narrowing_constraints::NarrowingConstraintsBuilder;
 use crate::semantic_index::predicate::{
     PatternPredicate, PatternPredicateKind, Predicate, PredicateNode, ScopedPredicateId,
 };
@@ -293,11 +292,6 @@ impl<'db> SemanticIndexBuilder<'db> {
     fn current_symbol_states_mut(&mut self) -> &mut SymbolStatesBuilder {
         let scope_id = self.current_scope();
         &mut self.use_def_maps[scope_id].symbol_states_builder
-    }
-
-    fn current_narrowing_constraints_mut(&mut self) -> &mut NarrowingConstraintsBuilder {
-        let scope_id = self.current_scope();
-        &mut self.use_def_maps[scope_id].narrowing_constraints
     }
 
     fn current_visibility_constraints_mut(&mut self) -> &mut VisibilityConstraintsBuilder {

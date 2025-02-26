@@ -342,25 +342,35 @@ impl SymbolBindings {
         visibility_constraints: &mut VisibilityConstraintsBuilder,
         other: Self,
     ) {
-        self.live_bindings =
-            symbol_states
-                .bindings
-                .union_with(self.live_bindings, other.live_bindings, |a, b| {
-                    // If the same definition is visible through both paths, any constraint
-                    // that applies on only one path is irrelevant to the resulting type from
-                    // unioning the two paths, so we intersect the constraints.
-                    let narrowing_constraint = narrowing_constraints
-                        .intersect_constraints(a.narrowing_constraint, b.narrowing_constraint);
+        self.live_bindings = symbol_states.bindings.union_with_clone(
+            std::mem::take(&mut self.live_bindings),
+            other.live_bindings,
+            |a, b| {
+                // If the same definition is visible through both paths, any constraint
+                // that applies on only one path is irrelevant to the resulting type from
+                // unioning the two paths, so we intersect the constraints.
+                let mut narrowing_constraint =
+                    narrowing_constraints.clone_constraint(&a.narrowing_constraint);
+                if let Some(b) = b {
+                    let b_narrowing_constraint =
+                        narrowing_constraints.clone_constraint(&b.narrowing_constraint);
+                    narrowing_constraint = narrowing_constraints
+                        .intersect_constraints(narrowing_constraint, b_narrowing_constraint);
+                }
 
-                    // For visibility constraints, we merge them using a ternary OR operation:
-                    let visibility_constraint = visibility_constraints
-                        .add_or_constraint(a.visibility_constraint, b.visibility_constraint);
+                // For visibility constraints, we merge them using a ternary OR operation:
+                let visibility_constraint = match b {
+                    Some(b) => visibility_constraints
+                        .add_or_constraint(a.visibility_constraint, b.visibility_constraint),
+                    None => a.visibility_constraint,
+                };
 
-                    LiveBinding {
-                        narrowing_constraint,
-                        visibility_constraint,
-                    }
-                });
+                LiveBinding {
+                    narrowing_constraint,
+                    visibility_constraint,
+                }
+            },
+        );
     }
 }
 
@@ -530,7 +540,7 @@ mod tests {
     ) {
         let mut actual = symbol_states
             .bindings
-            .iter_reverse(symbol.bindings.live_bindings)
+            .iter_reverse(&symbol.bindings.live_bindings)
             .map(|(def_id, live_binding)| {
                 let def = if *def_id == ScopedDefinitionId::UNBOUND {
                     "unbound".into()
@@ -557,7 +567,7 @@ mod tests {
     ) {
         let mut actual = symbol_states
             .declarations
-            .iter_reverse(symbol.declarations.live_declarations)
+            .iter_reverse(&symbol.declarations.live_declarations)
             .map(|(declaration, _)| {
                 if *declaration == ScopedDefinitionId::UNBOUND {
                     "undeclared".into()
@@ -661,7 +671,7 @@ mod tests {
             &mut symbol_states,
             &mut narrowing_constraints,
             &mut visibility_constraints,
-            &sym1b,
+            sym1b,
         );
         let mut sym1 = sym1a;
         assert_bindings(&symbol_states, &narrowing_constraints, &sym1, &["1<0>"]);
@@ -703,7 +713,7 @@ mod tests {
             &mut symbol_states,
             &mut narrowing_constraints,
             &mut visibility_constraints,
-            &sym1b,
+            sym1b,
         );
         let sym2 = sym2a;
         assert_bindings(&symbol_states, &narrowing_constraints, &sym2, &["2<>"]);
@@ -734,7 +744,7 @@ mod tests {
             &mut symbol_states,
             &mut narrowing_constraints,
             &mut visibility_constraints,
-            &sym2b,
+            sym2b,
         );
         let sym3 = sym3a;
         assert_bindings(
@@ -749,7 +759,7 @@ mod tests {
             &mut symbol_states,
             &mut narrowing_constraints,
             &mut visibility_constraints,
-            &sym3,
+            sym3,
         );
         let sym = sym1;
         assert_bindings(
@@ -817,7 +827,7 @@ mod tests {
             &mut symbol_states,
             &mut narrowing_constraints,
             &mut visibility_constraints,
-            &sym2,
+            sym2,
         );
 
         assert_declarations(&symbol_states, &sym, &["1", "2"]);
@@ -843,7 +853,7 @@ mod tests {
             &mut symbol_states,
             &mut narrowing_constraints,
             &mut visibility_constraints,
-            &sym2,
+            sym2,
         );
 
         assert_declarations(&symbol_states, &sym, &["undeclared", "1"]);

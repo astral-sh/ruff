@@ -555,13 +555,34 @@ impl<K, V> ListBuilder<K, V> {
 
     /// Returns the union of two lists. The result will contain an entry for any key that appears
     /// in either list. For keys that appear in both lists, the corresponding values will be
-    /// combined using the `combine` function that you provide.
+    /// combined using the `combine` function that you provide, and cloned using their [`Clone`]
+    /// impl.
     #[allow(clippy::needless_pass_by_value)]
     pub fn union_with<F>(&mut self, a: List<K, V>, b: List<K, V>, mut combine: F) -> List<K, V>
     where
         K: Clone + Ord,
         V: Clone,
         F: FnMut(&V, &V) -> V,
+    {
+        self.union_with_clone(a, b, |a, b| match b {
+            Some(b) => combine(a, b),
+            None => a.clone(),
+        })
+    }
+
+    /// Returns the union of two lists. The result will contain an entry for any key that appears
+    /// in either list. For keys that appear in both lists, the corresponding values will be
+    /// combined or cloned using the function that you provide.
+    #[allow(clippy::needless_pass_by_value)]
+    pub fn union_with_clone<F>(
+        &mut self,
+        a: List<K, V>,
+        b: List<K, V>,
+        mut combine: F,
+    ) -> List<K, V>
+    where
+        K: Clone + Ord,
+        F: FnMut(&V, Option<&V>) -> V,
     {
         self.scratch.clear();
 
@@ -597,7 +618,7 @@ impl<K, V> ListBuilder<K, V> {
                 Ordering::Equal => {
                     let a_rest = a_cell.rest;
                     let b_rest = b_cell.rest;
-                    let new_value = combine(&a_cell.value, &b_cell.value);
+                    let new_value = combine(&a_cell.value, Some(&b_cell.value));
                     // Update the `a` cell to contain the combined value.
                     self.storage.cells[a_id].value = new_value;
                     if let Some((_, unaliased_end)) = unaliased_bounds.as_mut() {
@@ -661,7 +682,7 @@ impl<K, V> ListBuilder<K, V> {
                 // Both lists contain this key; combine their values
                 Ordering::Equal => {
                     let new_key = a_cell.key.clone();
-                    let new_value = combine(&a_cell.value, &b_cell.value);
+                    let new_value = combine(&a_cell.value, Some(&b_cell.value));
                     self.scratch.push((new_key, new_value));
                     a = a_cell.rest;
                     b = b_cell.rest;
@@ -669,14 +690,14 @@ impl<K, V> ListBuilder<K, V> {
                 // a's key goes into the result next
                 Ordering::Greater => {
                     let new_key = a_cell.key.clone();
-                    let new_value = a_cell.value.clone();
+                    let new_value = combine(&a_cell.value, None);
                     self.scratch.push((new_key, new_value));
                     a = a_cell.rest;
                 }
                 // b's key goes into the result next
                 Ordering::Less => {
                     let new_key = b_cell.key.clone();
-                    let new_value = b_cell.value.clone();
+                    let new_value = combine(&b_cell.value, None);
                     self.scratch.push((new_key, new_value));
                     b = b_cell.rest;
                 }
