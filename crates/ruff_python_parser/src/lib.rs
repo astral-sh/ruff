@@ -664,7 +664,7 @@ impl FusedIterator for TokenIterWithContext<'_> {}
 #[cfg_attr(
     feature = "serde",
     derive(serde::Deserialize),
-    serde(rename_all = "lowercase")
+    serde(rename_all = "kebab-case")
 )]
 pub enum Mode {
     /// The code consists of a sequence of statements.

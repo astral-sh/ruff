@@ -21,7 +21,11 @@ use crate::{AsMode, Mode};
 /// let options = ParseOptions::from(PySourceType::Python);
 /// ```
 #[derive(Clone, Debug)]
-#[cfg_attr(feature = "serde", derive(serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Deserialize),
+    serde(rename_all = "kebab-case")
+)]
 pub struct ParseOptions {
     /// Specify the mode in which the code will be parsed.
     #[cfg_attr(feature = "serde", serde(default = "default_mode"))]

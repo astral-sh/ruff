@@ -2266,13 +2266,13 @@ impl<'src> Parser<'src> {
         let cases = self.parse_match_body();
 
         // test_err match_before_py310
-        // # parse_options: { "target_version": "3.9" }
+        // # parse_options: { "target-version": "3.9" }
         // match 2:
         //     case 1:
         //         pass
 
         // test_ok match_after_py310
-        // # parse_options: { "target_version": "3.10" }
+        // # parse_options: { "target-version": "3.10" }
         // match 2:
         //     case 1:
         //         pass

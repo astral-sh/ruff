@@ -166,7 +166,7 @@ fn test_invalid_syntax(input_path: &Path) {
 /// For example,
 ///
 /// ```python
-/// # parse_options: { "target_version": "3.10" }
+/// # parse_options: { "target-version": "3.10" }
 /// def f(): ...
 fn extract_options(source: &str) -> Option<ParseOptions> {
     // extract options from pragma on the first line
