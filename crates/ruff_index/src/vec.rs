@@ -82,6 +82,14 @@ impl<I: Idx, T> IndexVec<I, T> {
     {
         self.raw.resize(new_len, value);
     }
+
+    #[inline]
+    pub fn resize_with<F>(&mut self, new_len: usize, f: F)
+    where
+        F: FnMut() -> T,
+    {
+        self.raw.resize_with(new_len, f);
+    }
 }
 
 impl<I, T> Debug for IndexVec<I, T>

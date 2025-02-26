@@ -47,6 +47,7 @@ jobs:
         run: |
           export QUICKCHECK_TESTS=100000
           for _ in {1..5}; do
+            cargo test --locked --release --package ruff_index -- --ignored list::property_tests
             cargo test --locked --release --package red_knot_python_semantic -- --ignored types::property_tests::stable
           done
 
