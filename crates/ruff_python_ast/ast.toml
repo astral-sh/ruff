@@ -277,14 +277,15 @@ name = "arguments"
 type = "Arguments"
 
 [Expr.nodes.ExprFString]
-rustdoc = """/// An AST node that represents either a single-part f-string literal
-/// or an implicitly concatenated f-string literal.
-///
-/// This type differs from the original Python AST ([JoinedStr]) in that it
-/// doesn't join the implicitly concatenated parts into a single string. Instead,
-/// it keeps them separate and provide various methods to access the parts.
-///
-/// [JoinedStr]: https://docs.python.org/3/library/ast.html#ast.JoinedStr"""
+rustdoc = """
+An AST node that represents either a single-part f-string literal
+or an implicitly concatenated f-string literal.
+
+This type differs from the original Python AST ([JoinedStr]) in that it
+doesn't join the implicitly concatenated parts into a single string. Instead,
+it keeps them separate and provide various methods to access the parts.
+
+[JoinedStr]: https://docs.python.org/3/library/ast.html#ast.JoinedStr"""
 
 [[Expr.nodes.ExprFString.fields]]
 name = "value"
