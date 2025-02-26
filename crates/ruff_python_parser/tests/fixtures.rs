@@ -161,6 +161,39 @@ fn test_invalid_syntax(input_path: &Path) {
     });
 }
 
+/// Copy of [`ParseOptions`] for deriving [`Deserialize`] with serde as a dev-dependency.
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+struct JsonParseOptions {
+    #[serde(default)]
+    mode: JsonMode,
+    #[serde(default)]
+    target_version: PythonVersion,
+}
+
+/// Copy of [`Mode`] for deserialization.
+#[derive(Default, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+enum JsonMode {
+    #[default]
+    Module,
+    Expression,
+    ParenthesizedExpression,
+    Ipython,
+}
+
+impl From<JsonParseOptions> for ParseOptions {
+    fn from(value: JsonParseOptions) -> Self {
+        let mode = match value.mode {
+            JsonMode::Module => Mode::Module,
+            JsonMode::Expression => Mode::Expression,
+            JsonMode::ParenthesizedExpression => Mode::ParenthesizedExpression,
+            JsonMode::Ipython => Mode::Ipython,
+        };
+        Self::from(mode).with_target_version(value.target_version)
+    }
+}
+
 /// Extract [`ParseOptions`] from an initial pragma line, if present.
 ///
 /// For example,
@@ -171,7 +204,8 @@ fn test_invalid_syntax(input_path: &Path) {
 fn extract_options(source: &str) -> Option<ParseOptions> {
     let header = source.lines().next()?;
     let (_label, options) = header.split_once("# parse_options: ")?;
-    serde_json::from_str(options.trim()).ok()
+    let options: Option<JsonParseOptions> = serde_json::from_str(options.trim()).ok();
+    options.map(ParseOptions::from)
 }
 
 // Test that is intentionally ignored by default.
