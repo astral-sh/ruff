@@ -22,7 +22,7 @@ use crate::rules::ruff::rules::helpers::{dataclass_kind, is_class_var_annotation
 /// If the default value is intended to be mutable, it must be annotated with
 /// `typing.ClassVar`; otherwise, a `ValueError` will be raised.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// from dataclasses import dataclass
 ///

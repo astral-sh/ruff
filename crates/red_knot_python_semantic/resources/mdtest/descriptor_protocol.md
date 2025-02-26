@@ -425,15 +425,15 @@ wrapper_descriptor(f, None)
 wrapper_descriptor(f, C())
 
 # Calling it with something that is not a `FunctionType` as the first argument is an
-# error: [invalid-argument-type] "Object of type `Literal[1]` cannot be assigned to parameter 1 (`self`); expected type `FunctionType`"
+# error: [invalid-argument-type] "Object of type `Literal[1]` cannot be assigned to parameter 1 (`self`) of wrapper descriptor `FunctionType.__get__`; expected type `FunctionType`"
 wrapper_descriptor(1, None, type(f))
 
 # Calling it with something that is not a `type` as the `owner` argument is an
-# error: [invalid-argument-type] "Object of type `Literal[f]` cannot be assigned to parameter 3 (`owner`); expected type `type`"
+# error: [invalid-argument-type] "Object of type `Literal[f]` cannot be assigned to parameter 3 (`owner`) of wrapper descriptor `FunctionType.__get__`; expected type `type`"
 wrapper_descriptor(f, None, f)
 
 # Calling it with too many positional arguments is an
-# error: [too-many-positional-arguments] "Too many positional arguments: expected 3, got 4"
+# error: [too-many-positional-arguments] "Too many positional arguments to wrapper descriptor `FunctionType.__get__`: expected 3, got 4"
 wrapper_descriptor(f, None, type(f), "one too many")
 ```
 

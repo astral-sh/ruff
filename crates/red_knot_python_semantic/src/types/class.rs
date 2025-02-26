@@ -5,8 +5,8 @@ use crate::{
         symbol::ScopeId, symbol_table, use_def_map,
     },
     symbol::{
-        known_module_symbol, symbol, symbol_from_bindings, symbol_from_declarations, LookupError,
-        LookupResult, Symbol, SymbolAndQualifiers,
+        class_symbol, known_module_symbol, symbol_from_bindings, symbol_from_declarations,
+        Boundness, LookupError, LookupResult, Symbol, SymbolAndQualifiers,
     },
     types::{
         definition_expression_type, CallArguments, CallError, MetaclassCandidate, TupleType,
@@ -33,7 +33,7 @@ use super::{
 pub struct Class<'db> {
     /// Name of the class at definition
     #[return_ref]
-    pub name: ast::name::Name,
+    pub(crate) name: ast::name::Name,
 
     body_scope: ScopeId<'db>,
 
@@ -43,12 +43,12 @@ pub struct Class<'db> {
 #[salsa::tracked]
 impl<'db> Class<'db> {
     /// Return `true` if this class represents `known_class`
-    pub fn is_known(self, db: &'db dyn Db, known_class: KnownClass) -> bool {
+    pub(crate) fn is_known(self, db: &'db dyn Db, known_class: KnownClass) -> bool {
         self.known(db) == Some(known_class)
     }
 
     /// Return `true` if this class represents the builtin class `object`
-    pub fn is_object(self, db: &'db dyn Db) -> bool {
+    pub(crate) fn is_object(self, db: &'db dyn Db) -> bool {
         self.is_known(db, KnownClass::Object)
     }
 
@@ -156,7 +156,7 @@ impl<'db> Class<'db> {
     }
 
     /// Return `true` if `other` is present in this class's MRO.
-    pub fn is_subclass_of(self, db: &'db dyn Db, other: Class) -> bool {
+    pub(super) fn is_subclass_of(self, db: &'db dyn Db, other: Class) -> bool {
         // `is_subclass_of` is checking the subtype relation, in which gradual types do not
         // participate, so we should not return `True` if we find `Any/Unknown` in the MRO.
         self.iter_mro(db).contains(&ClassBase::Class(other))
@@ -180,14 +180,14 @@ impl<'db> Class<'db> {
     }
 
     /// Return the metaclass of this class, or `type[Unknown]` if the metaclass cannot be inferred.
-    pub(crate) fn metaclass(self, db: &'db dyn Db) -> Type<'db> {
+    pub(super) fn metaclass(self, db: &'db dyn Db) -> Type<'db> {
         self.try_metaclass(db)
             .unwrap_or_else(|_| SubclassOfType::subclass_of_unknown())
     }
 
     /// Return the metaclass of this class, or an error if the metaclass cannot be inferred.
     #[salsa::tracked]
-    pub(crate) fn try_metaclass(self, db: &'db dyn Db) -> Result<Type<'db>, MetaclassError<'db>> {
+    pub(super) fn try_metaclass(self, db: &'db dyn Db) -> Result<Type<'db>, MetaclassError<'db>> {
         // Identify the class's own metaclass (or take the first base class's metaclass).
         let mut base_classes = self.fully_static_explicit_bases(db).peekable();
 
@@ -224,12 +224,12 @@ impl<'db> Class<'db> {
             let return_ty_result = match metaclass.try_call(db, &arguments) {
                 Ok(outcome) => Ok(outcome.return_type(db)),
 
-                Err(CallError::NotCallable { not_callable_ty }) => Err(MetaclassError {
-                    kind: MetaclassErrorKind::NotCallable(not_callable_ty),
+                Err(CallError::NotCallable { not_callable_type }) => Err(MetaclassError {
+                    kind: MetaclassErrorKind::NotCallable(not_callable_type),
                 }),
 
                 Err(CallError::Union(UnionCallError {
-                    called_ty,
+                    called_type,
                     errors,
                     bindings,
                 })) => {
@@ -259,7 +259,7 @@ impl<'db> Class<'db> {
 
                     if partly_not_callable {
                         Err(MetaclassError {
-                            kind: MetaclassErrorKind::PartlyNotCallable(called_ty),
+                            kind: MetaclassErrorKind::PartlyNotCallable(called_type),
                         })
                     } else {
                         Ok(return_ty.unwrap_or(Type::unknown()))
@@ -316,7 +316,9 @@ impl<'db> Class<'db> {
     /// Returns the class member of this class named `name`.
     ///
     /// The member resolves to a member on the class itself or any of its proper superclasses.
-    pub(crate) fn class_member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
+    ///
+    /// TODO: Should this be made private...?
+    pub(super) fn class_member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
         if name == "__mro__" {
             let tuple_elements = self.iter_mro(db).map(Type::from);
             return Symbol::bound(TupleType::from_elements(db, tuple_elements));
@@ -363,14 +365,15 @@ impl<'db> Class<'db> {
         }
     }
 
-    /// Returns the inferred type of the class member named `name`.
+    /// Returns the inferred type of the class member named `name`. Only bound members
+    /// or those marked as ClassVars are considered.
     ///
     /// Returns [`Symbol::Unbound`] if `name` cannot be found in this class's scope
     /// directly. Use [`Class::class_member`] if you require a method that will
     /// traverse through the MRO until it finds the member.
-    pub(crate) fn own_class_member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
-        let scope = self.body_scope(db);
-        symbol(db, scope, name)
+    pub(super) fn own_class_member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
+        let body_scope = self.body_scope(db);
+        class_symbol(db, body_scope, name)
     }
 
     /// Returns the `name` attribute of an instance of this class.
@@ -379,7 +382,10 @@ impl<'db> Class<'db> {
     /// defined attribute that is only present in a method (typically `__init__`).
     ///
     /// The attribute might also be defined in a superclass of this class.
-    pub(crate) fn instance_member(self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
+    pub(super) fn instance_member(self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
+        let mut union = UnionBuilder::new(db);
+        let mut union_qualifiers = TypeQualifiers::empty();
+
         for superclass in self.iter_mro(db) {
             match superclass {
                 ClassBase::Dynamic(_) => {
@@ -388,16 +394,43 @@ impl<'db> Class<'db> {
                     );
                 }
                 ClassBase::Class(class) => {
-                    if let member @ SymbolAndQualifiers(Symbol::Type(_, _), _) =
+                    if let member @ SymbolAndQualifiers(Symbol::Type(ty, boundness), qualifiers) =
                         class.own_instance_member(db, name)
                     {
-                        return member;
+                        // TODO: We could raise a diagnostic here if there are conflicting type qualifiers
+                        union_qualifiers = union_qualifiers.union(qualifiers);
+
+                        if boundness == Boundness::Bound {
+                            if union.is_empty() {
+                                // Short-circuit, no need to allocate inside the union builder
+                                return member;
+                            }
+
+                            return SymbolAndQualifiers(
+                                Symbol::bound(union.add(ty).build()),
+                                union_qualifiers,
+                            );
+                        }
+
+                        // If we see a possibly-unbound symbol, we need to keep looking
+                        // higher up in the MRO.
+                        union = union.add(ty);
                     }
                 }
             }
         }
 
-        SymbolAndQualifiers(Symbol::Unbound, TypeQualifiers::empty())
+        if union.is_empty() {
+            SymbolAndQualifiers(Symbol::Unbound, TypeQualifiers::empty())
+        } else {
+            // If we have reached this point, we know that we have only seen possibly-unbound symbols.
+            // This means that the final result is still possibly-unbound.
+
+            SymbolAndQualifiers(
+                Symbol::Type(union.build(), Boundness::PossiblyUnbound),
+                union_qualifiers,
+            )
+        }
     }
 
     /// Tries to find declarations/bindings of an instance attribute named `name` that are only
@@ -406,16 +439,18 @@ impl<'db> Class<'db> {
         db: &'db dyn Db,
         class_body_scope: ScopeId<'db>,
         name: &str,
-        inferred_type_from_class_body: Option<Type<'db>>,
+        inferred_from_class_body: &Symbol<'db>,
     ) -> Symbol<'db> {
         // If we do not see any declarations of an attribute, neither in the class body nor in
         // any method, we build a union of `Unknown` with the inferred types of all bindings of
         // that attribute. We include `Unknown` in that union to account for the fact that the
         // attribute might be externally modified.
         let mut union_of_inferred_types = UnionBuilder::new(db).add(Type::unknown());
+        let mut union_boundness = Boundness::Bound;
 
-        if let Some(ty) = inferred_type_from_class_body {
-            union_of_inferred_types = union_of_inferred_types.add(ty);
+        if let Symbol::Type(ty, boundness) = inferred_from_class_body {
+            union_of_inferred_types = union_of_inferred_types.add(*ty);
+            union_boundness = *boundness;
         }
 
         let attribute_assignments = attribute_assignments(db, class_body_scope);
@@ -424,10 +459,10 @@ impl<'db> Class<'db> {
             .as_deref()
             .and_then(|assignments| assignments.get(name))
         else {
-            if inferred_type_from_class_body.is_some() {
-                return Symbol::bound(union_of_inferred_types.build());
+            if inferred_from_class_body.is_unbound() {
+                return Symbol::Unbound;
             }
-            return Symbol::Unbound;
+            return Symbol::Type(union_of_inferred_types.build(), union_boundness);
         };
 
         for attribute_assignment in attribute_assignments {
@@ -481,7 +516,7 @@ impl<'db> Class<'db> {
             }
         }
 
-        Symbol::bound(union_of_inferred_types.build())
+        Symbol::Type(union_of_inferred_types.build(), union_boundness)
     }
 
     /// A helper function for `instance_member` that looks up the `name` attribute only on
@@ -490,7 +525,6 @@ impl<'db> Class<'db> {
         // TODO: There are many things that are not yet implemented here:
         // - `typing.Final`
         // - Proper diagnostics
-        // - Handling of possibly-undeclared/possibly-unbound attributes
 
         let body_scope = self.body_scope(db);
         let table = symbol_table(db, body_scope);
@@ -501,7 +535,7 @@ impl<'db> Class<'db> {
             let declarations = use_def.public_declarations(symbol_id);
 
             match symbol_from_declarations(db, declarations) {
-                Ok(SymbolAndQualifiers(Symbol::Type(declared_ty, _), qualifiers)) => {
+                Ok(SymbolAndQualifiers(declared @ Symbol::Type(declared_ty, _), qualifiers)) => {
                     // The attribute is declared in the class body.
 
                     if let Some(function) = declared_ty.into_function_literal() {
@@ -511,7 +545,7 @@ impl<'db> Class<'db> {
                         if function.has_known_class_decorator(db, KnownClass::Classmethod)
                             && function.decorators(db).len() == 1
                         {
-                            SymbolAndQualifiers(Symbol::bound(declared_ty), qualifiers)
+                            SymbolAndQualifiers(declared, qualifiers)
                         } else if function.has_known_class_decorator(db, KnownClass::Property) {
                             SymbolAndQualifiers::todo("@property")
                         } else if function.has_known_function_decorator(db, KnownFunction::Overload)
@@ -520,10 +554,10 @@ impl<'db> Class<'db> {
                         } else if !function.decorators(db).is_empty() {
                             SymbolAndQualifiers::todo("decorated method")
                         } else {
-                            SymbolAndQualifiers(Symbol::bound(declared_ty), qualifiers)
+                            SymbolAndQualifiers(declared, qualifiers)
                         }
                     } else {
-                        SymbolAndQualifiers(Symbol::bound(declared_ty), qualifiers)
+                        SymbolAndQualifiers(declared, qualifiers)
                     }
                 }
                 Ok(SymbolAndQualifiers(Symbol::Unbound, _)) => {
@@ -532,9 +566,8 @@ impl<'db> Class<'db> {
 
                     let bindings = use_def.public_bindings(symbol_id);
                     let inferred = symbol_from_bindings(db, bindings);
-                    let inferred_ty = inferred.ignore_possibly_unbound();
 
-                    Self::implicit_instance_attribute(db, body_scope, name, inferred_ty).into()
+                    Self::implicit_instance_attribute(db, body_scope, name, &inferred).into()
                 }
                 Err((declared_ty, _conflicting_declarations)) => {
                     // There are conflicting declarations for this attribute in the class body.
@@ -548,7 +581,7 @@ impl<'db> Class<'db> {
             // This attribute is neither declared nor bound in the class body.
             // It could still be implicitly defined in a method.
 
-            Self::implicit_instance_attribute(db, body_scope, name, None).into()
+            Self::implicit_instance_attribute(db, body_scope, name, &Symbol::Unbound).into()
         }
     }
 
@@ -610,7 +643,7 @@ pub(super) enum InheritanceCycle {
 }
 
 impl InheritanceCycle {
-    pub(crate) const fn is_participant(self) -> bool {
+    pub(super) const fn is_participant(self) -> bool {
         matches!(self, InheritanceCycle::Participant)
     }
 }
@@ -648,7 +681,7 @@ pub struct InstanceType<'db> {
 }
 
 impl<'db> InstanceType<'db> {
-    pub(crate) fn class(self) -> Class<'db> {
+    pub(super) fn class(self) -> Class<'db> {
         self.class
     }
 
@@ -726,13 +759,13 @@ pub enum KnownClass {
 }
 
 impl<'db> KnownClass {
-    pub const fn is_bool(self) -> bool {
+    pub(crate) const fn is_bool(self) -> bool {
         matches!(self, Self::Bool)
     }
 
     /// Determine whether instances of this class are always truthy, always falsy,
     /// or have an ambiguous truthiness.
-    pub(super) const fn bool(self) -> Truthiness {
+    pub(crate) const fn bool(self) -> Truthiness {
         match self {
             // N.B. It's only generally safe to infer `Truthiness::AlwaysTrue` for a `KnownClass`
             // variant if the class's `__bool__` method always returns the same thing *and* the
@@ -784,7 +817,7 @@ impl<'db> KnownClass {
         }
     }
 
-    pub fn as_str(self, db: &'db dyn Db) -> &'static str {
+    pub(crate) fn as_str(self, db: &'db dyn Db) -> &'static str {
         match self {
             Self::Bool => "bool",
             Self::Object => "object",
@@ -842,17 +875,17 @@ impl<'db> KnownClass {
         }
     }
 
-    pub fn to_instance(self, db: &'db dyn Db) -> Type<'db> {
+    pub(crate) fn to_instance(self, db: &'db dyn Db) -> Type<'db> {
         self.to_class_literal(db).to_instance(db)
     }
 
-    pub fn to_class_literal(self, db: &'db dyn Db) -> Type<'db> {
+    pub(crate) fn to_class_literal(self, db: &'db dyn Db) -> Type<'db> {
         known_module_symbol(db, self.canonical_module(db), self.as_str(db))
             .ignore_possibly_unbound()
             .unwrap_or(Type::unknown())
     }
 
-    pub fn to_subclass_of(self, db: &'db dyn Db) -> Type<'db> {
+    pub(crate) fn to_subclass_of(self, db: &'db dyn Db) -> Type<'db> {
         self.to_class_literal(db)
             .into_class_literal()
             .map(|ClassLiteralType { class }| SubclassOfType::from(db, class))
@@ -861,7 +894,7 @@ impl<'db> KnownClass {
 
     /// Return `true` if this symbol can be resolved to a class definition `class` in typeshed,
     /// *and* `class` is a subclass of `other`.
-    pub fn is_subclass_of(self, db: &'db dyn Db, other: Class<'db>) -> bool {
+    pub(super) fn is_subclass_of(self, db: &'db dyn Db, other: Class<'db>) -> bool {
         known_module_symbol(db, self.canonical_module(db), self.as_str(db))
             .ignore_possibly_unbound()
             .and_then(Type::into_class_literal)
@@ -869,7 +902,7 @@ impl<'db> KnownClass {
     }
 
     /// Return the module in which we should look up the definition for this class
-    pub(crate) fn canonical_module(self, db: &'db dyn Db) -> KnownModule {
+    fn canonical_module(self, db: &'db dyn Db) -> KnownModule {
         match self {
             Self::Bool
             | Self::Object
@@ -1347,16 +1380,16 @@ impl<'db> KnownInstanceType<'db> {
     /// For example, the symbol `typing.Literal` is an instance of `typing._SpecialForm`,
     /// so `KnownInstanceType::Literal.instance_fallback(db)`
     /// returns `Type::Instance(InstanceType { class: <typing._SpecialForm> })`.
-    pub(crate) fn instance_fallback(self, db: &dyn Db) -> Type {
+    pub(super) fn instance_fallback(self, db: &dyn Db) -> Type {
         self.class().to_instance(db)
     }
 
     /// Return `true` if this symbol is an instance of `class`.
-    pub(crate) fn is_instance_of(self, db: &'db dyn Db, class: Class<'db>) -> bool {
+    pub(super) fn is_instance_of(self, db: &'db dyn Db, class: Class<'db>) -> bool {
         self.class().is_subclass_of(db, class)
     }
 
-    pub(crate) fn try_from_file_and_name(
+    pub(super) fn try_from_file_and_name(
         db: &'db dyn Db,
         file: File,
         symbol_name: &str,
@@ -1411,7 +1444,7 @@ impl<'db> KnownInstanceType<'db> {
     ///
     /// Most variants can only exist in one module, which is the same as `self.class().canonical_module()`.
     /// Some variants could validly be defined in either `typing` or `typing_extensions`, however.
-    pub(crate) fn check_module(self, module: KnownModule) -> bool {
+    fn check_module(self, module: KnownModule) -> bool {
         match self {
             Self::Any
             | Self::ClassVar

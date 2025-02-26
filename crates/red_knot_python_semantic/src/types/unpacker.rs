@@ -59,7 +59,7 @@ impl<'db> Unpacker<'db> {
             // type.
             value_ty = value_ty.try_iterate(self.db()).unwrap_or_else(|err| {
                 err.report_diagnostic(&self.context, value.as_any_node_ref(self.db()));
-                err.fallback_element_type()
+                err.fallback_element_type(self.db())
             });
         }
 
@@ -158,7 +158,7 @@ impl<'db> Unpacker<'db> {
                         } else {
                             ty.try_iterate(self.db()).unwrap_or_else(|err| {
                                 err.report_diagnostic(&self.context, value_expr);
-                                err.fallback_element_type()
+                                err.fallback_element_type(self.db())
                             })
                         };
                         for target_type in &mut target_types {

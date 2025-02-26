@@ -239,11 +239,11 @@ method_wrapper(None, C)
 method_wrapper(None)
 
 # Passing something that is not assignable to `type` as the `owner` argument is an
-# error: [invalid-argument-type] "Object of type `Literal[1]` cannot be assigned to parameter 2 (`owner`); expected type `type`"
+# error: [invalid-argument-type] "Object of type `Literal[1]` cannot be assigned to parameter 2 (`owner`) of method wrapper `__get__` of function `f`; expected type `type`"
 method_wrapper(None, 1)
 
 # Passing `None` as the `owner` argument when `instance` is `None` is an
-# error: [invalid-argument-type] "Object of type `None` cannot be assigned to parameter 2 (`owner`); expected type `type`"
+# error: [invalid-argument-type] "Object of type `None` cannot be assigned to parameter 2 (`owner`) of method wrapper `__get__` of function `f`; expected type `type`"
 method_wrapper(None, None)
 
 # Calling `__get__` without any arguments is an
@@ -251,7 +251,7 @@ method_wrapper(None, None)
 method_wrapper()
 
 # Calling `__get__` with too many positional arguments is an
-# error: [too-many-positional-arguments] "Too many positional arguments: expected 2, got 3"
+# error: [too-many-positional-arguments] "Too many positional arguments to method wrapper `__get__` of function `f`: expected 2, got 3"
 method_wrapper(C(), C, "one too many")
 ```
 
@@ -298,7 +298,7 @@ class D:
         # This function is wrongly annotated, it should be `type[D]` instead of `D`
         pass
 
-# error: [invalid-argument-type] "Object of type `Literal[D]` cannot be assigned to parameter 1 (`cls`); expected type `D`"
+# error: [invalid-argument-type] "Object of type `Literal[D]` cannot be assigned to parameter 1 (`cls`) of bound method `f`; expected type `D`"
 D.f()
 ```
 

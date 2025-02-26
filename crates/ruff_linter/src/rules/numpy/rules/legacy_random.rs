@@ -28,7 +28,7 @@ use crate::checkers::ast::Checker;
 /// See the documentation on [Random Sampling] and [NEP 19] for further
 /// details.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// import numpy as np
 ///

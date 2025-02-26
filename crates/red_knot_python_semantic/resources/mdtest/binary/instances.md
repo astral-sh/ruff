@@ -259,11 +259,17 @@ class A:
 class B:
     __add__ = A()
 
-# TODO: this could be `int` if we declare `B.__add__` using a `Callable` type
-# TODO: Should not be an error: `A` instance is not a method descriptor, don't prepend `self` arg.
-#   Revealed type should be `Unknown | int`.
-# error: [unsupported-operator] "Operator `+` is unsupported between objects of type `B` and `B`"
-reveal_type(B() + B())  # revealed: Unknown
+reveal_type(B() + B())  # revealed: Unknown | int
+```
+
+Note that we union with `Unknown` here because `__add__` is not declared. We do infer just `int` if
+the callable is declared:
+
+```py
+class B2:
+    __add__: A = A()
+
+reveal_type(B2() + B2())  # revealed: int
 ```
 
 ## Integration test: numbers from typeshed

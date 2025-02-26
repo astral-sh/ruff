@@ -371,3 +371,21 @@ class Comparable:
 
 Comparable() < Comparable()  # fine
 ```
+
+## Callables as comparison dunders
+
+```py
+from typing import Literal
+
+class AlwaysTrue:
+    def __call__(self, other: object) -> Literal[True]:
+        return True
+
+class A:
+    __eq__: AlwaysTrue = AlwaysTrue()
+    __lt__: AlwaysTrue = AlwaysTrue()
+
+reveal_type(A() == A())  # revealed: Literal[True]
+reveal_type(A() < A())  # revealed: Literal[True]
+reveal_type(A() > A())  # revealed: Literal[True]
+```

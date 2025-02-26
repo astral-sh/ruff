@@ -52,7 +52,7 @@ use crate::semantic_index::SemanticIndex;
 use crate::symbol::{
     builtins_module_scope, builtins_symbol, explicit_global_symbol,
     module_type_implicit_global_symbol, symbol, symbol_from_bindings, symbol_from_declarations,
-    typing_extensions_symbol, LookupError,
+    typing_extensions_symbol, Boundness, LookupError,
 };
 use crate::types::call::{Argument, CallArguments, UnionCallError};
 use crate::types::diagnostic::{
@@ -68,18 +68,18 @@ use crate::types::diagnostic::{
 use crate::types::mro::MroErrorKind;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
-    class::MetaclassErrorKind, todo_type, Boundness, Class, DynamicType, FunctionType,
-    InstanceType, IntersectionBuilder, IntersectionType, KnownClass, KnownFunction,
-    KnownInstanceType, MetaclassCandidate, SliceLiteralType, SubclassOfType, Symbol,
-    SymbolAndQualifiers, Truthiness, TupleType, Type, TypeAliasType, TypeAndQualifiers,
-    TypeArrayDisplay, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarInstance, UnionBuilder,
-    UnionType,
+    class::MetaclassErrorKind, todo_type, Class, DynamicType, FunctionType, InstanceType,
+    IntersectionBuilder, IntersectionType, KnownClass, KnownFunction, KnownInstanceType,
+    MetaclassCandidate, SliceLiteralType, SubclassOfType, Symbol, SymbolAndQualifiers, Truthiness,
+    TupleType, Type, TypeAliasType, TypeAndQualifiers, TypeArrayDisplay, TypeQualifiers,
+    TypeVarBoundOrConstraints, TypeVarInstance, UnionBuilder, UnionType,
 };
 use crate::unpack::Unpack;
 use crate::util::subscript::{PyIndex, PySlice};
 use crate::Db;
 
 use super::call::CallError;
+use super::class_base::ClassBase;
 use super::context::{InNoTypeCheck, InferContext, WithDiagnostics};
 use super::diagnostic::{
     report_index_out_of_bounds, report_invalid_exception_caught, report_invalid_exception_cause,
@@ -2414,7 +2414,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
                 TargetKind::Name => iterable_ty.try_iterate(self.db()).unwrap_or_else(|err| {
                     err.report_diagnostic(&self.context, iterable.into());
-                    err.fallback_element_type()
+                    err.fallback_element_type(self.db())
                 }),
             }
         };
@@ -3209,7 +3209,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         } else {
             iterable_ty.try_iterate(self.db()).unwrap_or_else(|err| {
                 err.report_diagnostic(&self.context, iterable.into());
-                err.fallback_element_type()
+                err.fallback_element_type(self.db())
             })
         };
 
@@ -3436,13 +3436,13 @@ impl<'db> TypeInferenceBuilder<'db> {
                     call_expression: &ast::ExprCall,
                 ) {
                     match err {
-                        CallError::NotCallable { not_callable_ty } => {
+                        CallError::NotCallable { not_callable_type } => {
                             context.report_lint(
                                 &CALL_NON_CALLABLE,
                                 call_expression,
                                 format_args!(
                                     "Object of type `{}` is not callable",
-                                    not_callable_ty.display(context.db())
+                                    not_callable_type.display(context.db())
                                 ),
                             );
                         }
@@ -3492,7 +3492,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let iterable_ty = self.infer_expression(value);
         iterable_ty.try_iterate(self.db()).unwrap_or_else(|err| {
             err.report_diagnostic(&self.context, value.as_ref().into());
-            err.fallback_element_type()
+            err.fallback_element_type(self.db())
         });
 
         // TODO
@@ -3511,7 +3511,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let iterable_ty = self.infer_expression(value);
         iterable_ty.try_iterate(self.db()).unwrap_or_else(|err| {
             err.report_diagnostic(&self.context, value.as_ref().into());
-            err.fallback_element_type()
+            err.fallback_element_type(self.db())
         });
 
         // TODO get type from `ReturnType` of generator
@@ -3712,15 +3712,45 @@ impl<'db> TypeInferenceBuilder<'db> {
             .member(db, &attr.id)
             .unwrap_with_diagnostic(|lookup_error| match lookup_error {
                 LookupError::Unbound => {
-                    self.context.report_lint(
-                        &UNRESOLVED_ATTRIBUTE,
-                        attribute,
-                        format_args!(
-                            "Type `{}` has no attribute `{}`",
-                            value_type.display(db),
-                            attr.id
-                        ),
-                    );
+                    let bound_on_instance = match value_type {
+                        Type::ClassLiteral(class) => {
+                            !class.class().instance_member(db, attr).0.is_unbound()
+                        }
+                        Type::SubclassOf(subclass_of @ SubclassOfType { .. }) => {
+                            match subclass_of.subclass_of() {
+                                ClassBase::Class(class) => {
+                                    !class.instance_member(db, attr).0.is_unbound()
+                                }
+                                ClassBase::Dynamic(_) => unreachable!(
+                                    "Attribute lookup on a dynamic `SubclassOf` type should always return a bound symbol"
+                                ),
+                            }
+                        }
+                        _ => false,
+                    };
+
+                    if bound_on_instance {
+                        self.context.report_lint(
+                            &UNRESOLVED_ATTRIBUTE,
+                            attribute,
+                            format_args!(
+                                "Attribute `{}` can only be accessed on instances, not on the class object `{}` itself.",
+                                attr.id,
+                                value_type.display(db)
+                            ),
+                        );
+                    } else {
+                        self.context.report_lint(
+                            &UNRESOLVED_ATTRIBUTE,
+                            attribute,
+                            format_args!(
+                                "Type `{}` has no attribute `{}`",
+                                value_type.display(db),
+                                attr.id
+                            ),
+                        );
+                    }
+
                     Type::unknown()
                 }
                 LookupError::PossiblyUnbound(type_when_bound) => {
@@ -3751,22 +3781,55 @@ impl<'db> TypeInferenceBuilder<'db> {
             ExprContext::Store => {
                 let value_ty = self.infer_expression(value);
 
-                let symbol = if let Type::Instance(instance) = value_ty {
-                    let instance_member = instance.class().instance_member(self.db(), attr);
-                    if instance_member.is_class_var() {
-                        self.context.report_lint(
-                            &INVALID_ATTRIBUTE_ACCESS,
-                            attribute,
-                            format_args!(
-                                "Cannot assign to ClassVar `{attr}` from an instance of type `{ty}`",
-                                ty = value_ty.display(self.db()),
-                            ),
-                        );
-                    }
+                let symbol = match value_ty {
+                    Type::Instance(instance) => {
+                        let instance_member = instance.class().instance_member(self.db(), attr);
+                        if instance_member.is_class_var() {
+                            self.context.report_lint(
+                                &INVALID_ATTRIBUTE_ACCESS,
+                                attribute,
+                                format_args!(
+                                    "Cannot assign to ClassVar `{attr}` from an instance of type `{ty}`",
+                                    ty = value_ty.display(self.db()),
+                                ),
+                            );
+                        }
 
-                    instance_member.0
-                } else {
-                    value_ty.member(self.db(), attr)
+                        instance_member.0
+                    }
+                    Type::ClassLiteral(_) | Type::SubclassOf(_) => {
+                        let class_member = value_ty.member(self.db(), attr);
+
+                        if class_member.is_unbound() {
+                            let class = match value_ty {
+                                Type::ClassLiteral(class) => Some(class.class()),
+                                Type::SubclassOf(subclass_of @ SubclassOfType { .. }) => {
+                                    match subclass_of.subclass_of() {
+                                        ClassBase::Class(class) => Some(class),
+                                        ClassBase::Dynamic(_) => unreachable!("Attribute lookup on a dynamic `SubclassOf` type should always return a bound symbol"),
+                                    }
+                                }
+                                _ => None,
+                            };
+                            if let Some(class) = class {
+                                let instance_member = class.instance_member(self.db(), attr);
+
+                                // Attribute is declared or bound on instance. Forbid access from the class object
+                                if !instance_member.0.is_unbound() {
+                                    self.context.report_lint(
+                                        &INVALID_ATTRIBUTE_ACCESS,
+                                        attribute,
+                                        format_args!(
+                                            "Cannot assign to instance attribute `{attr}` from the class object `{ty}`",
+                                            ty = value_ty.display(self.db()),
+                                    ));
+                                }
+                            }
+                        }
+
+                        class_member
+                    }
+                    _ => value_ty.member(self.db(), attr),
                 };
 
                 // TODO: The unbound-case might also yield a diagnostic, but we can not activate
@@ -4114,36 +4177,27 @@ impl<'db> TypeInferenceBuilder<'db> {
                     }
                 }
 
-                // TODO: Use `call_dunder`?
-                let call_on_left_instance = if let Symbol::Type(class_member, _) =
-                    left_class.member(self.db(), op.dunder())
-                {
-                    class_member
-                        .try_call(self.db(), &CallArguments::positional([left_ty, right_ty]))
-                        .map(|outcome| outcome.return_type(self.db()))
-                        .ok()
-                } else {
-                    None
-                };
+                let call_on_left_instance = left_ty
+                    .try_call_dunder(
+                        self.db(),
+                        op.dunder(),
+                        &CallArguments::positional([right_ty]),
+                    )
+                    .map(|outcome| outcome.return_type(self.db()))
+                    .ok();
 
                 call_on_left_instance.or_else(|| {
                     if left_ty == right_ty {
                         None
                     } else {
-                        if let Symbol::Type(class_member, _) =
-                            right_class.member(self.db(), op.reflected_dunder())
-                        {
-                            // TODO: Use `call_dunder`
-                            class_member
-                                .try_call(
-                                    self.db(),
-                                    &CallArguments::positional([right_ty, left_ty]),
-                                )
-                                .map(|outcome| outcome.return_type(self.db()))
-                                .ok()
-                        } else {
-                            None
-                        }
+                        right_ty
+                            .try_call_dunder(
+                                self.db(),
+                                op.reflected_dunder(),
+                                &CallArguments::positional([left_ty]),
+                            )
+                            .map(|outcome| outcome.return_type(self.db()))
+                            .ok()
                     }
                 })
             }
@@ -4785,20 +4839,17 @@ impl<'db> TypeInferenceBuilder<'db> {
         let db = self.db();
         // The following resource has details about the rich comparison algorithm:
         // https://snarky.ca/unravelling-rich-comparison-operators/
-        let call_dunder = |op: RichCompareOperator,
-                           left: InstanceType<'db>,
-                           right: InstanceType<'db>| {
-            match left.class().class_member(db, op.dunder()) {
-                Symbol::Type(class_member_dunder, Boundness::Bound) => class_member_dunder
-                    .try_call(
+        let call_dunder =
+            |op: RichCompareOperator, left: InstanceType<'db>, right: InstanceType<'db>| {
+                Type::Instance(left)
+                    .try_call_dunder(
                         db,
-                        &CallArguments::positional([Type::Instance(left), Type::Instance(right)]),
+                        op.dunder(),
+                        &CallArguments::positional([Type::Instance(right)]),
                     )
                     .map(|outcome| outcome.return_type(db))
-                    .ok(),
-                _ => None,
-            }
-        };
+                    .ok()
+            };
 
         // The reflected dunder has priority if the right-hand side is a strict subclass of the left-hand side.
         if left != right && right.is_subtype_of(db, left) {

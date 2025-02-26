@@ -19,7 +19,7 @@ use crate::checkers::ast::Checker;
 /// Prefer `dict.fromkeys(iterable)` over `{value: None for value in iterable}`,
 /// as `dict.fromkeys` is more readable and efficient.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// {a: None for a in iterable}
 /// {a: 1 for a in iterable}

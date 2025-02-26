@@ -145,7 +145,7 @@ def test(cond: bool):
 ```py
 def test(cond: bool):
     class NotBoolable:
-        __bool__: int
+        __bool__ = None
 
     a = 10 if cond else NotBoolable()
 

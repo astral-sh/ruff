@@ -7,7 +7,7 @@ use crate::suppression::{INVALID_IGNORE_COMMENT, UNKNOWN_RULE, UNUSED_IGNORE_COM
 pub use db::Db;
 pub use module_name::ModuleName;
 pub use module_resolver::{resolve_module, system_module_search_paths, KnownModule, Module};
-pub use program::{Program, ProgramSettings, SearchPathSettings, SitePackages};
+pub use program::{Program, ProgramSettings, PythonPath, SearchPathSettings};
 pub use python_platform::PythonPlatform;
 pub use semantic_model::{HasType, SemanticModel};
 
@@ -27,7 +27,6 @@ pub(crate) mod symbol;
 pub mod types;
 mod unpack;
 mod util;
-mod visibility_constraints;
 
 type FxOrderSet<V> = ordermap::set::OrderSet<V, BuildHasherDefault<FxHasher>>;
 

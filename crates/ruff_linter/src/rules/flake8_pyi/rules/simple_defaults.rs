@@ -145,7 +145,7 @@ impl AlwaysFixableViolation for AssignmentDefaultInStub {
     }
 }
 
-/// ## What it does?
+/// ## What it does
 /// Checks for unannotated assignments in stub (`.pyi`) files.
 ///
 /// ## Why is this bad?
