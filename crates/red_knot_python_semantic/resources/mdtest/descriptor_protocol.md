@@ -129,9 +129,9 @@ c = C()
 #     - Pyright also wrongly shows `int | Literal['data']` here
 #     - Mypy shows Literal["data"] here, but also shows Literal["non-data"] below.
 #
-reveal_type(c.data_descriptor)  # revealed: Unknown | Literal["data", 1]
+reveal_type(c.data_descriptor)  # revealed: Unknown | Literal["data"]
 
-reveal_type(c.non_data_descriptor)  # revealed: Unknown | Literal["non-data", 1]
+reveal_type(c.non_data_descriptor)  # revealed: Unknown | Literal["non-data"]
 
 reveal_type(C.data_descriptor)  # revealed: Unknown | Literal["data"]
 
@@ -166,8 +166,8 @@ c = C()
 
 reveal_type(c._name)  # revealed: str | None
 
-# Should be `str`
-reveal_type(c.name)  # revealed: @Todo(decorated method)
+# TODO: Should be `str`
+reveal_type(c.name)  # revealed: <bound method `name` of `C`>
 
 # Should be `builtins.property`
 reveal_type(C.name)  # revealed: Literal[name]
@@ -225,8 +225,7 @@ class C:
     def __init__(self):
         self.ten: Ten = Ten()
 
-# TODO: Should be Ten
-reveal_type(C().ten)  # revealed: Literal[10]
+reveal_type(C().ten)  # revealed: Ten
 ```
 
 ## Descriptors distinguishing between class and instance access
@@ -386,7 +385,7 @@ reveal_type(wrapper_descriptor(f, None, type(f)))  # revealed: Literal[f]
 reveal_type(f.__get__.__hash__)  # revealed: <bound method `__hash__` of `MethodWrapperType`>
 
 # Attribute access on the wrapper-descriptor falls back to `WrapperDescriptorType`:
-reveal_type(wrapper_descriptor.__qualname__)  # revealed: @Todo(@property)
+reveal_type(wrapper_descriptor.__qualname__)  # revealed: <bound method `__qualname__` of `WrapperDescriptorType`>
 ```
 
 We can also bind the free function `f` to an instance of a class `C`:

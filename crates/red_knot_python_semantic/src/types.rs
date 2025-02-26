@@ -1359,12 +1359,64 @@ impl<'db> Type<'db> {
         }
     }
 
+    #[must_use]
+    fn find_name_in_mro(&self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
+        let _span =
+            tracing::trace_span!("find_name_in_mro", self=%self.display(db), name).entered();
+
+        match self {
+            Type::ClassLiteral(ClassLiteralType { class })
+                if class.is_known(db, KnownClass::FunctionType) && name == "__get__" =>
+            {
+                Symbol::bound(Type::Callable(CallableType::WrapperDescriptorDunderGet))
+            }
+            Type::SubclassOf(subclass_of)
+                if name == "__get__"
+                    && matches!(
+                        subclass_of
+                            .subclass_of()
+                            .into_class()
+                            .and_then(|c| c.known(db)),
+                        Some(
+                            KnownClass::Str
+                                | KnownClass::Bytes
+                                | KnownClass::Tuple
+                                | KnownClass::Slice
+                                | KnownClass::Range,
+                        )
+                    ) =>
+            {
+                Symbol::Unbound
+            }
+            Type::ClassLiteral(class)
+                if name == "__get__"
+                    && matches!(
+                        class.class.known(db),
+                        Some(
+                            KnownClass::Str
+                                | KnownClass::Bytes
+                                | KnownClass::Tuple
+                                | KnownClass::Slice
+                                | KnownClass::Range,
+                        )
+                    ) =>
+            {
+                Symbol::Unbound
+            }
+            Type::ClassLiteral(class_literal) => class_literal.static_member(db, name),
+            Type::SubclassOf(subclass_of_ty) => subclass_of_ty.static_member(db, name),
+            _ => Symbol::todo("find_name_in_mro for non-class types"),
+        }
+    }
+
     /// Access an attribute of this type without invoking the descriptor protocol. This
     /// method corresponds to `inspect.getattr_static(<object of type 'self'>, name)`.
     ///
     /// See also: [`Type::member`]
     #[must_use]
     fn static_member(&self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
+        let _span = tracing::trace_span!("static_member", self=%self.display(db), name).entered();
+
         match self {
             Type::Dynamic(_) => Symbol::bound(self),
 
@@ -1559,6 +1611,8 @@ impl<'db> Type<'db> {
     /// lookup, like a failed `__get__` call on a descriptor.
     #[must_use]
     pub(crate) fn member(&self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
+        let _span = tracing::trace_span!("member", self=%self.display(db), name).entered();
+
         if name == "__class__" {
             return Symbol::bound(self.to_meta_type(db));
         }
@@ -1567,6 +1621,13 @@ impl<'db> Type<'db> {
             Type::FunctionLiteral(function) if name == "__get__" => Symbol::bound(Type::Callable(
                 CallableType::MethodWrapperDunderGet(*function),
             )),
+
+            // TODO: move to static member?
+            Type::ClassLiteral(ClassLiteralType { class })
+                if class.is_known(db, KnownClass::FunctionType) && name == "__get__" =>
+            {
+                Symbol::bound(Type::Callable(CallableType::WrapperDescriptorDunderGet))
+            }
 
             Type::Callable(CallableType::BoundMethod(bound_method)) => match name {
                 "__self__" => Symbol::bound(bound_method.self_instance(db)),
@@ -1603,23 +1664,86 @@ impl<'db> Type<'db> {
             | Type::Tuple(..)
             | Type::KnownInstance(..)
             | Type::FunctionLiteral(..) => {
-                let member = self.static_member(db, name);
+                let objtype = self.to_meta_type(db);
+                if let Symbol::Type(cls_var, _) = objtype.find_name_in_mro(db, name) {
+                    tracing::info!("cls_var = {:?}", cls_var.display(db));
+                    if let Symbol::Type(descr_get, _) =
+                        cls_var.to_meta_type(db).member(db, "__get__")
+                    //TODO
+                    {
+                        tracing::info!("descr_get = {:?}", descr_get.display(db));
+                        let instance = *self;
+                        let owner = objtype;
 
-                let instance = Some(*self);
-                let owner = self.to_meta_type(db);
+                        let result = descr_get
+                            .try_call(db, &CallArguments::positional([cls_var, instance, owner]));
 
-                // TODO: Handle `__get__` call errors instead of using `.unwrap_or(None)`.
-                // There is an existing test case for this in `descriptor_protocol.md`.
-                member.map_type(|ty| ty.try_call_dunder_get(db, instance, owner).unwrap_or(ty))
+                        tracing::info!("result = {:?}", result);
+
+                        Symbol::bound(
+                            result
+                                .map(|outcome| outcome.return_type(db))
+                                .unwrap_or(cls_var), // TODO
+                        )
+                    } else {
+                        tracing::info!("no __get__ found");
+                        self.static_member(db, name)
+                    }
+                } else {
+                    tracing::info!("no cls_var found");
+                    self.static_member(db, name)
+                }
+
+                // let instance = Some(*self);
+                // let owner = self.to_meta_type(db);
+
+                // // TODO: Handle `__get__` call errors instead of using `.unwrap_or(None)`.
+                // // There is an existing test case for this in `descriptor_protocol.md`.
+                // member.map_type(|ty| ty.try_call_dunder_get(db, instance, owner).unwrap_or(ty))
             }
+
+            Type::SubclassOf(subclass_of_ty)
+                if subclass_of_ty.subclass_of().is_dynamic() && name == "__get__" =>
+            {
+                Symbol::bound(Type::unknown())
+            }
+
             Type::ClassLiteral(..) | Type::SubclassOf(..) => {
-                let member = self.static_member(db, name);
+                if let cls_var_symbol @ Symbol::Type(cls_var, _) = self.find_name_in_mro(db, name) {
+                    tracing::info!("cls_var = {:?}", cls_var.display(db));
 
-                let instance = None;
-                let owner = *self;
+                    if let Symbol::Type(descr_get, _) =
+                        cls_var.to_meta_type(db).member(db, "__get__")
+                    //TODO
+                    {
+                        tracing::info!("descr_get = {:?}", descr_get.display(db));
 
-                // TODO: Handle `__get__` call errors (see above).
-                member.map_type(|ty| ty.try_call_dunder_get(db, instance, owner).unwrap_or(ty))
+                        Symbol::bound(
+                            descr_get
+                                .try_call(
+                                    db,
+                                    &CallArguments::positional([cls_var, Type::none(db), *self]),
+                                )
+                                .map(|outcome| outcome.return_type(db))
+                                .unwrap_or(cls_var),
+                        )
+                    } else {
+                        tracing::info!("no __get__ found");
+
+                        cls_var_symbol
+                    }
+                } else {
+                    tracing::info!("no cls_var found");
+                    Symbol::Unbound
+                }
+
+                // let member = self.find_name_in_mro(db, name);
+
+                // let instance = None;
+                // let owner = *self;
+
+                // // TODO: Handle `__get__` call errors (see above).
+                // member.map_type(|ty| ty.try_call_dunder_get(db, instance, owner).unwrap_or(ty))
             }
             Type::Union(union) => union.map_with_boundness(db, |elem| elem.member(db, name)),
             Type::Intersection(intersection) => {
@@ -1881,6 +2005,8 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         arguments: &CallArguments<'_, 'db>,
     ) -> Result<CallOutcome<'db>, CallError<'db>> {
+        let _span = tracing::trace_span!("try_call", self=%self.display(db), ?arguments).entered();
+
         match self {
             Type::Callable(CallableType::BoundMethod(bound_method)) => {
                 let instance = bound_method.self_instance(db);
