@@ -971,9 +971,18 @@ mod property_tests {
 
     #[quickcheck_macros::quickcheck]
     #[ignore]
-    fn roundtrip_set_intersection(a_elements: Vec<u16>, b_elements: Vec<u16>) -> bool {
+    fn roundtrip_set_intersection(
+        a_elements: Vec<u16>,
+        b_elements: Vec<u16>,
+        unrelated_elements: Vec<u16>,
+    ) -> bool {
+        // Create sets for `a`, `b`, and `a ∩ b`. Also create `a ∪ unrelated` in a way that induces
+        // structural sharing, so that we can ensure that none of the sets interfere with each
+        // other, even if/when we reuse cells.
         let mut builder = ListBuilder::default();
         let a = builder.set_from_elements(&a_elements);
+        let a_copy = builder.clone_list(&a);
+        let _ = builder.append_from_elements(a_copy, &unrelated_elements);
         let b = builder.set_from_elements(&b_elements);
         let intersection = builder.intersect(a, b);
         let a_set: BTreeSet<_> = a_elements.iter().copied().collect();
@@ -985,9 +994,18 @@ mod property_tests {
 
     #[quickcheck_macros::quickcheck]
     #[ignore]
-    fn roundtrip_set_union(a_elements: Vec<u16>, b_elements: Vec<u16>) -> bool {
+    fn roundtrip_set_union(
+        a_elements: Vec<u16>,
+        b_elements: Vec<u16>,
+        unrelated_elements: Vec<u16>,
+    ) -> bool {
+        // Create sets for `a`, `b`, and `a ∩ b`. Also create `a ∪ unrelated` in a way that induces
+        // structural sharing, so that we can ensure that none of the sets interfere with each
+        // other, even if/when we reuse cells.
         let mut builder = ListBuilder::default();
         let a = builder.set_from_elements(&a_elements);
+        let a_copy = builder.clone_list(&a);
+        let _ = builder.append_from_elements(a_copy, &unrelated_elements);
         let b = builder.set_from_elements(&b_elements);
         let union = builder.union(a, b);
         let a_set: BTreeSet<_> = a_elements.iter().copied().collect();
@@ -1078,15 +1096,21 @@ mod property_tests {
     #[quickcheck_macros::quickcheck]
     #[ignore]
     fn roundtrip_list_intersection(
-        a_elements: Vec<(u16, u16)>,
-        b_elements: Vec<(u16, u16)>,
+        a_pairs: Vec<(u16, u16)>,
+        b_pairs: Vec<(u16, u16)>,
+        unrelated_pairs: Vec<(u16, u16)>,
     ) -> bool {
+        // Create lists for `a`, `b`, and `a ∩ b`. Also create `a ∪ unrelated` in a way that
+        // induces structural sharing, so that we can ensure that none of the sets interfere with
+        // each other, even if/when we reuse cells.
         let mut builder = ListBuilder::default();
-        let a = builder.list_from_pairs(&a_elements);
-        let b = builder.list_from_pairs(&b_elements);
+        let a = builder.list_from_pairs(&a_pairs);
+        let a_copy = builder.clone_list(&a);
+        let _ = builder.append_from_pairs(a_copy, &unrelated_pairs);
+        let b = builder.list_from_pairs(&b_pairs);
         let intersection = builder.intersect_with(a, b, |a, b| a + b);
-        let a_map: BTreeMap<_, _> = a_elements.iter().copied().collect();
-        let b_map: BTreeMap<_, _> = b_elements.iter().copied().collect();
+        let a_map: BTreeMap<_, _> = a_pairs.iter().copied().collect();
+        let b_map: BTreeMap<_, _> = b_pairs.iter().copied().collect();
         let intersection_map = join(&a_map, &b_map);
         let expected: Vec<_> = intersection_map
             .into_iter()
@@ -1098,13 +1122,22 @@ mod property_tests {
 
     #[quickcheck_macros::quickcheck]
     #[ignore]
-    fn roundtrip_list_union(a_elements: Vec<(u16, u16)>, b_elements: Vec<(u16, u16)>) -> bool {
+    fn roundtrip_list_union(
+        a_pairs: Vec<(u16, u16)>,
+        b_pairs: Vec<(u16, u16)>,
+        unrelated_pairs: Vec<(u16, u16)>,
+    ) -> bool {
+        // Create lists for `a`, `b`, and `a ∩ b`. Also create `a ∪ unrelated` in a way that
+        // induces structural sharing, so that we can ensure that none of the sets interfere with
+        // each other, even if/when we reuse cells.
         let mut builder = ListBuilder::default();
-        let a = builder.list_from_pairs(&a_elements);
-        let b = builder.list_from_pairs(&b_elements);
+        let a = builder.list_from_pairs(&a_pairs);
+        let a_copy = builder.clone_list(&a);
+        let _ = builder.append_from_pairs(a_copy, &unrelated_pairs);
+        let b = builder.list_from_pairs(&b_pairs);
         let union = builder.union_with(a, b, |a, b| a + b);
-        let a_map: BTreeMap<_, _> = a_elements.iter().copied().collect();
-        let b_map: BTreeMap<_, _> = b_elements.iter().copied().collect();
+        let a_map: BTreeMap<_, _> = a_pairs.iter().copied().collect();
+        let b_map: BTreeMap<_, _> = b_pairs.iter().copied().collect();
         let union_map = join(&a_map, &b_map);
         let expected: Vec<_> = union_map
             .into_iter()
