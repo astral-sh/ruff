@@ -728,7 +728,39 @@ impl<K, V> ListBuilder<K, V> {
     {
         self.scratch.clear();
 
+        // Iterate through the list, applying the function to each value.
+        //
+        // We reuse any unaliased cells at the end of the list, since we consume the input and
+        // those cells are not used by any other lists. Once we encounter an aliased cell, we have
+        // to fail through to the lower loop, which creates new cells.
         let mut curr = list.last;
+        // The start and end of the range of cells that we're able to reuse, if any.
+        let mut unaliased_bounds: Option<(Option<ListCellId>, ListCellId)> = None;
+        while let Some(curr_id) = curr {
+            if self.aliased[curr_id] {
+                // We've reached an aliased cell, so we have to switch over to creating new cells
+                // instead of reusing existing ones.
+                break;
+            }
+
+            let cell = &self.storage.cells[curr_id];
+            let rest = cell.rest;
+            let new_value = f(&cell.value);
+            self.storage.cells[curr_id].value = new_value;
+            if let Some((_, unaliased_end)) = unaliased_bounds.as_mut() {
+                // Connect the previous reused unaliased cell to this one, and update the
+                // unaliased bounds to include this cell.
+                self.storage.cells[*unaliased_end].rest = curr;
+                *unaliased_end = curr_id;
+            } else {
+                // This is the first unaliased cell that we've been able to reuse.
+                unaliased_bounds = Some((curr, curr_id));
+            }
+            curr = rest;
+        }
+
+        // We have to build new cells from this point on. First add the new keys/values to the
+        // scratch accumulator.
         while let Some(curr_id) = curr {
             let cell = &self.storage.cells[curr_id];
             let new_key = cell.key.clone();
@@ -737,10 +769,20 @@ impl<K, V> ListBuilder<K, V> {
             curr = cell.rest;
         }
 
+        // Once the iteration loop terminates, we stitch the new entries back together into proper
+        // alist cells.
         let mut last = None;
         while let Some((key, value)) = self.scratch.pop() {
             last = self.add_cell(last, key, value);
         }
+
+        // If we were able to reuse any unaliased cells, append them to any new cells we had to
+        // create.
+        if let Some((unaliased_start, unaliased_end)) = unaliased_bounds {
+            self.storage.cells[unaliased_end].rest = last;
+            last = unaliased_start;
+        }
+
         List::new(last)
     }
 }
