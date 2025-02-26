@@ -1124,6 +1124,47 @@ mod tests {
             "[1:1, 2:22, 3:3, 4:44, 5:50, 7:70]"
         );
     }
+
+    #[test]
+    fn can_map_maps() {
+        let mut builder = ListBuilder::<u16, u16>::default();
+
+        let empty = List::empty();
+        let map1 = entry(&mut builder, &empty, 1).or_insert(1);
+        let map12 = entry(&mut builder, &map1, 2).or_insert(2);
+        let map123 = entry(&mut builder, &map12, 3).or_insert(3);
+        let map1234 = entry(&mut builder, &map123, 4).or_insert(4);
+
+        let map2 = entry(&mut builder, &empty, 2).or_insert(20);
+        let map24 = entry(&mut builder, &map2, 4).or_insert(40);
+        let map245 = entry(&mut builder, &map24, 5).or_insert(50);
+        let map2457 = entry(&mut builder, &map245, 7).or_insert(70);
+
+        #[allow(clippy::items_after_statements)]
+        fn map(builder: &mut ListBuilder<u16, u16>, input: &List<u16, u16>) -> List<u16, u16> {
+            let input = builder.clone_list(input);
+            builder.map_with(input, |v| *v * 3)
+        }
+
+        let result = map(&mut builder, &empty);
+        assert_eq!(builder.display(&result), "[]");
+        let result = map(&mut builder, &map1);
+        assert_eq!(builder.display(&result), "[1:3]");
+        let result = map(&mut builder, &map12);
+        assert_eq!(builder.display(&result), "[1:3, 2:6]");
+        let result = map(&mut builder, &map123);
+        assert_eq!(builder.display(&result), "[1:3, 2:6, 3:9]");
+        let result = map(&mut builder, &map1234);
+        assert_eq!(builder.display(&result), "[1:3, 2:6, 3:9, 4:12]");
+        let result = map(&mut builder, &map2);
+        assert_eq!(builder.display(&result), "[2:60]");
+        let result = map(&mut builder, &map24);
+        assert_eq!(builder.display(&result), "[2:60, 4:120]");
+        let result = map(&mut builder, &map245);
+        assert_eq!(builder.display(&result), "[2:60, 4:120, 5:150]");
+        let result = map(&mut builder, &map2457);
+        assert_eq!(builder.display(&result), "[2:60, 4:120, 5:150, 7:210]");
+    }
 }
 
 // --------------
@@ -1373,6 +1414,22 @@ mod property_tests {
             .map(|(k, (v1, v2))| (k, v1.unwrap_or_default() + v2.unwrap_or_default()))
             .collect();
         let actual = builder.iter_reverse(&union).map(|(k, v)| (*k, *v));
+        actual.eq(expected.into_iter().rev())
+    }
+
+    #[quickcheck_macros::quickcheck]
+    #[ignore]
+    fn roundtrip_list_map(pairs: Vec<(u16, u16)>, unrelated_pairs: Vec<(u16, u16)>) -> bool {
+        // Create lists for the input and the map result. Also create `input ∪ unrelated` in a way
+        // that induces structural sharing, so that we can ensure that none of the sets interfere
+        // with each other, even if/when we reuse cells.
+        let mut builder = ListBuilder::default();
+        let input = builder.list_from_pairs(&pairs);
+        let input_copy = builder.clone_list(&input);
+        let _ = builder.append_from_pairs(input_copy, &unrelated_pairs);
+        let result = builder.map_with(input, |a| a * 3);
+        let expected: BTreeMap<_, _> = pairs.iter().map(|(k, v)| (*k, *v * 3)).collect();
+        let actual = builder.iter_reverse(&result).map(|(k, v)| (*k, *v));
         actual.eq(expected.into_iter().rev())
     }
 }
