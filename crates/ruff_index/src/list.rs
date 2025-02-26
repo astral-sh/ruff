@@ -248,17 +248,21 @@ impl<K, V> ListBuilder<K, V> {
         // new key. Stash those away in our scratch accumulator as we step through the input. The
         // result of the loop is that "rest" of the result list, which we will stitch the new key
         // (and any succeeding keys) onto.
+        let mut prev = None;
         let mut curr = list.last;
         while let Some(curr_id) = curr {
             let cell = &self.storage.cells[curr_id];
             match key.cmp(&cell.key) {
                 // We found an existing entry in the input list with the desired key.
                 Ordering::Equal => {
+                    let insertion_point = cell.rest;
                     return ListEntry {
                         builder: self,
                         list,
                         key,
-                        rest: ListTail::Occupied(curr_id),
+                        existing_cell: curr,
+                        insertion_point,
+                        predecessor: prev,
                     };
                 }
                 // The input list does not already contain this key, and this is where we should
@@ -268,16 +272,14 @@ impl<K, V> ListBuilder<K, V> {
                         builder: self,
                         list,
                         key,
-                        rest: ListTail::Vacant(curr_id),
+                        existing_cell: None,
+                        insertion_point: curr,
+                        predecessor: prev,
                     };
                 }
-                // If this key is in the list, it's further along. We'll need to create a new cell
-                // for this entry in the result list, so add its contents to the scratch
-                // accumulator.
+                // If this key is in the list, it's further along.
                 Ordering::Less => {
-                    let new_key = cell.key.clone();
-                    let new_value = cell.value.clone();
-                    self.scratch.push((new_key, new_value));
+                    prev = curr;
                     curr = cell.rest;
                 }
             }
@@ -290,7 +292,9 @@ impl<K, V> ListBuilder<K, V> {
             builder: self,
             list,
             key,
-            rest: ListTail::Beginning,
+            existing_cell: None,
+            insertion_point: None,
+            predecessor: prev,
         }
     }
 }
@@ -300,18 +304,13 @@ pub struct ListEntry<'a, K, V = ()> {
     builder: &'a mut ListBuilder<K, V>,
     list: List<K, V>,
     key: K,
-    /// Points at the element that already contains `key`, if there is one, or the element
-    /// immediately before where it would go, if not.
-    rest: ListTail<ListCellId>,
-}
-
-enum ListTail<I> {
-    /// The list does not already contain `key`, and it would go at the beginning of the list.
-    Beginning,
-    /// The list already contains `key`
-    Occupied(I),
-    /// The list does not already contain key, and it would go immediately after the given element
-    Vacant(I),
+    /// The cell of the element containing `key`, if there is one.
+    existing_cell: Option<ListCellId>,
+    /// The cell of the element immediately before where `key` would go in the list.
+    insertion_point: Option<ListCellId>,
+    /// The cell of the element immediately after where `key` would go in the list, or None if
+    /// `key` would go at the end of the list.
+    predecessor: Option<ListCellId>,
 }
 
 impl<K, V> ListEntry<'_, K, V>
@@ -319,8 +318,27 @@ where
     K: Clone,
     V: Clone,
 {
-    fn stitch_up(self, rest: Option<ListCellId>, value: V) -> List<K, V> {
-        let mut last = rest;
+    fn stitch_up(self, value: V) -> List<K, V> {
+        // Make copies of the keys/values of any cells that will appear after the new element.
+        self.builder.scratch.clear();
+        if self.predecessor.is_some() {
+            let mut curr = self.list.last;
+            loop {
+                let cell_id = curr.expect("cell should not be empty");
+                let cell = &self.builder.cells[cell_id];
+                let new_key = cell.key.clone();
+                let new_value = cell.value.clone();
+                let next = cell.rest;
+                self.builder.scratch.push((new_key, new_value));
+                if curr == self.predecessor {
+                    break;
+                } else {
+                    curr = next;
+                }
+            }
+        }
+
+        let mut last = self.insertion_point;
         last = self.builder.add_cell(last, self.key, value);
         while let Some((key, value)) = self.builder.scratch.pop() {
             last = self.builder.add_cell(last, key, value);
@@ -334,15 +352,14 @@ where
     where
         F: FnOnce() -> V,
     {
-        let rest = match self.rest {
-            // If the list already contains `key`, we don't need to replace anything, and can
-            // return the original list unmodified.
-            ListTail::Occupied(_) => return self.list,
-            // Otherwise we have to create a new entry and stitch it onto the list.
-            ListTail::Beginning => None,
-            ListTail::Vacant(index) => Some(index),
-        };
-        self.stitch_up(rest, f())
+        // If the list already contains `key`, we don't need to replace anything, and can
+        // return the original list unmodified.
+        if self.existing_cell.is_some() {
+            return self.list;
+        }
+
+        // Otherwise we have to create a new entry and stitch it onto the list.
+        self.stitch_up(f())
     }
 
     /// Inserts a new key/value into the list if the key is not already present. If the list
@@ -367,21 +384,16 @@ where
     where
         V: Eq,
     {
-        // If the list already contains `key`, skip past its entry before we add its replacement.
-        let rest = match self.rest {
-            ListTail::Beginning => None,
-            ListTail::Occupied(index) => {
-                let cell = &self.builder.cells[index];
-                if value == cell.value {
-                    // As an optimization, if value isn't changed, there's no need to stitch up a
-                    // new list.
-                    return self.list;
-                }
-                cell.rest
+        // As an optimization, if value isn't changed, there's no need to stitch up a new list.
+        if let Some(existing) = self.existing_cell {
+            let cell = &self.builder.cells[existing];
+            if value == cell.value {
+                return self.list;
             }
-            ListTail::Vacant(index) => Some(index),
-        };
-        self.stitch_up(rest, value)
+        }
+
+        // Otherwise we have to create a new entry and stitch it onto the list.
+        self.stitch_up(value)
     }
 
     /// Ensures that the list contains an entry mapping the key to the default, returning the
