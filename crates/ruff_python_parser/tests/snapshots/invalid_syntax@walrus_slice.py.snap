@@ -1,0 +1,84 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/walrus_slice.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..84,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 71..83,
+                    value: Subscript(
+                        ExprSubscript {
+                            range: 71..83,
+                            value: Name(
+                                ExprName {
+                                    range: 71..74,
+                                    id: Name("lst"),
+                                    ctx: Load,
+                                },
+                            ),
+                            slice: Slice(
+                                ExprSlice {
+                                    range: 75..82,
+                                    lower: Some(
+                                        Named(
+                                            ExprNamed {
+                                                range: 75..79,
+                                                target: Name(
+                                                    ExprName {
+                                                        range: 75..76,
+                                                        id: Name("x"),
+                                                        ctx: Store,
+                                                    },
+                                                ),
+                                                value: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        range: 78..79,
+                                                        value: Int(
+                                                            1,
+                                                        ),
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                    ),
+                                    upper: Some(
+                                        UnaryOp(
+                                            ExprUnaryOp {
+                                                range: 80..82,
+                                                op: USub,
+                                                operand: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        range: 81..82,
+                                                        value: Int(
+                                                            1,
+                                                        ),
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                    ),
+                                    step: None,
+                                },
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | # even after 3.10, an unparenthesized walrus is not allowed in a slice
+2 | lst[x:=1:-1]
+  |     ^^^^ Syntax Error: Unparenthesized named expression cannot be used here
+  |

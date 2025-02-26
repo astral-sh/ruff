@@ -848,11 +848,41 @@ impl<'src> Parser<'src> {
         const STEP_END_SET: TokenSet =
             TokenSet::new([TokenKind::Comma, TokenKind::Rsqb]).union(NEWLINE_EOF_SET);
 
+        // Python 3.10 allowed assignment expressions to be unparenthesized within "sequence
+        // indexes", which I take to mean subscripts. See
+        // <https://docs.python.org/3/whatsnew/3.10.html#other-language-changes>.
+
+        // test_ok parenthesized_walrus_index_py39
+        // # parse_options: {"target-version": "3.9"}
+        // lst[(x:=1)]
+
+        // test_ok unparenthesized_walrus_index_py310
+        // # parse_options: {"target-version": "3.10"}
+        // lst[x:=1]
+
+        // test_err unparenthesized_walrus_index_py39
+        // # parse_options: {"target-version": "3.9"}
+        // lst[x:=1]
+
+        // test_err walrus_slice
+        // # even after 3.10, an unparenthesized walrus is not allowed in a slice
+        // lst[x:=1:-1]
+
         let start = self.node_start();
 
         let lower = if self.at_expr() {
             let lower =
                 self.parse_named_expression_or_higher(ExpressionContext::starred_conditional());
+
+            if self.options.target_version < PythonVersion::PY310
+                && lower.is_unparenthesized_named_expr()
+            {
+                self.add_unsupported_syntax_error(
+                    UnsupportedSyntaxErrorKind::UnparWalrusBefore310,
+                    self.node_range(start),
+                );
+            }
+
             if self.at_ts(NEWLINE_EOF_SET.union([TokenKind::Rsqb, TokenKind::Comma].into())) {
                 return lower.expr;
             }
@@ -1609,6 +1639,32 @@ impl<'src> Parser<'src> {
                     );
                 }
 
+                // Python 3.10 allowed assignment expressions to be unparenthesized within set
+                // literals and set comprehensions. See
+                // <https://docs.python.org/3/whatsnew/3.10.html#other-language-changes>. In my
+                // testing, these are also allowed on 3.9, but they are included in the 3.10 release
+                // notes, so that's the cutoff used here.
+
+                // test_ok parenthesized_walrus_py39
+                // # parse_options: {"target-version": "3.9"}
+                // {(x := 1), 2, 3}
+                // {(last := x) for x in range(3)}
+
+                // test_ok unparenthesized_walrus_py310
+                // # parse_options: {"target-version": "3.10"}
+                // {x := 1, 2, 3}
+                // {last := x for x in range(3)}
+
+                // test_err unparenthesized_walrus_set_comp_py39
+                // # parse_options: {"target-version": "3.9"}
+                // {last := x for x in range(3)}
+                if key_or_element.is_unparenthesized_named_expr() {
+                    self.add_unsupported_syntax_error(
+                        UnsupportedSyntaxErrorKind::UnparWalrusBefore310,
+                        self.node_range(start),
+                    );
+                }
+
                 Expr::SetComp(self.parse_set_comprehension_expression(key_or_element.expr, start))
             }
             TokenKind::Colon => {
@@ -1645,7 +1701,21 @@ impl<'src> Parser<'src> {
                     ))
                 }
             }
-            _ => Expr::Set(self.parse_set_expression(key_or_element.expr, start)),
+            _ => {
+                // test_err unparenthesized_walrus_set_literal_py39
+                // # parse_options: {"target-version": "3.9"}
+                // {x := 1, 2, 3}
+                // {1, x := 2, 3}
+                // {1, 2, x := 3}
+
+                if key_or_element.is_unparenthesized_named_expr() {
+                    self.add_unsupported_syntax_error(
+                        UnsupportedSyntaxErrorKind::UnparWalrusBefore310,
+                        self.node_range(start),
+                    );
+                }
+                Expr::Set(self.parse_set_expression(key_or_element.expr, start))
+            }
         }
     }
 
@@ -1803,11 +1873,17 @@ impl<'src> Parser<'src> {
         let mut elts = vec![first_element];
 
         self.parse_comma_separated_list(RecoveryContextKind::SetElements, |parser| {
-            elts.push(
-                parser
-                    .parse_named_expression_or_higher(ExpressionContext::starred_bitwise_or())
-                    .expr,
-            );
+            let parsed_expr =
+                parser.parse_named_expression_or_higher(ExpressionContext::starred_bitwise_or());
+
+            if parsed_expr.is_unparenthesized_named_expr() {
+                parser.add_unsupported_syntax_error(
+                    UnsupportedSyntaxErrorKind::UnparWalrusBefore310,
+                    parser.node_range(start),
+                );
+            }
+
+            elts.push(parsed_expr.expr);
         });
 
         self.expect(TokenKind::Rbrace);
@@ -2337,6 +2413,11 @@ impl ParsedExpr {
     #[inline]
     pub(super) const fn is_unparenthesized_starred_expr(&self) -> bool {
         !self.is_parenthesized && self.expr.is_starred_expr()
+    }
+
+    #[inline]
+    pub(super) const fn is_unparenthesized_named_expr(&self) -> bool {
+        !self.is_parenthesized && self.expr.is_named_expr()
     }
 }
 
