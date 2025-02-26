@@ -175,30 +175,25 @@ pub(crate) fn check(
     let lsp_diagnostics = lsp_diagnostics.chain(
         show_syntax_errors
             .then(|| {
-                parsed.errors().iter().map(|parse_error| {
-                    parse_error_to_lsp_diagnostic(
-                        parse_error,
-                        &source_kind,
-                        locator.to_index(),
-                        encoding,
-                    )
-                })
-            })
-            .into_iter()
-            .flatten(),
-    );
-
-    let lsp_diagnostics = lsp_diagnostics.chain(
-        show_syntax_errors
-            .then(|| {
-                parsed.unsupported_syntax_errors().iter().map(|error| {
-                    unsupported_syntax_error_to_lsp_diagnostic(
-                        error,
-                        &source_kind,
-                        locator.to_index(),
-                        encoding,
-                    )
-                })
+                parsed
+                    .errors()
+                    .iter()
+                    .map(|parse_error| {
+                        parse_error_to_lsp_diagnostic(
+                            parse_error,
+                            &source_kind,
+                            locator.to_index(),
+                            encoding,
+                        )
+                    })
+                    .chain(parsed.unsupported_syntax_errors().iter().map(|error| {
+                        unsupported_syntax_error_to_lsp_diagnostic(
+                            error,
+                            &source_kind,
+                            locator.to_index(),
+                            encoding,
+                        )
+                    }))
             })
             .into_iter()
             .flatten(),
