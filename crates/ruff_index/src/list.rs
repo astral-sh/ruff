@@ -1250,6 +1250,7 @@ mod property_tests {
 
     #[quickcheck_macros::quickcheck]
     #[ignore]
+    #[allow(clippy::needless_pass_by_value)]
     fn roundtrip_set_from_vec(elements: Vec<u16>) -> bool {
         let mut builder = ListBuilder::default();
         let set = builder.set_from_elements(&elements);
@@ -1260,6 +1261,7 @@ mod property_tests {
 
     #[quickcheck_macros::quickcheck]
     #[ignore]
+    #[allow(clippy::needless_pass_by_value)]
     fn roundtrip_shared_sets(a_elements: Vec<u16>, b_elements: Vec<u16>) -> bool {
         // Create sets for `a` and `a ∪ b` in a way that induces structural sharing between the
         // two.
@@ -1283,6 +1285,7 @@ mod property_tests {
 
     #[quickcheck_macros::quickcheck]
     #[ignore]
+    #[allow(clippy::needless_pass_by_value)]
     fn roundtrip_set_intersection(
         a_elements: Vec<u16>,
         b_elements: Vec<u16>,
@@ -1306,6 +1309,7 @@ mod property_tests {
 
     #[quickcheck_macros::quickcheck]
     #[ignore]
+    #[allow(clippy::needless_pass_by_value)]
     fn roundtrip_set_union(
         a_elements: Vec<u16>,
         b_elements: Vec<u16>,
@@ -1374,6 +1378,7 @@ mod property_tests {
 
     #[quickcheck_macros::quickcheck]
     #[ignore]
+    #[allow(clippy::needless_pass_by_value)]
     fn roundtrip_list_from_vec(pairs: Vec<(u16, u16)>) -> bool {
         let mut builder = ListBuilder::default();
         let list = builder.list_from_pairs(&pairs);
@@ -1384,6 +1389,7 @@ mod property_tests {
 
     #[quickcheck_macros::quickcheck]
     #[ignore]
+    #[allow(clippy::needless_pass_by_value)]
     fn roundtrip_shared_lists(a_pairs: Vec<(u16, u16)>, b_pairs: Vec<(u16, u16)>) -> bool {
         // Create lists for `a` and `a ∪ b` in a way that induces structural sharing between the
         // two.
@@ -1407,6 +1413,7 @@ mod property_tests {
 
     #[quickcheck_macros::quickcheck]
     #[ignore]
+    #[allow(clippy::needless_pass_by_value)]
     fn roundtrip_list_intersection(
         a_pairs: Vec<(u16, u16)>,
         b_pairs: Vec<(u16, u16)>,
@@ -1434,6 +1441,7 @@ mod property_tests {
 
     #[quickcheck_macros::quickcheck]
     #[ignore]
+    #[allow(clippy::needless_pass_by_value)]
     fn roundtrip_list_union(
         a_pairs: Vec<(u16, u16)>,
         b_pairs: Vec<(u16, u16)>,
