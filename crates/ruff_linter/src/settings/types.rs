@@ -300,7 +300,11 @@ impl<T> PerFile<T> {
         }
         let path = Path::new(&pattern);
         let absolute = match project_root {
-            Some(project_root) => fs::normalize_path_to(path, project_root),
+            Some(project_root) => {
+                // escape glob metacharacters in the path outside the `pattern`
+                let escaped = globset::escape(&project_root.to_string_lossy());
+                fs::normalize_path_to(path, escaped)
+            }
             None => fs::normalize_path(path),
         };
 
@@ -647,25 +651,6 @@ where
     }
 }
 
-/// Call [`Glob::new`] but peek at the [`globset::ErrorKind`] and try the glob again with any nested
-/// alternates escaped.
-///
-/// For example, the `cookiecutter` package generates paths like `{{cookiecutter.repo_name}}`, which
-/// look like nested glob alternate expressions like `{foo,bar}`. The nested version is not
-/// supported by `globset`, causing an error.
-fn try_glob_new(s: &str) -> Result<Glob> {
-    match Glob::new(s) {
-        Err(e) if *e.kind() == globset::ErrorKind::NestedAlternates => {
-            let new = s.replace("{{", "[{][{]").replace("}}", "[}][}]");
-            log::warn!(
-                "Error parsing original glob: `{s:?}`, trying with escaped braces: `{new:?}`"
-            );
-            Ok(Glob::new(&new)?)
-        }
-        glob => Ok(glob?),
-    }
-}
-
 impl<T> CompiledPerFileList<T> {
     /// Given a list of [`PerFile`] patterns, create a compiled set of globs.
     ///
@@ -676,10 +661,10 @@ impl<T> CompiledPerFileList<T> {
             .map(|per_file_ignore| {
                 // Construct absolute path matcher.
                 let absolute_matcher =
-                    try_glob_new(&per_file_ignore.absolute.to_string_lossy())?.compile_matcher();
+                    Glob::new(&per_file_ignore.absolute.to_string_lossy())?.compile_matcher();
 
                 // Construct basename matcher.
-                let basename_matcher = try_glob_new(&per_file_ignore.basename)?.compile_matcher();
+                let basename_matcher = Glob::new(&per_file_ignore.basename)?.compile_matcher();
 
                 Ok(CompiledPerFile::new(
                     absolute_matcher,
