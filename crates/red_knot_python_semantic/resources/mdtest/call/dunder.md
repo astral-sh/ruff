@@ -79,10 +79,6 @@ reveal_type(this_fails[0])  # revealed: Unknown
 However, the attached dunder method *can* be called if accessed directly:
 
 ```py
-# TODO: `this_fails.__getitem__` is incorrectly treated as a bound method. This
-# should be fixed with https://github.com/astral-sh/ruff/issues/16367
-# error: [too-many-positional-arguments]
-# error: [invalid-argument-type]
 reveal_type(this_fails.__getitem__(this_fails, 0))  # revealed: Unknown | str
 ```
 
