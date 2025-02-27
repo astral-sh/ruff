@@ -374,7 +374,13 @@ impl<'a> ErrorAssertionParser<'a> {
 
         while !self.cursor.is_eof() {
             match self.cursor.first() {
-                '0'..='9' if column.is_none() && rule.is_none() => {
+                '0'..='9' => {
+                    if column.is_some() {
+                        return Err(ErrorAssertionParseError::MultipleColumnNumbers);
+                    }
+                    if rule.is_some() {
+                        return Err(ErrorAssertionParseError::ColumnNumberAfterRuleCode);
+                    }
                     // This will return `None` if it hits the end of the file before hitting any whitespace
                     let Some(column_str) = self.consume_until(char::is_whitespace) else {
                         return Err(ErrorAssertionParseError::NoRuleOrMessage);
@@ -384,7 +390,10 @@ impl<'a> ErrorAssertionParser<'a> {
                         .map_err(|e| ErrorAssertionParseError::BadColumnNumber(column_str, e))?;
                 }
 
-                '[' if rule.is_none() => {
+                '[' => {
+                    if rule.is_some() {
+                        return Err(ErrorAssertionParseError::MultipleRuleCodes);
+                    }
                     self.cursor.bump();
                     let Some(position) = memchr::memmem::find(self.cursor.as_bytes(), b"]") else {
                         return Err(ErrorAssertionParseError::UnclosedRuleCode);
@@ -448,11 +457,17 @@ pub(crate) enum ErrorAssertionParseError<'a> {
     NoRuleOrMessage,
     #[error("bad column number `{0}`")]
     BadColumnNumber(&'a str, #[source] std::num::ParseIntError),
+    #[error("column number must precede the rule code")]
+    ColumnNumberAfterRuleCode,
+    #[error("multiple column numbers in one assertion")]
+    MultipleColumnNumbers,
     #[error("expected ']' to close rule code")]
     UnclosedRuleCode,
-    #[error("expected '\"' to close message")]
+    #[error("cannot use multiple rule codes in one assertion")]
+    MultipleRuleCodes,
+    #[error("expected '\"' to be the final character in an assertion with an error message")]
     UnclosedMessage,
-    #[error("Unexpected character `{character}` at offset {offset} (relative to comment `#`)")]
+    #[error("unexpected character `{character}` at offset {offset} (relative to comment `#`)")]
     UnexpectedCharacter { character: char, offset: usize },
 }
 

@@ -722,6 +722,20 @@ mod tests {
     }
 
     #[test]
+    fn error_match_column_and_rule_and_message() {
+        let result = get_result(
+            r#"x # error: 5 [some-rule] "Some message""#,
+            vec![ExpectedDiagnostic::new(
+                DiagnosticId::lint("some-rule"),
+                "Some message",
+                4,
+            )],
+        );
+
+        assert_ok(&result);
+    }
+
+    #[test]
     fn error_wrong_column() {
         let result = get_result(
             "x # error: 2 [rule]",
@@ -1031,6 +1045,30 @@ mod tests {
     }
 
     #[test]
+    fn bare_reveal_assertion_not_allowed() {
+        let source = "x  # revealed: ";
+        let result = get_result(
+            source,
+            vec![ExpectedDiagnostic::new(
+                DiagnosticId::lint("some-rule"),
+                "some message",
+                0,
+            )],
+        );
+
+        assert_fail(
+            result,
+            &[(
+                0,
+                &[
+                    "invalid assertion: Must specify which type should be revealed",
+                    r#"unexpected error: 1 [some-rule] "some message""#,
+                ],
+            )],
+        );
+    }
+
+    #[test]
     fn column_only_error_assertion_not_allowed() {
         let source = "x  # error: 1";
         let x = source.find('x').unwrap();
@@ -1049,6 +1087,222 @@ mod tests {
                 0,
                 &[
                     "invalid assertion: no rule or message text",
+                    r#"unexpected error: 1 [some-rule] "some message""#,
+                ],
+            )],
+        );
+    }
+
+    #[test]
+    fn unclosed_rule_not_allowed() {
+        let source = r#"x  # error: 42 [some-rule "Some message""#;
+        let result = get_result(
+            source,
+            vec![ExpectedDiagnostic::new(
+                DiagnosticId::lint("some-rule"),
+                "some message",
+                0,
+            )],
+        );
+
+        assert_fail(
+            result,
+            &[(
+                0,
+                &[
+                    "invalid assertion: expected ']' to close rule code",
+                    r#"unexpected error: 1 [some-rule] "some message""#,
+                ],
+            )],
+        );
+    }
+
+    #[test]
+    fn bad_column_number_not_allowed() {
+        let source = r#"x  # error: 3.14 [some-rule] "Some message""#;
+        let result = get_result(
+            source,
+            vec![ExpectedDiagnostic::new(
+                DiagnosticId::lint("some-rule"),
+                "some message",
+                0,
+            )],
+        );
+
+        assert_fail(
+            result,
+            &[(
+                0,
+                &[
+                    "invalid assertion: bad column number `3.14`",
+                    r#"unexpected error: 1 [some-rule] "some message""#,
+                ],
+            )],
+        );
+    }
+
+    #[test]
+    fn multiple_column_numbers_not_allowed() {
+        let source = r#"x  # error: 3 14 [some-rule] "Some message""#;
+        let result = get_result(
+            source,
+            vec![ExpectedDiagnostic::new(
+                DiagnosticId::lint("some-rule"),
+                "some message",
+                0,
+            )],
+        );
+
+        assert_fail(
+            result,
+            &[(
+                0,
+                &[
+                    "invalid assertion: multiple column numbers in one assertion",
+                    r#"unexpected error: 1 [some-rule] "some message""#,
+                ],
+            )],
+        );
+    }
+
+    #[test]
+    fn multiple_column_numbers_not_allowed_even_if_interspersed() {
+        let source = r#"x  # error: 3 [some-rule] 14 "Some message""#;
+        let result = get_result(
+            source,
+            vec![ExpectedDiagnostic::new(
+                DiagnosticId::lint("some-rule"),
+                "some message",
+                0,
+            )],
+        );
+
+        assert_fail(
+            result,
+            &[(
+                0,
+                &[
+                    "invalid assertion: multiple column numbers in one assertion",
+                    r#"unexpected error: 1 [some-rule] "some message""#,
+                ],
+            )],
+        );
+    }
+
+    #[test]
+    fn two_rule_codes_not_allowed() {
+        let source = r#"x  # error: [rule1] [rule2] "Some message""#;
+        let result = get_result(
+            source,
+            vec![
+                ExpectedDiagnostic::new(DiagnosticId::lint("rule1"), "Some message", 0),
+                ExpectedDiagnostic::new(DiagnosticId::lint("rule2"), "Some message", 0),
+            ],
+        );
+
+        assert_fail(
+            result,
+            &[(
+                0,
+                &[
+                    "invalid assertion: cannot use multiple rule codes in one assertion",
+                    r#"unexpected error: 1 [rule1] "Some message""#,
+                    r#"unexpected error: 1 [rule2] "Some message""#,
+                ],
+            )],
+        );
+    }
+
+    #[test]
+    fn column_number_not_allowed_after_rule_code() {
+        let source = r#"x  # error: [rule1] 4 "Some message""#;
+        let result = get_result(
+            source,
+            vec![ExpectedDiagnostic::new(
+                DiagnosticId::lint("rule1"),
+                "Some message",
+                0,
+            )],
+        );
+
+        assert_fail(
+            result,
+            &[(
+                0,
+                &[
+                    "invalid assertion: column number must precede the rule code",
+                    r#"unexpected error: 1 [rule1] "Some message""#,
+                ],
+            )],
+        );
+    }
+
+    #[test]
+    fn column_number_not_allowed_after_message() {
+        let source = r#"x  # error: "Some message" 0"#;
+        let result = get_result(
+            source,
+            vec![ExpectedDiagnostic::new(
+                DiagnosticId::lint("rule1"),
+                "Some message",
+                0,
+            )],
+        );
+
+        assert_fail(
+            result,
+            &[(
+                0,
+                &[
+                    "invalid assertion: expected '\"' to be the final character in an assertion with an error message",
+                    r#"unexpected error: 1 [rule1] "Some message""#,
+                ],
+            )],
+        );
+    }
+
+    #[test]
+    fn unclosed_message_not_allowed() {
+        let source = "x  # error: \"Some message";
+        let result = get_result(
+            source,
+            vec![ExpectedDiagnostic::new(
+                DiagnosticId::lint("some-rule"),
+                "some message",
+                0,
+            )],
+        );
+
+        assert_fail(
+            result,
+            &[(
+                0,
+                &[
+                    "invalid assertion: expected '\"' to be the final character in an assertion with an error message",
+                    r#"unexpected error: 1 [some-rule] "some message""#,
+                ],
+            )],
+        );
+    }
+
+    #[test]
+    fn unclosed_message_not_allowed_even_after_rule_code() {
+        let source = "x  # error: [some-rule] \"Some message";
+        let result = get_result(
+            source,
+            vec![ExpectedDiagnostic::new(
+                DiagnosticId::lint("some-rule"),
+                "some message",
+                0,
+            )],
+        );
+
+        assert_fail(
+            result,
+            &[(
+                0,
+                &[
+                    "invalid assertion: expected '\"' to be the final character in an assertion with an error message",
                     r#"unexpected error: 1 [some-rule] "some message""#,
                 ],
             )],
