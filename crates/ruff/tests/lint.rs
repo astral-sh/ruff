@@ -2701,3 +2701,47 @@ match 2:
     "
     );
 }
+
+/// Regression test for <https://github.com/astral-sh/ruff/issues/16417>
+#[test]
+fn cache_syntax_errors() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    fs::write(tempdir.path().join("main.py"), "match 2:\n    case 1: ...")?;
+
+    let mut cmd = Command::new(get_cargo_bin(BIN_NAME));
+    // inline STDIN_BASE_OPTIONS to remove --no-cache
+    cmd.args(["check", "--output-format", "concise"])
+        .arg("--target-version=py39")
+        .arg("--preview")
+        .current_dir(&tempdir);
+
+    assert_cmd_snapshot!(
+        cmd,
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    main.py:1:1: SyntaxError: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
+    Found 1 error.
+
+    ----- stderr -----
+    warning: Detected debug build without --no-cache.
+    "
+    );
+
+    // this should *not* be cached, like normal parse errors
+    assert_cmd_snapshot!(
+        cmd,
+        @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    warning: Detected debug build without --no-cache.
+    "
+    );
+
+    Ok(())
+}
