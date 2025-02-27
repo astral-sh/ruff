@@ -577,43 +577,6 @@ class Subclass(C):
 reveal_type(Subclass.pure_class_variable1)  # revealed: str
 ```
 
-#### Declarations in stubs
-
-Unlike regular python modules, stub files often declare class variables without initializing them.
-But from the perspective of the type checker, we should treat something like `symbol: type` same as
-`symbol: type = ...`.
-
-`b.pyi`:
-
-```pyi
-from typing import ClassVar
-
-class C:
-    a_classvar: ClassVar[str]
-    instance_var: int
-```
-
-```py
-from typing import ClassVar, Literal
-
-from b import C
-
-reveal_type(C.a_classvar)  # revealed: str
-
-class Subclass(C):
-    declared: int
-    declared_and_bound: int = 42
-
-s_inst = Subclass()
-
-reveal_type(s_inst.instance_var)  # revealed: int
-
-# TODO: this should be an error showing possibly unbound.
-reveal_type(s_inst.declared)  # revealed: int
-
-reveal_type(s_inst.declared_and_bound)  # revealed: int
-```
-
 #### Variable only mentioned in a class method
 
 We also consider a class variable to be a pure class variable if it is only mentioned in a class
@@ -1034,6 +997,8 @@ reveal_type(Foo.__class__)  # revealed: Literal[type]
 
 ## Module attributes
 
+### Regular modules
+
 `mod.py`:
 
 ```py
@@ -1066,6 +1031,34 @@ class IntIterable:
 # error: [invalid-assignment] "Object of type `int` is not assignable to attribute `global_symbol` of type `str`"
 for mod.global_symbol in IntIterable():
     pass
+```
+
+### Declarations in stubs
+
+Unlike regular python modules, stub files often declare module-global and class variables without
+initializing them. But from the perspective of the type checker, we should treat something like
+`symbol: type` same as `symbol: type = ...`.
+
+`b.pyi`:
+
+```pyi
+from typing import Literal
+
+CONSTANT: Literal[42]
+
+# No error here, even though the variable is not initialized.
+uses_constant: int = CONSTANT
+
+class C:
+    instance_var: int
+```
+
+```py
+from typing import Literal
+
+from b import CONSTANT
+
+reveal_type(CONSTANT)  # revealed: Literal[42]
 ```
 
 ## Nested attributes

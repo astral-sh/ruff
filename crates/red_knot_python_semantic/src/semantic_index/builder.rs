@@ -353,7 +353,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         #[allow(unsafe_code)]
         // SAFETY: `definition_node` is guaranteed to be a child of `self.module`
         let kind = unsafe { definition_node.into_owned(self.module.clone()) };
-        let category = kind.category();
+        let category = kind.category(self.file.is_stub(self.db.upcast()));
         let is_reexported = kind.is_reexported();
         let definition = Definition::new(
             self.db,
@@ -370,7 +370,7 @@ impl<'db> SemanticIndexBuilder<'db> {
             .insert(definition_node.key(), definition);
         debug_assert_eq!(existing_definition, None);
 
-        if category.is_binding() || self.file.is_stub(self.db.upcast()) {
+        if category.is_binding() {
             self.mark_symbol_bound(symbol);
         }
         if category.is_declaration() {
