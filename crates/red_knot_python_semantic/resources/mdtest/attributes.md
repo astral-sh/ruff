@@ -577,6 +577,43 @@ class Subclass(C):
 reveal_type(Subclass.pure_class_variable1)  # revealed: str
 ```
 
+#### Declarations in stubs
+
+Unlike regular python modules, stub files often declare class variables without initializing them.
+But from the perspective of the type checker, we should treat something like `symbol: type` same as
+`symbol: type = ...`.
+
+`b.pyi`:
+
+```pyi
+from typing import ClassVar
+
+class C:
+    a_classvar: ClassVar[str]
+    instance_var: int
+```
+
+```py
+from typing import ClassVar, Literal
+
+from b import C
+
+reveal_type(C.a_classvar)  # revealed: str
+
+class Subclass(C):
+    declared: int
+    declared_and_bound: int = 42
+
+s_inst = Subclass()
+
+reveal_type(s_inst.instance_var)  # revealed: int
+
+# TODO: this should be an error showing possibly unbound.
+reveal_type(s_inst.declared)  # revealed: int
+
+reveal_type(s_inst.declared_and_bound)  # revealed: int
+```
+
 #### Variable only mentioned in a class method
 
 We also consider a class variable to be a pure class variable if it is only mentioned in a class

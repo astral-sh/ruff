@@ -370,7 +370,7 @@ impl<'db> SemanticIndexBuilder<'db> {
             .insert(definition_node.key(), definition);
         debug_assert_eq!(existing_definition, None);
 
-        if category.is_binding() {
+        if category.is_binding() || self.file.is_stub(self.db.upcast()) {
             self.mark_symbol_bound(symbol);
         }
         if category.is_declaration() {
