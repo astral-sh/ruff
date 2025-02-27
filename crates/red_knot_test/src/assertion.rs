@@ -237,16 +237,22 @@ const TYPE_PREFIX: &str = "# revealed:";
 const ERROR_PREFIX: &str = "# error:";
 
 /// A single diagnostic assertion comment.
+///
+/// This type represents an *attempted* assertion, but not necessarily a *valid* assertion.
+/// Parsing is done lazily in `matcher.rs`; this allows us to emit nicer error messages
+/// in the event of an invalid assertion
 #[derive(Debug)]
 pub(crate) enum UnparsedAssertion<'a> {
-    /// A `revealed: ` assertion.
+    /// A `# revealed:` assertion.
     Revealed(&'a str),
 
-    /// An `error: ` assertion.
+    /// An `# error:` assertion.
     Error(&'a str),
 }
 
 impl<'a> UnparsedAssertion<'a> {
+    /// Returns `Some(_)` if the comment starts with `# error:` or `# revealed:`,
+    /// indicating that it is an assertion comment.
     fn from_comment(comment: &'a str) -> Option<Self> {
         comment
             .strip_prefix(TYPE_PREFIX)
@@ -254,6 +260,7 @@ impl<'a> UnparsedAssertion<'a> {
             .or_else(|| comment.strip_prefix(ERROR_PREFIX).map(Self::Error))
     }
 
+    /// Parse the attempted assertion into a [`ParsedAssertion`] structured representation.
     pub(crate) fn parse(&self) -> Result<ParsedAssertion<'a>, AssertionParseError<'a>> {
         match self {
             Self::Revealed(revealed) => {
@@ -280,9 +287,13 @@ impl std::fmt::Display for UnparsedAssertion<'_> {
     }
 }
 
+/// An assertion comment that has been parsed and validated for correctness.
 #[derive(Debug)]
 pub(crate) enum ParsedAssertion<'a> {
+    /// A `# revealed:` assertion.
     Revealed(&'a str),
+
+    /// An `# error:` assertion.
     Error(ErrorAssertion<'a>),
 }
 
@@ -295,7 +306,7 @@ impl std::fmt::Display for ParsedAssertion<'_> {
     }
 }
 
-/// An `error: ` assertion comment.
+/// A parsed and validated `# error:` assertion comment.
 #[derive(Debug)]
 pub(crate) struct ErrorAssertion<'a> {
     /// The diagnostic rule code we expect.
@@ -330,35 +341,44 @@ impl std::fmt::Display for ErrorAssertion<'_> {
     }
 }
 
+/// A parser to convert a string into a [`ErrorAssertion`].
 #[derive(Debug, Clone)]
-pub(crate) struct ErrorAssertionParser<'a> {
+struct ErrorAssertionParser<'a> {
     cursor: Cursor<'a>,
-    source: &'a str,
+
+    /// string slice representing all characters *after* the `# error:` prefix.
+    comment_source: &'a str,
 }
 
 impl<'a> ErrorAssertionParser<'a> {
     fn new(comment: &'a str) -> Self {
         Self {
             cursor: Cursor::new(comment),
-            source: comment,
+            comment_source: comment,
         }
     }
 
     /// Retrieves the current offset of the cursor within the source code.
     fn offset(&self) -> TextSize {
-        self.source.text_len() - self.cursor.text_len()
+        self.comment_source.text_len() - self.cursor.text_len()
     }
 
+    /// Consume characters in the assertion comment until we find a non-whitespace character
     fn skip_whitespace(&mut self) {
-        self.cursor.eat_while(|c| c.is_whitespace() && c != '\n');
+        self.cursor.eat_while(char::is_whitespace);
     }
 
+    /// Consume characters in the assertion comment until we find a character that satisfies `end_predicate`.
+    ///
+    /// Return a string slice representing the concatenation of all characters we consumed,
+    /// or `None` if we hit the end of the comment before finding a character
+    /// that satisfies `end_predicate`.
     fn consume_until(&mut self, mut end_predicate: impl FnMut(char) -> bool) -> Option<&'a str> {
         let start = self.offset().to_usize();
 
         while !self.cursor.is_eof() {
             if end_predicate(self.cursor.first()) {
-                return Some(&self.source[start..self.offset().to_usize()]);
+                return Some(&self.comment_source[start..self.offset().to_usize()]);
             }
             self.cursor.bump();
         }
@@ -366,7 +386,8 @@ impl<'a> ErrorAssertionParser<'a> {
         None
     }
 
-    pub(crate) fn parse(mut self) -> Result<ErrorAssertion<'a>, ErrorAssertionParseError<'a>> {
+    /// Attempt to parse the assertion comment into a [`ErrorAssertion`].
+    fn parse(mut self) -> Result<ErrorAssertion<'a>, ErrorAssertionParseError<'a>> {
         let mut column = None;
         let mut rule = None;
 
@@ -374,6 +395,7 @@ impl<'a> ErrorAssertionParser<'a> {
 
         while !self.cursor.is_eof() {
             match self.cursor.first() {
+                // column number
                 '0'..='9' => {
                     if column.is_some() {
                         return Err(ErrorAssertionParseError::MultipleColumnNumbers);
@@ -390,6 +412,7 @@ impl<'a> ErrorAssertionParser<'a> {
                         .map_err(|e| ErrorAssertionParseError::BadColumnNumber(column_str, e))?;
                 }
 
+                // rule code
                 '[' => {
                     if rule.is_some() {
                         return Err(ErrorAssertionParseError::MultipleRuleCodes);
@@ -402,10 +425,11 @@ impl<'a> ErrorAssertionParser<'a> {
                     self.cursor.skip_bytes(position + b"]".len());
                 }
 
+                // message text
                 '"' => {
                     self.cursor.bump();
-                    let rest =
-                        &self.source[self.offset().to_usize()..self.source.trim_end().len() - 1];
+                    let rest = &self.comment_source
+                        [self.offset().to_usize()..self.comment_source.trim_end().len() - 1];
                     self.cursor.skip_bytes(rest.len());
                     return if self.cursor.first() == '"' {
                         Ok(ErrorAssertion {
@@ -418,8 +442,10 @@ impl<'a> ErrorAssertionParser<'a> {
                     };
                 }
 
-                '\n' | '\r' => break,
+                // Some other assumptions we make don't hold true if we hit this branch:
+                '\n' | '\r' => unreachable!("Assertion comments should never contain newlines"),
 
+                // something else (bad!)...
                 unexpected => {
                     return Err(ErrorAssertionParseError::UnexpectedCharacter {
                         character: unexpected,
@@ -443,6 +469,9 @@ impl<'a> ErrorAssertionParser<'a> {
     }
 }
 
+/// Enumeration of ways in which parsing an assertion comment can fail.
+///
+/// The assertion comment could be either a "revealed" assertion or an "error" assertion.
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum AssertionParseError<'a> {
     #[error("Must specify which type should be revealed")]
@@ -451,6 +480,7 @@ pub(crate) enum AssertionParseError<'a> {
     ErrorAssertionParseError(ErrorAssertionParseError<'a>),
 }
 
+/// Enumeration of ways in which parsing an *error* assertion comment can fail.
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum ErrorAssertionParseError<'a> {
     #[error("no rule or message text")]

@@ -136,6 +136,9 @@ trait UnmatchedWithColumn {
     fn unmatched_with_column(&self, column: OneIndexed) -> String;
 }
 
+// This is necessary since we only parse assertions lazily,
+// and sometimes we know before parsing any assertions that an assertion will be unmatched,
+// e.g. if we've exhausted all diagnostics but there are still assertions left.
 impl Unmatched for UnparsedAssertion<'_> {
     fn unmatched(&self) -> String {
         format!("{} {self}", "unmatched assertion:".red())
