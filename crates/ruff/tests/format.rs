@@ -2158,12 +2158,12 @@ fn cookiecutter_globbing() -> Result<()> {
     }, {
         assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
             .args(["format", "--no-cache", "--diff"])
-            .current_dir(tempdir.path()), @r#"
+            .current_dir(tempdir.path()), @r"
         success: false
         exit_code: 1
         ----- stdout -----
-        --- {{cookiecutter.repo_name}}/tests/maintest.py
-        +++ {{cookiecutter.repo_name}}/tests/maintest.py
+        --- tmp/{{cookiecutter.repo_name}}/tests/maintest.py
+        +++ tmp/{{cookiecutter.repo_name}}/tests/maintest.py
         @@ -1,3 +1,3 @@
          import foo
          import bar
@@ -2173,9 +2173,8 @@ fn cookiecutter_globbing() -> Result<()> {
 
 
         ----- stderr -----
-        warning: Error parsing original glob: `"[TMP]/{{cookiecutter.repo_name}}/tests/*"`, trying with escaped braces: `"[TMP]/[{][{]cookiecutter.repo_name[}][}]/tests/*"`
         1 file would be reformatted
-        "#);
+        ");
     });
 
     Ok(())
