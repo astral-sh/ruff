@@ -96,13 +96,6 @@ static EXPECTED_DIAGNOSTICS: &[KeyDiagnosticFields] = &[
         Cow::Borrowed("Unused blanket `type: ignore` directive"),
         Severity::Warning,
     ),
-    (
-        DiagnosticId::lint("invalid-attribute-access"),
-        Some("/src/tomllib/__init__.py"),
-        Some(270..296),
-        Cow::Borrowed("Cannot assign to instance attribute `__module__` from the class object `Literal[TOMLDecodeError]`"),
-        Severity::Error,
-    ),
 ];
 
 fn tomllib_path(file: &TestFile) -> SystemPathBuf {
