@@ -2470,32 +2470,45 @@ impl<'db> Type<'db> {
         match self {
             // Special cases for `float` and `complex`
             // https://typing.readthedocs.io/en/latest/spec/special-types.html#special-cases-for-float-and-complex
-            Type::ClassLiteral(ClassLiteralType { class })
-                if class.is_known(db, KnownClass::Float) =>
-            {
-                Ok(UnionType::from_elements(
-                    db,
-                    [
-                        KnownClass::Int.to_instance(db),
-                        KnownClass::Float.to_instance(db),
-                    ],
-                ))
+            Type::ClassLiteral(ClassLiteralType { class }) => {
+                let ty = match class.known(db) {
+                    Some(KnownClass::Complex) => UnionType::from_elements(
+                        db,
+                        [
+                            KnownClass::Int.to_instance(db),
+                            KnownClass::Float.to_instance(db),
+                            KnownClass::Complex.to_instance(db),
+                        ],
+                    ),
+                    Some(KnownClass::Float) => UnionType::from_elements(
+                        db,
+                        [
+                            KnownClass::Int.to_instance(db),
+                            KnownClass::Float.to_instance(db),
+                        ],
+                    ),
+                    _ => Type::instance(*class),
+                };
+                Ok(ty)
             }
-            Type::ClassLiteral(ClassLiteralType { class })
-                if class.is_known(db, KnownClass::Complex) =>
-            {
-                Ok(UnionType::from_elements(
-                    db,
-                    [
-                        KnownClass::Int.to_instance(db),
-                        KnownClass::Float.to_instance(db),
-                        KnownClass::Complex.to_instance(db),
-                    ],
-                ))
-            }
-            // In a type expression, a bare `type` is interpreted as "instance of `type`", which is
-            // equivalent to `type[object]`.
-            Type::ClassLiteral(_) | Type::SubclassOf(_) => Ok(self.to_instance(db)),
+            Type::SubclassOf(_)
+            | Type::BooleanLiteral(_)
+            | Type::BytesLiteral(_)
+            | Type::AlwaysTruthy
+            | Type::AlwaysFalsy
+            | Type::SliceLiteral(_)
+            | Type::IntLiteral(_)
+            | Type::LiteralString
+            | Type::ModuleLiteral(_)
+            | Type::StringLiteral(_)
+            | Type::Tuple(_)
+            | Type::Callable(_)
+            | Type::Never
+            | Type::FunctionLiteral(_) => Err(InvalidTypeExpressionError {
+                invalid_expressions: smallvec::smallvec![InvalidTypeExpression::InvalidType(*self)],
+                fallback_type: Type::unknown(),
+            }),
+
             // We treat `typing.Type` exactly the same as `builtins.type`:
             Type::KnownInstance(KnownInstanceType::Type) => Ok(KnownClass::Type.to_instance(db)),
             Type::KnownInstance(KnownInstanceType::Tuple) => Ok(KnownClass::Tuple.to_instance(db)),
@@ -2556,7 +2569,6 @@ impl<'db> Type<'db> {
             }
             Type::KnownInstance(KnownInstanceType::LiteralString) => Ok(Type::LiteralString),
             Type::KnownInstance(KnownInstanceType::Any) => Ok(Type::any()),
-            // TODO: Should emit a diagnostic
             Type::KnownInstance(KnownInstanceType::Annotated) => Err(InvalidTypeExpressionError {
                 invalid_expressions: smallvec::smallvec![InvalidTypeExpression::BareAnnotated],
                 fallback_type: Type::unknown(),
@@ -2580,9 +2592,13 @@ impl<'db> Type<'db> {
             Type::KnownInstance(KnownInstanceType::Unknown) => Ok(Type::unknown()),
             Type::KnownInstance(KnownInstanceType::AlwaysTruthy) => Ok(Type::AlwaysTruthy),
             Type::KnownInstance(KnownInstanceType::AlwaysFalsy) => Ok(Type::AlwaysFalsy),
-            _ => Ok(todo_type!(
-                "Unsupported or invalid type in a type expression"
+            Type::KnownInstance(_) => Ok(todo_type!(
+                "Invalid or unsupported `KnownInstanceType` in `Type::to_type_expression`"
             )),
+            Type::Instance(_) => Ok(todo_type!(
+                "Invalid or unsupported `Instance` in `Type::to_type_expression`"
+            )),
+            Type::Intersection(_) => Ok(todo_type!("Type::Intersection.in_type_expression")),
         }
     }
 
@@ -2815,7 +2831,7 @@ impl<'db> From<Type<'db>> for TypeAndQualifiers<'db> {
 #[derive(Debug, PartialEq, Eq)]
 pub struct InvalidTypeExpressionError<'db> {
     fallback_type: Type<'db>,
-    invalid_expressions: smallvec::SmallVec<[InvalidTypeExpression; 1]>,
+    invalid_expressions: smallvec::SmallVec<[InvalidTypeExpression<'db>; 1]>,
 }
 
 impl<'db> InvalidTypeExpressionError<'db> {
@@ -2825,7 +2841,11 @@ impl<'db> InvalidTypeExpressionError<'db> {
             invalid_expressions,
         } = self;
         for error in invalid_expressions {
-            context.report_lint(&INVALID_TYPE_FORM, node, format_args!("{}", error.reason()));
+            context.report_lint(
+                &INVALID_TYPE_FORM,
+                node,
+                format_args!("{}", error.reason(context.db())),
+            );
         }
         fallback_type
     }
@@ -2833,7 +2853,7 @@ impl<'db> InvalidTypeExpressionError<'db> {
 
 /// Enumeration of various types that are invalid in type-expression contexts
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-enum InvalidTypeExpression {
+enum InvalidTypeExpression<'db> {
     /// `x: Annotated` is invalid as an annotation
     BareAnnotated,
     /// `x: Literal` is invalid as an annotation
@@ -2842,16 +2862,42 @@ enum InvalidTypeExpression {
     ClassVarInTypeExpression,
     /// The `Final` type qualifier was used in a type expression
     FinalInTypeExpression,
+    /// Some types are always invalid in type expressions
+    InvalidType(Type<'db>),
 }
 
-impl InvalidTypeExpression {
-    const fn reason(self) -> &'static str {
-        match self {
-            Self::BareAnnotated => "`Annotated` requires at least two arguments when used in an annotation or type expression",
-            Self::BareLiteral => "`Literal` requires at least one argument when used in a type expression",
-            Self::ClassVarInTypeExpression => "Type qualifier `typing.ClassVar` is not allowed in type expressions (only in annotation expressions)",
-            Self::FinalInTypeExpression => "Type qualifier `typing.Final` is not allowed in type expressions (only in annotation expressions)",
+impl<'db> InvalidTypeExpression<'db> {
+    const fn reason(self, db: &'db dyn Db) -> impl std::fmt::Display + 'db {
+        struct Display<'db> {
+            error: InvalidTypeExpression<'db>,
+            db: &'db dyn Db,
         }
+
+        impl std::fmt::Display for Display<'_> {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                match self.error {
+                    InvalidTypeExpression::BareAnnotated => f.write_str(
+                        "`Annotated` requires at least two arguments when used in an annotation or type expression"
+                    ),
+                    InvalidTypeExpression::BareLiteral => f.write_str(
+                        "`Literal` requires at least one argument when used in a type expression"
+                    ),
+                    InvalidTypeExpression::ClassVarInTypeExpression => f.write_str(
+                        "Type qualifier `typing.ClassVar` is not allowed in type expressions (only in annotation expressions)"
+                    ),
+                    InvalidTypeExpression::FinalInTypeExpression => f.write_str(
+                        "Type qualifier `typing.Final` is not allowed in type expressions (only in annotation expressions)"
+                    ),
+                    InvalidTypeExpression::InvalidType(ty) => write!(
+                        f,
+                        "Variable of type `{ty}` is not allowed in a type expression",
+                        ty = ty.display(self.db)
+                    ),
+                }
+            }
+        }
+
+        Display { error: self, db }
     }
 }
 
