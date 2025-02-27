@@ -3805,8 +3805,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let value_ty = self.infer_expression(value);
 
                 let symbol = match value_ty {
-                    Type::Instance(instance) => {
-                        let instance_member = instance.class().class_member(self.db(), attr);
+                    Type::Instance(_) => {
+                        let instance_member = value_ty.member(self.db(), attr);
                         if instance_member.is_class_var() {
                             self.context.report_lint(
                                 &INVALID_ATTRIBUTE_ACCESS,
