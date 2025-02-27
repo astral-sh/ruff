@@ -2722,34 +2722,39 @@ fn cookiecutter_globbing() -> Result<()> {
     // F811 example from the docs to ensure the glob still works
     let maintest = tests.join("maintest.py");
     fs::write(maintest, "import foo\nimport bar\nimport foo")?;
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-            .args(STDIN_BASE_OPTIONS)
-            .arg("--select=F811")
-            .current_dir(tempdir.path()), @r"
-        success: true
-        exit_code: 0
-        ----- stdout -----
-        All checks passed!
 
-        ----- stderr -----
-        ");
+    insta::with_settings!({filters => vec![(r"\\", "/")]}, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+                .args(STDIN_BASE_OPTIONS)
+                .arg("--select=F811")
+                .current_dir(tempdir.path()), @r"
+			success: true
+			exit_code: 0
+			----- stdout -----
+			All checks passed!
+
+			----- stderr -----
+			");
+    });
 
     // after removing the config file with the ignore, F811 applies, so the glob worked above
     fs::remove_file(cookiecutter_toml)?;
 
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-            .args(STDIN_BASE_OPTIONS)
-            .arg("--select=F811")
-            .current_dir(tempdir.path()), @r"
-		success: false
-		exit_code: 1
-		----- stdout -----
-		{{cookiecutter.repo_name}}/tests/maintest.py:3:8: F811 [*] Redefinition of unused `foo` from line 1
-		Found 1 error.
-		[*] 1 fixable with the `--fix` option.
+    insta::with_settings!({filters => vec![(r"\\", "/")]}, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+                .args(STDIN_BASE_OPTIONS)
+                .arg("--select=F811")
+                .current_dir(tempdir.path()), @r"
+			success: false
+			exit_code: 1
+			----- stdout -----
+			{{cookiecutter.repo_name}}/tests/maintest.py:3:8: F811 [*] Redefinition of unused `foo` from line 1
+			Found 1 error.
+			[*] 1 fixable with the `--fix` option.
 
-		----- stderr -----
-	");
+			----- stderr -----
+		");
+    });
 
     Ok(())
 }
@@ -2761,18 +2766,20 @@ fn cookiecutter_globbing_no_project_root() -> Result<()> {
     let tempdir = tempdir.path().join("{{cookiecutter.repo_name}}");
     fs::create_dir(&tempdir)?;
 
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .current_dir(&tempdir)
-        .args(STDIN_BASE_OPTIONS)
-        .args(["--extend-per-file-ignores", "generated.py:Q"]), @r"
-    success: true
-    exit_code: 0
-    ----- stdout -----
-    All checks passed!
+    insta::with_settings!({filters => vec![(r"\\", "/")]}, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .current_dir(&tempdir)
+            .args(STDIN_BASE_OPTIONS)
+            .args(["--extend-per-file-ignores", "generated.py:Q"]), @r"
+		success: true
+		exit_code: 0
+		----- stdout -----
+		All checks passed!
 
-    ----- stderr -----
-    warning: No Python files found under the given path(s)
-    ");
+		----- stderr -----
+		warning: No Python files found under the given path(s)
+		");
+    });
 
     Ok(())
 }
