@@ -418,7 +418,7 @@ impl ResolvedClientSettings {
 
         if contains_invalid_settings {
             show_err_msg!(
-                "Ruff received invalid client settings. Refer to the logs for more information."
+                "Ruff received invalid settings from the editor. Refer to the logs for more information."
             );
         }
 
