@@ -131,7 +131,7 @@ c = C()
 #
 reveal_type(c.data_descriptor)  # revealed: Unknown | Literal["data"]
 
-reveal_type(c.non_data_descriptor)  # revealed: Unknown | Literal["non-data"]
+reveal_type(c.non_data_descriptor)  # revealed: Unknown | Literal[1]
 
 reveal_type(C.data_descriptor)  # revealed: Unknown | Literal["data"]
 
@@ -318,7 +318,7 @@ class C:
     descriptor: Descriptor = Descriptor()
 
 # TODO: This should be an error
-reveal_type(C.descriptor)  # revealed: Descriptor
+reveal_type(C.descriptor)  # revealed: Unknown
 ```
 
 ## Possibly-unbound `__get__` method
