@@ -42,7 +42,7 @@
 //! Tracking live declarations is simpler, since constraints are not involved, but otherwise very
 //! similar to tracking live bindings.
 
-use ruff_index::list::{List, ListBuilder, ListReverseIterator, ListStorage};
+use ruff_index::list::{List, ListBuilder, ListReverseIterator, ListStorage, MutableList};
 use ruff_index::newtype_index;
 
 use crate::semantic_index::narrowing_constraints::{
@@ -127,13 +127,13 @@ impl SymbolDeclarations {
         visibility_constraints: &mut VisibilityConstraintsBuilder,
         constraint: ScopedVisibilityConstraintId,
     ) {
-        self.live_declarations = symbol_states.declarations.map_with(
-            std::mem::take(&mut self.live_declarations),
-            |declaration| LiveDeclaration {
-                visibility_constraint: visibility_constraints
-                    .add_and_constraint(declaration.visibility_constraint, constraint),
-            },
-        );
+        self.live_declarations = symbol_states
+            .make_mut_declarations(&mut self.live_declarations)
+            .for_each(|declaration| {
+                declaration.visibility_constraint = visibility_constraints
+                    .add_and_constraint(declaration.visibility_constraint, constraint);
+            })
+            .finish();
     }
 
     /// Return an iterator over live declarations for this symbol in reverse.
@@ -189,14 +189,6 @@ impl SymbolDeclarations {
     }
 }
 
-/// Live bindings for a single symbol at some point in control flow. Each live binding comes
-/// with a set of narrowing constraints and a visibility constraint.
-#[derive(Debug, Default, PartialEq, Eq, salsa::Update)]
-pub(super) struct SymbolBindings {
-    /// A list of live bindings for this symbol, sorted by their `ScopedDefinitionId`
-    live_bindings: List<ScopedDefinitionId, LiveBinding>,
-}
-
 /// One of the live bindings for a single symbol at some point in control flow.
 #[derive(Debug, PartialEq, Eq)]
 pub(super) struct LiveBinding {
@@ -204,7 +196,25 @@ pub(super) struct LiveBinding {
     pub(super) visibility_constraint: ScopedVisibilityConstraintId,
 }
 
+impl LiveBinding {
+    fn clone(&self, narrowing_constraints: &mut NarrowingConstraintsBuilder) -> Self {
+        LiveBinding {
+            narrowing_constraint: narrowing_constraints
+                .clone_constraint(&self.narrowing_constraint),
+            visibility_constraint: self.visibility_constraint,
+        }
+    }
+}
+
 pub(super) type LiveBindingsIterator<'a> = ListReverseIterator<'a, ScopedDefinitionId, LiveBinding>;
+
+/// Live bindings for a single symbol at some point in control flow. Each live binding comes
+/// with a set of narrowing constraints and a visibility constraint.
+#[derive(Debug, Default, PartialEq, Eq, salsa::Update)]
+pub(super) struct SymbolBindings {
+    /// A list of live bindings for this symbol, sorted by their `ScopedDefinitionId`
+    live_bindings: List<ScopedDefinitionId, LiveBinding>,
+}
 
 impl SymbolBindings {
     fn unbound(
@@ -252,20 +262,13 @@ impl SymbolBindings {
         narrowing_constraints: &mut NarrowingConstraintsBuilder,
         predicate: ScopedNarrowingConstraintPredicate,
     ) {
-        self.live_bindings =
-            symbol_states
-                .bindings
-                .map_with(std::mem::take(&mut self.live_bindings), |binding| {
-                    // TODO: update map to allow in-place update
-                    let mut narrowing_constraint =
-                        narrowing_constraints.clone_constraint(&binding.narrowing_constraint);
-                    narrowing_constraints
-                        .add_predicate_to_constraint(&mut narrowing_constraint, predicate);
-                    LiveBinding {
-                        narrowing_constraint,
-                        visibility_constraint: binding.visibility_constraint,
-                    }
-                });
+        self.live_bindings = symbol_states
+            .make_mut_bindings(narrowing_constraints, &mut self.live_bindings)
+            .for_each(|binding| {
+                narrowing_constraints
+                    .add_predicate_to_constraint(&mut binding.narrowing_constraint, predicate);
+            })
+            .finish();
     }
 
     /// Add given visibility constraint to all live bindings.
@@ -276,19 +279,13 @@ impl SymbolBindings {
         visibility_constraints: &mut VisibilityConstraintsBuilder,
         constraint: ScopedVisibilityConstraintId,
     ) {
-        self.live_bindings =
-            symbol_states
-                .bindings
-                .map_with(std::mem::take(&mut self.live_bindings), |binding| {
-                    // TODO: update map to allow in-place update
-                    let narrowing_constraint =
-                        narrowing_constraints.clone_constraint(&binding.narrowing_constraint);
-                    LiveBinding {
-                        narrowing_constraint,
-                        visibility_constraint: visibility_constraints
-                            .add_and_constraint(binding.visibility_constraint, constraint),
-                    }
-                });
+        self.live_bindings = symbol_states
+            .make_mut_bindings(narrowing_constraints, &mut self.live_bindings)
+            .for_each(|binding| {
+                binding.visibility_constraint = visibility_constraints
+                    .add_and_constraint(binding.visibility_constraint, constraint);
+            })
+            .finish();
     }
 
     /// Iterate over currently live bindings for this symbol in reverse
@@ -324,7 +321,6 @@ impl SymbolBindings {
             std::mem::take(&mut self.live_bindings),
             other.live_bindings,
             |binding, other_binding| {
-                // TODO: update map to allow in-place update
                 let narrowing_constraint =
                     narrowing_constraints.clone_constraint(&binding.narrowing_constraint);
                 LiveBinding {
@@ -519,6 +515,24 @@ impl SymbolStatesBuilder {
             bindings: self.bindings.build(),
             declarations: self.declarations.build(),
         }
+    }
+
+    fn make_mut_bindings(
+        &mut self,
+        narrowing_constraints: &mut NarrowingConstraintsBuilder,
+        bindings: &mut List<ScopedDefinitionId, LiveBinding>,
+    ) -> MutableList<'_, ScopedDefinitionId, LiveBinding> {
+        self.bindings
+            .make_mut_with(std::mem::take(bindings), |binding| {
+                binding.clone(narrowing_constraints)
+            })
+    }
+
+    fn make_mut_declarations(
+        &mut self,
+        declarations: &mut List<ScopedDefinitionId, LiveDeclaration>,
+    ) -> MutableList<'_, ScopedDefinitionId, LiveDeclaration> {
+        self.declarations.make_mut(std::mem::take(declarations))
     }
 }
 
