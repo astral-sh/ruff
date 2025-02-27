@@ -1037,7 +1037,7 @@ class function:
     # mypy uses `builtins.function.__get__` to represent methods, properties, and getset_descriptors so we type the return as Any.
     def __get__(self, instance: object, owner: type | None = None, /) -> Any: ...
 
-class list(MutableSequence[_T]):
+class list:
     @overload
     def __init__(self) -> None: ...
     @overload
