@@ -208,11 +208,12 @@ impl ProjectDatabase {
                         return WalkState::Continue;
                     }
 
-                    if entry
-                        .path()
-                        .extension()
-                        .and_then(PySourceType::try_from_extension)
-                        .is_some()
+                    if entry.path().starts_with(&project_path)
+                        && entry
+                            .path()
+                            .extension()
+                            .and_then(PySourceType::try_from_extension)
+                            .is_some()
                     {
                         let mut paths = added_paths.lock().unwrap();
 

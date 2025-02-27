@@ -245,9 +245,9 @@ pub(crate) fn missing_whitespace_around_operator(
             let has_leading_trivia =
                 prev_token.end() < token.start() || is_non_logical_token(prev_token.kind());
 
-            let has_trailing_trivia = tokens.peek().map_or(true, |next| {
-                token.end() < next.start() || is_non_logical_token(next.kind())
-            });
+            let has_trailing_trivia = tokens
+                .peek()
+                .is_none_or(|next| token.end() < next.start() || is_non_logical_token(next.kind()));
 
             match (has_leading_trivia, has_trailing_trivia) {
                 // Operator with trailing but no leading space, enforce consistent spacing.

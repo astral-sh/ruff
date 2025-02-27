@@ -35,7 +35,7 @@ impl<'db> CallOutcome<'db> {
         let elements = union.elements(db);
         let mut bindings = Vec::with_capacity(elements.len());
         let mut errors = Vec::new();
-        let mut not_callable = true;
+        let mut all_errors_not_callable = true;
 
         for element in elements {
             match call(*element) {
@@ -44,7 +44,7 @@ impl<'db> CallOutcome<'db> {
                     bindings.extend(inner_bindings);
                 }
                 Err(error) => {
-                    not_callable |= error.is_not_callable();
+                    all_errors_not_callable &= error.is_not_callable();
                     errors.push(error);
                 }
             }
@@ -52,7 +52,7 @@ impl<'db> CallOutcome<'db> {
 
         if errors.is_empty() {
             Ok(CallOutcome::Union(bindings.into()))
-        } else if bindings.is_empty() && not_callable {
+        } else if bindings.is_empty() && all_errors_not_callable {
             Err(CallError::NotCallable {
                 not_callable_type: Type::Union(union),
             })

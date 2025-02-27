@@ -60,9 +60,9 @@ impl FormatNodeRule<ExprSlice> for FormatExprSlice {
 
         // Handle spacing around the colon(s)
         // https://black.readthedocs.io/en/stable/the_black_code_style/current_style.html#slices
-        let lower_simple = lower.as_ref().map_or(true, |expr| is_simple_expr(expr));
-        let upper_simple = upper.as_ref().map_or(true, |expr| is_simple_expr(expr));
-        let step_simple = step.as_ref().map_or(true, |expr| is_simple_expr(expr));
+        let lower_simple = lower.as_ref().is_none_or(|expr| is_simple_expr(expr));
+        let upper_simple = upper.as_ref().is_none_or(|expr| is_simple_expr(expr));
+        let step_simple = step.as_ref().is_none_or(|expr| is_simple_expr(expr));
         let all_simple = lower_simple && upper_simple && step_simple;
 
         // lower
