@@ -567,9 +567,26 @@ impl<'db> Class<'db> {
         // } else {
         // This attribute is neither declared nor bound in the class body.
         // It could still be implicitly defined in a method.
-
-        Self::implicit_instance_attribute(db, body_scope, name).into()
         // }
+
+        let implicit_instance_attribute = Self::implicit_instance_attribute(db, body_scope, name);
+
+        if let Symbol::Type(implicit_instance_attribute_ty, _) = implicit_instance_attribute {
+            let table = symbol_table(db, body_scope);
+
+            if let Some(symbol_id) = table.symbol_id_by_name(name) {
+                let use_def = use_def_map(db, body_scope);
+
+                let declarations = use_def.public_declarations(symbol_id);
+
+                match symbol_from_declarations(db, declarations) {
+                    Ok(declared @ SymbolAndQualifiers(Symbol::Type(_, _), _)) => return declared,
+                    _ => {}
+                }
+            }
+        }
+
+        implicit_instance_attribute.into()
     }
 
     /// Return this class' involvement in an inheritance cycle, if any.

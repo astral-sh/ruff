@@ -441,7 +441,7 @@ class _FormatMapMapping(Protocol):
 class _TranslateTable(Protocol):
     def __getitem__(self, key: int, /) -> str | int | None: ...
 
-class str(Sequence[str]):
+class str:
     @overload
     def __new__(cls, object: object = ...) -> Self: ...
     @overload
@@ -625,7 +625,7 @@ class str(Sequence[str]):
     def __rmul__(self, value: SupportsIndex, /) -> str: ...  # type: ignore[misc]
     def __getnewargs__(self) -> tuple[str]: ...
 
-class bytes(Sequence[int]):
+class bytes:
     @overload
     def __new__(cls, o: Iterable[SupportsIndex] | SupportsIndex | SupportsBytes | ReadableBuffer, /) -> Self: ...
     @overload

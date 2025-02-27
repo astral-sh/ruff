@@ -1370,6 +1370,15 @@ impl<'db> Type<'db> {
             {
                 Symbol::bound(Type::Callable(CallableType::WrapperDescriptorDunderGet))
             }
+
+            // Hard code this knowledge, as we need to look this up often.
+            Type::ClassLiteral(ClassLiteralType { class })
+                if class.is_known(db, KnownClass::FunctionType) && name == "__set__"
+                    || name == "__delete___" =>
+            {
+                Symbol::Unbound
+            }
+
             Type::SubclassOf(subclass_of)
                 if name == "__get__"
                     && matches!(
@@ -1389,7 +1398,7 @@ impl<'db> Type<'db> {
                 Symbol::Unbound
             }
             Type::ClassLiteral(class)
-                if name == "__get__"
+                if matches!(name, "__get__" | "__set__" | "__delete__")
                     && matches!(
                         class.class.known(db),
                         Some(
@@ -1475,7 +1484,7 @@ impl<'db> Type<'db> {
                         | KnownClass::Slice
                         | KnownClass::Range,
                     ),
-                    "__get__",
+                    "__get__" | "__set__" | "__delete__",
                 ) => Symbol::Unbound,
 
                 _ => {
