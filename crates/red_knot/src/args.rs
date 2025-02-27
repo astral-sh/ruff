@@ -83,7 +83,7 @@ pub(crate) struct CheckCommand {
     #[arg(long)]
     pub(crate) exit_zero: bool,
 
-    /// Watch files for changes and re-run type checking related to changed files.
+    /// Watch files for changes and recheck files related to the changed files.
     #[arg(long, short = 'W')]
     pub(crate) watch: bool,
 }

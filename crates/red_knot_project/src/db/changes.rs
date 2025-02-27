@@ -212,6 +212,6 @@ impl ProjectDatabase {
         // across revisions doesn't feel essential, considering that they're rare. However, we could
         // implement a `BTreeMap` or similar and only prune the diagnostics from paths that we've
         // re-scanned (or that were removed etc).
-        project.replace_file_diagnostics(self, diagnostics);
+        project.replace_index_diagnostics(self, diagnostics);
     }
 }

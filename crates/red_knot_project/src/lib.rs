@@ -247,12 +247,9 @@ impl Project {
     /// even files of a project by using `knot check <paths>`. In that case, this method
     /// returns the provided absolute paths.
     ///
-    /// Note: The CLI doesn't prohibit that users specify paths outside the project.
-    /// This allows users to check arbitrary files but it is generally not recommended.
-    /// However, it does mean that there's no guarantee that all files are a sub-path
-    /// of the project root. Our goal is to not catastrophically fail for such paths
-    /// but it's okay to not provide the same level of support as for real project paths. For example,
-    /// Red Knot doesn't support watching files for changes that are outside the project root.
+    /// Note: The CLI doesn't prohibit users from specifying paths outside the project root.
+    /// This can be useful to check arbitrary files, but it isn't something we recommend.
+    /// We should try to support this use case but it's okay if there are some limitations around it.
     fn included_paths_or_root(self, db: &dyn Db) -> &[SystemPathBuf] {
         match &**self.included_paths_list(db) {
             [] => std::slice::from_ref(&self.metadata(db).root),
@@ -342,7 +339,10 @@ impl Project {
         index.insert(file);
     }
 
-    pub fn replace_file_diagnostics(self, db: &mut dyn Db, diagnostics: Vec<IOErrorDiagnostic>) {
+    /// Replaces the diagnostics from indexing the project files with `diagnostics`.
+    ///
+    /// This is a no-op if the project files haven't been indexed yet.
+    pub fn replace_index_diagnostics(self, db: &mut dyn Db, diagnostics: Vec<IOErrorDiagnostic>) {
         let Some(mut index) = IndexedFiles::indexed_mut(db, self) else {
             return;
         };

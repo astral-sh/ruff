@@ -15,7 +15,7 @@ use thiserror::Error;
 /// to access fields from within the walker.
 #[derive(Default, Debug)]
 pub(crate) struct ProjectFilesFilter<'a> {
-    /// A copy of [`Project::included_paths_or_root`] because it isn't possible to
+    /// The same as [`Project::included_paths_or_root`].
     included_paths: &'a [SystemPathBuf],
 
     /// The filter skips checking if the path is in `included_paths` if set to `true`.
