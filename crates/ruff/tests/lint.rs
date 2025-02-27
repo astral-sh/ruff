@@ -2722,10 +2722,7 @@ fn cookiecutter_globbing() -> Result<()> {
     // F811 example from the docs to ensure the glob still works
     let maintest = tests.join("maintest.py");
     fs::write(maintest, "import foo\nimport bar\nimport foo")?;
-    insta::with_settings!({
-        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/"), (r"\\", "/")]
-    }, {
-        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
             .args(STDIN_BASE_OPTIONS)
             .arg("--select=F811")
             .current_dir(tempdir.path()), @r"
@@ -2736,15 +2733,11 @@ fn cookiecutter_globbing() -> Result<()> {
 
         ----- stderr -----
         ");
-    });
 
     // after removing the config file with the ignore, F811 applies, so the glob worked above
     fs::remove_file(cookiecutter_toml)?;
 
-    insta::with_settings!({
-        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/"), (r"\\", "/")]
-    }, {
-        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
             .args(STDIN_BASE_OPTIONS)
             .arg("--select=F811")
             .current_dir(tempdir.path()), @r"
@@ -2756,8 +2749,7 @@ fn cookiecutter_globbing() -> Result<()> {
 		[*] 1 fixable with the `--fix` option.
 
 		----- stderr -----
-		");
-    });
+	");
 
     Ok(())
 }
