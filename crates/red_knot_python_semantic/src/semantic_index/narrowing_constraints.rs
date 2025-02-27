@@ -28,8 +28,7 @@
 //!
 //! [`Predicate`]: crate::semantic_index::predicate::Predicate
 
-use ruff_index::list::{ListBuilder, ListSetReverseIterator, ListStorage};
-use ruff_index::newtype_index;
+use ruff_index::list::{List, ListBuilder, ListSetReverseIterator, ListStorage};
 
 use crate::semantic_index::predicate::ScopedPredicateId;
 
@@ -37,12 +36,8 @@ use crate::semantic_index::predicate::ScopedPredicateId;
 ///
 /// A constraint is a list of [`Predicate`]s that each constrain the type of the binding's symbol.
 ///
-/// An instance of this type represents a _non-empty_ narrowing constraint. You will often wrap
-/// this in `Option` and use `None` to represent an empty narrowing constraint.
-///
 /// [`Predicate`]: crate::semantic_index::predicate::Predicate
-#[newtype_index]
-pub(crate) struct ScopedNarrowingConstraintId;
+pub(crate) type ScopedNarrowingConstraint = List<ScopedNarrowingConstraintPredicate>;
 
 /// One of the [`Predicate`]s in a narrowing constraint, which constraints the type of the
 /// binding's symbol.
@@ -71,7 +66,7 @@ impl From<ScopedPredicateId> for ScopedNarrowingConstraintPredicate {
 /// A collection of narrowing constraints for a given scope.
 #[derive(Debug, Eq, PartialEq)]
 pub(crate) struct NarrowingConstraints {
-    lists: ListStorage<ScopedNarrowingConstraintId, ScopedNarrowingConstraintPredicate>,
+    lists: ListStorage<ScopedNarrowingConstraintPredicate>,
 }
 
 // Building constraints
@@ -80,7 +75,7 @@ pub(crate) struct NarrowingConstraints {
 /// A builder for creating narrowing constraints.
 #[derive(Debug, Default, Eq, PartialEq)]
 pub(crate) struct NarrowingConstraintsBuilder {
-    lists: ListBuilder<ScopedNarrowingConstraintId, ScopedNarrowingConstraintPredicate>,
+    lists: ListBuilder<ScopedNarrowingConstraintPredicate>,
 }
 
 impl NarrowingConstraintsBuilder {
@@ -93,9 +88,9 @@ impl NarrowingConstraintsBuilder {
     /// Adds a predicate to an existing narrowing constraint.
     pub(crate) fn add_predicate_to_constraint(
         &mut self,
-        constraint: Option<ScopedNarrowingConstraintId>,
+        constraint: ScopedNarrowingConstraint,
         predicate: ScopedNarrowingConstraintPredicate,
-    ) -> Option<ScopedNarrowingConstraintId> {
+    ) -> ScopedNarrowingConstraint {
         self.lists.insert(constraint, predicate)
     }
 
@@ -103,9 +98,9 @@ impl NarrowingConstraintsBuilder {
     /// that appear in both inputs.
     pub(crate) fn intersect_constraints(
         &mut self,
-        a: Option<ScopedNarrowingConstraintId>,
-        b: Option<ScopedNarrowingConstraintId>,
-    ) -> Option<ScopedNarrowingConstraintId> {
+        a: ScopedNarrowingConstraint,
+        b: ScopedNarrowingConstraint,
+    ) -> ScopedNarrowingConstraint {
         self.lists.intersect(a, b)
     }
 }
@@ -113,15 +108,14 @@ impl NarrowingConstraintsBuilder {
 // Iteration
 // ---------
 
-pub(crate) type NarrowingConstraintsIterator<'a> = std::iter::Copied<
-    ListSetReverseIterator<'a, ScopedNarrowingConstraintId, ScopedNarrowingConstraintPredicate>,
->;
+pub(crate) type NarrowingConstraintsIterator<'a> =
+    std::iter::Copied<ListSetReverseIterator<'a, ScopedNarrowingConstraintPredicate>>;
 
 impl NarrowingConstraints {
     /// Iterates over the predicates in a narrowing constraint.
     pub(crate) fn iter_predicates(
         &self,
-        set: Option<ScopedNarrowingConstraintId>,
+        set: ScopedNarrowingConstraint,
     ) -> NarrowingConstraintsIterator<'_> {
         self.lists.iter_set_reverse(set).copied()
     }
@@ -143,7 +137,7 @@ mod tests {
     impl NarrowingConstraintsBuilder {
         pub(crate) fn iter_predicates(
             &self,
-            set: Option<ScopedNarrowingConstraintId>,
+            set: ScopedNarrowingConstraint,
         ) -> NarrowingConstraintsIterator<'_> {
             self.lists.iter_set_reverse(set).copied()
         }

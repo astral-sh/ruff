@@ -47,7 +47,7 @@ use ruff_index::newtype_index;
 use smallvec::{smallvec, SmallVec};
 
 use crate::semantic_index::narrowing_constraints::{
-    NarrowingConstraintsBuilder, ScopedNarrowingConstraintId, ScopedNarrowingConstraintPredicate,
+    NarrowingConstraintsBuilder, ScopedNarrowingConstraint, ScopedNarrowingConstraintPredicate,
 };
 use crate::semantic_index::visibility_constraints::{
     ScopedVisibilityConstraintId, VisibilityConstraintsBuilder,
@@ -189,7 +189,7 @@ pub(super) struct SymbolBindings {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct LiveBinding {
     pub(super) binding: ScopedDefinitionId,
-    pub(super) narrowing_constraint: Option<ScopedNarrowingConstraintId>,
+    pub(super) narrowing_constraint: ScopedNarrowingConstraint,
     pub(super) visibility_constraint: ScopedVisibilityConstraintId,
 }
 
@@ -199,7 +199,7 @@ impl SymbolBindings {
     fn unbound(scope_start_visibility: ScopedVisibilityConstraintId) -> Self {
         let initial_binding = LiveBinding {
             binding: ScopedDefinitionId::UNBOUND,
-            narrowing_constraint: None,
+            narrowing_constraint: ScopedNarrowingConstraint::empty(),
             visibility_constraint: scope_start_visibility,
         };
         Self {
@@ -218,7 +218,7 @@ impl SymbolBindings {
         self.live_bindings.clear();
         self.live_bindings.push(LiveBinding {
             binding,
-            narrowing_constraint: None,
+            narrowing_constraint: ScopedNarrowingConstraint::empty(),
             visibility_constraint,
         });
     }
