@@ -75,10 +75,10 @@ impl ProjectDatabase {
 
                     // Unlike other files, it's not only important to update the status of existing
                     // and known `File`s, it's also important to discover new files that were added
-                    // for files that belong to the current project. That is because we want to
-                    // include those files in the next check run. So we'll need to traverse
+                    // to the current project. That is because we want to
+                    // include those files in the next check run. For this, we traverse
                     // the enclosing directory to discover all added files.
-                    // We can skip step for non-project files or files that don't match
+                    // We can skip this step for non-project files or files that don't match
                     // any path passed to `knot check <path>`
                     if project.is_path_included(self, &path) {
                         if self.system().is_file(&path) {
@@ -120,7 +120,6 @@ impl ProjectDatabase {
                             custom_stdlib_change = true;
                         }
 
-                        // TODO: Is this still necessary now that we don't have packages anymore?
                         // Perform a full-reload in case the deleted directory contained the pyproject.toml.
                         // We may want to make this more clever in the future, to e.g. iterate over the
                         // indexed files and remove the once that start with the same path, unless
@@ -195,14 +194,25 @@ impl ProjectDatabase {
             }
         }
 
-        // Use directory walking to discover newly added files.
+        let diagnostics =
+            if let Some(walker) = ProjectFilesWalker::new_with_paths(self, added_paths) {
+                // Use directory walking to discover newly added files.
+                let (files, diagnostics) = walker.collect_vec(self);
 
-        let added_paths: Vec<_> = added_paths.into_iter().collect();
-        let walker = ProjectFilesWalker::new_with_paths(self, &*added_paths);
-        let files: Vec<_> = walker.into_files_iter(self).collect();
+                for file in files {
+                    project.add_file(self, file);
+                }
 
-        for file in files {
-            project.add_file(self, file);
-        }
+                diagnostics
+            } else {
+                Vec::new()
+            };
+
+        // Note: We simply replace all IO related diagnostics here. This isn't ideal, because
+        // it removes IO errors that may still be relevant. However, tracking IO errors correctly
+        // across revisions doesn't feel essential, considering that they're rare. However, we could
+        // implement a `BTreeMap` or similar and only prune the diagnostics from paths that we've
+        // re-scanned (or that were removed etc).
+        project.replace_file_diagnostics(self, diagnostics);
     }
 }

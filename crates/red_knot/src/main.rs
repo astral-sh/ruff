@@ -107,7 +107,6 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         .transpose()?
         .unwrap_or_else(|| cwd.clone());
 
-    // TODO: Validate that these paths at least exist now?
     let check_paths: Vec<_> = args
         .paths
         .iter()
@@ -268,12 +267,13 @@ impl MainLoop {
                         };
 
                     if check_revision == revision {
-                        let mut stdout = stdout().lock();
-                        if result.is_empty() {
-                            if db.project().files(db).is_empty() {
-                                tracing::warn!("No python files found under the given path(s)");
-                            }
+                        if db.project().files(db).is_empty() {
+                            tracing::warn!("No python files found under the given path(s)");
+                        }
 
+                        let mut stdout = stdout().lock();
+
+                        if result.is_empty() {
                             writeln!(stdout, "All checks passed!")?;
 
                             if self.watcher.is_none() {

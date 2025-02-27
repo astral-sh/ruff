@@ -19,6 +19,7 @@ use salsa::Durability;
 use salsa::Setter;
 use std::borrow::Cow;
 use std::sync::Arc;
+use thiserror::Error;
 
 pub mod combine;
 
@@ -160,6 +161,13 @@ impl Project {
             diagnostic
         }));
 
+        let files = ProjectFiles::new(db, self);
+
+        diagnostics.extend(files.diagnostics().iter().cloned().map(|diagnostic| {
+            let diagnostic: Box<dyn Diagnostic> = Box::new(diagnostic);
+            diagnostic
+        }));
+
         let result = Arc::new(std::sync::Mutex::new(diagnostics));
         let inner_result = Arc::clone(&result);
 
@@ -167,8 +175,6 @@ impl Project {
         let project_span = project_span.clone();
 
         rayon::scope(move |scope| {
-            let files = ProjectFiles::new(&db, self);
-
             for file in &files {
                 let result = inner_result.clone();
                 let db = db.clone();
@@ -337,6 +343,14 @@ impl Project {
         index.insert(file);
     }
 
+    pub fn replace_file_diagnostics(self, db: &mut dyn Db, diagnostics: Vec<IOErrorDiagnostic>) {
+        let Some(mut index) = IndexedFiles::indexed_mut(db, self) else {
+            return;
+        };
+
+        index.set_diagnostics(diagnostics);
+    }
+
     /// Returns the files belonging to this project.
     pub fn files(self, db: &dyn Db) -> Indexed<'_> {
         let files = self.file_set(db);
@@ -348,10 +362,10 @@ impl Project {
                         .entered();
 
                 let walker = ProjectFilesWalker::new(db);
-                let files = walker.into_files_set(db);
+                let (files, diagnostics) = walker.collect_set(db);
 
                 tracing::info!("Found {} files in project `{}`", files.len(), self.name(db));
-                vacant.set(files)
+                vacant.set(files, diagnostics)
             }
             Index::Indexed(indexed) => indexed,
         };
@@ -377,8 +391,8 @@ fn check_file_impl(db: &dyn Db, file: File) -> Vec<Box<dyn Diagnostic>> {
 
     if let Some(read_error) = source.read_error() {
         diagnostics.push(Box::new(IOErrorDiagnostic {
-            file,
-            error: read_error.clone(),
+            file: Some(file),
+            error: read_error.clone().into(),
         }));
         return diagnostics;
     }
@@ -419,6 +433,13 @@ impl<'a> ProjectFiles<'a> {
             ProjectFiles::Indexed(project.files(db))
         }
     }
+
+    fn diagnostics(&self) -> &[IOErrorDiagnostic] {
+        match self {
+            ProjectFiles::OpenFiles(_) => &[],
+            ProjectFiles::Indexed(indexed) => indexed.diagnostics(),
+        }
+    }
 }
 
 impl<'a> IntoIterator for &'a ProjectFiles<'a> {
@@ -451,10 +472,10 @@ impl Iterator for ProjectFilesIter<'_> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct IOErrorDiagnostic {
-    file: File,
-    error: SourceTextError,
+    file: Option<File>,
+    error: IOErrorKind,
 }
 
 impl Diagnostic for IOErrorDiagnostic {
@@ -467,12 +488,21 @@ impl Diagnostic for IOErrorDiagnostic {
     }
 
     fn span(&self) -> Option<Span> {
-        Some(Span::from(self.file))
+        self.file.map(Span::from)
     }
 
     fn severity(&self) -> Severity {
         Severity::Error
     }
+}
+
+#[derive(Error, Debug, Clone)]
+enum IOErrorKind {
+    #[error(transparent)]
+    Walk(#[from] walk::WalkError),
+
+    #[error(transparent)]
+    SourceText(#[from] SourceTextError),
 }
 
 #[cfg(test)]

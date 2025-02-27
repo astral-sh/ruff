@@ -71,9 +71,6 @@ pub enum DiagnosticId {
     /// Some code contains a syntax error
     InvalidSyntax,
 
-    /// Checking or formatting the project completed but found no files to check or format.
-    NoMatchingFiles,
-
     /// A lint violation.
     ///
     /// Lints can be suppressed and some lints can be enabled or disabled in the configuration.
@@ -130,7 +127,6 @@ impl DiagnosticId {
         Ok(match self {
             DiagnosticId::Io => "io",
             DiagnosticId::InvalidSyntax => "invalid-syntax",
-            DiagnosticId::NoMatchingFiles => "no-matching-files",
             DiagnosticId::Lint(name) => {
                 return Err(DiagnosticAsStrError::Category {
                     category: "lint",
