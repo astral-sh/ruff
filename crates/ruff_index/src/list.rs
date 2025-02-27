@@ -9,12 +9,8 @@
 //! like a linked list; and looking up an element by key is also O(n), since you must do a linear
 //! scan of the list to find the matching element. The typical implementation also suffers from
 //! poor cache locality and high memory allocation overhead, since individual list cells are
-//! typically allocated separately from the heap.
-//!
-//! We solve that last problem by storing the cells of an association list in an [`IndexVec`]
-//! arena. You provide the index type (`I`) that you want to use with this arena. That means that
-//! an individual association list is represented by an `Option<I>`, with `None` representing an
-//! empty list.
+//! typically allocated separately from the heap. We solve that last problem by storing the cells
+//! of an association list in an [`IndexVec`] arena.
 //!
 //! We exploit structural sharing where possible, reusing cells across multiple lists when we can.
 //! That said, we don't guarantee that lists are canonical — it's entirely possible for two lists
