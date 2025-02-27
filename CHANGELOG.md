@@ -1,5 +1,41 @@
 # Changelog
 
+## 0.9.8
+
+### Preview features
+
+- Start detecting version-related syntax errors in the parser ([#16090](https://github.com/astral-sh/ruff/pull/16090))
+
+### Rule changes
+
+- \[`pylint`\] Mark fix unsafe (`PLW1507`) ([#16343](https://github.com/astral-sh/ruff/pull/16343))
+- \[`pylint`\] Catch `case np.nan`/`case math.nan` in `match` statements (`PLW0177`) ([#16378](https://github.com/astral-sh/ruff/pull/16378))
+- \[`ruff`\] Add more Pydantic models variants to the list of default copy semantics (`RUF012`) ([#16291](https://github.com/astral-sh/ruff/pull/16291))
+
+### Server
+
+- Avoid indexing the project if `configurationPreference` is `editorOnly` ([#16381](https://github.com/astral-sh/ruff/pull/16381))
+- Avoid unnecessary info at non-trace server log level ([#16389](https://github.com/astral-sh/ruff/pull/16389))
+- Expand `ruff.configuration` to allow inline config ([#16296](https://github.com/astral-sh/ruff/pull/16296))
+- Notify users for invalid client settings ([#16361](https://github.com/astral-sh/ruff/pull/16361))
+
+### Configuration
+
+- Add `per-file-target-version` option ([#16257](https://github.com/astral-sh/ruff/pull/16257))
+
+### Bug fixes
+
+- \[`refurb`\] Do not consider docstring(s) (`FURB156`) ([#16391](https://github.com/astral-sh/ruff/pull/16391))
+- \[`flake8-self`\] Ignore attribute accesses on instance-like variables (`SLF001`) ([#16149](https://github.com/astral-sh/ruff/pull/16149))
+- \[`pylint`\] Fix false positives, add missing methods, and support positional-only parameters (`PLE0302`) ([#16263](https://github.com/astral-sh/ruff/pull/16263))
+- \[`flake8-pyi`\] Mark `PYI030` fix unsafe when comments are deleted ([#16322](https://github.com/astral-sh/ruff/pull/16322))
+
+### Documentation
+
+- Fix example for `S611` ([#16316](https://github.com/astral-sh/ruff/pull/16316))
+- Normalize inconsistent markdown headings in docstrings ([#16364](https://github.com/astral-sh/ruff/pull/16364))
+- Document MSRV policy ([#16384](https://github.com/astral-sh/ruff/pull/16384))
+
 ## 0.9.7
 
 ### Preview features
