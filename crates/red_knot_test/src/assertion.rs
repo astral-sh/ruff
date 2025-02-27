@@ -35,7 +35,6 @@
 //! ```
 
 use crate::db::Db;
-use regex::Regex;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::{line_index, source_text, SourceText};
@@ -45,7 +44,6 @@ use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use smallvec::SmallVec;
 use std::ops::Deref;
 use std::str::FromStr;
-use std::sync::LazyLock;
 
 /// Diagnostic assertion comments in a single embedded file.
 #[derive(Debug)]
@@ -235,9 +233,7 @@ impl<'a> Deref for LineAssertions<'a> {
     }
 }
 
-static TYPE_RE: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"^#\s*revealed:\s*(?<ty_display>.+?)\s*$").unwrap());
-
+const TYPE_PREFIX: &str = "# revealed:";
 const ERROR_PREFIX: &str = "# error:";
 
 /// A single diagnostic assertion comment.
@@ -252,18 +248,25 @@ pub(crate) enum UnparsedAssertion<'a> {
 
 impl<'a> UnparsedAssertion<'a> {
     fn from_comment(comment: &'a str) -> Option<Self> {
-        if let Some(caps) = TYPE_RE.captures(comment) {
-            Some(Self::Revealed(caps.name("ty_display").unwrap().as_str()))
-        } else {
-            let (prefix, assertion) = comment.split_at_checked(ERROR_PREFIX.len())?;
-            (prefix == ERROR_PREFIX).then_some(Self::Error(assertion))
-        }
+        comment
+            .strip_prefix(TYPE_PREFIX)
+            .map(Self::Revealed)
+            .or_else(|| comment.strip_prefix(ERROR_PREFIX).map(Self::Error))
     }
 
-    pub(crate) fn parse(&self) -> Result<ParsedAssertion<'a>, ErrorAssertionParseError<'a>> {
+    pub(crate) fn parse(&self) -> Result<ParsedAssertion<'a>, AssertionParseError<'a>> {
         match self {
-            Self::Revealed(revealed) => Ok(ParsedAssertion::Revealed(revealed)),
-            Self::Error(error) => ErrorAssertion::from_str(error).map(ParsedAssertion::Error),
+            Self::Revealed(revealed) => {
+                let trimmed = revealed.trim();
+                if trimmed.is_empty() {
+                    Err(AssertionParseError::EmptyRevealTypeAssertion)
+                } else {
+                    Ok(ParsedAssertion::Revealed(trimmed))
+                }
+            }
+            Self::Error(error) => ErrorAssertion::from_str(error)
+                .map(ParsedAssertion::Error)
+                .map_err(AssertionParseError::ErrorAssertionParseError),
         }
     }
 }
@@ -271,7 +274,7 @@ impl<'a> UnparsedAssertion<'a> {
 impl std::fmt::Display for UnparsedAssertion<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Revealed(expected_type) => write!(f, "revealed: {expected_type}"),
+            Self::Revealed(expected_type) => write!(f, "revealed: {}", expected_type.trim()),
             Self::Error(assertion) => write!(f, "error: {}", assertion.trim()),
         }
     }
@@ -429,6 +432,14 @@ impl<'a> ErrorAssertionParser<'a> {
             Err(ErrorAssertionParseError::NoRuleOrMessage)
         }
     }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub(crate) enum AssertionParseError<'a> {
+    #[error("Must specify which type should be revealed")]
+    EmptyRevealTypeAssertion,
+    #[error("{0}")]
+    ErrorAssertionParseError(ErrorAssertionParseError<'a>),
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -635,7 +646,7 @@ mod tests {
         let error1 = ErrorAssertion::from_str(error1).unwrap();
 
         assert_eq!(error1.rule, Some("invalid-assignment"));
-        assert_eq!(*expected_ty, "str");
+        assert_eq!(expected_ty.trim(), "str");
 
         let [UnparsedAssertion::Error(error2)] = &line2.assertions[..] else {
             panic!("expected one error assertion");
