@@ -1,6 +1,6 @@
 //! Match [`Diagnostic`]s against [`Assertion`]s and produce test failure messages for any
 //! mismatches.
-use crate::assertion::{Assertion, ErrorAssertion, InlineFileAssertions};
+use crate::assertion::{InlineFileAssertions, ParsedAssertion, UnparsedAssertion};
 use crate::db::Db;
 use crate::diagnostic::SortedDiagnostics;
 use colored::Colorize;
@@ -136,7 +136,13 @@ trait UnmatchedWithColumn {
     fn unmatched_with_column(&self, column: OneIndexed) -> String;
 }
 
-impl Unmatched for Assertion<'_> {
+impl Unmatched for UnparsedAssertion<'_> {
+    fn unmatched(&self) -> String {
+        format!("{} {self}", "unmatched assertion:".red())
+    }
+}
+
+impl Unmatched for ParsedAssertion<'_> {
     fn unmatched(&self) -> String {
         format!("{} {self}", "unmatched assertion:".red())
     }
@@ -219,7 +225,7 @@ impl Matcher {
     fn match_line<'a, 'b, T: Diagnostic + 'a>(
         &self,
         diagnostics: &'a [T],
-        assertions: &'a [Assertion<'b>],
+        assertions: &'a [UnparsedAssertion<'b>],
     ) -> Result<(), Vec<String>>
     where
         'b: 'a,
@@ -227,22 +233,15 @@ impl Matcher {
         let mut failures = vec![];
         let mut unmatched: Vec<_> = diagnostics.iter().collect();
         for assertion in assertions {
-            if matches!(
-                assertion,
-                Assertion::Error(ErrorAssertion {
-                    rule: None,
-                    message_contains: None,
-                    ..
-                })
-            ) {
-                failures.push(format!(
-                    "{} no rule or message text",
-                    "invalid assertion:".red()
-                ));
-                continue;
-            }
-            if !self.matches(assertion, &mut unmatched) {
-                failures.push(assertion.unmatched());
+            match assertion.parse() {
+                Ok(assertion) => {
+                    if !self.matches(&assertion, &mut unmatched) {
+                        failures.push(assertion.unmatched());
+                    }
+                }
+                Err(error) => {
+                    failures.push(format!("{} {}", "invalid assertion:".red(), error));
+                }
             }
         }
         for diagnostic in unmatched {
@@ -277,9 +276,9 @@ impl Matcher {
     ///
     /// A `Revealed` assertion must match a revealed-type diagnostic, and may also match an
     /// undefined-reveal diagnostic, if present.
-    fn matches<T: Diagnostic>(&self, assertion: &Assertion, unmatched: &mut Vec<&T>) -> bool {
+    fn matches<T: Diagnostic>(&self, assertion: &ParsedAssertion, unmatched: &mut Vec<&T>) -> bool {
         match assertion {
-            Assertion::Error(error) => {
+            ParsedAssertion::Error(error) => {
                 let position = unmatched.iter().position(|diagnostic| {
                     !error.rule.is_some_and(|rule| {
                         !(diagnostic.id().is_lint_named(rule) || diagnostic.id().matches(rule))
@@ -297,7 +296,7 @@ impl Matcher {
                     false
                 }
             }
-            Assertion::Revealed(expected_type) => {
+            ParsedAssertion::Revealed(expected_type) => {
                 #[cfg(not(debug_assertions))]
                 let expected_type = discard_todo_metadata(&expected_type);
 

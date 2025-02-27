@@ -39,11 +39,12 @@ use regex::Regex;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::{line_index, source_text, SourceText};
-use ruff_python_trivia::CommentRanges;
+use ruff_python_trivia::{CommentRanges, Cursor};
 use ruff_source_file::{LineIndex, OneIndexed};
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use smallvec::SmallVec;
 use std::ops::Deref;
+use std::str::FromStr;
 use std::sync::LazyLock;
 
 /// Diagnostic assertion comments in a single embedded file.
@@ -94,10 +95,10 @@ impl<'a> IntoIterator for &'a InlineFileAssertions {
 
 /// An [`Assertion`] with the [`TextRange`] of its original inline comment.
 #[derive(Debug)]
-struct AssertionWithRange<'a>(Assertion<'a>, TextRange);
+struct AssertionWithRange<'a>(UnparsedAssertion<'a>, TextRange);
 
 impl<'a> Deref for AssertionWithRange<'a> {
-    type Target = Assertion<'a>;
+    type Target = UnparsedAssertion<'a>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -110,7 +111,7 @@ impl Ranged for AssertionWithRange<'_> {
     }
 }
 
-impl<'a> From<AssertionWithRange<'a>> for Assertion<'a> {
+impl<'a> From<AssertionWithRange<'a>> for UnparsedAssertion<'a> {
     fn from(value: AssertionWithRange<'a>) -> Self {
         value.0
     }
@@ -130,7 +131,7 @@ impl<'a> Iterator for AssertionWithRangeIterator<'a> {
         loop {
             let inner_next = self.inner.next()?;
             let comment = &self.file_assertions.source[inner_next];
-            if let Some(assertion) = Assertion::from_comment(comment) {
+            if let Some(assertion) = UnparsedAssertion::from_comment(comment) {
                 return Some(AssertionWithRange(assertion, inner_next));
             };
         }
@@ -143,7 +144,7 @@ impl std::iter::FusedIterator for AssertionWithRangeIterator<'_> {}
 ///
 /// Most lines will have zero or one assertion, so we use a [`SmallVec`] optimized for a single
 /// element to avoid most heap vector allocations.
-type AssertionVec<'a> = SmallVec<[Assertion<'a>; 1]>;
+type AssertionVec<'a> = SmallVec<[UnparsedAssertion<'a>; 1]>;
 
 #[derive(Debug)]
 pub(crate) struct LineAssertionsIterator<'a> {
@@ -227,7 +228,7 @@ pub(crate) struct LineAssertions<'a> {
 }
 
 impl<'a> Deref for LineAssertions<'a> {
-    type Target = [Assertion<'a>];
+    type Target = [UnparsedAssertion<'a>];
 
     fn deref(&self) -> &Self::Target {
         &self.assertions
@@ -237,40 +238,52 @@ impl<'a> Deref for LineAssertions<'a> {
 static TYPE_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^#\s*revealed:\s*(?<ty_display>.+?)\s*$").unwrap());
 
-static ERROR_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(
-        r#"^#\s*error:(\s*(?<column>\d+))?(\s*\[(?<rule>.+?)\])?(\s*"(?<message>.+?)")?\s*$"#,
-    )
-    .unwrap()
-});
+const ERROR_PREFIX: &str = "# error: ";
 
 /// A single diagnostic assertion comment.
 #[derive(Debug)]
-pub(crate) enum Assertion<'a> {
+pub(crate) enum UnparsedAssertion<'a> {
     /// A `revealed: ` assertion.
     Revealed(&'a str),
 
     /// An `error: ` assertion.
-    Error(ErrorAssertion<'a>),
+    Error(&'a str),
 }
 
-impl<'a> Assertion<'a> {
+impl<'a> UnparsedAssertion<'a> {
     fn from_comment(comment: &'a str) -> Option<Self> {
         if let Some(caps) = TYPE_RE.captures(comment) {
             Some(Self::Revealed(caps.name("ty_display").unwrap().as_str()))
         } else {
-            ERROR_RE.captures(comment).map(|caps| {
-                Self::Error(ErrorAssertion {
-                    rule: caps.name("rule").map(|m| m.as_str()),
-                    column: caps.name("column").and_then(|m| m.as_str().parse().ok()),
-                    message_contains: caps.name("message").map(|m| m.as_str()),
-                })
-            })
+            let (prefix, assertion) = comment.split_at_checked(ERROR_PREFIX.len())?;
+            (prefix == ERROR_PREFIX).then_some(Self::Error(assertion))
+        }
+    }
+
+    pub(crate) fn parse(&self) -> Result<ParsedAssertion<'a>, String> {
+        match self {
+            Self::Revealed(revealed) => Ok(ParsedAssertion::Revealed(revealed)),
+            Self::Error(error) => ErrorAssertion::from_str(error).map(ParsedAssertion::Error),
         }
     }
 }
 
-impl std::fmt::Display for Assertion<'_> {
+impl std::fmt::Display for UnparsedAssertion<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Revealed(expected_type) => write!(f, "revealed: {expected_type}"),
+            Self::Error(assertion) => write!(f, "error: {assertion}"),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub(crate) enum ParsedAssertion<'a> {
+    Revealed(&'a str),
+    Error(ErrorAssertion<'a>),
+}
+
+impl std::fmt::Display for ParsedAssertion<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Revealed(expected_type) => write!(f, "revealed: {expected_type}"),
@@ -292,6 +305,12 @@ pub(crate) struct ErrorAssertion<'a> {
     pub(crate) message_contains: Option<&'a str>,
 }
 
+impl<'a> ErrorAssertion<'a> {
+    fn from_str(source: &'a str) -> Result<Self, String> {
+        ErrorAssertionParser::new(source).parse()
+    }
+}
+
 impl std::fmt::Display for ErrorAssertion<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("error:")?;
@@ -308,9 +327,113 @@ impl std::fmt::Display for ErrorAssertion<'_> {
     }
 }
 
+#[derive(Debug, Clone)]
+pub(crate) struct ErrorAssertionParser<'a> {
+    cursor: Cursor<'a>,
+    source: &'a str,
+}
+
+impl<'a> ErrorAssertionParser<'a> {
+    fn new(comment: &'a str) -> Self {
+        Self {
+            cursor: Cursor::new(comment),
+            source: comment,
+        }
+    }
+
+    /// Retrieves the current offset of the cursor within the source code.
+    fn offset(&self) -> TextSize {
+        self.source.text_len() - self.cursor.text_len()
+    }
+
+    fn skip_whitespace(&mut self) {
+        self.cursor.eat_while(|c| c.is_whitespace() && c != '\n');
+    }
+
+    fn consume_until(&mut self, mut end_predicate: impl FnMut(char) -> bool) -> Option<&'a str> {
+        let start = self.offset().to_usize();
+
+        while !self.cursor.is_eof() {
+            if end_predicate(self.cursor.first()) {
+                return Some(&self.source[start..self.offset().to_usize()]);
+            }
+            self.cursor.bump();
+        }
+
+        None
+    }
+
+    pub(crate) fn parse(mut self) -> Result<ErrorAssertion<'a>, String> {
+        let mut column = None;
+        let mut rule = None;
+
+        self.skip_whitespace();
+
+        while !self.cursor.is_eof() {
+            match self.cursor.first() {
+                '0'..='9' if column.is_none() && rule.is_none() => {
+                    let Some(column_str) = self.consume_until(char::is_whitespace) else {
+                        return Err("no rule or message text".to_string());
+                    };
+                    column = OneIndexed::from_str(column_str)
+                        .map_err(|_| format!("Bad column number `{column_str}`"))
+                        .map(Some)?;
+                }
+
+                '[' if rule.is_none() => {
+                    self.cursor.bump();
+                    let Some(position) = memchr::memmem::find(self.cursor.as_bytes(), b"]") else {
+                        return Err("expected ']' to close rule code".to_string());
+                    };
+                    rule = Some(&self.cursor.as_str()[..position]);
+                    self.cursor.skip_bytes(position + b"]".len());
+                }
+
+                '"' => {
+                    self.cursor.bump();
+                    let rest =
+                        &self.source[self.offset().to_usize()..self.source.trim_end().len() - 1];
+                    self.cursor.skip_bytes(rest.len());
+                    return if self.cursor.first() == '"' {
+                        Ok(ErrorAssertion {
+                            rule,
+                            column,
+                            message_contains: Some(rest),
+                        })
+                    } else {
+                        Err("expected '\"' to close message".to_string())
+                    };
+                }
+
+                '\n' | '\r' => break,
+
+                unexpected => {
+                    return Err(format!(
+                        "encountered unexpected character `{unexpected}` at offset {offset} (relative to comment `#`)",
+                        unexpected = unexpected,
+                        offset = self.offset().to_usize() + ERROR_PREFIX.len()
+                    ))
+                }
+            }
+
+            self.skip_whitespace();
+        }
+
+        if rule.is_none() {
+            return Err("no rule or message text".to_string());
+        }
+
+        Ok(ErrorAssertion {
+            rule,
+            column,
+            message_contains: None,
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{Assertion, InlineFileAssertions, LineAssertions};
+    use super::*;
     use ruff_db::files::system_path_to_file;
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
     use ruff_python_trivia::textwrap::dedent;
@@ -366,7 +489,7 @@ mod tests {
             panic!("expected one assertion");
         };
 
-        assert_eq!(format!("{assert}"), "error:");
+        assert_eq!(format!("{assert}"), "error: ");
     }
 
     #[test]
@@ -455,15 +578,19 @@ mod tests {
         assert_eq!(line1.line_number, OneIndexed::from_zero_indexed(2));
         assert_eq!(line2.line_number, OneIndexed::from_zero_indexed(3));
 
-        let [Assertion::Error(error1)] = &line1.assertions[..] else {
+        let [UnparsedAssertion::Error(error1)] = &line1.assertions[..] else {
             panic!("expected one error assertion");
         };
+
+        let error1 = ErrorAssertion::from_str(error1).unwrap();
 
         assert_eq!(error1.rule, Some("invalid-assignment"));
 
-        let [Assertion::Error(error2)] = &line2.assertions[..] else {
+        let [UnparsedAssertion::Error(error2)] = &line2.assertions[..] else {
             panic!("expected one error assertion");
         };
+
+        let error2 = ErrorAssertion::from_str(error2).unwrap();
 
         assert_eq!(error2.rule, Some("unbound-name"));
     }
@@ -485,17 +612,22 @@ mod tests {
         assert_eq!(line1.line_number, OneIndexed::from_zero_indexed(2));
         assert_eq!(line2.line_number, OneIndexed::from_zero_indexed(3));
 
-        let [Assertion::Error(error1), Assertion::Revealed(expected_ty)] = &line1.assertions[..]
+        let [UnparsedAssertion::Error(error1), UnparsedAssertion::Revealed(expected_ty)] =
+            &line1.assertions[..]
         else {
             panic!("expected one error assertion and one Revealed assertion");
         };
 
+        let error1 = ErrorAssertion::from_str(error1).unwrap();
+
         assert_eq!(error1.rule, Some("invalid-assignment"));
         assert_eq!(*expected_ty, "str");
 
-        let [Assertion::Error(error2)] = &line2.assertions[..] else {
+        let [UnparsedAssertion::Error(error2)] = &line2.assertions[..] else {
             panic!("expected one error assertion");
         };
+
+        let error2 = ErrorAssertion::from_str(error2).unwrap();
 
         assert_eq!(error2.rule, Some("unbound-name"));
     }
