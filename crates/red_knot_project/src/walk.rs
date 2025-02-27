@@ -10,16 +10,25 @@ use thiserror::Error;
 /// Filter that decides which files are included in the project.
 ///
 /// In the future, this will hold a reference to the `include` and `exclude` pattern.
+///
+/// This struct mainly exists because `dyn Db` isn't `Send` or `Sync`, making it impossible
+/// to access fields from within the walker.
 #[derive(Default, Debug)]
 pub(crate) struct ProjectFilesFilter<'a> {
-    /// A copy of [`Project::check_paths_or_root`] because we can't access the db from the walker.
-    check_paths: &'a [SystemPathBuf],
+    /// A copy of [`Project::included_paths_or_root`] because it isn't possible to
+    included_paths: &'a [SystemPathBuf],
+
+    /// The filter skips checking if the path is in `included_paths` if set to `true`.
+    ///
+    /// Skipping this check is useful when the walker only walks over `included_paths`.
+    skip_included_paths: bool,
 }
 
 impl<'a> ProjectFilesFilter<'a> {
     pub(crate) fn from_project(db: &'a dyn Db, project: Project) -> Self {
         Self {
-            check_paths: project.check_paths_or_root(db),
+            included_paths: project.included_paths_or_root(db),
+            skip_included_paths: false,
         }
     }
 
@@ -46,22 +55,25 @@ impl<'a> ProjectFilesFilter<'a> {
             Full,
         }
 
-        let m = self
-            .check_paths
-            .iter()
-            .filter_map(|check_path| {
-                if let Ok(relative_path) = path.strip_prefix(check_path) {
-                    // Exact matches are always included
-                    if relative_path.as_str().is_empty() {
-                        Some(CheckPathMatch::Full)
+        let m = if self.skip_included_paths {
+            Some(CheckPathMatch::Partial)
+        } else {
+            self.included_paths
+                .iter()
+                .filter_map(|included_path| {
+                    if let Ok(relative_path) = path.strip_prefix(included_path) {
+                        // Exact matches are always included
+                        if relative_path.as_str().is_empty() {
+                            Some(CheckPathMatch::Full)
+                        } else {
+                            Some(CheckPathMatch::Partial)
+                        }
                     } else {
-                        Some(CheckPathMatch::Partial)
+                        None
                     }
-                } else {
-                    None
-                }
-            })
-            .max();
+                })
+                .max()
+        };
 
         match m {
             None => false,
@@ -84,13 +96,33 @@ impl<'a> ProjectFilesWalker<'a> {
     pub(crate) fn new(db: &'a dyn Db) -> Self {
         let project = db.project();
 
-        Self::new_with_paths(db, project.check_paths_or_root(db))
+        let mut filter = ProjectFilesFilter::from_project(db, project);
+        // It's unnecessary to set `check_paths` because it only iterates over the project's root.
+        filter.skip_included_paths = true;
+
+        Self::from_paths(db, project.included_paths_or_root(db), filter)
             .expect("check_paths_or_root to never return an empty iterator")
     }
 
-    pub(crate) fn new_with_paths<P>(
+    /// Creates a walker for indexing the project file incrementally.
+    ///
+    /// The main difference to a full project walk is that `paths` may contain paths
+    /// that aren't part of the checked project files.
+    pub(crate) fn incremental<P>(db: &'a dyn Db, paths: impl IntoIterator<Item = P>) -> Option<Self>
+    where
+        P: AsRef<SystemPath>,
+    {
+        let project = db.project();
+
+        let filter = ProjectFilesFilter::from_project(db, project);
+
+        Self::from_paths(db, paths, filter)
+    }
+
+    fn from_paths<P>(
         db: &'a dyn Db,
         paths: impl IntoIterator<Item = P>,
+        filter: ProjectFilesFilter<'a>,
     ) -> Option<Self>
     where
         P: AsRef<SystemPath>,
@@ -103,10 +135,6 @@ impl<'a> ProjectFilesWalker<'a> {
             walker = walker.add(path);
         }
 
-        let project = db.project();
-
-        let filter = ProjectFilesFilter::from_project(db, project);
-
         Some(Self { walker, filter })
     }
 
@@ -115,6 +143,7 @@ impl<'a> ProjectFilesWalker<'a> {
     pub(crate) fn walk_paths(self) -> (Vec<SystemPathBuf>, Vec<IOErrorDiagnostic>) {
         let paths = std::sync::Mutex::new(Vec::new());
         let diagnostics = std::sync::Mutex::new(Vec::new());
+
         self.walker.run(|| {
             Box::new(|entry| {
                 match entry {

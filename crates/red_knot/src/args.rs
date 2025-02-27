@@ -84,8 +84,6 @@ pub(crate) struct CheckCommand {
     pub(crate) exit_zero: bool,
 
     /// Watch files for changes and re-run type checking related to changed files.
-    ///
-    /// Manually specified paths that are outside the project's root directory aren't watched for changes.
     #[arg(long, short = 'W')]
     pub(crate) watch: bool,
 }

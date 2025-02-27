@@ -72,17 +72,16 @@ pub struct Project {
     #[return_ref]
     pub settings: Settings,
 
-    /// TODO: Should we use `matchit` for this?
-    /// The paths that should be checked in the project.
+    /// The paths that should be included in this project.
     ///
-    /// The default (when this list is empty) is to check all files in the project root (that satisfy the configured include and exclude patterns).
+    /// The default (when this list is empty) is to include all files in the project root (that satisfy the configured include and exclude patterns).
     /// However, it's sometimes desired to only check a subset of the project, e.g. to see
     /// the diagnostics for a single file or a folder.
     ///
     /// This list gets initialized by the paths passed to `knot check <paths>`
     #[default]
     #[return_ref]
-    check_path_list: Vec<SystemPathBuf>,
+    included_paths_list: Vec<SystemPathBuf>,
 
     /// Diagnostics that were generated when resolving the project settings.
     #[return_ref]
@@ -234,10 +233,10 @@ impl Project {
         removed
     }
 
-    pub fn set_check_paths(self, db: &mut dyn Db, paths: Vec<SystemPathBuf>) {
-        tracing::debug!("Setting check paths: {paths}", paths = paths.len());
+    pub fn set_included_paths(self, db: &mut dyn Db, paths: Vec<SystemPathBuf>) {
+        tracing::debug!("Setting included paths: {paths}", paths = paths.len());
 
-        self.set_check_path_list(db).to(paths);
+        self.set_included_paths_list(db).to(paths);
         self.reload_files(db);
     }
 
@@ -254,8 +253,8 @@ impl Project {
     /// of the project root. Our goal is to not catastrophically fail for such paths
     /// but it's okay to not provide the same level of support as for real project paths. For example,
     /// Red Knot doesn't support watching files for changes that are outside the project root.
-    fn check_paths_or_root(self, db: &dyn Db) -> &[SystemPathBuf] {
-        match &**self.check_path_list(db) {
+    fn included_paths_or_root(self, db: &dyn Db) -> &[SystemPathBuf] {
+        match &**self.included_paths_list(db) {
             [] => std::slice::from_ref(&self.metadata(db).root),
             paths => paths,
         }

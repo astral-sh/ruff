@@ -125,7 +125,7 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     let mut db = ProjectDatabase::new(project_metadata, system)?;
 
     if !check_paths.is_empty() {
-        db.project().set_check_paths(&mut db, check_paths);
+        db.project().set_included_paths(&mut db, check_paths);
     }
 
     let (main_loop, main_loop_cancellation_token) = MainLoop::new(cli_options);

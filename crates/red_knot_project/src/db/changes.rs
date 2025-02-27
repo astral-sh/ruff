@@ -194,19 +194,18 @@ impl ProjectDatabase {
             }
         }
 
-        let diagnostics =
-            if let Some(walker) = ProjectFilesWalker::new_with_paths(self, added_paths) {
-                // Use directory walking to discover newly added files.
-                let (files, diagnostics) = walker.collect_vec(self);
+        let diagnostics = if let Some(walker) = ProjectFilesWalker::incremental(self, added_paths) {
+            // Use directory walking to discover newly added files.
+            let (files, diagnostics) = walker.collect_vec(self);
 
-                for file in files {
-                    project.add_file(self, file);
-                }
+            for file in files {
+                project.add_file(self, file);
+            }
 
-                diagnostics
-            } else {
-                Vec::new()
-            };
+            diagnostics
+        } else {
+            Vec::new()
+        };
 
         // Note: We simply replace all IO related diagnostics here. This isn't ideal, because
         // it removes IO errors that may still be relevant. However, tracking IO errors correctly
