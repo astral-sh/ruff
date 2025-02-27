@@ -31,13 +31,10 @@ reveal_type(c.ten)  # revealed: Literal[10]
 reveal_type(C.ten)  # revealed: Literal[10]
 
 # These are fine:
-# TODO: This should not be an error
-c.ten = 10  # error: [invalid-assignment]
+c.ten = 10
 C.ten = 10
 
-# TODO: This should be an error (as the wrong type is being implicitly passed to `Ten.__set__`),
-# but the error message is misleading.
-# error: [invalid-assignment] "Object of type `Literal[11]` is not assignable to attribute `ten` of type `Ten`"
+# TODO: This should be an error (as the wrong type is being implicitly passed to `Ten.__set__`)
 c.ten = 11
 
 # TODO: same as above
@@ -67,16 +64,12 @@ c = C()
 
 reveal_type(c.flexible_int)  # revealed: int | None
 
-# TODO: These should not be errors
-# error: [invalid-assignment]
 c.flexible_int = 42  # okay
-# error: [invalid-assignment]
 c.flexible_int = "42"  # also okay!
 
 reveal_type(c.flexible_int)  # revealed: int | None
 
-# TODO: This should be an error, but the message needs to be improved.
-# error: [invalid-assignment] "Object of type `None` is not assignable to attribute `flexible_int` of type `FlexibleInt`"
+# TODO: This should be an error
 c.flexible_int = None  # not okay
 
 reveal_type(c.flexible_int)  # revealed: int | None
@@ -302,8 +295,8 @@ reveal_type(C.class_object_access)  # revealed: int
 reveal_type(C().instance_access)  # revealed: str
 
 # TODO: These should emit a diagnostic
-reveal_type(C().class_object_access)  # revealed: TailoredForClassObjectAccess
-reveal_type(C.instance_access)  # revealed: TailoredForInstanceAccess
+reveal_type(C().class_object_access)  # revealed: Unknown
+reveal_type(C.instance_access)  # revealed: Unknown
 ```
 
 ## Descriptors with incorrect `__get__` signature

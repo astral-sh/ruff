@@ -2678,18 +2678,18 @@ impl<'db> Type<'db> {
         let meta_type = self.to_meta_type(db);
 
         match meta_type.static_member(db, name) {
-            Symbol::Type(callable_ty, boundness) => {
+            Symbol::Type(mut callable_ty, mut boundness) => {
                 // Dunder methods are looked up on the meta type, but they invoke the descriptor
                 // protocol *as if they had been called on the instance itself*. This is why we
                 // pass `Some(self)` for the `instance` argument here.
-                // let callable_ty =
 
-                let result =
-                    callable_ty.run_descriptor_protocol_instances(db, name, Some(self), meta_type);
-
-                let result = CallOutcome::Single(CallBinding::from_return_type(
-                    result.ignore_possibly_unbound().unwrap_or(Type::unknown()),
-                )); //TODO
+                if let Symbol::Type(callable_ty_desc, boundness_desc) =
+                    callable_ty.run_descriptor_protocol_instances(db, name, Some(self), meta_type)
+                {
+                    callable_ty = callable_ty_desc;
+                    boundness = boundness_desc;
+                }
+                let result = callable_ty.try_call(db, arguments)?;
 
                 if boundness == Boundness::Bound {
                     Ok(result)
