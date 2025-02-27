@@ -1,4 +1,4 @@
-//! Match [`Diagnostic`]s against [`Assertion`]s and produce test failure messages for any
+//! Match [`Diagnostic`]s against assertions and produce test failure messages for any
 //! mismatches.
 use crate::assertion::{InlineFileAssertions, ParsedAssertion, UnparsedAssertion};
 use crate::db::Db;
@@ -222,7 +222,7 @@ impl Matcher {
         }
     }
 
-    /// Check a slice of [`Diagnostic`]s against a slice of [`Assertion`]s.
+    /// Check a slice of [`Diagnostic`]s against a slice of [`UnparsedAssertion`]s.
     ///
     /// Return vector of [`Unmatched`] for any unmatched diagnostics or assertions.
     fn match_line<'a, 'b, T: Diagnostic + 'a>(

@@ -91,7 +91,7 @@ impl<'a> IntoIterator for &'a InlineFileAssertions {
     }
 }
 
-/// An [`Assertion`] with the [`TextRange`] of its original inline comment.
+/// An [`UnparsedAssertion`] with the [`TextRange`] of its original inline comment.
 #[derive(Debug)]
 struct AssertionWithRange<'a>(UnparsedAssertion<'a>, TextRange);
 
@@ -138,7 +138,7 @@ impl<'a> Iterator for AssertionWithRangeIterator<'a> {
 
 impl std::iter::FusedIterator for AssertionWithRangeIterator<'_> {}
 
-/// A vector of [`Assertion`]s belonging to a single line.
+/// A vector of [`UnparsedAssertion`]s belonging to a single line.
 ///
 /// Most lines will have zero or one assertion, so we use a [`SmallVec`] optimized for a single
 /// element to avoid most heap vector allocations.
