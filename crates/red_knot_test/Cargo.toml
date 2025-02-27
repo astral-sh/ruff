@@ -27,6 +27,7 @@ insta = { workspace = true, features = ["filters"] }
 memchr = { workspace = true }
 regex = { workspace = true }
 rustc-hash = { workspace = true }
+rust-fuzzy-search = { workspace = true}
 salsa = { workspace = true }
 smallvec = { workspace = true }
 serde = { workspace = true }

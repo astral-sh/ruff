@@ -424,6 +424,19 @@ impl<'s> Parser<'s> {
         const CODE_BLOCK_END: &[u8] = b"```";
         const HTML_COMMENT_END: &[u8] = b"-->";
 
+        /// Return `true` if `comment` looks like a typo of `SECTION_CONFIG_SNAPSHOT`.
+        ///
+        /// The heuristic we use is to check whether the length of `comment` is within
+        /// 2 characters of the length of `SECTION_CONFIG_SNAPSHOT`,
+        /// and also whether they have a reasonably similar fuzzy comparison score.
+        fn looks_like_snapshot_directive_typo(comment: &str) -> bool {
+            use rust_fuzzy_search::fuzzy_compare;
+
+            comment.len() >= SECTION_CONFIG_SNAPSHOT.len() - 2
+                && comment.len() <= SECTION_CONFIG_SNAPSHOT.len() + 2
+                && fuzzy_compare(comment, "snapshot-diagnostics") > 0.6
+        }
+
         while let Some(first) = self.cursor.bump() {
             match first {
                 '<' if self.cursor.eat_char3('!', '-', '-') => {
@@ -431,9 +444,13 @@ impl<'s> Parser<'s> {
                         memchr::memmem::find(self.cursor.as_bytes(), HTML_COMMENT_END)
                     {
                         let html_comment = self.cursor.as_str()[..position].trim();
+
                         if html_comment == SECTION_CONFIG_SNAPSHOT {
                             self.process_snapshot_diagnostics()?;
+                        } else if looks_like_snapshot_directive_typo(html_comment) {
+                            bail!("HTML comment `{html_comment}` looks like a typo (did you mean `{SECTION_CONFIG_SNAPSHOT}`?)");
                         }
+
                         self.cursor.skip_bytes(position + HTML_COMMENT_END.len());
                     } else {
                         bail!("Unterminated HTML comment.");
@@ -1800,5 +1817,66 @@ mod tests {
              come before everything else \
              (including embedded files).",
         );
+    }
+
+    #[test]
+    fn obvious_typos_in_directives_are_detected() {
+        let source = dedent(
+            "
+            # Some header
+
+            <!-- snpashot-diagnostics -->
+
+            ```py
+            x = 1
+            ```
+            ",
+        );
+        let err = super::parse("file.md", &source).expect_err("Should fail to parse");
+        assert_eq!(
+            err.to_string(),
+            "HTML comment `snpashot-diagnostics` looks like a typo (did you mean `snapshot-diagnostics`?)",
+        );
+    }
+
+    #[test]
+    fn obvious_typos_in_directives_are_detected_2() {
+        let source = dedent(
+            "
+            # Some header
+
+            <!-- snpshot-dignosstics -->
+
+            ```py
+            x = 1
+            ```
+            ",
+        );
+        let err = super::parse("file.md", &source).expect_err("Should fail to parse");
+        assert_eq!(
+            err.to_string(),
+            "HTML comment `snpshot-dignosstics` looks like a typo (did you mean `snapshot-diagnostics`?)",
+        );
+    }
+
+    #[test]
+    fn unrelated_html_comments_are_fine() {
+        let source = dedent(
+            "
+            # Some header
+
+            <!-- blackendocs:off -->
+
+            ```py
+            x = 1
+            ```
+
+            <!-- blackendocs:on -->
+            <!-- shot-diagnostics -->
+            <!-- short-diagnostics -->
+            <!-- look at all the ways we snapshot diagnostics in this mdtest -->
+            ",
+        );
+        assert!(super::parse("file.md", &source).is_ok());
     }
 }

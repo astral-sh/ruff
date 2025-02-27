@@ -122,6 +122,7 @@ rand = { version = "0.9.0" }
 rayon = { version = "1.10.0" }
 regex = { version = "1.10.2" }
 rustc-hash = { version = "2.0.0" }
+rust-fuzzy-search = { version = "0.1.1" }
 # When updating salsa, make sure to also update the revision in `fuzz/Cargo.toml`
 salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "99be5d9917c3dd88e19735a82ef6bf39ba84bd7e" }
 schemars = { version = "0.8.16" }
