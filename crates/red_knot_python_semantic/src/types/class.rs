@@ -318,10 +318,10 @@ impl<'db> Class<'db> {
     /// The member resolves to a member on the class itself or any of its proper superclasses.
     ///
     /// TODO: Should this be made private...?
-    pub(super) fn class_member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
+    pub(super) fn class_member(self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
         if name == "__mro__" {
             let tuple_elements = self.iter_mro(db).map(Type::from);
-            return Symbol::bound(TupleType::from_elements(db, tuple_elements));
+            return Symbol::bound(TupleType::from_elements(db, tuple_elements)).into();
         }
 
         // If we encounter a dynamic type in this class's MRO, we'll save that dynamic type
@@ -353,15 +353,25 @@ impl<'db> Class<'db> {
             }
         }
 
-        match (Symbol::from(lookup_result), dynamic_type_to_intersect_with) {
-            (symbol, None) => symbol,
-            (Symbol::Type(ty, _), Some(dynamic_type)) => Symbol::bound(
-                IntersectionBuilder::new(db)
-                    .add_positive(ty)
-                    .add_positive(dynamic_type)
-                    .build(),
-            ),
-            (Symbol::Unbound, Some(dynamic_type)) => Symbol::bound(dynamic_type),
+        match (
+            SymbolAndQualifiers::from(lookup_result),
+            dynamic_type_to_intersect_with,
+        ) {
+            (symbol_and_qualifiers, None) => symbol_and_qualifiers,
+            (SymbolAndQualifiers(Symbol::Type(ty, _), qualifiers), Some(dynamic_type)) => {
+                SymbolAndQualifiers(
+                    Symbol::bound(
+                        IntersectionBuilder::new(db)
+                            .add_positive(ty)
+                            .add_positive(dynamic_type)
+                            .build(),
+                    ),
+                    qualifiers,
+                )
+            }
+            (SymbolAndQualifiers(Symbol::Unbound, _), Some(dynamic_type)) => {
+                Symbol::bound(dynamic_type).into()
+            }
         }
     }
 
@@ -371,7 +381,7 @@ impl<'db> Class<'db> {
     /// Returns [`Symbol::Unbound`] if `name` cannot be found in this class's scope
     /// directly. Use [`Class::class_member`] if you require a method that will
     /// traverse through the MRO until it finds the member.
-    pub(super) fn own_class_member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
+    pub(super) fn own_class_member(self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
         let body_scope = self.body_scope(db);
         class_symbol(db, body_scope, name)
     }
@@ -677,7 +687,7 @@ impl<'db> ClassLiteralType<'db> {
         self.class.body_scope(db)
     }
 
-    pub(super) fn find_name_in_mro(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
+    pub(super) fn find_name_in_mro(self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
         self.class.class_member(db, name)
     }
 }
@@ -895,6 +905,7 @@ impl<'db> KnownClass {
 
     pub(crate) fn to_class_literal(self, db: &'db dyn Db) -> Type<'db> {
         known_module_symbol(db, self.canonical_module(db), self.as_str(db))
+            .0
             .ignore_possibly_unbound()
             .unwrap_or(Type::unknown())
     }
@@ -910,6 +921,7 @@ impl<'db> KnownClass {
     /// *and* `class` is a subclass of `other`.
     pub(super) fn is_subclass_of(self, db: &'db dyn Db, other: Class<'db>) -> bool {
         known_module_symbol(db, self.canonical_module(db), self.as_str(db))
+            .0
             .ignore_possibly_unbound()
             .and_then(Type::into_class_literal)
             .is_some_and(|ClassLiteralType { class }| class.is_subclass_of(db, other))
