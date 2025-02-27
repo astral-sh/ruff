@@ -2627,3 +2627,77 @@ class A(Generic[T]):
     "
     );
 }
+
+#[test]
+fn match_before_py310() {
+    // ok on 3.10
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--stdin-filename", "test.py"])
+        .arg("--target-version=py310")
+        .arg("-")
+        .pass_stdin(
+            r#"
+match 2:
+    case 1:
+        print("it's one")
+"#
+        ),
+        @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    "
+    );
+
+    // ok on 3.9 without preview
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--stdin-filename", "test.py"])
+        .arg("--target-version=py39")
+        .arg("-")
+        .pass_stdin(
+            r#"
+match 2:
+    case 1:
+        print("it's one")
+"#
+        ),
+        @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    "
+    );
+
+    // syntax error on 3.9 with preview
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--stdin-filename", "test.py"])
+        .arg("--target-version=py39")
+        .arg("--preview")
+        .arg("-")
+        .pass_stdin(
+            r#"
+match 2:
+    case 1:
+        print("it's one")
+"#
+        ),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:2:1: SyntaxError: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
+    Found 1 error.
+
+    ----- stderr -----
+    "
+    );
+}

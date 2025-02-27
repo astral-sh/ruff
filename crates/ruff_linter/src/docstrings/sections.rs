@@ -453,7 +453,7 @@ fn is_docstring_section(
     }
 
     // Determine whether the previous line looks like the end of a paragraph.
-    let previous_line_looks_like_end_of_paragraph = previous_line.map_or(true, |previous_line| {
+    let previous_line_looks_like_end_of_paragraph = previous_line.is_none_or(|previous_line| {
         let previous_line = previous_line.trim();
         let previous_line_ends_with_punctuation = [',', ';', '.', '-', '\\', '/', ']', '}', ')']
             .into_iter()

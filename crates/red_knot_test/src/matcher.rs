@@ -283,12 +283,12 @@ impl Matcher {
                 let position = unmatched.iter().position(|diagnostic| {
                     !error.rule.is_some_and(|rule| {
                         !(diagnostic.id().is_lint_named(rule) || diagnostic.id().matches(rule))
-                    }) && !error
+                    }) && error
                         .column
-                        .is_some_and(|col| col != self.column(*diagnostic))
-                        && !error
+                        .is_none_or(|col| col == self.column(*diagnostic))
+                        && error
                             .message_contains
-                            .is_some_and(|needle| !diagnostic.message().contains(needle))
+                            .is_none_or(|needle| diagnostic.message().contains(needle))
                 });
                 if let Some(position) = position {
                     unmatched.swap_remove(position);

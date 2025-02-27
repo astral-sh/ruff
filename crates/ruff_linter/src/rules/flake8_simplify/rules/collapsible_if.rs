@@ -120,7 +120,7 @@ pub(crate) fn nested_if_statements(
         diagnostic.try_set_optional_fix(|| {
             match collapse_nested_if(checker.locator(), checker.stylist(), nested_if) {
                 Ok(edit) => {
-                    if edit.content().map_or(true, |content| {
+                    if edit.content().is_none_or(|content| {
                         fits(
                             content,
                             (&nested_if).into(),

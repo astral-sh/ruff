@@ -1742,6 +1742,15 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 pylint::rules::useless_exception_statement(checker, expr);
             }
         }
+        Stmt::Match(ast::StmtMatch {
+            subject: _,
+            cases,
+            range: _,
+        }) => {
+            if checker.enabled(Rule::NanComparison) {
+                pylint::rules::nan_comparison_match(checker, cases);
+            }
+        }
         _ => {}
     }
 }
