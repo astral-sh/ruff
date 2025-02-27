@@ -125,7 +125,6 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     let mut db = ProjectDatabase::new(project_metadata, system)?;
 
     if !check_paths.is_empty() {
-        // TODO: What happens if a path gets deleted? What if it is later recreated?
         db.project().set_check_paths(&mut db, check_paths);
     }
 

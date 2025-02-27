@@ -364,7 +364,7 @@ impl Project {
                 let walker = ProjectFilesWalker::new(db);
                 let (files, diagnostics) = walker.collect_set(db);
 
-                tracing::info!("Found {} files in project `{}`", files.len(), self.name(db));
+                tracing::info!("Indexed {} file(s)", files.len());
                 vacant.set(files, diagnostics)
             }
             Index::Indexed(indexed) => indexed,
