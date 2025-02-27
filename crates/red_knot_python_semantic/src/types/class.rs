@@ -5,8 +5,8 @@ use crate::{
         symbol::ScopeId, symbol_table, use_def_map,
     },
     symbol::{
-        class_symbol, known_module_symbol, symbol_from_bindings, symbol_from_declarations,
-        Boundness, LookupError, LookupResult, Symbol, SymbolAndQualifiers,
+        class_symbol, known_module_symbol, symbol_from_declarations, Boundness, LookupError,
+        LookupResult, Symbol, SymbolAndQualifiers,
     },
     types::{
         definition_expression_type, CallArguments, CallError, MetaclassCandidate, TupleType,
@@ -571,7 +571,7 @@ impl<'db> Class<'db> {
 
         let implicit_instance_attribute = Self::implicit_instance_attribute(db, body_scope, name);
 
-        if let Symbol::Type(implicit_instance_attribute_ty, _) = implicit_instance_attribute {
+        if let Symbol::Type(_, _) = implicit_instance_attribute {
             let table = symbol_table(db, body_scope);
 
             if let Some(symbol_id) = table.symbol_id_by_name(name) {
