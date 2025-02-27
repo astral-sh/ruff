@@ -18,9 +18,7 @@ use ruff_python_ast::{Mod, PySourceType};
 use ruff_python_codegen::Stylist;
 use ruff_python_formatter::{format_module_ast, pretty_comments, PyFormatContext, QuoteStyle};
 use ruff_python_index::Indexer;
-use ruff_python_parser::{
-    parse, parse_unchecked, parse_unchecked_source, Mode, ParseOptions, Parsed,
-};
+use ruff_python_parser::{parse, parse_unchecked, Mode, ParseOptions, Parsed};
 use ruff_python_trivia::CommentRanges;
 use ruff_source_file::SourceLocation;
 use ruff_text_size::Ranged;
@@ -163,8 +161,14 @@ impl Workspace {
         // TODO(dhruvmanila): Support Jupyter Notebooks
         let source_kind = SourceKind::Python(contents.to_string());
 
+        // Use the unresolved version because we don't have a file path.
+        let target_version = self.settings.linter.unresolved_target_version;
+
         // Parse once.
-        let parsed = parse_unchecked_source(source_kind.source_code(), source_type);
+        let options = ParseOptions::from(source_type).with_target_version(target_version);
+        let parsed = parse_unchecked(source_kind.source_code(), options)
+            .try_into_module()
+            .expect("`PySourceType` always parses to a `ModModule`.");
 
         // Map row and column locations to byte slices (lazily).
         let locator = Locator::new(contents);
@@ -196,7 +200,7 @@ impl Workspace {
             &source_kind,
             source_type,
             &parsed,
-            self.settings.linter.unresolved_target_version,
+            target_version,
         );
 
         let source_code = locator.to_source_code();
