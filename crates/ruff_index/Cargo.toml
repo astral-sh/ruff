@@ -24,3 +24,7 @@ static_assertions = { workspace = true }
 
 [lints]
 workspace = true
+
+[package.metadata.cargo-shear]
+# Used via macro expansion.
+ignored = ["quickcheck"]
