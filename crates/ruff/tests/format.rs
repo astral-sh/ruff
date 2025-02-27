@@ -2153,14 +2153,9 @@ fn cookiecutter_globbing() -> Result<()> {
     )?;
     let maintest = tests.join("maintest.py");
     fs::write(maintest, "import foo\nimport bar\nimport foo")?;
-
-    let tmp_filter = tempdir_filter(&tempdir);
-    let filters = vec![
-        (tmp_filter.as_str(), "[TMP]/"),
-        (r#"\\(\w\w|\s|\.|")"#, "/$1"),
-    ];
-
-    insta::with_settings!({filters => filters}, {
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/"), (r"\\", "/")]
+    }, {
         assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
             .args(["format", "--no-cache", "--diff"])
             .current_dir(tempdir.path()), @r#"
