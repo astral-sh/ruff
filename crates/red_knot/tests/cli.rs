@@ -940,6 +940,13 @@ fn check_specific_paths() -> anyhow::Result<()> {
 fn check_non_existing_path() -> anyhow::Result<()> {
     let case = TestCase::with_files([])?;
 
+    let mut settings = insta::Settings::clone_current();
+    settings.add_filter(
+        &regex::escape("The system cannot find the path specified. (os error 3)"),
+        "No such file or directory (os error 2)",
+    );
+    let _s = settings.bind_to_scope();
+
     assert_cmd_snapshot!(
         case.command().arg("project/main.py").arg("project/tests"),
         @r"
