@@ -2689,7 +2689,7 @@ impl<'db> Type<'db> {
     ) -> Result<CallOutcome<'db>, CallDunderError<'db>> {
         let meta_type = self.to_meta_type(db);
 
-        match meta_type.static_member(db, name) {
+        match meta_type.find_name_in_mro(db, name).0 {
             Symbol::Type(mut callable_ty, mut boundness) => {
                 // Dunder methods are looked up on the meta type, but they invoke the descriptor
                 // protocol *as if they had been called on the instance itself*. This is why we
