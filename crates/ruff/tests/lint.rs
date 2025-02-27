@@ -2722,9 +2722,14 @@ fn cookiecutter_globbing() -> Result<()> {
     // F811 example from the docs to ensure the glob still works
     let maintest = tests.join("maintest.py");
     fs::write(maintest, "import foo\nimport bar\nimport foo")?;
-    insta::with_settings!({
-        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/"), (r"\\", "/")]
-    }, {
+
+    let tmp_filter = tempdir_filter(&tempdir);
+    let filters = vec![
+        (tmp_filter.as_str(), "[TMP]/"),
+        (r#"\\(\w\w|\s|\.|")"#, "/$1"),
+    ];
+
+    insta::with_settings!({filters => filters.clone()}, {
         assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
             .args(STDIN_BASE_OPTIONS)
             .arg("--select=F811")
@@ -2742,9 +2747,7 @@ fn cookiecutter_globbing() -> Result<()> {
     // after removing the config file with the ignore, F811 applies, so the glob worked above
     fs::remove_file(cookiecutter_toml)?;
 
-    insta::with_settings!({
-        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/"), (r"\\", "/")]
-    }, {
+    insta::with_settings!({filters => filters}, {
         assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
             .args(STDIN_BASE_OPTIONS)
             .arg("--select=F811")
