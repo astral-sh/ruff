@@ -80,8 +80,7 @@ use crate as ruff_index;
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct List<K, V = ()> {
     last: Option<ListCellId>,
-    _phantom_key: PhantomData<K>,
-    _phantom_value: PhantomData<V>,
+    _phantom: PhantomData<(K, V)>,
 }
 
 impl<K, V> List<K, V> {
@@ -92,8 +91,7 @@ impl<K, V> List<K, V> {
     const fn new(last: Option<ListCellId>) -> List<K, V> {
         List {
             last,
-            _phantom_key: PhantomData,
-            _phantom_value: PhantomData,
+            _phantom: PhantomData,
         }
     }
 }
