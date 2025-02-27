@@ -238,7 +238,7 @@ impl<'a> Deref for LineAssertions<'a> {
 static TYPE_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^#\s*revealed:\s*(?<ty_display>.+?)\s*$").unwrap());
 
-const ERROR_PREFIX: &str = "# error: ";
+const ERROR_PREFIX: &str = "# error:";
 
 /// A single diagnostic assertion comment.
 #[derive(Debug)]
@@ -260,7 +260,7 @@ impl<'a> UnparsedAssertion<'a> {
         }
     }
 
-    pub(crate) fn parse(&self) -> Result<ParsedAssertion<'a>, String> {
+    pub(crate) fn parse(&self) -> Result<ParsedAssertion<'a>, ErrorAssertionParseError<'a>> {
         match self {
             Self::Revealed(revealed) => Ok(ParsedAssertion::Revealed(revealed)),
             Self::Error(error) => ErrorAssertion::from_str(error).map(ParsedAssertion::Error),
@@ -272,7 +272,7 @@ impl std::fmt::Display for UnparsedAssertion<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Revealed(expected_type) => write!(f, "revealed: {expected_type}"),
-            Self::Error(assertion) => write!(f, "error: {assertion}"),
+            Self::Error(assertion) => write!(f, "error: {}", assertion.trim()),
         }
     }
 }
@@ -306,7 +306,7 @@ pub(crate) struct ErrorAssertion<'a> {
 }
 
 impl<'a> ErrorAssertion<'a> {
-    fn from_str(source: &'a str) -> Result<Self, String> {
+    fn from_str(source: &'a str) -> Result<Self, ErrorAssertionParseError<'a>> {
         ErrorAssertionParser::new(source).parse()
     }
 }
@@ -363,7 +363,7 @@ impl<'a> ErrorAssertionParser<'a> {
         None
     }
 
-    pub(crate) fn parse(mut self) -> Result<ErrorAssertion<'a>, String> {
+    pub(crate) fn parse(mut self) -> Result<ErrorAssertion<'a>, ErrorAssertionParseError<'a>> {
         let mut column = None;
         let mut rule = None;
 
@@ -372,18 +372,19 @@ impl<'a> ErrorAssertionParser<'a> {
         while !self.cursor.is_eof() {
             match self.cursor.first() {
                 '0'..='9' if column.is_none() && rule.is_none() => {
+                    // This will return `None` if it hits the end of the file before hitting any whitespace
                     let Some(column_str) = self.consume_until(char::is_whitespace) else {
-                        return Err("no rule or message text".to_string());
+                        return Err(ErrorAssertionParseError::NoRuleOrMessage);
                     };
                     column = OneIndexed::from_str(column_str)
-                        .map_err(|_| format!("Bad column number `{column_str}`"))
-                        .map(Some)?;
+                        .map(Some)
+                        .map_err(|e| ErrorAssertionParseError::BadColumnNumber(column_str, e))?;
                 }
 
                 '[' if rule.is_none() => {
                     self.cursor.bump();
                     let Some(position) = memchr::memmem::find(self.cursor.as_bytes(), b"]") else {
-                        return Err("expected ']' to close rule code".to_string());
+                        return Err(ErrorAssertionParseError::UnclosedRuleCode);
                     };
                     rule = Some(&self.cursor.as_str()[..position]);
                     self.cursor.skip_bytes(position + b"]".len());
@@ -401,34 +402,47 @@ impl<'a> ErrorAssertionParser<'a> {
                             message_contains: Some(rest),
                         })
                     } else {
-                        Err("expected '\"' to close message".to_string())
+                        Err(ErrorAssertionParseError::UnclosedMessage)
                     };
                 }
 
                 '\n' | '\r' => break,
 
                 unexpected => {
-                    return Err(format!(
-                        "encountered unexpected character `{unexpected}` at offset {offset} (relative to comment `#`)",
-                        unexpected = unexpected,
-                        offset = self.offset().to_usize() + ERROR_PREFIX.len()
-                    ))
+                    return Err(ErrorAssertionParseError::UnexpectedCharacter {
+                        character: unexpected,
+                        offset: self.offset().to_usize() + ERROR_PREFIX.len(),
+                    });
                 }
             }
 
             self.skip_whitespace();
         }
 
-        if rule.is_none() {
-            return Err("no rule or message text".to_string());
+        if rule.is_some() {
+            Ok(ErrorAssertion {
+                rule,
+                column,
+                message_contains: None,
+            })
+        } else {
+            Err(ErrorAssertionParseError::NoRuleOrMessage)
         }
-
-        Ok(ErrorAssertion {
-            rule,
-            column,
-            message_contains: None,
-        })
     }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub(crate) enum ErrorAssertionParseError<'a> {
+    #[error("no rule or message text")]
+    NoRuleOrMessage,
+    #[error("bad column number `{0}`")]
+    BadColumnNumber(&'a str, #[source] std::num::ParseIntError),
+    #[error("expected ']' to close rule code")]
+    UnclosedRuleCode,
+    #[error("expected '\"' to close message")]
+    UnclosedMessage,
+    #[error("Unexpected character `{character}` at offset {offset} (relative to comment `#`)")]
+    UnexpectedCharacter { character: char, offset: usize },
 }
 
 #[cfg(test)]
