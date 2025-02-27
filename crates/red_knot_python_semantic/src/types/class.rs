@@ -667,7 +667,7 @@ impl<'db> ClassLiteralType<'db> {
         self.class.body_scope(db)
     }
 
-    pub(super) fn static_member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
+    pub(super) fn find_name_in_mro(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
         self.class.class_member(db, name)
     }
 }

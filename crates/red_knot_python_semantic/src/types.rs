@@ -6,7 +6,7 @@ use call::{CallDunderError, CallError};
 use context::InferContext;
 use diagnostic::NOT_ITERABLE;
 use ruff_db::files::File;
-use ruff_python_ast::{self as ast, name};
+use ruff_python_ast::{self as ast};
 use ruff_text_size::{Ranged, TextRange};
 use type_ordering::union_elements_ordering;
 
@@ -1412,8 +1412,9 @@ impl<'db> Type<'db> {
             {
                 Symbol::Unbound
             }
-            Type::ClassLiteral(class_literal) => class_literal.static_member(db, name),
-            Type::SubclassOf(subclass_of_ty) => subclass_of_ty.static_member(db, name),
+            Type::ClassLiteral(class_literal) => class_literal.find_name_in_mro(db, name),
+            Type::SubclassOf(subclass_of_ty) => subclass_of_ty.find_name_in_mro(db, name),
+            dynamic @ Type::Dynamic(_) => Symbol::bound(dynamic),
             _ => Symbol::todo("find_name_in_mro for non-class types"),
         }
     }
@@ -1451,9 +1452,9 @@ impl<'db> Type<'db> {
 
             Type::ModuleLiteral(module) => module.static_member(db, name),
 
-            Type::ClassLiteral(class_ty) => class_ty.static_member(db, name),
+            Type::ClassLiteral(class_ty) => class_ty.find_name_in_mro(db, name),
 
-            Type::SubclassOf(subclass_of_ty) => subclass_of_ty.static_member(db, name),
+            Type::SubclassOf(subclass_of_ty) => subclass_of_ty.find_name_in_mro(db, name),
 
             Type::KnownInstance(known_instance) => known_instance.static_member(db, name),
 
@@ -1985,7 +1986,7 @@ impl<'db> Type<'db> {
                     self.run_descriptor_protocol_instances(db, name, cls_var, objtype)
                 } else {
                     tracing::info!("no cls_var found");
-                    self.static_member(db, name)
+                    self.instance_variable(db, name)
                 }
 
                 // let instance = Some(*self);
@@ -2004,8 +2005,12 @@ impl<'db> Type<'db> {
             }
 
             Type::ClassLiteral(..) | Type::SubclassOf(..) => {
-                if let Symbol::Type(cls_var, _) = self.find_name_in_mro(db, name) {
+                if let symbol @ Symbol::Type(cls_var, _) = self.find_name_in_mro(db, name) {
                     tracing::info!("class => cls_var = {:?}", cls_var.display(db));
+
+                    if name == "__mro__" {
+                        return symbol;
+                    }
 
                     self.run_descriptor_protocol_classes(db, name, cls_var)
                 } else {
