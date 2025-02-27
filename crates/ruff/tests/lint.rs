@@ -2753,3 +2753,31 @@ fn cookiecutter_globbing() -> Result<()> {
 
     Ok(())
 }
+
+/// Like the test above but exercises the non-absolute path case. I think this will be much more
+/// rare in practice but still worth considering. This is adapted from
+/// `extend_per_file_ignores_stdin`. I think reading from stdin might be one of the only ways to
+/// trigger the case where `project_root` is `None` when the globs are being loaded.
+#[test]
+fn cookiecutter_globbing_no_project_root() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let tempdir = tempdir.path().join("{{cookiecutter.repo_name}}");
+    fs::create_dir(&tempdir)?;
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .current_dir(&tempdir)
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--extend-per-file-ignores", "generated.py:Q"]), @r#"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    [crates/ruff_linter/src/settings/types.rs:308:21] fs::normalize_path(path) = "/tmp/.tmpEibace/{{cookiecutter.repo_name}}/generated.py"
+    ruff failed
+      Cause: invalid glob "/tmp/.tmpEibace/{{cookiecutter.repo_name}}/generated.py"
+      Cause: error parsing glob '/tmp/.tmpEibace/{{cookiecutter.repo_name}}/generated.py': nested alternate groups are not allowed
+    "#);
+
+    Ok(())
+}
