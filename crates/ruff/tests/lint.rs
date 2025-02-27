@@ -2754,10 +2754,7 @@ fn cookiecutter_globbing() -> Result<()> {
     Ok(())
 }
 
-/// Like the test above but exercises the non-absolute path case. I think this will be much more
-/// rare in practice but still worth considering. This is adapted from
-/// `extend_per_file_ignores_stdin`. I think reading from stdin might be one of the only ways to
-/// trigger the case where `project_root` is `None` when the globs are being loaded.
+/// Like the test above but exercises the non-absolute path case in `PerFile::new`
 #[test]
 fn cookiecutter_globbing_no_project_root() -> Result<()> {
     let tempdir = TempDir::new()?;
