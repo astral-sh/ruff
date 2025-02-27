@@ -18,7 +18,9 @@ use ruff_workspace::{
     resolver::{ConfigurationTransformer, Relativity},
 };
 
-use crate::session::settings::{ConfigurationPreference, ResolvedEditorSettings};
+use crate::session::settings::{
+    ConfigurationPreference, ResolvedConfiguration, ResolvedEditorSettings,
+};
 
 #[derive(Debug)]
 pub struct RuffSettings {
@@ -363,21 +365,39 @@ impl ConfigurationTransformer for EditorConfigurationTransformer<'_> {
             ..Configuration::default()
         };
 
-        // Merge in the editor-specified configuration file, if it exists.
-        let editor_configuration = if let Some(config_file_path) = configuration {
-            tracing::debug!(
-                "Combining settings from editor-specified configuration file at: {}",
-                config_file_path.display()
-            );
-            match open_configuration_file(&config_file_path) {
-                Ok(config_from_file) => editor_configuration.combine(config_from_file),
-                err => {
-                    tracing::error!(
-                        "{:?}",
-                        err.context("Unable to load editor-specified configuration file")
-                            .unwrap_err()
+        // Merge in the editor-specified configuration.
+        let editor_configuration = if let Some(configuration) = configuration {
+            match configuration {
+                ResolvedConfiguration::FilePath(path) => {
+                    tracing::debug!(
+                        "Combining settings from editor-specified configuration file at: {}",
+                        path.display()
                     );
-                    editor_configuration
+                    match open_configuration_file(&path) {
+                        Ok(config_from_file) => editor_configuration.combine(config_from_file),
+                        err => {
+                            tracing::error!(
+                                "{:?}",
+                                err.context("Unable to load editor-specified configuration file")
+                                    .unwrap_err()
+                            );
+                            editor_configuration
+                        }
+                    }
+                }
+                ResolvedConfiguration::Inline(options) => {
+                    tracing::debug!(
+                        "Combining settings from editor-specified inline configuration"
+                    );
+                    match Configuration::from_options(options, None, project_root) {
+                        Ok(configuration) => editor_configuration.combine(configuration),
+                        Err(err) => {
+                            tracing::error!(
+                                "Unable to load editor-specified inline configuration: {err:?}",
+                            );
+                            editor_configuration
+                        }
+                    }
                 }
             }
         } else {
@@ -409,5 +429,49 @@ struct IdentityTransformer;
 impl ConfigurationTransformer for IdentityTransformer {
     fn transform(&self, config: Configuration) -> Configuration {
         config
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use ruff_linter::line_width::LineLength;
+    use ruff_workspace::options::Options;
+
+    use super::*;
+
+    /// This test ensures that the inline configuration is correctly applied to the configuration.
+    #[test]
+    fn inline_settings() {
+        let editor_settings = ResolvedEditorSettings {
+            configuration: Some(ResolvedConfiguration::Inline(Options {
+                line_length: Some(LineLength::try_from(120).unwrap()),
+                ..Default::default()
+            })),
+            ..Default::default()
+        };
+
+        let config = EditorConfigurationTransformer(&editor_settings, Path::new("/src/project"))
+            .transform(Configuration::default());
+
+        assert_eq!(config.line_length.unwrap().value(), 120);
+    }
+
+    /// This test ensures that between the inline configuration and specific settings, the specific
+    /// settings is prioritized.
+    #[test]
+    fn inline_and_specific_settings_resolution_order() {
+        let editor_settings = ResolvedEditorSettings {
+            configuration: Some(ResolvedConfiguration::Inline(Options {
+                line_length: Some(LineLength::try_from(120).unwrap()),
+                ..Default::default()
+            })),
+            line_length: Some(LineLength::try_from(100).unwrap()),
+            ..Default::default()
+        };
+
+        let config = EditorConfigurationTransformer(&editor_settings, Path::new("/src/project"))
+            .transform(Configuration::default());
+
+        assert_eq!(config.line_length.unwrap().value(), 100);
     }
 }

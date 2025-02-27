@@ -3,8 +3,11 @@ use std::{ops::Deref, path::PathBuf, str::FromStr};
 use lsp_types::Url;
 use rustc_hash::FxHashMap;
 use serde::Deserialize;
+use serde_json::{Map, Value};
+use thiserror::Error;
 
 use ruff_linter::{line_width::LineLength, RuleSelector};
+use ruff_workspace::options::Options;
 
 /// Maps a workspace URI to its associated client settings. Used during server initialization.
 pub(crate) type WorkspaceSettingsMap = FxHashMap<Url, ClientSettings>;
@@ -29,9 +32,9 @@ pub(crate) struct ResolvedClientSettings {
 /// LSP client settings. These fields are optional because we don't want to override file-based linter/formatting settings
 /// if these were un-set.
 #[derive(Clone, Debug)]
-#[cfg_attr(test, derive(PartialEq, Eq))]
+#[cfg_attr(test, derive(Default, PartialEq, Eq))]
 pub(crate) struct ResolvedEditorSettings {
-    pub(super) configuration: Option<PathBuf>,
+    pub(super) configuration: Option<ResolvedConfiguration>,
     pub(super) lint_preview: Option<bool>,
     pub(super) format_preview: Option<bool>,
     pub(super) select: Option<Vec<RuleSelector>>,
@@ -40,6 +43,48 @@ pub(crate) struct ResolvedEditorSettings {
     pub(super) exclude: Option<Vec<String>>,
     pub(super) line_length: Option<LineLength>,
     pub(super) configuration_preference: ConfigurationPreference,
+}
+
+/// The resolved configuration from the client settings.
+#[derive(Clone, Debug)]
+#[cfg_attr(test, derive(PartialEq, Eq))]
+pub(crate) enum ResolvedConfiguration {
+    FilePath(PathBuf),
+    Inline(Options),
+}
+
+impl TryFrom<&ClientConfiguration> for ResolvedConfiguration {
+    type Error = ResolvedConfigurationError;
+
+    fn try_from(value: &ClientConfiguration) -> Result<Self, Self::Error> {
+        match value {
+            ClientConfiguration::String(path) => Ok(ResolvedConfiguration::FilePath(
+                PathBuf::from(shellexpand::full(path)?.as_ref()),
+            )),
+            ClientConfiguration::Object(map) => {
+                let options = toml::Table::try_from(map)?.try_into::<Options>()?;
+                if options.extend.is_some() {
+                    Err(ResolvedConfigurationError::ExtendNotSupported)
+                } else {
+                    Ok(ResolvedConfiguration::Inline(options))
+                }
+            }
+        }
+    }
+}
+
+/// An error that can occur when trying to resolve the `configuration` value from the client
+/// settings.
+#[derive(Debug, Error)]
+pub(crate) enum ResolvedConfigurationError {
+    #[error(transparent)]
+    EnvVarLookupError(#[from] shellexpand::LookupError<std::env::VarError>),
+    #[error("error serializing configuration to TOML: {0}")]
+    InvalidToml(#[from] toml::ser::Error),
+    #[error(transparent)]
+    InvalidRuffSchema(#[from] toml::de::Error),
+    #[error("using `extend` is unsupported for inline configuration")]
+    ExtendNotSupported,
 }
 
 /// Determines how multiple conflicting configurations should be resolved - in this
@@ -57,12 +102,23 @@ pub(crate) enum ConfigurationPreference {
     EditorOnly,
 }
 
+/// A direct representation of of `configuration` schema within the client settings.
+#[derive(Debug, Deserialize)]
+#[cfg_attr(test, derive(PartialEq, Eq))]
+#[serde(untagged)]
+enum ClientConfiguration {
+    /// A path to a configuration file.
+    String(String),
+    /// An object containing the configuration options.
+    Object(Map<String, Value>),
+}
+
 /// This is a direct representation of the settings schema sent by the client.
 #[derive(Debug, Deserialize, Default)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[serde(rename_all = "camelCase")]
 pub struct ClientSettings {
-    configuration: Option<String>,
+    configuration: Option<ClientConfiguration>,
     fix_all: Option<bool>,
     organize_imports: Option<bool>,
     lint: Option<LintOptions>,
@@ -306,11 +362,17 @@ impl ResolvedClientSettings {
             ),
             editor_settings: ResolvedEditorSettings {
                 configuration: Self::resolve_optional(all_settings, |settings| {
-                    settings
-                        .configuration
-                        .as_ref()
-                        .and_then(|config_path| shellexpand::full(config_path).ok())
-                        .map(|config_path| PathBuf::from(config_path.as_ref()))
+                    settings.configuration.as_ref().and_then(|configuration| {
+                        match ResolvedConfiguration::try_from(configuration) {
+                            Ok(configuration) => Some(configuration),
+                            Err(err) => {
+                                tracing::error!(
+                                    "Failed to load settings from `configuration`: {err}"
+                                );
+                                None
+                            }
+                        }
+                    })
                 }),
                 lint_preview: Self::resolve_optional(all_settings, |settings| {
                     settings.lint.as_ref()?.preview
@@ -425,6 +487,10 @@ impl Default for InitializationOptions {
 #[cfg(test)]
 mod tests {
     use insta::assert_debug_snapshot;
+    use ruff_python_formatter::QuoteStyle;
+    use ruff_workspace::options::{
+        FormatOptions as RuffFormatOptions, LintCommonOptions, LintOptions,
+    };
     use serde::de::DeserializeOwned;
 
     #[cfg(not(windows))]
@@ -444,6 +510,9 @@ mod tests {
     // the `cwd` and the `workspace` value.
     const EMPTY_MULTIPLE_WORKSPACE_INIT_OPTIONS_FIXTURE: &str =
         include_str!("../../resources/test/fixtures/settings/empty_multiple_workspace.json");
+
+    const INLINE_CONFIGURATION_FIXTURE: &str =
+        include_str!("../../resources/test/fixtures/settings/inline_configuration.json");
 
     fn deserialize_fixture<T: DeserializeOwned>(content: &str) -> T {
         serde_json::from_str(content).expect("test fixture JSON should deserialize")
@@ -854,5 +923,49 @@ mod tests {
 
         all_settings.set_preview(true);
         assert_preview_all_settings(&all_settings, true);
+    }
+
+    #[test]
+    fn inline_configuration() {
+        let options: InitializationOptions = deserialize_fixture(INLINE_CONFIGURATION_FIXTURE);
+
+        let AllSettings {
+            global_settings,
+            workspace_settings: None,
+        } = AllSettings::from_init_options(options)
+        else {
+            panic!("Expected global settings only");
+        };
+
+        assert_eq!(
+            ResolvedClientSettings::global(&global_settings),
+            ResolvedClientSettings {
+                fix_all: true,
+                organize_imports: true,
+                lint_enable: true,
+                disable_rule_comment_enable: true,
+                fix_violation_enable: true,
+                show_syntax_errors: true,
+                editor_settings: ResolvedEditorSettings {
+                    configuration: Some(ResolvedConfiguration::Inline(Options {
+                        line_length: Some(LineLength::try_from(100).unwrap()),
+                        lint: Some(LintOptions {
+                            common: LintCommonOptions {
+                                extend_select: Some(vec![RuleSelector::from_str("I001").unwrap()]),
+                                ..Default::default()
+                            },
+                            ..Default::default()
+                        }),
+                        format: Some(RuffFormatOptions {
+                            quote_style: Some(QuoteStyle::Single),
+                            ..Default::default()
+                        }),
+                        ..Default::default()
+                    })),
+                    extend_select: Some(vec![RuleSelector::from_str("RUF001").unwrap()]),
+                    ..Default::default()
+                }
+            }
+        );
     }
 }

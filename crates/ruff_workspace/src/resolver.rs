@@ -588,7 +588,7 @@ impl ParallelVisitor for PythonFilesVisitor<'_, '_> {
         match result {
             Ok(entry) => {
                 // Ignore directories
-                let resolved = if entry.file_type().map_or(true, |ft| ft.is_dir()) {
+                let resolved = if entry.file_type().is_none_or(|ft| ft.is_dir()) {
                     None
                 } else if entry.depth() == 0 {
                     // Accept all files that are passed-in directly.

@@ -41,22 +41,22 @@ use crate::Db;
 
 mod except_handlers;
 
-/// Are we in a state where a `break` statement is allowed?
-#[derive(Clone, Copy, Debug)]
-enum LoopState {
-    InLoop,
-    NotInLoop,
+#[derive(Debug, Default)]
+struct Loop {
+    /// Flow states at each `break` in the current loop.
+    break_states: Vec<FlowSnapshot>,
 }
 
-impl LoopState {
-    fn is_inside(self) -> bool {
-        matches!(self, LoopState::InLoop)
+impl Loop {
+    fn push_break(&mut self, state: FlowSnapshot) {
+        self.break_states.push(state);
     }
 }
 
 struct ScopeInfo {
     file_scope_id: FileScopeId,
-    loop_state: LoopState,
+    /// Current loop state; None if we are not currently visiting a loop
+    current_loop: Option<Loop>,
 }
 
 pub(super) struct SemanticIndexBuilder<'db> {
@@ -73,8 +73,6 @@ pub(super) struct SemanticIndexBuilder<'db> {
     /// The name of the first function parameter of the innermost function that we're currently visiting.
     current_first_parameter_name: Option<&'db str>,
 
-    /// Flow states at each `break` in the current loop.
-    loop_break_states: Vec<FlowSnapshot>,
     /// Per-scope contexts regarding nested `try`/`except` statements
     try_node_context_stack_manager: TryNodeContextStackManager,
 
@@ -106,7 +104,6 @@ impl<'db> SemanticIndexBuilder<'db> {
             current_assignments: vec![],
             current_match_case: None,
             current_first_parameter_name: None,
-            loop_break_states: vec![],
             try_node_context_stack_manager: TryNodeContextStackManager::default(),
 
             has_future_annotations: false,
@@ -134,19 +131,20 @@ impl<'db> SemanticIndexBuilder<'db> {
         builder
     }
 
-    fn current_scope(&self) -> FileScopeId {
-        *self
-            .scope_stack
-            .last()
-            .map(|ScopeInfo { file_scope_id, .. }| file_scope_id)
-            .expect("SemanticIndexBuilder should have created a root scope")
-    }
-
-    fn loop_state(&self) -> LoopState {
+    fn current_scope_info(&self) -> &ScopeInfo {
         self.scope_stack
             .last()
             .expect("SemanticIndexBuilder should have created a root scope")
-            .loop_state
+    }
+
+    fn current_scope_info_mut(&mut self) -> &mut ScopeInfo {
+        self.scope_stack
+            .last_mut()
+            .expect("SemanticIndexBuilder should have created a root scope")
+    }
+
+    fn current_scope(&self) -> FileScopeId {
+        self.current_scope_info().file_scope_id
     }
 
     /// Returns the scope ID of the surrounding class body scope if the current scope
@@ -167,11 +165,21 @@ impl<'db> SemanticIndexBuilder<'db> {
         }
     }
 
-    fn set_inside_loop(&mut self, state: LoopState) {
-        self.scope_stack
-            .last_mut()
-            .expect("Always to have a root scope")
-            .loop_state = state;
+    /// Push a new loop, returning the outer loop, if any.
+    fn push_loop(&mut self) -> Option<Loop> {
+        self.current_scope_info_mut()
+            .current_loop
+            .replace(Loop::default())
+    }
+
+    /// Pop a loop, replacing with the previous saved outer loop, if any.
+    fn pop_loop(&mut self, outer_loop: Option<Loop>) -> Loop {
+        std::mem::replace(&mut self.current_scope_info_mut().current_loop, outer_loop)
+            .expect("pop_loop() should not be called without a prior push_loop()")
+    }
+
+    fn current_loop_mut(&mut self) -> Option<&mut Loop> {
+        self.current_scope_info_mut().current_loop.as_mut()
     }
 
     fn push_scope(&mut self, node: NodeWithScopeRef) {
@@ -204,7 +212,7 @@ impl<'db> SemanticIndexBuilder<'db> {
 
         self.scope_stack.push(ScopeInfo {
             file_scope_id,
-            loop_state: LoopState::NotInLoop,
+            current_loop: None,
         });
     }
 
@@ -1217,15 +1225,9 @@ where
                     .current_visibility_constraints_mut()
                     .add_atom(later_predicate_id);
 
-                // Save aside any break states from an outer loop
-                let saved_break_states = std::mem::take(&mut self.loop_break_states);
-
-                // TODO: definitions created inside the body should be fully visible
-                // to other statements/expressions inside the body --Alex/Carl
-                let outer_loop_state = self.loop_state();
-                self.set_inside_loop(LoopState::InLoop);
+                let outer_loop = self.push_loop();
                 self.visit_body(body);
-                self.set_inside_loop(outer_loop_state);
+                let this_loop = self.pop_loop(outer_loop);
 
                 // If the body is executed, we know that we've evaluated the condition at least
                 // once, and that the first evaluation was True. We might not have evaluated the
@@ -1233,11 +1235,6 @@ where
                 // So the body's full visibility constraint is `first`.
                 let body_vis_constraint_id = first_vis_constraint_id;
                 self.record_visibility_constraint_id(body_vis_constraint_id);
-
-                // Get the break states from the body of this loop, and restore the saved outer
-                // ones.
-                let break_states =
-                    std::mem::replace(&mut self.loop_break_states, saved_break_states);
 
                 // We execute the `else` once the condition evaluates to false. This could happen
                 // without ever executing the body, if the condition is false the first time it's
@@ -1259,7 +1256,7 @@ where
 
                 // Breaking out of a while loop bypasses the `else` clause, so merge in the break
                 // states after visiting `else`.
-                for break_state in break_states {
+                for break_state in this_loop.break_states {
                     let snapshot = self.flow_snapshot();
                     self.flow_restore(break_state);
                     self.record_visibility_constraint_id(body_vis_constraint_id);
@@ -1307,7 +1304,6 @@ where
                 self.record_ambiguous_visibility();
 
                 let pre_loop = self.flow_snapshot();
-                let saved_break_states = std::mem::take(&mut self.loop_break_states);
 
                 let current_assignment = match &**target {
                     ast::Expr::List(_) | ast::Expr::Tuple(_) => Some(CurrentAssignment::For {
@@ -1355,16 +1351,9 @@ where
                     self.pop_assignment();
                 }
 
-                // TODO: Definitions created by loop variables
-                // (and definitions created inside the body)
-                // are fully visible to other statements/expressions inside the body --Alex/Carl
-                let outer_loop_state = self.loop_state();
-                self.set_inside_loop(LoopState::InLoop);
+                let outer_loop = self.push_loop();
                 self.visit_body(body);
-                self.set_inside_loop(outer_loop_state);
-
-                let break_states =
-                    std::mem::replace(&mut self.loop_break_states, saved_break_states);
+                let this_loop = self.pop_loop(outer_loop);
 
                 // We may execute the `else` clause without ever executing the body, so merge in
                 // the pre-loop state before visiting `else`.
@@ -1373,7 +1362,7 @@ where
 
                 // Breaking out of a `for` loop bypasses the `else` clause, so merge in the break
                 // states after visiting `else`.
-                for break_state in break_states {
+                for break_state in this_loop.break_states {
                     self.flow_merge(break_state);
                 }
             }
@@ -1556,9 +1545,9 @@ where
             }
 
             ast::Stmt::Break(_) => {
-                if self.loop_state().is_inside() {
-                    let snapshot = self.flow_snapshot();
-                    self.loop_break_states.push(snapshot);
+                let snapshot = self.flow_snapshot();
+                if let Some(current_loop) = self.current_loop_mut() {
+                    current_loop.push_break(snapshot);
                 }
                 // Everything in the current block after a terminal statement is unreachable.
                 self.mark_unreachable();

@@ -830,7 +830,7 @@ enum InvalidConfigFlagReason {
     ValidTomlButInvalidRuffSchema(toml::de::Error),
     /// It was a valid ruff config file, but the user tried to pass a
     /// value for `extend` as part of the config override.
-    // `extend` is special, because it affects which config files we look at
+    /// `extend` is special, because it affects which config files we look at
     /// in the first place. We currently only parse --config overrides *after*
     /// we've combined them with all the arguments from the various config files
     /// that we found, so trying to override `extend` as part of a --config

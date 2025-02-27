@@ -16,7 +16,7 @@ use ruff_notebook::NotebookError;
 use ruff_python_ast::PySourceType;
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
-use ruff_python_parser::ParseError;
+use ruff_python_parser::{ParseError, ParseOptions};
 use ruff_python_trivia::textwrap::dedent;
 use ruff_source_file::SourceFileBuilder;
 use ruff_text_size::Ranged;
@@ -110,7 +110,11 @@ pub(crate) fn test_contents<'a>(
     settings: &LinterSettings,
 ) -> (Vec<Message>, Cow<'a, SourceKind>) {
     let source_type = PySourceType::from(path);
-    let parsed = ruff_python_parser::parse_unchecked_source(source_kind.source_code(), source_type);
+    let target_version = settings.resolve_target_version(path);
+    let options = ParseOptions::from(source_type).with_target_version(target_version);
+    let parsed = ruff_python_parser::parse_unchecked(source_kind.source_code(), options.clone())
+        .try_into_module()
+        .expect("PySourceType always parses into a module");
     let locator = Locator::new(source_kind.source_code());
     let stylist = Stylist::from_tokens(parsed.tokens(), locator.contents());
     let indexer = Indexer::from_tokens(parsed.tokens(), locator.contents());
@@ -134,6 +138,7 @@ pub(crate) fn test_contents<'a>(
         source_kind,
         source_type,
         &parsed,
+        target_version,
     );
 
     let source_has_errors = !parsed.is_valid();
@@ -174,7 +179,9 @@ pub(crate) fn test_contents<'a>(
             transformed = Cow::Owned(transformed.updated(fixed_contents, &source_map));
 
             let parsed =
-                ruff_python_parser::parse_unchecked_source(transformed.source_code(), source_type);
+                ruff_python_parser::parse_unchecked(transformed.source_code(), options.clone())
+                    .try_into_module()
+                    .expect("PySourceType always parses into a module");
             let locator = Locator::new(transformed.source_code());
             let stylist = Stylist::from_tokens(parsed.tokens(), locator.contents());
             let indexer = Indexer::from_tokens(parsed.tokens(), locator.contents());
@@ -197,6 +204,7 @@ pub(crate) fn test_contents<'a>(
                 &transformed,
                 source_type,
                 &parsed,
+                target_version,
             );
 
             if !parsed.is_valid() && !source_has_errors {
