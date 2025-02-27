@@ -359,9 +359,8 @@ where
                     self.builder.scratch.push((new_key, new_value));
                     if curr == self.predecessor {
                         break;
-                    } else {
-                        curr = next;
                     }
+                    curr = next;
                 }
             }
 
@@ -721,6 +720,7 @@ impl<K, V> ListBuilder<K, V> {
     }
 
     /// Applies a function to each value in a list, returning a new list.
+    #[allow(clippy::needless_pass_by_value)]
     pub fn map_with<F>(&mut self, list: List<K, V>, mut f: F) -> List<K, V>
     where
         K: Clone,
