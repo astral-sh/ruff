@@ -1529,31 +1529,172 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Access an attribute of this type without invoking the descriptor protocol. This
+    /// method corresponds to `inspect.getattr_static(<object of type 'self'>, name)`.
+    ///
+    /// See also: [`Type::member`]
+    #[must_use]
+    fn instance_variable(&self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
+        let _span =
+            tracing::trace_span!("instance_variable", self=%self.display(db), name).entered();
+
+        match self {
+            Type::Dynamic(_) => Symbol::bound(self),
+
+            Type::Never => Symbol::todo("attribute lookup on Never"),
+
+            Type::FunctionLiteral(_) => KnownClass::FunctionType
+                .to_instance(db)
+                .instance_variable(db, name),
+
+            Type::Callable(CallableType::BoundMethod(_)) => KnownClass::MethodType
+                .to_instance(db)
+                .instance_variable(db, name),
+            Type::Callable(CallableType::MethodWrapperDunderGet(_)) => {
+                KnownClass::MethodWrapperType
+                    .to_instance(db)
+                    .instance_variable(db, name)
+            }
+            Type::Callable(CallableType::WrapperDescriptorDunderGet) => {
+                KnownClass::WrapperDescriptorType
+                    .to_instance(db)
+                    .instance_variable(db, name)
+            }
+
+            Type::ModuleLiteral(module) => Symbol::Unbound, // TODO: fallback to instance
+
+            Type::ClassLiteral(class_ty) => Symbol::Unbound,
+
+            Type::SubclassOf(subclass_of_ty) => Symbol::Unbound,
+
+            Type::KnownInstance(known_instance) => Symbol::Unbound,
+
+            Type::Instance(InstanceType { class }) => match (class.known(db), name) {
+                (Some(KnownClass::VersionInfo), "major") => Symbol::bound(Type::IntLiteral(
+                    Program::get(db).python_version(db).major.into(),
+                )),
+                (Some(KnownClass::VersionInfo), "minor") => Symbol::bound(Type::IntLiteral(
+                    Program::get(db).python_version(db).minor.into(),
+                )),
+                (Some(KnownClass::FunctionType), "__get__") => {
+                    Symbol::bound(Type::Callable(CallableType::WrapperDescriptorDunderGet))
+                }
+
+                // TODO:
+                // We currently hard-code the knowledge that the following known classes are not
+                // descriptors, i.e. that they have no `__get__` method. This is not wrong and
+                // potentially even beneficial for performance, but it's not very principled.
+                // This case can probably be removed eventually, but we include it at the moment
+                // because we make extensive use of these types in our test suite. Note that some
+                // builtin types are not included here, since they do not have generic bases and
+                // are correctly handled by the `instance_member` method.
+                (
+                    Some(
+                        KnownClass::Str
+                        | KnownClass::Bytes
+                        | KnownClass::Tuple
+                        | KnownClass::Slice
+                        | KnownClass::Range,
+                    ),
+                    "__get__",
+                ) => Symbol::Unbound,
+
+                _ => {
+                    let SymbolAndQualifiers(symbol, _) = class.instance_member(db, name);
+                    symbol
+                }
+            },
+
+            Type::Union(union) => {
+                union.map_with_boundness(db, |elem| elem.instance_variable(db, name))
+            }
+
+            Type::Intersection(intersection) => {
+                intersection.map_with_boundness(db, |elem| elem.instance_variable(db, name))
+            }
+
+            Type::IntLiteral(_) => match name {
+                "real" | "numerator" => Symbol::bound(self),
+                // TODO more attributes could probably be usefully special-cased
+                _ => KnownClass::Int.to_instance(db).instance_variable(db, name),
+            },
+
+            Type::BooleanLiteral(bool_value) => match name {
+                "real" | "numerator" => Symbol::bound(Type::IntLiteral(i64::from(*bool_value))),
+                _ => KnownClass::Bool.to_instance(db).instance_variable(db, name),
+            },
+
+            Type::StringLiteral(_) | Type::LiteralString => {
+                KnownClass::Str.to_instance(db).instance_variable(db, name)
+            }
+
+            Type::BytesLiteral(_) => KnownClass::Bytes
+                .to_instance(db)
+                .instance_variable(db, name),
+
+            // We could plausibly special-case `start`, `step`, and `stop` here,
+            // but it doesn't seem worth the complexity given the very narrow range of places
+            // where we infer `SliceLiteral` types.
+            Type::SliceLiteral(_) => KnownClass::Slice
+                .to_instance(db)
+                .instance_variable(db, name),
+
+            Type::Tuple(_) => {
+                // TODO: We might want to special case some attributes here, as the stubs
+                // for `builtins.tuple` assume that `self` is a homogeneous tuple, while
+                // we're explicitly modeling heterogeneous tuples using `Type::Tuple`.
+                KnownClass::Tuple
+                    .to_instance(db)
+                    .instance_variable(db, name)
+            }
+
+            Type::AlwaysTruthy | Type::AlwaysFalsy => match name {
+                "__bool__" => {
+                    // TODO should be `Callable[[], Literal[True/False]]`
+                    Symbol::todo("`__bool__` for `AlwaysTruthy`/`AlwaysFalsy` Type variants")
+                }
+                _ => Type::object(db).instance_variable(db, name),
+            },
+        }
+    }
+
     /// Call the `__get__(instance, owner)` method on a type, and get the return
     /// type of the call.
     ///
     /// If `__get__` is not defined on the type, this method returns `Ok(None)`.
     /// If the call to `__get__` fails, this method returns an error.
-    fn try_call_dunder_get(
+    fn run_descriptor_protocol_instances(
         self,
         db: &'db dyn Db,
+        name: &str,
         instance: Option<Type<'db>>,
         owner: Type<'db>,
-    ) -> Option<Type<'db>> {
-        #[salsa::tracked]
-        fn try_call_dunder_get_query<'db>(
+    ) -> Symbol<'db> {
+        let _span = tracing::trace_span!(
+            "run_descriptor_protocol_instances",
+            self=%self.display(db),
+            name=%name,
+            instance=%instance.map_or_else(|| "None".to_string(), |t| t.display(db).to_string()),
+            owner=%owner.display(db),
+        )
+        .entered();
+
+        // #[salsa::tracked]
+        fn run_descriptor_protocol_instances_query<'db>(
             db: &'db dyn Db,
             ty_self: Type<'db>,
+            name: &str,
             instance: Option<Type<'db>>,
             owner: Type<'db>,
-        ) -> Option<Type<'db>> {
+        ) -> Symbol<'db> {
             // TODO: Handle possible-unboundness and errors from `__get__` calls.
 
             match ty_self {
                 Type::Union(union) => {
                     let mut builder = UnionBuilder::new(db);
                     for elem in union.elements(db) {
-                        let ty = if let Some(result) = elem.try_call_dunder_get(db, instance, owner)
+                        let ty = if let Symbol::Type(result, _) =
+                            elem.run_descriptor_protocol_instances(db, name, instance, owner)
                         {
                             result
                         } else {
@@ -1561,18 +1702,19 @@ impl<'db> Type<'db> {
                         };
                         builder = builder.add(ty);
                     }
-                    Some(builder.build())
+                    Symbol::bound(builder.build())
                 }
                 Type::Intersection(intersection) => {
                     if !intersection.negative(db).is_empty() {
-                        return Some(todo_type!(
-                            "try_call_dunder_get: intersections with negative contributions"
-                        ));
+                        return Symbol::todo(
+                            "try_call_dunder_get: intersections with negative contributions",
+                        );
                     }
 
                     let mut builder = IntersectionBuilder::new(db);
                     for elem in intersection.positive(db) {
-                        let ty = if let Some(result) = elem.try_call_dunder_get(db, instance, owner)
+                        let ty = if let Symbol::Type(result, _) =
+                            elem.run_descriptor_protocol_instances(db, name, instance, owner)
                         {
                             result
                         } else {
@@ -1580,26 +1722,185 @@ impl<'db> Type<'db> {
                         };
                         builder = builder.add_positive(ty);
                     }
-                    Some(builder.build())
+                    Symbol::bound(builder.build())
                 }
                 _ => {
                     // TODO: Handle possible-unboundness of `__get__` method
                     // There is an existing test case for this in `descriptor_protocol.md`.
 
-                    ty_self
-                        .member(db, "__get__")
-                        .ignore_possibly_unbound()?
-                        .try_call(
-                            db,
-                            &CallArguments::positional([instance.unwrap_or(Type::none(db)), owner]),
-                        )
-                        .map(|outcome| Some(outcome.return_type(db)))
-                        .unwrap_or(None)
+                    let instance = instance.unwrap_or(Type::none(db));
+                    let self_meta = ty_self.to_meta_type(db);
+
+                    let descr_get = self_meta.member(db, "__get__");
+
+                    tracing::info!("self_meta = {}", self_meta.display(db));
+                    tracing::info!("descr_get = {:?}", descr_get);
+
+                    if let Symbol::Type(descr_get, _) = descr_get {
+                        if !self_meta.member(db, "__set__").is_unbound()
+                            || !self_meta.member(db, "__delete__").is_unbound()
+                        {
+                            tracing::info!("protocol resolution: Data descriptor");
+                            // Data descriptor
+                            return Symbol::bound(
+                                descr_get
+                                    .try_call(
+                                        db,
+                                        &CallArguments::positional([ty_self, instance, owner]),
+                                    )
+                                    .map(|outcome| outcome.return_type(db))
+                                    .unwrap_or(Type::unknown()),
+                            );
+                        }
+                    }
+
+                    tracing::info!("protocol resolution: Not a data descriptor");
+
+                    if let instance_variable @ Symbol::Type(_, _) =
+                        instance.instance_variable(db, name)
+                    {
+                        tracing::info!("protocol resolution: Instance variable");
+                        return instance_variable;
+                    }
+
+                    if let Symbol::Type(descr_get, _) = descr_get {
+                        tracing::info!("protocol resolution: Non-data descriptor");
+                        // Non-data descriptor
+
+                        return Symbol::bound(
+                            descr_get
+                                .try_call(
+                                    db,
+                                    &CallArguments::positional([ty_self, instance, owner]),
+                                )
+                                .map(|outcome| outcome.return_type(db))
+                                .unwrap_or(Type::unknown()),
+                        ); // TODO: avoid duplication
+                    }
+
+                    tracing::info!("protocol resolution: Class variable");
+
+                    Symbol::bound(ty_self)
                 }
             }
         }
 
-        try_call_dunder_get_query(db, self, instance, owner)
+        run_descriptor_protocol_instances_query(db, self, name, instance, owner)
+    }
+
+    /// Call the `__get__(instance, owner)` method on a type, and get the return
+    /// type of the call.
+    ///
+    /// If `__get__` is not defined on the type, this method returns `Ok(None)`.
+    /// If the call to `__get__` fails, this method returns an error.
+    fn run_descriptor_protocol_classes(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        owner: Type<'db>,
+    ) -> Symbol<'db> {
+        let _span = tracing::trace_span!(
+            "run_descriptor_protocol_classes",
+            self=%self.display(db),
+            owner=%owner.display(db),
+        )
+        .entered();
+
+        // #[salsa::tracked]
+        fn run_descriptor_protocol_classes_query<'db>(
+            db: &'db dyn Db,
+            ty_self: Type<'db>,
+            name: &str,
+            owner: Type<'db>,
+        ) -> Symbol<'db> {
+            // TODO: Handle possible-unboundness and errors from `__get__` calls.
+
+            match ty_self {
+                Type::Union(union) => {
+                    let mut builder = UnionBuilder::new(db);
+                    for elem in union.elements(db) {
+                        let ty = if let Symbol::Type(result, _) =
+                            elem.run_descriptor_protocol_classes(db, name, owner)
+                        {
+                            result
+                        } else {
+                            *elem
+                        };
+                        builder = builder.add(ty);
+                    }
+                    Symbol::bound(builder.build())
+                }
+                Type::Intersection(intersection) => {
+                    if !intersection.negative(db).is_empty() {
+                        return Symbol::todo(
+                            "try_call_dunder_get: intersections with negative contributions",
+                        );
+                    }
+
+                    let mut builder = IntersectionBuilder::new(db);
+                    for elem in intersection.positive(db) {
+                        let ty = if let Symbol::Type(result, _) =
+                            elem.run_descriptor_protocol_classes(db, name, owner)
+                        {
+                            result
+                        } else {
+                            *elem
+                        };
+                        builder = builder.add_positive(ty);
+                    }
+                    Symbol::bound(builder.build())
+                }
+                _ => {
+                    // TODO: Handle possible-unboundness of `__get__` method
+                    // There is an existing test case for this in `descriptor_protocol.md`.
+
+                    let meta_type = owner.to_meta_type(db);
+                    if let Symbol::Type(meta_attribute, _) = meta_type.find_name_in_mro(db, name) {
+                        let meta_descr_get = meta_attribute.find_name_in_mro(db, "__get__");
+                        if let Symbol::Type(meta_descr_get, _) = meta_descr_get {
+                            if !meta_type.member(db, "__set__").is_unbound()
+                                || !meta_type.member(db, "__delete__").is_unbound()
+                            {
+                                // Data descriptor on meta class
+                                return Symbol::bound(
+                                    meta_descr_get
+                                        .try_call(
+                                            db,
+                                            &CallArguments::positional([
+                                                meta_attribute,
+                                                owner,
+                                                meta_type,
+                                            ]),
+                                        )
+                                        .map(|outcome| outcome.return_type(db))
+                                        .unwrap_or(Type::unknown()),
+                                );
+                            }
+                        }
+                    }
+
+                    let descr_get = ty_self.to_meta_type(db).find_name_in_mro(db, "__get__");
+                    if let Symbol::Type(descr_get, _) = descr_get {
+                        // Data or non-data descriptor on class
+                        return Symbol::bound(
+                            descr_get
+                                .try_call(
+                                    db,
+                                    &CallArguments::positional([ty_self, Type::none(db), owner]),
+                                )
+                                .map(|outcome| outcome.return_type(db))
+                                .unwrap_or(Type::unknown()),
+                        );
+                    }
+
+                    Symbol::bound(ty_self)
+
+                    // TODO: here we should call non-data descriptors on the metaclass
+                }
+            }
+        }
+
+        run_descriptor_protocol_classes_query(db, self, name, owner)
     }
 
     /// Access an attribute of this type, potentially invoking the descriptor protocol.
@@ -1666,29 +1967,9 @@ impl<'db> Type<'db> {
             | Type::FunctionLiteral(..) => {
                 let objtype = self.to_meta_type(db);
                 if let Symbol::Type(cls_var, _) = objtype.find_name_in_mro(db, name) {
-                    tracing::info!("cls_var = {:?}", cls_var.display(db));
-                    if let Symbol::Type(descr_get, _) =
-                        cls_var.to_meta_type(db).member(db, "__get__")
-                    //TODO
-                    {
-                        tracing::info!("descr_get = {:?}", descr_get.display(db));
-                        let instance = *self;
-                        let owner = objtype;
+                    tracing::info!("instance => cls_var = {:?}", cls_var.display(db));
 
-                        let result = descr_get
-                            .try_call(db, &CallArguments::positional([cls_var, instance, owner]));
-
-                        tracing::info!("result = {:?}", result);
-
-                        Symbol::bound(
-                            result
-                                .map(|outcome| outcome.return_type(db))
-                                .unwrap_or(cls_var), // TODO
-                        )
-                    } else {
-                        tracing::info!("no __get__ found");
-                        self.static_member(db, name)
-                    }
+                    cls_var.run_descriptor_protocol_instances(db, name, Some(*self), objtype)
                 } else {
                     tracing::info!("no cls_var found");
                     self.static_member(db, name)
@@ -1703,47 +1984,21 @@ impl<'db> Type<'db> {
             }
 
             Type::SubclassOf(subclass_of_ty)
-                if subclass_of_ty.subclass_of().is_dynamic() && name == "__get__" =>
+                if subclass_of_ty.subclass_of().is_dynamic()
+                    && matches!(name, "__get__" | "__set__" | "__delete__") =>
             {
                 Symbol::bound(Type::unknown())
             }
 
             Type::ClassLiteral(..) | Type::SubclassOf(..) => {
-                if let cls_var_symbol @ Symbol::Type(cls_var, _) = self.find_name_in_mro(db, name) {
-                    tracing::info!("cls_var = {:?}", cls_var.display(db));
+                if let Symbol::Type(cls_var, _) = self.find_name_in_mro(db, name) {
+                    tracing::info!("class => cls_var = {:?}", cls_var.display(db));
 
-                    if let Symbol::Type(descr_get, _) =
-                        cls_var.to_meta_type(db).member(db, "__get__")
-                    //TODO
-                    {
-                        tracing::info!("descr_get = {:?}", descr_get.display(db));
-
-                        Symbol::bound(
-                            descr_get
-                                .try_call(
-                                    db,
-                                    &CallArguments::positional([cls_var, Type::none(db), *self]),
-                                )
-                                .map(|outcome| outcome.return_type(db))
-                                .unwrap_or(cls_var),
-                        )
-                    } else {
-                        tracing::info!("no __get__ found");
-
-                        cls_var_symbol
-                    }
+                    cls_var.run_descriptor_protocol_classes(db, name, *self)
                 } else {
                     tracing::info!("no cls_var found");
                     Symbol::Unbound
                 }
-
-                // let member = self.find_name_in_mro(db, name);
-
-                // let instance = None;
-                // let owner = *self;
-
-                // // TODO: Handle `__get__` call errors (see above).
-                // member.map_type(|ty| ty.try_call_dunder_get(db, instance, owner).unwrap_or(ty))
             }
             Type::Union(union) => union.map_with_boundness(db, |elem| elem.member(db, name)),
             Type::Intersection(intersection) => {
@@ -2427,11 +2682,14 @@ impl<'db> Type<'db> {
                 // Dunder methods are looked up on the meta type, but they invoke the descriptor
                 // protocol *as if they had been called on the instance itself*. This is why we
                 // pass `Some(self)` for the `instance` argument here.
-                let callable_ty = callable_ty
-                    .try_call_dunder_get(db, Some(self), meta_type)
-                    .unwrap_or(callable_ty);
+                // let callable_ty =
 
-                let result = callable_ty.try_call(db, arguments)?;
+                let result =
+                    callable_ty.run_descriptor_protocol_instances(db, name, Some(self), meta_type);
+
+                let result = CallOutcome::Single(CallBinding::from_return_type(
+                    result.ignore_possibly_unbound().unwrap_or(Type::unknown()),
+                )); //TODO
 
                 if boundness == Boundness::Bound {
                     Ok(result)

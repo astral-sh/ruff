@@ -439,19 +439,12 @@ impl<'db> Class<'db> {
         db: &'db dyn Db,
         class_body_scope: ScopeId<'db>,
         name: &str,
-        inferred_from_class_body: &Symbol<'db>,
     ) -> Symbol<'db> {
         // If we do not see any declarations of an attribute, neither in the class body nor in
         // any method, we build a union of `Unknown` with the inferred types of all bindings of
         // that attribute. We include `Unknown` in that union to account for the fact that the
         // attribute might be externally modified.
         let mut union_of_inferred_types = UnionBuilder::new(db).add(Type::unknown());
-        let mut union_boundness = Boundness::Bound;
-
-        if let Symbol::Type(ty, boundness) = inferred_from_class_body {
-            union_of_inferred_types = union_of_inferred_types.add(*ty);
-            union_boundness = *boundness;
-        }
 
         let attribute_assignments = attribute_assignments(db, class_body_scope);
 
@@ -459,10 +452,7 @@ impl<'db> Class<'db> {
             .as_deref()
             .and_then(|assignments| assignments.get(name))
         else {
-            if inferred_from_class_body.is_unbound() {
-                return Symbol::Unbound;
-            }
-            return Symbol::Type(union_of_inferred_types.build(), union_boundness);
+            return Symbol::Unbound;
         };
 
         for attribute_assignment in attribute_assignments {
@@ -516,7 +506,7 @@ impl<'db> Class<'db> {
             }
         }
 
-        Symbol::Type(union_of_inferred_types.build(), union_boundness)
+        Symbol::Type(union_of_inferred_types.build(), Boundness::Bound)
     }
 
     /// A helper function for `instance_member` that looks up the `name` attribute only on
@@ -527,62 +517,59 @@ impl<'db> Class<'db> {
         // - Proper diagnostics
 
         let body_scope = self.body_scope(db);
-        let table = symbol_table(db, body_scope);
+        // let table = symbol_table(db, body_scope);
 
-        if let Some(symbol_id) = table.symbol_id_by_name(name) {
-            let use_def = use_def_map(db, body_scope);
+        // if let Some(symbol_id) = table.symbol_id_by_name(name) {
+        //     let use_def = use_def_map(db, body_scope);
 
-            let declarations = use_def.public_declarations(symbol_id);
+        //     let declarations = use_def.public_declarations(symbol_id);
 
-            match symbol_from_declarations(db, declarations) {
-                Ok(SymbolAndQualifiers(declared @ Symbol::Type(declared_ty, _), qualifiers)) => {
-                    // The attribute is declared in the class body.
+        //     match symbol_from_declarations(db, declarations) {
+        //         Ok(SymbolAndQualifiers(declared @ Symbol::Type(declared_ty, _), qualifiers)) => {
+        //             // The attribute is declared in the class body.
 
-                    if let Some(function) = declared_ty.into_function_literal() {
-                        // TODO: Eventually, we are going to process all decorators correctly. This is
-                        // just a temporary heuristic to provide a broad categorization
+        //             if let Some(function) = declared_ty.into_function_literal() {
+        //                 // TODO: Eventually, we are going to process all decorators correctly. This is
+        //                 // just a temporary heuristic to provide a broad categorization
 
-                        if function.has_known_class_decorator(db, KnownClass::Classmethod)
-                            && function.decorators(db).len() == 1
-                        {
-                            SymbolAndQualifiers(declared, qualifiers)
-                        } else if function.has_known_class_decorator(db, KnownClass::Property) {
-                            SymbolAndQualifiers::todo("@property")
-                        } else if function.has_known_function_decorator(db, KnownFunction::Overload)
-                        {
-                            SymbolAndQualifiers::todo("overloaded method")
-                        } else if !function.decorators(db).is_empty() {
-                            SymbolAndQualifiers::todo("decorated method")
-                        } else {
-                            SymbolAndQualifiers(declared, qualifiers)
-                        }
-                    } else {
-                        SymbolAndQualifiers(declared, qualifiers)
-                    }
-                }
-                Ok(SymbolAndQualifiers(Symbol::Unbound, _)) => {
-                    // The attribute is not *declared* in the class body. It could still be declared
-                    // in a method, and it could also be *bound* in the class body (and/or in a method).
+        //                 if function.has_known_class_decorator(db, KnownClass::Classmethod)
+        //                     && function.decorators(db).len() == 1
+        //                 {
+        //                     SymbolAndQualifiers(declared, qualifiers)
+        //                 } else if function.has_known_class_decorator(db, KnownClass::Property) {
+        //                     SymbolAndQualifiers::todo("@property")
+        //                 } else if function.has_known_function_decorator(db, KnownFunction::Overload)
+        //                 {
+        //                     SymbolAndQualifiers::todo("overloaded method")
+        //                 } else if !function.decorators(db).is_empty() {
+        //                     SymbolAndQualifiers::todo("decorated method")
+        //                 } else {
+        //                     SymbolAndQualifiers(declared, qualifiers)
+        //                 }
+        //             } else {
+        //                 SymbolAndQualifiers(declared, qualifiers)
+        //             }
+        //         }
+        //         Ok(SymbolAndQualifiers(Symbol::Unbound, _)) => {
+        //             // The attribute is not *declared* in the class body. It could still be declared/bound
+        //             // in a method.
 
-                    let bindings = use_def.public_bindings(symbol_id);
-                    let inferred = symbol_from_bindings(db, bindings);
+        //             Self::implicit_instance_attribute(db, body_scope, name).into()
+        //         }
+        //         Err((declared_ty, _conflicting_declarations)) => {
+        //             // There are conflicting declarations for this attribute in the class body.
+        //             SymbolAndQualifiers(
+        //                 Symbol::bound(declared_ty.inner_type()),
+        //                 declared_ty.qualifiers(),
+        //             )
+        //         }
+        //     }
+        // } else {
+        // This attribute is neither declared nor bound in the class body.
+        // It could still be implicitly defined in a method.
 
-                    Self::implicit_instance_attribute(db, body_scope, name, &inferred).into()
-                }
-                Err((declared_ty, _conflicting_declarations)) => {
-                    // There are conflicting declarations for this attribute in the class body.
-                    SymbolAndQualifiers(
-                        Symbol::bound(declared_ty.inner_type()),
-                        declared_ty.qualifiers(),
-                    )
-                }
-            }
-        } else {
-            // This attribute is neither declared nor bound in the class body.
-            // It could still be implicitly defined in a method.
-
-            Self::implicit_instance_attribute(db, body_scope, name, &Symbol::Unbound).into()
-        }
+        Self::implicit_instance_attribute(db, body_scope, name).into()
+        // }
     }
 
     /// Return this class' involvement in an inheritance cycle, if any.
