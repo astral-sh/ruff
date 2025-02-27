@@ -733,7 +733,7 @@ impl<'db> Type<'db> {
             (Type::ClassLiteral(ClassLiteralType { class }), _) => class
                 .metaclass(db)
                 .to_instance(db)
-                .is_subtype_of(db, target),
+                .is_some_and(|instance_type| instance_type.is_subtype_of(db, target)),
 
             // `type[str]` (== `SubclassOf("str")` in red-knot) describes all possible runtime subclasses
             // of the class object `str`. It is a subtype of `type` (== `Instance("type")`) because `str`
@@ -745,11 +745,9 @@ impl<'db> Type<'db> {
             (Type::SubclassOf(subclass_of_ty), _) => subclass_of_ty
                 .subclass_of()
                 .into_class()
-                .is_some_and(|class| {
-                    class
-                        .metaclass(db)
-                        .to_instance(db)
-                        .is_subtype_of(db, target)
+                .and_then(|class| class.metaclass(db).to_instance(db))
+                .is_some_and(|metaclass_instance_type| {
+                    metaclass_instance_type.is_subtype_of(db, target)
                 }),
 
             // For example: `Type::KnownInstance(KnownInstanceType::Type)` is a subtype of `Type::Instance(_SpecialForm)`,
@@ -1122,16 +1120,22 @@ impl<'db> Type<'db> {
                 ty.bool(db).is_always_true()
             }
 
+            // for `type[Any]`/`type[Unknown]`/`type[Todo]`, we know the type cannot be any larger than `type`,
+            // so although the type is dynamic we can still determine disjointness in some situations
             (Type::SubclassOf(subclass_of_ty), other)
-            | (other, Type::SubclassOf(subclass_of_ty)) => {
-                let metaclass_instance_ty = match subclass_of_ty.subclass_of() {
-                    // for `type[Any]`/`type[Unknown]`/`type[Todo]`, we know the type cannot be any larger than `type`,
-                    // so although the type is dynamic we can still determine disjointness in some situations
-                    ClassBase::Dynamic(_) => KnownClass::Type.to_instance(db),
-                    ClassBase::Class(class) => class.metaclass(db).to_instance(db),
-                };
-                other.is_disjoint_from(db, metaclass_instance_ty)
-            }
+            | (other, Type::SubclassOf(subclass_of_ty)) => match subclass_of_ty.subclass_of() {
+                ClassBase::Dynamic(_) => {
+                    KnownClass::Type.to_instance(db).is_disjoint_from(db, other)
+                }
+                ClassBase::Class(class) => {
+                    class
+                        .metaclass(db)
+                        .to_instance(db)
+                        .is_some_and(|metaclass_instance_type| {
+                            metaclass_instance_type.is_disjoint_from(db, other)
+                        })
+                }
+            },
 
             (Type::KnownInstance(known_instance), Type::Instance(InstanceType { class }))
             | (Type::Instance(InstanceType { class }), Type::KnownInstance(known_instance)) => {
@@ -1202,7 +1206,9 @@ impl<'db> Type<'db> {
                 !class
                     .metaclass(db)
                     .to_instance(db)
-                    .is_subtype_of(db, instance)
+                    .is_some_and(|metaclass_instance_type| {
+                        metaclass_instance_type.is_subtype_of(db, instance)
+                    })
             }
 
             (Type::FunctionLiteral(..), Type::Instance(InstanceType { class }))
@@ -2107,18 +2113,16 @@ impl<'db> Type<'db> {
             Type::Callable(_) => Truthiness::AlwaysTrue,
             Type::ModuleLiteral(_) => Truthiness::AlwaysTrue,
             Type::ClassLiteral(ClassLiteralType { class }) => {
-                return class
-                    .metaclass(db)
-                    .to_instance(db)
-                    .try_bool_impl(db, allow_short_circuit);
+                if let Some(metaclass_instance_type) = class.metaclass(db).to_instance(db) {
+                    metaclass_instance_type.try_bool_impl(db, allow_short_circuit)?
+                } else {
+                    Truthiness::Ambiguous
+                }
             }
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
                 ClassBase::Dynamic(_) => Truthiness::Ambiguous,
                 ClassBase::Class(class) => {
-                    return class
-                        .metaclass(db)
-                        .to_instance(db)
-                        .try_bool_impl(db, allow_short_circuit);
+                    Type::class_literal(class).try_bool_impl(db, allow_short_circuit)?
                 }
             },
             Type::AlwaysTruthy => Truthiness::AlwaysTrue,
@@ -2948,17 +2952,19 @@ impl<'db> Type<'db> {
     }
 
     #[must_use]
-    pub fn to_instance(&self, db: &'db dyn Db) -> Type<'db> {
+    pub fn to_instance(&self, db: &'db dyn Db) -> Option<Type<'db>> {
         match self {
-            Type::Dynamic(_) => *self,
-            Type::Never => Type::Never,
-            Type::ClassLiteral(ClassLiteralType { class }) => Type::instance(*class),
-            Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
-                ClassBase::Class(class) => Type::instance(class),
-                ClassBase::Dynamic(dynamic) => Type::Dynamic(dynamic),
-            },
-            Type::Union(union) => union.map(db, |element| element.to_instance(db)),
-            Type::Intersection(_) => todo_type!("Type::Intersection.to_instance()"),
+            Type::Dynamic(_) | Type::Never => Some(*self),
+            Type::ClassLiteral(ClassLiteralType { class }) => Some(Type::instance(*class)),
+            Type::SubclassOf(subclass_of_ty) => Some(subclass_of_ty.to_instance()),
+            Type::Union(union) => {
+                let mut builder = UnionBuilder::new(db);
+                for element in union.elements(db) {
+                    builder = builder.add(element.to_instance(db)?);
+                }
+                Some(builder.build())
+            }
+            Type::Intersection(_) => Some(todo_type!("Type::Intersection.to_instance()")),
             // TODO: calling `.to_instance()` on any of these should result in a diagnostic,
             // since they already indicate that the object is an instance of some kind:
             Type::BooleanLiteral(_)
@@ -2974,7 +2980,7 @@ impl<'db> Type<'db> {
             | Type::Tuple(_)
             | Type::LiteralString
             | Type::AlwaysTruthy
-            | Type::AlwaysFalsy => Type::unknown(),
+            | Type::AlwaysFalsy => None,
         }
     }
 
