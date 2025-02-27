@@ -2767,17 +2767,15 @@ fn cookiecutter_globbing_no_project_root() -> Result<()> {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .current_dir(&tempdir)
         .args(STDIN_BASE_OPTIONS)
-        .args(["--extend-per-file-ignores", "generated.py:Q"]), @r#"
-    success: false
-    exit_code: 2
+        .args(["--extend-per-file-ignores", "generated.py:Q"]), @r"
+    success: true
+    exit_code: 0
     ----- stdout -----
+    All checks passed!
 
     ----- stderr -----
-    [crates/ruff_linter/src/settings/types.rs:308:21] fs::normalize_path(path) = "/tmp/.tmpEibace/{{cookiecutter.repo_name}}/generated.py"
-    ruff failed
-      Cause: invalid glob "/tmp/.tmpEibace/{{cookiecutter.repo_name}}/generated.py"
-      Cause: error parsing glob '/tmp/.tmpEibace/{{cookiecutter.repo_name}}/generated.py': nested alternate groups are not allowed
-    "#);
+    warning: No Python files found under the given path(s)
+    ");
 
     Ok(())
 }

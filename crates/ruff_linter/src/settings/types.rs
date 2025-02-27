@@ -8,6 +8,7 @@ use std::string::ToString;
 use anyhow::{bail, Context, Result};
 use globset::{Glob, GlobMatcher, GlobSet, GlobSetBuilder};
 use log::debug;
+use path_absolutize::path_dedot;
 use pep440_rs::{VersionSpecifier, VersionSpecifiers};
 use rustc_hash::FxHashMap;
 use serde::{de, Deserialize, Deserializer, Serialize};
@@ -299,14 +300,11 @@ impl<T> PerFile<T> {
             pattern.drain(..1);
         }
         let path = Path::new(&pattern);
-        let absolute = match project_root {
-            Some(project_root) => {
-                // escape glob metacharacters in the path outside the `pattern`
-                let escaped = globset::escape(&project_root.to_string_lossy());
-                fs::normalize_path_to(path, escaped)
-            }
-            None => dbg!(fs::normalize_path(path)),
-        };
+
+        let project_root = project_root.unwrap_or(&path_dedot::CWD);
+        // escape glob metacharacters in the path outside the `pattern`
+        let escaped = globset::escape(&project_root.to_string_lossy());
+        let absolute = fs::normalize_path_to(path, escaped);
 
         Self {
             basename: pattern,
