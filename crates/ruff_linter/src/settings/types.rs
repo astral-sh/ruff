@@ -204,7 +204,8 @@ impl FromStr for FilePattern {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let pattern = s.to_string();
-        let absolute = fs::normalize_path(&pattern);
+        let cwd = globset::escape(&path_dedot::CWD.to_string_lossy());
+        let absolute = fs::normalize_path_to(&pattern, cwd);
         Ok(Self::User(pattern, absolute))
     }
 }

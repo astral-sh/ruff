@@ -476,7 +476,10 @@ impl Configuration {
                 paths
                     .into_iter()
                     .map(|pattern| {
-                        let absolute = fs::normalize_path_to(&pattern, project_root);
+                        let absolute = fs::normalize_path_to(
+                            &pattern,
+                            globset::escape(&project_root.to_string_lossy()),
+                        );
                         FilePattern::User(pattern, absolute)
                     })
                     .collect()
@@ -495,7 +498,10 @@ impl Configuration {
                     paths
                         .into_iter()
                         .map(|pattern| {
-                            let absolute = fs::normalize_path_to(&pattern, project_root);
+                            let absolute = fs::normalize_path_to(
+                                &pattern,
+                                globset::escape(&project_root.to_string_lossy()),
+                            );
                             FilePattern::User(pattern, absolute)
                         })
                         .collect()
@@ -507,7 +513,10 @@ impl Configuration {
                     paths
                         .into_iter()
                         .map(|pattern| {
-                            let absolute = fs::normalize_path_to(&pattern, project_root);
+                            let absolute = fs::normalize_path_to(
+                                &pattern,
+                                globset::escape(&project_root.to_string_lossy()),
+                            );
                             FilePattern::User(pattern, absolute)
                         })
                         .collect()
@@ -517,7 +526,10 @@ impl Configuration {
                 paths
                     .into_iter()
                     .map(|pattern| {
-                        let absolute = fs::normalize_path_to(&pattern, project_root);
+                        let absolute = fs::normalize_path_to(
+                            &pattern,
+                            globset::escape(&project_root.to_string_lossy()),
+                        );
                         FilePattern::User(pattern, absolute)
                     })
                     .collect()
@@ -700,7 +712,10 @@ impl LintConfiguration {
                 paths
                     .into_iter()
                     .map(|pattern| {
-                        let absolute = fs::normalize_path_to(&pattern, project_root);
+                        let absolute = fs::normalize_path_to(
+                            &pattern,
+                            globset::escape(&project_root.to_string_lossy()),
+                        );
                         FilePattern::User(pattern, absolute)
                     })
                     .collect()
@@ -1203,7 +1218,10 @@ impl FormatConfiguration {
                 paths
                     .into_iter()
                     .map(|pattern| {
-                        let absolute = fs::normalize_path_to(&pattern, project_root);
+                        let absolute = fs::normalize_path_to(
+                            &pattern,
+                            globset::escape(&project_root.to_string_lossy()),
+                        );
                         FilePattern::User(pattern, absolute)
                     })
                     .collect()
@@ -1267,7 +1285,10 @@ impl AnalyzeConfiguration {
                 paths
                     .into_iter()
                     .map(|pattern| {
-                        let absolute = fs::normalize_path_to(&pattern, project_root);
+                        let absolute = fs::normalize_path_to(
+                            &pattern,
+                            globset::escape(&project_root.to_string_lossy()),
+                        );
                         FilePattern::User(pattern, absolute)
                     })
                     .collect()

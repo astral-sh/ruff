@@ -356,7 +356,10 @@ impl ConfigurationTransformer for EditorConfigurationTransformer<'_> {
                 exclude
                     .into_iter()
                     .map(|pattern| {
-                        let absolute = normalize_path_to(&pattern, project_root);
+                        let absolute = normalize_path_to(
+                            &pattern,
+                            globset::escape(&project_root.to_string_lossy()),
+                        );
                         FilePattern::User(pattern, absolute)
                     })
                     .collect()
