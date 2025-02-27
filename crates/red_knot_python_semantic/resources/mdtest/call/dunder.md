@@ -122,3 +122,18 @@ class_with_descriptor_dunder = ClassWithDescriptorDunder()
 
 reveal_type(class_with_descriptor_dunder[0])  # revealed: str
 ```
+
+## Dunders can not be overwritten on instances
+
+```py
+class C:
+    def __init__(self):
+        # TODO: should be an error
+        self.__getitem__ = None
+
+    def __getitem__(self, key: int) -> str:
+        return str(key)
+
+reveal_type(C()[0])  # revealed: str
+reveal_type(C().__getitem__(0))  # revealed: str
+```
