@@ -150,7 +150,7 @@ impl VirtualEnvironment {
             version,
         };
 
-        tracing::trace!("Resolved metadata for virtual environment: {metadata:?}");
+        // tracing::trace!("Resolved metadata for virtual environment: {metadata:?}");
         Ok(metadata)
     }
 

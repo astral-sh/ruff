@@ -504,7 +504,7 @@ fn symbol_impl<'db>(
     name: &str,
     requires_explicit_reexport: RequiresExplicitReExport,
 ) -> Symbol<'db> {
-    let _span = tracing::trace_span!("symbol", ?name).entered();
+    // let _span = tracing::trace_span!("symbol", ?name).entered();
 
     if name == "platform"
         && file_to_module(db, scope.file(db))
