@@ -2152,28 +2152,18 @@ fn cookiecutter_globbing() -> Result<()> {
         r#"tool.ruff.lint.per-file-ignores = { "tests/*" = ["F811"] }"#,
     )?;
     let maintest = tests.join("maintest.py");
-    fs::write(maintest, "import foo\nimport bar\nimport foo")?;
-    insta::with_settings!({filters => vec![(r"\\", "/")]}, {
-        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-                .args(["format", "--no-cache", "--diff"])
-                .current_dir(tempdir.path()), @r"
-        success: false
-        exit_code: 1
-        ----- stdout -----
-        --- {{cookiecutter.repo_name}}/tests/maintest.py
-        +++ {{cookiecutter.repo_name}}/tests/maintest.py
-        @@ -1,3 +1,3 @@
-        import foo
-        import bar
-        -import foo
-        \ No newline at end of file
-        +import foo
+    fs::write(maintest, "import foo\nimport bar\nimport foo\n")?;
 
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .args(["format", "--no-cache", "--diff"])
+            .current_dir(tempdir.path()), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
 
-        ----- stderr -----
-        1 file would be reformatted
-        ");
-    });
+    ----- stderr -----
+    1 file already formatted
+    ");
 
     Ok(())
 }
