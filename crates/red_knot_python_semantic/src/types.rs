@@ -2431,9 +2431,36 @@ impl<'db> Type<'db> {
                                     if instance.is_none(db) {
                                         function_ty
                                     } else {
-                                        Type::Callable(CallableType::BoundMethod(
-                                            BoundMethodType::new(db, function, instance),
-                                        ))
+                                        match instance {
+                                            Type::KnownInstance(
+                                                KnownInstanceType::TypeAliasType(type_alias),
+                                            ) if arguments
+                                                .third_argument()
+                                                .and_then(|owner| owner.into_class_literal())
+                                                .is_some_and(|class_literal| {
+                                                    class_literal
+                                                        .class
+                                                        .is_known(db, KnownClass::TypeAliasType)
+                                                })
+                                                && function.name(db) == "__name__" =>
+                                            {
+                                                Type::string_literal(db, type_alias.name(db))
+                                            }
+                                            _ => {
+                                                if function.has_known_class_decorator(
+                                                    db,
+                                                    KnownClass::Property,
+                                                ) {
+                                                    todo_type!("@property")
+                                                } else {
+                                                    Type::Callable(CallableType::BoundMethod(
+                                                        BoundMethodType::new(
+                                                            db, function, instance,
+                                                        ),
+                                                    ))
+                                                }
+                                            }
+                                        }
                                     }
                                 } else {
                                     Type::unknown()
