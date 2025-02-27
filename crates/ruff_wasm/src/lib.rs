@@ -238,6 +238,18 @@ impl Workspace {
                     fix: None,
                 }
             }))
+            .chain(parsed.unsupported_syntax_errors().iter().map(|error| {
+                let start_location = source_code.source_location(error.range.start());
+                let end_location = source_code.source_location(error.range.end());
+
+                ExpandedMessage {
+                    code: None,
+                    message: format!("SyntaxError: {error}"),
+                    location: start_location,
+                    end_location,
+                    fix: None,
+                }
+            }))
             .collect();
 
         serde_wasm_bindgen::to_value(&messages).map_err(into_error)
