@@ -2713,6 +2713,7 @@ fn cache_syntax_errors() -> Result<()> {
     cmd.args(["check", "--output-format", "concise"])
         .arg("--target-version=py39")
         .arg("--preview")
+        .arg("--quiet") // suppress `debug build without --no-cache` warnings
         .current_dir(&tempdir);
 
     assert_cmd_snapshot!(
@@ -2722,10 +2723,8 @@ fn cache_syntax_errors() -> Result<()> {
     exit_code: 1
     ----- stdout -----
     main.py:1:1: SyntaxError: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
-    Found 1 error.
 
     ----- stderr -----
-    warning: Detected debug build without --no-cache.
     "
     );
 
@@ -2737,10 +2736,8 @@ fn cache_syntax_errors() -> Result<()> {
     exit_code: 1
     ----- stdout -----
     main.py:1:1: SyntaxError: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
-    Found 1 error.
 
     ----- stderr -----
-    warning: Detected debug build without --no-cache.
     "
     );
 
