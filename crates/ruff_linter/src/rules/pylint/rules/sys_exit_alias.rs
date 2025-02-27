@@ -70,26 +70,31 @@ pub(crate) fn sys_exit_alias(checker: &Checker, call: &ExprCall) {
         call.func.range(),
     );
 
-    let ExprCall { arguments, .. } = call;
-    let arg = arguments.args.first();
-    let kwr = arguments.keywords.first();
+    let num_str = call
+        .arguments
+        .args
+        .first()
+        .and_then(|arg| arg.as_number_literal_expr())
+        .map(|lit| format!("{:?}", lit.value))
+        .or_else(|| {
+            call.arguments
+                .keywords
+                .first()
+                .filter(|kwr| kwr.value.is_number_literal_expr())
+                .map(|kwr| format!("{:?}", kwr.value.as_number_literal_expr().unwrap().value))
+        });
 
-    let code = if arg.is_some() {
-        format!("{:?}", arg.unwrap().as_number_literal_expr().unwrap().value)
-    } else if kwr.is_some() && kwr.unwrap().value.is_number_literal_expr() {
-        format!(
-            "{:?}",
-            kwr.unwrap().value.as_number_literal_expr().unwrap().value
-        )
+    let code = if let Some(value) = num_str {
+        value
+            .strip_prefix("Int(")
+            .and_then(|s| s.strip_suffix(")"))
+            .and_then(|num_str| num_str.parse::<i32>().ok())
+            .unwrap()
     } else {
-        // If it is not possible to retrieve the code, then just a violation is raised
+        // if it is not possible to retrieve the code, just a violation is raised
         checker.report_diagnostic(diagnostic);
         return;
-    }
-    .strip_prefix("Int(")
-    .and_then(|s| s.strip_suffix(")"))
-    .and_then(|num_str| num_str.parse::<i32>().ok())
-    .unwrap_or(0);
+    };
 
     diagnostic.try_set_fix(|| {
         let (import_edit, binding) = checker.importer().get_or_import_symbol(
