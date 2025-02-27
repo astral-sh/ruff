@@ -6453,24 +6453,24 @@ impl AnyNodeRef<'_> {
 pub struct ExprBoolOp {
     pub range: ruff_text_size::TextRange,
     pub op: crate::BoolOp,
-    pub values: Vec<crate::Expr>,
+    pub values: Vec<Expr>,
 }
 
 /// See also [NamedExpr](https://docs.python.org/3/library/ast.html#ast.NamedExpr)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprNamed {
     pub range: ruff_text_size::TextRange,
-    pub target: Box<crate::Expr>,
-    pub value: Box<crate::Expr>,
+    pub target: Box<Expr>,
+    pub value: Box<Expr>,
 }
 
 /// See also [BinOp](https://docs.python.org/3/library/ast.html#ast.BinOp)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprBinOp {
     pub range: ruff_text_size::TextRange,
-    pub left: Box<crate::Expr>,
+    pub left: Box<Expr>,
     pub op: crate::Operator,
-    pub right: Box<crate::Expr>,
+    pub right: Box<Expr>,
 }
 
 /// See also [UnaryOp](https://docs.python.org/3/library/ast.html#ast.UnaryOp)
@@ -6478,7 +6478,7 @@ pub struct ExprBinOp {
 pub struct ExprUnaryOp {
     pub range: ruff_text_size::TextRange,
     pub op: crate::UnaryOp,
-    pub operand: Box<crate::Expr>,
+    pub operand: Box<Expr>,
 }
 
 /// See also [Lambda](https://docs.python.org/3/library/ast.html#ast.Lambda)
@@ -6486,16 +6486,16 @@ pub struct ExprUnaryOp {
 pub struct ExprLambda {
     pub range: ruff_text_size::TextRange,
     pub parameters: Option<Box<crate::Parameters>>,
-    pub body: Box<crate::Expr>,
+    pub body: Box<Expr>,
 }
 
 /// See also [IfExp](https://docs.python.org/3/library/ast.html#ast.IfExp)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprIf {
     pub range: ruff_text_size::TextRange,
-    pub test: Box<crate::Expr>,
-    pub body: Box<crate::Expr>,
-    pub orelse: Box<crate::Expr>,
+    pub test: Box<Expr>,
+    pub body: Box<Expr>,
+    pub orelse: Box<Expr>,
 }
 
 /// See also [Dict](https://docs.python.org/3/library/ast.html#ast.Dict)
@@ -6509,14 +6509,14 @@ pub struct ExprDict {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprSet {
     pub range: ruff_text_size::TextRange,
-    pub elts: Vec<crate::Expr>,
+    pub elts: Vec<Expr>,
 }
 
 /// See also [ListComp](https://docs.python.org/3/library/ast.html#ast.ListComp)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprListComp {
     pub range: ruff_text_size::TextRange,
-    pub elt: Box<crate::Expr>,
+    pub elt: Box<Expr>,
     pub generators: Vec<crate::Comprehension>,
 }
 
@@ -6524,7 +6524,7 @@ pub struct ExprListComp {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprSetComp {
     pub range: ruff_text_size::TextRange,
-    pub elt: Box<crate::Expr>,
+    pub elt: Box<Expr>,
     pub generators: Vec<crate::Comprehension>,
 }
 
@@ -6532,8 +6532,8 @@ pub struct ExprSetComp {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprDictComp {
     pub range: ruff_text_size::TextRange,
-    pub key: Box<crate::Expr>,
-    pub value: Box<crate::Expr>,
+    pub key: Box<Expr>,
+    pub value: Box<Expr>,
     pub generators: Vec<crate::Comprehension>,
 }
 
@@ -6541,7 +6541,7 @@ pub struct ExprDictComp {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprGenerator {
     pub range: ruff_text_size::TextRange,
-    pub elt: Box<crate::Expr>,
+    pub elt: Box<Expr>,
     pub generators: Vec<crate::Comprehension>,
     pub parenthesized: bool,
 }
@@ -6550,28 +6550,28 @@ pub struct ExprGenerator {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprAwait {
     pub range: ruff_text_size::TextRange,
-    pub value: Box<crate::Expr>,
+    pub value: Box<Expr>,
 }
 
 /// See also [Yield](https://docs.python.org/3/library/ast.html#ast.Yield)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprYield {
     pub range: ruff_text_size::TextRange,
-    pub value: Option<Box<crate::Expr>>,
+    pub value: Option<Box<Expr>>,
 }
 
 /// See also [YieldFrom](https://docs.python.org/3/library/ast.html#ast.YieldFrom)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprYieldFrom {
     pub range: ruff_text_size::TextRange,
-    pub value: Box<crate::Expr>,
+    pub value: Box<Expr>,
 }
 
 /// See also [Compare](https://docs.python.org/3/library/ast.html#ast.Compare)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprCompare {
     pub range: ruff_text_size::TextRange,
-    pub left: Box<crate::Expr>,
+    pub left: Box<Expr>,
     pub ops: Box<[crate::CmpOp]>,
     pub comparators: Box<[Expr]>,
 }
@@ -6580,7 +6580,7 @@ pub struct ExprCompare {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprCall {
     pub range: ruff_text_size::TextRange,
-    pub func: Box<crate::Expr>,
+    pub func: Box<Expr>,
     pub arguments: crate::Arguments,
 }
 
@@ -6640,7 +6640,7 @@ pub struct ExprEllipsisLiteral {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprAttribute {
     pub range: ruff_text_size::TextRange,
-    pub value: Box<crate::Expr>,
+    pub value: Box<Expr>,
     pub attr: crate::Identifier,
     pub ctx: crate::ExprContext,
 }
@@ -6649,8 +6649,8 @@ pub struct ExprAttribute {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprSubscript {
     pub range: ruff_text_size::TextRange,
-    pub value: Box<crate::Expr>,
-    pub slice: Box<crate::Expr>,
+    pub value: Box<Expr>,
+    pub slice: Box<Expr>,
     pub ctx: crate::ExprContext,
 }
 
@@ -6658,7 +6658,7 @@ pub struct ExprSubscript {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprStarred {
     pub range: ruff_text_size::TextRange,
-    pub value: Box<crate::Expr>,
+    pub value: Box<Expr>,
     pub ctx: crate::ExprContext,
 }
 
@@ -6674,7 +6674,7 @@ pub struct ExprName {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprList {
     pub range: ruff_text_size::TextRange,
-    pub elts: Option<Vec<crate::Expr>>,
+    pub elts: Vec<Expr>,
     pub ctx: crate::ExprContext,
 }
 
@@ -6682,7 +6682,7 @@ pub struct ExprList {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprTuple {
     pub range: ruff_text_size::TextRange,
-    pub elts: Vec<crate::Expr>,
+    pub elts: Vec<Expr>,
     pub ctx: crate::ExprContext,
     pub parenthesized: bool,
 }
@@ -6691,9 +6691,9 @@ pub struct ExprTuple {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprSlice {
     pub range: ruff_text_size::TextRange,
-    pub lower: Option<Box<crate::Expr>>,
-    pub upper: Option<Box<crate::Expr>>,
-    pub step: Option<Box<crate::Expr>>,
+    pub lower: Option<Box<Expr>>,
+    pub upper: Option<Box<Expr>>,
+    pub step: Option<Box<Expr>>,
 }
 
 /// An AST node used to represent a IPython escape command at the expression level.
