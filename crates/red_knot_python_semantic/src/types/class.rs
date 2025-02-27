@@ -1517,12 +1517,7 @@ impl<'db> KnownInstanceType<'db> {
     }
 
     pub(super) fn static_member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
-        let ty = match (self, name) {
-            (Self::TypeVar(typevar), "__name__") => Type::string_literal(db, typevar.name(db)),
-            (Self::TypeAliasType(alias), "__name__") => Type::string_literal(db, alias.name(db)),
-            _ => return self.instance_fallback(db).static_member(db, name),
-        };
-        Symbol::bound(ty)
+        self.instance_fallback(db).static_member(db, name)
     }
 }
 

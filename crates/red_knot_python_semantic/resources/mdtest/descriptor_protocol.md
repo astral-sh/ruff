@@ -31,10 +31,13 @@ reveal_type(c.ten)  # revealed: Literal[10]
 reveal_type(C.ten)  # revealed: Literal[10]
 
 # These are fine:
-c.ten = 10
+# TODO: This should not be an error
+c.ten = 10  # error: [invalid-assignment]
 C.ten = 10
 
-# TODO: This should be an error (as the wrong type is being implicitly passed to `Ten.__set__`)
+# TODO: This should be an error (as the wrong type is being implicitly passed to `Ten.__set__`),
+# but the error message is misleading.
+# error: [invalid-assignment] "Object of type `Literal[11]` is not assignable to attribute `ten` of type `Ten`"
 c.ten = 11
 
 # TODO: same as above
@@ -64,12 +67,16 @@ c = C()
 
 reveal_type(c.flexible_int)  # revealed: int | None
 
+# TODO: These should not be errors
+# error: [invalid-assignment]
 c.flexible_int = 42  # okay
+# error: [invalid-assignment]
 c.flexible_int = "42"  # also okay!
 
 reveal_type(c.flexible_int)  # revealed: int | None
 
-# TODO: This should be an error
+# TODO: This should be an error, but the message needs to be improved.
+# error: [invalid-assignment] "Object of type `None` is not assignable to attribute `flexible_int` of type `FlexibleInt`"
 c.flexible_int = None  # not okay
 
 reveal_type(c.flexible_int)  # revealed: int | None
@@ -165,12 +172,15 @@ reveal_type(c.name)  # revealed: <bound method `name` of `C`>
 # Should be `builtins.property`
 reveal_type(C.name)  # revealed: Literal[name]
 
-# This is fine:
+# TODO: These should not emit errors
+# error: [invalid-assignment]
 c.name = "new"
 
+# error: [invalid-assignment]
 c.name = None
 
-# TODO: this should be an error
+# TODO: this should be an error, but with a proper error message
+# error: [invalid-assignment] "Implicit shadowing of function `name`; annotate to make it explicit if this is intentional"
 c.name = 42
 ```
 
@@ -378,7 +388,7 @@ reveal_type(wrapper_descriptor(f, None, type(f)))  # revealed: Literal[f]
 reveal_type(f.__get__.__hash__)  # revealed: <bound method `__hash__` of `MethodWrapperType`>
 
 # Attribute access on the wrapper-descriptor falls back to `WrapperDescriptorType`:
-reveal_type(wrapper_descriptor.__qualname__)  # revealed: <bound method `__qualname__` of `WrapperDescriptorType`>
+reveal_type(wrapper_descriptor.__qualname__)  # revealed: @Todo(@property)
 ```
 
 We can also bind the free function `f` to an instance of a class `C`:
