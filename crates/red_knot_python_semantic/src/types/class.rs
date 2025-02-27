@@ -5,8 +5,8 @@ use crate::{
         symbol::ScopeId, symbol_table, use_def_map,
     },
     symbol::{
-        class_symbol, known_module_symbol, symbol_from_declarations, Boundness, LookupError,
-        LookupResult, Symbol, SymbolAndQualifiers,
+        class_symbol, known_module_symbol, symbol_from_bindings, symbol_from_declarations,
+        Boundness, LookupError, LookupResult, Symbol, SymbolAndQualifiers,
     },
     types::{
         definition_expression_type, CallArguments, CallError, MetaclassCandidate, TupleType,
@@ -517,76 +517,86 @@ impl<'db> Class<'db> {
         // - Proper diagnostics
 
         let body_scope = self.body_scope(db);
-        // let table = symbol_table(db, body_scope);
+        let table = symbol_table(db, body_scope);
 
-        // if let Some(symbol_id) = table.symbol_id_by_name(name) {
-        //     let use_def = use_def_map(db, body_scope);
+        if let Some(symbol_id) = table.symbol_id_by_name(name) {
+            let use_def = use_def_map(db, body_scope);
 
-        //     let declarations = use_def.public_declarations(symbol_id);
+            let declarations = use_def.public_declarations(symbol_id);
 
-        //     match symbol_from_declarations(db, declarations) {
-        //         Ok(SymbolAndQualifiers(declared @ Symbol::Type(declared_ty, _), qualifiers)) => {
-        //             // The attribute is declared in the class body.
+            match symbol_from_declarations(db, declarations) {
+                Ok(SymbolAndQualifiers(declared @ Symbol::Type(declared_ty, _), qualifiers)) => {
+                    // The attribute is declared in the class body.
 
-        //             if let Some(function) = declared_ty.into_function_literal() {
-        //                 // TODO: Eventually, we are going to process all decorators correctly. This is
-        //                 // just a temporary heuristic to provide a broad categorization
+                    // Make sure it's not bound in the body
+                    let bindings = use_def.public_bindings(symbol_id);
+                    let inferred = symbol_from_bindings(db, bindings);
 
-        //                 if function.has_known_class_decorator(db, KnownClass::Classmethod)
-        //                     && function.decorators(db).len() == 1
-        //                 {
-        //                     SymbolAndQualifiers(declared, qualifiers)
-        //                 } else if function.has_known_class_decorator(db, KnownClass::Property) {
-        //                     SymbolAndQualifiers::todo("@property")
-        //                 } else if function.has_known_function_decorator(db, KnownFunction::Overload)
-        //                 {
-        //                     SymbolAndQualifiers::todo("overloaded method")
-        //                 } else if !function.decorators(db).is_empty() {
-        //                     SymbolAndQualifiers::todo("decorated method")
-        //                 } else {
-        //                     SymbolAndQualifiers(declared, qualifiers)
-        //                 }
-        //             } else {
-        //                 SymbolAndQualifiers(declared, qualifiers)
-        //             }
-        //         }
-        //         Ok(SymbolAndQualifiers(Symbol::Unbound, _)) => {
-        //             // The attribute is not *declared* in the class body. It could still be declared/bound
-        //             // in a method.
+                    if !inferred.is_unbound() {
+                        return Symbol::Unbound.into();
+                    }
 
-        //             Self::implicit_instance_attribute(db, body_scope, name).into()
-        //         }
-        //         Err((declared_ty, _conflicting_declarations)) => {
-        //             // There are conflicting declarations for this attribute in the class body.
-        //             SymbolAndQualifiers(
-        //                 Symbol::bound(declared_ty.inner_type()),
-        //                 declared_ty.qualifiers(),
-        //             )
-        //         }
-        //     }
-        // } else {
-        // This attribute is neither declared nor bound in the class body.
-        // It could still be implicitly defined in a method.
-        // }
+                    if let Some(function) = declared_ty.into_function_literal() {
+                        // TODO: Eventually, we are going to process all decorators correctly. This is
+                        // just a temporary heuristic to provide a broad categorization
 
-        let implicit_instance_attribute = Self::implicit_instance_attribute(db, body_scope, name);
+                        if function.has_known_class_decorator(db, KnownClass::Classmethod)
+                            && function.decorators(db).len() == 1
+                        {
+                            SymbolAndQualifiers(declared, qualifiers)
+                        } else if function.has_known_class_decorator(db, KnownClass::Property) {
+                            SymbolAndQualifiers::todo("@property")
+                        } else if function.has_known_function_decorator(db, KnownFunction::Overload)
+                        {
+                            SymbolAndQualifiers::todo("overloaded method")
+                        } else if !function.decorators(db).is_empty() {
+                            SymbolAndQualifiers::todo("decorated method")
+                        } else {
+                            SymbolAndQualifiers(declared, qualifiers)
+                        }
+                    } else {
+                        SymbolAndQualifiers(declared, qualifiers)
+                    }
+                }
+                Ok(SymbolAndQualifiers(Symbol::Unbound, _)) => {
+                    // The attribute is not *declared* in the class body. It could still be declared/bound
+                    // in a method.
 
-        if let Symbol::Type(_, _) = implicit_instance_attribute {
-            let table = symbol_table(db, body_scope);
-
-            if let Some(symbol_id) = table.symbol_id_by_name(name) {
-                let use_def = use_def_map(db, body_scope);
-
-                let declarations = use_def.public_declarations(symbol_id);
-
-                match symbol_from_declarations(db, declarations) {
-                    Ok(declared @ SymbolAndQualifiers(Symbol::Type(_, _), _)) => return declared,
-                    _ => {}
+                    Self::implicit_instance_attribute(db, body_scope, name).into()
+                }
+                Err((declared_ty, _conflicting_declarations)) => {
+                    // There are conflicting declarations for this attribute in the class body.
+                    SymbolAndQualifiers(
+                        Symbol::bound(declared_ty.inner_type()),
+                        declared_ty.qualifiers(),
+                    )
                 }
             }
+        } else {
+            // This attribute is neither declared nor bound in the class body.
+            // It could still be implicitly defined in a method.
+
+            Self::implicit_instance_attribute(db, body_scope, name).into()
         }
 
-        implicit_instance_attribute.into()
+        // let implicit_instance_attribute = Self::implicit_instance_attribute(db, body_scope, name);
+
+        // if let Symbol::Type(_, _) = implicit_instance_attribute {
+        //     let table = symbol_table(db, body_scope);
+
+        //     if let Some(symbol_id) = table.symbol_id_by_name(name) {
+        //         let use_def = use_def_map(db, body_scope);
+
+        //         let declarations = use_def.public_declarations(symbol_id);
+
+        //         match symbol_from_declarations(db, declarations) {
+        //             Ok(declared @ SymbolAndQualifiers(Symbol::Type(_, _), _)) => return declared,
+        //             _ => {}
+        //         }
+        //     }
+        // }
+
+        // implicit_instance_attribute.into()
     }
 
     /// Return this class' involvement in an inheritance cycle, if any.

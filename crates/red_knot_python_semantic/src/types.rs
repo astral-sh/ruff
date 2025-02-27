@@ -61,7 +61,7 @@ mod property_tests;
 
 #[salsa::tracked(return_ref)]
 pub fn check_types(db: &dyn Db, file: File) -> TypeCheckDiagnostics {
-    let _span = tracing::trace_span!("check_types", file=?file.path(db)).entered();
+    // let _span = tracing::trace_span!("check_types", file=?file.path(db)).entered();
 
     tracing::debug!("Checking file '{path}'", path = file.path(db));
 

@@ -498,7 +498,7 @@ fn symbol_impl<'db>(
     name: &str,
     requires_explicit_reexport: RequiresExplicitReExport,
 ) -> Symbol<'db> {
-    let _span = tracing::trace_span!("symbol", ?name).entered();
+    // let _span = tracing::trace_span!("symbol", ?name).entered();
 
     // We don't need to check for `typing_extensions` here, because `typing_extensions.TYPE_CHECKING`
     // is just a re-export of `typing.TYPE_CHECKING`.
