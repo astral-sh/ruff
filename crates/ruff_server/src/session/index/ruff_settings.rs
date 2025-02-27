@@ -7,9 +7,8 @@ use std::sync::Arc;
 use anyhow::Context;
 use ignore::{WalkBuilder, WalkState};
 
-use ruff_linter::{
-    fs::normalize_path_to, settings::types::FilePattern, settings::types::PreviewMode,
-};
+use ruff_linter::settings::types::GlobPath;
+use ruff_linter::{settings::types::FilePattern, settings::types::PreviewMode};
 use ruff_workspace::resolver::match_exclusion;
 use ruff_workspace::Settings;
 use ruff_workspace::{
@@ -356,10 +355,7 @@ impl ConfigurationTransformer for EditorConfigurationTransformer<'_> {
                 exclude
                     .into_iter()
                     .map(|pattern| {
-                        let absolute = normalize_path_to(
-                            &pattern,
-                            globset::escape(&project_root.to_string_lossy()),
-                        );
+                        let absolute = GlobPath::normalize(&pattern, project_root);
                         FilePattern::User(pattern, absolute)
                     })
                     .collect()

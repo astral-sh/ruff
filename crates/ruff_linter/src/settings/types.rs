@@ -160,10 +160,41 @@ impl UnsafeFixes {
     }
 }
 
+/// Represents a path to be passed to [`Glob::new`].
+#[derive(Debug, Clone, CacheKey, PartialEq, PartialOrd, Eq, Ord)]
+pub struct GlobPath {
+    path: PathBuf,
+}
+
+impl GlobPath {
+    /// Constructs a [`GlobPath`] by escaping any glob metacharacters in `root` and normalizing
+    /// `path` to the escaped `root`.
+    ///
+    /// See [`fs::normalize_path_to`] for details of the normalization.
+    pub fn normalize(path: impl AsRef<Path>, root: impl AsRef<Path>) -> Self {
+        let root = root.as_ref().to_string_lossy();
+        let escaped = globset::escape(&root);
+        let absolute = fs::normalize_path_to(path, escaped);
+        Self { path: absolute }
+    }
+
+    pub fn into_inner(self) -> PathBuf {
+        self.path
+    }
+}
+
+impl Deref for GlobPath {
+    type Target = PathBuf;
+
+    fn deref(&self) -> &Self::Target {
+        &self.path
+    }
+}
+
 #[derive(Debug, Clone, CacheKey, PartialEq, PartialOrd, Eq, Ord)]
 pub enum FilePattern {
     Builtin(&'static str),
-    User(String, PathBuf),
+    User(String, GlobPath),
 }
 
 impl FilePattern {
@@ -203,10 +234,10 @@ impl FromStr for FilePattern {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let pattern = s.to_string();
-        let cwd = globset::escape(&path_dedot::CWD.to_string_lossy());
-        let absolute = fs::normalize_path_to(&pattern, cwd);
-        Ok(Self::User(pattern, absolute))
+        Ok(Self::User(
+            s.to_string(),
+            GlobPath::normalize(s, &*path_dedot::CWD),
+        ))
     }
 }
 
@@ -283,7 +314,7 @@ pub struct PerFile<T> {
     /// The glob pattern used to construct the [`PerFile`].
     basename: String,
     /// The same pattern as `basename` but normalized to the project root directory.
-    absolute: PathBuf,
+    absolute: GlobPath,
     /// Whether the glob pattern should be negated (e.g. `!*.ipynb`)
     negated: bool,
     /// The per-file data associated with these glob patterns.
@@ -300,16 +331,12 @@ impl<T> PerFile<T> {
         if negated {
             pattern.drain(..1);
         }
-        let path = Path::new(&pattern);
 
         let project_root = project_root.unwrap_or(&path_dedot::CWD);
-        // escape glob metacharacters in the path outside the `pattern`
-        let escaped = globset::escape(&project_root.to_string_lossy());
-        let absolute = fs::normalize_path_to(path, escaped);
 
         Self {
+            absolute: GlobPath::normalize(&pattern, project_root),
             basename: pattern,
-            absolute,
             negated,
             data,
         }
