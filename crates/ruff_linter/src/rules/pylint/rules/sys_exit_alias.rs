@@ -1,10 +1,12 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::Expr;
-use ruff_text_size::Ranged;
+use std::fmt::{format, Debug};
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_python_ast::Number;
+use ruff_python_ast::{Expr, ExprCall};
+use ruff_text_size::Ranged;
 
 /// ## What it does
 /// Checks for uses of the `exit()` and `quit()`.
@@ -56,8 +58,8 @@ impl Violation for SysExitAlias {
 }
 
 /// PLR1722
-pub(crate) fn sys_exit_alias(checker: &Checker, func: &Expr) {
-    let Some(builtin) = checker.semantic().resolve_builtin_symbol(func) else {
+pub(crate) fn sys_exit_alias(checker: &Checker, func: &Expr, call: &ExprCall) {
+    let Some(builtin) = checker.semantic().resolve_builtin_symbol(&call.func) else {
         return;
     };
     if !matches!(builtin, "exit" | "quit") {
@@ -67,15 +69,36 @@ pub(crate) fn sys_exit_alias(checker: &Checker, func: &Expr) {
         SysExitAlias {
             name: builtin.to_string(),
         },
-        func.range(),
+        call.func.range(),
     );
+
+    let ExprCall { arguments, .. } = call;
+    let arg = arguments.args.first();
+    let kwr = arguments.keywords.first();
+
+    let code = if !arg.is_none() {
+        format!("{:?}", arg.unwrap().as_number_literal_expr().unwrap().value)
+    } else if !kwr.is_none() {
+        format!(
+            "{:?}",
+            kwr.unwrap().value.as_number_literal_expr().unwrap().value
+        )
+    } else {
+        String::new()
+    }
+    .strip_prefix("Int(")
+    .and_then(|s| s.strip_suffix(")"))
+    .and_then(|num_str| num_str.parse::<i32>().ok())
+    .unwrap_or(0);
+
     diagnostic.try_set_fix(|| {
         let (import_edit, binding) = checker.importer().get_or_import_symbol(
             &ImportRequest::import("sys", "exit"),
-            func.start(),
+            call.func.start(),
             checker.semantic(),
         )?;
-        let reference_edit = Edit::range_replacement(binding, func.range());
+        let reference_edit =
+            Edit::range_replacement(format!("{}({:?})", binding, code,), call.range);
         Ok(Fix::unsafe_edits(import_edit, [reference_edit]))
     });
     checker.report_diagnostic(diagnostic);
