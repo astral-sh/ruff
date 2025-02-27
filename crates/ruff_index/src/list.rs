@@ -104,6 +104,20 @@ impl<K, V> Default for List<K, V> {
     }
 }
 
+/// A handle to a mutable association list. It is safe to modify a mutable list; we will have
+/// ensured that the list's contents are not shared with any other list.
+pub struct MutableList<'a, K, V = ()> {
+    last: Option<ListCellId>,
+    builder: &'a mut ListBuilder<K, V>,
+}
+
+impl<K, V> MutableList<'_, K, V> {
+    /// Converts a mutable handle to a list back into a regular handle.
+    pub fn finish(self) -> List<K, V> {
+        List::new(self.last)
+    }
+}
+
 #[newtype_index]
 #[derive(PartialOrd, Ord)]
 struct ListCellId;
@@ -719,54 +733,57 @@ impl<K, V> ListBuilder<K, V> {
         List::new(last)
     }
 
-    /// Applies a function to each value in a list, returning a new list.
-    #[allow(clippy::needless_pass_by_value)]
-    pub fn map_with<F>(&mut self, list: List<K, V>, mut f: F) -> List<K, V>
+    /// Ensures that a list can be mutated in-place, and returns a mutable handle to it. If any
+    /// cells need to be cloned, their keys and values are cloned using their [`Clone`] impls.
+    pub fn make_mut(&mut self, list: List<K, V>) -> MutableList<K, V>
+    where
+        K: Clone,
+        V: Clone,
+    {
+        self.make_mut_with(list, V::clone)
+    }
+
+    /// Ensures that a list can be mutated in-place, and returns a mutable handle to it. If any
+    /// cells need to be cloned, their keys are cloned using their [`Clone`] impls, and their
+    /// values are cloned using the function you provide.
+    pub fn make_mut_with<F>(&mut self, list: List<K, V>, mut clone: F) -> MutableList<K, V>
     where
         K: Clone,
         F: FnMut(&V) -> V,
     {
-        self.scratch.clear();
-
-        // Iterate through the list, applying the function to each value.
-        //
-        // We reuse any unaliased cells at the end of the list, since we consume the input and
-        // those cells are not used by any other lists. Once we encounter an aliased cell, we have
-        // to fail through to the lower loop, which creates new cells.
+        // Iterate through the list to find the first aliased cell.
+        let mut prev = None;
         let mut curr = list.last;
-        // The start and end of the range of cells that we're able to reuse, if any.
-        let mut unaliased_bounds: Option<(Option<ListCellId>, ListCellId)> = None;
-        while let Some(curr_id) = curr {
+        let last_unaliased = loop {
+            let Some(curr_id) = curr else {
+                // If we reach the end of the list without finding an aliased cell, then the
+                // original list is already mutable.
+                return MutableList {
+                    last: list.last,
+                    builder: self,
+                };
+            };
+
+            // We've reached an aliased cell, so we have to switch over to creating new cells
+            // instead of reusing existing ones.
             if self.aliased[curr_id] {
-                // We've reached an aliased cell, so we have to switch over to creating new cells
-                // instead of reusing existing ones.
-                break;
+                break prev;
             }
 
+            prev = curr;
+            curr = self.storage.cells[curr_id].rest;
+        };
+
+        // We have to build new cells from this point on. First add the cloned keys/values to the
+        // scratch accumulator.
+        self.scratch.clear();
+        while let Some(curr_id) = curr {
             let cell = &self.storage.cells[curr_id];
             let rest = cell.rest;
-            let new_value = f(&cell.value);
-            self.storage.cells[curr_id].value = new_value;
-            if let Some((_, unaliased_end)) = unaliased_bounds.as_mut() {
-                // Connect the previous reused unaliased cell to this one, and update the
-                // unaliased bounds to include this cell.
-                self.storage.cells[*unaliased_end].rest = curr;
-                *unaliased_end = curr_id;
-            } else {
-                // This is the first unaliased cell that we've been able to reuse.
-                unaliased_bounds = Some((curr, curr_id));
-            }
-            curr = rest;
-        }
-
-        // We have to build new cells from this point on. First add the new keys/values to the
-        // scratch accumulator.
-        while let Some(curr_id) = curr {
-            let cell = &self.storage.cells[curr_id];
             let new_key = cell.key.clone();
-            let new_value = f(&cell.value);
+            let new_value = clone(&cell.value);
             self.scratch.push((new_key, new_value));
-            curr = cell.rest;
+            curr = rest;
         }
 
         // Once the iteration loop terminates, we stitch the new entries back together into proper
@@ -778,12 +795,30 @@ impl<K, V> ListBuilder<K, V> {
 
         // If we were able to reuse any unaliased cells, append them to any new cells we had to
         // create.
-        if let Some((unaliased_start, unaliased_end)) = unaliased_bounds {
-            self.storage.cells[unaliased_end].rest = last;
-            last = unaliased_start;
+        if let Some(last_unaliased_id) = last_unaliased {
+            self.storage.cells[last_unaliased_id].rest = last;
+            last = list.last;
         }
 
-        List::new(last)
+        MutableList {
+            last,
+            builder: self,
+        }
+    }
+}
+
+impl<K, V> MutableList<'_, K, V> {
+    /// Applies a function to each value in a mutable list.
+    pub fn for_each<F>(self, mut f: F) -> Self
+    where
+        F: FnMut(&mut V),
+    {
+        let mut curr = self.last;
+        while let Some(curr_id) = curr {
+            f(&mut self.builder.storage.cells[curr_id].value);
+            curr = self.builder.storage.cells[curr_id].rest;
+        }
+        self
     }
 }
 
@@ -1185,7 +1220,7 @@ mod tests {
         #[allow(clippy::items_after_statements)]
         fn map(builder: &mut ListBuilder<u16, u16>, input: &List<u16, u16>) -> List<u16, u16> {
             let input = builder.clone_list(input);
-            builder.map_with(input, |v| *v * 3)
+            builder.make_mut(input).for_each(|v| *v *= 3).finish()
         }
 
         let result = map(&mut builder, &empty);
@@ -1477,7 +1512,7 @@ mod property_tests {
         let input = builder.list_from_pairs(&pairs);
         let input_copy = builder.clone_list(&input);
         let _ = builder.append_from_pairs(input_copy, &unrelated_pairs);
-        let result = builder.map_with(input, |a| a * 3);
+        let result = builder.make_mut(input).for_each(|a| *a *= 3).finish();
         let expected: BTreeMap<_, _> = pairs.iter().map(|(k, v)| (*k, *v * 3)).collect();
         let actual = builder.iter_reverse(&result).map(|(k, v)| (*k, *v));
         actual.eq(expected.into_iter().rev())
