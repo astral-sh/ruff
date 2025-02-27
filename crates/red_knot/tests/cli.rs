@@ -843,6 +843,123 @@ fn user_configuration() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[test]
+fn check_specific_paths() -> anyhow::Result<()> {
+    let case = TestCase::with_files([
+        (
+            "project/main.py",
+            r#"
+            y = 4 / 0  # error: division-by-zero
+            "#,
+        ),
+        (
+            "project/tests/test_main.py",
+            r#"
+            import does_not_exist  # error: unresolved-import
+            "#,
+        ),
+        (
+            "project/other.py",
+            r#"
+            from main2 import z  # error: unresolved-import
+
+            print(z)
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(
+        case.command(),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error: lint:unresolved-import
+     --> <temp_dir>/project/tests/test_main.py:2:8
+      |
+    2 | import does_not_exist  # error: unresolved-import
+      |        ^^^^^^^^^^^^^^ Cannot resolve import `does_not_exist`
+      |
+
+    error: lint:division-by-zero
+     --> <temp_dir>/project/main.py:2:5
+      |
+    2 | y = 4 / 0  # error: division-by-zero
+      |     ^^^^^ Cannot divide object of type `Literal[4]` by zero
+      |
+
+    error: lint:unresolved-import
+     --> <temp_dir>/project/other.py:2:6
+      |
+    2 | from main2 import z  # error: unresolved-import
+      |      ^^^^^ Cannot resolve import `main2`
+    3 |
+    4 | print(z)
+      |
+
+    Found 3 diagnostics
+
+    ----- stderr -----
+    "
+    );
+
+    // Now check only the `tests` and `other.py` files.
+    // We should no longer see any diagnostics related to `main.py`.
+    assert_cmd_snapshot!(
+        case.command().arg("project/tests").arg("project/other.py"),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error: lint:unresolved-import
+     --> <temp_dir>/project/tests/test_main.py:2:8
+      |
+    2 | import does_not_exist  # error: unresolved-import
+      |        ^^^^^^^^^^^^^^ Cannot resolve import `does_not_exist`
+      |
+
+    error: lint:unresolved-import
+     --> <temp_dir>/project/other.py:2:6
+      |
+    2 | from main2 import z  # error: unresolved-import
+      |      ^^^^^ Cannot resolve import `main2`
+    3 |
+    4 | print(z)
+      |
+
+    Found 2 diagnostics
+
+    ----- stderr -----
+    "
+    );
+
+    Ok(())
+}
+
+#[test]
+fn check_non_existing_path() -> anyhow::Result<()> {
+    let case = TestCase::with_files([])?;
+
+    assert_cmd_snapshot!(
+        case.command().arg("project/main.py").arg("project/tests"),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error: io: `<temp_dir>/project/main.py`: No such file or directory (os error 2)
+
+    error: io: `<temp_dir>/project/tests`: No such file or directory (os error 2)
+
+    Found 2 diagnostics
+
+    ----- stderr -----
+    WARN No python files found under the given path(s)
+    "
+    );
+
+    Ok(())
+}
+
 struct TestCase {
     _temp_dir: TempDir,
     _settings_scope: SettingsBindDropGuard,
