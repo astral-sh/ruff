@@ -352,9 +352,8 @@ where
                     self.builder.scratch.push((new_key, new_value));
                     if curr == self.predecessor {
                         break;
-                    } else {
-                        curr = next;
                     }
+                    curr = next;
                 }
             }
 
