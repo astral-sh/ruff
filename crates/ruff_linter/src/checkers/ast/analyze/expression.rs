@@ -900,7 +900,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 pylint::rules::unnecessary_direct_lambda_call(checker, expr, func);
             }
             if checker.enabled(Rule::SysExitAlias) {
-                pylint::rules::sys_exit_alias(checker, func, call);
+                pylint::rules::sys_exit_alias(checker, call);
             }
             if checker.enabled(Rule::BadOpenMode) {
                 pylint::rules::bad_open_mode(checker, call);

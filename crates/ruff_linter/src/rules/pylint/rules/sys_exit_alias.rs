@@ -1,11 +1,9 @@
-use std::fmt::{format, Debug};
-
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::Number;
-use ruff_python_ast::{Expr, ExprCall};
+
+use ruff_python_ast::ExprCall;
 use ruff_text_size::Ranged;
 
 /// ## What it does
@@ -58,7 +56,7 @@ impl Violation for SysExitAlias {
 }
 
 /// PLR1722
-pub(crate) fn sys_exit_alias(checker: &Checker, func: &Expr, call: &ExprCall) {
+pub(crate) fn sys_exit_alias(checker: &Checker, call: &ExprCall) {
     let Some(builtin) = checker.semantic().resolve_builtin_symbol(&call.func) else {
         return;
     };
@@ -76,15 +74,17 @@ pub(crate) fn sys_exit_alias(checker: &Checker, func: &Expr, call: &ExprCall) {
     let arg = arguments.args.first();
     let kwr = arguments.keywords.first();
 
-    let code = if !arg.is_none() {
+    let code = if arg.is_some() {
         format!("{:?}", arg.unwrap().as_number_literal_expr().unwrap().value)
-    } else if !kwr.is_none() {
+    } else if kwr.is_some() && kwr.unwrap().value.is_number_literal_expr() {
         format!(
             "{:?}",
             kwr.unwrap().value.as_number_literal_expr().unwrap().value
         )
     } else {
-        String::new()
+        // If it is not possible to retrieve the code, then just a violation is raised
+        checker.report_diagnostic(diagnostic);
+        return;
     }
     .strip_prefix("Int(")
     .and_then(|s| s.strip_suffix(")"))
@@ -97,8 +97,7 @@ pub(crate) fn sys_exit_alias(checker: &Checker, func: &Expr, call: &ExprCall) {
             call.func.start(),
             checker.semantic(),
         )?;
-        let reference_edit =
-            Edit::range_replacement(format!("{}({:?})", binding, code,), call.range);
+        let reference_edit = Edit::range_replacement(format!("{binding}({code:?})"), call.range);
         Ok(Fix::unsafe_edits(import_edit, [reference_edit]))
     });
     checker.report_diagnostic(diagnostic);
