@@ -6,7 +6,6 @@ use ruff_db::parsed::parsed_module;
 use ruff_index::{IndexSlice, IndexVec};
 
 use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
-use salsa::plumbing::AsId;
 use salsa::Update;
 
 use crate::module_name::ModuleName;

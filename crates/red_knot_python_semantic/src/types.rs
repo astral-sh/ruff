@@ -1360,7 +1360,7 @@ impl<'db> Type<'db> {
     }
 
     #[must_use]
-    fn find_name_in_mro(&self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
+    fn find_name_in_mro(&self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
         let _span =
             tracing::trace_span!("find_name_in_mro", self=%self.display(db), name).entered();
 
@@ -1368,7 +1368,7 @@ impl<'db> Type<'db> {
             Type::ClassLiteral(ClassLiteralType { class })
                 if class.is_known(db, KnownClass::FunctionType) && name == "__get__" =>
             {
-                Symbol::bound(Type::Callable(CallableType::WrapperDescriptorDunderGet))
+                Symbol::bound(Type::Callable(CallableType::WrapperDescriptorDunderGet)).into()
             }
 
             // Hard code this knowledge, as we need to look this up often.
@@ -1376,7 +1376,7 @@ impl<'db> Type<'db> {
                 if class.is_known(db, KnownClass::FunctionType) && name == "__set__"
                     || name == "__delete___" =>
             {
-                Symbol::Unbound
+                Symbol::Unbound.into()
             }
 
             Type::SubclassOf(subclass_of)
@@ -1395,7 +1395,7 @@ impl<'db> Type<'db> {
                         )
                     ) =>
             {
-                Symbol::Unbound
+                Symbol::Unbound.into()
             }
             Type::ClassLiteral(class)
                 if matches!(name, "__get__" | "__set__" | "__delete__")
@@ -1410,12 +1410,12 @@ impl<'db> Type<'db> {
                         )
                     ) =>
             {
-                Symbol::Unbound
+                Symbol::Unbound.into()
             }
             Type::ClassLiteral(class_literal) => class_literal.find_name_in_mro(db, name),
             Type::SubclassOf(subclass_of_ty) => subclass_of_ty.find_name_in_mro(db, name),
-            dynamic @ Type::Dynamic(_) => Symbol::bound(dynamic),
-            _ => Symbol::todo("find_name_in_mro for non-class types"),
+            dynamic @ Type::Dynamic(_) => Symbol::bound(dynamic).into(),
+            _ => Symbol::todo("find_name_in_mro for non-class types").into(),
         }
     }
 
@@ -1452,9 +1452,9 @@ impl<'db> Type<'db> {
 
             Type::ModuleLiteral(module) => module.static_member(db, name),
 
-            Type::ClassLiteral(class_ty) => class_ty.find_name_in_mro(db, name),
+            Type::ClassLiteral(class_ty) => class_ty.find_name_in_mro(db, name).0,
 
-            Type::SubclassOf(subclass_of_ty) => subclass_of_ty.find_name_in_mro(db, name),
+            Type::SubclassOf(subclass_of_ty) => subclass_of_ty.find_name_in_mro(db, name).0,
 
             Type::KnownInstance(known_instance) => known_instance.static_member(db, name),
 
@@ -1677,9 +1677,9 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         name: &str,
-        class_attr: Symbol<'db>,
+        class_attr: SymbolAndQualifiers<'db>,
         owner: Type<'db>,
-    ) -> Symbol<'db> {
+    ) -> SymbolAndQualifiers<'db> {
         let _span = tracing::trace_span!(
             "run_descriptor_protocol_instances",
             self=%self.display(db),
@@ -1694,45 +1694,50 @@ impl<'db> Type<'db> {
             db: &'db dyn Db,
             instance: Type<'db>,
             name: &str,
-            class_attr: Symbol<'db>,
+            class_attr: SymbolAndQualifiers<'db>,
             owner: Type<'db>,
-        ) -> Symbol<'db> {
+        ) -> SymbolAndQualifiers<'db> {
             // TODO: Handle possible-unboundness and errors from `__get__` calls.
 
-            match class_attr {
-                Symbol::Type(Type::Union(union), boundness) => {
-                    union.map_with_boundness(db, |elem| {
-                        instance.run_descriptor_protocol_instances(
-                            db,
-                            name,
-                            Symbol::Type(*elem, boundness),
-                            owner,
-                        )
+            match class_attr.0 {
+                Symbol::Type(Type::Union(union), boundness) => union
+                    .map_with_boundness(db, |elem| {
+                        instance
+                            .run_descriptor_protocol_instances(
+                                db,
+                                name,
+                                Symbol::Type(*elem, boundness).into(),
+                                owner,
+                            )
+                            .0
                     })
-                }
+                    .into(),
                 Symbol::Type(Type::Intersection(intersection), boundness) => intersection
                     .map_with_boundness(db, |elem| {
-                        instance.run_descriptor_protocol_instances(
-                            db,
-                            name,
-                            Symbol::Type(*elem, boundness),
-                            owner,
-                        )
-                    }),
+                        instance
+                            .run_descriptor_protocol_instances(
+                                db,
+                                name,
+                                Symbol::Type(*elem, boundness).into(),
+                                owner,
+                            )
+                            .0
+                    })
+                    .into(),
                 Symbol::Type(class_attr_ty, class_attr_boundness) => {
                     // TODO: Handle possible-unboundness of `__get__` method
                     // There is an existing test case for this in `descriptor_protocol.md`.
 
                     let class_attr_meta_ty = class_attr_ty.to_meta_type(db);
 
-                    let descr_get = class_attr_meta_ty.member(db, "__get__");
+                    let descr_get = class_attr_meta_ty.member(db, "__get__").0;
 
                     tracing::info!("self_meta = {}", class_attr_meta_ty.display(db));
                     tracing::info!("descr_get = {:?}", descr_get);
 
                     if let Symbol::Type(descr_get, _) = descr_get {
-                        if !class_attr_meta_ty.member(db, "__set__").is_unbound()
-                            || !class_attr_meta_ty.member(db, "__delete__").is_unbound()
+                        if !class_attr_meta_ty.member(db, "__set__").0.is_unbound()
+                            || !class_attr_meta_ty.member(db, "__delete__").0.is_unbound()
                         {
                             tracing::info!("protocol resolution: Data descriptor");
                             // Data descriptor
@@ -1749,7 +1754,8 @@ impl<'db> Type<'db> {
                                     .map(|outcome| outcome.return_type(db))
                                     .unwrap_or(Type::unknown()),
                                 class_attr_boundness,
-                            );
+                            )
+                            .into();
                         }
                     }
 
@@ -1759,7 +1765,7 @@ impl<'db> Type<'db> {
                         instance.instance_variable(db, name)
                     {
                         tracing::info!("protocol resolution: Instance variable");
-                        return instance_variable;
+                        return instance_variable.into();
                     }
 
                     if let Symbol::Type(descr_get, _) = descr_get {
@@ -1775,14 +1781,15 @@ impl<'db> Type<'db> {
                                 .map(|outcome| outcome.return_type(db))
                                 .unwrap_or(Type::unknown()),
                             class_attr_boundness,
-                        ); // TODO: avoid duplication
+                        )
+                        .into(); // TODO: avoid duplication
                     }
 
                     tracing::info!("protocol resolution: Class variable");
 
                     class_attr
                 }
-                Symbol::Unbound => instance.instance_variable(db, name),
+                Symbol::Unbound => instance.instance_variable(db, name).into(),
             }
         }
 
@@ -1798,8 +1805,8 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         name: &str,
-        class_attr: Symbol<'db>,
-    ) -> Symbol<'db> {
+        class_attr: SymbolAndQualifiers<'db>,
+    ) -> SymbolAndQualifiers<'db> {
         let _span = tracing::trace_span!(
             "run_descriptor_protocol_classes",
             self=%self.display(db),
@@ -1813,38 +1820,44 @@ impl<'db> Type<'db> {
             db: &'db dyn Db,
             object_ty: Type<'db>,
             name: &str,
-            class_attr: Symbol<'db>,
-        ) -> Symbol<'db> {
+            class_attr: SymbolAndQualifiers<'db>,
+        ) -> SymbolAndQualifiers<'db> {
             // TODO: Handle possible-unboundness and errors from `__get__` calls.
 
-            match class_attr {
-                Symbol::Type(Type::Union(union), boundness) => {
-                    union.map_with_boundness(db, |elem| {
-                        object_ty.run_descriptor_protocol_classes(
-                            db,
-                            name,
-                            Symbol::Type(*elem, boundness),
-                        )
+            match class_attr.0 {
+                Symbol::Type(Type::Union(union), boundness) => union
+                    .map_with_boundness(db, |elem| {
+                        object_ty
+                            .run_descriptor_protocol_classes(
+                                db,
+                                name,
+                                Symbol::Type(*elem, boundness).into(),
+                            )
+                            .0
                     })
-                }
+                    .into(),
                 Symbol::Type(Type::Intersection(intersection), boundness) => intersection
                     .map_with_boundness(db, |elem| {
-                        object_ty.run_descriptor_protocol_classes(
-                            db,
-                            name,
-                            Symbol::Type(*elem, boundness),
-                        )
-                    }),
+                        object_ty
+                            .run_descriptor_protocol_classes(
+                                db,
+                                name,
+                                Symbol::Type(*elem, boundness).into(),
+                            )
+                            .0
+                    })
+                    .into(),
                 Symbol::Type(class_attr_ty, class_attr_boundness) => {
                     // TODO: Handle possible-unboundness of `__get__` method
                     // There is an existing test case for this in `descriptor_protocol.md`.
 
                     let meta_type = object_ty.to_meta_type(db);
-                    if let Symbol::Type(meta_attribute, _) = meta_type.find_name_in_mro(db, name) {
-                        let meta_descr_get = meta_attribute.find_name_in_mro(db, "__get__");
+                    if let Symbol::Type(meta_attribute, _) = meta_type.find_name_in_mro(db, name).0
+                    {
+                        let meta_descr_get = meta_attribute.find_name_in_mro(db, "__get__").0;
                         if let Symbol::Type(meta_descr_get, _) = meta_descr_get {
-                            if !meta_type.member(db, "__set__").is_unbound()
-                                || !meta_type.member(db, "__delete__").is_unbound()
+                            if !meta_type.member(db, "__set__").0.is_unbound()
+                                || !meta_type.member(db, "__delete__").0.is_unbound()
                             {
                                 // Data descriptor on meta class
                                 return Symbol::Type(
@@ -1860,14 +1873,16 @@ impl<'db> Type<'db> {
                                         .map(|outcome| outcome.return_type(db))
                                         .unwrap_or(Type::unknown()),
                                     class_attr_boundness,
-                                );
+                                )
+                                .into();
                             }
                         }
                     }
 
                     let descr_get = class_attr_ty
                         .to_meta_type(db)
-                        .find_name_in_mro(db, "__get__");
+                        .find_name_in_mro(db, "__get__")
+                        .0;
                     if let Symbol::Type(descr_get, _) = descr_get {
                         // Data or non-data descriptor on class
                         return Symbol::Type(
@@ -1883,14 +1898,15 @@ impl<'db> Type<'db> {
                                 .map(|outcome| outcome.return_type(db))
                                 .unwrap_or(Type::unknown()),
                             class_attr_boundness,
-                        );
+                        )
+                        .into();
                     }
 
                     class_attr
 
                     // TODO: here we should call non-data descriptors on the metaclass
                 }
-                Symbol::Unbound => Symbol::Unbound,
+                Symbol::Unbound => Symbol::Unbound.into(),
             }
         }
 
@@ -1905,28 +1921,31 @@ impl<'db> Type<'db> {
     /// TODO: We should return a `Result` here to handle errors that can appear during attribute
     /// lookup, like a failed `__get__` call on a descriptor.
     #[must_use]
-    pub(crate) fn member(&self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
+    pub(crate) fn member(&self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
         let _span = tracing::trace_span!("member", self=%self.display(db), name).entered();
 
         if name == "__class__" {
-            return Symbol::bound(self.to_meta_type(db));
+            return Symbol::bound(self.to_meta_type(db)).into();
         }
 
         match self {
             Type::FunctionLiteral(function) if name == "__get__" => Symbol::bound(Type::Callable(
                 CallableType::MethodWrapperDunderGet(*function),
-            )),
+            ))
+            .into(),
 
             // TODO: move to static member?
             Type::ClassLiteral(ClassLiteralType { class })
                 if class.is_known(db, KnownClass::FunctionType) && name == "__get__" =>
             {
-                Symbol::bound(Type::Callable(CallableType::WrapperDescriptorDunderGet))
+                Symbol::bound(Type::Callable(CallableType::WrapperDescriptorDunderGet)).into()
             }
 
             Type::Callable(CallableType::BoundMethod(bound_method)) => match name {
-                "__self__" => Symbol::bound(bound_method.self_instance(db)),
-                "__func__" => Symbol::bound(Type::FunctionLiteral(bound_method.function(db))),
+                "__self__" => Symbol::bound(bound_method.self_instance(db)).into(),
+                "__func__" => {
+                    Symbol::bound(Type::FunctionLiteral(bound_method.function(db))).into()
+                }
                 _ => {
                     KnownClass::MethodType
                         .to_instance(db)
@@ -1978,7 +1997,7 @@ impl<'db> Type<'db> {
                 if subclass_of_ty.subclass_of().is_dynamic()
                     && matches!(name, "__get__" | "__set__" | "__delete__") =>
             {
-                Symbol::bound(Type::unknown())
+                Symbol::bound(Type::unknown()).into()
             }
 
             Type::ClassLiteral(..) | Type::SubclassOf(..) => {
@@ -1991,16 +2010,18 @@ impl<'db> Type<'db> {
 
                 self.run_descriptor_protocol_classes(db, name, cls_var)
             }
-            Type::Union(union) => union.map_with_boundness(db, |elem| elem.member(db, name)),
-            Type::Intersection(intersection) => {
-                intersection.map_with_boundness(db, |elem| elem.member(db, name))
-            }
+            Type::Union(union) => union
+                .map_with_boundness(db, |elem| elem.member(db, name).0)
+                .into(),
+            Type::Intersection(intersection) => intersection
+                .map_with_boundness(db, |elem| elem.member(db, name).0)
+                .into(),
 
             Type::Dynamic(..)
             | Type::Never
             | Type::AlwaysFalsy
             | Type::AlwaysTruthy
-            | Type::ModuleLiteral(..) => self.static_member(db, name),
+            | Type::ModuleLiteral(..) => self.static_member(db, name).into(),
         }
     }
 
@@ -2678,9 +2699,10 @@ impl<'db> Type<'db> {
                     .run_descriptor_protocol_instances(
                         db,
                         name,
-                        Symbol::Type(callable_ty, boundness),
+                        Symbol::Type(callable_ty, boundness).into(),
                         meta_type,
                     )
+                    .0
                 {
                     callable_ty = callable_ty_desc;
                     boundness = boundness_desc;
@@ -4238,7 +4260,7 @@ impl<'db> ModuleLiteralType<'db> {
             }
         }
 
-        imported_symbol(db, &self.module(db), name)
+        imported_symbol(db, &self.module(db), name).0
     }
 }
 
@@ -4759,8 +4781,9 @@ pub(crate) mod tests {
             .build()
             .unwrap();
 
-        let typing_no_default = typing_symbol(&db, "NoDefault").expect_type();
-        let typing_extensions_no_default = typing_extensions_symbol(&db, "NoDefault").expect_type();
+        let typing_no_default = typing_symbol(&db, "NoDefault").0.expect_type();
+        let typing_extensions_no_default =
+            typing_extensions_symbol(&db, "NoDefault").0.expect_type();
 
         assert_eq!(typing_no_default.display(&db).to_string(), "NoDefault");
         assert_eq!(
@@ -4792,7 +4815,7 @@ pub(crate) mod tests {
         )?;
 
         let bar = system_path_to_file(&db, "src/bar.py")?;
-        let a = global_symbol(&db, bar, "a");
+        let a = global_symbol(&db, bar, "a").0;
 
         assert_eq!(
             a.expect_type(),
@@ -4811,7 +4834,7 @@ pub(crate) mod tests {
         )?;
         db.clear_salsa_events();
 
-        let a = global_symbol(&db, bar, "a");
+        let a = global_symbol(&db, bar, "a").0;
 
         assert_eq!(
             a.expect_type(),
@@ -4913,6 +4936,7 @@ pub(crate) mod tests {
             };
 
             let function_body_scope = known_module_symbol(&db, module, function_name)
+                .0
                 .expect_type()
                 .expect_function_literal()
                 .body_scope(&db);
