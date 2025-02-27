@@ -68,7 +68,7 @@ fn unsupported_syntax_error() {
         r#"{}"#,
         [ExpandedMessage {
             code: None,
-            message: "SyntaxError: Cannot use `match` statement on Python 3.9 (syntax was added in Python {})".to_string(),
+            message: "SyntaxError: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)".to_string(),
             location: SourceLocation {
                 row: OneIndexed::from_zero_indexed(0),
                 column: OneIndexed::from_zero_indexed(0)
