@@ -14,15 +14,24 @@ from typing import Any
 
 import tomllib
 
-imports = ["crate::name::Name"]
-
-
-def requires_crate_prefix(ty: str) -> bool:
-    no_crate_prefix_types = [
-        "Name",  # Imported at the top
-        "bool",
-    ]
-    return not (ty in no_crate_prefix_types or ty.startswith("Box"))
+# Types that require `crate::`. We can slowly remove these types as we move them to generate scripts.
+types_requiring_create_prefix = [
+    "IpyEscapeKind",
+    "ExprContext",
+    "Identifier",
+    "Number",
+    "BytesLiteralValue",
+    "StringLiteralValue",
+    "FStringValue",
+    "Arguments",
+    "CmpOp",
+    "Comprehension",
+    "DictItem",
+    "Parameters",
+    "UnaryOp",
+    "BoolOp",
+    "Operator",
+]
 
 
 def rustfmt(code: str) -> str:
@@ -140,12 +149,11 @@ class Field:
 
 
 def write_preamble(out: list[str]) -> None:
-    import_section = "\n".join(f"use {im};" for im in imports)
-    out.append(f"""
+    out.append("""
     // This is a generated file. Don't modify it by hand!
     // Run `crates/ruff_python_ast/generate.py` to re-generate the file.
 
-    {import_section}
+    use crate::name::Name;
     """)
 
 
@@ -612,7 +620,7 @@ def write_node(out: list[str], ast: Ast) -> None:
                 field_str = f"pub {field.name}: "
 
                 inner = f"{field.ty}"
-                if requires_crate_prefix(field.ty):
+                if field.ty in types_requiring_create_prefix:
                     inner = f"crate::{inner}"
                 if field.ty in group_names and field.seq is False:
                     inner = f"Box<{inner}>"
