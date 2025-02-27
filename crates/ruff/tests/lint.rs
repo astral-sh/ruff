@@ -2733,10 +2733,11 @@ fn cache_syntax_errors() -> Result<()> {
     assert_cmd_snapshot!(
         cmd,
         @r"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 1
     ----- stdout -----
-    All checks passed!
+    main.py:1:1: SyntaxError: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
+    Found 1 error.
 
     ----- stderr -----
     warning: Detected debug build without --no-cache.

@@ -445,7 +445,7 @@ pub fn lint_only(
             &locator,
             &directives,
         ),
-        has_syntax_error: !parsed.is_valid(),
+        has_syntax_error: !parsed.is_valid() || !parsed.unsupported_syntax_errors().is_empty(),
     }
 }
 
@@ -546,7 +546,7 @@ pub fn lint_fix<'a>(
         );
 
         if iterations == 0 {
-            is_valid_syntax = parsed.is_valid();
+            is_valid_syntax = parsed.is_valid() && parsed.unsupported_syntax_errors().is_empty();
         } else {
             // If the source code was parseable on the first pass, but is no
             // longer parseable on a subsequent pass, then we've introduced a
