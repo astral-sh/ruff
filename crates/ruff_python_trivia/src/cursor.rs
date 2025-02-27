@@ -95,7 +95,8 @@ impl<'a> Cursor<'a> {
     /// Eats the next two characters if they are `c1` and `c2`. Does not
     /// consume any input otherwise, even if the first character matches.
     pub fn eat_char2(&mut self, c1: char, c2: char) -> bool {
-        if self.first() == c1 && self.second() == c2 {
+        let mut chars = self.chars.clone();
+        if chars.next() == Some(c1) && chars.next() == Some(c2) {
             self.bump();
             self.bump();
             true
@@ -104,8 +105,8 @@ impl<'a> Cursor<'a> {
         }
     }
 
-    /// Eats the next two characters if they are `c1` and `c2`. Does not
-    /// consume any input otherwise, even if the first character matches.
+    /// Eats the next three characters if they are `c1`, `c2` and `c3`
+    /// Does not consume any input otherwise, even if the first character matches.
     pub fn eat_char3(&mut self, c1: char, c2: char, c3: char) -> bool {
         let mut chars = self.chars.clone();
         if chars.next() == Some(c1) && chars.next() == Some(c2) && chars.next() == Some(c3) {
