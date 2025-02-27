@@ -2143,7 +2143,12 @@ fn cookiecutter_globbing() -> Result<()> {
     // The absolute path of the glob contains the glob metacharacters `{{` and `}}` even though the
     // user's glob does not.
     let tempdir = TempDir::new()?;
-    let cookiecutter = tempdir.path().join("{{cookiecutter.repo_name}}");
+    // add an extra layer here to prevent the regex escapes on `{` from conflicting with the tempdir
+    // filter for insta
+    let cookiecutter = tempdir
+        .path()
+        .join("tmp")
+        .join("{{cookiecutter.repo_name}}");
     let cookiecutter_toml = cookiecutter.join("pyproject.toml");
     let tests = cookiecutter.join("tests");
     fs::create_dir_all(&tests)?;
@@ -2167,8 +2172,8 @@ fn cookiecutter_globbing() -> Result<()> {
         success: false
         exit_code: 1
         ----- stdout -----
-        --- {{cookiecutter.repo_name}}/tests/maintest.py
-        +++ {{cookiecutter.repo_name}}/tests/maintest.py
+        --- tmp/{{cookiecutter.repo_name}}/tests/maintest.py
+        +++ tmp/{{cookiecutter.repo_name}}/tests/maintest.py
         @@ -1,3 +1,3 @@
          import foo
          import bar
@@ -2178,7 +2183,7 @@ fn cookiecutter_globbing() -> Result<()> {
 
 
         ----- stderr -----
-        warning: Error parsing original glob: `"[TMP]/{{cookiecutter.repo_name}}/tests/*"`, trying with escaped braces: `"[TMP]/[{][{]cookiecutter.repo_name[}][}]/tests/*"`
+        warning: Error parsing original glob: `"[TMP]/tmp/{{cookiecutter.repo_name}}/tests/*"`, trying with escaped braces: `"[TMP]/tmp/[{][{]cookiecutter.repo_name[}][}]/tests/*"`
         1 file would be reformatted
         "#);
     });
