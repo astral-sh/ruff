@@ -44,7 +44,7 @@ fn empty_config() {
 fn syntax_error() {
     check!(
         "x =\ny = 1\n",
-        r#"{"preview": true}"#,
+        r#"{}"#,
         [ExpandedMessage {
             code: None,
             message: "SyntaxError: Expected an expression".to_string(),
@@ -65,7 +65,7 @@ fn syntax_error() {
 fn unsupported_syntax_error() {
     check!(
         "match 2:\n    case 1: ...",
-        r#"{}"#,
+        r#"{"preview": true}"#,
         [ExpandedMessage {
             code: None,
             message: "SyntaxError: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)".to_string(),
