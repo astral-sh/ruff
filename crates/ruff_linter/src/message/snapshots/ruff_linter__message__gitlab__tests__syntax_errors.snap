@@ -1,10 +1,10 @@
 ---
 source: crates/ruff_linter/src/message/gitlab.rs
 expression: redact_fingerprint(&content)
-snapshot_kind: text
 ---
 [
   {
+    "check_name": "Syntax error",
     "description": "SyntaxError: Expected one or more symbol names after import",
     "fingerprint": "<redacted>",
     "location": {
@@ -17,6 +17,7 @@ snapshot_kind: text
     "severity": "major"
   },
   {
+    "check_name": "Syntax error",
     "description": "SyntaxError: Expected ')', found newline",
     "fingerprint": "<redacted>",
     "location": {

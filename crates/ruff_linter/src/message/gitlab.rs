@@ -90,13 +90,15 @@ impl Serialize for SerializedMessages<'_> {
             }
             fingerprints.insert(message_fingerprint);
 
-            let description = if let Some(rule) = message.rule() {
-                format!("({}) {}", rule.noqa_code(), message.body())
+            let description = message.body().to_string();
+            let check_name = if let Some(rule) = message.rule() {
+                rule.noqa_code().to_string()
             } else {
-                message.body().to_string()
+                "Syntax error".to_string()
             };
 
             let value = json!({
+                "check_name": check_name,
                 "description": description,
                 "severity": "major",
                 "fingerprint": format!("{:x}", message_fingerprint),
