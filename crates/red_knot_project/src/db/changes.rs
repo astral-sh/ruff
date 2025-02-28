@@ -39,6 +39,8 @@ impl ProjectDatabase {
         };
 
         for change in changes {
+            tracing::trace!("Handle change: {:?}", change);
+
             if let Some(path) = change.system_path() {
                 if matches!(
                     path.file_name(),
@@ -117,11 +119,19 @@ impl ProjectDatabase {
                             custom_stdlib_change = true;
                         }
 
-                        // Perform a full-reload in case the deleted directory contained the pyproject.toml.
-                        // We may want to make this more clever in the future, to e.g. iterate over the
-                        // indexed files and remove the once that start with the same path, unless
-                        // the deleted path is the project configuration.
-                        project_changed = true;
+                        if project.is_path_included(self, &path) || path == project_root {
+                            // TODO: Shouldn't it be enough to simply traverse the project files and remove all
+                            // that start with the given path?
+                            tracing::debug!(
+                                "Reload project because of a path that could have been a directory."
+                            );
+
+                            // Perform a full-reload in case the deleted directory contained the pyproject.toml.
+                            // We may want to make this more clever in the future, to e.g. iterate over the
+                            // indexed files and remove the once that start with the same path, unless
+                            // the deleted path is the project configuration.
+                            project_changed = true;
+                        }
                     }
                 }
 
