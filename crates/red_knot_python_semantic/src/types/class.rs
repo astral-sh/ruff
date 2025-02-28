@@ -319,6 +319,9 @@ impl<'db> Class<'db> {
     ///
     /// TODO: Should this be made private...?
     pub(super) fn class_member(self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
+        let _span =
+            tracing::debug_span!("Class::class_member", class=%self.name(db), name=%name).entered();
+
         if name == "__mro__" {
             let tuple_elements = self.iter_mro(db).map(Type::from);
             return Symbol::bound(TupleType::from_elements(db, tuple_elements)).into();
@@ -382,6 +385,9 @@ impl<'db> Class<'db> {
     /// directly. Use [`Class::class_member`] if you require a method that will
     /// traverse through the MRO until it finds the member.
     pub(super) fn own_class_member(self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
+        let _span =
+            tracing::debug_span!("own_class_member", class=%self.name(db), name=%name).entered();
+
         let body_scope = self.body_scope(db);
         class_symbol(db, body_scope, name)
     }
@@ -1532,10 +1538,6 @@ impl<'db> KnownInstanceType<'db> {
             | Self::Intersection
             | Self::TypeOf => module.is_knot_extensions(),
         }
-    }
-
-    pub(super) fn static_member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
-        self.instance_fallback(db).static_member(db, name)
     }
 }
 
