@@ -2165,11 +2165,11 @@ impl<'src> Parser<'src> {
 
         // test_err walrus_py37
         // # parse_options: { "target-version": "3.7" }
-        // if x := 1: ...
+        // (x := 1)
 
         // test_ok walrus_py38
         // # parse_options: { "target-version": "3.8" }
-        // if x := 1: ...
+        // (x := 1)
 
         if self.options.target_version < PythonVersion::PY38 {
             self.add_unsupported_syntax_error(UnsupportedSyntaxErrorKind::Walrus, range);

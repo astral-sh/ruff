@@ -7,24 +7,24 @@ input_file: crates/ruff_python_parser/resources/inline/ok/walrus_py38.py
 ```
 Module(
     ModModule {
-        range: 0..60,
+        range: 0..54,
         body: [
-            If(
-                StmtIf {
-                    range: 45..59,
-                    test: Named(
+            Expr(
+                StmtExpr {
+                    range: 45..53,
+                    value: Named(
                         ExprNamed {
-                            range: 48..54,
+                            range: 46..52,
                             target: Name(
                                 ExprName {
-                                    range: 48..49,
+                                    range: 46..47,
                                     id: Name("x"),
                                     ctx: Store,
                                 },
                             ),
                             value: NumberLiteral(
                                 ExprNumberLiteral {
-                                    range: 53..54,
+                                    range: 51..52,
                                     value: Int(
                                         1,
                                     ),
@@ -32,19 +32,6 @@ Module(
                             ),
                         },
                     ),
-                    body: [
-                        Expr(
-                            StmtExpr {
-                                range: 56..59,
-                                value: EllipsisLiteral(
-                                    ExprEllipsisLiteral {
-                                        range: 56..59,
-                                    },
-                                ),
-                            },
-                        ),
-                    ],
-                    elif_else_clauses: [],
                 },
             ),
         ],
