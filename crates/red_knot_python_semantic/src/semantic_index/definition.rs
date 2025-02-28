@@ -515,7 +515,7 @@ impl DefinitionKind<'_> {
         }
     }
 
-    pub(crate) fn category(&self) -> DefinitionCategory {
+    pub(crate) fn category(&self, in_stub: bool) -> DefinitionCategory {
         match self {
             // functions, classes, and imports always bind, and we consider them declarations
             DefinitionKind::Function(_)
@@ -543,9 +543,10 @@ impl DefinitionKind<'_> {
                     DefinitionCategory::Binding
                 }
             }
-            // annotated assignment is always a declaration, only a binding if there is a RHS
+            // Annotated assignment is always a declaration. It is also a binding if there is a RHS
+            // or if we are in a stub file. Unfortunately, it is common for stubs to omit even an `...` value placeholder.
             DefinitionKind::AnnotatedAssignment(ann_assign) => {
-                if ann_assign.value.is_some() {
+                if in_stub || ann_assign.value.is_some() {
                     DefinitionCategory::DeclarationAndBinding
                 } else {
                     DefinitionCategory::Declaration
