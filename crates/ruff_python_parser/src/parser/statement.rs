@@ -1458,13 +1458,28 @@ impl<'src> Parser<'src> {
             );
         }
 
+        // test_ok except_star_py311
+        // # parse_options: {"target-version": "3.11"}
+        // try: ...
+        // except* ValueError: ...
+
+        // test_err except_star_py310
+        // # parse_options: {"target-version": "3.10"}
+        // try: ...
+        // except* ValueError: ...
+
+        let range = self.node_range(try_start);
+        if is_star && self.options.target_version < PythonVersion::PY311 {
+            self.add_unsupported_syntax_error(UnsupportedSyntaxErrorKind::ExceptStar, range);
+        }
+
         ast::StmtTry {
             body: try_body,
             handlers,
             orelse,
             finalbody,
             is_star,
-            range: self.node_range(try_start),
+            range,
         }
     }
 

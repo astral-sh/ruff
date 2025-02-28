@@ -448,6 +448,7 @@ pub struct UnsupportedSyntaxError {
 pub enum UnsupportedSyntaxErrorKind {
     Match,
     Walrus,
+    ExceptStar,
 }
 
 impl Display for UnsupportedSyntaxError {
@@ -455,6 +456,7 @@ impl Display for UnsupportedSyntaxError {
         let kind = match self.kind {
             UnsupportedSyntaxErrorKind::Match => "`match` statement",
             UnsupportedSyntaxErrorKind::Walrus => "named assignment expression (`:=`)",
+            UnsupportedSyntaxErrorKind::ExceptStar => "`except*`",
         };
         write!(
             f,
@@ -471,6 +473,7 @@ impl UnsupportedSyntaxError {
         match self.kind {
             UnsupportedSyntaxErrorKind::Match => PythonVersion::PY310,
             UnsupportedSyntaxErrorKind::Walrus => PythonVersion::PY38,
+            UnsupportedSyntaxErrorKind::ExceptStar => PythonVersion::PY311,
         }
     }
 }
