@@ -1840,10 +1840,7 @@ impl<'db> Type<'db> {
                             if let Symbol::Type(meta_attribute, _) =
                                 object_ty.class_member(db, name).0
                             {
-                                let meta_descr_get = meta_attribute
-                                    .find_name_in_mro(db, "__get__")
-                                    .expect("TODO")
-                                    .0;
+                                let meta_descr_get = meta_attribute.class_member(db, "__get__").0;
                                 if let Symbol::Type(meta_descr_get, _) = meta_descr_get {
                                     if !meta_type.member(db, "__set__").0.is_unbound()
                                         || !meta_type.member(db, "__delete__").0.is_unbound()
