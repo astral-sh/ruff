@@ -76,7 +76,7 @@ use crate::types::{
 };
 use crate::unpack::Unpack;
 use crate::util::subscript::{PyIndex, PySlice};
-use crate::{db, Db};
+use crate::Db;
 
 use super::call::CallError;
 use super::class_base::ClassBase;
@@ -99,9 +99,9 @@ use super::{CallDunderError, ParameterExpectation, ParameterExpectations};
 #[salsa::tracked(return_ref)]
 pub(crate) fn infer_scope_types<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> TypeInference<'db> {
     let file = scope.file(db);
-    // let _span =
-    //     tracing::trace_span!("infer_scope_types", scope=?scope.as_id(), file=%file.path(db))
-    //         .entered();
+    let _span =
+        tracing::trace_span!("infer_scope_types", scope=?scope.as_id(), file=%file.path(db))
+            .entered();
 
     // Using the index here is fine because the code below depends on the AST anyway.
     // The isolation of the query is by the return inferred types.
@@ -141,12 +141,12 @@ pub(crate) fn infer_definition_types<'db>(
     definition: Definition<'db>,
 ) -> TypeInference<'db> {
     let file = definition.file(db);
-    // let _span = tracing::trace_span!(
-    //     "infer_definition_types",
-    //     range = ?definition.kind(db).target_range(),
-    //     file = %file.path(db)
-    // )
-    // .entered();
+    let _span = tracing::trace_span!(
+        "infer_definition_types",
+        range = ?definition.kind(db).target_range(),
+        file = %file.path(db)
+    )
+    .entered();
 
     let index = semantic_index(db, file);
 
@@ -163,13 +163,13 @@ pub(crate) fn infer_deferred_types<'db>(
     definition: Definition<'db>,
 ) -> TypeInference<'db> {
     let file = definition.file(db);
-    // let _span = tracing::trace_span!(
-    //     "infer_deferred_types",
-    //     definition = ?definition.as_id(),
-    //     range = ?definition.kind(db).target_range(),
-    //     file = %file.path(db)
-    // )
-    // .entered();
+    let _span = tracing::trace_span!(
+        "infer_deferred_types",
+        definition = ?definition.as_id(),
+        range = ?definition.kind(db).target_range(),
+        file = %file.path(db)
+    )
+    .entered();
 
     let index = semantic_index(db, file);
 
@@ -186,13 +186,13 @@ pub(crate) fn infer_expression_types<'db>(
     expression: Expression<'db>,
 ) -> TypeInference<'db> {
     let file = expression.file(db);
-    // let _span = tracing::trace_span!(
-    //     "infer_expression_types",
-    //     expression = ?expression.as_id(),
-    //     range = ?expression.node_ref(db).range(),
-    //     file = %file.path(db)
-    // )
-    // .entered();
+    let _span = tracing::trace_span!(
+        "infer_expression_types",
+        expression = ?expression.as_id(),
+        range = ?expression.node_ref(db).range(),
+        file = %file.path(db)
+    )
+    .entered();
 
     let index = semantic_index(db, file);
 
@@ -238,9 +238,9 @@ pub(crate) fn infer_expression_type<'db>(
 #[salsa::tracked(return_ref)]
 pub(super) fn infer_unpack_types<'db>(db: &'db dyn Db, unpack: Unpack<'db>) -> UnpackResult<'db> {
     let file = unpack.file(db);
-    // let _span =
-    //     tracing::trace_span!("infer_unpack_types", range=?unpack.range(db), file=%file.path(db))
-    //         .entered();
+    let _span =
+        tracing::trace_span!("infer_unpack_types", range=?unpack.range(db), file=%file.path(db))
+            .entered();
 
     let mut unpacker = Unpacker::new(db, unpack.scope(db));
     unpacker.unpack(unpack.target(db), unpack.value(db));
