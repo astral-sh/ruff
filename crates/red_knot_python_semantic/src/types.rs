@@ -1706,101 +1706,121 @@ impl<'db> Type<'db> {
         ) -> SymbolAndQualifiers<'db> {
             // TODO: Handle possible-unboundness and errors from `__get__` calls.
 
-            match class_attr.0 {
-                // This branch is not strictly needed, but it short-circuits the lookup
-                // of various dunder methods and calls that would otherwise be made.
-                dynamic @ Symbol::Type(Type::Dynamic(_), _) => dynamic.into(),
-
-                Symbol::Type(Type::Union(union), boundness) => union
+            match instance {
+                Type::Union(union) => union
                     .map_with_boundness(db, |elem| {
-                        instance
-                            .run_descriptor_protocol_instances(
-                                db,
-                                name,
-                                Symbol::Type(*elem, boundness).into(),
-                                owner,
-                            )
+                        elem.run_descriptor_protocol_instances(db, name, class_attr.clone(), owner)
                             .0
                     })
                     .into(),
-                Symbol::Type(Type::Intersection(intersection), boundness) => intersection
+                Type::Intersection(intersection) => intersection
                     .map_with_boundness(db, |elem| {
-                        instance
-                            .run_descriptor_protocol_instances(
-                                db,
-                                name,
-                                Symbol::Type(*elem, boundness).into(),
-                                owner,
-                            )
+                        elem.run_descriptor_protocol_instances(db, name, class_attr.clone(), owner)
                             .0
                     })
                     .into(),
-                Symbol::Type(class_attr_ty, class_attr_boundness) => {
-                    // TODO: Handle possible-unboundness of `__get__` method
-                    // There is an existing test case for this in `descriptor_protocol.md`.
+                _ => {
+                    match class_attr.0 {
+                        // This branch is not strictly needed, but it short-circuits the lookup
+                        // of various dunder methods and calls that would otherwise be made.
+                        dynamic @ Symbol::Type(Type::Dynamic(_), _) => dynamic.into(),
 
-                    let class_attr_meta_ty = class_attr_ty.to_meta_type(db);
-
-                    let descr_get = class_attr_meta_ty.member(db, "__get__").0;
-
-                    tracing::info!("self_meta = {}", class_attr_meta_ty.display(db));
-                    tracing::info!("descr_get = {:?}", descr_get);
-
-                    if let Symbol::Type(descr_get, _) = descr_get {
-                        if !class_attr_meta_ty.member(db, "__set__").0.is_unbound()
-                            || !class_attr_meta_ty.member(db, "__delete__").0.is_unbound()
-                        {
-                            tracing::info!("protocol resolution: Data descriptor");
-                            // Data descriptor
-                            return Symbol::Type(
-                                descr_get
-                                    .try_call(
+                        Symbol::Type(Type::Union(union), boundness) => union
+                            .map_with_boundness(db, |elem| {
+                                instance
+                                    .run_descriptor_protocol_instances(
                                         db,
-                                        &CallArguments::positional([
-                                            class_attr_ty,
-                                            instance,
-                                            owner,
-                                        ]),
+                                        name,
+                                        Symbol::Type(*elem, boundness).into(),
+                                        owner,
                                     )
-                                    .map(|outcome| outcome.return_type(db))
-                                    .unwrap_or(Type::unknown()),
-                                class_attr_boundness,
-                            )
-                            .into();
-                        }
-                    }
+                                    .0
+                            })
+                            .into(),
+                        Symbol::Type(Type::Intersection(intersection), boundness) => intersection
+                            .map_with_boundness(db, |elem| {
+                                instance
+                                    .run_descriptor_protocol_instances(
+                                        db,
+                                        name,
+                                        Symbol::Type(*elem, boundness).into(),
+                                        owner,
+                                    )
+                                    .0
+                            })
+                            .into(),
+                        Symbol::Type(class_attr_ty, class_attr_boundness) => {
+                            // TODO: Handle possible-unboundness of `__get__` method
+                            // There is an existing test case for this in `descriptor_protocol.md`.
 
-                    if let instance_variable @ Symbol::Type(_, _) =
-                        instance.instance_variable(db, name)
-                    {
-                        tracing::info!(
-                            "protocol resolution: Instance variable {instance_variable:?}",
-                        );
-                        return instance_variable.into();
-                    }
+                            let class_attr_meta_ty = class_attr_ty.to_meta_type(db);
 
-                    if let Symbol::Type(descr_get, _) = descr_get {
-                        tracing::info!("protocol resolution: Non-data descriptor");
-                        // Non-data descriptor
+                            let descr_get = class_attr_meta_ty.member(db, "__get__").0;
 
-                        return Symbol::Type(
-                            descr_get
-                                .try_call(
-                                    db,
-                                    &CallArguments::positional([class_attr_ty, instance, owner]),
+                            tracing::info!("self_meta = {}", class_attr_meta_ty.display(db));
+                            tracing::info!("descr_get = {:?}", descr_get);
+
+                            if let Symbol::Type(descr_get, _) = descr_get {
+                                if !class_attr_meta_ty.member(db, "__set__").0.is_unbound()
+                                    || !class_attr_meta_ty.member(db, "__delete__").0.is_unbound()
+                                {
+                                    tracing::info!("protocol resolution: Data descriptor");
+                                    // Data descriptor
+                                    return Symbol::Type(
+                                        descr_get
+                                            .try_call(
+                                                db,
+                                                &CallArguments::positional([
+                                                    class_attr_ty,
+                                                    instance,
+                                                    owner,
+                                                ]),
+                                            )
+                                            .map(|outcome| outcome.return_type(db))
+                                            .unwrap_or(Type::unknown()),
+                                        class_attr_boundness,
+                                    )
+                                    .into();
+                                }
+                            }
+
+                            if let instance_variable @ Symbol::Type(_, _) =
+                                instance.instance_variable(db, name)
+                            {
+                                tracing::info!(
+                                    "protocol resolution: Instance variable {instance_variable:?}",
+                                );
+                                return instance_variable.into();
+                            }
+
+                            if let Symbol::Type(descr_get, _) = descr_get {
+                                tracing::info!("protocol resolution: Non-data descriptor");
+                                // Non-data descriptor
+
+                                return Symbol::Type(
+                                    descr_get
+                                        .try_call(
+                                            db,
+                                            &CallArguments::positional([
+                                                class_attr_ty,
+                                                instance,
+                                                owner,
+                                            ]),
+                                        )
+                                        .map(|outcome| outcome.return_type(db))
+                                        .unwrap_or(Type::unknown()),
+                                    class_attr_boundness,
                                 )
-                                .map(|outcome| outcome.return_type(db))
-                                .unwrap_or(Type::unknown()),
-                            class_attr_boundness,
-                        )
-                        .into(); // TODO: avoid duplication
+                                .into(); // TODO: avoid duplication
+                            }
+
+                            tracing::info!("protocol resolution: Class variable");
+
+                            class_attr
+                        }
+                        Symbol::Unbound => instance.instance_variable(db, name).into(),
                     }
-
-                    tracing::info!("protocol resolution: Class variable");
-
-                    class_attr
                 }
-                Symbol::Unbound => instance.instance_variable(db, name).into(),
             }
         }
 
