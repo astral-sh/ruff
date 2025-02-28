@@ -449,6 +449,7 @@ pub enum UnsupportedSyntaxErrorKind {
     Match,
     Walrus,
     ExceptStar,
+    TypeParamDefault,
 }
 
 impl Display for UnsupportedSyntaxError {
@@ -457,6 +458,7 @@ impl Display for UnsupportedSyntaxError {
             UnsupportedSyntaxErrorKind::Match => "`match` statement",
             UnsupportedSyntaxErrorKind::Walrus => "named assignment expression (`:=`)",
             UnsupportedSyntaxErrorKind::ExceptStar => "`except*`",
+            UnsupportedSyntaxErrorKind::TypeParamDefault => "type parameter default",
         };
         write!(
             f,
@@ -474,6 +476,7 @@ impl UnsupportedSyntaxErrorKind {
             UnsupportedSyntaxErrorKind::Match => PythonVersion::PY310,
             UnsupportedSyntaxErrorKind::Walrus => PythonVersion::PY38,
             UnsupportedSyntaxErrorKind::ExceptStar => PythonVersion::PY311,
+            UnsupportedSyntaxErrorKind::TypeParamDefault => PythonVersion::PY313,
         }
     }
 }

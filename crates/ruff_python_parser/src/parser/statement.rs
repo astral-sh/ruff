@@ -3267,8 +3267,28 @@ impl<'src> Parser<'src> {
                 None
             };
 
+            // test_ok type_param_default_py313
+            // # parse_options: {"target-version": "3.13"}
+            // type X[T = int] = int
+            // def f[T = int](): ...
+            // class C[T = int](): ...
+
+            // test_err type_param_default_py312
+            // # parse_options: {"target-version": "3.12"}
+            // type X[T = int] = int
+            // def f[T = int](): ...
+            // class C[T = int](): ...
+
+            let range = self.node_range(start);
+            if default.is_some() {
+                self.add_unsupported_syntax_error(
+                    UnsupportedSyntaxErrorKind::TypeParamDefault,
+                    range,
+                );
+            }
+
             ast::TypeParam::TypeVar(ast::TypeParamTypeVar {
-                range: self.node_range(start),
+                range,
                 name,
                 bound,
                 default,
