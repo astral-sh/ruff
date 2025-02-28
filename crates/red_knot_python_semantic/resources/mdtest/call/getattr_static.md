@@ -59,7 +59,7 @@ import sys
 reveal_type(inspect.getattr_static(sys, "platform"))  # revealed: LiteralString
 reveal_type(inspect.getattr_static(inspect, "getattr_static"))  # revealed: Literal[getattr_static]
 
-reveal_type(inspect.getattr_static(1, "real"))  # revealed: Literal[1]
+reveal_type(inspect.getattr_static(1, "real"))  # revealed: Literal[real]
 ```
 
 (Implicit) instance attributes can also be accessed through `inspect.getattr_static`:
