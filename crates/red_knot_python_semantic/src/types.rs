@@ -1593,14 +1593,6 @@ impl<'db> Type<'db> {
             Type::KnownInstance(_) => Symbol::Unbound.into(),
 
             Type::Instance(InstanceType { class }) => match (class.known(db), name) {
-                (Some(KnownClass::VersionInfo), "major") => Symbol::bound(Type::IntLiteral(
-                    Program::get(db).python_version(db).major.into(),
-                ))
-                .into(),
-                (Some(KnownClass::VersionInfo), "minor") => Symbol::bound(Type::IntLiteral(
-                    Program::get(db).python_version(db).minor.into(),
-                ))
-                .into(),
                 (Some(KnownClass::FunctionType), "__get__") => {
                     Symbol::bound(Type::Callable(CallableType::WrapperDescriptorDunderGet)).into()
                 }
@@ -1768,63 +1760,84 @@ impl<'db> Type<'db> {
                             tracing::info!("self_meta = {}", class_attr_meta_ty.display(db));
                             tracing::info!("descr_get = {:?}", descr_get);
 
-                            if let Symbol::Type(descr_get, _) = descr_get {
-                                if !class_attr_meta_ty.member(db, "__set__").0.is_unbound()
-                                    || !class_attr_meta_ty.member(db, "__delete__").0.is_unbound()
-                                {
-                                    tracing::info!("protocol resolution: Data descriptor");
-                                    // Data descriptor
-                                    return Symbol::Type(
-                                        descr_get
-                                            .try_call(
-                                                db,
-                                                &CallArguments::positional([
-                                                    class_attr_ty,
-                                                    instance,
-                                                    owner,
-                                                ]),
-                                            )
-                                            .map(|outcome| outcome.return_type(db))
-                                            .unwrap_or(Type::unknown()),
-                                        class_attr_boundness,
-                                    )
-                                    .into();
-                                }
-                            }
+                            // if let Symbol::Type(descr_get, _) = descr_get {
+                            //     if !class_attr_meta_ty.member(db, "__set__").0.is_unbound()
+                            //         || !class_attr_meta_ty.member(db, "__delete__").0.is_unbound()
+                            //     {
+                            //         tracing::info!("protocol resolution: Data descriptor");
+                            //         // Data descriptor
+                            //         return Symbol::Type(
+                            //             descr_get
+                            //                 .try_call(
+                            //                     db,
+                            //                     &CallArguments::positional([
+                            //                         class_attr_ty,
+                            //                         instance,
+                            //                         owner,
+                            //                     ]),
+                            //                 )
+                            //                 .map(|outcome| outcome.return_type(db))
+                            //                 .unwrap_or(Type::unknown()),
+                            //             class_attr_boundness,
+                            //         )
+                            //         .into();
+                            //     }
+                            // }
 
-                            if let instance_variable @ SymbolAndQualifiers(Symbol::Type(_, _), _) =
-                                instance.instance_variable(db, name)
+                            let descr_get_return_ty = if let Symbol::Type(descr_get, _) = descr_get
                             {
-                                tracing::info!(
-                                    "protocol resolution: Instance variable {instance_variable:?}",
-                                );
-                                return instance_variable;
-                            }
+                                descr_get
+                                    .try_call(
+                                        db,
+                                        &CallArguments::positional([
+                                            class_attr_ty,
+                                            instance,
+                                            owner,
+                                        ]),
+                                    )
+                                    .map(|outcome| Some(outcome.return_type(db)))
+                                    .unwrap_or(None)
+                            } else {
+                                None
+                            };
 
-                            if let Symbol::Type(descr_get, _) = descr_get {
-                                tracing::info!("protocol resolution: Non-data descriptor");
-                                // Non-data descriptor
+                            let instance_variable = instance.instance_variable(db, name);
 
-                                return Symbol::Type(
-                                    descr_get
-                                        .try_call(
+                            tracing::trace!("instance_variable = {:?}", instance_variable);
+
+                            match (descr_get_return_ty, &instance_variable.0) {
+                                (Some(return_ty), Symbol::Unbound) => SymbolAndQualifiers(
+                                    Symbol::Type(return_ty, class_attr_boundness),
+                                    class_attr_qualifiers,
+                                ),
+                                (
+                                    Some(return_ty),
+                                    Symbol::Type(instance_variable_ty, boundness),
+                                ) => SymbolAndQualifiers(
+                                    Symbol::Type(
+                                        UnionType::from_elements(
                                             db,
-                                            &CallArguments::positional([
-                                                class_attr_ty,
-                                                instance,
-                                                owner,
-                                            ]),
-                                        )
-                                        .map(|outcome| outcome.return_type(db))
-                                        .unwrap_or(Type::unknown()),
-                                    class_attr_boundness,
-                                )
-                                .into(); // TODO: avoid duplication
+                                            [return_ty, *instance_variable_ty],
+                                        ),
+                                        *boundness,
+                                    ),
+                                    class_attr_qualifiers,
+                                ),
+                                (None, Symbol::Type(instance_variable_ty, _)) => {
+                                    SymbolAndQualifiers(
+                                        Symbol::Type(
+                                            UnionType::from_elements(
+                                                db,
+                                                [class_attr_ty, *instance_variable_ty],
+                                            ),
+                                            // TODO: should this be min(class_attr_boundness, instance_variable_boundness)?
+                                            class_attr_boundness,
+                                        ),
+                                        class_attr_qualifiers,
+                                    )
+                                }
+                                (None, Symbol::Unbound) => class_attr,
                             }
-
-                            tracing::info!("protocol resolution: Class variable");
-
-                            class_attr
                         }
                         Symbol::Unbound => instance.instance_variable(db, name).into(),
                     }
@@ -2028,6 +2041,23 @@ impl<'db> Type<'db> {
                 KnownClass::WrapperDescriptorType
                     .to_instance(db)
                     .member(db, name)
+            }
+
+            Type::Instance(InstanceType { class })
+                if class.is_known(db, KnownClass::VersionInfo) && name == "major" =>
+            {
+                Symbol::bound(Type::IntLiteral(
+                    Program::get(db).python_version(db).major.into(),
+                ))
+                .into()
+            }
+            Type::Instance(InstanceType { class })
+                if class.is_known(db, KnownClass::VersionInfo) && name == "minor" =>
+            {
+                Symbol::bound(Type::IntLiteral(
+                    Program::get(db).python_version(db).minor.into(),
+                ))
+                .into()
             }
 
             Type::Instance(..)

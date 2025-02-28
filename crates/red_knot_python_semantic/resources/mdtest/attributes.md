@@ -155,7 +155,7 @@ reveal_type(c_instance.declared_in_body_and_init)  # revealed: str | None
 
 reveal_type(c_instance.declared_in_body_defined_in_init)  # revealed: str | None
 
-reveal_type(c_instance.bound_in_body_declared_in_init)  # revealed: str | None
+reveal_type(c_instance.bound_in_body_declared_in_init)  # revealed: Unknown | str | None
 
 reveal_type(c_instance.bound_in_body_and_init)  # revealed: Unknown | None | Literal["a"]
 ```
