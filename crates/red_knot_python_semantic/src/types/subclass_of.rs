@@ -66,7 +66,11 @@ impl<'db> SubclassOfType<'db> {
         !self.is_dynamic()
     }
 
-    pub(crate) fn find_name_in_mro(self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
+    pub(crate) fn find_name_in_mro(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+    ) -> Option<SymbolAndQualifiers<'db>> {
         Type::from(self.subclass_of).find_name_in_mro(db, name)
     }
 

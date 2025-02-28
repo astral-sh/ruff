@@ -1360,21 +1360,31 @@ impl<'db> Type<'db> {
     }
 
     #[must_use]
-    fn find_name_in_mro(&self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
+    fn class_member(&self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
+        match self {
+            Type::Union(union) => {
+                union.map_with_boundness_and_qualifiers(db, |elem| elem.class_member(db, name))
+            }
+            Type::Intersection(inter) => {
+                inter.map_with_boundness_and_qualifiers(db, |elem| elem.class_member(db, name))
+            }
+            _ => self
+                .to_meta_type(db)
+                .find_name_in_mro(db, name)
+                .expect("was called on meta type"),
+        }
+    }
+
+    #[must_use]
+    fn find_name_in_mro(&self, db: &'db dyn Db, name: &str) -> Option<SymbolAndQualifiers<'db>> {
         let _span =
             tracing::trace_span!("find_name_in_mro", self=%self.display(db), name).entered();
 
         match self {
-            Type::Union(union) => {
-                union.map_with_boundness_and_qualifiers(db, |elem| elem.find_name_in_mro(db, name))
-            }
-            Type::Intersection(inter) => {
-                inter.map_with_boundness_and_qualifiers(db, |elem| elem.find_name_in_mro(db, name))
-            }
             Type::ClassLiteral(ClassLiteralType { class })
                 if class.is_known(db, KnownClass::FunctionType) && name == "__get__" =>
             {
-                Symbol::bound(Type::Callable(CallableType::WrapperDescriptorDunderGet)).into()
+                Some(Symbol::bound(Type::Callable(CallableType::WrapperDescriptorDunderGet)).into())
             }
 
             // Hard code this knowledge, as we need to look this up often.
@@ -1382,7 +1392,7 @@ impl<'db> Type<'db> {
                 if class.is_known(db, KnownClass::FunctionType) && name == "__set__"
                     || name == "__delete___" =>
             {
-                Symbol::Unbound.into()
+                Some(Symbol::Unbound.into())
             }
 
             Type::SubclassOf(subclass_of)
@@ -1401,7 +1411,7 @@ impl<'db> Type<'db> {
                         )
                     ) =>
             {
-                Symbol::Unbound.into()
+                Some(Symbol::Unbound.into())
             }
             Type::ClassLiteral(class)
                 if matches!(name, "__get__" | "__set__" | "__delete__")
@@ -1416,9 +1426,9 @@ impl<'db> Type<'db> {
                         )
                     ) =>
             {
-                Symbol::Unbound.into()
+                Some(Symbol::Unbound.into())
             }
-            Type::ClassLiteral(class_literal) => class_literal.find_name_in_mro(db, name),
+            Type::ClassLiteral(class_literal) => Some(class_literal.class_member(db, name)),
             Type::SubclassOf(subclass_of_ty) => subclass_of_ty.find_name_in_mro(db, name),
 
             Type::Instance(InstanceType { class }) if class.is_known(db, KnownClass::Type) => {
@@ -1427,8 +1437,9 @@ impl<'db> Type<'db> {
                     .find_name_in_mro(db, name)
             }
 
-            dynamic @ Type::Dynamic(_) => Symbol::bound(dynamic).into(),
-            _ => Symbol::todo("find_name_in_mro for non-class types").into(),
+            dynamic @ Type::Dynamic(_) => Some(Symbol::bound(dynamic).into()),
+
+            _ => None,
         }
     }
 
@@ -1440,115 +1451,18 @@ impl<'db> Type<'db> {
     fn static_member(&self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
         let _span = tracing::trace_span!("static_member", self=%self.display(db), name).entered();
 
-        match self {
-            Type::Dynamic(_) => Symbol::bound(self),
-
-            Type::Never => Symbol::todo("attribute lookup on Never"),
-
-            Type::FunctionLiteral(_) => KnownClass::FunctionType
-                .to_instance(db)
-                .static_member(db, name),
-
-            Type::Callable(CallableType::BoundMethod(_)) => KnownClass::MethodType
-                .to_instance(db)
-                .static_member(db, name),
-            Type::Callable(CallableType::MethodWrapperDunderGet(_)) => {
-                KnownClass::MethodWrapperType
-                    .to_instance(db)
-                    .static_member(db, name)
-            }
-            Type::Callable(CallableType::WrapperDescriptorDunderGet) => {
-                KnownClass::WrapperDescriptorType
-                    .to_instance(db)
-                    .static_member(db, name)
-            }
-
-            Type::ModuleLiteral(module) => module.static_member(db, name),
-
-            Type::ClassLiteral(class_ty) => class_ty.find_name_in_mro(db, name).0,
-
-            Type::SubclassOf(subclass_of_ty) => subclass_of_ty.find_name_in_mro(db, name).0,
-
-            Type::KnownInstance(known_instance) => known_instance.static_member(db, name),
-
-            Type::Instance(InstanceType { class }) => match (class.known(db), name) {
-                (Some(KnownClass::VersionInfo), "major") => Symbol::bound(Type::IntLiteral(
-                    Program::get(db).python_version(db).major.into(),
-                )),
-                (Some(KnownClass::VersionInfo), "minor") => Symbol::bound(Type::IntLiteral(
-                    Program::get(db).python_version(db).minor.into(),
-                )),
-                (Some(KnownClass::FunctionType), "__get__") => {
-                    Symbol::bound(Type::Callable(CallableType::WrapperDescriptorDunderGet))
-                }
-
-                // TODO:
-                // We currently hard-code the knowledge that the following known classes are not
-                // descriptors, i.e. that they have no `__get__` method. This is not wrong and
-                // potentially even beneficial for performance, but it's not very principled.
-                // This case can probably be removed eventually, but we include it at the moment
-                // because we make extensive use of these types in our test suite. Note that some
-                // builtin types are not included here, since they do not have generic bases and
-                // are correctly handled by the `instance_member` method.
-                (
-                    Some(
-                        KnownClass::Str
-                        | KnownClass::Bytes
-                        | KnownClass::Tuple
-                        | KnownClass::Slice
-                        | KnownClass::Range,
-                    ),
-                    "__get__" | "__set__" | "__delete__",
-                ) => Symbol::Unbound,
-
-                _ => {
-                    let SymbolAndQualifiers(symbol, _) = class.instance_member(db, name);
-                    symbol
-                }
-            },
-
-            Type::Union(union) => union.map_with_boundness(db, |elem| elem.static_member(db, name)),
-
-            Type::Intersection(intersection) => {
-                intersection.map_with_boundness(db, |elem| elem.static_member(db, name))
-            }
-
-            Type::IntLiteral(_) => match name {
-                "real" | "numerator" => Symbol::bound(self),
-                // TODO more attributes could probably be usefully special-cased
-                _ => KnownClass::Int.to_instance(db).static_member(db, name),
-            },
-
-            Type::BooleanLiteral(bool_value) => match name {
-                "real" | "numerator" => Symbol::bound(Type::IntLiteral(i64::from(*bool_value))),
-                _ => KnownClass::Bool.to_instance(db).static_member(db, name),
-            },
-
-            Type::StringLiteral(_) | Type::LiteralString => {
-                KnownClass::Str.to_instance(db).static_member(db, name)
-            }
-
-            Type::BytesLiteral(_) => KnownClass::Bytes.to_instance(db).static_member(db, name),
-
-            // We could plausibly special-case `start`, `step`, and `stop` here,
-            // but it doesn't seem worth the complexity given the very narrow range of places
-            // where we infer `SliceLiteral` types.
-            Type::SliceLiteral(_) => KnownClass::Slice.to_instance(db).static_member(db, name),
-
-            Type::Tuple(_) => {
-                // TODO: We might want to special case some attributes here, as the stubs
-                // for `builtins.tuple` assume that `self` is a homogeneous tuple, while
-                // we're explicitly modeling heterogeneous tuples using `Type::Tuple`.
-                KnownClass::Tuple.to_instance(db).static_member(db, name)
-            }
-
-            Type::AlwaysTruthy | Type::AlwaysFalsy => match name {
-                "__bool__" => {
-                    // TODO should be `Callable[[], Literal[True/False]]`
-                    Symbol::todo("`__bool__` for `AlwaysTruthy`/`AlwaysFalsy` Type variants")
-                }
-                _ => Type::object(db).static_member(db, name),
-            },
+        if let Type::ModuleLiteral(module) = self {
+            module.static_member(db, name)
+        } else if let symbol @ SymbolAndQualifiers(Symbol::Type(_, _), _) =
+            self.class_member(db, name)
+        {
+            symbol.0
+        } else if let Some(symbol @ SymbolAndQualifiers(Symbol::Type(_, _), _)) =
+            self.find_name_in_mro(db, name)
+        {
+            symbol.0
+        } else {
+            self.instance_variable(db, name).0
         }
     }
 
@@ -1924,10 +1838,12 @@ impl<'db> Type<'db> {
 
                             let meta_type = object_ty.to_meta_type(db);
                             if let Symbol::Type(meta_attribute, _) =
-                                meta_type.find_name_in_mro(db, name).0
+                                object_ty.class_member(db, name).0
                             {
-                                let meta_descr_get =
-                                    meta_attribute.find_name_in_mro(db, "__get__").0;
+                                let meta_descr_get = meta_attribute
+                                    .find_name_in_mro(db, "__get__")
+                                    .expect("TODO")
+                                    .0;
                                 if let Symbol::Type(meta_descr_get, _) = meta_descr_get {
                                     if !meta_type.member(db, "__set__").0.is_unbound()
                                         || !meta_type.member(db, "__delete__").0.is_unbound()
@@ -1952,10 +1868,7 @@ impl<'db> Type<'db> {
                                 }
                             }
 
-                            let descr_get = class_attr_ty
-                                .to_meta_type(db)
-                                .find_name_in_mro(db, "__get__")
-                                .0;
+                            let descr_get = class_attr_ty.class_member(db, "__get__").0;
                             if let Symbol::Type(descr_get, _) = descr_get {
                                 // Data or non-data descriptor on class
                                 return Symbol::Type(
@@ -2078,7 +1991,7 @@ impl<'db> Type<'db> {
             | Type::FunctionLiteral(..) => {
                 let objtype = self.to_meta_type(db);
 
-                let class_attr = objtype.find_name_in_mro(db, name);
+                let class_attr = self.class_member(db, name);
                 // tracing::info!("instance => cls_var = {:?}", cls_var.display(db));
 
                 self.run_descriptor_protocol_instances(db, name, class_attr, objtype)
@@ -2099,7 +2012,7 @@ impl<'db> Type<'db> {
             }
 
             Type::ClassLiteral(..) | Type::SubclassOf(..) => {
-                let cls_var = self.find_name_in_mro(db, name);
+                let cls_var = self.find_name_in_mro(db, name).expect("TODO");
                 tracing::info!("class => cls_var = {:?}", cls_var);
 
                 if name == "__mro__" {
@@ -2115,11 +2028,11 @@ impl<'db> Type<'db> {
                 .map_with_boundness(db, |elem| elem.member(db, name).0)
                 .into(),
 
-            Type::Dynamic(..)
-            | Type::Never
-            | Type::AlwaysFalsy
-            | Type::AlwaysTruthy
-            | Type::ModuleLiteral(..) => self.static_member(db, name).into(),
+            Type::ModuleLiteral(module) => module.static_member(db, name).into(),
+
+            Type::Dynamic(..) | Type::Never | Type::AlwaysFalsy | Type::AlwaysTruthy => {
+                self.class_member(db, name)
+            }
         }
     }
 
@@ -2818,7 +2731,7 @@ impl<'db> Type<'db> {
 
         let meta_type = self.to_meta_type(db);
 
-        match meta_type.find_name_in_mro(db, name).0 {
+        match self.class_member(db, name).0 {
             Symbol::Type(mut callable_ty, mut boundness) => {
                 // Dunder methods are looked up on the meta type, but they invoke the descriptor
                 // protocol *as if they had been called on the instance itself*. This is why we
