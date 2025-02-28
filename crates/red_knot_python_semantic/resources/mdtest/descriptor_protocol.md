@@ -31,13 +31,11 @@ reveal_type(c.ten)  # revealed: Literal[10]
 reveal_type(C.ten)  # revealed: Literal[10]
 
 # These are fine:
-# TODO: This should not be an error
-c.ten = 10  # error: [invalid-assignment]
+c.ten = 10
 C.ten = 10
 
-# TODO: This should be an error (as the wrong type is being implicitly passed to `Ten.__set__`),
-# but the error message is misleading.
-# error: [invalid-assignment] "Object of type `Literal[11]` is not assignable to attribute `ten` of type `Ten`"
+# TODO: This should be an error (as the wrong type is being implicitly passed to `Ten.__set__`).
+# error: [invalid-assignment] "Object of type `Literal[11]` is not assignable to attribute `ten` of type `Literal[10]`"
 c.ten = 11
 
 # TODO: same as above
@@ -67,16 +65,14 @@ c = C()
 
 reveal_type(c.flexible_int)  # revealed: int | None
 
-# TODO: These should not be errors
-# error: [invalid-assignment]
 c.flexible_int = 42  # okay
+# TODO: This should not be an error
 # error: [invalid-assignment]
 c.flexible_int = "42"  # also okay!
 
 reveal_type(c.flexible_int)  # revealed: int | None
 
-# TODO: This should be an error, but the message needs to be improved.
-# error: [invalid-assignment] "Object of type `None` is not assignable to attribute `flexible_int` of type `FlexibleInt`"
+# TODO: This should be an error
 c.flexible_int = None  # not okay
 
 reveal_type(c.flexible_int)  # revealed: int | None
@@ -180,7 +176,7 @@ c.name = "new"
 c.name = None
 
 # TODO: this should be an error, but with a proper error message
-# error: [invalid-assignment] "Implicit shadowing of function `name`; annotate to make it explicit if this is intentional"
+# error: [invalid-assignment] "Object of type `Literal[42]` is not assignable to attribute `name` of type `<bound method `name` of `C`>`"
 c.name = 42
 ```
 
