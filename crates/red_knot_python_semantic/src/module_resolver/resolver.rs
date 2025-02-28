@@ -34,7 +34,7 @@ pub(crate) fn resolve_module_query<'db>(
     module_name: ModuleNameIngredient<'db>,
 ) -> Option<Module> {
     let name = module_name.name(db);
-    // let _span = tracing::trace_span!("resolve_module", %name).entered();
+    let _span = tracing::trace_span!("resolve_module", %name).entered();
 
     let Some((search_path, module_file, kind)) = resolve_name(db, name) else {
         tracing::debug!("Module `{name}` not found in search paths");
@@ -43,10 +43,10 @@ pub(crate) fn resolve_module_query<'db>(
 
     let module = Module::new(name.clone(), kind, search_path, module_file);
 
-    // tracing::trace!(
-    //     "Resolved module `{name}` to `{path}`",
-    //     path = module_file.path(db)
-    // );
+    tracing::trace!(
+        "Resolved module `{name}` to `{path}`",
+        path = module_file.path(db)
+    );
 
     Some(module)
 }
@@ -88,7 +88,7 @@ impl std::fmt::Display for SystemOrVendoredPathRef<'_> {
 /// Returns `None` if the file is not a module locatable via any of the known search paths.
 #[salsa::tracked]
 pub(crate) fn file_to_module(db: &dyn Db, file: File) -> Option<Module> {
-    // let _span = tracing::trace_span!("file_to_module", ?file).entered();
+    let _span = tracing::trace_span!("file_to_module", ?file).entered();
 
     let path = match file.path(db.upcast()) {
         FilePath::System(system) => SystemOrVendoredPathRef::System(system),

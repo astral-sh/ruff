@@ -86,7 +86,7 @@ impl Files {
             .system_by_path
             .entry(absolute.clone())
             .or_insert_with(|| {
-                // tracing::trace!("Adding file '{path}'");
+                tracing::trace!("Adding file '{path}'");
 
                 let metadata = db.system().path_metadata(path);
                 let durability = self
@@ -134,7 +134,7 @@ impl Files {
                     Err(_) => return Err(FileError::NotFound),
                 };
 
-                // tracing::trace!("Adding vendored file `{}`", path);
+                tracing::trace!("Adding vendored file `{}`", path);
                 let file = File::builder(FilePath::Vendored(path.to_path_buf()))
                     .permissions(Some(0o444))
                     .revision(metadata.revision())

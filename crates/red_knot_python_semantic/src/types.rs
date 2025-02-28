@@ -1614,6 +1614,9 @@ impl<'db> Type<'db> {
 
         // TODO: Handle possible-unboundness and errors from `__get__` calls.
 
+        // TODO: Handle `__get__` call errors instead of using `.unwrap_or(None)`.
+        // There is an existing test case for this in `descriptor_protocol.md`.
+
         match instance {
             Type::Union(union) => union.map_with_boundness_and_qualifiers(db, |elem| {
                 elem.run_descriptor_protocol_instances(db, name, class_attr.clone(), owner)
@@ -1962,16 +1965,8 @@ impl<'db> Type<'db> {
                 let objtype = self.to_meta_type(db);
 
                 let class_attr = self.class_member(db, name);
-                // tracing::info!("instance => cls_var = {:?}", cls_var.display(db));
 
                 self.run_descriptor_protocol_instances(db, name, class_attr, objtype)
-
-                // let instance = Some(*self);
-                // let owner = self.to_meta_type(db);
-
-                // // TODO: Handle `__get__` call errors instead of using `.unwrap_or(None)`.
-                // // There is an existing test case for this in `descriptor_protocol.md`.
-                // member.map_type(|ty| ty.try_call_dunder_get(db, instance, owner).unwrap_or(ty))
             }
 
             Type::SubclassOf(subclass_of_ty)
