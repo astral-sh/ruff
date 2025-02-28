@@ -100,7 +100,7 @@ impl Serialize for SerializedMessages<'_> {
 
                 (
                     description_without_prefix.to_string(),
-                    "Syntax error".to_string(),
+                    "syntax-error".to_string(),
                 )
             };
 
