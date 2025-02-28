@@ -9,7 +9,7 @@ is unbound.
 ```py
 reveal_type(__name__)  # revealed: str
 reveal_type(__file__)  # revealed: str | None
-reveal_type(__loader__)  # revealed: LoaderProtocol | None
+reveal_type(__loader__)  # revealed: Unknown | None
 reveal_type(__package__)  # revealed: str | None
 reveal_type(__doc__)  # revealed: str | None
 
