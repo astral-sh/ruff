@@ -2638,11 +2638,10 @@ fn walrus_before_py38() {
         .arg("-")
         .pass_stdin(r#"(x := 1)"#),
         @r"
-    success: false
-    exit_code: 1
+    success: true
+    exit_code: 0
     ----- stdout -----
-    test.py:1:10: E701 Multiple statements on one line (colon)
-    Found 1 error.
+    All checks passed!
 
     ----- stderr -----
     "
@@ -2660,9 +2659,8 @@ fn walrus_before_py38() {
     success: false
     exit_code: 1
     ----- stdout -----
-    test.py:1:4: SyntaxError: Cannot use named assignment expression (`:=`) on Python 3.7 (syntax was added in Python 3.8)
-    test.py:1:10: E701 Multiple statements on one line (colon)
-    Found 2 errors.
+    test.py:1:2: SyntaxError: Cannot use named assignment expression (`:=`) on Python 3.7 (syntax was added in Python 3.8)
+    Found 1 error.
 
     ----- stderr -----
     "

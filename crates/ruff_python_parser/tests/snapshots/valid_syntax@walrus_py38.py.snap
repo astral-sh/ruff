@@ -1,6 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
-input_file: crates/ruff_python_parser/resources/inline/err/walrus_before_py38.py
+input_file: crates/ruff_python_parser/resources/inline/ok/walrus_py38.py
 ---
 ## AST
 
@@ -51,10 +51,3 @@ Module(
     },
 )
 ```
-## Unsupported Syntax Errors
-
-  |
-1 | # parse_options: { "target-version": "3.7" }
-2 | if x := 1: ...
-  |    ^^^^^^ Syntax Error: Cannot use named assignment expression (`:=`) on Python 3.7 (syntax was added in Python 3.8)
-  |
