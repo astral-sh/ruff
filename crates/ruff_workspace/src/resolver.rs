@@ -303,7 +303,7 @@ pub fn resolve_configuration(
     pyproject: &Path,
     relativity: Relativity,
     transformer: &dyn ConfigurationTransformer,
-    origin: Option<&ConfigurationOrigin>,
+    origin: Option<ConfigurationOrigin>,
 ) -> Result<Configuration> {
     let mut configurations = indexmap::IndexMap::new();
     let mut next = Some(fs::normalize_path(pyproject));
@@ -383,7 +383,7 @@ fn resolve_scoped_settings<'a>(
     pyproject: &'a Path,
     relativity: Relativity,
     transformer: &dyn ConfigurationTransformer,
-    origin: Option<&ConfigurationOrigin>,
+    origin: Option<ConfigurationOrigin>,
 ) -> Result<(&'a Path, Settings)> {
     let configuration = resolve_configuration(pyproject, relativity, transformer, origin)?;
     let project_root = relativity.resolve(pyproject);
@@ -397,14 +397,14 @@ pub fn resolve_root_settings(
     pyproject: &Path,
     relativity: Relativity,
     transformer: &dyn ConfigurationTransformer,
-    origin: &ConfigurationOrigin,
+    origin: ConfigurationOrigin,
 ) -> Result<Settings> {
     let (_project_root, settings) =
         resolve_scoped_settings(pyproject, relativity, transformer, Some(origin))?;
     Ok(settings)
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 /// How the configuration is provided.
 pub enum ConfigurationOrigin {
     /// User specified path to specific configuration file
@@ -938,7 +938,7 @@ mod tests {
                 &find_settings_toml(&package_root)?.unwrap(),
                 Relativity::Parent,
                 &NoOpTransformer,
-                &ConfigurationOrigin::Ancestor,
+                ConfigurationOrigin::Ancestor,
             )?,
             None,
         );
