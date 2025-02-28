@@ -2278,10 +2278,7 @@ impl<'src> Parser<'src> {
         //         pass
 
         if self.options.target_version < PythonVersion::PY310 {
-            self.add_unsupported_syntax_error(
-                UnsupportedSyntaxErrorKind::MatchBeforePy310,
-                match_range,
-            );
+            self.add_unsupported_syntax_error(UnsupportedSyntaxErrorKind::Match, match_range);
         }
 
         ast::StmtMatch {

@@ -2172,7 +2172,7 @@ impl<'src> Parser<'src> {
         // if x := 1: ...
 
         if self.options.target_version < PythonVersion::PY38 {
-            self.add_unsupported_syntax_error(UnsupportedSyntaxErrorKind::WalrusBeforePy38, range);
+            self.add_unsupported_syntax_error(UnsupportedSyntaxErrorKind::Walrus, range);
         }
 
         ast::ExprNamed {

@@ -446,15 +446,15 @@ pub struct UnsupportedSyntaxError {
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum UnsupportedSyntaxErrorKind {
-    MatchBeforePy310,
-    WalrusBeforePy38,
+    Match,
+    Walrus,
 }
 
 impl Display for UnsupportedSyntaxError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let kind = match self.kind {
-            UnsupportedSyntaxErrorKind::MatchBeforePy310 => "`match` statement",
-            UnsupportedSyntaxErrorKind::WalrusBeforePy38 => "named assignment expression (`:=`)",
+            UnsupportedSyntaxErrorKind::Match => "`match` statement",
+            UnsupportedSyntaxErrorKind::Walrus => "named assignment expression (`:=`)",
         };
         write!(
             f,
@@ -469,8 +469,8 @@ impl UnsupportedSyntaxError {
     /// The earliest allowed version for the syntax associated with this error.
     pub const fn minimum_version(&self) -> PythonVersion {
         match self.kind {
-            UnsupportedSyntaxErrorKind::MatchBeforePy310 => PythonVersion::PY310,
-            UnsupportedSyntaxErrorKind::WalrusBeforePy38 => PythonVersion::PY38,
+            UnsupportedSyntaxErrorKind::Match => PythonVersion::PY310,
+            UnsupportedSyntaxErrorKind::Walrus => PythonVersion::PY38,
         }
     }
 }
