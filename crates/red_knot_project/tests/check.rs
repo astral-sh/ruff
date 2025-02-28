@@ -283,4 +283,6 @@ const KNOWN_FAILURES: &[(&str, bool, bool)] = &[
     // related to circular references in f-string annotations (invalid syntax)
     ("crates/ruff_linter/resources/test/fixtures/pyflakes/F821_15.py", true, true),
     ("crates/ruff_linter/resources/test/fixtures/pyflakes/F821_14.py", false, true),
+    // related to circular references in stub type annotations (salsa cycle panic):
+    ("crates/ruff_linter/resources/test/fixtures/pycodestyle/E501_4.py", false, true),
 ];
