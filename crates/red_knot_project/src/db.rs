@@ -150,7 +150,7 @@ impl salsa::Database for ProjectDatabase {
             return;
         }
 
-        // tracing::trace!("Salsa event: {event:?}");
+        tracing::trace!("Salsa event: {event:?}");
     }
 }
 

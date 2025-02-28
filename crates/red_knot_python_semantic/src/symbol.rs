@@ -256,10 +256,7 @@ pub(crate) fn imported_symbol<'db>(
         if name == "__getattr__" {
             Symbol::Unbound.into()
         } else {
-            KnownClass::ModuleType
-                .to_instance(db)
-                .member(db, name)
-                .into()
+            KnownClass::ModuleType.to_instance(db).member(db, name)
         }
     })
 }
@@ -278,7 +275,7 @@ pub(crate) fn builtins_symbol<'db>(db: &'db dyn Db, symbol: &str) -> SymbolAndQu
                 // We're looking up in the builtins namespace and not the module, so we should
                 // do the normal lookup in `types.ModuleType` and not the special one as in
                 // `imported_symbol`.
-                module_type_implicit_global_symbol(db, symbol).into()
+                module_type_implicit_global_symbol(db, symbol)
             })
         })
         .unwrap_or(Symbol::Unbound.into())
@@ -540,7 +537,7 @@ fn symbol_impl<'db>(
     name: &str,
     requires_explicit_reexport: RequiresExplicitReExport,
 ) -> SymbolAndQualifiers<'db> {
-    // let _span = tracing::trace_span!("symbol", ?name).entered();
+    let _span = tracing::trace_span!("symbol", ?name).entered();
 
     // We don't need to check for `typing_extensions` here, because `typing_extensions.TYPE_CHECKING`
     // is just a re-export of `typing.TYPE_CHECKING`.

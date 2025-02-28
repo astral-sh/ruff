@@ -1600,15 +1600,6 @@ impl<'db> Type<'db> {
         class_attr: SymbolAndQualifiers<'db>,
         owner: Type<'db>,
     ) -> SymbolAndQualifiers<'db> {
-        let _span = tracing::trace_span!(
-            "run_descriptor_protocol_instances",
-            self=%self.display(db),
-            name=%name,
-            class_attr=?class_attr,
-            owner=%owner.display(db),
-        )
-        .entered();
-
         // #[salsa::tracked]
         fn run_descriptor_protocol_instances_query<'db>(
             db: &'db dyn Db,
@@ -1754,11 +1745,20 @@ impl<'db> Type<'db> {
                                 (None, Symbol::Unbound) => class_attr,
                             }
                         }
-                        Symbol::Unbound => instance.instance_variable(db, name).into(),
+                        Symbol::Unbound => instance.instance_variable(db, name),
                     }
                 }
             }
         }
+
+        let _span = tracing::trace_span!(
+            "run_descriptor_protocol_instances",
+            self=%self.display(db),
+            name=%name,
+            class_attr=?class_attr,
+            owner=%owner.display(db),
+        )
+        .entered();
 
         run_descriptor_protocol_instances_query(db, self, name, class_attr, owner)
     }
@@ -1774,14 +1774,6 @@ impl<'db> Type<'db> {
         name: &str,
         class_attr: SymbolAndQualifiers<'db>,
     ) -> SymbolAndQualifiers<'db> {
-        let _span = tracing::trace_span!(
-            "run_descriptor_protocol_classes",
-            self=%self.display(db),
-            name=%name,
-            class_attr=?class_attr,
-        )
-        .entered();
-
         // #[salsa::tracked]
         fn run_descriptor_protocol_classes_query<'db>(
             db: &'db dyn Db,
@@ -1895,6 +1887,14 @@ impl<'db> Type<'db> {
                 }
             }
         }
+
+        let _span = tracing::trace_span!(
+            "run_descriptor_protocol_classes",
+            self=%self.display(db),
+            name=%name,
+            class_attr=?class_attr,
+        )
+        .entered();
 
         run_descriptor_protocol_classes_query(db, self, name, class_attr)
     }
@@ -2445,7 +2445,7 @@ impl<'db> Type<'db> {
                                                 KnownInstanceType::TypeAliasType(type_alias),
                                             ) if arguments
                                                 .third_argument()
-                                                .and_then(|owner| owner.into_class_literal())
+                                                .and_then(Type::into_class_literal)
                                                 .is_some_and(|class_literal| {
                                                     class_literal
                                                         .class
@@ -2459,7 +2459,7 @@ impl<'db> Type<'db> {
                                                 typevar,
                                             )) if arguments
                                                 .third_argument()
-                                                .and_then(|owner| owner.into_class_literal())
+                                                .and_then(Type::into_class_literal)
                                                 .is_some_and(|class_literal| {
                                                     class_literal
                                                         .class
