@@ -14,6 +14,7 @@ pub use semantic_model::{HasType, SemanticModel};
 pub mod ast_node_ref;
 mod db;
 pub mod lint;
+pub(crate) mod list;
 mod module_name;
 mod module_resolver;
 mod node_key;
