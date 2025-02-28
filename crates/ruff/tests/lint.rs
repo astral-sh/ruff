@@ -2636,7 +2636,7 @@ fn walrus_before_py38() {
         .args(["--stdin-filename", "test.py"])
         .arg("--target-version=py38")
         .arg("-")
-        .pass_stdin(r#"if x := 1: pass"#),
+        .pass_stdin(r#"(x := 1)"#),
         @r"
     success: false
     exit_code: 1
@@ -2655,7 +2655,7 @@ fn walrus_before_py38() {
         .arg("--target-version=py37")
         .arg("--preview")
         .arg("-")
-        .pass_stdin(r#"if x := 1: pass"#),
+        .pass_stdin(r#"(x := 1)"#),
         @r"
     success: false
     exit_code: 1
