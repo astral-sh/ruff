@@ -7,7 +7,7 @@ use path_absolutize::path_dedot;
 use ruff_workspace::configuration::Configuration;
 use ruff_workspace::pyproject::{self, find_fallback_target_version};
 use ruff_workspace::resolver::{
-    resolve_root_settings, ConfigurationProvenance, ConfigurationTransformer, PyprojectConfig,
+    resolve_root_settings, ConfigurationOrigin, ConfigurationTransformer, PyprojectConfig,
     PyprojectDiscoveryStrategy, Relativity,
 };
 
@@ -39,7 +39,7 @@ pub fn resolve(
             pyproject,
             Relativity::Cwd,
             config_arguments,
-            &ConfigurationProvenance::UserSpecified,
+            &ConfigurationOrigin::UserSpecified,
         )?;
         debug!(
             "Using user-specified configuration file at: {}",
@@ -70,7 +70,7 @@ pub fn resolve(
             &pyproject,
             Relativity::Parent,
             config_arguments,
-            &ConfigurationProvenance::Ancestor,
+            &ConfigurationOrigin::Ancestor,
         )?;
         return Ok(PyprojectConfig::new(
             PyprojectDiscoveryStrategy::Hierarchical,
@@ -92,7 +92,7 @@ pub fn resolve(
             &pyproject,
             Relativity::Cwd,
             config_arguments,
-            &ConfigurationProvenance::UserSettings,
+            &ConfigurationOrigin::UserSettings,
         )?;
         return Ok(PyprojectConfig::new(
             PyprojectDiscoveryStrategy::Hierarchical,
