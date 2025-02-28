@@ -2085,12 +2085,12 @@ select = ["UP006"]
     Ok(())
 }
 
-#[test]
 /// ```
 /// tmp
 /// ├── pyproject.toml #<--- no `[tool.ruff]`
 /// └── test.py
 /// ```
+#[test]
 fn requires_python_no_tool() -> Result<()> {
     let tempdir = TempDir::new()?;
     let project_dir = tempdir.path().canonicalize()?;
@@ -2129,13 +2129,13 @@ requires-python = ">= 3.11"
     Ok(())
 }
 
-#[test]
 /// ```
 /// tmp
 /// ├── pyproject.toml #<-- no [tool.ruff]
 /// ├── ruff.toml #<-- no `target-version`
 /// └── test.py
 /// ```
+#[test]
 fn requires_python_ruff_toml_no_target_fallback() -> Result<()> {
     let tempdir = TempDir::new()?;
     let project_dir = tempdir.path().canonicalize()?;
@@ -2189,7 +2189,6 @@ from typing import Union;foo: Union[int, str] = 1
     Ok(())
 }
 
-#[test]
 /// ```
 /// tmp
 /// ├── foo
@@ -2197,6 +2196,7 @@ from typing import Union;foo: Union[int, str] = 1
 /// │   └── test.py
 /// └── pyproject.toml #<-- no [tool.ruff], has `requires-python`
 /// ```
+#[test]
 fn requires_python_pyproject_toml_above() -> Result<()> {
     let tempdir = TempDir::new()?;
     let project_dir = tempdir.path().canonicalize()?;
@@ -2254,7 +2254,6 @@ from typing import Union;foo: Union[int, str] = 1
     Ok(())
 }
 
-#[test]
 /// ```
 /// tmp
 /// ├── foo
@@ -2262,6 +2261,7 @@ from typing import Union;foo: Union[int, str] = 1
 /// │   └── test.py
 /// └── ruff.toml #<-- no `target-version`
 /// ```
+#[test]
 fn requires_python_ruff_toml_above() -> Result<()> {
     let tempdir = TempDir::new()?;
     let project_dir = tempdir.path().canonicalize()?;
