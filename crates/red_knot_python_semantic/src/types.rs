@@ -1381,6 +1381,7 @@ impl<'db> Type<'db> {
             tracing::trace_span!("find_name_in_mro", self=%self.display(db), name).entered();
 
         match self {
+            Type::Never => Some(Symbol::bound(Type::Never).into()),
             Type::ClassLiteral(ClassLiteralType { class })
                 if class.is_known(db, KnownClass::FunctionType) && name == "__get__" =>
             {
