@@ -120,14 +120,9 @@ class C:
 
 c = C()
 
-# TODO: This should ideally be `Unknown | Literal["data"]`.
-#
-#     - Pyright also wrongly shows `int | Literal['data']` here
-#     - Mypy shows Literal["data"] here, but also shows Literal["non-data"] below.
-#
-reveal_type(c.data_descriptor)  # revealed: Unknown | Literal["data"]
+reveal_type(c.data_descriptor)  # revealed: Unknown | Literal["data", 1]
 
-reveal_type(c.non_data_descriptor)  # revealed: Unknown | Literal[1]
+reveal_type(c.non_data_descriptor)  # revealed: Unknown | Literal["non-data", 1]
 
 reveal_type(C.data_descriptor)  # revealed: Unknown | Literal["data"]
 
@@ -301,7 +296,7 @@ reveal_type(C.class_object_access)  # revealed: int
 reveal_type(C().instance_access)  # revealed: str
 
 # TODO: These should emit a diagnostic
-reveal_type(C().class_object_access)  # revealed: Unknown
+reveal_type(C().class_object_access)  # revealed: TailoredForClassObjectAccess
 reveal_type(C.instance_access)  # revealed: Unknown
 ```
 
