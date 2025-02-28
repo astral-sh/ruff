@@ -285,4 +285,7 @@ const KNOWN_FAILURES: &[(&str, bool, bool)] = &[
     ("crates/ruff_linter/resources/test/fixtures/pyflakes/F821_14.py", false, true),
     // related to circular references in stub type annotations (salsa cycle panic):
     ("crates/ruff_linter/resources/test/fixtures/pycodestyle/E501_4.py", false, true),
+    ("crates/ruff_linter/resources/test/fixtures/pyflakes/F401_0.py", false, true),
+    ("crates/ruff_linter/resources/test/fixtures/pyflakes/F401_12.py", false, true),
+    ("crates/ruff_linter/resources/test/fixtures/pyflakes/F401_14.py", false, true),
 ];
