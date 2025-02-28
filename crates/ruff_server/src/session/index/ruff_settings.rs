@@ -71,7 +71,7 @@ impl RuffSettings {
                     &user_settings,
                     Relativity::Cwd,
                     &EditorConfigurationTransformer(editor_settings, root),
-                    &ruff_workspace::resolver::ConfigurationProvenance::UserSettings,
+                    &ruff_workspace::resolver::ConfigurationOrigin::UserSettings,
                 )
                 .ok()
                 .map(|settings| RuffSettings {
@@ -144,7 +144,7 @@ impl RuffSettingsIndex {
                         &pyproject,
                         Relativity::Parent,
                         &EditorConfigurationTransformer(editor_settings, root),
-                        &ruff_workspace::resolver::ConfigurationProvenance::Ancestor,
+                        &ruff_workspace::resolver::ConfigurationOrigin::Ancestor,
                     ) {
                         Ok(settings) => {
                             respect_gitignore = Some(settings.file_resolver.respect_gitignore);
@@ -269,7 +269,7 @@ impl RuffSettingsIndex {
                             &pyproject,
                             Relativity::Parent,
                             &EditorConfigurationTransformer(editor_settings, root),
-                            &ruff_workspace::resolver::ConfigurationProvenance::Ancestor,
+                            &ruff_workspace::resolver::ConfigurationOrigin::Ancestor,
                         ) {
                             Ok(settings) => {
                                 index.write().unwrap().insert(

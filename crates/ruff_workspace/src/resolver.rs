@@ -303,7 +303,7 @@ pub fn resolve_configuration(
     pyproject: &Path,
     relativity: Relativity,
     transformer: &dyn ConfigurationTransformer,
-    provenance: Option<&ConfigurationProvenance>,
+    origin: Option<&ConfigurationOrigin>,
 ) -> Result<Configuration> {
     let mut configurations = indexmap::IndexMap::new();
     let mut next = Some(fs::normalize_path(pyproject));
@@ -320,19 +320,18 @@ pub fn resolve_configuration(
         }
 
         // Resolve the current path.
-        let version_strategy = if configurations.is_empty()
-            && matches!(provenance, Some(ConfigurationProvenance::Ancestor))
-        {
-            // For configurations that are discovered by
-            // walking back from a file, we will attempt to
-            // infer the `target-version` if it is missing
-            TargetVersionStrategy::RequiresPythonFallback
-        } else {
-            // In all other cases (e.g. for configurations
-            // inherited via `extend`, or user-level settings)
-            // we do not attempt to infer a missing `target-version`
-            TargetVersionStrategy::Standard
-        };
+        let version_strategy =
+            if configurations.is_empty() && matches!(origin, Some(ConfigurationOrigin::Ancestor)) {
+                // For configurations that are discovered by
+                // walking back from a file, we will attempt to
+                // infer the `target-version` if it is missing
+                TargetVersionStrategy::RequiresPythonFallback
+            } else {
+                // In all other cases (e.g. for configurations
+                // inherited via `extend`, or user-level settings)
+                // we do not attempt to infer a missing `target-version`
+                TargetVersionStrategy::Standard
+            };
         let options = pyproject::load_options(&path, &version_strategy).with_context(|| {
             if configurations.is_empty() {
                 format!(
@@ -384,9 +383,9 @@ fn resolve_scoped_settings<'a>(
     pyproject: &'a Path,
     relativity: Relativity,
     transformer: &dyn ConfigurationTransformer,
-    provenance: Option<&ConfigurationProvenance>,
+    origin: Option<&ConfigurationOrigin>,
 ) -> Result<(&'a Path, Settings)> {
-    let configuration = resolve_configuration(pyproject, relativity, transformer, provenance)?;
+    let configuration = resolve_configuration(pyproject, relativity, transformer, origin)?;
     let project_root = relativity.resolve(pyproject);
     let settings = configuration.into_settings(project_root)?;
     Ok((project_root, settings))
@@ -398,16 +397,16 @@ pub fn resolve_root_settings(
     pyproject: &Path,
     relativity: Relativity,
     transformer: &dyn ConfigurationTransformer,
-    provenance: &ConfigurationProvenance,
+    origin: &ConfigurationOrigin,
 ) -> Result<Settings> {
     let (_project_root, settings) =
-        resolve_scoped_settings(pyproject, relativity, transformer, Some(provenance))?;
+        resolve_scoped_settings(pyproject, relativity, transformer, Some(origin))?;
     Ok(settings)
 }
 
 #[derive(Debug)]
 /// How the configuration is provided.
-pub enum ConfigurationProvenance {
+pub enum ConfigurationOrigin {
     /// User specified path to specific configuration file
     UserSpecified,
     /// User-level configuration
@@ -916,8 +915,8 @@ mod tests {
     use crate::pyproject::find_settings_toml;
     use crate::resolver::{
         is_file_excluded, match_exclusion, python_files_in_path, resolve_root_settings,
-        ConfigurationProvenance, ConfigurationTransformer, PyprojectConfig,
-        PyprojectDiscoveryStrategy, Relativity, ResolvedFile, Resolver,
+        ConfigurationOrigin, ConfigurationTransformer, PyprojectConfig, PyprojectDiscoveryStrategy,
+        Relativity, ResolvedFile, Resolver,
     };
     use crate::settings::Settings;
     use crate::tests::test_resource_path;
@@ -939,7 +938,7 @@ mod tests {
                 &find_settings_toml(&package_root)?.unwrap(),
                 Relativity::Parent,
                 &NoOpTransformer,
-                &ConfigurationProvenance::Ancestor,
+                &ConfigurationOrigin::Ancestor,
             )?,
             None,
         );
