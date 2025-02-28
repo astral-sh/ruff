@@ -28,8 +28,7 @@
 //!
 //! [`Predicate`]: crate::semantic_index::predicate::Predicate
 
-use ruff_index::list::{List, ListBuilder, ListSetReverseIterator, ListStorage};
-
+use crate::list::{List, ListBuilder, ListSetReverseIterator, ListStorage};
 use crate::semantic_index::predicate::ScopedPredicateId;
 
 /// A narrowing constraint associated with a live binding.

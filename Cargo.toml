@@ -117,8 +117,6 @@ pretty_assertions = "1.3.0"
 proc-macro2 = { version = "1.0.79" }
 pyproject-toml = { version = "0.13.4" }
 quick-junit = { version = "0.5.0" }
-quickcheck = { version = "1.0.3", default-features = false }
-quickcheck_macros = { version = "1.0.0" }
 quote = { version = "1.0.23" }
 rand = { version = "0.9.0" }
 rayon = { version = "1.10.0" }
