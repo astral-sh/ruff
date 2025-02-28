@@ -44,7 +44,7 @@ fn empty_config() {
 fn syntax_error() {
     check!(
         "x =\ny = 1\n",
-        r#"{"preview" = true}"#,
+        r#"{"preview": true}"#,
         [ExpandedMessage {
             code: None,
             message: "SyntaxError: Expected an expression".to_string(),
