@@ -15,6 +15,7 @@ use crate::rules::pycodestyle::rules::logical_lines::{
 };
 use crate::settings::LinterSettings;
 use crate::Locator;
+use crate::rules::ruff::rules::indented_form_feed;
 
 /// Return the amount of indentation, expanding tabs to the next multiple of the settings' tab size.
 pub(crate) fn expand_indent(line: &str, indent_width: IndentWidth) -> usize {
@@ -97,7 +98,11 @@ pub(crate) fn check_logical_lines(
         Rule::UnexpectedIndentationComment,
         Rule::OverIndented,
     ]);
-
+    let enforce_indented_form_feed = settings.rules.any_enabled(&[Rule::IndentedFormFeed]);
+    println!("{:?}", settings.rules);
+    println!("{:?}", settings.preview);
+    println!("{}", enforce_indented_form_feed);
+    panic!();
     for line in &LogicalLines::from_tokens(tokens, locator) {
         if line.flags().contains(TokenFlags::OPERATOR) {
             if enforce_space_around_operator {
@@ -153,6 +158,13 @@ pub(crate) fn check_logical_lines(
             }
         }
 
+        if enforce_indented_form_feed {
+            println!("HERE inside");
+            if let Some(diagnostic) = indented_form_feed(&line) {
+                context.push_diagnostic(diagnostic);
+            }
+        }
+
         // Extract the indentation level.
         let Some(first_token) = line.first_token() else {
             continue;
@@ -187,6 +199,7 @@ pub(crate) fn check_logical_lines(
             prev_line = Some(line);
             prev_indent_level = Some(indent_level);
         }
+
     }
     context.diagnostics
 }

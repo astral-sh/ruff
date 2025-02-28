@@ -13,7 +13,6 @@ use crate::rules::pycodestyle::rules::{
     trailing_whitespace,
 };
 use crate::rules::pylint;
-use crate::rules::ruff::rules::indented_form_feed;
 use crate::settings::LinterSettings;
 use crate::Locator;
 
@@ -69,12 +68,6 @@ pub(crate) fn check_physical_lines(
 
         if enforce_trailing_whitespace || enforce_blank_line_contains_whitespace {
             if let Some(diagnostic) = trailing_whitespace(&line, locator, indexer, settings) {
-                diagnostics.push(diagnostic);
-            }
-        }
-
-        if settings.rules.enabled(Rule::IndentedFormFeed) {
-            if let Some(diagnostic) = indented_form_feed(&line) {
                 diagnostics.push(diagnostic);
             }
         }
