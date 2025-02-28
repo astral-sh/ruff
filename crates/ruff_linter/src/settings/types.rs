@@ -236,7 +236,7 @@ impl FromStr for FilePattern {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(Self::User(
             s.to_string(),
-            GlobPath::normalize(s, &*path_dedot::CWD),
+            GlobPath::normalize(s, fs::get_cwd()),
         ))
     }
 }
@@ -332,7 +332,7 @@ impl<T> PerFile<T> {
             pattern.drain(..1);
         }
 
-        let project_root = project_root.unwrap_or(&path_dedot::CWD);
+        let project_root = project_root.unwrap_or(fs::get_cwd());
 
         Self {
             absolute: GlobPath::normalize(&pattern, project_root),
