@@ -217,7 +217,8 @@ impl IndexedMut<'_> {
     }
 
     fn inner_mut(&mut self) -> &mut IndexedInner {
-        Arc::get_mut(&mut self.indexed).expect("All references to `FilesSet` to have been dropped")
+        Arc::get_mut(&mut self.indexed)
+            .expect("All references to `FilesSet` should have been dropped")
     }
 
     fn set_impl(&mut self) {

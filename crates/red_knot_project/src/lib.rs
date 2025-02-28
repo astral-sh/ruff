@@ -72,13 +72,26 @@ pub struct Project {
     #[return_ref]
     pub settings: Settings,
 
-    /// The paths that should be included in this project.
+    /// The paths that should be included when checking this project.
     ///
-    /// The default (when this list is empty) is to include all files in the project root (that satisfy the configured include and exclude patterns).
+    /// The default (when this list is empty) is to include all files in the project root
+    /// (that satisfy the configured include and exclude patterns).
     /// However, it's sometimes desired to only check a subset of the project, e.g. to see
     /// the diagnostics for a single file or a folder.
     ///
     /// This list gets initialized by the paths passed to `knot check <paths>`
+    ///
+    /// ## How is this different from `open_files`?
+    ///
+    /// The `included_paths` is closely related to `open_files`. The only difference is that
+    /// `open_files` is already a resolved set of files whereas `included_paths` is only a list of paths
+    /// that are resolved to files by indexing them. The other difference is that
+    /// new files added to any directory in `included_paths` will be indexed and added to the project
+    /// whereas `open_files` needs to be updated manually (e.g. by the IDE).
+    ///
+    /// In short, `open_files` is cheaper in contexts where the set of files is know, like
+    /// in an IDE when the user only wants to check the open tabs. This could be modeled
+    /// with `included_paths` too but it would require an explicit walk dir step that's simply unnecessary.
     #[default]
     #[return_ref]
     included_paths_list: Vec<SystemPathBuf>,
@@ -118,10 +131,12 @@ impl Project {
         self.settings(db).to_rules()
     }
 
-    /// Returns `true` if `path` is included in the project and one of the paths that should be checked.
+    /// Returns `true` if `path` is both part of the project and included (see `included_paths_list`).
     ///
-    /// This is an over approximation compared to [Self::files] because it returns `true` for files
-    /// that are excluded by `.gitignore`.
+    /// Unlike [Self::files], this method does not respect `.gitignore` files. It only checks
+    /// the project's include and exclude settings as well as the paths that were passed to `knot check <paths>`.
+    /// This means, that this method is an over-approximation of `Self::files` and may return `true` for paths
+    /// that won't be included when checking the project because they're ignored in a `.gitignore` file.
     pub fn is_path_included(self, db: &dyn Db, path: &SystemPath) -> bool {
         ProjectFilesFilter::from_project(db, self).is_included(path)
     }

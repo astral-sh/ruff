@@ -75,7 +75,7 @@ impl ProjectWatcher {
             .iter()
             .map(SystemPathBuf::as_path);
 
-        // Find the common ancestor between the project root and any path provided by the user on the CLI.
+        // Watch both the project root and any paths provided by the user on the CLI (removing any redundant nested paths).
         // This is necessary to observe changes to files that are outside the project root.
         // We always need to watch the project root to observe changes to its configuration.
         let included_paths = ruff_db::system::deduplicate_nested_paths(

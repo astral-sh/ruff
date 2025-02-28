@@ -32,19 +32,19 @@ impl<'a> ProjectFilesFilter<'a> {
         }
     }
 
-    /// Returns `true` if a file is included according to the project's `include` and `exclude` settings
-    /// and the paths specified on the CLI.
+    /// Returns `true` if a file is part of the project and included in the paths to check.
     ///
-    /// A file is considered being part of the project if it is a sub path of the project's root
-    /// (when no CLI path arguments are specified) or if it is a sub path of one of the CLI paths AND:
+    /// A file is included in the checked files if it is a sub path of the project's root
+    /// (when no CLI path arguments are specified) or if it is a sub path of any path provided on the CLI (`knot check <paths>`) AND:
     ///
-    /// * It is considered included after applying all `include` patterns
-    /// * It isn't excluded by any `exclude` pattern
+    /// * It matches a positive `include` pattern and isn't excluded by a later negative `include` pattern.
+    /// * It doesn't match a positive `exclude` pattern or is re-included by a later negative `exclude` pattern.
     ///
     /// ## Note
     ///
     /// This method may return `true` for files that don't end up being included when walking the
-    /// project tree because it doesn't consider `.gitignore` and other ignore files.
+    /// project tree because it doesn't consider `.gitignore` and other ignore files when deciding
+    /// if a file's included.
     pub(crate) fn is_included(&self, path: &SystemPath) -> bool {
         #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
         enum CheckPathMatch {
@@ -97,17 +97,17 @@ impl<'a> ProjectFilesWalker<'a> {
         let project = db.project();
 
         let mut filter = ProjectFilesFilter::from_project(db, project);
-        // It's unnecessary to set `check_paths` because it only iterates over the project's root.
+        // It's unnecessary to filter on included paths because it only iterates over those to start with.
         filter.skip_included_paths = true;
 
         Self::from_paths(db, project.included_paths_or_root(db), filter)
-            .expect("check_paths_or_root to never return an empty iterator")
+            .expect("included_paths_or_root to never return an empty iterator")
     }
 
-    /// Creates a walker for indexing the project file incrementally.
+    /// Creates a walker for indexing the project files incrementally.
     ///
     /// The main difference to a full project walk is that `paths` may contain paths
-    /// that aren't part of the checked project files.
+    /// that aren't part of the included files.
     pub(crate) fn incremental<P>(db: &'a dyn Db, paths: impl IntoIterator<Item = P>) -> Option<Self>
     where
         P: AsRef<SystemPath>,

@@ -576,7 +576,7 @@ fn new_files_with_explicit_included_paths() -> anyhow::Result<()> {
     let sub_a_path = case.project_path("src/sub/a.py");
     std::fs::write(sub_a_path.as_std_path(), "print('Hello')")?;
 
-    // and write a second file in the root director -- this should not be included
+    // and write a second file in the root directory -- this should not be included
     let test2_path = case.project_path("src/test2.py");
     std::fs::write(test2_path.as_std_path(), "print('Hello')")?;
 

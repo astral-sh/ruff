@@ -2,6 +2,7 @@ use crate::db::{Db, ProjectDatabase};
 use crate::metadata::options::Options;
 use crate::watch::{ChangeEvent, CreatedKind, DeletedKind};
 use crate::{Project, ProjectMetadata};
+use std::collections::BTreeSet;
 
 use crate::walk::ProjectFilesWalker;
 use red_knot_python_semantic::Program;
@@ -29,17 +30,11 @@ impl ProjectDatabase {
 
         // Deduplicate the `sync` calls. Many file watchers emit multiple events for the same path.
         let mut synced_files = FxHashSet::default();
-        let mut synced_recursively = FxHashSet::default();
+        let mut sync_recursively = BTreeSet::default();
 
         let mut sync_path = |db: &mut ProjectDatabase, path: &SystemPath| {
             if synced_files.insert(path.to_path_buf()) {
                 File::sync_path(db, path);
-            }
-        };
-
-        let mut sync_recursively = |db: &mut ProjectDatabase, path: &SystemPath| {
-            if synced_recursively.insert(path.to_path_buf()) {
-                Files::sync_recursively(db, path);
             }
         };
 
@@ -69,17 +64,19 @@ impl ProjectDatabase {
                     match kind {
                         CreatedKind::File => sync_path(self, &path),
                         CreatedKind::Directory | CreatedKind::Any => {
-                            sync_recursively(self, &path);
+                            sync_recursively.insert(path.clone());
                         }
                     }
 
                     // Unlike other files, it's not only important to update the status of existing
-                    // and known `File`s, it's also important to discover new files that were added
-                    // to the current project. That is because we want to
-                    // include those files in the next check run. For this, we traverse
-                    // the enclosing directory to discover all added files.
-                    // We can skip this step for non-project files or files that don't match
-                    // any path passed to `knot check <path>`
+                    // and known `File`s (`sync_recursively`), it's also important to discover new files
+                    // that were added in the project's root (or any of the paths included for checking).
+                    //
+                    // This is important because `Project::check` iterates over all included files.
+                    // The code below walks the `added_paths` and adds all files that
+                    // should be included in the project. We can skip this check for
+                    // paths that aren't part of the project or shouldn't be included
+                    // when checking the project.
                     if project.is_path_included(self, &path) {
                         if self.system().is_file(&path) {
                             // Add the parent directory because `walkdir` always visits explicitly passed files
@@ -111,7 +108,7 @@ impl ProjectDatabase {
                             project.remove_file(self, file);
                         }
                     } else {
-                        sync_recursively(self, &path);
+                        sync_recursively.insert(path.clone());
 
                         if custom_stdlib_versions_path
                             .as_ref()
@@ -141,9 +138,25 @@ impl ProjectDatabase {
                 ChangeEvent::Rescan => {
                     project_changed = true;
                     Files::sync_all(self);
+                    sync_recursively.clear();
                     break;
                 }
             }
+        }
+
+        let sync_recursively = sync_recursively.into_iter();
+        let mut last = None;
+
+        for path in sync_recursively {
+            // Avoid re-syncing paths that are sub-paths of each other.
+            if let Some(last) = &last {
+                if path.starts_with(last) {
+                    continue;
+                }
+            }
+
+            Files::sync_recursively(self, &path);
+            last = Some(path);
         }
 
         if project_changed {
