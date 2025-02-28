@@ -2339,6 +2339,82 @@ from typing import Union;foo: Union[int, str] = 1
     Ok(())
 }
 
+/// ```
+/// tmp
+/// ├── pyproject.toml <-- requires >=3.9
+/// ├── ruff.toml <--- extends base
+/// ├── shared
+/// │   └── base_config.toml <-- targets 3.10
+/// └── test.py
+/// ```
+#[test]
+fn requires_python_extend_from_shared_config() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let project_dir = tempdir.path().canonicalize()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+extend = "./shared/base_config.toml"
+[lint]
+select = ["UP007"]
+"#,
+    )?;
+
+    let shared_dir = tempdir.path().join("shared");
+    fs::create_dir(shared_dir)?;
+
+    let pyproject_toml = tempdir.path().join("pyproject.toml");
+    fs::write(
+        &pyproject_toml,
+        r#"[project]
+requires-python = ">= 3.9"
+"#,
+    )?;
+
+    let shared_toml = tempdir.path().join("shared/base_config.toml");
+    fs::write(
+        &shared_toml,
+        r#"
+target-version = "py310"
+"#,
+    )?;
+
+    let testpy = tempdir.path().join("test.py");
+    fs::write(
+        &testpy,
+        r#"
+from typing import Union;foo: Union[int, str] = 1
+"#,
+    )?;
+
+    let testpy_canon = testpy.canonicalize()?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&testpy_canon).as_str(), "[TMP]/test.py"),(tempdir_filter(&project_dir).as_str(), "[TMP]/"),(r"(?m)\n.*\[ruff::commands::check\].*$",""),(r"(?m)^.*(\[.*\])\[DEBUG\](.*)$","$1[DEBUG]$2")]
+    }, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .arg("-v")
+            .arg("test.py")
+            .current_dir(&project_dir), @r###"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        All checks passed!
+
+        ----- stderr -----
+        [ruff::resolve][DEBUG] Using configuration file (via parent) at: [TMP]/ruff.toml
+        [ruff_workspace::pyproject][DEBUG] No `target-version` found in `ruff.toml`
+        [ruff_workspace::pyproject][DEBUG] Detected minimum supported `requires-python` version: 3.9
+        [ruff_workspace::pyproject][DEBUG] Derived `target-version` from `requires-python` in `pyproject.toml`
+        [ruff::diagnostics][DEBUG] Checking: [TMP]/test.py
+        "###);
+    });
+
+    Ok(())
+}
+
 #[test]
 fn checks_notebooks_in_stable() -> anyhow::Result<()> {
     let tempdir = TempDir::new()?;
