@@ -16,11 +16,15 @@ reveal_type(Bar)  # revealed: Literal[Bar]
 reveal_type(Bar.__mro__)  # revealed: tuple[Literal[Bar], Unknown, Literal[object]]
 ```
 
-## Acces to attributes declarated in stubs
+## Access to attributes declarated in stubs
 
-Unlike regular python modules, stub files often declare module-global and class variables without
-initializing them. But from the perspective of the type checker, we should treat something like
-`symbol: type` same as `symbol: type = ...`.
+Unlike regular Python modules, stub files often omit the RHS in declarations, including in class
+scope. However, from the perspective of the type checker, we have to treat them as bindings too.
+That is, `symbol: type` is the same as `symbol: type = ...`.
+
+One implication of this is that we'll always treat symbols in class scope as either
+`class or instance` or `class only` (if `ClassVar` is used). We'll never infer a pure instance
+attribute from a stub.
 
 `b.pyi`:
 
@@ -28,8 +32,7 @@ initializing them. But from the perspective of the type checker, we should treat
 from typing import ClassVar
 
 class C:
-    a_classvar: ClassVar[str]
-    instance_var: int
+    class_or_instance_var: int
 ```
 
 ```py
@@ -37,22 +40,6 @@ from typing import ClassVar, Literal
 
 from b import C
 
-reveal_type(C.a_classvar)  # revealed: str
-
-class Subclass(C):
-    unbound_classvar: ClassVar[str]
-    declared: int
-    declared_and_bound: int = 42
-
-# TODO: this should be an error showing possibly unbound.
-reveal_type(Subclass.unbound_classvar)  # revealed: str
-
-s_inst = Subclass()
-
-reveal_type(s_inst.instance_var)  # revealed: int
-
-# TODO: this should be an error showing possibly unbound.
-reveal_type(s_inst.declared)  # revealed: int
-
-reveal_type(s_inst.declared_and_bound)  # revealed: int
+# No error here, since we treat `class_or_instance_var` as bound on the class.
+reveal_type(C.class_or_instance_var)  # revealed: int
 ```

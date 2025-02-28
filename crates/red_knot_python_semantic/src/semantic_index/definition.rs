@@ -543,7 +543,8 @@ impl DefinitionKind<'_> {
                     DefinitionCategory::Binding
                 }
             }
-            // annotated assignment is always a declaration, only a binding if there is a RHS
+            // Annotated assignment is always a declaration. It is also a binding if there is a RHS
+            // or if we are in a stub file. Unfortunately, it is common for stubs to omit even an `...` value placeholder.
             DefinitionKind::AnnotatedAssignment(ann_assign) => {
                 if in_stub || ann_assign.value.is_some() {
                     DefinitionCategory::DeclarationAndBinding

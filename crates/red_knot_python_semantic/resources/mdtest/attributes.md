@@ -997,8 +997,6 @@ reveal_type(Foo.__class__)  # revealed: Literal[type]
 
 ## Module attributes
 
-### Regular modules
-
 `mod.py`:
 
 ```py
@@ -1031,34 +1029,6 @@ class IntIterable:
 # error: [invalid-assignment] "Object of type `int` is not assignable to attribute `global_symbol` of type `str`"
 for mod.global_symbol in IntIterable():
     pass
-```
-
-### Declarations in stubs
-
-Unlike regular python modules, stub files often declare module-global and class variables without
-initializing them. But from the perspective of the type checker, we should treat something like
-`symbol: type` same as `symbol: type = ...`.
-
-`b.pyi`:
-
-```pyi
-from typing import Literal
-
-CONSTANT: Literal[42]
-
-# No error here, even though the variable is not initialized.
-uses_constant: int = CONSTANT
-
-class C:
-    instance_var: int
-```
-
-```py
-from typing import Literal
-
-from b import CONSTANT
-
-reveal_type(CONSTANT)  # revealed: Literal[42]
 ```
 
 ## Nested attributes
