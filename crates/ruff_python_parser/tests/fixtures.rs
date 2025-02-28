@@ -39,7 +39,7 @@ fn test_valid_syntax(input_path: &Path) {
     });
     let parsed = parse_unchecked(&source, options);
 
-    let is_valid = parsed.is_valid() && parsed.unsupported_syntax_errors().is_empty();
+    let is_valid = parsed.has_no_errors();
 
     if !is_valid {
         let line_index = LineIndex::from_source_text(&source);
@@ -101,7 +101,7 @@ fn test_invalid_syntax(input_path: &Path) {
     });
     let parsed = parse_unchecked(&source, options);
 
-    let is_valid = parsed.is_valid() && parsed.unsupported_syntax_errors().is_empty();
+    let is_valid = parsed.has_no_errors();
 
     assert!(
         !is_valid,

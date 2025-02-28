@@ -42,6 +42,8 @@ pub struct LinterResult {
     pub messages: Vec<Message>,
     /// A flag indicating the presence of syntax errors in the source file.
     /// If `true`, at least one syntax error was detected in the source file.
+    ///
+    /// This includes both [`ParseError`]s and [`UnsupportedSyntaxError`]s.
     pub has_syntax_error: bool,
 }
 
@@ -445,7 +447,7 @@ pub fn lint_only(
             &locator,
             &directives,
         ),
-        has_syntax_error: !parsed.is_valid() || !parsed.unsupported_syntax_errors().is_empty(),
+        has_syntax_error: !parsed.has_no_errors(),
     }
 }
 
@@ -546,7 +548,7 @@ pub fn lint_fix<'a>(
         );
 
         if iterations == 0 {
-            is_valid_syntax = parsed.is_valid() && parsed.unsupported_syntax_errors().is_empty();
+            is_valid_syntax = parsed.has_no_errors();
         } else {
             // If the source code was parseable on the first pass, but is no
             // longer parseable on a subsequent pass, then we've introduced a
