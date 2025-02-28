@@ -11,6 +11,8 @@ use ruff_workspace::resolver::{
     PyprojectDiscoveryStrategy,
 };
 
+use ruff_python_ast as ast;
+
 use crate::args::ConfigArguments;
 
 /// Resolve the relevant settings strategy and defaults for the current
@@ -110,7 +112,7 @@ pub fn resolve(
         if fallback.is_some() {
             debug!("Derived `target-version` from found `requires-python`");
         }
-        config.target_version = fallback.map(Into::into);
+        config.target_version = fallback.map(ast::PythonVersion::from);
     }
     let settings = config.into_settings(&path_dedot::CWD)?;
     Ok(PyprojectConfig::new(
