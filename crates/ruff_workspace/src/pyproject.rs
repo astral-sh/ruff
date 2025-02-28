@@ -42,18 +42,18 @@ impl Pyproject {
 
 /// Parse a `ruff.toml` file.
 fn parse_ruff_toml<P: AsRef<Path>>(path: P) -> Result<Options> {
-    let contents = std::fs::read_to_string(path.as_ref())
-        .with_context(|| format!("Failed to read {}", path.as_ref().display()))?;
-    toml::from_str(&contents)
-        .with_context(|| format!("Failed to parse {}", path.as_ref().display()))
+    let path = path.as_ref();
+    let contents = std::fs::read_to_string(path)
+        .with_context(|| format!("Failed to read {}", path.display()))?;
+    toml::from_str(&contents).with_context(|| format!("Failed to parse {}", path.display()))
 }
 
 /// Parse a `pyproject.toml` file.
 fn parse_pyproject_toml<P: AsRef<Path>>(path: P) -> Result<Pyproject> {
-    let contents = std::fs::read_to_string(path.as_ref())
-        .with_context(|| format!("Failed to read {}", path.as_ref().display()))?;
-    toml::from_str(&contents)
-        .with_context(|| format!("Failed to parse {}", path.as_ref().display()))
+    let path = path.as_ref();
+    let contents = std::fs::read_to_string(path)
+        .with_context(|| format!("Failed to read {}", path.display()))?;
+    toml::from_str(&contents).with_context(|| format!("Failed to parse {}", path.display()))
 }
 
 /// Return `true` if a `pyproject.toml` contains a `[tool.ruff]` section.
@@ -65,20 +65,21 @@ pub fn ruff_enabled<P: AsRef<Path>>(path: P) -> Result<bool> {
 /// Return the path to the `pyproject.toml` or `ruff.toml` file in a given
 /// directory.
 pub fn settings_toml<P: AsRef<Path>>(path: P) -> Result<Option<PathBuf>> {
+    let path = path.as_ref();
     // Check for `.ruff.toml`.
-    let ruff_toml = path.as_ref().join(".ruff.toml");
+    let ruff_toml = path.join(".ruff.toml");
     if ruff_toml.is_file() {
         return Ok(Some(ruff_toml));
     }
 
     // Check for `ruff.toml`.
-    let ruff_toml = path.as_ref().join("ruff.toml");
+    let ruff_toml = path.join("ruff.toml");
     if ruff_toml.is_file() {
         return Ok(Some(ruff_toml));
     }
 
     // Check for `pyproject.toml`.
-    let pyproject_toml = path.as_ref().join("pyproject.toml");
+    let pyproject_toml = path.join("pyproject.toml");
     if pyproject_toml.is_file() && ruff_enabled(&pyproject_toml)? {
         return Ok(Some(pyproject_toml));
     }
@@ -156,8 +157,9 @@ pub(super) fn load_options<P: AsRef<Path>>(
     path: P,
     version_strategy: &TargetVersionStrategy,
 ) -> Result<Options> {
-    if path.as_ref().ends_with("pyproject.toml") {
-        let pyproject = parse_pyproject_toml(&path)?;
+    let path = path.as_ref();
+    if path.ends_with("pyproject.toml") {
+        let pyproject = parse_pyproject_toml(path)?;
         let mut ruff = pyproject
             .tool
             .and_then(|tool| tool.ruff)
@@ -171,14 +173,14 @@ pub(super) fn load_options<P: AsRef<Path>>(
         }
         Ok(ruff)
     } else {
-        let mut ruff = parse_ruff_toml(&path);
+        let mut ruff = parse_ruff_toml(path);
         if let Ok(ref mut ruff) = ruff {
             if ruff.target_version.is_none() {
                 debug!("No `target-version` found in `ruff.toml`");
                 match version_strategy {
                     TargetVersionStrategy::UseDefault => {}
                     TargetVersionStrategy::RequiresPythonFallback => {
-                        if let Some(dir) = path.as_ref().parent() {
+                        if let Some(dir) = path.parent() {
                             let fallback = get_fallback_target_version(dir);
                             if fallback.is_some() {
                                 debug!("Derived `target-version` from `requires-python` in `pyproject.toml`");
