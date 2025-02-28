@@ -4299,7 +4299,8 @@ impl<'db> ModuleLiteralType<'db> {
         if name == "__dict__" {
             return KnownClass::ModuleType
                 .to_instance(db)
-                .static_member(db, "__dict__");
+                .member(db, "__dict__")
+                .0;
         }
 
         // If the file that originally imported the module has also imported a submodule
