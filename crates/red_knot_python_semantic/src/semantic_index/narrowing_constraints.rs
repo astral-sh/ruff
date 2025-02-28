@@ -16,10 +16,10 @@
 //! - Iterating through the predicates in a constraint
 //!
 //! In particular, note that we do not need random access to the predicates in a constraint. That
-//! means that we can use a simple [_sorted association list_][ruff_index::list] as our data
-//! structure. That lets us use a single 32-bit integer to store each narrowing constraint, no
-//! matter how many predicates it contains. It also makes merging two narrowing constraints fast,
-//! since alists support fast intersection.
+//! means that we can use a simple [_sorted association list_][crate::list] as our data structure.
+//! That lets us use a single 32-bit integer to store each narrowing constraint, no matter how many
+//! predicates it contains. It also makes merging two narrowing constraints fast, since alists
+//! support fast intersection.
 //!
 //! Because we visit the contents of each scope in source-file order, and assign scoped IDs in
 //! source-file order, that means that we will tend to visit narrowing constraints in order by
