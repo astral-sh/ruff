@@ -1421,6 +1421,13 @@ impl<'db> Type<'db> {
             }
             Type::ClassLiteral(class_literal) => class_literal.find_name_in_mro(db, name),
             Type::SubclassOf(subclass_of_ty) => subclass_of_ty.find_name_in_mro(db, name),
+
+            Type::Instance(InstanceType { class }) if class.is_known(db, KnownClass::Type) => {
+                KnownClass::Object
+                    .to_class_literal(db)
+                    .find_name_in_mro(db, name)
+            }
+
             dynamic @ Type::Dynamic(_) => Symbol::bound(dynamic).into(),
             _ => Symbol::todo("find_name_in_mro for non-class types").into(),
         }

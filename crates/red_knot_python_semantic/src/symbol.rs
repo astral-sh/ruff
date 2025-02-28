@@ -171,7 +171,7 @@ pub(crate) fn class_symbol<'db>(
                 return symbol_and_quals;
             }
 
-            if let SymbolAndQualifiers(Symbol::Type(ty, _), _) = symbol_and_quals {
+            if let SymbolAndQualifiers(Symbol::Type(ty, _), qualifiers) = symbol_and_quals {
                 // Otherwise, we need to check if the symbol has bindings
                 let use_def = use_def_map(db, scope);
                 let bindings = use_def.public_bindings(symbol);
@@ -181,8 +181,10 @@ pub(crate) fn class_symbol<'db>(
                 // TODO: we should not need to calculate inferred type second time. This is a temporary
                 // solution until the notion of Boundness and Declaredness is split. See #16036, #16264
                 match inferred {
-                    Symbol::Unbound => Symbol::Unbound.into(),
-                    Symbol::Type(_, boundness) => Symbol::Type(ty, boundness).into(),
+                    Symbol::Unbound => SymbolAndQualifiers(Symbol::Unbound, qualifiers),
+                    Symbol::Type(_, boundness) => {
+                        SymbolAndQualifiers(Symbol::Type(ty, boundness), qualifiers)
+                    }
                 }
             } else {
                 Symbol::Unbound.into()
