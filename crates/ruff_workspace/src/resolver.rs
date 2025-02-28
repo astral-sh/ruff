@@ -301,10 +301,10 @@ pub trait ConfigurationTransformer {
 // resolving the "default" configuration).
 pub fn resolve_configuration(
     pyproject: &Path,
-    relativity: Relativity,
     transformer: &dyn ConfigurationTransformer,
     origin: ConfigurationOrigin,
 ) -> Result<Configuration> {
+    let relativity = Relativity::from(origin);
     let mut configurations = indexmap::IndexMap::new();
     let mut next = Some(fs::normalize_path(pyproject));
     while let Some(path) = next {
@@ -381,11 +381,12 @@ pub fn resolve_configuration(
 /// `pyproject.toml`.
 fn resolve_scoped_settings<'a>(
     pyproject: &'a Path,
-    relativity: Relativity,
     transformer: &dyn ConfigurationTransformer,
     origin: ConfigurationOrigin,
 ) -> Result<(&'a Path, Settings)> {
-    let configuration = resolve_configuration(pyproject, relativity, transformer, origin)?;
+    let relativity = Relativity::from(origin);
+
+    let configuration = resolve_configuration(pyproject, transformer, origin)?;
     let project_root = relativity.resolve(pyproject);
     let settings = configuration.into_settings(project_root)?;
     Ok((project_root, settings))
@@ -395,12 +396,10 @@ fn resolve_scoped_settings<'a>(
 /// configuration with the given [`ConfigurationTransformer`].
 pub fn resolve_root_settings(
     pyproject: &Path,
-    relativity: Relativity,
     transformer: &dyn ConfigurationTransformer,
     origin: ConfigurationOrigin,
 ) -> Result<Settings> {
-    let (_project_root, settings) =
-        resolve_scoped_settings(pyproject, relativity, transformer, origin)?;
+    let (_project_root, settings) = resolve_scoped_settings(pyproject, transformer, origin)?;
     Ok(settings)
 }
 
@@ -415,6 +414,17 @@ pub enum ConfigurationOrigin {
     UserSettings,
     /// In parent or higher ancestor directory of path
     Ancestor,
+}
+
+impl From<ConfigurationOrigin> for Relativity {
+    fn from(value: ConfigurationOrigin) -> Self {
+        match value {
+            ConfigurationOrigin::Unknown => Self::Parent,
+            ConfigurationOrigin::UserSpecified => Self::Cwd,
+            ConfigurationOrigin::UserSettings => Self::Cwd,
+            ConfigurationOrigin::Ancestor => Self::Parent,
+        }
+    }
 }
 
 /// Find all Python (`.py`, `.pyi` and `.ipynb` files) in a set of paths.
@@ -442,7 +452,6 @@ pub fn python_files_in_path<'a>(
                     if let Some(pyproject) = settings_toml(ancestor)? {
                         let (root, settings) = resolve_scoped_settings(
                             &pyproject,
-                            Relativity::Parent,
                             transformer,
                             ConfigurationOrigin::Unknown,
                         )?;
@@ -597,7 +606,6 @@ impl ParallelVisitor for PythonFilesVisitor<'_, '_> {
                     match settings_toml(entry.path()) {
                         Ok(Some(pyproject)) => match resolve_scoped_settings(
                             &pyproject,
-                            Relativity::Parent,
                             self.transformer,
                             ConfigurationOrigin::Unknown,
                         ) {
@@ -732,12 +740,8 @@ pub fn python_file_at_path(
     if resolver.is_hierarchical() {
         for ancestor in path.ancestors() {
             if let Some(pyproject) = settings_toml(ancestor)? {
-                let (root, settings) = resolve_scoped_settings(
-                    &pyproject,
-                    Relativity::Parent,
-                    transformer,
-                    ConfigurationOrigin::Unknown,
-                )?;
+                let (root, settings) =
+                    resolve_scoped_settings(&pyproject, transformer, ConfigurationOrigin::Unknown)?;
                 resolver.add(root, settings);
                 break;
             }
@@ -922,7 +926,7 @@ mod tests {
     use crate::resolver::{
         is_file_excluded, match_exclusion, python_files_in_path, resolve_root_settings,
         ConfigurationOrigin, ConfigurationTransformer, PyprojectConfig, PyprojectDiscoveryStrategy,
-        Relativity, ResolvedFile, Resolver,
+        ResolvedFile, Resolver,
     };
     use crate::settings::Settings;
     use crate::tests::test_resource_path;
@@ -942,7 +946,6 @@ mod tests {
             PyprojectDiscoveryStrategy::Hierarchical,
             resolve_root_settings(
                 &find_settings_toml(&package_root)?.unwrap(),
-                Relativity::Parent,
                 &NoOpTransformer,
                 ConfigurationOrigin::Ancestor,
             )?,
