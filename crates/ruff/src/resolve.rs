@@ -108,7 +108,7 @@ pub fn resolve(
                 .unwrap_or(&path_dedot::CWD.as_path()),
         );
         if fallback.is_some() {
-            debug!("Deriving `target-version` from found `requires-python`");
+            debug!("Derived `target-version` from found `requires-python`");
         }
         config.target_version = fallback.map(Into::into);
     }
