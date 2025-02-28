@@ -58,32 +58,40 @@ impl std::fmt::Display for RuffSettings {
 }
 
 impl RuffSettings {
+    /// Constructs [`RuffSettings`] by attempting to resolve settings from a user-provided
+    /// configuration file, such as `pyproject.toml` or `ruff.toml`, within the
+    /// user's workspace.
+    ///
+    /// In the absence of a valid configuration file, it gracefully falls back to
+    /// editor-only settings.
     pub(crate) fn fallback(editor_settings: &ResolvedEditorSettings, root: &Path) -> RuffSettings {
-        let mut path = None;
-        let fallback = find_user_settings_toml()
+        find_user_settings_toml()
             .and_then(|user_settings| {
-                let settings = ruff_workspace::resolver::resolve_root_settings(
+                ruff_workspace::resolver::resolve_root_settings(
                     &user_settings,
                     Relativity::Cwd,
                     &EditorConfigurationTransformer(editor_settings, root),
                 )
-                .ok();
-                path = Some(user_settings);
-                settings
+                .ok()
+                .map(|settings| RuffSettings {
+                    path: Some(user_settings),
+                    settings,
+                })
             })
-            .unwrap_or_else(|| {
-                let default_configuration = Configuration::default();
-                EditorConfigurationTransformer(editor_settings, root)
-                    .transform(default_configuration)
-                    .into_settings(root)
-                    .expect(
-                        "editor configuration should merge successfully with default configuration",
-                    )
-            });
+            .unwrap_or_else(|| Self::editor_only(editor_settings, root))
+    }
+
+    /// Constructs [`RuffSettings`] by merging the editor-defined settings with the
+    /// default configuration.
+    fn editor_only(editor_settings: &ResolvedEditorSettings, root: &Path) -> RuffSettings {
+        let settings = EditorConfigurationTransformer(editor_settings, root)
+            .transform(Configuration::default())
+            .into_settings(root)
+            .expect("editor configuration should merge successfully with default configuration");
 
         RuffSettings {
-            path,
-            settings: fallback,
+            path: None,
+            settings,
         }
     }
 }
@@ -104,11 +112,22 @@ impl RuffSettingsIndex {
         editor_settings: &ResolvedEditorSettings,
         is_default_workspace: bool,
     ) -> Self {
+        if editor_settings.configuration_preference == ConfigurationPreference::EditorOnly {
+            tracing::debug!(
+                "Using editor-only settings for workspace: {} (skipped indexing)",
+                root.display()
+            );
+            return RuffSettingsIndex {
+                index: BTreeMap::default(),
+                fallback: Arc::new(RuffSettings::editor_only(editor_settings, root)),
+            };
+        }
+
         tracing::debug!("Indexing settings for workspace: {}", root.display());
 
         let mut has_error = false;
-        let mut index = BTreeMap::default();
         let mut respect_gitignore = None;
+        let mut index = BTreeMap::default();
 
         // If this is *not* the default workspace, then we should skip the workspace root itself
         // because it will be resolved when walking the workspace directory tree. This is done by
