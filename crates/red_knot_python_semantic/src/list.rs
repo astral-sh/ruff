@@ -61,6 +61,7 @@
 //!
 //! [alist]: https://en.wikipedia.org/wiki/Association_list
 
+use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::marker::PhantomData;
 use std::ops::Deref;
@@ -69,7 +70,7 @@ use ruff_index::{newtype_index, IndexVec};
 
 /// A handle to an association list. Use [`ListStorage`] to access its elements, and
 /// [`ListBuilder`] to construct other lists based on this one.
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) struct List<K, V = ()> {
     last: Option<ListCellId>,
     _phantom: PhantomData<(K, V)>,
@@ -95,14 +96,84 @@ impl<K, V> Default for List<K, V> {
 }
 
 #[newtype_index]
-#[derive(PartialOrd, Ord)]
+// #[derive(PartialOrd, Ord)]
 struct ListCellId;
 
 /// Stores one or more association lists. This type provides read-only access to the lists.  Use a
 /// [`ListBuilder`] to create lists.
 #[derive(Debug, Eq, PartialEq)]
 pub(crate) struct ListStorage<K, V = ()> {
-    cells: IndexVec<ListCellId, ListCell<K, V>>,
+    cells: ListChunk<K, V>,
+}
+
+impl<K, V> ListStorage<K, V> {
+    fn new() -> Self {
+        Self {
+            cells: ListChunk {
+                current: Vec::with_capacity(16),
+                rest: Vec::new(),
+            },
+        }
+    }
+
+    fn push(&mut self, cell: ListCell<K, V>) -> ListCellId {
+        self.push_fast(cell)
+            .unwrap_or_else(|cell| self.push_slow(cell))
+    }
+
+    #[inline]
+    fn push_fast(&mut self, cell: ListCell<K, V>) -> Result<ListCellId, ListCell<K, V>> {
+        let len = self.cells.current.len();
+
+        if len < self.cells.current.capacity() {
+            let list_len = self.cells.current.len();
+            self.cells.current.push(cell);
+            let chunk = self.cells.rest.len() << 28;
+            Ok(ListCellId::from_usize(list_len | chunk))
+        } else {
+            Err(cell)
+        }
+    }
+
+    #[cold]
+    fn push_slow(&mut self, cell: ListCell<K, V>) -> ListCellId {
+        let mut next_vec = Vec::with_capacity(self.cells.current.capacity() * 2);
+        next_vec.push(cell);
+
+        let current = std::mem::replace(&mut self.cells.current, next_vec);
+        self.cells.rest.push(current);
+
+        let chunk = self.cells.rest.len() << 28;
+        ListCellId::from_usize(chunk)
+    }
+}
+
+impl<K, V> std::ops::Index<ListCellId> for ListStorage<K, V> {
+    type Output = ListCell<K, V>;
+
+    #[inline]
+    fn index(&self, index: ListCellId) -> &Self::Output {
+        let offset = index.as_u32();
+
+        let chunk = offset >> 28;
+        let list_id = offset & !(0b1111 << 28);
+        let list = self
+            .cells
+            .rest
+            .get(chunk as usize)
+            .unwrap_or(&self.cells.current);
+
+        &list[list_id as usize]
+    }
+}
+
+#[newtype_index]
+struct ChunkId;
+
+#[derive(Debug, Eq, PartialEq, Default)]
+struct ListChunk<K, V = ()> {
+    current: Vec<ListCell<K, V>>,
+    rest: Vec<Vec<ListCell<K, V>>>,
 }
 
 /// Each association list is represented by a sequence of snoc cells. A snoc cell is like the more
@@ -151,9 +222,7 @@ pub(crate) struct ListBuilder<K, V = ()> {
 impl<K, V> Default for ListBuilder<K, V> {
     fn default() -> Self {
         ListBuilder {
-            storage: ListStorage {
-                cells: IndexVec::default(),
-            },
+            storage: ListStorage::new(),
             scratch: Vec::default(),
         }
     }
@@ -170,7 +239,8 @@ impl<K, V> ListBuilder<K, V> {
     /// Finalizes a `ListBuilder`. After calling this, you cannot create any new lists managed by
     /// this storage.
     pub(crate) fn build(mut self) -> ListStorage<K, V> {
-        self.storage.cells.shrink_to_fit();
+        self.storage.cells.current.shrink_to_fit();
+        self.storage.cells.rest.shrink_to_fit();
         self.storage
     }
 
@@ -182,7 +252,7 @@ impl<K, V> ListBuilder<K, V> {
     /// list.
     #[allow(clippy::unnecessary_wraps)]
     fn add_cell(&mut self, rest: Option<ListCellId>, key: K, value: V) -> Option<ListCellId> {
-        Some(self.storage.cells.push(ListCell { rest, key, value }))
+        Some(self.storage.push(ListCell { rest, key, value }))
     }
 
     /// Returns an entry pointing at where `key` would be inserted into a list.
@@ -210,7 +280,7 @@ impl<K, V> ListBuilder<K, V> {
         // (and any succeeding keys) onto.
         let mut curr = list.last;
         while let Some(curr_id) = curr {
-            let cell = &self.storage.cells[curr_id];
+            let cell = &self.storage[curr_id];
             match key.cmp(&cell.key) {
                 // We found an existing entry in the input list with the desired key.
                 Ordering::Equal => {
@@ -339,8 +409,8 @@ impl<K, V> ListBuilder<K, V> {
         let mut a = a.last;
         let mut b = b.last;
         while let (Some(a_id), Some(b_id)) = (a, b) {
-            let a_cell = &self.storage.cells[a_id];
-            let b_cell = &self.storage.cells[b_id];
+            let a_cell = &self.storage[a_id];
+            let b_cell = &self.storage[b_id];
             match a_cell.key.cmp(&b_cell.key) {
                 // Both lists contain this key; combine their values
                 Ordering::Equal => {
@@ -390,7 +460,7 @@ impl<'a, K> Iterator for ListSetReverseIterator<'a, K> {
     type Item = &'a K;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let cell = &self.storage.cells[self.curr?];
+        let cell = &self.storage[self.curr?];
         self.curr = cell.rest;
         Some(&cell.key)
     }
@@ -531,7 +601,7 @@ mod tests {
         type Item = (&'a K, &'a V);
 
         fn next(&mut self) -> Option<Self::Item> {
-            let cell = &self.storage.cells[self.curr?];
+            let cell = &self.storage[self.curr?];
             self.curr = cell.rest;
             Some((&cell.key, &cell.value))
         }

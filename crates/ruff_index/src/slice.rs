@@ -51,6 +51,11 @@ impl<I: Idx, T> IndexSlice<I, T> {
     }
 
     #[inline]
+    pub const fn capacity(&self) -> usize {
+        self.raw.len()
+    }
+
+    #[inline]
     pub const fn is_empty(&self) -> bool {
         self.raw.is_empty()
     }
