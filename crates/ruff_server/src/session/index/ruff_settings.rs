@@ -14,7 +14,7 @@ use ruff_workspace::Settings;
 use ruff_workspace::{
     configuration::{Configuration, FormatConfiguration, LintConfiguration, RuleSelection},
     pyproject::{find_user_settings_toml, settings_toml},
-    resolver::{ConfigurationTransformer, Relativity},
+    resolver::ConfigurationTransformer,
 };
 
 use crate::session::settings::{
@@ -68,7 +68,6 @@ impl RuffSettings {
             .and_then(|user_settings| {
                 ruff_workspace::resolver::resolve_root_settings(
                     &user_settings,
-                    Relativity::Cwd,
                     &EditorConfigurationTransformer(editor_settings, root),
                     ruff_workspace::resolver::ConfigurationOrigin::UserSettings,
                 )
@@ -141,7 +140,6 @@ impl RuffSettingsIndex {
                 Ok(Some(pyproject)) => {
                     match ruff_workspace::resolver::resolve_root_settings(
                         &pyproject,
-                        Relativity::Parent,
                         &EditorConfigurationTransformer(editor_settings, root),
                         ruff_workspace::resolver::ConfigurationOrigin::Ancestor,
                     ) {
@@ -266,7 +264,6 @@ impl RuffSettingsIndex {
                     Ok(Some(pyproject)) => {
                         match ruff_workspace::resolver::resolve_root_settings(
                             &pyproject,
-                            Relativity::Parent,
                             &EditorConfigurationTransformer(editor_settings, root),
                             ruff_workspace::resolver::ConfigurationOrigin::Ancestor,
                         ) {
@@ -440,9 +437,8 @@ impl ConfigurationTransformer for EditorConfigurationTransformer<'_> {
 fn open_configuration_file(config_path: &Path) -> crate::Result<Configuration> {
     ruff_workspace::resolver::resolve_configuration(
         config_path,
-        Relativity::Cwd,
         &IdentityTransformer,
-        ruff_workspace::resolver::ConfigurationOrigin::Unknown,
+        ruff_workspace::resolver::ConfigurationOrigin::UserSpecified,
     )
 }
 
