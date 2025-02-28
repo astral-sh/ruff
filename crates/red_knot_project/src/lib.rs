@@ -341,11 +341,11 @@ impl Project {
     }
 
     pub fn add_file(self, db: &mut dyn Db, file: File) {
-        // tracing::debug!(
-        //     "Adding file `{}` to project `{}`",
-        //     file.path(db),
-        //     self.name(db)
-        // );
+        tracing::debug!(
+            "Adding file `{}` to project `{}`",
+            file.path(db),
+            self.name(db)
+        );
 
         let Some(mut index) = IndexedFiles::indexed_mut(db, self) else {
             return;

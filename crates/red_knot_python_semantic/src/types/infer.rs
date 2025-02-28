@@ -2636,19 +2636,19 @@ impl<'db> TypeInferenceBuilder<'db> {
         let module = module.as_deref();
 
         let module_name = if let Some(level) = NonZeroU32::new(*level) {
-            // tracing::trace!(
-            //     "Resolving imported object `{}` from module `{}` relative to file `{}`",
-            //     alias.name,
-            //     format_import_from_module(level.get(), module),
-            //     self.file().path(self.db()),
-            // );
+            tracing::trace!(
+                "Resolving imported object `{}` from module `{}` relative to file `{}`",
+                alias.name,
+                format_import_from_module(level.get(), module),
+                self.file().path(self.db()),
+            );
             self.relative_module_name(module, level)
         } else {
-            // tracing::trace!(
-            //     "Resolving imported object `{}` from module `{}`",
-            //     alias.name,
-            //     format_import_from_module(*level, module),
-            // );
+            tracing::trace!(
+                "Resolving imported object `{}` from module `{}`",
+                alias.name,
+                format_import_from_module(*level, module),
+            );
             module
                 .and_then(ModuleName::new)
                 .ok_or(ModuleNameResolutionError::InvalidSyntax)
