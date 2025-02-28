@@ -176,7 +176,7 @@ pub(super) fn load_options<P: AsRef<Path>>(
             if ruff.target_version.is_none() {
                 debug!("No `target-version` found in `ruff.toml`");
                 match version_strategy {
-                    TargetVersionStrategy::Standard => {}
+                    TargetVersionStrategy::UseDefault => {}
                     TargetVersionStrategy::RequiresPythonFallback => {
                         if let Some(dir) = path.as_ref().parent() {
                             let fallback = get_fallback_target_version(dir);
@@ -255,10 +255,11 @@ fn get_minimum_supported_version(requires_version: &VersionSpecifiers) -> Option
 }
 
 /// Strategy for handling missing `target-version` in configuration.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub(super) enum TargetVersionStrategy {
-    #[default]
-    Standard,
+    /// Use default `target-version`
+    UseDefault,
+    /// Derive from `requires-python` if available
     RequiresPythonFallback,
 }
 

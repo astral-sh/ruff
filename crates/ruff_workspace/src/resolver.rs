@@ -330,7 +330,7 @@ pub fn resolve_configuration(
                 // In all other cases (e.g. for configurations
                 // inherited via `extend`, or user-level settings)
                 // we do not attempt to infer a missing `target-version`
-                TargetVersionStrategy::Standard
+                TargetVersionStrategy::UseDefault
             };
         let options = pyproject::load_options(&path, &version_strategy).with_context(|| {
             if configurations.is_empty() {
