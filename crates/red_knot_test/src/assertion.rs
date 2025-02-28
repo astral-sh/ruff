@@ -233,9 +233,6 @@ impl<'a> Deref for LineAssertions<'a> {
     }
 }
 
-const TYPE_PREFIX: &str = "# revealed:";
-const ERROR_PREFIX: &str = "# error:";
-
 /// A single diagnostic assertion comment.
 ///
 /// This type represents an *attempted* assertion, but not necessarily a *valid* assertion.
@@ -254,26 +251,31 @@ impl<'a> UnparsedAssertion<'a> {
     /// Returns `Some(_)` if the comment starts with `# error:` or `# revealed:`,
     /// indicating that it is an assertion comment.
     fn from_comment(comment: &'a str) -> Option<Self> {
-        comment
-            .strip_prefix(TYPE_PREFIX)
-            .map(Self::Revealed)
-            .or_else(|| comment.strip_prefix(ERROR_PREFIX).map(Self::Error))
+        let comment = comment.trim().strip_prefix('#')?.trim();
+        let (keyword, body) = comment.split_once(':')?;
+        let keyword = keyword.trim();
+        let body = body.trim();
+
+        match keyword {
+            "revealed" => Some(Self::Revealed(body)),
+            "error" => Some(Self::Error(body)),
+            _ => None,
+        }
     }
 
     /// Parse the attempted assertion into a [`ParsedAssertion`] structured representation.
-    pub(crate) fn parse(&self) -> Result<ParsedAssertion<'a>, AssertionParseError<'a>> {
+    pub(crate) fn parse(&self) -> Result<ParsedAssertion<'a>, PragmaParseError<'a>> {
         match self {
             Self::Revealed(revealed) => {
-                let trimmed = revealed.trim();
-                if trimmed.is_empty() {
-                    Err(AssertionParseError::EmptyRevealTypeAssertion)
+                if revealed.is_empty() {
+                    Err(PragmaParseError::EmptyRevealTypeAssertion)
                 } else {
-                    Ok(ParsedAssertion::Revealed(trimmed))
+                    Ok(ParsedAssertion::Revealed(revealed))
                 }
             }
             Self::Error(error) => ErrorAssertion::from_str(error)
                 .map(ParsedAssertion::Error)
-                .map_err(AssertionParseError::ErrorAssertionParseError),
+                .map_err(PragmaParseError::ErrorAssertionParseError),
         }
     }
 }
@@ -281,8 +283,8 @@ impl<'a> UnparsedAssertion<'a> {
 impl std::fmt::Display for UnparsedAssertion<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Revealed(expected_type) => write!(f, "revealed: {}", expected_type.trim()),
-            Self::Error(assertion) => write!(f, "error: {}", assertion.trim()),
+            Self::Revealed(expected_type) => write!(f, "revealed: {expected_type}"),
+            Self::Error(assertion) => write!(f, "error: {assertion}"),
         }
     }
 }
@@ -368,24 +370,6 @@ impl<'a> ErrorAssertionParser<'a> {
         self.cursor.eat_while(char::is_whitespace);
     }
 
-    /// Consume characters in the assertion comment until we find a character that satisfies `end_predicate`.
-    ///
-    /// Return a string slice representing the concatenation of all characters we consumed,
-    /// or `None` if we hit the end of the comment before finding a character
-    /// that satisfies `end_predicate`.
-    fn consume_until(&mut self, mut end_predicate: impl FnMut(char) -> bool) -> Option<&'a str> {
-        let start = self.offset().to_usize();
-
-        while !self.cursor.is_eof() {
-            if end_predicate(self.cursor.first()) {
-                return Some(&self.comment_source[start..self.offset().to_usize()]);
-            }
-            self.cursor.bump();
-        }
-
-        None
-    }
-
     /// Attempt to parse the assertion comment into a [`ErrorAssertion`].
     fn parse(mut self) -> Result<ErrorAssertion<'a>, ErrorAssertionParseError<'a>> {
         let mut column = None;
@@ -393,8 +377,8 @@ impl<'a> ErrorAssertionParser<'a> {
 
         self.skip_whitespace();
 
-        while !self.cursor.is_eof() {
-            match self.cursor.first() {
+        while let Some(character) = self.cursor.bump() {
+            match character {
                 // column number
                 '0'..='9' => {
                     if column.is_some() {
@@ -403,10 +387,9 @@ impl<'a> ErrorAssertionParser<'a> {
                     if rule.is_some() {
                         return Err(ErrorAssertionParseError::ColumnNumberAfterRuleCode);
                     }
-                    // This will return `None` if it hits the end of the file before hitting any whitespace
-                    let Some(column_str) = self.consume_until(char::is_whitespace) else {
-                        return Err(ErrorAssertionParseError::NoRuleOrMessage);
-                    };
+                    let offset = self.offset() - TextSize::new(1);
+                    self.cursor.eat_while(|c| !c.is_whitespace());
+                    let column_str = &self.comment_source[TextRange::new(offset, self.offset())];
                     column = OneIndexed::from_str(column_str)
                         .map(Some)
                         .map_err(|e| ErrorAssertionParseError::BadColumnNumber(column_str, e))?;
@@ -417,21 +400,21 @@ impl<'a> ErrorAssertionParser<'a> {
                     if rule.is_some() {
                         return Err(ErrorAssertionParseError::MultipleRuleCodes);
                     }
-                    self.cursor.bump();
-                    let Some(position) = memchr::memmem::find(self.cursor.as_bytes(), b"]") else {
+                    let offset = self.offset();
+                    self.cursor.eat_while(|c| c != ']');
+                    if self.cursor.is_eof() {
                         return Err(ErrorAssertionParseError::UnclosedRuleCode);
-                    };
-                    rule = Some(&self.cursor.as_str()[..position]);
-                    self.cursor.skip_bytes(position + b"]".len());
+                    }
+                    rule = Some(self.comment_source[TextRange::new(offset, self.offset())].trim());
+                    self.cursor.bump();
                 }
 
                 // message text
                 '"' => {
-                    self.cursor.bump();
-                    let rest = &self.comment_source
-                        [self.offset().to_usize()..self.comment_source.trim_end().len() - 1];
-                    self.cursor.skip_bytes(rest.len());
-                    return if self.cursor.first() == '"' {
+                    let comment_source = self.comment_source.trim();
+                    return if comment_source.ends_with('"') {
+                        let rest =
+                            &comment_source[self.offset().to_usize()..comment_source.len() - 1];
                         Ok(ErrorAssertion {
                             rule,
                             column,
@@ -443,13 +426,15 @@ impl<'a> ErrorAssertionParser<'a> {
                 }
 
                 // Some other assumptions we make don't hold true if we hit this branch:
-                '\n' | '\r' => unreachable!("Assertion comments should never contain newlines"),
+                '\n' | '\r' => {
+                    unreachable!("Assertion comments should never contain newlines")
+                }
 
                 // something else (bad!)...
                 unexpected => {
                     return Err(ErrorAssertionParseError::UnexpectedCharacter {
                         character: unexpected,
-                        offset: self.offset().to_usize() + ERROR_PREFIX.len(),
+                        offset: self.offset().to_usize(),
                     });
                 }
             }
@@ -473,7 +458,7 @@ impl<'a> ErrorAssertionParser<'a> {
 ///
 /// The assertion comment could be either a "revealed" assertion or an "error" assertion.
 #[derive(Debug, thiserror::Error)]
-pub(crate) enum AssertionParseError<'a> {
+pub(crate) enum PragmaParseError<'a> {
     #[error("Must specify which type should be revealed")]
     EmptyRevealTypeAssertion,
     #[error("{0}")]
@@ -497,7 +482,7 @@ pub(crate) enum ErrorAssertionParseError<'a> {
     MultipleRuleCodes,
     #[error("expected '\"' to be the final character in an assertion with an error message")]
     UnclosedMessage,
-    #[error("unexpected character `{character}` at offset {offset} (relative to comment `#`)")]
+    #[error("unexpected character `{character}` at offset {offset} (relative to the `:` in the assertion comment)")]
     UnexpectedCharacter { character: char, offset: usize },
 }
 

@@ -651,6 +651,34 @@ mod tests {
     }
 
     #[test]
+    fn error_match_rule_no_whitespace() {
+        let result = get_result(
+            "x #error:[some-rule]",
+            vec![ExpectedDiagnostic::new(
+                DiagnosticId::lint("some-rule"),
+                "Any message",
+                0,
+            )],
+        );
+
+        assert_ok(&result);
+    }
+
+    #[test]
+    fn error_match_rule_lots_of_whitespace() {
+        let result = get_result(
+            "x   #  error  :  [ some-rule ]",
+            vec![ExpectedDiagnostic::new(
+                DiagnosticId::lint("some-rule"),
+                "Any message",
+                0,
+            )],
+        );
+
+        assert_ok(&result);
+    }
+
+    #[test]
     fn error_wrong_rule() {
         let result = get_result(
             "x # error: [some-rule]",
