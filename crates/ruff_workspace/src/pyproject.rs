@@ -182,7 +182,7 @@ pub(super) fn load_options<P: AsRef<Path>>(
                             let fallback = get_fallback_target_version(dir);
                             if fallback.is_some() {
                                 debug!(
-                            "Deriving `target-version` from `requires-python` in `pyproject.toml`"
+                            "Derived `target-version` from `requires-python` in `pyproject.toml`"
                         );
                             } else {
                                 debug!("No `pyproject.toml` with `requires-python` in same directory; `target-version` unspecified");
