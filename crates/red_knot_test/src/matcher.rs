@@ -139,6 +139,10 @@ trait UnmatchedWithColumn {
 // This is necessary since we only parse assertions lazily,
 // and sometimes we know before parsing any assertions that an assertion will be unmatched,
 // e.g. if we've exhausted all diagnostics but there are still assertions left.
+//
+// TODO: the lazy parsing means that we sometimes won't report malformed assertions as
+// being invalid if we detect that they'll be unmatched before parsing them.
+// That's perhaps not the best user experience.
 impl Unmatched for UnparsedAssertion<'_> {
     fn unmatched(&self) -> String {
         format!("{} {self}", "unmatched assertion:".red())
