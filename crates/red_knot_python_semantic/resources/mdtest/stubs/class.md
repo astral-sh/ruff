@@ -18,13 +18,12 @@ reveal_type(Bar.__mro__)  # revealed: tuple[Literal[Bar], Unknown, Literal[objec
 
 ## Access to attributes declarated in stubs
 
-Unlike regular Python modules, stub files often omit the right-hand side in declarations, including in class
-scope. However, from the perspective of the type checker, we have to treat them as bindings too.
-That is, `symbol: type` is the same as `symbol: type = ...`.
+Unlike regular Python modules, stub files often omit the right-hand side in declarations, including
+in class scope. However, from the perspective of the type checker, we have to treat them as bindings
+too. That is, `symbol: type` is the same as `symbol: type = ...`.
 
-One implication of this is that we'll always treat symbols in class scope as safe to be
-accessed from the class object itself. We'll never infer a "pure instance attribute" from
-a stub.
+One implication of this is that we'll always treat symbols in class scope as safe to be accessed
+from the class object itself. We'll never infer a "pure instance attribute" from a stub.
 
 `b.pyi`:
 
