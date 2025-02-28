@@ -303,7 +303,7 @@ pub fn resolve_configuration(
     pyproject: &Path,
     relativity: Relativity,
     transformer: &dyn ConfigurationTransformer,
-    origin: Option<ConfigurationOrigin>,
+    origin: ConfigurationOrigin,
 ) -> Result<Configuration> {
     let mut configurations = indexmap::IndexMap::new();
     let mut next = Some(fs::normalize_path(pyproject));
@@ -321,7 +321,7 @@ pub fn resolve_configuration(
 
         // Resolve the current path.
         let version_strategy =
-            if configurations.is_empty() && matches!(origin, Some(ConfigurationOrigin::Ancestor)) {
+            if configurations.is_empty() && matches!(origin, ConfigurationOrigin::Ancestor) {
                 // For configurations that are discovered by
                 // walking back from a file, we will attempt to
                 // infer the `target-version` if it is missing
@@ -383,7 +383,7 @@ fn resolve_scoped_settings<'a>(
     pyproject: &'a Path,
     relativity: Relativity,
     transformer: &dyn ConfigurationTransformer,
-    origin: Option<ConfigurationOrigin>,
+    origin: ConfigurationOrigin,
 ) -> Result<(&'a Path, Settings)> {
     let configuration = resolve_configuration(pyproject, relativity, transformer, origin)?;
     let project_root = relativity.resolve(pyproject);
@@ -400,16 +400,18 @@ pub fn resolve_root_settings(
     origin: ConfigurationOrigin,
 ) -> Result<Settings> {
     let (_project_root, settings) =
-        resolve_scoped_settings(pyproject, relativity, transformer, Some(origin))?;
+        resolve_scoped_settings(pyproject, relativity, transformer, origin)?;
     Ok(settings)
 }
 
 #[derive(Debug, Clone, Copy)]
 /// How the configuration is provided.
 pub enum ConfigurationOrigin {
+    /// Origin is unknown to the caller
+    Unknown,
     /// User specified path to specific configuration file
     UserSpecified,
-    /// User-level configuration
+    /// User-level configuration (e.g. in `~/.config/ruff/pyproject.toml`)
     UserSettings,
     /// In parent or higher ancestor directory of path
     Ancestor,
@@ -442,7 +444,7 @@ pub fn python_files_in_path<'a>(
                             &pyproject,
                             Relativity::Parent,
                             transformer,
-                            None,
+                            ConfigurationOrigin::Unknown,
                         )?;
                         resolver.add(root, settings);
                         // We found the closest configuration.
@@ -597,7 +599,7 @@ impl ParallelVisitor for PythonFilesVisitor<'_, '_> {
                             &pyproject,
                             Relativity::Parent,
                             self.transformer,
-                            None,
+                            ConfigurationOrigin::Unknown,
                         ) {
                             Ok((root, settings)) => {
                                 self.global.resolver.write().unwrap().add(root, settings);
@@ -730,8 +732,12 @@ pub fn python_file_at_path(
     if resolver.is_hierarchical() {
         for ancestor in path.ancestors() {
             if let Some(pyproject) = settings_toml(ancestor)? {
-                let (root, settings) =
-                    resolve_scoped_settings(&pyproject, Relativity::Parent, transformer, None)?;
+                let (root, settings) = resolve_scoped_settings(
+                    &pyproject,
+                    Relativity::Parent,
+                    transformer,
+                    ConfigurationOrigin::Unknown,
+                )?;
                 resolver.add(root, settings);
                 break;
             }
