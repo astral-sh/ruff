@@ -71,7 +71,7 @@ import typing
 class ListSubclass(typing.List): ...
 
 # TODO: should have `Generic`, should not have `Unknown`
-# revealed: tuple[Literal[ListSubclass], Literal[list], Unknown, Literal[object]]
+# revealed: tuple[Literal[ListSubclass], Literal[list], Literal[object]]
 reveal_type(ListSubclass.__mro__)
 
 class DictSubclass(typing.Dict): ...
