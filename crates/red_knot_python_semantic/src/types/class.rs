@@ -393,6 +393,9 @@ impl<'db> Class<'db> {
     ///
     /// The attribute might also be defined in a superclass of this class.
     pub(super) fn instance_member(self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
+        let _span =
+            tracing::debug_span!("instance_member", class=%self.name(db), name=%name).entered();
+
         let mut union = UnionBuilder::new(db);
         let mut union_qualifiers = TypeQualifiers::empty();
 
@@ -450,6 +453,8 @@ impl<'db> Class<'db> {
         class_body_scope: ScopeId<'db>,
         name: &str,
     ) -> Symbol<'db> {
+        let _span = tracing::debug_span!("implicit_instance_attribute", name).entered();
+
         // If we do not see any declarations of an attribute, neither in the class body nor in
         // any method, we build a union of `Unknown` with the inferred types of all bindings of
         // that attribute. We include `Unknown` in that union to account for the fact that the
@@ -526,6 +531,9 @@ impl<'db> Class<'db> {
         // - `typing.Final`
         // - Proper diagnostics
 
+        let _span =
+            tracing::debug_span!("own_instance_member", class=%self.name(db), name=%name).entered();
+
         let body_scope = self.body_scope(db);
         let table = symbol_table(db, body_scope);
 
@@ -534,14 +542,17 @@ impl<'db> Class<'db> {
 
             let declarations = use_def.public_declarations(symbol_id);
 
-            match symbol_from_declarations(db, declarations) {
+            let declared_and_qualifiers = symbol_from_declarations(db, declarations);
+
+            tracing::debug!(?declared_and_qualifiers, "found declared attribute");
+
+            match declared_and_qualifiers {
                 Ok(SymbolAndQualifiers(declared @ Symbol::Type(declared_ty, _), qualifiers)) => {
                     // The attribute is declared in the class body.
 
                     // Make sure it's not bound in the body
                     let bindings = use_def.public_bindings(symbol_id);
                     let inferred = symbol_from_bindings(db, bindings);
-
                     if !inferred.is_unbound() {
                         return Symbol::Unbound.into();
                     }
@@ -575,6 +586,13 @@ impl<'db> Class<'db> {
                     Self::implicit_instance_attribute(db, body_scope, name).into()
                 }
                 Err((declared_ty, _conflicting_declarations)) => {
+                    // Make sure it's not bound in the body
+                    let bindings = use_def.public_bindings(symbol_id);
+                    let inferred = symbol_from_bindings(db, bindings);
+                    if !inferred.is_unbound() {
+                        return Symbol::Unbound.into();
+                    }
+
                     // There are conflicting declarations for this attribute in the class body.
                     SymbolAndQualifiers(
                         Symbol::bound(declared_ty.inner_type()),

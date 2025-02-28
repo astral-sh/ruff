@@ -76,7 +76,7 @@ use crate::types::{
 };
 use crate::unpack::Unpack;
 use crate::util::subscript::{PyIndex, PySlice};
-use crate::Db;
+use crate::{db, Db};
 
 use super::call::CallError;
 use super::class_base::ClassBase;

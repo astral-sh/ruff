@@ -1365,6 +1365,13 @@ impl<'db> Type<'db> {
             tracing::trace_span!("find_name_in_mro", self=%self.display(db), name).entered();
 
         match self {
+            Type::Union(union) => union
+                .map_with_boundness(db, |elem| elem.find_name_in_mro(db, name).0)
+                .into(),
+            Type::Intersection(inter) => inter
+                .map_with_boundness(db, |elem| elem.find_name_in_mro(db, name).0)
+                .into(),
+
             Type::ClassLiteral(ClassLiteralType { class })
                 if class.is_known(db, KnownClass::FunctionType) && name == "__get__" =>
             {
@@ -1700,6 +1707,10 @@ impl<'db> Type<'db> {
             // TODO: Handle possible-unboundness and errors from `__get__` calls.
 
             match class_attr.0 {
+                // This branch is not strictly needed, but it short-circuits the lookup
+                // of various dunder methods and calls that would otherwise be made.
+                dynamic @ Symbol::Type(Type::Dynamic(_), _) => dynamic.into(),
+
                 Symbol::Type(Type::Union(union), boundness) => union
                     .map_with_boundness(db, |elem| {
                         instance
@@ -1759,12 +1770,12 @@ impl<'db> Type<'db> {
                         }
                     }
 
-                    tracing::info!("protocol resolution: Not a data descriptor");
-
                     if let instance_variable @ Symbol::Type(_, _) =
                         instance.instance_variable(db, name)
                     {
-                        tracing::info!("protocol resolution: Instance variable");
+                        tracing::info!(
+                            "protocol resolution: Instance variable {instance_variable:?}",
+                        );
                         return instance_variable.into();
                     }
 
@@ -1825,6 +1836,10 @@ impl<'db> Type<'db> {
             // TODO: Handle possible-unboundness and errors from `__get__` calls.
 
             match class_attr.0 {
+                // This branch is not strictly needed, but it short-circuits the lookup
+                // of various dunder methods and calls that would otherwise be made.
+                dynamic @ Symbol::Type(Type::Dynamic(_), _) => dynamic.into(),
+
                 Symbol::Type(Type::Union(union), boundness) => union
                     .map_with_boundness(db, |elem| {
                         object_ty
@@ -2714,6 +2729,10 @@ impl<'db> Type<'db> {
         name: &str,
         arguments: &CallArguments<'_, 'db>,
     ) -> Result<CallOutcome<'db>, CallDunderError<'db>> {
+        let _span =
+            tracing::trace_span!("try_call_dunder", self=%self.display(db), name, ?arguments)
+                .entered();
+
         let meta_type = self.to_meta_type(db);
 
         match meta_type.find_name_in_mro(db, name).0 {
@@ -2721,6 +2740,8 @@ impl<'db> Type<'db> {
                 // Dunder methods are looked up on the meta type, but they invoke the descriptor
                 // protocol *as if they had been called on the instance itself*. This is why we
                 // pass `Some(self)` for the `instance` argument here.
+
+                tracing::trace!("callable before = {}", callable_ty.display(db));
 
                 if let Symbol::Type(callable_ty_desc, boundness_desc) = self
                     .run_descriptor_protocol_instances(
@@ -2734,12 +2755,17 @@ impl<'db> Type<'db> {
                     callable_ty = callable_ty_desc;
                     boundness = boundness_desc;
                 }
-                let result = callable_ty.try_call(db, arguments)?;
+
+                tracing::trace!("callable after = {}", callable_ty.display(db));
+
+                let result = callable_ty.try_call(db, arguments);
+
+                tracing::trace!("result = {:?}", result);
 
                 if boundness == Boundness::Bound {
-                    Ok(result)
+                    Ok(result?)
                 } else {
-                    Err(CallDunderError::PossiblyUnbound(result))
+                    Err(CallDunderError::PossiblyUnbound(result?))
                 }
             }
             Symbol::Unbound => Err(CallDunderError::MethodNotAvailable),
@@ -2786,6 +2812,8 @@ impl<'db> Type<'db> {
         let dunder_iter_result = self
             .try_call_dunder(db, "__iter__", &CallArguments::none())
             .map(|dunder_iter_outcome| dunder_iter_outcome.return_type(db));
+
+        tracing::trace!("dunder_iter_result = {:?}", dunder_iter_result);
 
         let iteration_result = match dunder_iter_result {
             Ok(iterator) => {
