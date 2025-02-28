@@ -443,7 +443,7 @@ fn open_configuration_file(config_path: &Path) -> crate::Result<Configuration> {
         config_path,
         Relativity::Cwd,
         &IdentityTransformer,
-        None,
+        ruff_workspace::resolver::ConfigurationOrigin::Unknown,
     )
 }
 
