@@ -8,7 +8,6 @@ use std::string::ToString;
 use anyhow::{bail, Context, Result};
 use globset::{Glob, GlobMatcher, GlobSet, GlobSetBuilder};
 use log::debug;
-use path_absolutize::path_dedot;
 use pep440_rs::{VersionSpecifier, VersionSpecifiers};
 use rustc_hash::FxHashMap;
 use serde::{de, Deserialize, Deserializer, Serialize};
