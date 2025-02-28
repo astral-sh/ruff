@@ -2457,6 +2457,20 @@ impl<'db> Type<'db> {
                                             {
                                                 Type::string_literal(db, type_alias.name(db))
                                             }
+                                            Type::KnownInstance(KnownInstanceType::TypeVar(
+                                                typevar,
+                                            )) if arguments
+                                                .third_argument()
+                                                .and_then(|owner| owner.into_class_literal())
+                                                .is_some_and(|class_literal| {
+                                                    class_literal
+                                                        .class
+                                                        .is_known(db, KnownClass::TypeVar)
+                                                })
+                                                && function.name(db) == "__name__" =>
+                                            {
+                                                Type::string_literal(db, typevar.name(db))
+                                            }
                                             _ => {
                                                 if function.has_known_class_decorator(
                                                     db,
