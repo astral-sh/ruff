@@ -205,6 +205,12 @@ impl Workspace {
 
         let source_code = locator.to_source_code();
 
+        let unsupported_syntax_errors = if self.settings.linter.preview.is_enabled() {
+            parsed.unsupported_syntax_errors()
+        } else {
+            &[]
+        };
+
         let messages: Vec<ExpandedMessage> = diagnostics
             .into_iter()
             .map(|diagnostic| {
@@ -242,7 +248,7 @@ impl Workspace {
                     fix: None,
                 }
             }))
-            .chain(parsed.unsupported_syntax_errors().iter().map(|error| {
+            .chain(unsupported_syntax_errors.iter().map(|error| {
                 let start_location = source_code.source_location(error.range.start());
                 let end_location = source_code.source_location(error.range.end());
 

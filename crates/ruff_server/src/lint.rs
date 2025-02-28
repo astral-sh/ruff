@@ -172,6 +172,12 @@ pub(crate) fn check(
             )
         });
 
+    let unsupported_syntax_errors = if settings.linter.preview.is_enabled() {
+        parsed.unsupported_syntax_errors()
+    } else {
+        &[]
+    };
+
     let lsp_diagnostics = lsp_diagnostics.chain(
         show_syntax_errors
             .then(|| {
@@ -186,7 +192,7 @@ pub(crate) fn check(
                             encoding,
                         )
                     })
-                    .chain(parsed.unsupported_syntax_errors().iter().map(|error| {
+                    .chain(unsupported_syntax_errors.iter().map(|error| {
                         unsupported_syntax_error_to_lsp_diagnostic(
                             error,
                             &source_kind,
