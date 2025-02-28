@@ -421,6 +421,7 @@ impl<'s> Parser<'s> {
 
     fn parse_impl(&mut self) -> anyhow::Result<()> {
         const SECTION_CONFIG_SNAPSHOT: &str = "snapshot-diagnostics";
+        const HTML_COMMENT_ALLOWLIST: &[&str] = &["blacken-docs:on", "blacken-docs:off"];
         const CODE_BLOCK_END: &[u8] = b"```";
         const HTML_COMMENT_END: &[u8] = b"-->";
 
@@ -433,6 +434,12 @@ impl<'s> Parser<'s> {
                         let html_comment = self.cursor.as_str()[..position].trim();
                         if html_comment == SECTION_CONFIG_SNAPSHOT {
                             self.process_snapshot_diagnostics()?;
+                        } else if !HTML_COMMENT_ALLOWLIST.contains(&html_comment) {
+                            bail!(
+                                "Unknown HTML comment `{}` -- possibly a `snapshot-diagnostics` typo? \
+                                (Add to `HTML_COMMENT_ALLOWLIST` if this is a false positive)",
+                                html_comment
+                            );
                         }
                         self.cursor.skip_bytes(position + HTML_COMMENT_END.len());
                     } else {
@@ -1800,5 +1807,42 @@ mod tests {
              come before everything else \
              (including embedded files).",
         );
+    }
+
+    #[test]
+    fn obvious_typos_in_directives_are_detected() {
+        let source = dedent(
+            "
+            # Some header
+            <!-- snpshotttt-digggggnosstic -->
+            ```py
+            x = 1
+            ```
+            ",
+        );
+        let err = super::parse("file.md", &source).expect_err("Should fail to parse");
+        assert_eq!(
+            err.to_string(),
+            "Unknown HTML comment `snpshotttt-digggggnosstic` -- possibly a `snapshot-diagnostics` typo? \
+            (Add to `HTML_COMMENT_ALLOWLIST` if this is a false positive)",
+        );
+    }
+
+    #[test]
+    fn allowlisted_html_comments_are_permitted() {
+        let source = dedent(
+            "
+            # Some header
+            <!-- blacken-docs:off -->
+
+            ```py
+            x = 1
+            ```
+
+            <!-- blacken-docs:on -->
+            ",
+        );
+        let parse_result = super::parse("file.md", &source);
+        assert!(parse_result.is_ok(), "{parse_result:?}");
     }
 }
