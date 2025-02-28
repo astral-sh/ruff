@@ -420,27 +420,33 @@ impl<'s> Parser<'s> {
     }
 
     fn parse_impl(&mut self) -> anyhow::Result<()> {
-        const SECTION_CONFIG_SNAPSHOT: &str = "<!-- snapshot-diagnostics -->";
+        const SECTION_CONFIG_SNAPSHOT: &str = "snapshot-diagnostics";
+        const HTML_COMMENT_ALLOWLIST: &[&str] = &["blacken-docs:on", "blacken-docs:off"];
         const CODE_BLOCK_END: &[u8] = b"```";
+        const HTML_COMMENT_END: &[u8] = b"-->";
 
         while let Some(first) = self.cursor.bump() {
             match first {
-                '<' => {
-                    self.explicit_path = None;
-                    self.preceding_blank_lines = 0;
-                    // If we want to support more comment directives, then we should
-                    // probably just parse the directive generically first. But it's
-                    // not clear if we'll want to add more, since comments are hidden
-                    // from GitHub Markdown rendering.
-                    if self
-                        .cursor
-                        .as_str()
-                        .starts_with(&SECTION_CONFIG_SNAPSHOT[1..])
+                '<' if self.cursor.eat_char3('!', '-', '-') => {
+                    if let Some(position) =
+                        memchr::memmem::find(self.cursor.as_bytes(), HTML_COMMENT_END)
                     {
-                        self.cursor.skip_bytes(SECTION_CONFIG_SNAPSHOT.len() - 1);
-                        self.process_snapshot_diagnostics()?;
+                        let html_comment = self.cursor.as_str()[..position].trim();
+                        if html_comment == SECTION_CONFIG_SNAPSHOT {
+                            self.process_snapshot_diagnostics()?;
+                        } else if !HTML_COMMENT_ALLOWLIST.contains(&html_comment) {
+                            bail!(
+                                "Unknown HTML comment `{}` -- possibly a `snapshot-diagnostics` typo? \
+                                (Add to `HTML_COMMENT_ALLOWLIST` if this is a false positive)",
+                                html_comment
+                            );
+                        }
+                        self.cursor.skip_bytes(position + HTML_COMMENT_END.len());
+                    } else {
+                        bail!("Unterminated HTML comment.");
                     }
                 }
+
                 '#' => {
                     self.explicit_path = None;
                     self.preceding_blank_lines = 0;
@@ -1730,6 +1736,31 @@ mod tests {
     }
 
     #[test]
+    fn snapshot_diagnostic_directive_detection_ignores_whitespace() {
+        // A bit weird, but the fact that the parser rejects this indicates that
+        // we have correctly recognised both of these HTML comments as a directive to have
+        // snapshotting enabled for the file, which is what we want (even though they both
+        // contain different amounts of whitespace to the "standard" snapshot directive).
+        let source = dedent(
+            "
+            # Some header
+
+            <!--       snapshot-diagnostics   -->
+            <!--snapshot-diagnostics-->
+
+            ```py
+            x = 1
+            ```
+            ",
+        );
+        let err = super::parse("file.md", &source).expect_err("Should fail to parse");
+        assert_eq!(
+            err.to_string(),
+            "Section config to enable snapshotting diagnostics should appear at most once.",
+        );
+    }
+
+    #[test]
     fn section_directive_must_appear_before_config() {
         let source = dedent(
             "
@@ -1776,5 +1807,42 @@ mod tests {
              come before everything else \
              (including embedded files).",
         );
+    }
+
+    #[test]
+    fn obvious_typos_in_directives_are_detected() {
+        let source = dedent(
+            "
+            # Some header
+            <!-- snpshotttt-digggggnosstic -->
+            ```py
+            x = 1
+            ```
+            ",
+        );
+        let err = super::parse("file.md", &source).expect_err("Should fail to parse");
+        assert_eq!(
+            err.to_string(),
+            "Unknown HTML comment `snpshotttt-digggggnosstic` -- possibly a `snapshot-diagnostics` typo? \
+            (Add to `HTML_COMMENT_ALLOWLIST` if this is a false positive)",
+        );
+    }
+
+    #[test]
+    fn allowlisted_html_comments_are_permitted() {
+        let source = dedent(
+            "
+            # Some header
+            <!-- blacken-docs:off -->
+
+            ```py
+            x = 1
+            ```
+
+            <!-- blacken-docs:on -->
+            ",
+        );
+        let parse_result = super::parse("file.md", &source);
+        assert!(parse_result.is_ok(), "{parse_result:?}");
     }
 }

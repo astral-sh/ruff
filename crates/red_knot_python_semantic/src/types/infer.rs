@@ -119,7 +119,7 @@ fn infer_definition_types_cycle_recovery<'db>(
 ) -> TypeInference<'db> {
     tracing::trace!("infer_definition_types_cycle_recovery");
     let mut inference = TypeInference::empty(input.scope(db));
-    let category = input.kind(db).category();
+    let category = input.kind(db).category(input.file(db).is_stub(db.upcast()));
     if category.is_declaration() {
         inference
             .declarations
@@ -903,7 +903,10 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn add_binding(&mut self, node: AnyNodeRef, binding: Definition<'db>, ty: Type<'db>) {
-        debug_assert!(binding.kind(self.db()).category().is_binding());
+        debug_assert!(binding
+            .kind(self.db())
+            .category(self.context.in_stub())
+            .is_binding());
         let use_def = self.index.use_def_map(binding.file_scope(self.db()));
         let declarations = use_def.declarations_at_binding(binding);
         let mut bound_ty = ty;
@@ -938,7 +941,10 @@ impl<'db> TypeInferenceBuilder<'db> {
         declaration: Definition<'db>,
         ty: TypeAndQualifiers<'db>,
     ) {
-        debug_assert!(declaration.kind(self.db()).category().is_declaration());
+        debug_assert!(declaration
+            .kind(self.db())
+            .category(self.context.in_stub())
+            .is_declaration());
         let use_def = self.index.use_def_map(declaration.file_scope(self.db()));
         let prior_bindings = use_def.bindings_at_declaration(declaration);
         // unbound_ty is Never because for this check we don't care about unbound
@@ -968,8 +974,14 @@ impl<'db> TypeInferenceBuilder<'db> {
         definition: Definition<'db>,
         declared_and_inferred_ty: &DeclaredAndInferredType<'db>,
     ) {
-        debug_assert!(definition.kind(self.db()).category().is_binding());
-        debug_assert!(definition.kind(self.db()).category().is_declaration());
+        debug_assert!(definition
+            .kind(self.db())
+            .category(self.context.in_stub())
+            .is_binding());
+        debug_assert!(definition
+            .kind(self.db())
+            .category(self.context.in_stub())
+            .is_declaration());
 
         let (declared_ty, inferred_ty) = match *declared_and_inferred_ty {
             DeclaredAndInferredType::AreTheSame(ty) => (ty.into(), ty),
@@ -2226,7 +2238,15 @@ impl<'db> TypeInferenceBuilder<'db> {
                 },
             );
         } else {
-            self.add_declaration(assignment.into(), definition, declared_ty);
+            if self.in_stub() {
+                self.add_declaration_with_binding(
+                    assignment.into(),
+                    definition,
+                    &DeclaredAndInferredType::AreTheSame(declared_ty.inner_type()),
+                );
+            } else {
+                self.add_declaration(assignment.into(), definition, declared_ty);
+            }
         }
 
         self.infer_expression(target);

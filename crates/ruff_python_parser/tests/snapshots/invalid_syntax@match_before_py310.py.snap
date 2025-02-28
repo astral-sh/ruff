@@ -1,0 +1,63 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/match_before_py310.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..79,
+        body: [
+            Match(
+                StmtMatch {
+                    range: 45..78,
+                    subject: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 51..52,
+                            value: Int(
+                                2,
+                            ),
+                        },
+                    ),
+                    cases: [
+                        MatchCase {
+                            range: 58..78,
+                            pattern: MatchValue(
+                                PatternMatchValue {
+                                    range: 63..64,
+                                    value: NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 63..64,
+                                            value: Int(
+                                                1,
+                                            ),
+                                        },
+                                    ),
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Pass(
+                                    StmtPass {
+                                        range: 74..78,
+                                    },
+                                ),
+                            ],
+                        },
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Unsupported Syntax Errors
+
+  |
+1 | # parse_options: { "target-version": "3.9" }
+2 | match 2:
+  | ^^^^^ Syntax Error: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
+3 |     case 1:
+4 |         pass
+  |

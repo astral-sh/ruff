@@ -2549,6 +2549,7 @@ dependencies = [
  "salsa",
  "serde",
  "smallvec",
+ "thiserror 2.0.11",
  "toml",
 ]
 
@@ -2656,7 +2657,7 @@ dependencies = [
 
 [[package]]
 name = "ruff"
-version = "0.9.7"
+version = "0.9.9"
 dependencies = [
  "anyhow",
  "argfile",
@@ -2890,7 +2891,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_linter"
-version = "0.9.7"
+version = "0.9.9"
 dependencies = [
  "aho-corasick",
  "anyhow",
@@ -3090,6 +3091,8 @@ dependencies = [
  "ruff_source_file",
  "ruff_text_size",
  "rustc-hash 2.1.1",
+ "serde",
+ "serde_json",
  "static_assertions",
  "unicode-ident",
  "unicode-normalization",
@@ -3210,7 +3213,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_wasm"
-version = "0.9.7"
+version = "0.9.9"
 dependencies = [
  "console_error_panic_hook",
  "console_log",
