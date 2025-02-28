@@ -104,6 +104,12 @@ pub fn resolve(
     debug!("Using Ruff default settings");
     let mut config = config_arguments.transform(Configuration::default());
     if config.target_version.is_none() {
+        // If we have arrived here we know that there was no `pyproject.toml`
+        // containing a `[tool.ruff]` section found in an ancestral directory.
+        // (This is an implicit requirement in the function
+        // `pyproject::find_settings_toml`.)
+        // However, there may be a `pyproject.toml` with a `requires-python`
+        // specified, and that is what we look for in this step.
         let fallback = find_fallback_target_version(
             stdin_filename
                 .as_ref()
