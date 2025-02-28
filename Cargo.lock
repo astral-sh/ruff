@@ -2549,6 +2549,7 @@ dependencies = [
  "salsa",
  "serde",
  "smallvec",
+ "thiserror 2.0.11",
  "toml",
 ]
 
