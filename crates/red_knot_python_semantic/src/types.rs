@@ -2059,6 +2059,12 @@ impl<'db> Type<'db> {
                 ))
                 .into()
             }
+            Type::IntLiteral(_) if matches!(name, "real" | "numerator") => {
+                Symbol::bound(self).into()
+            }
+            Type::BooleanLiteral(bool_value) if matches!(name, "real" | "numerator") => {
+                Symbol::bound(Type::IntLiteral(i64::from(*bool_value))).into()
+            }
 
             Type::Instance(..)
             | Type::BooleanLiteral(..)
