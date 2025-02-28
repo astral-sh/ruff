@@ -411,7 +411,7 @@ impl<'db> Class<'db> {
                         class.own_instance_member(db, name)
                     {
                         // TODO: We could raise a diagnostic here if there are conflicting type qualifiers
-                        union_qualifiers = union_qualifiers.union(qualifiers);
+                        union_qualifiers |= qualifiers;
 
                         if boundness == Boundness::Bound {
                             if union.is_empty() {
