@@ -444,31 +444,35 @@ pub struct UnsupportedSyntaxError {
     pub target_version: PythonVersion,
 }
 
-impl UnsupportedSyntaxError {
-    /// The earliest allowed version for the syntax associated with this error.
-    pub const fn minimum_version(&self) -> PythonVersion {
-        match self.kind {
-            UnsupportedSyntaxErrorKind::MatchBeforePy310 => PythonVersion::PY310,
-        }
-    }
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub enum UnsupportedSyntaxErrorKind {
+    Match,
+    Walrus,
 }
 
 impl Display for UnsupportedSyntaxError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.kind {
-            UnsupportedSyntaxErrorKind::MatchBeforePy310 => write!(
-                f,
-                "Cannot use `match` statement on Python {} (syntax was added in Python {})",
-                self.target_version,
-                self.minimum_version(),
-            ),
-        }
+        let kind = match self.kind {
+            UnsupportedSyntaxErrorKind::Match => "`match` statement",
+            UnsupportedSyntaxErrorKind::Walrus => "named assignment expression (`:=`)",
+        };
+        write!(
+            f,
+            "Cannot use {kind} on Python {} (syntax was added in Python {})",
+            self.target_version,
+            self.minimum_version(),
+        )
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Copy)]
-pub enum UnsupportedSyntaxErrorKind {
-    MatchBeforePy310,
+impl UnsupportedSyntaxError {
+    /// The earliest allowed version for the syntax associated with this error.
+    pub const fn minimum_version(&self) -> PythonVersion {
+        match self.kind {
+            UnsupportedSyntaxErrorKind::Match => PythonVersion::PY310,
+            UnsupportedSyntaxErrorKind::Walrus => PythonVersion::PY38,
+        }
+    }
 }
 
 #[cfg(target_pointer_width = "64")]

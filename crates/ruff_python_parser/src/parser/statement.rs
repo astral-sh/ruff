@@ -17,7 +17,7 @@ use crate::parser::{
 };
 use crate::token::{TokenKind, TokenValue};
 use crate::token_set::TokenSet;
-use crate::{Mode, ParseErrorType, UnsupportedSyntaxError, UnsupportedSyntaxErrorKind};
+use crate::{Mode, ParseErrorType, UnsupportedSyntaxErrorKind};
 
 use super::expression::ExpressionContext;
 use super::Parenthesized;
@@ -2278,11 +2278,7 @@ impl<'src> Parser<'src> {
         //         pass
 
         if self.options.target_version < PythonVersion::PY310 {
-            self.unsupported_syntax_errors.push(UnsupportedSyntaxError {
-                kind: UnsupportedSyntaxErrorKind::MatchBeforePy310,
-                range: match_range,
-                target_version: self.options.target_version,
-            });
+            self.add_unsupported_syntax_error(UnsupportedSyntaxErrorKind::Match, match_range);
         }
 
         ast::StmtMatch {

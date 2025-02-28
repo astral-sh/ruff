@@ -2629,6 +2629,45 @@ class A(Generic[T]):
 }
 
 #[test]
+fn walrus_before_py38() {
+    // ok
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--stdin-filename", "test.py"])
+        .arg("--target-version=py38")
+        .arg("-")
+        .pass_stdin(r#"(x := 1)"#),
+        @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    "
+    );
+
+    // not ok on 3.7 with preview
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--stdin-filename", "test.py"])
+        .arg("--target-version=py37")
+        .arg("--preview")
+        .arg("-")
+        .pass_stdin(r#"(x := 1)"#),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:1:2: SyntaxError: Cannot use named assignment expression (`:=`) on Python 3.7 (syntax was added in Python 3.8)
+    Found 1 error.
+
+    ----- stderr -----
+    "
+    );
+}
+
+#[test]
 fn match_before_py310() {
     // ok on 3.10
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
