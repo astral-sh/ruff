@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.9.9
+
+### Preview features
+
+- Fix caching of unsupported-syntax errors ([#16425](https://github.com/astral-sh/ruff/pull/16425))
+
+### Bug fixes
+
+- Only show unsupported-syntax errors in editors when preview mode is enabled ([#16429](https://github.com/astral-sh/ruff/pull/16429))
+
 ## 0.9.8
 
 ### Preview features
