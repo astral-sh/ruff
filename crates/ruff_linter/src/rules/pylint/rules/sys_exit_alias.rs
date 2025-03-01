@@ -71,7 +71,6 @@ pub(crate) fn sys_exit_alias(checker: &Checker, call: &ExprCall) {
     );
 
     let arg = call.arguments.find_argument_value("code", 0);
-
     let code = if let Some(arg) = arg {
         &checker.source()[arg.range()]
     } else {
@@ -86,7 +85,7 @@ pub(crate) fn sys_exit_alias(checker: &Checker, call: &ExprCall) {
             call.func.start(),
             checker.semantic(),
         )?;
-        let reference_edit = Edit::range_replacement(format!("{binding}({code:?})"), call.range);
+        let reference_edit = Edit::range_replacement(format!("{binding}({code})"), call.range);
         Ok(Fix::unsafe_edits(import_edit, [reference_edit]))
     });
     checker.report_diagnostic(diagnostic);
