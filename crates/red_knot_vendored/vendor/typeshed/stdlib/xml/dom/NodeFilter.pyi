@@ -1,7 +1,10 @@
+from typing import Literal
+from xml.dom.minidom import Node
+
 class NodeFilter:
-    FILTER_ACCEPT: int
-    FILTER_REJECT: int
-    FILTER_SKIP: int
+    FILTER_ACCEPT: Literal[1]
+    FILTER_REJECT: Literal[2]
+    FILTER_SKIP: Literal[3]
 
     SHOW_ALL: int
     SHOW_ELEMENT: int
@@ -16,4 +19,4 @@ class NodeFilter:
     SHOW_DOCUMENT_TYPE: int
     SHOW_DOCUMENT_FRAGMENT: int
     SHOW_NOTATION: int
-    def acceptNode(self, node) -> int: ...
+    def acceptNode(self, node: Node) -> int: ...
