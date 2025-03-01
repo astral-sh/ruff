@@ -48,6 +48,7 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
         Rule::UnusedPrivateTypedDict,
         Rule::UnusedPrivateTypeVar,
         Rule::UnusedStaticMethodArgument,
+        Rule::UnusedUnpackedVariable,
         Rule::UnusedVariable,
     ]) {
         return;
@@ -396,6 +397,10 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
 
             if checker.enabled(Rule::UnusedAnnotation) {
                 pyflakes::rules::unused_annotation(checker, scope);
+            }
+
+            if checker.enabled(Rule::UnusedUnpackedVariable) {
+                ruff::rules::unused_unpacked_variable(checker, scope);
             }
 
             if !checker.source_type.is_stub() {

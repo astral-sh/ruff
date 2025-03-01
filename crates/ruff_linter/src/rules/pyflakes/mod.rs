@@ -177,7 +177,6 @@ mod tests {
     #[test_case(Rule::UnusedVariable, Path::new("F841_1.py"))]
     #[test_case(Rule::UnusedVariable, Path::new("F841_2.py"))]
     #[test_case(Rule::UnusedVariable, Path::new("F841_3.py"))]
-    #[test_case(Rule::UnusedVariable, Path::new("F841_4.py"))]
     #[test_case(Rule::UnusedAnnotation, Path::new("F842.py"))]
     #[test_case(Rule::RaiseNotImplemented, Path::new("F901.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
@@ -225,7 +224,6 @@ mod tests {
         assert_messages!(diagnostics);
     }
 
-    #[test_case(Rule::UnusedVariable, Path::new("F841_4.py"))]
     #[test_case(Rule::UnusedImport, Path::new("__init__.py"))]
     #[test_case(Rule::UnusedImport, Path::new("F401_24/__init__.py"))]
     #[test_case(Rule::UnusedImport, Path::new("F401_25__all_nonempty/__init__.py"))]
