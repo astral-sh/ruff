@@ -3,8 +3,8 @@ from _codecs import *
 from _typeshed import ReadableBuffer
 from abc import abstractmethod
 from collections.abc import Callable, Generator, Iterable
-from typing import Any, BinaryIO, ClassVar, Final, Literal, Protocol, TextIO
-from typing_extensions import Self
+from typing import Any, BinaryIO, ClassVar, Final, Literal, Protocol, TextIO, overload
+from typing_extensions import Self, TypeAlias
 
 __all__ = [
     "register",
@@ -58,6 +58,21 @@ BOM32_LE: Final = b"\xff\xfe"
 BOM64_BE: Final = b"\x00\x00\xfe\xff"
 BOM64_LE: Final = b"\xff\xfe\x00\x00"
 
+_BufferedEncoding: TypeAlias = Literal[
+    "idna",
+    "raw-unicode-escape",
+    "unicode-escape",
+    "utf-16",
+    "utf-16-be",
+    "utf-16-le",
+    "utf-32",
+    "utf-32-be",
+    "utf-32-le",
+    "utf-7",
+    "utf-8",
+    "utf-8-sig",
+]
+
 class _WritableStream(Protocol):
     def write(self, data: bytes, /) -> object: ...
     def seek(self, offset: int, whence: int, /) -> object: ...
@@ -94,6 +109,9 @@ class _IncrementalEncoder(Protocol):
 class _IncrementalDecoder(Protocol):
     def __call__(self, errors: str = ...) -> IncrementalDecoder: ...
 
+class _BufferedIncrementalDecoder(Protocol):
+    def __call__(self, errors: str = ...) -> BufferedIncrementalDecoder: ...
+
 class CodecInfo(tuple[_Encoder, _Decoder, _StreamReader, _StreamWriter]):
     _is_text_encoding: bool
     @property
@@ -125,6 +143,9 @@ class CodecInfo(tuple[_Encoder, _Decoder, _StreamReader, _StreamWriter]):
 def getencoder(encoding: str) -> _Encoder: ...
 def getdecoder(encoding: str) -> _Decoder: ...
 def getincrementalencoder(encoding: str) -> _IncrementalEncoder: ...
+@overload
+def getincrementaldecoder(encoding: _BufferedEncoding) -> _BufferedIncrementalDecoder: ...
+@overload
 def getincrementaldecoder(encoding: str) -> _IncrementalDecoder: ...
 def getreader(encoding: str) -> _StreamReader: ...
 def getwriter(encoding: str) -> _StreamWriter: ...

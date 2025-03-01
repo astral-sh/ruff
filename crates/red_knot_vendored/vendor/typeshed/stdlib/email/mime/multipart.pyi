@@ -1,8 +1,7 @@
 from collections.abc import Sequence
 from email import _ParamsType
-from email.message import Message
 from email.mime.base import MIMEBase
-from email.policy import Policy
+from email.policy import Policy, _MessageT
 
 __all__ = ["MIMEMultipart"]
 
@@ -11,8 +10,8 @@ class MIMEMultipart(MIMEBase):
         self,
         _subtype: str = "mixed",
         boundary: str | None = None,
-        _subparts: Sequence[Message] | None = None,
+        _subparts: Sequence[_MessageT] | None = None,
         *,
-        policy: Policy | None = None,
+        policy: Policy[_MessageT] | None = None,
         **_params: _ParamsType,
     ) -> None: ...
