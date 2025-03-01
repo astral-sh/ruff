@@ -121,9 +121,3 @@ def f():
 def f():
     for x, y in z:
         yield x, y, x + y
-
-
-# https://github.com/astral-sh/ruff/issues/15540
-def f():
-    for a in 1,:
-        yield a
