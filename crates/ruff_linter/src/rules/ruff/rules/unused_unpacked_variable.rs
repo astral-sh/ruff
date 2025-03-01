@@ -20,9 +20,11 @@ use crate::checkers::ast::Checker;
 /// triggers on unused unpacked assignments (for example, `x, y = foo()`).
 ///
 /// ## Example
+///
 /// ```python
 /// def get_pair():
 ///     return 1, 2
+///
 ///
 /// def foo():
 ///     x, y = get_pair()
@@ -30,6 +32,7 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// def foo():
 ///     x, _ = get_pair()
