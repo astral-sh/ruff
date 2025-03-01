@@ -70,26 +70,10 @@ pub(crate) fn sys_exit_alias(checker: &Checker, call: &ExprCall) {
         call.func.range(),
     );
 
-    let num_str = call
-        .arguments
-        .args
-        .first()
-        .and_then(|arg| arg.as_number_literal_expr())
-        .map(|lit| format!("{:?}", lit.value))
-        .or_else(|| {
-            call.arguments
-                .keywords
-                .first()
-                .filter(|kwr| kwr.value.is_number_literal_expr())
-                .map(|kwr| format!("{:?}", kwr.value.as_number_literal_expr().unwrap().value))
-        });
+    let arg = call.arguments.find_argument_value("code", 0);
 
-    let code = if let Some(value) = num_str {
-        value
-            .strip_prefix("Int(")
-            .and_then(|s| s.strip_suffix(")"))
-            .and_then(|num_str| num_str.parse::<i32>().ok())
-            .unwrap()
+    let code = if let Some(arg) = arg {
+        &checker.source()[arg.range()]
     } else {
         // if it is not possible to retrieve the code, just a violation is raised
         checker.report_diagnostic(diagnostic);
