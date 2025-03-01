@@ -99,10 +99,7 @@ pub(crate) fn check_logical_lines(
         Rule::OverIndented,
     ]);
     let enforce_indented_form_feed = settings.rules.any_enabled(&[Rule::IndentedFormFeed]);
-    println!("{:?}", settings.rules);
-    println!("{:?}", settings.preview);
-    println!("{}", enforce_indented_form_feed);
-    panic!();
+
     for line in &LogicalLines::from_tokens(tokens, locator) {
         if line.flags().contains(TokenFlags::OPERATOR) {
             if enforce_space_around_operator {
@@ -159,7 +156,6 @@ pub(crate) fn check_logical_lines(
         }
 
         if enforce_indented_form_feed {
-            println!("HERE inside");
             if let Some(diagnostic) = indented_form_feed(&line) {
                 context.push_diagnostic(diagnostic);
             }

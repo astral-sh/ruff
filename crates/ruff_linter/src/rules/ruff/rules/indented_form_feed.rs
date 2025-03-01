@@ -50,16 +50,5 @@ const TAB: u8 = b'\t';
 
 /// RUF054
 pub(crate) fn indented_form_feed(line: &LogicalLine) -> Option<Diagnostic> {
-    let index_relative_to_line = memchr(FORM_FEED, line.text().as_bytes())?;
-
-    if index_relative_to_line == 0 {
-        return None;
-    }
-
-
-    let relative_index = u32::try_from(index_relative_to_line).ok()?;
-    let absolute_index = TextSize::new(relative_index);
-    let range = TextRange::at(absolute_index, 1.into());
-
-    Some(Diagnostic::new(IndentedFormFeed, range))
+    panic!();
 }
