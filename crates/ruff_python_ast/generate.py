@@ -134,14 +134,54 @@ class Node:
 class Field:
     name: str
     ty: str
-    seq: bool
-    optional: bool
+    parsed_ty: FieldType
 
     def __init__(self, field: dict[str, Any]) -> None:
         self.name = field["name"]
         self.ty = field["type"]
-        self.seq = field.get("seq", False)
-        self.optional = field.get("optional", False)
+        self.parsed_ty = FieldType(self.ty)
+
+
+@dataclass
+class FieldType:
+    rule: str
+    name: str
+    seq: bool = False
+    optional: bool = False
+    slice_: bool = False
+
+    def __init__(self, rule: str) -> None:
+        self.rule = rule
+        self.name = ""
+
+        # The following cases are the limitations of this parser(and not used in the ast.toml):
+        # * Rules that involve declaring a sequence with optional items e.g. Vec<Option<...>>
+        last_pos = len(rule) - 1
+        for i, ch in enumerate(rule):
+            if ch == "?":
+                if i == last_pos:
+                    self.optional = True
+                else:
+                    raise ValueError(f"`?` must be at the end: {rule}")
+            elif ch == "*":
+                if self.slice_:  # The * after & is a slice
+                    continue
+                if i == last_pos:
+                    self.seq = True
+                else:
+                    raise ValueError(f"`*` must be at the end: {rule}")
+            elif ch == "&":
+                if i == 0 and rule.endswith("*"):
+                    self.slice_ = True
+                else:
+                    raise ValueError(
+                        f"`&` must be at the start and end with `*`: {rule}"
+                    )
+            else:
+                self.name += ch
+
+        if self.optional and (self.seq or self.slice_):
+            raise ValueError(f"optional field cannot be sequence or slice: {rule}")
 
 
 # ------------------------------------------------------------------------------
@@ -618,19 +658,24 @@ def write_node(out: list[str], ast: Ast) -> None:
             out.append("pub range: ruff_text_size::TextRange,")
             for field in node.fields:
                 field_str = f"pub {field.name}: "
+                ty = field.parsed_ty
 
-                inner = f"{field.ty}"
-                if field.ty in types_requiring_create_prefix:
-                    inner = f"crate::{inner}"
-                if field.ty in group_names and field.seq is False:
-                    inner = f"Box<{inner}>"
+                rust_ty = f"{field.parsed_ty.name}"
+                if ty.name in types_requiring_create_prefix:
+                    rust_ty = f"crate::{rust_ty}"
+                if ty.slice_:
+                    rust_ty = f"[{rust_ty}]"
+                if (
+                    ty.name in group_names or ty.name == "Parameters" or ty.slice_
+                ) and ty.seq is False:
+                    rust_ty = f"Box<{rust_ty}>"
 
-                if field.seq:
-                    field_str += f"Vec<{inner}>,"
-                elif field.optional:
-                    field_str += f"Option<{inner}>,"
-                else:
-                    field_str += f"{inner},"
+                if ty.seq:
+                    rust_ty = f"Vec<{rust_ty}>"
+                elif ty.optional:
+                    rust_ty = f"Option<{rust_ty}>"
+
+                field_str += rust_ty + ","
                 out.append(field_str)
             out.append("}")
             out.append("")
