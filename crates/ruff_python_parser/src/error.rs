@@ -438,9 +438,9 @@ pub struct UnsupportedSyntaxError {
     /// The target [`PythonVersion`] for which this error was detected.
     ///
     /// This is different from the version reported by the
-    /// [`minimum_version`](UnsupportedSyntaxError::minimum_version) method, which is the earliest
-    /// allowed version for this piece of syntax. The `target_version` is primarily used for
-    /// user-facing error messages.
+    /// [`minimum_version`](UnsupportedSyntaxErrorKind::minimum_version) method, which is the
+    /// earliest allowed version for this piece of syntax. The `target_version` is primarily used
+    /// for user-facing error messages.
     pub target_version: PythonVersion,
 }
 
@@ -462,15 +462,15 @@ impl Display for UnsupportedSyntaxError {
             f,
             "Cannot use {kind} on Python {} (syntax was added in Python {})",
             self.target_version,
-            self.minimum_version(),
+            self.kind.minimum_version(),
         )
     }
 }
 
-impl UnsupportedSyntaxError {
+impl UnsupportedSyntaxErrorKind {
     /// The earliest allowed version for the syntax associated with this error.
     pub const fn minimum_version(&self) -> PythonVersion {
-        match self.kind {
+        match self {
             UnsupportedSyntaxErrorKind::Match => PythonVersion::PY310,
             UnsupportedSyntaxErrorKind::Walrus => PythonVersion::PY38,
             UnsupportedSyntaxErrorKind::ExceptStar => PythonVersion::PY311,
