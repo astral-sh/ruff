@@ -441,11 +441,13 @@ impl<'src> Parser<'src> {
     /// Add an [`UnsupportedSyntaxError`] with the given [`UnsupportedSyntaxErrorKind`] and
     /// [`TextRange`].
     fn add_unsupported_syntax_error(&mut self, kind: UnsupportedSyntaxErrorKind, range: TextRange) {
-        self.unsupported_syntax_errors.push(UnsupportedSyntaxError {
-            kind,
-            range,
-            target_version: self.options.target_version,
-        });
+        if self.options.target_version < kind.minimum_version() {
+            self.unsupported_syntax_errors.push(UnsupportedSyntaxError {
+                kind,
+                range,
+                target_version: self.options.target_version,
+            });
+        }
     }
 
     /// Returns `true` if the current token is of the given kind.

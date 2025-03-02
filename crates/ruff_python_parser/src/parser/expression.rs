@@ -7,7 +7,7 @@ use rustc_hash::{FxBuildHasher, FxHashSet};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{
     self as ast, BoolOp, CmpOp, ConversionFlag, Expr, ExprContext, FStringElement, FStringElements,
-    IpyEscapeKind, Number, Operator, PythonVersion, StringFlags, UnaryOp,
+    IpyEscapeKind, Number, Operator, StringFlags, UnaryOp,
 };
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
@@ -2171,9 +2171,7 @@ impl<'src> Parser<'src> {
         // # parse_options: { "target-version": "3.8" }
         // (x := 1)
 
-        if self.options.target_version < PythonVersion::PY38 {
-            self.add_unsupported_syntax_error(UnsupportedSyntaxErrorKind::Walrus, range);
-        }
+        self.add_unsupported_syntax_error(UnsupportedSyntaxErrorKind::Walrus, range);
 
         ast::ExprNamed {
             target: Box::new(target),
