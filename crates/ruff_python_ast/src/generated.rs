@@ -6587,7 +6587,7 @@ pub struct ExprCall {
 /// An AST node that represents either a single-part f-string literal
 /// or an implicitly concatenated f-string literal.
 ///
-/// This type differs from the original Python AST ([`JoinedStr`]) in that it
+/// This type differs from the original Python AST `JoinedStr` in that it
 /// doesn't join the implicitly concatenated parts into a single string. Instead,
 /// it keeps them separate and provide various methods to access the parts.
 ///
@@ -6706,7 +6706,7 @@ pub struct ExprSlice {
 /// Here, the escape kind can only be `!` or `%` otherwise it is a syntax error.
 ///
 /// For more information related to terminology and syntax of escape commands,
-/// see [`StmtIpyEscapeCommand`].
+/// see [`crate::StmtIpyEscapeCommand`].
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprIpyEscapeCommand {
     pub range: ruff_text_size::TextRange,
