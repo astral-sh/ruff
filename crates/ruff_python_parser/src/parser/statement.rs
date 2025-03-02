@@ -5,8 +5,7 @@ use rustc_hash::{FxBuildHasher, FxHashSet};
 
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{
-    self as ast, ExceptHandler, Expr, ExprContext, IpyEscapeKind, Operator, PythonVersion, Stmt,
-    WithItem,
+    self as ast, ExceptHandler, Expr, ExprContext, IpyEscapeKind, Operator, Stmt, WithItem,
 };
 use ruff_text_size::{Ranged, TextSize};
 
@@ -1458,13 +1457,28 @@ impl<'src> Parser<'src> {
             );
         }
 
+        // test_ok except_star_py311
+        // # parse_options: {"target-version": "3.11"}
+        // try: ...
+        // except* ValueError: ...
+
+        // test_err except_star_py310
+        // # parse_options: {"target-version": "3.10"}
+        // try: ...
+        // except* ValueError: ...
+
+        let range = self.node_range(try_start);
+        if is_star {
+            self.add_unsupported_syntax_error(UnsupportedSyntaxErrorKind::ExceptStar, range);
+        }
+
         ast::StmtTry {
             body: try_body,
             handlers,
             orelse,
             finalbody,
             is_star,
-            range: self.node_range(try_start),
+            range,
         }
     }
 
@@ -2277,9 +2291,7 @@ impl<'src> Parser<'src> {
         //     case 1:
         //         pass
 
-        if self.options.target_version < PythonVersion::PY310 {
-            self.add_unsupported_syntax_error(UnsupportedSyntaxErrorKind::Match, match_range);
-        }
+        self.add_unsupported_syntax_error(UnsupportedSyntaxErrorKind::Match, match_range);
 
         ast::StmtMatch {
             subject: Box::new(subject),
