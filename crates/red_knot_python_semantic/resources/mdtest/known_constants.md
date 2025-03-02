@@ -26,21 +26,35 @@ from typing import TYPE_CHECKING as TC
 reveal_type(TC)  # revealed: Literal[True]
 ```
 
-### Must originate from `typing`
+### User-defined `TYPE_CHECKING`
 
-Make sure we only use our special handling for `typing.TYPE_CHECKING` and not for other constants
-with the same name:
+If we set `TYPE_CHECKING = False` directly instead of importing it from the `typing` module, it will
+still be treated as `True` during type checking. This behavior is for compatibility with other major
+type checkers, e.g. mypy and pyright.
 
 `constants.py`:
 
 ```py
-TYPE_CHECKING: bool = False
+TYPE_CHECKING = False
 ```
 
 ```py
+TYPE_CHECKING = False
+reveal_type(TYPE_CHECKING)  # revealed: Literal[True]
+if TYPE_CHECKING:
+    type_checking = True
+if not TYPE_CHECKING:
+    runtime = True
+
+# type_checking is treated as unconditionally assigned.
+reveal_type(type_checking)  # revealed: Literal[True]
+# error: [unresolved-reference]
+reveal_type(runtime)  # revealed: Unknown
+
 from constants import TYPE_CHECKING
 
-reveal_type(TYPE_CHECKING)  # revealed: bool
+# constants.TYPE_CHECKING is modifiable, but it is still treated as True.
+reveal_type(TYPE_CHECKING)  # revealed: Literal[True]
 ```
 
 ### `typing_extensions` re-export
