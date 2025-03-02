@@ -1262,16 +1262,64 @@ where
                 is_async,
                 ..
             }) => {
-                for item in items {
-                    self.visit_expr(&item.context_expr);
-                    if let Some(optional_vars) = item.optional_vars.as_deref() {
-                        self.add_standalone_expression(&item.context_expr);
-                        self.push_assignment(CurrentAssignment::WithItem {
-                            item,
-                            is_async: *is_async,
-                        });
+                for item @ ruff_python_ast::WithItem {
+                    range: _,
+                    context_expr,
+                    optional_vars,
+                } in items
+                {
+                    // TODO: yes this name is terrible
+                    let context_expr_expr = self.add_standalone_expression(context_expr);
+                    self.visit_expr(context_expr);
+                    if let Some(optional_vars) = optional_vars.as_deref() {
+                        self.add_standalone_expression(context_expr);
+                        let current_assignment = match optional_vars {
+                            ast::Expr::Tuple(_) | ast::Expr::List(_) => {
+                                Some(CurrentAssignment::WithItem {
+                                    item,
+                                    is_async: *is_async,
+                                    unpack: Some(Unpack::new(
+                                        self.db,
+                                        self.file,
+                                        self.current_scope(),
+                                        #[allow(unsafe_code)]
+                                        unsafe {
+                                            AstNodeRef::new(self.module.clone(), optional_vars)
+                                        },
+                                        UnpackValue::ContextManager(context_expr_expr),
+                                        countme::Count::default(),
+                                    )),
+                                })
+                            }
+                            ast::Expr::Name(_) => Some(CurrentAssignment::WithItem {
+                                item,
+                                is_async: *is_async,
+                                unpack: None,
+                            }),
+                            ast::Expr::Attribute(ast::ExprAttribute {
+                                value: object,
+                                attr,
+                                ..
+                            }) => {
+                                self.register_attribute_assignment(
+                                    object,
+                                    attr,
+                                    AttributeAssignment::ContextManager {
+                                        context_manager: context_expr_expr,
+                                    },
+                                );
+                                None
+                            }
+                            _ => None,
+                        };
+
+                        if let Some(current_assignment) = current_assignment {
+                            self.push_assignment(current_assignment);
+                        }
                         self.visit_expr(optional_vars);
-                        self.pop_assignment();
+                        if current_assignment.is_some() {
+                            self.pop_assignment();
+                        }
                     }
                 }
                 self.visit_body(body);
@@ -1631,12 +1679,17 @@ where
                                 },
                             );
                         }
-                        Some(CurrentAssignment::WithItem { item, is_async }) => {
+                        Some(CurrentAssignment::WithItem {
+                            item,
+                            is_async,
+                            unpack,
+                        }) => {
                             self.add_definition(
                                 symbol,
                                 WithItemDefinitionNodeRef {
-                                    node: item,
-                                    target: name_node,
+                                    unpack,
+                                    context_expr: &item.context_expr,
+                                    name: name_node,
                                     is_async,
                                 },
                             );
@@ -1920,6 +1973,7 @@ enum CurrentAssignment<'a> {
     WithItem {
         item: &'a ast::WithItem,
         is_async: bool,
+        unpack: Option<Unpack<'a>>,
     },
 }
 

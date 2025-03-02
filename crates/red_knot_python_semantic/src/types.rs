@@ -2426,6 +2426,10 @@ impl<'db> Type<'db> {
         })
     }
 
+    fn enter(self, _db: &'db dyn Db) -> Type<'db> {
+        todo!()
+    }
+
     #[must_use]
     pub fn to_instance(&self, db: &'db dyn Db) -> Type<'db> {
         match self {
