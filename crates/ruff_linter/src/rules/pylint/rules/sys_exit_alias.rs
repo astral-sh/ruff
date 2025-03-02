@@ -70,11 +70,13 @@ pub(crate) fn sys_exit_alias(checker: &Checker, call: &ExprCall) {
         call.func.range(),
     );
 
-    let arg = call.arguments.find_argument_value("code", 0);
-    let code = if let Some(arg) = arg {
-        &checker.source()[arg.range()]
-    } else {
-        // if it is not possible to retrieve the code, just a violation is raised
+    let has_star_kwargs = call
+        .arguments
+        .keywords
+        .iter()
+        .any(|kwarg| kwarg.arg.is_none());
+    // only one optional argument allowed, and we can't convert **kwargs
+    if call.arguments.len() > 1 || has_star_kwargs {
         checker.report_diagnostic(diagnostic);
         return;
     };
@@ -85,8 +87,15 @@ pub(crate) fn sys_exit_alias(checker: &Checker, call: &ExprCall) {
             call.func.start(),
             checker.semantic(),
         )?;
-        let reference_edit = Edit::range_replacement(format!("{binding}({code})"), call.range);
-        Ok(Fix::unsafe_edits(import_edit, [reference_edit]))
+        let reference_edit = Edit::range_replacement(binding, call.func.range());
+        let mut edits = vec![reference_edit];
+        if let Some(kwarg) = call.arguments.find_keyword("code") {
+            edits.push(Edit::range_replacement(
+                checker.source()[kwarg.value.range()].to_string(),
+                kwarg.range,
+            ));
+        };
+        Ok(Fix::unsafe_edits(import_edit, edits))
     });
     checker.report_diagnostic(diagnostic);
 }

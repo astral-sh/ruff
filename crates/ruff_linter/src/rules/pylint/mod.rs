@@ -67,6 +67,7 @@ mod tests {
     #[test_case(Rule::SysExitAlias, Path::new("sys_exit_alias_13.py"))]
     #[test_case(Rule::SysExitAlias, Path::new("sys_exit_alias_14.py"))]
     #[test_case(Rule::SysExitAlias, Path::new("sys_exit_alias_15.py"))]
+    #[test_case(Rule::SysExitAlias, Path::new("sys_exit_alias_16.py"))]
     #[test_case(Rule::ContinueInFinally, Path::new("continue_in_finally.py"))]
     #[test_case(Rule::GlobalStatement, Path::new("global_statement.py"))]
     #[test_case(
