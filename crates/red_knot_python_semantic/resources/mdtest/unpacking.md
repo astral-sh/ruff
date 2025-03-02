@@ -613,3 +613,84 @@ def _(arg: tuple[tuple[int, str], Iterable]):
         reveal_type(a)  # revealed: int | bytes
         reveal_type(b)  # revealed: str | bytes
 ```
+
+## With statement
+
+Unpacking in a `with` statement.
+
+### Same types
+
+```py
+class ContextManager:
+    def __enter__(self) -> tuple[int, int]:
+        return (1, 2)
+    
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
+        pass
+
+with ContextManager() as (a, b):
+    reveal_type(a)  # revealed: int
+    reveal_type(b)  # revealed: int
+```
+
+### Mixed types
+
+```py
+class ContextManager:
+    def __enter__(self) -> tuple[int, str]:
+        return (1, "a")
+    
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
+        pass
+
+with ContextManager() as (a, b):
+    reveal_type(a)  # revealed: int
+    reveal_type(b)  # revealed: str
+```
+
+### Same literal values
+
+```py
+class ContextManager:
+    def __enter__(self):
+        return (1, 2)
+    
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
+        pass
+
+with ContextManager() as (a, b):
+    reveal_type(a) # revealed: Literal[1]
+    reveal_type(b) # revealed: Literal[1]
+```
+
+### Nested
+
+```py
+class ContextManager:
+    def __enter__(self) -> tuple[int, tuple[str, bytes]]:
+        return (1, ("a", b"bytes"))
+    
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
+        pass
+
+with ContextManager() as (a, (b, c)):
+    reveal_type(a)  # revealed: int
+    reveal_type(b)  # revealed: str
+    reveal_type(c)  # revealed: bytes
+```
+
+### Starred expression
+
+```py
+class ContextManager:
+    def __enter__(self) -> tuple[int, int, int]:
+        return (1, 2, 3)
+    
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
+        pass
+
+with ContextManager() as (a, *b):
+    reveal_type(a)  # revealed: int
+    # TODO: Should be list[int] once support for assigning to starred expression is added
+    reveal_type(b)  # revealed: @Todo(starred unpacking)
+```

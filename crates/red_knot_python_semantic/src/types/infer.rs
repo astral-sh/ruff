@@ -43,7 +43,7 @@ use crate::module_resolver::{file_to_module, resolve_module};
 use crate::semantic_index::ast_ids::{HasScopedExpressionId, HasScopedUseId, ScopedExpressionId};
 use crate::semantic_index::definition::{
     AssignmentDefinitionKind, Definition, DefinitionKind, DefinitionNodeKey,
-    ExceptHandlerDefinitionKind, ForStmtDefinitionKind, TargetKind,
+    ExceptHandlerDefinitionKind, ForStmtDefinitionKind, TargetKind, WithItemDefinitionKind,
 };
 use crate::semantic_index::expression::{Expression, ExpressionKind};
 use crate::semantic_index::semantic_index;
@@ -839,13 +839,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             DefinitionKind::Parameter(parameter_with_default) => {
                 self.infer_parameter_definition(parameter_with_default, definition);
             }
-            DefinitionKind::WithItem(with_item) => {
-                self.infer_with_item_definition(
-                    with_item.target(),
-                    with_item.node(),
-                    with_item.is_async(),
-                    definition,
-                );
+            DefinitionKind::WithItem(with_item_definition) => {
+                self.infer_with_item_definition(with_item_definition, definition);
             }
             DefinitionKind::MatchPattern(match_pattern) => {
                 self.infer_match_pattern_definition(
@@ -1619,24 +1614,29 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     fn infer_with_item_definition(
         &mut self,
-        target: &ast::ExprName,
-        with_item: &ast::WithItem,
-        is_async: bool,
+        with_item: &WithItemDefinitionKind<'db>,
         definition: Definition<'db>,
     ) {
-        self.infer_standalone_expression(&with_item.context_expr);
+        let context_expr = with_item.context_expr();
+        let name = with_item.name();
 
-        let target_ty = self.infer_context_expression(
-            &with_item.context_expr,
-            self.expression_type(&with_item.context_expr),
-            is_async,
-        );
+        let context_expr_ty = self.infer_standalone_expression(context_expr);
 
-        self.types.expressions.insert(
-            target.scoped_expression_id(self.db(), self.scope()),
-            target_ty,
-        );
-        self.add_binding(target.into(), definition, target_ty);
+        let target_ty = match with_item.target() {
+            TargetKind::Sequence(unpack) => {
+                let unpacked = infer_unpack_types(self.db(), unpack);
+                let name_ast_id = name.scoped_expression_id(self.db(), self.scope());
+                // TODO: only if first: true (also learn what that means)
+                self.context.extend(unpacked);
+                unpacked.expression_type(name_ast_id)
+            }
+            TargetKind::Name => {
+                self.infer_context_expression(context_expr, context_expr_ty, with_item.is_async())
+            }
+        };
+
+        self.store_expression_type(name, target_ty);
+        self.add_binding(name.into(), definition, target_ty);
     }
 
     /// Infers the type of a context expression (`with expr`) and returns the target's type
