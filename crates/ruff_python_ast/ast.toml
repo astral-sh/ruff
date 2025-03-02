@@ -112,7 +112,7 @@ fields = [
 [Expr.nodes.ExprLambda]
 doc = "See also [Lambda](https://docs.python.org/3/library/ast.html#ast.Lambda)"
 fields = [
-  { name = "parameters", type = "Parameters?" },
+  { name = "parameters", type = "Box<crate::Parameters>?" },
   { name = "body", type = "Expr" }
 ]
 

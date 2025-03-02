@@ -27,7 +27,6 @@ types_requiring_create_prefix = [
     "CmpOp",
     "Comprehension",
     "DictItem",
-    "Parameters",
     "UnaryOp",
     "BoolOp",
     "Operator",
@@ -665,9 +664,7 @@ def write_node(out: list[str], ast: Ast) -> None:
                     rust_ty = f"crate::{rust_ty}"
                 if ty.slice_:
                     rust_ty = f"[{rust_ty}]"
-                if (
-                    ty.name in group_names or ty.name == "Parameters" or ty.slice_
-                ) and ty.seq is False:
+                if (ty.name in group_names or ty.slice_) and ty.seq is False:
                     rust_ty = f"Box<{rust_ty}>"
 
                 if ty.seq:
