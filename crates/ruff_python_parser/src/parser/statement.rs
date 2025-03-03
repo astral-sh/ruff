@@ -1005,7 +1005,7 @@ impl<'src> Parser<'src> {
             IpyEscapeKind::Help
         };
 
-        if parsed_expr.is_parenthesized {
+        if parsed_expr.is_parenthesized() {
             let token_range = self.node_range(start);
             self.add_error(
                 ParseErrorType::OtherError(
@@ -1136,7 +1136,7 @@ impl<'src> Parser<'src> {
         // (a): int
         // a.b: int
         // a[0]: int
-        let simple = target.is_name_expr() && !target.is_parenthesized;
+        let simple = target.is_name_expr() && !target.is_parenthesized();
 
         // test_err ann_assign_stmt_invalid_annotation
         // x: *int = 1
@@ -2155,7 +2155,7 @@ impl<'src> Parser<'src> {
             .then(|| Box::new(self.parse_with_item_optional_vars().expr));
 
         ParsedWithItem {
-            is_parenthesized: context_expr.is_parenthesized,
+            is_parenthesized: context_expr.is_parenthesized(),
             item: ast::WithItem {
                 range: self.node_range(start),
                 context_expr: context_expr.expr,
