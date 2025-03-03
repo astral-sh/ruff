@@ -1253,6 +1253,8 @@ pub enum KnownInstanceType<'db> {
     Deque,
     /// The symbol `typing.OrderedDict` (which can also be found as `typing_extensions.OrderedDict`)
     OrderedDict,
+    /// The symbol `typing.Protocol` (which can also be found as `typing_extensions.Protocol`)
+    Protocol,
     /// The symbol `typing.Type` (which can also be found as `typing_extensions.Type`)
     Type,
     /// A single instance of `typing.TypeVar`
@@ -1324,6 +1326,7 @@ impl<'db> KnownInstanceType<'db> {
             | Self::Deque
             | Self::ChainMap
             | Self::OrderedDict
+            | Self::Protocol
             | Self::ReadOnly
             | Self::TypeAliasType(_)
             | Self::Unknown
@@ -1368,6 +1371,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::Deque => "typing.Deque",
             Self::ChainMap => "typing.ChainMap",
             Self::OrderedDict => "typing.OrderedDict",
+            Self::Protocol => "typing.Protocol",
             Self::ReadOnly => "typing.ReadOnly",
             Self::TypeVar(typevar) => typevar.name(db),
             Self::TypeAliasType(_) => "typing.TypeAliasType",
@@ -1414,6 +1418,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::Deque => KnownClass::StdlibAlias,
             Self::ChainMap => KnownClass::StdlibAlias,
             Self::OrderedDict => KnownClass::StdlibAlias,
+            Self::Protocol => KnownClass::SpecialForm,
             Self::TypeVar(_) => KnownClass::TypeVar,
             Self::TypeAliasType(_) => KnownClass::TypeAliasType,
             Self::TypeOf => KnownClass::SpecialForm,
@@ -1456,6 +1461,7 @@ impl<'db> KnownInstanceType<'db> {
             "Counter" => Self::Counter,
             "ChainMap" => Self::ChainMap,
             "OrderedDict" => Self::OrderedDict,
+            "Protocol" => Self::Protocol,
             "Optional" => Self::Optional,
             "Union" => Self::Union,
             "NoReturn" => Self::NoReturn,
@@ -1507,6 +1513,7 @@ impl<'db> KnownInstanceType<'db> {
             | Self::Counter
             | Self::ChainMap
             | Self::OrderedDict
+            | Self::Protocol
             | Self::Optional
             | Self::Union
             | Self::NoReturn

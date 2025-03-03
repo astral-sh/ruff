@@ -10,6 +10,7 @@ from _typeshed import (
     ConvertibleToFloat,
     ConvertibleToInt,
     FileDescriptorOrPath,
+    MaybeNone,
     OpenBinaryMode,
     OpenBinaryModeReading,
     OpenBinaryModeUpdating,
@@ -94,14 +95,9 @@ _SupportsAnextT = TypeVar("_SupportsAnextT", bound=SupportsAnext[Any], covariant
 _AwaitableT = TypeVar("_AwaitableT", bound=Awaitable[Any])
 _AwaitableT_co = TypeVar("_AwaitableT_co", bound=Awaitable[Any], covariant=True)
 _P = ParamSpec("_P")
-
-# Type variables for slice
-_StartT_co = TypeVar("_StartT_co", covariant=True, default=Any)  # slice -> slice[Any, Any, Any]
-_StopT_co = TypeVar("_StopT_co", covariant=True, default=_StartT_co)  #  slice[A] -> slice[A, A, A]
-# NOTE: step could differ from start and stop, (e.g. datetime/timedelta)l
-#   the default (start|stop) is chosen to cater to the most common case of int/index slices.
-# FIXME: https://github.com/python/typing/issues/213 (replace step=start|stop with step=start&stop)
-_StepT_co = TypeVar("_StepT_co", covariant=True, default=_StartT_co | _StopT_co)  #  slice[A,B] -> slice[A, B, A|B]
+_StartT = TypeVar("_StartT", covariant=True, default=Any)
+_StopT = TypeVar("_StopT", covariant=True, default=Any)
+_StepT = TypeVar("_StepT", covariant=True, default=Any)
 
 class object:
     __doc__: str | None
@@ -441,7 +437,7 @@ class _FormatMapMapping(Protocol):
 class _TranslateTable(Protocol):
     def __getitem__(self, key: int, /) -> str | int | None: ...
 
-class str:
+class str(Sequence[str]):
     @overload
     def __new__(cls, object: object = ...) -> Self: ...
     @overload
@@ -625,7 +621,7 @@ class str:
     def __rmul__(self, value: SupportsIndex, /) -> str: ...  # type: ignore[misc]
     def __getnewargs__(self) -> tuple[str]: ...
 
-class bytes:
+class bytes(Sequence[int]):
     @overload
     def __new__(cls, o: Iterable[SupportsIndex] | SupportsIndex | SupportsBytes | ReadableBuffer, /) -> Self: ...
     @overload
@@ -842,7 +838,7 @@ _IntegerFormats: TypeAlias = Literal[
 ]
 
 @final
-class memoryview:
+class memoryview(Sequence[_I]):
     @property
     def format(self) -> str: ...
     @property
@@ -944,35 +940,23 @@ class bool(int):
     def __invert__(self) -> int: ...
 
 @final
-class slice(Generic[_StartT_co, _StopT_co, _StepT_co]):
+class slice(Generic[_StartT, _StopT, _StepT]):
     @property
-    def start(self) -> _StartT_co: ...
+    def start(self) -> _StartT: ...
     @property
-    def step(self) -> _StepT_co: ...
+    def step(self) -> _StepT: ...
     @property
-    def stop(self) -> _StopT_co: ...
-    # Note: __new__ overloads map `None` to `Any`, since users expect slice(x, None)
-    #  to be compatible with slice(None, x).
-    # generic slice --------------------------------------------------------------------
+    def stop(self) -> _StopT: ...
     @overload
-    def __new__(cls, start: None, stop: None = None, step: None = None, /) -> slice[Any, Any, Any]: ...
-    # unary overloads ------------------------------------------------------------------
+    def __new__(cls, stop: int | None, /) -> slice[int | MaybeNone, int | MaybeNone, int | MaybeNone]: ...
+    @overload
+    def __new__(
+        cls, start: int | None, stop: int | None, step: int | None = None, /
+    ) -> slice[int | MaybeNone, int | MaybeNone, int | MaybeNone]: ...
     @overload
     def __new__(cls, stop: _T2, /) -> slice[Any, _T2, Any]: ...
-    # binary overloads -----------------------------------------------------------------
     @overload
-    def __new__(cls, start: _T1, stop: None, step: None = None, /) -> slice[_T1, Any, Any]: ...
-    @overload
-    def __new__(cls, start: None, stop: _T2, step: None = None, /) -> slice[Any, _T2, Any]: ...
-    @overload
-    def __new__(cls, start: _T1, stop: _T2, step: None = None, /) -> slice[_T1, _T2, Any]: ...
-    # ternary overloads ----------------------------------------------------------------
-    @overload
-    def __new__(cls, start: None, stop: None, step: _T3, /) -> slice[Any, Any, _T3]: ...
-    @overload
-    def __new__(cls, start: _T1, stop: None, step: _T3, /) -> slice[_T1, Any, _T3]: ...
-    @overload
-    def __new__(cls, start: None, stop: _T2, step: _T3, /) -> slice[Any, _T2, _T3]: ...
+    def __new__(cls, start: _T1, stop: _T2, /) -> slice[_T1, _T2, Any]: ...
     @overload
     def __new__(cls, start: _T1, stop: _T2, step: _T3, /) -> slice[_T1, _T2, _T3]: ...
     def __eq__(self, value: object, /) -> bool: ...
@@ -983,7 +967,7 @@ class slice(Generic[_StartT_co, _StopT_co, _StepT_co]):
 
     def indices(self, len: SupportsIndex, /) -> tuple[int, int, int]: ...
 
-class tuple:
+class tuple(Sequence[_T_co]):
     def __new__(cls, iterable: Iterable[_T_co] = ..., /) -> Self: ...
     def __len__(self) -> int: ...
     def __contains__(self, key: object, /) -> bool: ...
@@ -1037,7 +1021,7 @@ class function:
     # mypy uses `builtins.function.__get__` to represent methods, properties, and getset_descriptors so we type the return as Any.
     def __get__(self, instance: object, owner: type | None = None, /) -> Any: ...
 
-class list:
+class list(MutableSequence[_T]):
     @overload
     def __init__(self) -> None: ...
     @overload
@@ -1252,7 +1236,7 @@ class enumerate(Generic[_T]):
         def __class_getitem__(cls, item: Any, /) -> GenericAlias: ...
 
 @final
-class range:
+class range(Sequence[int]):
     @property
     def start(self) -> int: ...
     @property
