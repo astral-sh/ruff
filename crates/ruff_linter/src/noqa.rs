@@ -43,25 +43,14 @@ pub fn generate_noqa_edits(
     build_noqa_edits_by_diagnostic(comments, locator, line_ending)
 }
 
-/// A directive to ignore a set of rules for a given line of Python source code (e.g.,
-/// `# noqa: F401, F841`).
+/// A directive to ignore a set of rules either for a given line of Python source code or an entire file (e.g.,
+/// `# noqa: F401, F841` or `#ruff: noqa: F401, F841`).
 #[derive(Debug)]
 pub(crate) enum Directive<'a> {
     /// The `noqa` directive ignores all rules (e.g., `# noqa`).
     All(All),
     /// The `noqa` directive ignores specific rules (e.g., `# noqa: F401, F841`).
     Codes(Codes<'a>),
-}
-
-impl<'a> Directive<'a> {
-    /// Extract the noqa `Directive` from a line of Python source code.
-    pub(crate) fn try_extract(
-        comment_range: TextRange,
-        source: &'a str,
-    ) -> Result<Option<Self>, ParseError> {
-        let parsed = parse_inline_noqa(comment_range, source)?;
-        Ok(parsed.map(|parsed_noqa| Self::from(parsed_noqa.directive)))
-    }
 }
 
 #[derive(Debug)]
@@ -144,9 +133,15 @@ pub(crate) fn rule_is_ignored(
     let &[comment_range] = comment_ranges.comments_in_range(line_range) else {
         return false;
     };
-    match Directive::try_extract(comment_range, locator.contents()) {
-        Ok(Some(Directive::All(_))) => true,
-        Ok(Some(Directive::Codes(codes))) => codes.includes(code),
+    match parse_inline_noqa(comment_range, locator.contents()) {
+        Ok(Some(ParsedNoqa {
+            directive: Directive::All(_),
+            ..
+        })) => true,
+        Ok(Some(ParsedNoqa {
+            directive: Directive::Codes(codes),
+            ..
+        })) => codes.includes(code),
         _ => false,
     }
 }
@@ -192,7 +187,7 @@ impl<'a> From<&'a FileNoqaDirectives<'a>> for FileExemption<'a> {
         if directives
             .lines()
             .iter()
-            .any(|line| matches!(line.parsed_file_exemption, ParsedNoqaDirective::All(_)))
+            .any(|line| matches!(line.parsed_file_exemption, Directive::All(_)))
         {
             FileExemption::All(codes)
         } else {
@@ -207,7 +202,7 @@ pub(crate) struct FileNoqaDirectiveLine<'a> {
     /// The range of the text line for which the noqa directive applies.
     pub(crate) range: TextRange,
     /// The blanket noqa directive.
-    pub(crate) parsed_file_exemption: ParsedNoqaDirective<'a>,
+    pub(crate) parsed_file_exemption: Directive<'a>,
     /// The codes that are ignored by the parsed exemptions.
     pub(crate) matches: Vec<NoqaCode>,
 }
@@ -259,10 +254,10 @@ impl<'a> FileNoqaDirectives<'a> {
                     }
 
                     let matches = match &directive {
-                        ParsedNoqaDirective::All(_) => {
+                        Directive::All(_) => {
                             vec![]
                         }
-                        ParsedNoqaDirective::Codes(codes) => {
+                        Directive::Codes(codes) => {
                             codes.iter().filter_map(|code| {
                                 let code = code.as_str();
                                 // Ignore externally-defined rules.
@@ -307,30 +302,11 @@ impl<'a> FileNoqaDirectives<'a> {
     }
 }
 
-/// An individual suppression directive, which may either be
-/// in-line or file-level.
-#[derive(Debug)]
-pub(crate) enum ParsedNoqaDirective<'a> {
-    /// Suppress all rules (e.g. `# noqa` or `# ruff: noqa`)
-    All(All),
-    /// Suppress specific rules (e.g. `# noqa: F401,F841` or `ruff: noqa: F401,F841`)
-    Codes(Codes<'a>),
-}
-
-impl<'a> From<ParsedNoqaDirective<'a>> for Directive<'a> {
-    fn from(value: ParsedNoqaDirective<'a>) -> Self {
-        match value {
-            ParsedNoqaDirective::All(all) => Self::All(all),
-            ParsedNoqaDirective::Codes(codes) => Self::Codes(codes),
-        }
-    }
-}
-
 /// Output of parsed `noqa` directive.
 #[derive(Debug)]
 pub(crate) struct ParsedNoqa<'a> {
     warnings: Vec<ParseWarning>,
-    directive: ParsedNoqaDirective<'a>,
+    directive: Directive<'a>,
 }
 
 /// Marks the beginning of an in-line `noqa` directive
@@ -412,12 +388,12 @@ impl<'a> NoqaParser<'a> {
             None => {
                 // Ex) `# noqa`
                 let range = TextRange::new(comment_start, noqa_literal_end).add(offset);
-                ParsedNoqaDirective::All(All { range })
+                Directive::All(All { range })
             }
             Some(c) if c.is_ascii_whitespace() || c == '#' => {
                 // Ex) `# noqa#comment` or `# noqa comment`
                 let range = TextRange::new(comment_start, noqa_literal_end).add(offset);
-                ParsedNoqaDirective::All(All { range })
+                Directive::All(All { range })
             }
             Some(':') => {
                 // Ex) `# noqa: F401,F841`
@@ -431,7 +407,7 @@ impl<'a> NoqaParser<'a> {
                 };
                 let codes_end = last_code.range.end();
                 let range = TextRange::new(comment_start + offset, codes_end);
-                ParsedNoqaDirective::Codes(Codes { codes, range })
+                Directive::Codes(Codes { codes, range })
             }
             _ => return Err(ParseError::InvalidSuffix),
         };
@@ -1252,8 +1228,7 @@ mod tests {
     use ruff_text_size::{TextLen, TextRange, TextSize};
 
     use crate::noqa::{
-        add_noqa_inner, parse_file_exemption, parse_inline_noqa, NoqaMapping, ParsedNoqa,
-        ParsedNoqaDirective,
+        add_noqa_inner, parse_file_exemption, parse_inline_noqa, Directive, NoqaMapping, ParsedNoqa,
     };
     use crate::rules::pycodestyle::rules::{AmbiguousVariableName, UselessSemicolon};
     use crate::rules::pyflakes::rules::UnusedVariable;
@@ -1273,7 +1248,7 @@ mod tests {
 
         if let Ok(Some(ParsedNoqa {
             warnings: _,
-            directive: ParsedNoqaDirective::Codes(codes),
+            directive: Directive::Codes(codes),
         })) = directive
         {
             assert_codes_match_slices(codes, source);
@@ -1287,7 +1262,7 @@ mod tests {
         assert_debug_snapshot!(directive);
         if let Ok(Some(ParsedNoqa {
             warnings: _,
-            directive: ParsedNoqaDirective::Codes(codes),
+            directive: Directive::Codes(codes),
         })) = directive
         {
             assert_codes_match_slices(codes, source);
@@ -1301,7 +1276,7 @@ mod tests {
         assert_debug_snapshot!(directive);
         if let Ok(Some(ParsedNoqa {
             warnings: _,
-            directive: ParsedNoqaDirective::Codes(codes),
+            directive: Directive::Codes(codes),
         })) = directive
         {
             assert_codes_match_slices(codes, source);
@@ -1315,7 +1290,7 @@ mod tests {
         assert_debug_snapshot!(directive);
         if let Ok(Some(ParsedNoqa {
             warnings: _,
-            directive: ParsedNoqaDirective::Codes(codes),
+            directive: Directive::Codes(codes),
         })) = directive
         {
             assert_codes_match_slices(codes, source);
@@ -1329,7 +1304,7 @@ mod tests {
         assert_debug_snapshot!(directive);
         if let Ok(Some(ParsedNoqa {
             warnings: _,
-            directive: ParsedNoqaDirective::Codes(codes),
+            directive: Directive::Codes(codes),
         })) = directive
         {
             assert_codes_match_slices(codes, source);
@@ -1343,7 +1318,7 @@ mod tests {
         assert_debug_snapshot!(directive);
         if let Ok(Some(ParsedNoqa {
             warnings: _,
-            directive: ParsedNoqaDirective::Codes(codes),
+            directive: Directive::Codes(codes),
         })) = directive
         {
             assert_codes_match_slices(codes, source);
@@ -1357,7 +1332,7 @@ mod tests {
         assert_debug_snapshot!(directive);
         if let Ok(Some(ParsedNoqa {
             warnings: _,
-            directive: ParsedNoqaDirective::Codes(codes),
+            directive: Directive::Codes(codes),
         })) = directive
         {
             assert_codes_match_slices(codes, source);
@@ -1371,7 +1346,7 @@ mod tests {
         assert_debug_snapshot!(directive);
         if let Ok(Some(ParsedNoqa {
             warnings: _,
-            directive: ParsedNoqaDirective::Codes(codes),
+            directive: Directive::Codes(codes),
         })) = directive
         {
             assert_codes_match_slices(codes, source);
@@ -1385,7 +1360,7 @@ mod tests {
         assert_debug_snapshot!(directive);
         if let Ok(Some(ParsedNoqa {
             warnings: _,
-            directive: ParsedNoqaDirective::Codes(codes),
+            directive: Directive::Codes(codes),
         })) = directive
         {
             assert_codes_match_slices(codes, source);
@@ -1399,7 +1374,7 @@ mod tests {
         assert_debug_snapshot!(directive);
         if let Ok(Some(ParsedNoqa {
             warnings: _,
-            directive: ParsedNoqaDirective::Codes(codes),
+            directive: Directive::Codes(codes),
         })) = directive
         {
             assert_codes_match_slices(codes, source);
@@ -1413,7 +1388,7 @@ mod tests {
         assert_debug_snapshot!(directive);
         if let Ok(Some(ParsedNoqa {
             warnings: _,
-            directive: ParsedNoqaDirective::Codes(codes),
+            directive: Directive::Codes(codes),
         })) = directive
         {
             assert_codes_match_slices(codes, source);
@@ -1427,7 +1402,7 @@ mod tests {
         assert_debug_snapshot!(directive);
         if let Ok(Some(ParsedNoqa {
             warnings: _,
-            directive: ParsedNoqaDirective::Codes(codes),
+            directive: Directive::Codes(codes),
         })) = directive
         {
             assert_codes_match_slices(codes, source);
@@ -1441,7 +1416,7 @@ mod tests {
         assert_debug_snapshot!(directive);
         if let Ok(Some(ParsedNoqa {
             warnings: _,
-            directive: ParsedNoqaDirective::Codes(codes),
+            directive: Directive::Codes(codes),
         })) = directive
         {
             assert_codes_match_slices(codes, source);
@@ -1455,7 +1430,7 @@ mod tests {
         assert_debug_snapshot!(directive);
         if let Ok(Some(ParsedNoqa {
             warnings: _,
-            directive: ParsedNoqaDirective::Codes(codes),
+            directive: Directive::Codes(codes),
         })) = directive
         {
             assert_codes_match_slices(codes, source);
@@ -1469,7 +1444,7 @@ mod tests {
         assert_debug_snapshot!(directive);
         if let Ok(Some(ParsedNoqa {
             warnings: _,
-            directive: ParsedNoqaDirective::Codes(codes),
+            directive: Directive::Codes(codes),
         })) = directive
         {
             assert_codes_match_slices(codes, source);
@@ -1483,7 +1458,7 @@ mod tests {
         assert_debug_snapshot!(directive);
         if let Ok(Some(ParsedNoqa {
             warnings: _,
-            directive: ParsedNoqaDirective::Codes(codes),
+            directive: Directive::Codes(codes),
         })) = directive
         {
             assert_codes_match_slices(codes, source);
@@ -1497,7 +1472,7 @@ mod tests {
         assert_debug_snapshot!(directive);
         if let Ok(Some(ParsedNoqa {
             warnings: _,
-            directive: ParsedNoqaDirective::Codes(codes),
+            directive: Directive::Codes(codes),
         })) = directive
         {
             assert_codes_match_slices(codes, source);
@@ -1511,7 +1486,7 @@ mod tests {
         assert_debug_snapshot!(directive);
         if let Ok(Some(ParsedNoqa {
             warnings: _,
-            directive: ParsedNoqaDirective::Codes(codes),
+            directive: Directive::Codes(codes),
         })) = directive
         {
             assert_codes_match_slices(codes, source);
@@ -1525,7 +1500,7 @@ mod tests {
         assert_debug_snapshot!(directive);
         if let Ok(Some(ParsedNoqa {
             warnings: _,
-            directive: ParsedNoqaDirective::Codes(codes),
+            directive: Directive::Codes(codes),
         })) = directive
         {
             assert_codes_match_slices(codes, source);
@@ -1539,7 +1514,7 @@ mod tests {
         assert_debug_snapshot!(directive);
         if let Ok(Some(ParsedNoqa {
             warnings: _,
-            directive: ParsedNoqaDirective::Codes(codes),
+            directive: Directive::Codes(codes),
         })) = directive
         {
             assert_codes_match_slices(codes, source);
@@ -1553,7 +1528,7 @@ mod tests {
         assert_debug_snapshot!(directive);
         if let Ok(Some(ParsedNoqa {
             warnings: _,
-            directive: ParsedNoqaDirective::Codes(codes),
+            directive: Directive::Codes(codes),
         })) = directive
         {
             assert_codes_match_slices(codes, source);
@@ -1567,7 +1542,7 @@ mod tests {
         assert_debug_snapshot!(directive);
         if let Ok(Some(ParsedNoqa {
             warnings: _,
-            directive: ParsedNoqaDirective::Codes(codes),
+            directive: Directive::Codes(codes),
         })) = directive
         {
             assert_codes_match_slices(codes, source);
@@ -1581,7 +1556,7 @@ mod tests {
         assert_debug_snapshot!(directive);
         if let Ok(Some(ParsedNoqa {
             warnings: _,
-            directive: ParsedNoqaDirective::Codes(codes),
+            directive: Directive::Codes(codes),
         })) = directive
         {
             assert_codes_match_slices(codes, source);
@@ -1595,7 +1570,7 @@ mod tests {
         assert_debug_snapshot!(directive);
         if let Ok(Some(ParsedNoqa {
             warnings: _,
-            directive: ParsedNoqaDirective::Codes(codes),
+            directive: Directive::Codes(codes),
         })) = directive
         {
             assert_codes_match_slices(codes, source);
@@ -1609,7 +1584,7 @@ mod tests {
         assert_debug_snapshot!(directive);
         if let Ok(Some(ParsedNoqa {
             warnings: _,
-            directive: ParsedNoqaDirective::Codes(codes),
+            directive: Directive::Codes(codes),
         })) = directive
         {
             assert_codes_match_slices(codes, source);
@@ -1623,7 +1598,7 @@ mod tests {
         assert_debug_snapshot!(directive);
         if let Ok(Some(ParsedNoqa {
             warnings: _,
-            directive: ParsedNoqaDirective::Codes(codes),
+            directive: Directive::Codes(codes),
         })) = directive
         {
             assert_codes_match_slices(codes, source);
@@ -1637,7 +1612,7 @@ mod tests {
         assert_debug_snapshot!(directive);
         if let Ok(Some(ParsedNoqa {
             warnings: _,
-            directive: ParsedNoqaDirective::Codes(codes),
+            directive: Directive::Codes(codes),
         })) = directive
         {
             assert_codes_match_slices(codes, source);
@@ -1651,7 +1626,7 @@ mod tests {
         assert_debug_snapshot!(directive);
         if let Ok(Some(ParsedNoqa {
             warnings: _,
-            directive: ParsedNoqaDirective::Codes(codes),
+            directive: Directive::Codes(codes),
         })) = directive
         {
             assert_codes_match_slices(codes, source);
@@ -1665,7 +1640,7 @@ mod tests {
         assert_debug_snapshot!(directive);
         if let Ok(Some(ParsedNoqa {
             warnings: _,
-            directive: ParsedNoqaDirective::Codes(codes),
+            directive: Directive::Codes(codes),
         })) = directive
         {
             assert_codes_match_slices(codes, source);
@@ -1679,7 +1654,7 @@ mod tests {
         assert_debug_snapshot!(exemption);
         if let Ok(Some(ParsedNoqa {
             warnings: _,
-            directive: ParsedNoqaDirective::Codes(codes),
+            directive: Directive::Codes(codes),
         })) = exemption
         {
             assert_codes_match_slices(codes, source);
@@ -1693,7 +1668,7 @@ mod tests {
         assert_debug_snapshot!(exemption);
         if let Ok(Some(ParsedNoqa {
             warnings: _,
-            directive: ParsedNoqaDirective::Codes(codes),
+            directive: Directive::Codes(codes),
         })) = exemption
         {
             assert_codes_match_slices(codes, source);
@@ -1707,7 +1682,7 @@ mod tests {
         assert_debug_snapshot!(exemption);
         if let Ok(Some(ParsedNoqa {
             warnings: _,
-            directive: ParsedNoqaDirective::Codes(codes),
+            directive: Directive::Codes(codes),
         })) = exemption
         {
             assert_codes_match_slices(codes, source);
@@ -1721,7 +1696,7 @@ mod tests {
         assert_debug_snapshot!(exemption);
         if let Ok(Some(ParsedNoqa {
             warnings: _,
-            directive: ParsedNoqaDirective::Codes(codes),
+            directive: Directive::Codes(codes),
         })) = exemption
         {
             assert_codes_match_slices(codes, source);
@@ -1736,7 +1711,7 @@ mod tests {
         assert_debug_snapshot!(exemption);
         if let Ok(Some(ParsedNoqa {
             warnings: _,
-            directive: ParsedNoqaDirective::Codes(codes),
+            directive: Directive::Codes(codes),
         })) = exemption
         {
             assert_codes_match_slices(codes, source);
@@ -1750,7 +1725,7 @@ mod tests {
         assert_debug_snapshot!(exemption);
         if let Ok(Some(ParsedNoqa {
             warnings: _,
-            directive: ParsedNoqaDirective::Codes(codes),
+            directive: Directive::Codes(codes),
         })) = exemption
         {
             assert_codes_match_slices(codes, source);
@@ -1763,7 +1738,7 @@ mod tests {
         assert_debug_snapshot!(exemption);
         if let Ok(Some(ParsedNoqa {
             warnings: _,
-            directive: ParsedNoqaDirective::Codes(codes),
+            directive: Directive::Codes(codes),
         })) = exemption
         {
             assert_codes_match_slices(codes, source);
@@ -1777,7 +1752,7 @@ mod tests {
         assert_debug_snapshot!(exemption);
         if let Ok(Some(ParsedNoqa {
             warnings: _,
-            directive: ParsedNoqaDirective::Codes(codes),
+            directive: Directive::Codes(codes),
         })) = exemption
         {
             assert_codes_match_slices(codes, source);
@@ -1791,7 +1766,7 @@ mod tests {
         assert_debug_snapshot!(exemption);
         if let Ok(Some(ParsedNoqa {
             warnings: _,
-            directive: ParsedNoqaDirective::Codes(codes),
+            directive: Directive::Codes(codes),
         })) = exemption
         {
             assert_codes_match_slices(codes, source);
@@ -1805,7 +1780,7 @@ mod tests {
         assert_debug_snapshot!(exemption);
         if let Ok(Some(ParsedNoqa {
             warnings: _,
-            directive: ParsedNoqaDirective::Codes(codes),
+            directive: Directive::Codes(codes),
         })) = exemption
         {
             assert_codes_match_slices(codes, source);
@@ -1819,7 +1794,7 @@ mod tests {
         assert_debug_snapshot!(exemption);
         if let Ok(Some(ParsedNoqa {
             warnings: _,
-            directive: ParsedNoqaDirective::Codes(codes),
+            directive: Directive::Codes(codes),
         })) = exemption
         {
             assert_codes_match_slices(codes, source);
@@ -1833,7 +1808,7 @@ mod tests {
         assert_debug_snapshot!(exemption);
         if let Ok(Some(ParsedNoqa {
             warnings: _,
-            directive: ParsedNoqaDirective::Codes(codes),
+            directive: Directive::Codes(codes),
         })) = exemption
         {
             assert_codes_match_slices(codes, source);
@@ -1847,7 +1822,7 @@ mod tests {
         assert_debug_snapshot!(exemption);
         if let Ok(Some(ParsedNoqa {
             warnings: _,
-            directive: ParsedNoqaDirective::Codes(codes),
+            directive: Directive::Codes(codes),
         })) = exemption
         {
             assert_codes_match_slices(codes, source);
@@ -1861,7 +1836,7 @@ mod tests {
         assert_debug_snapshot!(exemption);
         if let Ok(Some(ParsedNoqa {
             warnings: _,
-            directive: ParsedNoqaDirective::Codes(codes),
+            directive: Directive::Codes(codes),
         })) = exemption
         {
             assert_codes_match_slices(codes, source);
@@ -1875,7 +1850,7 @@ mod tests {
         assert_debug_snapshot!(exemption);
         if let Ok(Some(ParsedNoqa {
             warnings: _,
-            directive: ParsedNoqaDirective::Codes(codes),
+            directive: Directive::Codes(codes),
         })) = exemption
         {
             assert_codes_match_slices(codes, source);
@@ -1889,7 +1864,7 @@ mod tests {
         assert_debug_snapshot!(exemption);
         if let Ok(Some(ParsedNoqa {
             warnings: _,
-            directive: ParsedNoqaDirective::Codes(codes),
+            directive: Directive::Codes(codes),
         })) = exemption
         {
             assert_codes_match_slices(codes, source);
@@ -1903,7 +1878,7 @@ mod tests {
         assert_debug_snapshot!(exemption);
         if let Ok(Some(ParsedNoqa {
             warnings: _,
-            directive: ParsedNoqaDirective::Codes(codes),
+            directive: Directive::Codes(codes),
         })) = exemption
         {
             assert_codes_match_slices(codes, source);
@@ -1917,7 +1892,7 @@ mod tests {
         assert_debug_snapshot!(exemption);
         if let Ok(Some(ParsedNoqa {
             warnings: _,
-            directive: ParsedNoqaDirective::Codes(codes),
+            directive: Directive::Codes(codes),
         })) = exemption
         {
             assert_codes_match_slices(codes, source);
@@ -1931,7 +1906,7 @@ mod tests {
         assert_debug_snapshot!(exemption);
         if let Ok(Some(ParsedNoqa {
             warnings: _,
-            directive: ParsedNoqaDirective::Codes(codes),
+            directive: Directive::Codes(codes),
         })) = exemption
         {
             assert_codes_match_slices(codes, source);
@@ -1945,7 +1920,7 @@ mod tests {
         assert_debug_snapshot!(exemption);
         if let Ok(Some(ParsedNoqa {
             warnings: _,
-            directive: ParsedNoqaDirective::Codes(codes),
+            directive: Directive::Codes(codes),
         })) = exemption
         {
             assert_codes_match_slices(codes, source);
@@ -1959,7 +1934,7 @@ mod tests {
         assert_debug_snapshot!(exemption);
         if let Ok(Some(ParsedNoqa {
             warnings: _,
-            directive: ParsedNoqaDirective::Codes(codes),
+            directive: Directive::Codes(codes),
         })) = exemption
         {
             assert_codes_match_slices(codes, source);
