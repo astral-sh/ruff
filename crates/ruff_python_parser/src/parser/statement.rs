@@ -3106,10 +3106,22 @@ impl<'src> Parser<'src> {
 
         self.expect(TokenKind::Rsqb);
 
-        ast::TypeParams {
-            range: self.node_range(start),
-            type_params,
-        }
+        // test_ok type_params_py312
+        // # parse_options: {"target-version": "3.12"}
+        // type List[T] = list | set
+        // def foo[T](): ...
+        // class Foo[T]: ...
+
+        // test_err type_params_py311
+        // # parse_options: {"target-version": "3.11"}
+        // type List[T] = list | set
+        // def foo[T](): ...
+        // class Foo[T]: ...
+
+        let range = self.node_range(start);
+        self.add_unsupported_syntax_error(UnsupportedSyntaxErrorKind::TypeParams, range);
+
+        ast::TypeParams { range, type_params }
     }
 
     /// Parses a type parameter.
