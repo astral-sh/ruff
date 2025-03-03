@@ -135,7 +135,7 @@ pub fn check_path(
     }
 
     // Run the AST-based rules only if there are no syntax errors.
-    if parsed.is_valid() {
+    if parsed.has_valid_syntax() {
         let use_ast = settings
             .rules
             .iter_enabled()
@@ -285,7 +285,7 @@ pub fn check_path(
             locator,
             comment_ranges,
             &directives.noqa_line_for,
-            parsed.is_valid(),
+            parsed.has_valid_syntax(),
             &per_file_ignores,
             settings,
         );
@@ -296,7 +296,7 @@ pub fn check_path(
         }
     }
 
-    if parsed.is_valid() {
+    if parsed.has_valid_syntax() {
         // Remove fixes for any rules marked as unfixable.
         for diagnostic in &mut diagnostics {
             if !settings.rules.should_fix(diagnostic.kind.rule()) {
