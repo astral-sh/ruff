@@ -247,18 +247,18 @@ impl DisplayDiagnosticConfig {
 }
 
 #[derive(Debug)]
-pub struct ParseDiagnostic {
+pub struct OldParseDiagnostic {
     file: File,
     error: ParseError,
 }
 
-impl ParseDiagnostic {
+impl OldParseDiagnostic {
     pub fn new(file: File, error: ParseError) -> Self {
         Self { file, error }
     }
 }
 
-impl OldDiagnosticTrait for ParseDiagnostic {
+impl OldDiagnosticTrait for OldParseDiagnostic {
     fn id(&self) -> DiagnosticId {
         DiagnosticId::InvalidSyntax
     }
