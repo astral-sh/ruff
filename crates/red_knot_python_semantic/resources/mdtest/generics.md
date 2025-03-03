@@ -39,7 +39,7 @@ class MySecureBox[T](MyBox[T]): ...
 secure_box: MySecureBox[int] = MySecureBox(5)
 reveal_type(secure_box)  # revealed: MySecureBox
 # TODO reveal int
-reveal_type(secure_box.data)  # revealed: Unknown
+reveal_type(secure_box.data)  # revealed: T
 ```
 
 ## Cyclical class definition

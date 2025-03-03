@@ -4053,6 +4053,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             | (_, unknown @ Type::Dynamic(DynamicType::Unknown), _) => Some(unknown),
             (todo @ Type::Dynamic(DynamicType::Todo(_)), _, _)
             | (_, todo @ Type::Dynamic(DynamicType::Todo(_)), _) => Some(todo),
+            (todo @ Type::Dynamic(DynamicType::TodoProtocol), _, _)
+            | (_, todo @ Type::Dynamic(DynamicType::TodoProtocol), _) => Some(todo),
             (Type::Never, _, _) | (_, Type::Never, _) => Some(Type::Never),
 
             (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Add) => Some(
@@ -5226,6 +5228,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                 value_ty,
                 Type::IntLiteral(i64::from(bool)),
             ),
+            (Type::KnownInstance(KnownInstanceType::Protocol), _) => {
+                Type::Dynamic(DynamicType::TodoProtocol)
+            }
             (value_ty, slice_ty) => {
                 // If the class defines `__getitem__`, return its return type.
                 //
@@ -5331,7 +5336,13 @@ impl<'db> TypeInferenceBuilder<'db> {
                     );
                 }
 
-                Type::unknown()
+                match value_ty {
+                    Type::ClassLiteral(_) => {
+                        // TODO: proper support for generic classes
+                        value_ty
+                    }
+                    _ => Type::unknown(),
+                }
             }
         }
     }
@@ -6194,7 +6205,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
             KnownInstanceType::Protocol => {
                 self.infer_type_expression(arguments_slice);
-                todo_type!("Generic protocol")
+                Type::Dynamic(DynamicType::TodoProtocol)
             }
             KnownInstanceType::NoReturn
             | KnownInstanceType::Never

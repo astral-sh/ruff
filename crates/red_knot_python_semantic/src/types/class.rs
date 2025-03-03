@@ -9,8 +9,8 @@ use crate::{
         Boundness, LookupError, LookupResult, Symbol, SymbolAndQualifiers,
     },
     types::{
-        definition_expression_type, CallArguments, CallError, MetaclassCandidate, TupleType,
-        UnionBuilder, UnionCallError,
+        definition_expression_type, CallArguments, CallError, DynamicType, MetaclassCandidate,
+        TupleType, UnionBuilder, UnionCallError,
     },
     Db, KnownModule, Program,
 };
@@ -339,6 +339,11 @@ impl<'db> Class<'db> {
 
         for superclass in self.iter_mro(db) {
             match superclass {
+                ClassBase::Dynamic(DynamicType::TodoProtocol) => {
+                    // TODO: We currently skip protocols when looking up class members, in order to
+                    // avoid creating many dynamic types in our test suite that would otherwise
+                    // result from looking up attributes on builtin types like `str`, `list`, `tuple`
+                }
                 ClassBase::Dynamic(_) => {
                     // Note: calling `Type::from(superclass).member()` would be incorrect here.
                     // What we'd really want is a `Type::Any.own_class_member()` method,
@@ -407,6 +412,11 @@ impl<'db> Class<'db> {
 
         for superclass in self.iter_mro(db) {
             match superclass {
+                ClassBase::Dynamic(DynamicType::TodoProtocol) => {
+                    // TODO: We currently skip protocols when looking up instance members, in order to
+                    // avoid creating many dynamic types in our test suite that would otherwise
+                    // result from looking up attributes on builtin types like `str`, `list`, `tuple`
+                }
                 ClassBase::Dynamic(_) => {
                     return SymbolAndQualifiers::todo(
                         "instance attribute on class with dynamic base",
