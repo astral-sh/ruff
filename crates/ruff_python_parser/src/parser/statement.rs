@@ -3242,6 +3242,7 @@ impl<'src> Parser<'src> {
                 None
             };
 
+            let default_start = self.node_start();
             let default = if self.eat(TokenKind::Equal) {
                 if self.at_expr() {
                     // test_err type_param_type_var_invalid_default_expr
@@ -3279,16 +3280,15 @@ impl<'src> Parser<'src> {
             // def f[T = int](): ...
             // class C[T = int](): ...
 
-            let range = self.node_range(start);
             if default.is_some() {
                 self.add_unsupported_syntax_error(
                     UnsupportedSyntaxErrorKind::TypeParamDefault,
-                    range,
+                    self.node_range(default_start),
                 );
             }
 
             ast::TypeParam::TypeVar(ast::TypeParamTypeVar {
-                range,
+                range: self.node_range(start),
                 name,
                 bound,
                 default,

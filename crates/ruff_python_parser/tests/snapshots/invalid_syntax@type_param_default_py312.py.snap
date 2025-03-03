@@ -176,7 +176,7 @@ Module(
   |
 1 | # parse_options: {"target-version": "3.12"}
 2 | type X[T = int] = int
-  |        ^^^^^^^ Syntax Error: Cannot use type parameter default on Python 3.12 (syntax was added in Python 3.13)
+  |          ^^^^^ Syntax Error: Cannot use type parameter default on Python 3.12 (syntax was added in Python 3.13)
 3 | def f[T = int](): ...
 4 | class C[T = int](): ...
   |
@@ -186,7 +186,7 @@ Module(
 1 | # parse_options: {"target-version": "3.12"}
 2 | type X[T = int] = int
 3 | def f[T = int](): ...
-  |       ^^^^^^^ Syntax Error: Cannot use type parameter default on Python 3.12 (syntax was added in Python 3.13)
+  |         ^^^^^ Syntax Error: Cannot use type parameter default on Python 3.12 (syntax was added in Python 3.13)
 4 | class C[T = int](): ...
   |
 
@@ -195,5 +195,5 @@ Module(
 2 | type X[T = int] = int
 3 | def f[T = int](): ...
 4 | class C[T = int](): ...
-  |         ^^^^^^^ Syntax Error: Cannot use type parameter default on Python 3.12 (syntax was added in Python 3.13)
+  |           ^^^^^ Syntax Error: Cannot use type parameter default on Python 3.12 (syntax was added in Python 3.13)
   |
