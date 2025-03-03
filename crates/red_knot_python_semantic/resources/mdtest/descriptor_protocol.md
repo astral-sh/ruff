@@ -80,11 +80,10 @@ reveal_type(c.flexible_int)  # revealed: int | None
 
 ## Data and non-data descriptors
 
-Descriptors that define `__set__` or `__delete__` are called *data descriptors*. An example\
-of a data descriptor is a `property` with a setter and/or a deleter.\
-Descriptors that only define `__get__`, meanwhile, are called *non-data descriptors*. Examples
-include\
-functions, `classmethod` or `staticmethod`).
+Descriptors that define `__set__` or `__delete__` are called *data descriptors*. An example of a
+data descriptor is a `property` with a setter and/or a deleter. Descriptors that only define
+`__get__`, meanwhile, are called *non-data descriptors*. Examples include functions, `classmethod`
+or `staticmethod`.
 
 The precedence chain for attribute access is (1) data descriptors, (2) instance attributes, and (3)
 non-data descriptors.
@@ -120,7 +119,7 @@ class C:
 
 c = C()
 
-reveal_type(c.data_descriptor)  # revealed: Unknown | Literal["data", 1]
+reveal_type(c.data_descriptor)  # revealed: Unknown | Literal["data"]
 
 reveal_type(c.non_data_descriptor)  # revealed: Unknown | Literal["non-data", 1]
 
@@ -132,6 +131,67 @@ reveal_type(C.non_data_descriptor)  # revealed: Unknown | Literal["non-data"]
 # assignment does not call `DataDescriptor.__set__`. For this reason, we infer
 # `Unknown | …` for all (descriptor) attributes.
 C.data_descriptor = "something else"  # This is okay
+```
+
+## Possibly unbound descriptors, unions with other attributes
+
+```py
+class DataDescriptor:
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        return 1
+
+    def __set__(self, instance: int, value) -> None:
+        pass
+
+class NonDataDescriptor:
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        return 1
+
+def _(flag: bool):
+    class PossiblyUnbound:
+        if flag:
+            non_data: NonDataDescriptor = NonDataDescriptor()
+            data: DataDescriptor = DataDescriptor()
+
+    # error: [possibly-unbound-attribute] "Attribute `non_data` on type `Literal[PossiblyUnbound]` is possibly unbound"
+    reveal_type(PossiblyUnbound.non_data)  # revealed: int
+
+    # error: [possibly-unbound-attribute] "Attribute `non_data` on type `PossiblyUnbound` is possibly unbound"
+    reveal_type(PossiblyUnbound().non_data)  # revealed: int
+
+    # error: [possibly-unbound-attribute] "Attribute `data` on type `Literal[PossiblyUnbound]` is possibly unbound"
+    reveal_type(PossiblyUnbound.data)  # revealed: int
+
+    # error: [possibly-unbound-attribute] "Attribute `data` on type `PossiblyUnbound` is possibly unbound"
+    reveal_type(PossiblyUnbound().data)  # revealed: int
+
+    class UnionWithClassAttribute:
+        if flag:
+            non_data: NonDataDescriptor = NonDataDescriptor()
+            data: DataDescriptor = DataDescriptor()
+        else:
+            non_data: str = "a"
+            data: str = "a"
+
+    reveal_type(UnionWithClassAttribute.non_data)  # revealed: int | str
+    reveal_type(UnionWithClassAttribute.data)  # revealed: int | str
+    reveal_type(UnionWithClassAttribute().non_data)  # revealed: int | str
+    reveal_type(UnionWithClassAttribute().data)  # revealed: int | str
+
+    class UnionWithInstanceAttribute:
+        if flag:
+            non_data: NonDataDescriptor = NonDataDescriptor()
+            data: DataDescriptor = DataDescriptor()
+
+        def f(self):
+            self.non_data: str = "a"
+            self.data: str = "a"
+
+    # error: [possibly-unbound-attribute] "Attribute `non_data` on type `UnionWithInstanceAttribute` is possibly unbound"
+    reveal_type(UnionWithInstanceAttribute().non_data)  # revealed: int | str
+
+    # error: [possibly-unbound-attribute] "Attribute `data` on type `UnionWithInstanceAttribute` is possibly unbound"
+    reveal_type(UnionWithInstanceAttribute().data)  # revealed: int | str
 ```
 
 ## Built-in `property` descriptor

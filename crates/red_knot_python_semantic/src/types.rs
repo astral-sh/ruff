@@ -1672,77 +1672,99 @@ impl<'db> Type<'db> {
                         tracing::info!("self_meta = {}", class_attr_meta_ty.display(db));
                         tracing::info!("descr_get = {:?}", descr_get);
 
-                        // if let Symbol::Type(descr_get, _) = descr_get {
-                        //     if !class_attr_meta_ty.member(db, "__set__").0.is_unbound()
-                        //         || !class_attr_meta_ty.member(db, "__delete__").0.is_unbound()
-                        //     {
-                        //         tracing::info!("protocol resolution: Data descriptor");
-                        //         // Data descriptor
-                        //         return Symbol::Type(
-                        //             descr_get
-                        //                 .try_call(
-                        //                     db,
-                        //                     &CallArguments::positional([
-                        //                         class_attr_ty,
-                        //                         instance,
-                        //                         owner,
-                        //                     ]),
-                        //                 )
-                        //                 .map(|outcome| outcome.return_type(db))
-                        //                 .unwrap_or(Type::unknown()),
-                        //             class_attr_boundness,
-                        //         )
-                        //         .into();
-                        //     }
-                        // }
+                        let (descr_get_return_ty, is_data_descriptor) =
+                            if let Symbol::Type(descr_get, _) = descr_get {
+                                let return_ty = descr_get
+                                    .try_call(
+                                        db,
+                                        &CallArguments::positional([
+                                            class_attr_ty,
+                                            instance,
+                                            owner,
+                                        ]),
+                                    )
+                                    .map(|outcome| Some(outcome.return_type(db)))
+                                    .unwrap_or(None);
+                                let is_data_descriptor = !class_attr_meta_ty
+                                    .member(db, "__set__")
+                                    .0
+                                    .is_unbound()
+                                    || !class_attr_meta_ty.member(db, "__delete__").0.is_unbound();
 
-                        let descr_get_return_ty = if let Symbol::Type(descr_get, _) = descr_get {
-                            descr_get
-                                .try_call(
-                                    db,
-                                    &CallArguments::positional([class_attr_ty, instance, owner]),
-                                )
-                                .map(|outcome| Some(outcome.return_type(db)))
-                                .unwrap_or(None)
-                        } else {
-                            None
-                        };
+                                (return_ty, is_data_descriptor)
+                            } else {
+                                (None, false)
+                            };
 
                         let instance_variable = instance.instance_variable(db, name);
 
                         tracing::trace!("instance_variable = {:?}", instance_variable);
 
-                        match (descr_get_return_ty, &instance_variable.0) {
-                            (Some(return_ty), Symbol::Unbound) => SymbolAndQualifiers(
+                        // eprintln!("descr_get_return_ty = {:?}", descr_get_return_ty);
+                        // eprintln!("is_data_descriptor = {:?}", is_data_descriptor);
+                        // eprintln!("instance_variable = {:?}", instance_variable.0);
+
+                        match (
+                            descr_get_return_ty,
+                            is_data_descriptor,
+                            &instance_variable.0,
+                        ) {
+                            (Some(return_ty), _, Symbol::Unbound) => SymbolAndQualifiers(
                                 Symbol::Type(return_ty, class_attr_boundness),
                                 class_attr_qualifiers,
                             ),
-                            (Some(return_ty), Symbol::Type(instance_variable_ty, boundness)) => {
-                                SymbolAndQualifiers(
-                                    Symbol::Type(
-                                        UnionType::from_elements(
-                                            db,
-                                            [return_ty, *instance_variable_ty],
+                            (
+                                Some(return_ty),
+                                true,
+                                Symbol::Type(instance_variable_ty, instance_variable_boundness),
+                            ) => {
+                                if class_attr_boundness == Boundness::Bound {
+                                    SymbolAndQualifiers(
+                                        Symbol::Type(return_ty, Boundness::Bound),
+                                        class_attr_qualifiers,
+                                    )
+                                } else {
+                                    SymbolAndQualifiers(
+                                        Symbol::Type(
+                                            UnionType::from_elements(
+                                                db,
+                                                [return_ty, *instance_variable_ty],
+                                            ),
+                                            class_attr_boundness.min(*instance_variable_boundness),
                                         ),
-                                        *boundness,
-                                    ),
-                                    class_attr_qualifiers,
-                                )
+                                        class_attr_qualifiers,
+                                    )
+                                }
                             }
-                            (None, Symbol::Type(instance_variable_ty, _)) => {
-                                SymbolAndQualifiers(
-                                    Symbol::Type(
-                                        UnionType::from_elements(
-                                            db,
-                                            [class_attr_ty, *instance_variable_ty],
-                                        ),
-                                        // TODO: should this be min(class_attr_boundness, instance_variable_boundness)?
-                                        class_attr_boundness,
+                            (
+                                Some(return_ty),
+                                false,
+                                Symbol::Type(instance_variable_ty, instance_variable_boundness),
+                            ) => SymbolAndQualifiers(
+                                Symbol::Type(
+                                    UnionType::from_elements(
+                                        db,
+                                        [return_ty, *instance_variable_ty],
                                     ),
-                                    class_attr_qualifiers,
-                                )
-                            }
-                            (None, Symbol::Unbound) => class_attr,
+                                    class_attr_boundness.min(*instance_variable_boundness),
+                                ),
+                                class_attr_qualifiers,
+                            ),
+                            (
+                                None,
+                                _,
+                                Symbol::Type(instance_variable_ty, instance_variable_boundness),
+                            ) => SymbolAndQualifiers(
+                                Symbol::Type(
+                                    UnionType::from_elements(
+                                        db,
+                                        [class_attr_ty, *instance_variable_ty],
+                                    ),
+                                    class_attr_boundness.min(*instance_variable_boundness),
+                                ),
+                                class_attr_qualifiers,
+                            ),
+                            (None, _, Symbol::Unbound) => class_attr,
                         }
                     }
                     Symbol::Unbound => instance.instance_variable(db, name),
