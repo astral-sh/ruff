@@ -4,16 +4,19 @@ expression: exemption
 ---
 Ok(
     Some(
-        Codes(
-            Codes {
-                range: 18..36,
-                codes: [
-                    Code {
-                        code: "F401",
-                        range: 32..36,
-                    },
-                ],
-            },
-        ),
+        ParsedNoqa {
+            warnings: [],
+            directive: Codes(
+                Codes {
+                    range: 18..36,
+                    codes: [
+                        Code {
+                            code: "F401",
+                            range: 32..36,
+                        },
+                    ],
+                },
+            ),
+        },
     ),
 )
