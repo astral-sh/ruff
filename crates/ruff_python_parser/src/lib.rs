@@ -347,7 +347,8 @@ impl<T> Parsed<T> {
     /// Note that this does not include version-related
     /// [`unsupported_syntax_errors`](Parsed::unsupported_syntax_errors).
     ///
-    /// See [`has_no_errors`](Parsed::has_no_errors) for a version that takes these into account.
+    /// See [`has_no_syntax_errors`](Parsed::has_no_syntax_errors) for a version that takes these
+    /// into account.
     pub fn has_valid_syntax(&self) -> bool {
         self.errors.is_empty()
     }
@@ -357,7 +358,8 @@ impl<T> Parsed<T> {
     /// Note that this does not include version-related
     /// [`unsupported_syntax_errors`](Parsed::unsupported_syntax_errors).
     ///
-    /// See [`has_no_errors`](Parsed::has_no_errors) for a version that takes these into account.
+    /// See [`has_no_syntax_errors`](Parsed::has_no_syntax_errors) for a version that takes these
+    /// into account.
     pub fn has_invalid_syntax(&self) -> bool {
         !self.has_valid_syntax()
     }
@@ -366,7 +368,7 @@ impl<T> Parsed<T> {
     /// [`UnsupportedSyntaxError`]s.
     ///
     /// See [`Parsed::has_valid_syntax`] for a version specific to [`ParseError`]s.
-    pub fn has_no_errors(&self) -> bool {
+    pub fn has_no_syntax_errors(&self) -> bool {
         self.has_valid_syntax() && self.unsupported_syntax_errors.is_empty()
     }
 
