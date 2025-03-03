@@ -1,14 +1,29 @@
 {
   $schema: "https://docs.renovatebot.com/renovate-schema.json",
   dependencyDashboard: true,
-  suppressNotifications: ["prEditedNotification"],
-  extends: ["config:recommended"],
-  labels: ["internal"],
-  schedule: ["before 4am on Monday"],
+  suppressNotifications: [
+    "prEditedNotification"
+  ],
+  extends: [
+    "config:recommended"
+  ],
+  labels: [
+    "internal"
+  ],
+  schedule: [
+    "before 4am on Monday"
+  ],
   semanticCommits: "disabled",
   separateMajorMinor: false,
   prHourlyLimit: 10,
-  enabledManagers: ["github-actions", "pre-commit", "cargo", "pep621", "pip_requirements", "npm"],
+  enabledManagers: [
+    "github-actions",
+    "pre-commit",
+    "cargo",
+    "pep621",
+    "pip_requirements",
+    "npm"
+  ],
   cargo: {
     // See https://docs.renovatebot.com/configuration-options/#rangestrategy
     rangeStrategy: "update-lockfile",
@@ -16,7 +31,9 @@
   pep621: {
     // The default for this package manager is to only search for `pyproject.toml` files
     // found at the repository root: https://docs.renovatebot.com/modules/manager/pep621/#file-matching
-    fileMatch: ["^(python|scripts)/.*pyproject\\.toml$"],
+    fileMatch: [
+      "^(python|scripts)/.*pyproject\\.toml$"
+    ],
   },
   pip_requirements: {
     // The default for this package manager is to run on all requirements.txt files:
@@ -29,12 +46,16 @@
     // - https://docs.renovatebot.com/modules/manager/#ignoring-files-that-match-the-default-filematch
     // - https://docs.renovatebot.com/configuration-options/#ignorepaths
     // - https://docs.renovatebot.com/string-pattern-matching/#negative-matching
-    ignorePaths: ["!docs/requirements*.txt"]
+    ignorePaths: [
+      "!docs/requirements*.txt"
+    ]
   },
   npm: {
     // The default for this package manager is to only search for `package.json` files
     // found at the repository root: https://docs.renovatebot.com/modules/manager/npm/#file-matching
-    fileMatch: ["^playground/.*package\\.json$"],
+    fileMatch: [
+      "^playground/.*package\\.json$"
+    ],
   },
   "pre-commit": {
     enabled: true,
@@ -43,9 +64,16 @@
     {
       // Group upload/download artifact updates, the versions are dependent
       groupName: "Artifact GitHub Actions dependencies",
-      matchManagers: ["github-actions"],
-      matchDatasources: ["gitea-tags", "github-tags"],
-      matchPackageNames: ["actions/.*-artifact"],
+      matchManagers: [
+        "github-actions"
+      ],
+      matchDatasources: [
+        "gitea-tags",
+        "github-tags"
+      ],
+      matchPackageNames: [
+        "actions/.*-artifact"
+      ],
       description: "Weekly update of artifact-related GitHub Actions dependencies",
     },
     {
@@ -53,58 +81,81 @@
       // we'd only pin them to a specific version
       // if there was a deliberate reason to do so
       groupName: "GitHub runners",
-      matchManagers: ["github-actions"],
-      matchDatasources: ["github-runners"],
+      matchManagers: [
+        "github-actions"
+      ],
+      matchDatasources: [
+        "github-runners"
+      ],
       description: "Disable PRs updating GitHub runners (e.g. 'runs-on: macos-14')",
-      enabled: false,
-    },
-    {
-      // TODO: Remove this once the codebase is upgrade to v4 (https://github.com/astral-sh/ruff/pull/16069)
-      matchPackageNames: ["tailwindcss"],
-      matchManagers: ["npm"],
       enabled: false,
     },
     {
       // Disable updates of `zip-rs`; intentionally pinned for now due to ownership change
       // See: https://github.com/astral-sh/uv/issues/3642
-      matchPackageNames: ["zip"],
-      matchManagers: ["cargo"],
+      matchPackageNames: [
+        "zip"
+      ],
+      matchManagers: [
+        "cargo"
+      ],
       enabled: false,
     },
     {
       // `mkdocs-material` requires a manual update to keep the version in sync
       // with `mkdocs-material-insider`.
       // See: https://squidfunk.github.io/mkdocs-material/insiders/upgrade/
-      matchManagers: ["pip_requirements"],
-      matchPackageNames: ["mkdocs-material"],
+      matchManagers: [
+        "pip_requirements"
+      ],
+      matchPackageNames: [
+        "mkdocs-material"
+      ],
       enabled: false,
     },
     {
       groupName: "pre-commit dependencies",
-      matchManagers: ["pre-commit"],
+      matchManagers: [
+        "pre-commit"
+      ],
       description: "Weekly update of pre-commit dependencies",
     },
     {
       groupName: "NPM Development dependencies",
-      matchManagers: ["npm"],
-      matchDepTypes: ["devDependencies"],
+      matchManagers: [
+        "npm"
+      ],
+      matchDepTypes: [
+        "devDependencies"
+      ],
       description: "Weekly update of NPM development dependencies",
     },
     {
       groupName: "Monaco",
-      matchManagers: ["npm"],
-      matchPackageNames: ["monaco"],
+      matchManagers: [
+        "npm"
+      ],
+      matchPackageNames: [
+        "monaco"
+      ],
       description: "Weekly update of the Monaco editor",
     },
     {
       groupName: "strum",
-      matchManagers: ["cargo"],
-      matchPackageNames: ["strum"],
+      matchManagers: [
+        "cargo"
+      ],
+      matchPackageNames: [
+        "strum"
+      ],
       description: "Weekly update of strum dependencies",
     }
   ],
   vulnerabilityAlerts: {
     commitMessageSuffix: "",
-    labels: ["internal", "security"],
+    labels: [
+      "internal",
+      "security"
+    ],
   },
 }
