@@ -244,7 +244,7 @@ impl<'a> FileNoqaDirectives<'a> {
                         let path_display = relativize_path(path);
 
                         for warning in warnings {
-                            warn!("Missing or joined rule code(s) at {path_display}:{line}: {warning}")
+                            warn!("Missing or joined rule code(s) at {path_display}:{line}: {warning}");
                         }
 
                         if no_indentation_at_offset {
@@ -318,18 +318,18 @@ static FILE_EXEMPTION_PREFIX: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"#\s*(?:ruff|flake8)\s*:\s*(?i)noqa").unwrap());
 
 /// Parses in-line `noqa` comment, e.g. `# noqa: F401`
-pub(crate) fn parse_inline_noqa<'a>(
+pub(crate) fn parse_inline_noqa(
     comment_range: TextRange,
-    source: &'a str,
-) -> Result<Option<ParsedNoqa<'a>>, ParseError> {
+    source: &str,
+) -> Result<Option<ParsedNoqa<'_>>, ParseError> {
     parse_noqa_with_prefix(comment_range, source, &NOQA_DIRECTIVE_PREFIX)
 }
 
 /// Parses file-level exemption comment, e.g. `# ruff: noqa: F401`
-pub(crate) fn parse_file_exemption<'a>(
+pub(crate) fn parse_file_exemption(
     comment_range: TextRange,
-    source: &'a str,
-) -> Result<Option<ParsedNoqa<'a>>, ParseError> {
+    source: &str,
+) -> Result<Option<ParsedNoqa<'_>>, ParseError> {
     parse_noqa_with_prefix(comment_range, source, &FILE_EXEMPTION_PREFIX)
 }
 
@@ -407,7 +407,7 @@ impl<'a> NoqaParser<'a> {
                 };
                 let codes_end = last_code.range.end();
                 let range = TextRange::new(comment_start + offset, codes_end);
-                Directive::Codes(Codes { codes, range })
+                Directive::Codes(Codes { range, codes })
             }
             _ => return Err(ParseError::InvalidSuffix),
         };
@@ -438,17 +438,17 @@ impl<'a> NoqaParser<'a> {
             //
             // Note: `next_remaining` is guaranteed to be smaller than
             // `remaining`, so the surrounding loop will terminate.
-            let (segment, has_comma, next_remaining) = self.extract_next_segment(remaining);
+            let (segment, has_comma, next_remaining) = Self::extract_next_segment(remaining);
             remaining = next_remaining;
 
             let segment_start = curr;
 
             // Handle empty segments (just whitespace between commas)
             // Ex) `F401,  ,F841`
-            if self.is_empty_segment(segment) {
+            if Self::is_empty_segment(segment) {
                 let segment_len = TextSize::of(segment);
                 self.add_missing_item_warning(segment_start, segment_len);
-                curr = self.advance_position(curr, segment_len, has_comma);
+                curr = Self::advance_position(curr, segment_len, has_comma);
                 continue;
             }
 
@@ -478,7 +478,7 @@ impl<'a> NoqaParser<'a> {
         // Process each whitespace-separated item in the segment
         while !item_remaining.is_empty() {
             // Skip leading whitespace
-            let (non_ws_text, ws_len) = self.skip_leading_whitespace(item_remaining);
+            let (non_ws_text, ws_len) = Self::skip_leading_whitespace(item_remaining);
             item_remaining = non_ws_text;
             segment_curr += ws_len;
 
@@ -491,16 +491,16 @@ impl<'a> NoqaParser<'a> {
             // Note: `next_remaining` is guaranteed to be have
             // smaller size than `item_remaining`, so the surrounding
             // loop will terminate.
-            let (item, next_remaining) = self.extract_next_item(item_remaining);
+            let (item, next_remaining) = Self::extract_next_item(item_remaining);
 
             // Parse the item into codes
-            match self.parse_item(item)? {
+            match Self::parse_item(item)? {
                 ParsedItem::Continue(codes) => {
-                    segment_curr = self.process_codes(codes, segment_curr);
+                    segment_curr = self.process_codes(&codes, segment_curr);
                 }
                 // Ex) `F401#Comment`
                 ParsedItem::StopAtComment(codes) => {
-                    self.process_codes(codes, segment_curr);
+                    self.process_codes(&codes, segment_curr);
                     return Ok(None);
                 }
                 // Ex) If we reach "Comment" in `F401 Comment`
@@ -512,7 +512,7 @@ impl<'a> NoqaParser<'a> {
 
         // Calculate the final position after processing this segment
         let segment_len = TextSize::of(segment);
-        Ok(Some(self.advance_position(
+        Ok(Some(Self::advance_position(
             segment_start,
             segment_len,
             has_comma,
@@ -527,7 +527,7 @@ impl<'a> NoqaParser<'a> {
     /// It is expected that this returns a single code, but for purposes
     /// of error recovery we will parse, e.g., `F401F841` as two separate
     /// codes and record a warning.
-    fn parse_item(&mut self, item: &'a str) -> Result<ParsedItem<'a>, ParseError> {
+    fn parse_item(item: &'a str) -> Result<ParsedItem<'a>, ParseError> {
         let mut res = Vec::new();
         let mut line = item;
         while let Some((code, end)) = Self::parse_code(line) {
@@ -541,7 +541,7 @@ impl<'a> NoqaParser<'a> {
             // Ex) `# noqa: F401#Some comment`
             Some('#') => Ok(ParsedItem::StopAtComment(res)),
             // Ex) `# noqa: F401abc`
-            Some(_) if res.len() >= 1 => Err(ParseError::InvalidCodeSuffix),
+            Some(_) if !res.is_empty() => Err(ParseError::InvalidCodeSuffix),
             _ => Ok(ParsedItem::Continue(res)),
         }
     }
@@ -565,7 +565,7 @@ impl<'a> NoqaParser<'a> {
     }
 
     /// Processes a list of codes, adding them to the result and updating the current position
-    fn process_codes(&mut self, codes: Vec<&'a str>, mut curr: TextSize) -> TextSize {
+    fn process_codes(&mut self, codes: &[&'a str], mut curr: TextSize) -> TextSize {
         for (i, code) in codes.iter().enumerate() {
             let code_len = TextSize::of(*code);
 
@@ -590,7 +590,7 @@ impl<'a> NoqaParser<'a> {
 
     /// Extracts the next comma-separated segment from the input
     #[inline]
-    fn extract_next_segment(&self, input: &'a str) -> (&'a str, bool, &'a str) {
+    fn extract_next_segment(input: &'a str) -> (&'a str, bool, &'a str) {
         if let Some(pos) = input.find(',') {
             let segment = &input[..pos];
             let next_remaining = &input[pos + 1..];
@@ -602,7 +602,7 @@ impl<'a> NoqaParser<'a> {
 
     /// Extracts the next whitespace-separated item from the input
     #[inline]
-    fn extract_next_item(&self, text: &'a str) -> (&'a str, &'a str) {
+    fn extract_next_item(text: &'a str) -> (&'a str, &'a str) {
         let item_end = text
             .find(|c: char| char::is_ascii_whitespace(&c))
             .unwrap_or(text.len());
@@ -615,7 +615,7 @@ impl<'a> NoqaParser<'a> {
 
     /// Advances the current position based on segment length and comma presence
     #[inline]
-    fn advance_position(&self, curr: TextSize, segment_len: TextSize, has_comma: bool) -> TextSize {
+    fn advance_position(curr: TextSize, segment_len: TextSize, has_comma: bool) -> TextSize {
         let mut new_pos = curr + segment_len;
         if has_comma {
             new_pos += TextSize::new(1); // Add 1 for the comma
@@ -625,7 +625,7 @@ impl<'a> NoqaParser<'a> {
 
     /// Skips leading whitespace in a string and returns the remaining text and the length of whitespace skipped
     #[inline]
-    fn skip_leading_whitespace(&self, text: &'a str) -> (&'a str, TextSize) {
+    fn skip_leading_whitespace(text: &'a str) -> (&'a str, TextSize) {
         // Find the position of the first non-whitespace character (if any)
         let non_ws_pos = text
             .find(|c: char| !char::is_ascii_whitespace(&c))
@@ -638,7 +638,7 @@ impl<'a> NoqaParser<'a> {
 
     /// Checks if a segment is empty (contains only whitespace)
     #[inline]
-    fn is_empty_segment(&self, segment: &str) -> bool {
+    fn is_empty_segment(segment: &str) -> bool {
         segment.chars().all(|x| char::is_ascii_whitespace(&x))
     }
 
@@ -678,9 +678,9 @@ impl Display for ParseWarning {
 
 impl Ranged for ParseWarning {
     fn range(&self) -> TextRange {
-        match self {
-            &ParseWarning::MissingItem(text_range) => text_range,
-            &ParseWarning::MissingDelimiter(text_range) => text_range,
+        match *self {
+            ParseWarning::MissingItem(text_range) => text_range,
+            ParseWarning::MissingDelimiter(text_range) => text_range,
         }
     }
 }
@@ -1065,10 +1065,9 @@ impl<'a> NoqaDirectives<'a> {
                         let line = locator.compute_line_index(range.start());
                         let path_display = relativize_path(path);
                         for warning in warnings {
-                            warn!("Missing or joined rule code(s) at {path_display}:{line}: {warning}")
+                            warn!("Missing or joined rule code(s) at {path_display}:{line}: {warning}");
                         }
                     }
-                    let directive = Directive::from(directive);
                     if let Directive::Codes(codes) = &directive {
                         // Warn on invalid rule codes.
                         for code in &codes.codes {
@@ -1235,9 +1234,9 @@ mod tests {
     use crate::rules::pyupgrade::rules::PrintfStringFormatting;
     use crate::{generate_noqa_edits, Locator};
 
-    fn assert_codes_match_slices(codes: crate::noqa::Codes, source: &str) {
+    fn assert_codes_match_slices(codes: &crate::noqa::Codes, source: &str) {
         for code in codes.iter() {
-            assert_eq!(&source[code.range], code.code)
+            assert_eq!(&source[code.range], code.code);
         }
     }
 
@@ -1251,7 +1250,7 @@ mod tests {
             directive: Directive::Codes(codes),
         })) = directive
         {
-            assert_codes_match_slices(codes, source);
+            assert_codes_match_slices(&codes, source);
         }
     }
 
@@ -1265,7 +1264,7 @@ mod tests {
             directive: Directive::Codes(codes),
         })) = directive
         {
-            assert_codes_match_slices(codes, source);
+            assert_codes_match_slices(&codes, source);
         }
     }
 
@@ -1279,7 +1278,7 @@ mod tests {
             directive: Directive::Codes(codes),
         })) = directive
         {
-            assert_codes_match_slices(codes, source);
+            assert_codes_match_slices(&codes, source);
         }
     }
 
@@ -1293,7 +1292,7 @@ mod tests {
             directive: Directive::Codes(codes),
         })) = directive
         {
-            assert_codes_match_slices(codes, source);
+            assert_codes_match_slices(&codes, source);
         }
     }
 
@@ -1307,7 +1306,7 @@ mod tests {
             directive: Directive::Codes(codes),
         })) = directive
         {
-            assert_codes_match_slices(codes, source);
+            assert_codes_match_slices(&codes, source);
         }
     }
 
@@ -1321,7 +1320,7 @@ mod tests {
             directive: Directive::Codes(codes),
         })) = directive
         {
-            assert_codes_match_slices(codes, source);
+            assert_codes_match_slices(&codes, source);
         }
     }
 
@@ -1335,7 +1334,7 @@ mod tests {
             directive: Directive::Codes(codes),
         })) = directive
         {
-            assert_codes_match_slices(codes, source);
+            assert_codes_match_slices(&codes, source);
         }
     }
 
@@ -1349,7 +1348,7 @@ mod tests {
             directive: Directive::Codes(codes),
         })) = directive
         {
-            assert_codes_match_slices(codes, source);
+            assert_codes_match_slices(&codes, source);
         }
     }
 
@@ -1363,7 +1362,7 @@ mod tests {
             directive: Directive::Codes(codes),
         })) = directive
         {
-            assert_codes_match_slices(codes, source);
+            assert_codes_match_slices(&codes, source);
         }
     }
 
@@ -1377,7 +1376,7 @@ mod tests {
             directive: Directive::Codes(codes),
         })) = directive
         {
-            assert_codes_match_slices(codes, source);
+            assert_codes_match_slices(&codes, source);
         }
     }
 
@@ -1391,7 +1390,7 @@ mod tests {
             directive: Directive::Codes(codes),
         })) = directive
         {
-            assert_codes_match_slices(codes, source);
+            assert_codes_match_slices(&codes, source);
         }
     }
 
@@ -1405,7 +1404,7 @@ mod tests {
             directive: Directive::Codes(codes),
         })) = directive
         {
-            assert_codes_match_slices(codes, source);
+            assert_codes_match_slices(&codes, source);
         }
     }
 
@@ -1419,7 +1418,7 @@ mod tests {
             directive: Directive::Codes(codes),
         })) = directive
         {
-            assert_codes_match_slices(codes, source);
+            assert_codes_match_slices(&codes, source);
         }
     }
 
@@ -1433,7 +1432,7 @@ mod tests {
             directive: Directive::Codes(codes),
         })) = directive
         {
-            assert_codes_match_slices(codes, source);
+            assert_codes_match_slices(&codes, source);
         }
     }
 
@@ -1447,7 +1446,7 @@ mod tests {
             directive: Directive::Codes(codes),
         })) = directive
         {
-            assert_codes_match_slices(codes, source);
+            assert_codes_match_slices(&codes, source);
         }
     }
 
@@ -1461,7 +1460,7 @@ mod tests {
             directive: Directive::Codes(codes),
         })) = directive
         {
-            assert_codes_match_slices(codes, source);
+            assert_codes_match_slices(&codes, source);
         }
     }
 
@@ -1475,7 +1474,7 @@ mod tests {
             directive: Directive::Codes(codes),
         })) = directive
         {
-            assert_codes_match_slices(codes, source);
+            assert_codes_match_slices(&codes, source);
         }
     }
 
@@ -1489,7 +1488,7 @@ mod tests {
             directive: Directive::Codes(codes),
         })) = directive
         {
-            assert_codes_match_slices(codes, source);
+            assert_codes_match_slices(&codes, source);
         }
     }
 
@@ -1503,7 +1502,7 @@ mod tests {
             directive: Directive::Codes(codes),
         })) = directive
         {
-            assert_codes_match_slices(codes, source);
+            assert_codes_match_slices(&codes, source);
         }
     }
 
@@ -1517,7 +1516,7 @@ mod tests {
             directive: Directive::Codes(codes),
         })) = directive
         {
-            assert_codes_match_slices(codes, source);
+            assert_codes_match_slices(&codes, source);
         }
     }
 
@@ -1531,7 +1530,7 @@ mod tests {
             directive: Directive::Codes(codes),
         })) = directive
         {
-            assert_codes_match_slices(codes, source);
+            assert_codes_match_slices(&codes, source);
         }
     }
 
@@ -1545,7 +1544,7 @@ mod tests {
             directive: Directive::Codes(codes),
         })) = directive
         {
-            assert_codes_match_slices(codes, source);
+            assert_codes_match_slices(&codes, source);
         }
     }
 
@@ -1559,7 +1558,7 @@ mod tests {
             directive: Directive::Codes(codes),
         })) = directive
         {
-            assert_codes_match_slices(codes, source);
+            assert_codes_match_slices(&codes, source);
         }
     }
 
@@ -1573,7 +1572,7 @@ mod tests {
             directive: Directive::Codes(codes),
         })) = directive
         {
-            assert_codes_match_slices(codes, source);
+            assert_codes_match_slices(&codes, source);
         }
     }
 
@@ -1587,7 +1586,7 @@ mod tests {
             directive: Directive::Codes(codes),
         })) = directive
         {
-            assert_codes_match_slices(codes, source);
+            assert_codes_match_slices(&codes, source);
         }
     }
 
@@ -1601,7 +1600,7 @@ mod tests {
             directive: Directive::Codes(codes),
         })) = directive
         {
-            assert_codes_match_slices(codes, source);
+            assert_codes_match_slices(&codes, source);
         }
     }
 
@@ -1615,7 +1614,7 @@ mod tests {
             directive: Directive::Codes(codes),
         })) = directive
         {
-            assert_codes_match_slices(codes, source);
+            assert_codes_match_slices(&codes, source);
         }
     }
 
@@ -1629,7 +1628,7 @@ mod tests {
             directive: Directive::Codes(codes),
         })) = directive
         {
-            assert_codes_match_slices(codes, source);
+            assert_codes_match_slices(&codes, source);
         }
     }
 
@@ -1643,7 +1642,7 @@ mod tests {
             directive: Directive::Codes(codes),
         })) = directive
         {
-            assert_codes_match_slices(codes, source);
+            assert_codes_match_slices(&codes, source);
         }
     }
 
@@ -1657,7 +1656,7 @@ mod tests {
             directive: Directive::Codes(codes),
         })) = exemption
         {
-            assert_codes_match_slices(codes, source);
+            assert_codes_match_slices(&codes, source);
         }
     }
 
@@ -1671,7 +1670,7 @@ mod tests {
             directive: Directive::Codes(codes),
         })) = exemption
         {
-            assert_codes_match_slices(codes, source);
+            assert_codes_match_slices(&codes, source);
         }
     }
 
@@ -1685,7 +1684,7 @@ mod tests {
             directive: Directive::Codes(codes),
         })) = exemption
         {
-            assert_codes_match_slices(codes, source);
+            assert_codes_match_slices(&codes, source);
         }
     }
 
@@ -1699,7 +1698,7 @@ mod tests {
             directive: Directive::Codes(codes),
         })) = exemption
         {
-            assert_codes_match_slices(codes, source);
+            assert_codes_match_slices(&codes, source);
         }
     }
 
@@ -1714,7 +1713,7 @@ mod tests {
             directive: Directive::Codes(codes),
         })) = exemption
         {
-            assert_codes_match_slices(codes, source);
+            assert_codes_match_slices(&codes, source);
         }
     }
 
@@ -1728,7 +1727,7 @@ mod tests {
             directive: Directive::Codes(codes),
         })) = exemption
         {
-            assert_codes_match_slices(codes, source);
+            assert_codes_match_slices(&codes, source);
         }
     }
     #[test]
@@ -1741,7 +1740,7 @@ mod tests {
             directive: Directive::Codes(codes),
         })) = exemption
         {
-            assert_codes_match_slices(codes, source);
+            assert_codes_match_slices(&codes, source);
         }
     }
 
@@ -1755,7 +1754,7 @@ mod tests {
             directive: Directive::Codes(codes),
         })) = exemption
         {
-            assert_codes_match_slices(codes, source);
+            assert_codes_match_slices(&codes, source);
         }
     }
 
@@ -1769,7 +1768,7 @@ mod tests {
             directive: Directive::Codes(codes),
         })) = exemption
         {
-            assert_codes_match_slices(codes, source);
+            assert_codes_match_slices(&codes, source);
         }
     }
 
@@ -1783,7 +1782,7 @@ mod tests {
             directive: Directive::Codes(codes),
         })) = exemption
         {
-            assert_codes_match_slices(codes, source);
+            assert_codes_match_slices(&codes, source);
         }
     }
 
@@ -1797,7 +1796,7 @@ mod tests {
             directive: Directive::Codes(codes),
         })) = exemption
         {
-            assert_codes_match_slices(codes, source);
+            assert_codes_match_slices(&codes, source);
         }
     }
 
@@ -1811,7 +1810,7 @@ mod tests {
             directive: Directive::Codes(codes),
         })) = exemption
         {
-            assert_codes_match_slices(codes, source);
+            assert_codes_match_slices(&codes, source);
         }
     }
 
@@ -1825,7 +1824,7 @@ mod tests {
             directive: Directive::Codes(codes),
         })) = exemption
         {
-            assert_codes_match_slices(codes, source);
+            assert_codes_match_slices(&codes, source);
         }
     }
 
@@ -1839,7 +1838,7 @@ mod tests {
             directive: Directive::Codes(codes),
         })) = exemption
         {
-            assert_codes_match_slices(codes, source);
+            assert_codes_match_slices(&codes, source);
         }
     }
 
@@ -1853,7 +1852,7 @@ mod tests {
             directive: Directive::Codes(codes),
         })) = exemption
         {
-            assert_codes_match_slices(codes, source);
+            assert_codes_match_slices(&codes, source);
         }
     }
 
@@ -1867,7 +1866,7 @@ mod tests {
             directive: Directive::Codes(codes),
         })) = exemption
         {
-            assert_codes_match_slices(codes, source);
+            assert_codes_match_slices(&codes, source);
         }
     }
 
@@ -1881,7 +1880,7 @@ mod tests {
             directive: Directive::Codes(codes),
         })) = exemption
         {
-            assert_codes_match_slices(codes, source);
+            assert_codes_match_slices(&codes, source);
         }
     }
 
@@ -1895,7 +1894,7 @@ mod tests {
             directive: Directive::Codes(codes),
         })) = exemption
         {
-            assert_codes_match_slices(codes, source);
+            assert_codes_match_slices(&codes, source);
         }
     }
 
@@ -1909,7 +1908,7 @@ mod tests {
             directive: Directive::Codes(codes),
         })) = exemption
         {
-            assert_codes_match_slices(codes, source);
+            assert_codes_match_slices(&codes, source);
         }
     }
 
@@ -1923,7 +1922,7 @@ mod tests {
             directive: Directive::Codes(codes),
         })) = exemption
         {
-            assert_codes_match_slices(codes, source);
+            assert_codes_match_slices(&codes, source);
         }
     }
 
@@ -1937,7 +1936,7 @@ mod tests {
             directive: Directive::Codes(codes),
         })) = exemption
         {
-            assert_codes_match_slices(codes, source);
+            assert_codes_match_slices(&codes, source);
         }
     }
 
