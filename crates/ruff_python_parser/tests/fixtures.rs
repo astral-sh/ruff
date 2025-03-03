@@ -39,9 +39,7 @@ fn test_valid_syntax(input_path: &Path) {
     });
     let parsed = parse_unchecked(&source, options);
 
-    let is_valid = parsed.has_no_syntax_errors();
-
-    if !is_valid {
+    if parsed.has_syntax_errors() {
         let line_index = LineIndex::from_source_text(&source);
         let source_code = SourceCode::new(&source, &line_index);
 
@@ -101,10 +99,8 @@ fn test_invalid_syntax(input_path: &Path) {
     });
     let parsed = parse_unchecked(&source, options);
 
-    let is_valid = parsed.has_no_syntax_errors();
-
     assert!(
-        !is_valid,
+        parsed.has_syntax_errors(),
         "{input_path:?}: Expected parser to generate at least one syntax error for a program containing syntax errors."
     );
 

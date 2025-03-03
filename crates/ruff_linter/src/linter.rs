@@ -447,7 +447,7 @@ pub fn lint_only(
             &locator,
             &directives,
         ),
-        has_syntax_error: !parsed.has_no_syntax_errors(),
+        has_syntax_error: parsed.has_syntax_errors(),
     }
 }
 
