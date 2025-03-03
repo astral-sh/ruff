@@ -4,6 +4,13 @@ expression: exemption
 ---
 Ok(
     Some(
-        All,
+        ParsedNoqa {
+            warnings: [],
+            directive: All(
+                All {
+                    range: 18..30,
+                },
+            ),
+        },
     ),
 )

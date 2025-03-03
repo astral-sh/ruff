@@ -4,20 +4,27 @@ expression: exemption
 ---
 Ok(
     Some(
-        Codes(
-            Codes {
-                range: 0..25,
-                codes: [
-                    Code {
-                        code: "F401",
-                        range: 14..18,
-                    },
-                    Code {
-                        code: "F841",
-                        range: 21..25,
-                    },
-                ],
-            },
-        ),
+        ParsedNoqa {
+            warnings: [
+                MissingItem(
+                    19..20,
+                ),
+            ],
+            directive: Codes(
+                Codes {
+                    range: 0..25,
+                    codes: [
+                        Code {
+                            code: "F401",
+                            range: 14..18,
+                        },
+                        Code {
+                            code: "F841",
+                            range: 21..25,
+                        },
+                    ],
+                },
+            ),
+        },
     ),
 )

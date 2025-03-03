@@ -1,20 +1,22 @@
 ---
 source: crates/ruff_linter/src/noqa.rs
-expression: "Directive::try_extract(source, TextSize::default())"
-snapshot_kind: text
+expression: directive
 ---
 Ok(
     Some(
-        Codes(
-            Codes {
-                range: 0..12,
-                codes: [
-                    Code {
-                        code: "F401",
-                        range: 8..12,
-                    },
-                ],
-            },
-        ),
+        ParsedNoqa {
+            warnings: [],
+            directive: Codes(
+                Codes {
+                    range: 0..12,
+                    codes: [
+                        Code {
+                            code: "F401",
+                            range: 8..12,
+                        },
+                    ],
+                },
+            ),
+        },
     ),
 )
