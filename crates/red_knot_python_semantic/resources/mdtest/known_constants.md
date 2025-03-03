@@ -32,6 +32,40 @@ If we set `TYPE_CHECKING = False` directly instead of importing it from the `typ
 still be treated as `True` during type checking. This behavior is for compatibility with other major
 type checkers, e.g. mypy and pyright.
 
+Only `False` is allowed to be assigned to `TYPE_CHECKING`, and any assignment other than `False`
+will result in an error.
+
+`constants.py`:
+
+```py
+TYPE_CHECKING = False
+
+# error: [invalid-type-checking-constant]
+TYPE_CHECKING = True
+# error: [invalid-type-checking-constant]
+TYPE_CHECKING: bool = True
+# error: [invalid-type-checking-constant]
+TYPE_CHECKING: int = 1
+# error: [invalid-assignment]
+TYPE_CHECKING: str = False
+
+TYPE_CHECKING: object = False
+reveal_type(TYPE_CHECKING)  # revealed: Literal[True]
+```
+
+`stub.pyi`:
+
+```pyi
+TYPE_CHECKING: bool
+```
+
+`invalid_stub.pyi`:
+
+```pyi
+# error: [invalid-assignment]
+TYPE_CHECKING: str
+```
+
 ```py
 TYPE_CHECKING = False
 reveal_type(TYPE_CHECKING)  # revealed: Literal[True]
@@ -58,6 +92,10 @@ TYPE_CHECKING = False
 from constants import TYPE_CHECKING
 
 # constants.TYPE_CHECKING is modifiable, but it is still treated as True.
+reveal_type(TYPE_CHECKING)  # revealed: Literal[True]
+
+from stub import TYPE_CHECKING
+
 reveal_type(TYPE_CHECKING)  # revealed: Literal[True]
 ```
 

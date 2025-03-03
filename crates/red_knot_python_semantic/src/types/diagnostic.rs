@@ -39,6 +39,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_METACLASS);
     registry.register_lint(&INVALID_PARAMETER_DEFAULT);
     registry.register_lint(&INVALID_RAISE);
+    registry.register_lint(&INVALID_TYPE_CHECKING_CONSTANT);
     registry.register_lint(&INVALID_TYPE_FORM);
     registry.register_lint(&INVALID_TYPE_VARIABLE_CONSTRAINTS);
     registry.register_lint(&MISSING_ARGUMENT);
@@ -407,6 +408,19 @@ declare_lint! {
     /// - [Python documentation: Built-in Exceptions](https://docs.python.org/3/library/exceptions.html#built-in-exceptions)
     pub(crate) static INVALID_RAISE = {
         summary: "detects `raise` statements that raise invalid exceptions or use invalid causes",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Check for a value other than `False` assigned to the `TYPE_CHECKING` variable.
+    ///
+    /// ## Why is this bad?
+    /// TODO #14889
+    pub(crate) static INVALID_TYPE_CHECKING_CONSTANT = {
+        summary: "detects invalid TYPE_CHECKING constant assignments",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
@@ -1039,6 +1053,14 @@ pub(super) fn report_invalid_attribute_assignment(
             source_ty.display(context.db()),
             target_ty.display(context.db()),
         ),
+    );
+}
+
+pub(super) fn report_invalid_type_checking_constant(context: &InferContext, node: AnyNodeRef) {
+    context.report_lint(
+        &INVALID_TYPE_CHECKING_CONSTANT,
+        node,
+        format_args!("The name TYPE_CHECKING is reserved for use as a flag; only False can be assigned to it.",),
     );
 }
 
