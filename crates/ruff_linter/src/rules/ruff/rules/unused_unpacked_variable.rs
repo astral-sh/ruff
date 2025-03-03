@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_semantic::{Binding, Scope};
+use ruff_python_semantic::Binding;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -9,15 +9,11 @@ use crate::checkers::ast::Checker;
 /// Checks for the presence of unused variables in unpacked assignments.
 ///
 /// ## Why is this bad?
-/// A variable that is defined but not used is likely a mistake, and should
-/// be removed to avoid confusion.
+/// A variable that is defined but never used can confuse readers.
 ///
 /// If a variable is intentionally defined-but-not-used, it should be
 /// prefixed with an underscore, or some other value that adheres to the
 /// [`lint.dummy-variable-rgx`] pattern.
-///
-/// Under [preview mode](https://docs.astral.sh/ruff/preview), this rule also
-/// triggers on unused unpacked assignments (for example, `x, y = foo()`).
 ///
 /// ## Example
 ///
@@ -78,37 +74,19 @@ fn remove_unused_variable(binding: &Binding, checker: &Checker) -> Option<Fix> {
 }
 
 /// RUF059
-pub(crate) fn unused_unpacked_variable(checker: &Checker, scope: &Scope) {
-    if scope.uses_locals() && scope.kind.is_function() {
+pub(crate) fn unused_unpacked_variable(checker: &Checker, name: &str, binding: &Binding) {
+    if !binding.is_unpacked_assignment() {
         return;
     }
 
-    for (name, binding) in scope
-        .bindings()
-        .map(|(name, binding_id)| (name, checker.semantic().binding(binding_id)))
-        .filter_map(|(name, binding)| {
-            if checker.settings.preview.is_enabled()
-                && binding.is_unpacked_assignment()
-                && binding.is_unused()
-                && !binding.is_nonlocal()
-                && !binding.is_global()
-                && !checker.settings.dummy_variable_rgx.is_match(name)
-            {
-                return Some((name, binding));
-            }
-
-            None
-        })
-    {
-        let mut diagnostic = Diagnostic::new(
-            UnusedUnpackedVariable {
-                name: name.to_string(),
-            },
-            binding.range(),
-        );
-        if let Some(fix) = remove_unused_variable(binding, checker) {
-            diagnostic.set_fix(fix);
-        }
-        checker.report_diagnostic(diagnostic);
+    let mut diagnostic = Diagnostic::new(
+        UnusedUnpackedVariable {
+            name: name.to_string(),
+        },
+        binding.range(),
+    );
+    if let Some(fix) = remove_unused_variable(binding, checker) {
+        diagnostic.set_fix(fix);
     }
+    checker.report_diagnostic(diagnostic);
 }

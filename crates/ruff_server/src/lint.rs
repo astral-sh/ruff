@@ -378,7 +378,8 @@ fn tags(code: &str) -> Option<Vec<lsp_types::DiagnosticTag>> {
     match code {
         // F401: <module> imported but unused
         // F841: local variable <name> is assigned to but never used
-        "F401" | "F841" => Some(vec![lsp_types::DiagnosticTag::UNNECESSARY]),
+        // RUF059: Unused unpacked variable
+        "F401" | "F841" | "RUF059" => Some(vec![lsp_types::DiagnosticTag::UNNECESSARY]),
         _ => None,
     }
 }

@@ -391,16 +391,47 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
         }
 
         if matches!(scope.kind, ScopeKind::Function(_) | ScopeKind::Lambda(_)) {
-            if checker.enabled(Rule::UnusedVariable) {
-                pyflakes::rules::unused_variable(checker, scope);
+            if checker.any_enabled(&[Rule::UnusedVariable, Rule::UnusedUnpackedVariable])
+                && !(scope.uses_locals() && scope.kind.is_function())
+            {
+                let unused_bindings = scope
+                    .bindings()
+                    .map(|(name, binding_id)| (name, checker.semantic().binding(binding_id)))
+                    .filter_map(|(name, binding)| {
+                        if (binding.kind.is_assignment()
+                            || binding.kind.is_named_expr_assignment()
+                            || binding.kind.is_with_item_var())
+                            && binding.is_unused()
+                            && !binding.is_nonlocal()
+                            && !binding.is_global()
+                            && !checker.settings.dummy_variable_rgx.is_match(name)
+                            && !matches!(
+                                name,
+                                "__tracebackhide__"
+                                    | "__traceback_info__"
+                                    | "__traceback_supplement__"
+                                    | "__debuggerskip__"
+                            )
+                        {
+                            return Some((name, binding));
+                        }
+
+                        None
+                    });
+
+                for (unused_name, unused_binding) in unused_bindings {
+                    if checker.enabled(Rule::UnusedVariable) {
+                        pyflakes::rules::unused_variable(checker, unused_name, unused_binding);
+                    }
+
+                    if checker.enabled(Rule::UnusedUnpackedVariable) {
+                        ruff::rules::unused_unpacked_variable(checker, unused_name, unused_binding);
+                    }
+                }
             }
 
             if checker.enabled(Rule::UnusedAnnotation) {
                 pyflakes::rules::unused_annotation(checker, scope);
-            }
-
-            if checker.enabled(Rule::UnusedUnpackedVariable) {
-                ruff::rules::unused_unpacked_variable(checker, scope);
             }
 
             if !checker.source_type.is_stub() {
