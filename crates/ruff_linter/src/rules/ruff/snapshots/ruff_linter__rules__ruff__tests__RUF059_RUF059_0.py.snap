@@ -9,7 +9,7 @@ RUF059_0.py:24:6: RUF059 [*] Unpacked variable `c` is never used
 25 |
 26 |     (x, y) = baz = bar
    |
-   = help: Remove assignment to unused variable `c`
+   = help: Prefix it with an underscore or any other dummy variable pattern
 
 ℹ Unsafe fix
 21 21 |     (a, b) = (1, 2)
@@ -29,7 +29,7 @@ RUF059_0.py:24:9: RUF059 [*] Unpacked variable `d` is never used
 25 |
 26 |     (x, y) = baz = bar
    |
-   = help: Remove assignment to unused variable `d`
+   = help: Prefix it with an underscore or any other dummy variable pattern
 
 ℹ Unsafe fix
 21 21 |     (a, b) = (1, 2)
@@ -48,7 +48,7 @@ RUF059_0.py:26:6: RUF059 [*] Unpacked variable `x` is never used
 26 |     (x, y) = baz = bar
    |      ^ RUF059
    |
-   = help: Remove assignment to unused variable `x`
+   = help: Prefix it with an underscore or any other dummy variable pattern
 
 ℹ Unsafe fix
 23 23 |     bar = (1, 2)
@@ -67,7 +67,7 @@ RUF059_0.py:26:9: RUF059 [*] Unpacked variable `y` is never used
 26 |     (x, y) = baz = bar
    |         ^ RUF059
    |
-   = help: Remove assignment to unused variable `y`
+   = help: Prefix it with an underscore or any other dummy variable pattern
 
 ℹ Unsafe fix
 23 23 |     bar = (1, 2)
@@ -87,7 +87,7 @@ RUF059_0.py:66:24: RUF059 [*] Unpacked variable `connection` is never used
    |                        ^^^^^^^^^^ RUF059
 67 |         cursor.execute("SELECT * FROM users")
    |
-   = help: Remove assignment to unused variable `connection`
+   = help: Prefix it with an underscore or any other dummy variable pattern
 
 ℹ Unsafe fix
 63 63 |     def connect():
@@ -107,7 +107,7 @@ RUF059_0.py:74:24: RUF059 [*] Unpacked variable `connection` is never used
    |                        ^^^^^^^^^^ RUF059
 75 |         cursor.execute("SELECT * FROM users")
    |
-   = help: Remove assignment to unused variable `connection`
+   = help: Prefix it with an underscore or any other dummy variable pattern
 
 ℹ Unsafe fix
 71 71 |     def connect():
@@ -126,7 +126,7 @@ RUF059_0.py:79:49: RUF059 [*] Unpacked variable `this` is never used
    |                                                 ^^^^ RUF059
 80 |         print("hello")
    |
-   = help: Remove assignment to unused variable `this`
+   = help: Prefix it with an underscore or any other dummy variable pattern
 
 ℹ Unsafe fix
 76 76 | 
@@ -145,7 +145,7 @@ RUF059_0.py:79:55: RUF059 [*] Unpacked variable `that` is never used
    |                                                       ^^^^ RUF059
 80 |         print("hello")
    |
-   = help: Remove assignment to unused variable `that`
+   = help: Prefix it with an underscore or any other dummy variable pattern
 
 ℹ Unsafe fix
 76 76 | 
@@ -166,7 +166,7 @@ RUF059_0.py:86:23: RUF059 [*] Unpacked variable `this` is never used
 87 |     ):
 88 |         print("hello")
    |
-   = help: Remove assignment to unused variable `this`
+   = help: Prefix it with an underscore or any other dummy variable pattern
 
 ℹ Unsafe fix
 83 83 | def f():
@@ -187,7 +187,7 @@ RUF059_0.py:86:29: RUF059 [*] Unpacked variable `that` is never used
 87 |     ):
 88 |         print("hello")
    |
-   = help: Remove assignment to unused variable `that`
+   = help: Prefix it with an underscore or any other dummy variable pattern
 
 ℹ Unsafe fix
 83 83 | def f():

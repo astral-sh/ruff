@@ -9,7 +9,7 @@ RUF059_2.py:8:20: RUF059 [*] Unpacked variable `x2` is never used
   |                    ^^ RUF059
 9 |         pass
   |
-  = help: Remove assignment to unused variable `x2`
+  = help: Prefix it with an underscore or any other dummy variable pattern
 
 ℹ Unsafe fix
 5 5 |     with foo() as x1:
@@ -29,7 +29,7 @@ RUF059_2.py:8:24: RUF059 [*] Unpacked variable `y2` is never used
   |                        ^^ RUF059
 9 |         pass
   |
-  = help: Remove assignment to unused variable `y2`
+  = help: Prefix it with an underscore or any other dummy variable pattern
 
 ℹ Unsafe fix
 5 5 |     with foo() as x1:
@@ -49,7 +49,7 @@ RUF059_2.py:17:6: RUF059 [*] Unpacked variable `x2` is never used
    |      ^^ RUF059
 18 |     coords3 = (x3, y3) = (1, 2)
    |
-   = help: Remove assignment to unused variable `x2`
+   = help: Prefix it with an underscore or any other dummy variable pattern
 
 ℹ Unsafe fix
 14 14 | 
@@ -69,7 +69,7 @@ RUF059_2.py:17:10: RUF059 [*] Unpacked variable `y2` is never used
    |          ^^ RUF059
 18 |     coords3 = (x3, y3) = (1, 2)
    |
-   = help: Remove assignment to unused variable `y2`
+   = help: Prefix it with an underscore or any other dummy variable pattern
 
 ℹ Unsafe fix
 14 14 | 
@@ -88,7 +88,7 @@ RUF059_2.py:18:16: RUF059 [*] Unpacked variable `x3` is never used
 18 |     coords3 = (x3, y3) = (1, 2)
    |                ^^ RUF059
    |
-   = help: Remove assignment to unused variable `x3`
+   = help: Prefix it with an underscore or any other dummy variable pattern
 
 ℹ Unsafe fix
 15 15 | def f():
@@ -107,7 +107,7 @@ RUF059_2.py:18:20: RUF059 [*] Unpacked variable `y3` is never used
 18 |     coords3 = (x3, y3) = (1, 2)
    |                    ^^ RUF059
    |
-   = help: Remove assignment to unused variable `y3`
+   = help: Prefix it with an underscore or any other dummy variable pattern
 
 ℹ Unsafe fix
 15 15 | def f():
@@ -126,7 +126,7 @@ RUF059_2.py:22:24: RUF059 [*] Unpacked variable `x` is never used
    |                        ^ RUF059
 23 |         pass
    |
-   = help: Remove assignment to unused variable `x`
+   = help: Prefix it with an underscore or any other dummy variable pattern
 
 ℹ Unsafe fix
 19 19 | 
@@ -145,7 +145,7 @@ RUF059_2.py:22:27: RUF059 [*] Unpacked variable `y` is never used
    |                           ^ RUF059
 23 |         pass
    |
-   = help: Remove assignment to unused variable `y`
+   = help: Prefix it with an underscore or any other dummy variable pattern
 
 ℹ Unsafe fix
 19 19 | 
@@ -163,7 +163,7 @@ RUF059_2.py:27:17: RUF059 [*] Unpacked variable `a` is never used
 27 |     toplevel = (a, b) = lexer.get_token()
    |                 ^ RUF059
    |
-   = help: Remove assignment to unused variable `a`
+   = help: Prefix it with an underscore or any other dummy variable pattern
 
 ℹ Unsafe fix
 24 24 | 
@@ -181,7 +181,7 @@ RUF059_2.py:27:20: RUF059 [*] Unpacked variable `b` is never used
 27 |     toplevel = (a, b) = lexer.get_token()
    |                    ^ RUF059
    |
-   = help: Remove assignment to unused variable `b`
+   = help: Prefix it with an underscore or any other dummy variable pattern
 
 ℹ Unsafe fix
 24 24 | 
@@ -199,7 +199,7 @@ RUF059_2.py:31:6: RUF059 [*] Unpacked variable `a` is never used
 31 |     (a, b) = toplevel = lexer.get_token()
    |      ^ RUF059
    |
-   = help: Remove assignment to unused variable `a`
+   = help: Prefix it with an underscore or any other dummy variable pattern
 
 ℹ Unsafe fix
 28 28 | 
@@ -214,7 +214,7 @@ RUF059_2.py:31:9: RUF059 [*] Unpacked variable `b` is never used
 31 |     (a, b) = toplevel = lexer.get_token()
    |         ^ RUF059
    |
-   = help: Remove assignment to unused variable `b`
+   = help: Prefix it with an underscore or any other dummy variable pattern
 
 ℹ Unsafe fix
 28 28 | 

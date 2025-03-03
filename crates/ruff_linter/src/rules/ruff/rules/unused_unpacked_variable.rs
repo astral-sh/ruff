@@ -52,8 +52,7 @@ impl Violation for UnusedUnpackedVariable {
     }
 
     fn fix_title(&self) -> Option<String> {
-        let UnusedUnpackedVariable { name } = self;
-        Some(format!("Remove assignment to unused variable `{name}`"))
+        Some("Prefix it with an underscore or any other dummy variable pattern".to_string())
     }
 }
 

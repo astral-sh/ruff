@@ -7,7 +7,7 @@ RUF059_1.py:2:5: RUF059 [*] Unpacked variable `x` is never used
 2 |     x, y = tup
   |     ^ RUF059
   |
-  = help: Remove assignment to unused variable `x`
+  = help: Prefix it with an underscore or any other dummy variable pattern
 
 ℹ Unsafe fix
 1 1 | def f(tup):
@@ -23,7 +23,7 @@ RUF059_1.py:2:8: RUF059 [*] Unpacked variable `y` is never used
 2 |     x, y = tup
   |        ^ RUF059
   |
-  = help: Remove assignment to unused variable `y`
+  = help: Prefix it with an underscore or any other dummy variable pattern
 
 ℹ Unsafe fix
 1 1 | def f(tup):
@@ -41,7 +41,7 @@ RUF059_1.py:10:9: RUF059 [*] Unpacked variable `y` is never used
 11 |     if x > 1:
 12 |         print(coords)
    |
-   = help: Remove assignment to unused variable `y`
+   = help: Prefix it with an underscore or any other dummy variable pattern
 
 ℹ Unsafe fix
 7  7  | 
@@ -59,7 +59,7 @@ RUF059_1.py:16:6: RUF059 [*] Unpacked variable `x` is never used
 16 |     (x, y) = coords = 1, 2
    |      ^ RUF059
    |
-   = help: Remove assignment to unused variable `x`
+   = help: Prefix it with an underscore or any other dummy variable pattern
 
 ℹ Unsafe fix
 13 13 | 
@@ -77,7 +77,7 @@ RUF059_1.py:16:9: RUF059 [*] Unpacked variable `y` is never used
 16 |     (x, y) = coords = 1, 2
    |         ^ RUF059
    |
-   = help: Remove assignment to unused variable `y`
+   = help: Prefix it with an underscore or any other dummy variable pattern
 
 ℹ Unsafe fix
 13 13 | 
@@ -95,7 +95,7 @@ RUF059_1.py:20:15: RUF059 [*] Unpacked variable `x` is never used
 20 |     coords = (x, y) = 1, 2
    |               ^ RUF059
    |
-   = help: Remove assignment to unused variable `x`
+   = help: Prefix it with an underscore or any other dummy variable pattern
 
 ℹ Unsafe fix
 17 17 | 
@@ -113,7 +113,7 @@ RUF059_1.py:20:18: RUF059 [*] Unpacked variable `y` is never used
 20 |     coords = (x, y) = 1, 2
    |                  ^ RUF059
    |
-   = help: Remove assignment to unused variable `y`
+   = help: Prefix it with an underscore or any other dummy variable pattern
 
 ℹ Unsafe fix
 17 17 | 

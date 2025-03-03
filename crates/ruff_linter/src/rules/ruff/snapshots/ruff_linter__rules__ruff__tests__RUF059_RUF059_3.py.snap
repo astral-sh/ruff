@@ -8,7 +8,7 @@ RUF059_3.py:13:5: RUF059 [*] Unpacked variable `b` is never used
 13 |     b, c = foo()
    |     ^ RUF059
    |
-   = help: Remove assignment to unused variable `b`
+   = help: Prefix it with an underscore or any other dummy variable pattern
 
 ℹ Unsafe fix
 10 10 | 
@@ -27,7 +27,7 @@ RUF059_3.py:13:8: RUF059 [*] Unpacked variable `c` is never used
 13 |     b, c = foo()
    |        ^ RUF059
    |
-   = help: Remove assignment to unused variable `c`
+   = help: Prefix it with an underscore or any other dummy variable pattern
 
 ℹ Unsafe fix
 10 10 | 
