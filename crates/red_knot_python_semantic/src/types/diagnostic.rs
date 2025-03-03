@@ -8,7 +8,9 @@ use crate::types::string_annotation::{
 };
 use crate::types::{ClassLiteralType, KnownInstanceType, Type};
 use crate::{declare_lint, Db};
-use ruff_db::diagnostic::{Diagnostic, DiagnosticId, SecondaryDiagnosticMessage, Severity, Span};
+use ruff_db::diagnostic::{
+    DiagnosticId, OldDiagnosticTrait, OldSecondaryDiagnosticMessage, Severity, Span,
+};
 use ruff_db::files::File;
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::TextRange;
@@ -809,7 +811,7 @@ pub struct TypeCheckDiagnostic {
     pub(crate) range: TextRange,
     pub(crate) severity: Severity,
     pub(crate) file: File,
-    pub(crate) secondary_messages: Vec<SecondaryDiagnosticMessage>,
+    pub(crate) secondary_messages: Vec<OldSecondaryDiagnosticMessage>,
 }
 
 impl TypeCheckDiagnostic {
@@ -826,7 +828,7 @@ impl TypeCheckDiagnostic {
     }
 }
 
-impl Diagnostic for TypeCheckDiagnostic {
+impl OldDiagnosticTrait for TypeCheckDiagnostic {
     fn id(&self) -> DiagnosticId {
         self.id
     }
@@ -839,7 +841,7 @@ impl Diagnostic for TypeCheckDiagnostic {
         Some(Span::from(self.file).with_range(self.range))
     }
 
-    fn secondary_messages(&self) -> &[SecondaryDiagnosticMessage] {
+    fn secondary_messages(&self) -> &[OldSecondaryDiagnosticMessage] {
         &self.secondary_messages
     }
 

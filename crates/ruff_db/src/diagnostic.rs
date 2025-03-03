@@ -162,7 +162,7 @@ impl std::fmt::Display for DiagnosticId {
     }
 }
 
-pub trait Diagnostic: Send + Sync + std::fmt::Debug {
+pub trait OldDiagnosticTrait: Send + Sync + std::fmt::Debug {
     fn id(&self) -> DiagnosticId;
 
     fn message(&self) -> Cow<str>;
@@ -175,7 +175,7 @@ pub trait Diagnostic: Send + Sync + std::fmt::Debug {
 
     /// Returns an optional sequence of "secondary" messages (with spans) to
     /// include in the rendering of this diagnostic.
-    fn secondary_messages(&self) -> &[SecondaryDiagnosticMessage] {
+    fn secondary_messages(&self) -> &[OldSecondaryDiagnosticMessage] {
         &[]
     }
 
@@ -185,11 +185,11 @@ pub trait Diagnostic: Send + Sync + std::fmt::Debug {
         &'diag self,
         db: &'db dyn Db,
         config: &'config DisplayDiagnosticConfig,
-    ) -> DisplayDiagnostic<'db, 'diag, 'config>
+    ) -> OldDisplayDiagnostic<'db, 'diag, 'config>
     where
         Self: Sized,
     {
-        DisplayDiagnostic {
+        OldDisplayDiagnostic {
             db,
             diagnostic: self,
             config,
@@ -199,14 +199,14 @@ pub trait Diagnostic: Send + Sync + std::fmt::Debug {
 
 /// A single secondary message assigned to a `Diagnostic`.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct SecondaryDiagnosticMessage {
+pub struct OldSecondaryDiagnosticMessage {
     span: Span,
     message: String,
 }
 
-impl SecondaryDiagnosticMessage {
-    pub fn new(span: Span, message: impl Into<String>) -> SecondaryDiagnosticMessage {
-        SecondaryDiagnosticMessage {
+impl OldSecondaryDiagnosticMessage {
+    pub fn new(span: Span, message: impl Into<String>) -> OldSecondaryDiagnosticMessage {
+        OldSecondaryDiagnosticMessage {
             span,
             message: message.into(),
         }
@@ -298,13 +298,13 @@ impl DisplayDiagnosticConfig {
     }
 }
 
-pub struct DisplayDiagnostic<'db, 'diag, 'config> {
+pub struct OldDisplayDiagnostic<'db, 'diag, 'config> {
     db: &'db dyn Db,
-    diagnostic: &'diag dyn Diagnostic,
+    diagnostic: &'diag dyn OldDiagnosticTrait,
     config: &'config DisplayDiagnosticConfig,
 }
 
-impl std::fmt::Display for DisplayDiagnostic<'_, '_, '_> {
+impl std::fmt::Display for OldDisplayDiagnostic<'_, '_, '_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let render = |f: &mut std::fmt::Formatter, message| {
             let renderer = if self.config.color {
@@ -461,9 +461,9 @@ impl Annotation {
     }
 }
 
-impl<T> Diagnostic for Box<T>
+impl<T> OldDiagnosticTrait for Box<T>
 where
-    T: Diagnostic,
+    T: OldDiagnosticTrait,
 {
     fn id(&self) -> DiagnosticId {
         (**self).id()
@@ -477,7 +477,7 @@ where
         (**self).span()
     }
 
-    fn secondary_messages(&self) -> &[SecondaryDiagnosticMessage] {
+    fn secondary_messages(&self) -> &[OldSecondaryDiagnosticMessage] {
         (**self).secondary_messages()
     }
 
@@ -486,9 +486,9 @@ where
     }
 }
 
-impl<T> Diagnostic for std::sync::Arc<T>
+impl<T> OldDiagnosticTrait for std::sync::Arc<T>
 where
-    T: Diagnostic,
+    T: OldDiagnosticTrait,
 {
     fn id(&self) -> DiagnosticId {
         (**self).id()
@@ -502,7 +502,7 @@ where
         (**self).span()
     }
 
-    fn secondary_messages(&self) -> &[SecondaryDiagnosticMessage] {
+    fn secondary_messages(&self) -> &[OldSecondaryDiagnosticMessage] {
         (**self).secondary_messages()
     }
 
@@ -511,7 +511,7 @@ where
     }
 }
 
-impl Diagnostic for Box<dyn Diagnostic> {
+impl OldDiagnosticTrait for Box<dyn OldDiagnosticTrait> {
     fn id(&self) -> DiagnosticId {
         (**self).id()
     }
@@ -524,7 +524,7 @@ impl Diagnostic for Box<dyn Diagnostic> {
         (**self).span()
     }
 
-    fn secondary_messages(&self) -> &[SecondaryDiagnosticMessage] {
+    fn secondary_messages(&self) -> &[OldSecondaryDiagnosticMessage] {
         (**self).secondary_messages()
     }
 
@@ -533,7 +533,7 @@ impl Diagnostic for Box<dyn Diagnostic> {
     }
 }
 
-impl Diagnostic for &'_ dyn Diagnostic {
+impl OldDiagnosticTrait for &'_ dyn OldDiagnosticTrait {
     fn id(&self) -> DiagnosticId {
         (**self).id()
     }
@@ -546,7 +546,7 @@ impl Diagnostic for &'_ dyn Diagnostic {
         (**self).span()
     }
 
-    fn secondary_messages(&self) -> &[SecondaryDiagnosticMessage] {
+    fn secondary_messages(&self) -> &[OldSecondaryDiagnosticMessage] {
         (**self).secondary_messages()
     }
 
@@ -555,7 +555,7 @@ impl Diagnostic for &'_ dyn Diagnostic {
     }
 }
 
-impl Diagnostic for std::sync::Arc<dyn Diagnostic> {
+impl OldDiagnosticTrait for std::sync::Arc<dyn OldDiagnosticTrait> {
     fn id(&self) -> DiagnosticId {
         (**self).id()
     }
@@ -568,7 +568,7 @@ impl Diagnostic for std::sync::Arc<dyn Diagnostic> {
         (**self).span()
     }
 
-    fn secondary_messages(&self) -> &[SecondaryDiagnosticMessage] {
+    fn secondary_messages(&self) -> &[OldSecondaryDiagnosticMessage] {
         (**self).secondary_messages()
     }
 
@@ -589,7 +589,7 @@ impl ParseDiagnostic {
     }
 }
 
-impl Diagnostic for ParseDiagnostic {
+impl OldDiagnosticTrait for ParseDiagnostic {
     fn id(&self) -> DiagnosticId {
         DiagnosticId::InvalidSyntax
     }
