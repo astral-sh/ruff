@@ -3,7 +3,7 @@ use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_trivia::Cursor;
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::noqa::{Directive, FileNoqaDirectives, NoqaDirectives, NoqaParser, ParsedNoqaDirective};
+use crate::noqa::{Directive, FileNoqaDirectives, NoqaDirectives, NoqaParser};
 use crate::settings::types::PreviewMode;
 use crate::Locator;
 
@@ -94,7 +94,7 @@ pub(crate) fn blanket_noqa(
 ) {
     if preview.is_enabled() {
         for line in file_noqa_directives.lines() {
-            if let ParsedNoqaDirective::All(_) = line.parsed_file_exemption {
+            if let Directive::All(_) = line.parsed_file_exemption {
                 diagnostics.push(Diagnostic::new(
                     BlanketNOQA {
                         missing_colon: false,
