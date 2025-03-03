@@ -89,7 +89,7 @@ pub struct Project {
     /// new files added to any directory in `included_paths` will be indexed and added to the project
     /// whereas `open_files` needs to be updated manually (e.g. by the IDE).
     ///
-    /// In short, `open_files` is cheaper in contexts where the set of files is know, like
+    /// In short, `open_files` is cheaper in contexts where the set of files is known, like
     /// in an IDE when the user only wants to check the open tabs. This could be modeled
     /// with `included_paths` too but it would require an explicit walk dir step that's simply unnecessary.
     #[default]
