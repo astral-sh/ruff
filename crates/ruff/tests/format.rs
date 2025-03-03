@@ -2133,3 +2133,37 @@ with open("a_really_long_foo") as foo, open("a_really_long_bar") as bar, open("a
     ----- stderr -----
     "#);
 }
+
+/// Regression test for <https://github.com/astral-sh/ruff/issues/9381> with very helpful
+/// reproduction repo here: <https://github.com/lucasfijen/example_ruff_glob_bug>
+#[test]
+fn cookiecutter_globbing() -> Result<()> {
+    // This is a simplified directory structure from the repo linked above. The essence of the
+    // problem is this `{{cookiecutter.repo_name}}` directory containing a config file with a glob.
+    // The absolute path of the glob contains the glob metacharacters `{{` and `}}` even though the
+    // user's glob does not.
+    let tempdir = TempDir::new()?;
+    let cookiecutter = tempdir.path().join("{{cookiecutter.repo_name}}");
+    let cookiecutter_toml = cookiecutter.join("pyproject.toml");
+    let tests = cookiecutter.join("tests");
+    fs::create_dir_all(&tests)?;
+    fs::write(
+        cookiecutter_toml,
+        r#"tool.ruff.lint.per-file-ignores = { "tests/*" = ["F811"] }"#,
+    )?;
+    let maintest = tests.join("maintest.py");
+    fs::write(maintest, "import foo\nimport bar\nimport foo\n")?;
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .args(["format", "--no-cache", "--diff"])
+            .current_dir(tempdir.path()), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    1 file already formatted
+    ");
+
+    Ok(())
+}

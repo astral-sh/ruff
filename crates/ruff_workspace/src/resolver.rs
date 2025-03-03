@@ -877,7 +877,7 @@ mod tests {
     use path_absolutize::Absolutize;
     use tempfile::TempDir;
 
-    use ruff_linter::settings::types::FilePattern;
+    use ruff_linter::settings::types::{FilePattern, GlobPath};
 
     use crate::configuration::Configuration;
     use crate::pyproject::find_settings_toml;
@@ -972,13 +972,8 @@ mod tests {
         let project_root = Path::new("/tmp/");
 
         let path = Path::new("foo").absolutize_from(project_root).unwrap();
-        let exclude = FilePattern::User(
-            "foo".to_string(),
-            Path::new("foo")
-                .absolutize_from(project_root)
-                .unwrap()
-                .to_path_buf(),
-        );
+        let exclude =
+            FilePattern::User("foo".to_string(), GlobPath::normalize("foo", project_root));
         let file_path = &path;
         let file_basename = path.file_name().unwrap();
         assert!(match_exclusion(
@@ -988,13 +983,8 @@ mod tests {
         ));
 
         let path = Path::new("foo/bar").absolutize_from(project_root).unwrap();
-        let exclude = FilePattern::User(
-            "bar".to_string(),
-            Path::new("bar")
-                .absolutize_from(project_root)
-                .unwrap()
-                .to_path_buf(),
-        );
+        let exclude =
+            FilePattern::User("bar".to_string(), GlobPath::normalize("bar", project_root));
         let file_path = &path;
         let file_basename = path.file_name().unwrap();
         assert!(match_exclusion(
@@ -1008,10 +998,7 @@ mod tests {
             .unwrap();
         let exclude = FilePattern::User(
             "baz.py".to_string(),
-            Path::new("baz.py")
-                .absolutize_from(project_root)
-                .unwrap()
-                .to_path_buf(),
+            GlobPath::normalize("baz.py", project_root),
         );
         let file_path = &path;
         let file_basename = path.file_name().unwrap();
@@ -1024,10 +1011,7 @@ mod tests {
         let path = Path::new("foo/bar").absolutize_from(project_root).unwrap();
         let exclude = FilePattern::User(
             "foo/bar".to_string(),
-            Path::new("foo/bar")
-                .absolutize_from(project_root)
-                .unwrap()
-                .to_path_buf(),
+            GlobPath::normalize("foo/bar", project_root),
         );
         let file_path = &path;
         let file_basename = path.file_name().unwrap();
@@ -1042,10 +1026,7 @@ mod tests {
             .unwrap();
         let exclude = FilePattern::User(
             "foo/bar/baz.py".to_string(),
-            Path::new("foo/bar/baz.py")
-                .absolutize_from(project_root)
-                .unwrap()
-                .to_path_buf(),
+            GlobPath::normalize("foo/bar/baz.py", project_root),
         );
         let file_path = &path;
         let file_basename = path.file_name().unwrap();
@@ -1060,10 +1041,7 @@ mod tests {
             .unwrap();
         let exclude = FilePattern::User(
             "foo/bar/*.py".to_string(),
-            Path::new("foo/bar/*.py")
-                .absolutize_from(project_root)
-                .unwrap()
-                .to_path_buf(),
+            GlobPath::normalize("foo/bar/*.py", project_root),
         );
         let file_path = &path;
         let file_basename = path.file_name().unwrap();
@@ -1076,13 +1054,8 @@ mod tests {
         let path = Path::new("foo/bar/baz.py")
             .absolutize_from(project_root)
             .unwrap();
-        let exclude = FilePattern::User(
-            "baz".to_string(),
-            Path::new("baz")
-                .absolutize_from(project_root)
-                .unwrap()
-                .to_path_buf(),
-        );
+        let exclude =
+            FilePattern::User("baz".to_string(), GlobPath::normalize("baz", project_root));
         let file_path = &path;
         let file_basename = path.file_name().unwrap();
         assert!(!match_exclusion(
