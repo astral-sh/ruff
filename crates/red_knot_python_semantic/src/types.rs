@@ -4,7 +4,7 @@ use std::str::FromStr;
 use bitflags::bitflags;
 use call::{CallDunderError, CallError};
 use context::InferContext;
-use diagnostic::NOT_ITERABLE;
+use diagnostic::{INVALID_CONTEXT_MANAGER, NOT_ITERABLE};
 use ruff_db::files::File;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
@@ -2841,8 +2841,37 @@ impl<'db> Type<'db> {
         })
     }
 
-    fn enter(self, _db: &'db dyn Db) -> Type<'db> {
-        todo!()
+    fn enter(self, db: &'db dyn Db) -> Type<'db> {
+        self.try_enter(db)
+            .unwrap_or_else(|err| err.fallback_enter_type(db))
+    }
+
+    fn try_enter(self, db: &'db dyn Db) -> Result<Type<'db>, ContextManagerError<'db>> {
+        let enter = self.try_call_dunder(db, "__enter__", &CallArguments::none());
+        let exit = self.try_call_dunder(
+            db,
+            "__exit__",
+            &CallArguments::positional([Type::none(db), Type::none(db), Type::none(db)]),
+        );
+
+        // TODO: Make use of Protocols when we support it (the manager be assignable to `contextlib.AbstractContextManager`).
+        let result = match (enter, exit) {
+            (Ok(enter), Ok(_)) => Ok(enter.return_type(db)),
+            (Ok(enter), Err(exit_error)) => Err(ContextManagerErrorKind::Exit {
+                enter_ret_ty: enter.return_type(db),
+                exit_error,
+            }),
+            (Err(enter_error), Ok(_)) => Err(ContextManagerErrorKind::Enter(enter_error)),
+            (Err(enter_error), Err(exit_error)) => Err(ContextManagerErrorKind::EnterAndExit {
+                enter_error,
+                exit_error,
+            }),
+        };
+
+        result.map_err(|error_kind| ContextManagerError {
+            context_manager_type: self,
+            error_kind,
+        })
     }
 
     #[must_use]
@@ -3376,6 +3405,135 @@ impl<'db> TypeVarInstance<'db> {
 pub enum TypeVarBoundOrConstraints<'db> {
     UpperBound(Type<'db>),
     Constraints(TupleType<'db>),
+}
+
+/// Error returned if a type is not (or may not be) a context manager.
+#[derive(Debug)]
+struct ContextManagerError<'db> {
+    /// The type of the object that the analysed code attempted to use as a context manager.
+    context_manager_type: Type<'db>,
+
+    /// The precise kind of error encountered when trying to use the type as a context manager.
+    error_kind: ContextManagerErrorKind<'db>,
+}
+
+impl<'db> ContextManagerError<'db> {
+    fn enter_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
+        self.error_kind.enter_type(db)
+    }
+
+    fn fallback_enter_type(&self, db: &'db dyn Db) -> Type<'db> {
+        self.enter_type(db).unwrap_or(Type::unknown())
+    }
+
+    /// Reports the diagnostic for this error
+    fn report_diagnostic(
+        &self,
+        context: &InferContext<'db>,
+        context_manager_node: ast::AnyNodeRef,
+    ) {
+        self.error_kind
+            .report_diagnostic(context, self.context_manager_type, context_manager_node);
+    }
+}
+
+#[derive(Debug)]
+enum ContextManagerErrorKind<'db> {
+    Exit {
+        enter_ret_ty: Type<'db>,
+        exit_error: CallDunderError<'db>,
+    },
+    Enter(CallDunderError<'db>),
+    EnterAndExit {
+        enter_error: CallDunderError<'db>,
+        exit_error: CallDunderError<'db>,
+    },
+}
+
+impl<'db> ContextManagerErrorKind<'db> {
+    fn enter_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
+        match self {
+            ContextManagerErrorKind::Exit {
+                enter_ret_ty,
+                exit_error: _,
+            } => Some(*enter_ret_ty),
+            ContextManagerErrorKind::Enter(enter_error)
+            | ContextManagerErrorKind::EnterAndExit {
+                enter_error,
+                exit_error: _,
+            } => match enter_error {
+                CallDunderError::PossiblyUnbound(call_outcome) => {
+                    Some(call_outcome.return_type(db))
+                }
+                CallDunderError::Call(call_error) => call_error.return_type(db),
+                CallDunderError::MethodNotAvailable => None,
+            },
+        }
+    }
+
+    // TODO: consistency between "does not" and "doesn't"
+    fn format_call_dunder_error(call_dunder_error: &CallDunderError<'db>, name: &str) -> String {
+        match call_dunder_error {
+            CallDunderError::MethodNotAvailable => format!("it doesn't implement `{name}`"),
+            CallDunderError::PossiblyUnbound(_) => {
+                format!("the method `{name}` is possibly unbound")
+            }
+            CallDunderError::Call(_) => format!("it does not correctly implement `{name}`"),
+        }
+    }
+
+    fn format_call_dunder_errors(
+        error_a: &CallDunderError<'db>,
+        name_a: &str,
+        error_b: &CallDunderError<'db>,
+        name_b: &str,
+    ) -> String {
+        match (error_a, error_b) {
+            (CallDunderError::PossiblyUnbound(_), CallDunderError::PossiblyUnbound(_)) => {
+                format!("the methods `{name_a}` and `{name_b}` are possibly unbound")
+            }
+            (CallDunderError::MethodNotAvailable, CallDunderError::MethodNotAvailable) => {
+                format!("it doesn't implement `{name_a}` and `{name_b}`")
+            }
+            (CallDunderError::Call(_), CallDunderError::Call(_)) => {
+                format!("it does not correctly implement `{name_a}` or `{name_b}`")
+            }
+            (_, _) => format!(
+                "{format_a}, and {format_b}",
+                format_a = Self::format_call_dunder_error(error_a, name_a),
+                format_b = Self::format_call_dunder_error(error_b, name_b)
+            ),
+        }
+    }
+
+    fn report_diagnostic(
+        &self,
+        context: &InferContext<'db>,
+        context_expression_ty: Type<'db>,
+        context_expression_node: ast::AnyNodeRef,
+    ) {
+        let db = context.db();
+
+        let formatted_errors = match self {
+            ContextManagerErrorKind::Exit {
+                enter_ret_ty: _,
+                exit_error,
+            } => Self::format_call_dunder_error(exit_error, "__exit__"),
+            ContextManagerErrorKind::Enter(enter_error) => {
+                Self::format_call_dunder_error(enter_error, "__enter__")
+            }
+            ContextManagerErrorKind::EnterAndExit {
+                enter_error,
+                exit_error,
+            } => Self::format_call_dunder_errors(enter_error, "__enter__", exit_error, "__exit__"),
+        };
+
+        context.report_lint(&INVALID_CONTEXT_MANAGER, context_expression_node,
+            format_args!("Object of type `{context_expression}` cannot be used with `with` because {formatted_errors}",
+context_expression = context_expression_ty.display(db)
+        ),
+        );
+    }
 }
 
 /// Error returned if a type is not (or may not be) iterable.

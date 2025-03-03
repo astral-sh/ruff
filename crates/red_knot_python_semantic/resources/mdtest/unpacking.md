@@ -624,7 +624,7 @@ Unpacking in a `with` statement.
 class ContextManager:
     def __enter__(self) -> tuple[int, int]:
         return (1, 2)
-    
+
     def __exit__(self, exc_type, exc_value, traceback) -> None:
         pass
 
@@ -639,7 +639,7 @@ with ContextManager() as (a, b):
 class ContextManager:
     def __enter__(self) -> tuple[int, str]:
         return (1, "a")
-    
+
     def __exit__(self, exc_type, exc_value, traceback) -> None:
         pass
 
@@ -648,28 +648,13 @@ with ContextManager() as (a, b):
     reveal_type(b)  # revealed: str
 ```
 
-### Same literal values
-
-```py
-class ContextManager:
-    def __enter__(self):
-        return (1, 2)
-    
-    def __exit__(self, exc_type, exc_value, traceback) -> None:
-        pass
-
-with ContextManager() as (a, b):
-    reveal_type(a) # revealed: Literal[1]
-    reveal_type(b) # revealed: Literal[1]
-```
-
 ### Nested
 
 ```py
 class ContextManager:
     def __enter__(self) -> tuple[int, tuple[str, bytes]]:
         return (1, ("a", b"bytes"))
-    
+
     def __exit__(self, exc_type, exc_value, traceback) -> None:
         pass
 
@@ -685,7 +670,7 @@ with ContextManager() as (a, (b, c)):
 class ContextManager:
     def __enter__(self) -> tuple[int, int, int]:
         return (1, 2, 3)
-    
+
     def __exit__(self, exc_type, exc_value, traceback) -> None:
         pass
 
