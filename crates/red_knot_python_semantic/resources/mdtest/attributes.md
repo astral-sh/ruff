@@ -706,6 +706,33 @@ reveal_type(Derived().declared_in_body)  # revealed: int | None
 reveal_type(Derived().defined_in_init)  # revealed: str | None
 ```
 
+## Attributes defined on the meta class
+
+```py
+from typing import Any, Literal
+
+def _(flag: bool):
+    class Meta(type):
+        meta_class_attribute_1: Literal["value in meta class"] = "value in meta class"
+        meta_class_attribute_2: Any = "value in meta class"
+        meta_class_attribute_3: Any = "value in meta class"
+
+        if flag:
+            meta_class_attribute_4: Literal["possible value in meta class"] = "possible value in meta class"
+
+    class C(metaclass=Meta):
+        meta_class_attribute_2: Literal["value in class body"] = "value in class body"
+
+        if flag:
+            meta_class_attribute_3: Literal["value in class body"] = "value in class body"
+
+    reveal_type(C.meta_class_attribute_1)  # revealed: Literal["value in meta class"]
+    reveal_type(C.meta_class_attribute_2)  # revealed: Literal["value in class body"]
+    reveal_type(C.meta_class_attribute_3)  # revealed: Literal["value in class body"] | Any
+    # error: [possibly-unbound-attribute]
+    reveal_type(C.meta_class_attribute_4)  # revealed: Literal["possible value in meta class"]
+```
+
 ## Union of attributes
 
 ```py
