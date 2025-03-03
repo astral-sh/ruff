@@ -2588,28 +2588,28 @@ impl<'src> Parser<'src> {
         // before 3.9 but avoid false positives on examples like the `@_` "identity function hack"
         // or the "eval hack" called out in the PEP.
 
-        // test_ok decorator_expression_dotted_ident_before_py39
+        // test_ok decorator_expression_dotted_ident_py38
         // # parse_options: { "target-version": "3.8" }
         // @buttons.clicked.connect
         // def spam(): ...
 
-        // test_ok decorator_expression_identity_hack_before_py39
+        // test_ok decorator_expression_identity_hack_py38
         // # parse_options: { "target-version": "3.8" }
         // def _(x): return x
         // @_(buttons[0].clicked.connect)
         // def spam(): ...
 
-        // test_ok decorator_expression_eval_hack_before_py39
+        // test_ok decorator_expression_eval_hack_py38
         // # parse_options: { "target-version": "3.8" }
         // @eval("buttons[0].clicked.connect")
         // def spam(): ...
 
-        // test_ok decorator_expression_after_py39
+        // test_ok decorator_expression_py39
         // # parse_options: { "target-version": "3.9" }
         // @buttons[0].clicked.connect
         // def spam(): ...
 
-        // test_err decorator_expression_before_py39
+        // test_err decorator_expression_py38
         // # parse_options: { "target-version": "3.8" }
         // @buttons[0].clicked.connect
         // def spam(): ...

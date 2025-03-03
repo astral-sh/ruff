@@ -1,6 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
-input_file: crates/ruff_python_parser/resources/inline/err/decorator_expression_before_py39.py
+input_file: crates/ruff_python_parser/resources/inline/ok/decorator_expression_py39.py
 ---
 ## AST
 
@@ -91,11 +91,3 @@ Module(
     },
 )
 ```
-## Unsupported Syntax Errors
-
-  |
-1 | # parse_options: { "target-version": "3.8" }
-2 | @buttons[0].clicked.connect
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ Syntax Error: Cannot use named expression in decorator on Python 3.8 (syntax was added in Python 3.9)
-3 | def spam(): ...
-  |

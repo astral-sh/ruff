@@ -1,6 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
-input_file: crates/ruff_python_parser/resources/inline/ok/decorator_expression_dotted_ident_before_py39.py
+input_file: crates/ruff_python_parser/resources/inline/ok/decorator_expression_dotted_ident_py38.py
 ---
 ## AST
 
