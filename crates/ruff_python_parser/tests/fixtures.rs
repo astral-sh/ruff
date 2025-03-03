@@ -224,7 +224,7 @@ f'{foo!r'
     println!("AST:\n----\n{:#?}", parsed.syntax());
     println!("Tokens:\n-------\n{:#?}", parsed.tokens());
 
-    if !parsed.has_valid_syntax() {
+    if parsed.has_invalid_syntax() {
         println!("Errors:\n-------");
 
         let line_index = LineIndex::from_source_text(source);
