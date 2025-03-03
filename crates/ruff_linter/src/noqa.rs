@@ -53,7 +53,13 @@ pub(crate) enum Directive<'a> {
 
 impl<'a> Directive<'a> {
     /// Extract the noqa `Directive` from a line of Python source code.
-    pub(crate) fn try_extract(text: &'a str, offset: TextSize) -> Result<Option<Self>, ParseError> {
+    pub(crate) fn try_extract(
+        comment_range: TextRange,
+        source: &'a str,
+    ) -> Result<Option<Self>, ParseError> {
+        let text = &source[comment_range];
+        let offset = comment_range.start();
+
         for (char_index, char) in text.char_indices() {
             // Only bother checking for the `noqa` literal if the character is `n` or `N`.
             if !matches!(char, 'n' | 'N') {
@@ -263,11 +269,15 @@ pub(crate) fn rule_is_ignored(
     code: Rule,
     offset: TextSize,
     noqa_line_for: &NoqaMapping,
+    comment_ranges: &CommentRanges,
     locator: &Locator,
 ) -> bool {
     let offset = noqa_line_for.resolve(offset);
     let line_range = locator.line_range(offset);
-    match Directive::try_extract(locator.slice(line_range), line_range.start()) {
+    let &[comment_range] = comment_ranges.comments_in_range(line_range) else {
+        return false;
+    };
+    match Directive::try_extract(comment_range, locator.contents()) {
         Ok(Some(Directive::All(_))) => true,
         Ok(Some(Directive::Codes(codes))) => codes.includes(code),
         _ => false,
@@ -933,7 +943,7 @@ impl<'a> NoqaDirectives<'a> {
         let mut directives = Vec::new();
 
         for range in comment_ranges {
-            match Directive::try_extract(locator.slice(range), range.start()) {
+            match Directive::try_extract(range, locator.contents()) {
                 Err(err) => {
                     #[allow(deprecated)]
                     let line = locator.compute_line_index(range.start());
@@ -1081,169 +1091,253 @@ mod tests {
     #[test]
     fn noqa_all() {
         let source = "# noqa";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        assert_debug_snapshot!(Directive::try_extract(
+            TextRange::up_to(source.text_len()),
+            source
+        ));
     }
 
     #[test]
     fn noqa_code() {
         let source = "# noqa: F401";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        assert_debug_snapshot!(Directive::try_extract(
+            TextRange::up_to(source.text_len()),
+            source
+        ));
     }
 
     #[test]
     fn noqa_codes() {
         let source = "# noqa: F401, F841";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        assert_debug_snapshot!(Directive::try_extract(
+            TextRange::up_to(source.text_len()),
+            source
+        ));
     }
 
     #[test]
     fn noqa_all_case_insensitive() {
         let source = "# NOQA";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        assert_debug_snapshot!(Directive::try_extract(
+            TextRange::up_to(source.text_len()),
+            source
+        ));
     }
 
     #[test]
     fn noqa_code_case_insensitive() {
         let source = "# NOQA: F401";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        assert_debug_snapshot!(Directive::try_extract(
+            TextRange::up_to(source.text_len()),
+            source
+        ));
     }
 
     #[test]
     fn noqa_codes_case_insensitive() {
         let source = "# NOQA: F401, F841";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        assert_debug_snapshot!(Directive::try_extract(
+            TextRange::up_to(source.text_len()),
+            source
+        ));
     }
 
     #[test]
     fn noqa_leading_space() {
         let source = "#   # noqa: F401";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        assert_debug_snapshot!(Directive::try_extract(
+            TextRange::up_to(source.text_len()),
+            source
+        ));
     }
 
     #[test]
     fn noqa_trailing_space() {
         let source = "# noqa: F401   #";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        assert_debug_snapshot!(Directive::try_extract(
+            TextRange::up_to(source.text_len()),
+            source
+        ));
     }
 
     #[test]
     fn noqa_all_no_space() {
         let source = "#noqa";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        assert_debug_snapshot!(Directive::try_extract(
+            TextRange::up_to(source.text_len()),
+            source
+        ));
     }
 
     #[test]
     fn noqa_code_no_space() {
         let source = "#noqa:F401";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        assert_debug_snapshot!(Directive::try_extract(
+            TextRange::up_to(source.text_len()),
+            source
+        ));
     }
 
     #[test]
     fn noqa_codes_no_space() {
         let source = "#noqa:F401,F841";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        assert_debug_snapshot!(Directive::try_extract(
+            TextRange::up_to(source.text_len()),
+            source
+        ));
     }
 
     #[test]
     fn noqa_all_multi_space() {
         let source = "#  noqa";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        assert_debug_snapshot!(Directive::try_extract(
+            TextRange::up_to(source.text_len()),
+            source
+        ));
     }
 
     #[test]
     fn noqa_code_multi_space() {
         let source = "#  noqa: F401";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        assert_debug_snapshot!(Directive::try_extract(
+            TextRange::up_to(source.text_len()),
+            source
+        ));
     }
 
     #[test]
     fn noqa_codes_multi_space() {
         let source = "#  noqa: F401,  F841";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        assert_debug_snapshot!(Directive::try_extract(
+            TextRange::up_to(source.text_len()),
+            source
+        ));
     }
 
     #[test]
     fn noqa_code_leading_hashes() {
         let source = "###noqa: F401";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        assert_debug_snapshot!(Directive::try_extract(
+            TextRange::up_to(source.text_len()),
+            source
+        ));
     }
 
     #[test]
     fn noqa_all_leading_comment() {
         let source = "# Some comment describing the noqa # noqa";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        assert_debug_snapshot!(Directive::try_extract(
+            TextRange::up_to(source.text_len()),
+            source
+        ));
     }
 
     #[test]
     fn noqa_code_leading_comment() {
         let source = "# Some comment describing the noqa # noqa: F401";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        assert_debug_snapshot!(Directive::try_extract(
+            TextRange::up_to(source.text_len()),
+            source
+        ));
     }
 
     #[test]
     fn noqa_codes_leading_comment() {
         let source = "# Some comment describing the noqa # noqa: F401, F841";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        assert_debug_snapshot!(Directive::try_extract(
+            TextRange::up_to(source.text_len()),
+            source
+        ));
     }
 
     #[test]
     fn noqa_all_trailing_comment() {
         let source = "# noqa # Some comment describing the noqa";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        assert_debug_snapshot!(Directive::try_extract(
+            TextRange::up_to(source.text_len()),
+            source
+        ));
     }
 
     #[test]
     fn noqa_code_trailing_comment() {
         let source = "# noqa: F401 # Some comment describing the noqa";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        assert_debug_snapshot!(Directive::try_extract(
+            TextRange::up_to(source.text_len()),
+            source
+        ));
     }
 
     #[test]
     fn noqa_codes_trailing_comment() {
         let source = "# noqa: F401, F841 # Some comment describing the noqa";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        assert_debug_snapshot!(Directive::try_extract(
+            TextRange::up_to(source.text_len()),
+            source
+        ));
     }
 
     #[test]
     fn noqa_invalid_codes() {
         let source = "# noqa: unused-import, F401, some other code";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        assert_debug_snapshot!(Directive::try_extract(
+            TextRange::up_to(source.text_len()),
+            source
+        ));
     }
 
     #[test]
     fn noqa_squashed_codes() {
         let source = "# noqa: F401F841";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        assert_debug_snapshot!(Directive::try_extract(
+            TextRange::up_to(source.text_len()),
+            source
+        ));
     }
 
     #[test]
     fn noqa_empty_comma() {
         let source = "# noqa: F401,,F841";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        assert_debug_snapshot!(Directive::try_extract(
+            TextRange::up_to(source.text_len()),
+            source
+        ));
     }
 
     #[test]
     fn noqa_empty_comma_space() {
         let source = "# noqa: F401, ,F841";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        assert_debug_snapshot!(Directive::try_extract(
+            TextRange::up_to(source.text_len()),
+            source
+        ));
     }
 
     #[test]
     fn noqa_non_code() {
         let source = "# noqa: F401 We're ignoring an import";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        assert_debug_snapshot!(Directive::try_extract(
+            TextRange::up_to(source.text_len()),
+            source
+        ));
     }
 
     #[test]
     fn noqa_code_invalid_code_suffix() {
         let source = "# noqa: F401abc";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        assert_debug_snapshot!(Directive::try_extract(
+            TextRange::up_to(source.text_len()),
+            source
+        ));
     }
 
     #[test]
     fn noqa_invalid_suffix() {
         let source = "# noqa[F401]";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        assert_debug_snapshot!(Directive::try_extract(
+            TextRange::up_to(source.text_len()),
+            source
+        ));
     }
 
     #[test]
