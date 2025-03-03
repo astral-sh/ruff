@@ -2152,7 +2152,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 // `TYPE_CHECKING` is a special variable that is used only during type checking
                 // and is interpreted as True regardless of the actual type of the value.
                 // See mdtest/known_constants.md#user-defined-type_checking for details.
-                if name.id.as_str() == "TYPE_CHECKING" {
+                if &name.id == "TYPE_CHECKING" {
                     Type::BooleanLiteral(true)
                 } else if self.in_stub() && value.is_ellipsis_literal_expr() {
                     Type::unknown()
