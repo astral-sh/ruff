@@ -27,7 +27,7 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// yield from foo
 ///
-/// for _element in foo
+/// for _element in foo:
 ///     y = _element
 ///     yield y
 /// ```
