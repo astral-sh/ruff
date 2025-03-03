@@ -70,7 +70,7 @@ import typing
 
 class ListSubclass(typing.List): ...
 
-# TODO: should have `Generic`, should not have `Unknown`
+# TODO: Reflect the runtime value in the MRO here? (ListSubclass, list, typing.Generic, object)
 # revealed: tuple[Literal[ListSubclass], Literal[list], Literal[MutableSequence], Literal[Sequence], Literal[Reversible], Literal[Collection], Literal[Iterable], Literal[Container], @Todo(protocol), Literal[object]]
 reveal_type(ListSubclass.__mro__)
 
