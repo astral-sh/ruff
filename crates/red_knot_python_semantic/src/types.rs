@@ -1612,11 +1612,6 @@ impl<'db> Type<'db> {
 
         let instance = self;
 
-        // TODO: Handle possible-unboundness and errors from `__get__` calls.
-
-        // TODO: Handle `__get__` call errors instead of using `.unwrap_or(None)`.
-        // There is an existing test case for this in `descriptor_protocol.md`.
-
         match instance {
             Type::Union(union) => union.map_with_boundness_and_qualifiers(db, |elem| {
                 elem.run_descriptor_protocol_instances(db, name, class_attr.clone(), owner)
@@ -1662,9 +1657,6 @@ impl<'db> Type<'db> {
                         )
                     }
                     Symbol::Type(class_attr_ty, class_attr_boundness) => {
-                        // TODO: Handle possible-unboundness of `__get__` method
-                        // There is an existing test case for this in `descriptor_protocol.md`.
-
                         let class_attr_meta_ty = class_attr_ty.to_meta_type(db);
 
                         let descr_get = class_attr_meta_ty.member(db, "__get__").0;
@@ -1836,40 +1828,43 @@ impl<'db> Type<'db> {
                         )
                     }
                     Symbol::Type(class_attr_ty, class_attr_boundness) => {
-                        // TODO: Handle possible-unboundness of `__get__` method
-                        // There is an existing test case for this in `descriptor_protocol.md`.
-
                         let meta_type = self.to_meta_type(db);
-                        if let Symbol::Type(meta_attribute, _) = self.class_member(db, name).0 {
-                            let meta_descr_get = meta_attribute.class_member(db, "__get__").0;
-                            if let Symbol::Type(meta_descr_get, _) = meta_descr_get {
-                                if !meta_type.member(db, "__set__").0.is_unbound()
-                                    || !meta_type.member(db, "__delete__").0.is_unbound()
-                                {
-                                    // Data descriptor on meta class
-                                    return Symbol::Type(
+                        let meta_attribute = self.class_member(db, name).0;
+                        let (meta_attr_resolved, meta_is_data_descriptor) =
+                            if let Symbol::Type(meta_attribute_ty, meta_attribute_boundness) =
+                                meta_attribute
+                            {
+                                let meta_descr_get =
+                                    meta_attribute_ty.class_member(db, "__get__").0;
+                                if let Symbol::Type(meta_descr_get, _) = meta_descr_get {
+                                    let return_ty = Symbol::Type(
                                         meta_descr_get
                                             .try_call(
                                                 db,
                                                 &CallArguments::positional([
-                                                    meta_attribute,
+                                                    meta_attribute_ty,
                                                     self,
                                                     meta_type,
                                                 ]),
                                             )
                                             .map(|outcome| outcome.return_type(db))
                                             .unwrap_or(Type::unknown()),
-                                        class_attr_boundness,
-                                    )
-                                    .into();
+                                        meta_attribute_boundness,
+                                    );
+                                    let is_data = !self.class_member(db, "__set__").0.is_unbound()
+                                        || !self.class_member(db, "__delete__").0.is_unbound();
+                                    (return_ty, is_data)
+                                } else {
+                                    (meta_attribute, false)
                                 }
-                            }
-                        }
+                            } else {
+                                (meta_attribute, false)
+                            };
 
                         let descr_get = class_attr_ty.class_member(db, "__get__").0;
-                        if let Symbol::Type(descr_get, _) = descr_get {
+                        let class_attr_resolved = if let Symbol::Type(descr_get, _) = descr_get {
                             // Data or non-data descriptor on class
-                            return Symbol::Type(
+                            Symbol::Type(
                                 descr_get
                                     .try_call(
                                         db,
@@ -1883,14 +1878,87 @@ impl<'db> Type<'db> {
                                     .unwrap_or(Type::unknown()),
                                 class_attr_boundness,
                             )
-                            .into();
+                        } else {
+                            class_attr.0.clone() // TODO
+                        };
+
+                        match (
+                            &meta_attr_resolved,
+                            meta_is_data_descriptor,
+                            &class_attr_resolved,
+                        ) {
+                            (Symbol::Type(_, _), _, Symbol::Unbound)
+                            | (Symbol::Type(_, Boundness::Bound), true, _) => {
+                                meta_attr_resolved.into()
+                            }
+                            (Symbol::Unbound, _, Symbol::Type(_, _)) => class_attr_resolved.into(),
+                            (
+                                Symbol::Type(meta_attr_ty, Boundness::PossiblyUnbound),
+                                _,
+                                Symbol::Type(_, _),
+                            ) => SymbolAndQualifiers(
+                                Symbol::Type(
+                                    UnionType::from_elements(
+                                        db,
+                                        [class_attr_ty.clone(), meta_attr_ty.clone()],
+                                    ),
+                                    class_attr_boundness,
+                                ),
+                                class_attr_qualifiers,
+                            ),
+                            (Symbol::Type(_, _), false, Symbol::Type(_, Boundness::Bound)) => {
+                                class_attr
+                            }
+                            (
+                                Symbol::Type(meta_attr_ty, meta_attr_boundness),
+                                false,
+                                Symbol::Type(_, Boundness::PossiblyUnbound),
+                            ) => SymbolAndQualifiers(
+                                Symbol::Type(
+                                    UnionType::from_elements(
+                                        db,
+                                        [class_attr_ty.clone(), meta_attr_ty.clone()],
+                                    ),
+                                    dbg!(*meta_attr_boundness),
+                                ),
+                                class_attr_qualifiers,
+                            ),
+                            (Symbol::Unbound, _, Symbol::Unbound) => Symbol::Unbound.into(),
                         }
-
-                        class_attr
-
-                        // TODO: here we should call non-data descriptors on the metaclass
                     }
-                    Symbol::Unbound => Symbol::Unbound.into(),
+                    Symbol::Unbound => {
+                        // Did not find the attribute on the class; it could still be an attribute
+                        // on the meta class
+
+                        let meta_type = self.to_meta_type(db);
+
+                        let meta_attribute = self.class_member(db, name);
+
+                        if let Symbol::Type(meta_attribute_ty, _) = meta_attribute.0 {
+                            let meta_descr_get = meta_attribute_ty.class_member(db, "__get__").0;
+                            if let Symbol::Type(meta_descr_get, _) = meta_descr_get {
+                                Symbol::Type(
+                                    meta_descr_get
+                                        .try_call(
+                                            db,
+                                            &CallArguments::positional([
+                                                meta_attribute_ty,
+                                                self,
+                                                meta_type,
+                                            ]),
+                                        )
+                                        .map(|outcome| outcome.return_type(db))
+                                        .unwrap_or(Type::unknown()),
+                                    Boundness::Bound,
+                                )
+                                .into()
+                            } else {
+                                meta_attribute
+                            }
+                        } else {
+                            meta_attribute
+                        }
+                    }
                 }
             }
         }
@@ -1917,7 +1985,6 @@ impl<'db> Type<'db> {
             ))
             .into(),
 
-            // TODO: move to static member?
             Type::ClassLiteral(ClassLiteralType { class })
                 if class.is_known(db, KnownClass::FunctionType) && name == "__get__" =>
             {

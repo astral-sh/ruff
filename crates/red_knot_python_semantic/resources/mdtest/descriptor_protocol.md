@@ -133,6 +133,42 @@ reveal_type(C.non_data_descriptor)  # revealed: Unknown | Literal["non-data"]
 C.data_descriptor = "something else"  # This is okay
 ```
 
+## Descriptor protocol for class objects
+
+When a descriptor is accessed on a class object, the following precedence chain is used:
+
+- Data descriptor on the metaclass
+- Data or non-data descriptor on the class
+- Class attribute
+- Non-data descriptor on the metaclass
+
+```py
+from typing import Literal
+
+class DataDescriptor:
+    def __get__(self, instance: object, owner: type | None = None) -> Literal["data"]:
+        return "data"
+
+    def __set__(self, instance: int, value) -> None:
+        pass
+
+class NonDataDescriptor:
+    def __get__(self, instance: object, owner: type | None = None) -> Literal["non-data"]:
+        return "non-data"
+
+class Meta(type):
+    meta_data_descriptor: DataDescriptor = DataDescriptor()
+    meta_non_data_descriptor: NonDataDescriptor = NonDataDescriptor()
+
+class DescriptorsOnMetaClass(metaclass=Meta):
+    # meta_data_descriptor = "shadowed?"
+    # meta_non_data_descriptor = "shadowed?"
+    ...
+
+reveal_type(DescriptorsOnMetaClass.meta_data_descriptor)  # revealed: Literal["data"]
+reveal_type(DescriptorsOnMetaClass.meta_non_data_descriptor)  # revealed: Literal["non-data"]
+```
+
 ## Possibly unbound descriptors, unions with other attributes
 
 ```py
@@ -373,6 +409,9 @@ class C:
 
 # TODO: This should be an error
 reveal_type(C.descriptor)  # revealed: Unknown
+
+# TODO: This should be an error
+reveal_type(C().descriptor)  # revealed: Descriptor
 ```
 
 ## Possibly-unbound `__get__` method
@@ -389,6 +428,9 @@ def _(flag: bool):
 
     # TODO: This should be `MaybeDescriptor | int`
     reveal_type(C.descriptor)  # revealed: int
+
+    # TODO: This should be `MaybeDescriptor | int`
+    reveal_type(C().descriptor)  # revealed: int
 ```
 
 ## Dunder methods
