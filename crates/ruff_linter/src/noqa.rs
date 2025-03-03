@@ -62,12 +62,6 @@ impl<'a> Directive<'a> {
         let parsed = parse_inline_noqa(comment_range, source)?;
         Ok(parsed.map(|parsed_noqa| Self::from(parsed_noqa.directive)))
     }
-
-    /// Lex an individual rule code (e.g., `F401`).
-    #[inline]
-    pub(crate) fn lex_code(line: &str) -> Option<&str> {
-        NoqaParser::parse_code(line).map(|(code, _)| code)
-    }
 }
 
 #[derive(Debug)]
@@ -581,7 +575,7 @@ impl<'a> NoqaParser<'a> {
     /// Returns `None` if beginning of text does not match the regex
     /// `[A-Z]+[0-9]+`.
     #[inline]
-    fn parse_code(text: &'a str) -> Option<(&'a str, usize)> {
+    pub(crate) fn parse_code(text: &'a str) -> Option<(&'a str, usize)> {
         let prefix = text.chars().take_while(char::is_ascii_uppercase).count();
         let suffix = text[prefix..]
             .chars()
