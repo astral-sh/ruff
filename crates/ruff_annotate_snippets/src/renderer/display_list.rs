@@ -1251,25 +1251,25 @@ fn fold_body(body: Vec<DisplayLine<'_>>) -> Vec<DisplayLine<'_>> {
     const INNER_UNFOLD_SIZE: usize = INNER_CONTEXT * 2 + 1;
 
     let mut lines = vec![];
-    let mut unhighlighed_lines = vec![];
+    let mut unhighlighted_lines = vec![];
     for line in body {
         match &line {
             DisplayLine::Source { annotations, .. } => {
                 if annotations.is_empty() {
-                    unhighlighed_lines.push(line);
+                    unhighlighted_lines.push(line);
                 } else {
                     if lines.is_empty() {
-                        // Ignore leading unhighlighed lines
-                        unhighlighed_lines.clear();
+                        // Ignore leading unhighlighted lines
+                        unhighlighted_lines.clear();
                     }
-                    match unhighlighed_lines.len() {
+                    match unhighlighted_lines.len() {
                         0 => {}
                         n if n <= INNER_UNFOLD_SIZE => {
                             // Rather than render our cut indicator, don't fold
-                            lines.append(&mut unhighlighed_lines);
+                            lines.append(&mut unhighlighted_lines);
                         }
                         _ => {
-                            lines.extend(unhighlighed_lines.drain(..INNER_CONTEXT));
+                            lines.extend(unhighlighted_lines.drain(..INNER_CONTEXT));
                             let inline_marks = lines
                                 .last()
                                 .and_then(|line| {
@@ -1287,16 +1287,16 @@ fn fold_body(body: Vec<DisplayLine<'_>>) -> Vec<DisplayLine<'_>> {
                             lines.push(DisplayLine::Fold {
                                 inline_marks: inline_marks.clone(),
                             });
-                            unhighlighed_lines
-                                .drain(..unhighlighed_lines.len().saturating_sub(INNER_CONTEXT));
-                            lines.append(&mut unhighlighed_lines);
+                            unhighlighted_lines
+                                .drain(..unhighlighted_lines.len().saturating_sub(INNER_CONTEXT));
+                            lines.append(&mut unhighlighted_lines);
                         }
                     }
                     lines.push(line);
                 }
             }
             _ => {
-                unhighlighed_lines.push(line);
+                unhighlighted_lines.push(line);
             }
         }
     }

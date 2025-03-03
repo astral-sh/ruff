@@ -239,7 +239,7 @@ fn strip_z_date(call: &ExprCall) -> Option<(&Expr, &Expr)> {
     Some((value, func))
 }
 
-/// Returns `Some` if this is a subscribt with the form `date[:-1] + "-00"`.
+/// Returns `Some` if this is a subscript with the form `date[:-1] + "-00"`.
 fn slice_minus_1_date(subscript: &ExprSubscript) -> Option<&Expr> {
     let ExprSubscript { value, slice, .. } = subscript;
     let slice = slice.as_slice_expr()?;
