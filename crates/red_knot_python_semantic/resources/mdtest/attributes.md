@@ -885,7 +885,7 @@ def _(flag: bool):
                 self.x = 1
 
     # error: [possibly-unbound-attribute]
-    reveal_type(Foo().x)  # revealed: int
+    reveal_type(Foo().x)  # revealed: int | Unknown
 ```
 
 #### Possibly unbound

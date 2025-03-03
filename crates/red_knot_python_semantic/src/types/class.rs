@@ -10,7 +10,7 @@ use crate::{
     },
     types::{
         definition_expression_type, CallArguments, CallError, DynamicType, MetaclassCandidate,
-        TupleType, UnionBuilder, UnionCallError,
+        TupleType, UnionBuilder, UnionCallError, UnionType,
     },
     Db, KnownModule, Program,
 };
@@ -468,7 +468,7 @@ impl<'db> Class<'db> {
         db: &'db dyn Db,
         class_body_scope: ScopeId<'db>,
         name: &str,
-    ) -> Symbol<'db> {
+    ) -> Option<Type<'db>> {
         let _span = tracing::debug_span!("implicit_instance_attribute", name).entered();
 
         // If we do not see any declarations of an attribute, neither in the class body nor in
@@ -483,7 +483,7 @@ impl<'db> Class<'db> {
             .as_deref()
             .and_then(|assignments| assignments.get(name))
         else {
-            return Symbol::Unbound;
+            return None;
         };
 
         for attribute_assignment in attribute_assignments {
@@ -498,7 +498,7 @@ impl<'db> Class<'db> {
                     let annotation_ty = infer_expression_type(db, *annotation);
 
                     // TODO: check if there are conflicting declarations
-                    return Symbol::bound(annotation_ty);
+                    return Some(annotation_ty);
                 }
                 AttributeAssignment::Unannotated { value } => {
                     // We found an un-annotated attribute assignment of the form:
@@ -537,7 +537,7 @@ impl<'db> Class<'db> {
             }
         }
 
-        Symbol::Type(union_of_inferred_types.build(), Boundness::Bound)
+        Some(union_of_inferred_types.build())
     }
 
     /// A helper function for `instance_member` that looks up the `name` attribute only on
@@ -563,43 +563,48 @@ impl<'db> Class<'db> {
             tracing::debug!(?declared_and_qualifiers, "found declared attribute");
 
             match declared_and_qualifiers {
-                Ok(SymbolAndQualifiers(declared @ Symbol::Type(declared_ty, _), qualifiers)) => {
+                Ok(SymbolAndQualifiers(
+                    declared @ Symbol::Type(declared_ty, declaredness),
+                    qualifiers,
+                )) => {
                     // The attribute is declared in the class body.
 
                     // Make sure it's not bound in the body
                     let bindings = use_def.public_bindings(symbol_id);
                     let inferred = symbol_from_bindings(db, bindings);
                     if !inferred.is_unbound() {
-                        return Symbol::Unbound.into();
+                        if declaredness == Boundness::Bound {
+                            return Symbol::Unbound.into();
+                        } else {
+                            return Self::implicit_instance_attribute(db, body_scope, name)
+                                .map_or(Symbol::Unbound, Symbol::bound)
+                                .into();
+                        }
                     }
 
-                    if let Some(function) = declared_ty.into_function_literal() {
-                        // TODO: Eventually, we are going to process all decorators correctly. This is
-                        // just a temporary heuristic to provide a broad categorization
-
-                        if function.has_known_class_decorator(db, KnownClass::Classmethod)
-                            && function.decorators(db).len() == 1
-                        {
-                            SymbolAndQualifiers(declared, qualifiers)
-                        } else if function.has_known_class_decorator(db, KnownClass::Property) {
-                            SymbolAndQualifiers::todo("@property")
-                        } else if function.has_known_function_decorator(db, KnownFunction::Overload)
-                        {
-                            SymbolAndQualifiers::todo("overloaded method")
-                        } else if !function.decorators(db).is_empty() {
-                            SymbolAndQualifiers::todo("decorated method")
-                        } else {
-                            SymbolAndQualifiers(declared, qualifiers)
-                        }
-                    } else {
+                    if declaredness == Boundness::Bound {
                         SymbolAndQualifiers(declared, qualifiers)
+                    } else {
+                        match Self::implicit_instance_attribute(db, body_scope, name) {
+                            None => SymbolAndQualifiers(declared, qualifiers),
+                            Some(implicit_ty) => SymbolAndQualifiers(
+                                Symbol::Type(
+                                    UnionType::from_elements(db, [declared_ty, implicit_ty]),
+                                    declaredness,
+                                ),
+                                qualifiers,
+                            ),
+                        }
                     }
                 }
+
                 Ok(SymbolAndQualifiers(Symbol::Unbound, _)) => {
                     // The attribute is not *declared* in the class body. It could still be declared/bound
                     // in a method.
 
-                    Self::implicit_instance_attribute(db, body_scope, name).into()
+                    Self::implicit_instance_attribute(db, body_scope, name)
+                        .map_or(Symbol::Unbound, Symbol::bound)
+                        .into()
                 }
                 Err((declared_ty, _conflicting_declarations)) => {
                     // Make sure it's not bound in the body
@@ -620,7 +625,9 @@ impl<'db> Class<'db> {
             // This attribute is neither declared nor bound in the class body.
             // It could still be implicitly defined in a method.
 
-            Self::implicit_instance_attribute(db, body_scope, name).into()
+            Self::implicit_instance_attribute(db, body_scope, name)
+                .map_or(Symbol::Unbound, Symbol::bound)
+                .into()
         }
     }
 

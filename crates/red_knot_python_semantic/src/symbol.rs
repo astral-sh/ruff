@@ -21,6 +21,17 @@ pub(crate) enum Boundness {
     PossiblyUnbound,
 }
 
+impl Boundness {
+    pub const fn min(self, other: Self) -> Self {
+        match (self, other) {
+            (Boundness::PossiblyUnbound, _) | (_, Boundness::PossiblyUnbound) => {
+                Boundness::PossiblyUnbound
+            }
+            (Boundness::Bound, Boundness::Bound) => Boundness::Bound,
+        }
+    }
+}
+
 /// The result of a symbol lookup, which can either be a (possibly unbound) type
 /// or a completely unbound symbol.
 ///
