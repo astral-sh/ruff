@@ -3181,6 +3181,8 @@ pub enum DynamicType {
     ///
     /// This variant should be created with the `todo_type!` macro.
     Todo(TodoType),
+    /// Temporary type until we support protocols.
+    TodoProtocol,
 }
 
 impl std::fmt::Display for DynamicType {
@@ -3191,6 +3193,7 @@ impl std::fmt::Display for DynamicType {
             // `DynamicType::Todo`'s display should be explicit that is not a valid display of
             // any other type
             DynamicType::Todo(todo) => write!(f, "@Todo{todo}"),
+            DynamicType::TodoProtocol => f.write_str("@Todo(protocol)"),
         }
     }
 }
