@@ -7,7 +7,7 @@ use ruff_python_ast::name::Name;
 use ruff_python_ast::{
     self as ast, ExceptHandler, Expr, ExprContext, IpyEscapeKind, Operator, Stmt, WithItem,
 };
-use ruff_text_size::{Ranged, TextSize};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::parser::expression::{ParsedExpr, EXPR_SET};
 use crate::parser::progress::ParserProgress;
@@ -1377,6 +1377,9 @@ impl<'src> Parser<'src> {
         let mut mixed_except_ranges = Vec::new();
         let handlers = self.parse_clauses(Clause::Except, |p| {
             let (handler, kind) = p.parse_except_clause();
+            if let ExceptClauseKind::Star(range) = kind {
+                p.add_unsupported_syntax_error(UnsupportedSyntaxErrorKind::ExceptStar, range);
+            }
             if is_star.is_none() {
                 is_star = Some(kind.is_star());
             } else if is_star != Some(kind.is_star()) {
@@ -1466,11 +1469,7 @@ impl<'src> Parser<'src> {
         // # parse_options: {"target-version": "3.10"}
         // try: ...
         // except* ValueError: ...
-
-        let range = self.node_range(try_start);
-        if is_star {
-            self.add_unsupported_syntax_error(UnsupportedSyntaxErrorKind::ExceptStar, range);
-        }
+        // except* KeyError: ...
 
         ast::StmtTry {
             body: try_body,
@@ -1478,7 +1477,7 @@ impl<'src> Parser<'src> {
             orelse,
             finalbody,
             is_star,
-            range,
+            range: self.node_range(try_start),
         }
     }
 
@@ -1491,8 +1490,9 @@ impl<'src> Parser<'src> {
         let start = self.node_start();
         self.bump(TokenKind::Except);
 
+        let star_position = self.node_start();
         let block_kind = if self.eat(TokenKind::Star) {
-            ExceptClauseKind::Star
+            ExceptClauseKind::Star(TextRange::at(star_position, TextSize::from(1)))
         } else {
             ExceptClauseKind::Normal
         };
@@ -3650,12 +3650,14 @@ enum ExceptClauseKind {
     /// A normal except clause e.g., `except Exception as e: ...`.
     Normal,
     /// An except clause with a star e.g., `except *: ...`.
-    Star,
+    ///
+    /// Contains the star's [`TextRange`] for error reporting.
+    Star(TextRange),
 }
 
 impl ExceptClauseKind {
     const fn is_star(self) -> bool {
-        matches!(self, ExceptClauseKind::Star)
+        matches!(self, ExceptClauseKind::Star(..))
     }
 }
 

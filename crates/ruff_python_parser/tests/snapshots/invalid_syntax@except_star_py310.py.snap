@@ -7,11 +7,11 @@ input_file: crates/ruff_python_parser/resources/inline/err/except_star_py310.py
 ```
 Module(
     ModModule {
-        range: 0..77,
+        range: 0..99,
         body: [
             Try(
                 StmtTry {
-                    range: 44..76,
+                    range: 44..98,
                     body: [
                         Expr(
                             StmtExpr {
@@ -52,6 +52,33 @@ Module(
                                 ],
                             },
                         ),
+                        ExceptHandler(
+                            ExceptHandlerExceptHandler {
+                                range: 77..98,
+                                type_: Some(
+                                    Name(
+                                        ExprName {
+                                            range: 85..93,
+                                            id: Name("KeyError"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ),
+                                name: None,
+                                body: [
+                                    Expr(
+                                        StmtExpr {
+                                            range: 95..98,
+                                            value: EllipsisLiteral(
+                                                ExprEllipsisLiteral {
+                                                    range: 95..98,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
                     ],
                     orelse: [],
                     finalbody: [],
@@ -65,8 +92,17 @@ Module(
 ## Unsupported Syntax Errors
 
   |
-1 |   # parse_options: {"target-version": "3.10"}
-2 | / try: ...
-3 | | except* ValueError: ...
-  | |_______________________^ Syntax Error: Cannot use `except*` on Python 3.10 (syntax was added in Python 3.11)
+1 | # parse_options: {"target-version": "3.10"}
+2 | try: ...
+3 | except* ValueError: ...
+  |       ^ Syntax Error: Cannot use `except*` on Python 3.10 (syntax was added in Python 3.11)
+4 | except* KeyError: ...
+  |
+
+
+  |
+2 | try: ...
+3 | except* ValueError: ...
+4 | except* KeyError: ...
+  |       ^ Syntax Error: Cannot use `except*` on Python 3.10 (syntax was added in Python 3.11)
   |
