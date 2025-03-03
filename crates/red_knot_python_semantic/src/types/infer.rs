@@ -6192,6 +6192,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                 self.infer_type_expression(arguments_slice);
                 todo_type!("`Unpack[]` special form")
             }
+            KnownInstanceType::Protocol => {
+                self.infer_type_expression(arguments_slice);
+                todo_type!("Generic protocol")
+            }
             KnownInstanceType::NoReturn
             | KnownInstanceType::Never
             | KnownInstanceType::Any

@@ -184,6 +184,9 @@ pub(super) fn union_elements_ordering<'db>(left: &Type<'db>, right: &Type<'db>) 
                 (KnownInstanceType::OrderedDict, _) => Ordering::Less,
                 (_, KnownInstanceType::OrderedDict) => Ordering::Greater,
 
+                (KnownInstanceType::Protocol, _) => Ordering::Less,
+                (_, KnownInstanceType::Protocol) => Ordering::Greater,
+
                 (KnownInstanceType::NoReturn, _) => Ordering::Less,
                 (_, KnownInstanceType::NoReturn) => Ordering::Greater,
 

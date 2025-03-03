@@ -144,6 +144,9 @@ impl<'db> ClassBase<'db> {
                 KnownInstanceType::Callable => {
                     Self::try_from_type(db, todo_type!("Support for Callable as a base class"))
                 }
+                KnownInstanceType::Protocol => {
+                    Self::try_from_type(db, todo_type!("Support for protocols"))
+                }
             },
         }
     }
