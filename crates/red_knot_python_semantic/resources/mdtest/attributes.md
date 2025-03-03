@@ -155,6 +155,8 @@ reveal_type(c_instance.declared_in_body_and_init)  # revealed: str | None
 
 reveal_type(c_instance.declared_in_body_defined_in_init)  # revealed: str | None
 
+# TODO: This should be `str | None`. Fixing this requires an overhaul of the `Symbol` API,
+# which is planned in https://github.com/astral-sh/ruff/issues/14297
 reveal_type(c_instance.bound_in_body_declared_in_init)  # revealed: Unknown | str | None
 
 reveal_type(c_instance.bound_in_body_and_init)  # revealed: Unknown | None | Literal["a"]
