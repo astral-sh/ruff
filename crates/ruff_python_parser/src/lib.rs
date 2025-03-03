@@ -344,22 +344,18 @@ impl<T> Parsed<T> {
 
     /// Returns `true` if the parsed source code is valid i.e., it has no syntax errors.
     ///
-    /// Note that this does not include version-related
-    /// [`unsupported_syntax_errors`](Parsed::unsupported_syntax_errors).
+    /// Note that this does not include version-related [`Parsed::unsupported_syntax_errors`].
     ///
-    /// See [`has_no_syntax_errors`](Parsed::has_no_syntax_errors) for a version that takes these
-    /// into account.
+    /// See [`Parsed::has_no_syntax_errors`] for a version that takes these into account.
     pub fn has_valid_syntax(&self) -> bool {
         self.errors.is_empty()
     }
 
     /// Returns `true` if the parsed source code is invalid i.e., it has syntax errors.
     ///
-    /// Note that this does not include version-related
-    /// [`unsupported_syntax_errors`](Parsed::unsupported_syntax_errors).
+    /// Note that this does not include version-related [`Parsed::unsupported_syntax_errors`].
     ///
-    /// See [`has_no_syntax_errors`](Parsed::has_no_syntax_errors) for a version that takes these
-    /// into account.
+    /// See [`Parsed::has_no_syntax_errors`] for a version that takes these into account.
     pub fn has_invalid_syntax(&self) -> bool {
         !self.has_valid_syntax()
     }
