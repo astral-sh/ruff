@@ -17,11 +17,19 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// for x in foo:
 ///     yield x
+///
+/// global y
+/// for y in foo:
+///     yield y
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// yield from foo
+///
+/// for _element in foo
+///     y = _element
+///     yield y
 /// ```
 ///
 /// ## Fix safety
@@ -30,6 +38,9 @@ use crate::checkers::ast::Checker;
 /// For example, if a generator is being sent values via `send`, then rewriting
 /// to a `yield from` could lead to an attribute error if the underlying
 /// generator does not implement the `send` method.
+///
+/// Additionally, if at least one target is `global` or `nonlocal`,
+/// no fix will be offered.
 ///
 /// In most cases, however, the fix is safe, and such a modification should have
 /// no effect on the behavior of the program.
