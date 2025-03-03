@@ -5,7 +5,7 @@ use colored::Colorize;
 use parser as test_parser;
 use red_knot_python_semantic::types::check_types;
 use red_knot_python_semantic::{Program, ProgramSettings, PythonPath, SearchPathSettings};
-use ruff_db::diagnostic::{DisplayDiagnosticConfig, OldDiagnosticTrait, ParseDiagnostic};
+use ruff_db::diagnostic::{DisplayDiagnosticConfig, OldDiagnosticTrait, OldParseDiagnostic};
 use ruff_db::files::{system_path_to_file, File, Files};
 use ruff_db::panic::catch_unwind;
 use ruff_db::parsed::parsed_module;
@@ -201,7 +201,7 @@ fn run_test(
                 .cloned()
                 .map(|error| {
                     let diagnostic: Box<dyn OldDiagnosticTrait> =
-                        Box::new(ParseDiagnostic::new(test_file.file, error));
+                        Box::new(OldParseDiagnostic::new(test_file.file, error));
                     diagnostic
                 })
                 .collect();
