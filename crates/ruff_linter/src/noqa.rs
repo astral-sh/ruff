@@ -198,7 +198,7 @@ impl<'a> From<&'a FileNoqaDirectives<'a>> for FileExemption<'a> {
         if directives
             .lines()
             .iter()
-            .any(|line| matches!(line.parsed_file_exemption, ParsedFileExemption::All))
+            .any(|line| matches!(line.parsed_file_exemption, ParsedNoqaDirective::All(_)))
         {
             FileExemption::All(codes)
         } else {
@@ -213,7 +213,7 @@ pub(crate) struct FileNoqaDirectiveLine<'a> {
     /// The range of the text line for which the noqa directive applies.
     pub(crate) range: TextRange,
     /// The blanket noqa directive.
-    pub(crate) parsed_file_exemption: ParsedFileExemption<'a>,
+    pub(crate) parsed_file_exemption: ParsedNoqaDirective<'a>,
     /// The codes that are ignored by the parsed exemptions.
     pub(crate) matches: Vec<NoqaCode>,
 }
@@ -264,12 +264,11 @@ impl<'a> FileNoqaDirectives<'a> {
                         }
                     }
 
-                    let exemption = ParsedFileExemption::from(directive);
-                    let matches = match &exemption {
-                        ParsedFileExemption::All => {
+                    let matches = match &directive {
+                        ParsedNoqaDirective::All(_) => {
                             vec![]
                         }
-                        ParsedFileExemption::Codes(codes) => {
+                        ParsedNoqaDirective::Codes(codes) => {
                             codes.iter().filter_map(|code| {
                                 let code = code.as_str();
                                 // Ignore externally-defined rules.
@@ -293,7 +292,7 @@ impl<'a> FileNoqaDirectives<'a> {
 
                     lines.push(FileNoqaDirectiveLine {
                         range,
-                        parsed_file_exemption: exemption,
+                        parsed_file_exemption: directive,
                         matches,
                     });
                 }
@@ -314,28 +313,8 @@ impl<'a> FileNoqaDirectives<'a> {
     }
 }
 
-/// An individual file-level exemption (e.g., `# ruff: noqa` or `# ruff: noqa: F401, F841`). Like
-/// [`FileNoqaDirectives`], but only for a single line, as opposed to an aggregated set of exemptions
-/// across a source file.
-#[derive(Debug)]
-pub(crate) enum ParsedFileExemption<'a> {
-    /// The file-level exemption ignores all rules (e.g., `# ruff: noqa`).
-    All,
-    /// The file-level exemption ignores specific rules (e.g., `# ruff: noqa: F401, F841`).
-    Codes(Codes<'a>),
-}
-
-impl<'a> ParsedFileExemption<'a> {
-    /// Return a [`ParsedFileExemption`] for a given `comment_range` in `source`.
-    fn try_extract(comment_range: TextRange, source: &'a str) -> Result<Option<Self>, ParseError> {
-        let parsed = parse_file_exemption(comment_range, source)?;
-        Ok(parsed.map(|parsed_noqa| Self::from(parsed_noqa.directive)))
-    }
-}
-
 /// An individual suppression directive, which may either be
 /// in-line or file-level.
-/// Unifies [`ParsedFileExemption`] and [`Directive`].
 #[derive(Debug)]
 pub(crate) enum ParsedNoqaDirective<'a> {
     /// Suppress all rules (e.g. `# noqa` or `# ruff: noqa`)
@@ -348,14 +327,6 @@ impl<'a> From<ParsedNoqaDirective<'a>> for Directive<'a> {
     fn from(value: ParsedNoqaDirective<'a>) -> Self {
         match value {
             ParsedNoqaDirective::All(all) => Self::All(all),
-            ParsedNoqaDirective::Codes(codes) => Self::Codes(codes),
-        }
-    }
-}
-impl<'a> From<ParsedNoqaDirective<'a>> for ParsedFileExemption<'a> {
-    fn from(value: ParsedNoqaDirective<'a>) -> Self {
-        match value {
-            ParsedNoqaDirective::All(_) => Self::All,
             ParsedNoqaDirective::Codes(codes) => Self::Codes(codes),
         }
     }
