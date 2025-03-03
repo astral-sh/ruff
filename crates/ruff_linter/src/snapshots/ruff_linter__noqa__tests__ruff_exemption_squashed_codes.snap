@@ -1,0 +1,19 @@
+---
+source: crates/ruff_linter/src/noqa.rs
+expression: "ParsedFileExemption::try_extract(TextRange::up_to(source.text_len()), source,)"
+---
+Ok(
+    Some(
+        Codes(
+            Codes {
+                range: 0..22,
+                codes: [
+                    Code {
+                        code: "F401F841",
+                        range: 14..22,
+                    },
+                ],
+            },
+        ),
+    ),
+)

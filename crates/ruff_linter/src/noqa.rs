@@ -1163,6 +1163,12 @@ mod tests {
     }
 
     #[test]
+    fn noqa_code_leading_hashes() {
+        let source = "###noqa: F401";
+        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+    }
+
+    #[test]
     fn noqa_all_leading_comment() {
         let source = "# Some comment describing the noqa # noqa";
         assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
@@ -1229,6 +1235,12 @@ mod tests {
     }
 
     #[test]
+    fn noqa_code_invalid_code_suffix() {
+        let source = "# noqa: F401abc";
+        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+    }
+
+    #[test]
     fn noqa_invalid_suffix() {
         let source = "# noqa[F401]";
         assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
@@ -1283,6 +1295,122 @@ mod tests {
     #[test]
     fn ruff_exemption_codes() {
         let source = "# ruff: noqa: F401, F841";
+        assert_debug_snapshot!(ParsedFileExemption::try_extract(
+            TextRange::up_to(source.text_len()),
+            source,
+        ));
+    }
+    #[test]
+    fn ruff_exemption_codes_leading_hashes() {
+        let source = "#### ruff: noqa: F401, F841";
+        assert_debug_snapshot!(ParsedFileExemption::try_extract(
+            TextRange::up_to(source.text_len()),
+            source,
+        ));
+    }
+
+    #[test]
+    fn ruff_exemption_squashed_codes() {
+        let source = "# ruff: noqa: F401F841";
+        assert_debug_snapshot!(ParsedFileExemption::try_extract(
+            TextRange::up_to(source.text_len()),
+            source,
+        ));
+    }
+
+    #[test]
+    fn ruff_exemption_empty_comma() {
+        let source = "# ruff: noqa: F401,,F841";
+        assert_debug_snapshot!(ParsedFileExemption::try_extract(
+            TextRange::up_to(source.text_len()),
+            source,
+        ));
+    }
+
+    #[test]
+    fn ruff_exemption_empty_comma_space() {
+        let source = "# ruff: noqa: F401, ,F841";
+        assert_debug_snapshot!(ParsedFileExemption::try_extract(
+            TextRange::up_to(source.text_len()),
+            source,
+        ));
+    }
+
+    #[test]
+    fn ruff_exemption_invalid_code_suffix() {
+        let source = "# ruff: noqa: F401abc";
+        assert_debug_snapshot!(ParsedFileExemption::try_extract(
+            TextRange::up_to(source.text_len()),
+            source,
+        ));
+    }
+
+    #[test]
+    fn ruff_exemption_code_leading_comment() {
+        let source = "# Leading comment # ruff: noqa: F401";
+        assert_debug_snapshot!(ParsedFileExemption::try_extract(
+            TextRange::up_to(source.text_len()),
+            source,
+        ));
+    }
+
+    #[test]
+    fn ruff_exemption_code_trailing_comment() {
+        let source = "# ruff: noqa: F401 # Trailing comment";
+        assert_debug_snapshot!(ParsedFileExemption::try_extract(
+            TextRange::up_to(source.text_len()),
+            source,
+        ));
+    }
+
+    #[test]
+    fn ruff_exemption_all_leading_comment() {
+        let source = "# Leading comment # ruff: noqa";
+        assert_debug_snapshot!(ParsedFileExemption::try_extract(
+            TextRange::up_to(source.text_len()),
+            source,
+        ));
+    }
+
+    #[test]
+    fn ruff_exemption_all_trailing_comment() {
+        let source = "# ruff: noqa # Trailing comment";
+        assert_debug_snapshot!(ParsedFileExemption::try_extract(
+            TextRange::up_to(source.text_len()),
+            source,
+        ));
+    }
+
+    #[test]
+    fn ruff_exemption_code_trailing_comment_no_space() {
+        let source = "# ruff: noqa: F401# And another comment";
+        assert_debug_snapshot!(ParsedFileExemption::try_extract(
+            TextRange::up_to(source.text_len()),
+            source,
+        ));
+    }
+
+    #[test]
+    fn ruff_exemption_all_trailing_comment_no_space() {
+        let source = "# ruff: noqa# Trailing comment";
+        assert_debug_snapshot!(ParsedFileExemption::try_extract(
+            TextRange::up_to(source.text_len()),
+            source,
+        ));
+    }
+
+    #[test]
+    fn ruff_exemption_all_trailing_comment_no_hash() {
+        let source = "# ruff: noqa Trailing comment";
+        assert_debug_snapshot!(ParsedFileExemption::try_extract(
+            TextRange::up_to(source.text_len()),
+            source,
+        ));
+    }
+
+    #[test]
+    fn ruff_exemption_code_trailing_comment_no_hash() {
+        let source = "# ruff: noqa: F401 Trailing comment";
         assert_debug_snapshot!(ParsedFileExemption::try_extract(
             TextRange::up_to(source.text_len()),
             source,

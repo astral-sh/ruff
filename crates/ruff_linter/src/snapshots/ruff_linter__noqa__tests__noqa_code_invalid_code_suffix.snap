@@ -1,0 +1,19 @@
+---
+source: crates/ruff_linter/src/noqa.rs
+expression: "Directive::try_extract(source, TextSize::default())"
+---
+Ok(
+    Some(
+        Codes(
+            Codes {
+                range: 0..12,
+                codes: [
+                    Code {
+                        code: "F401",
+                        range: 8..12,
+                    },
+                ],
+            },
+        ),
+    ),
+)
