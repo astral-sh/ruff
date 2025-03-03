@@ -1,7 +1,9 @@
 ---
 source: crates/ruff_linter/src/noqa.rs
-expression: "ParsedFileExemption::try_extract(TextRange::up_to(source.text_len()), source,)"
+expression: exemption
 ---
 Ok(
-    None,
+    Some(
+        All,
+    ),
 )
