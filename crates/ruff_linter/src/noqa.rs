@@ -311,12 +311,11 @@ pub(crate) struct ParsedNoqa<'a> {
 
 /// Marks the beginning of an in-line `noqa` directive
 static NOQA_DIRECTIVE_PREFIX: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"#[\t\v\f\r ]*(?i)noqa").unwrap());
+    LazyLock::new(|| Regex::new(r"#\s*(?i)noqa").unwrap());
 
 /// Marks the beginning of a file-level exemption comment
-static FILE_EXEMPTION_PREFIX: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"#[\t\v\f\r ]*(?:ruff|flake8)[\t\v\f\r ]*:[\t\v\f\r ]*(?i)noqa").unwrap()
-});
+static FILE_EXEMPTION_PREFIX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"#\s*(?:ruff|flake8)\s*:\s*(?i)noqa").unwrap());
 
 /// Parses in-line `noqa` comment, e.g. `# noqa: F401`
 pub(crate) fn parse_inline_noqa(
