@@ -1,7 +1,23 @@
 ---
 source: crates/ruff_linter/src/noqa.rs
-expression: "ParsedFileExemption::try_extract(TextRange::up_to(source.text_len()), source,)"
+expression: exemption
 ---
 Ok(
-    None,
+    Some(
+        Codes(
+            Codes {
+                range: 3..27,
+                codes: [
+                    Code {
+                        code: "F401",
+                        range: 17..21,
+                    },
+                    Code {
+                        code: "F841",
+                        range: 23..27,
+                    },
+                ],
+            },
+        ),
+    ),
 )
