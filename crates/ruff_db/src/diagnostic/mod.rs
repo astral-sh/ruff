@@ -1,14 +1,12 @@
-use std::borrow::Cow;
 use std::fmt::Formatter;
 
 use thiserror::Error;
 
 use ruff_annotate_snippets::Level as AnnotateLevel;
-use ruff_python_parser::ParseError;
 use ruff_text_size::TextRange;
 
 pub use crate::diagnostic::old::{
-    OldDiagnosticTrait, OldDisplayDiagnostic, OldSecondaryDiagnosticMessage,
+    OldDiagnosticTrait, OldDisplayDiagnostic, OldParseDiagnostic, OldSecondaryDiagnosticMessage,
 };
 use crate::files::File;
 
@@ -243,35 +241,5 @@ impl DisplayDiagnosticConfig {
     /// Whether to enable colors or not.
     pub fn color(self, yes: bool) -> DisplayDiagnosticConfig {
         DisplayDiagnosticConfig { color: yes }
-    }
-}
-
-#[derive(Debug)]
-pub struct OldParseDiagnostic {
-    file: File,
-    error: ParseError,
-}
-
-impl OldParseDiagnostic {
-    pub fn new(file: File, error: ParseError) -> Self {
-        Self { file, error }
-    }
-}
-
-impl OldDiagnosticTrait for OldParseDiagnostic {
-    fn id(&self) -> DiagnosticId {
-        DiagnosticId::InvalidSyntax
-    }
-
-    fn message(&self) -> Cow<str> {
-        self.error.error.to_string().into()
-    }
-
-    fn span(&self) -> Option<Span> {
-        Some(Span::from(self.file).with_range(self.error.location))
-    }
-
-    fn severity(&self) -> Severity {
-        Severity::Error
     }
 }

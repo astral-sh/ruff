@@ -4,11 +4,13 @@ use ruff_annotate_snippets::{
     Annotation as AnnotateAnnotation, Level as AnnotateLevel, Message as AnnotateMessage,
     Renderer as AnnotateRenderer, Snippet as AnnotateSnippet,
 };
+use ruff_python_parser::ParseError;
 use ruff_source_file::{OneIndexed, SourceCode};
 use ruff_text_size::TextRange;
 
 use crate::{
     diagnostic::{DiagnosticId, DisplayDiagnosticConfig, Severity, Span},
+    files::File,
     source::{line_index, source_text},
     Db,
 };
@@ -340,5 +342,35 @@ impl OldDiagnosticTrait for std::sync::Arc<dyn OldDiagnosticTrait> {
 
     fn severity(&self) -> Severity {
         (**self).severity()
+    }
+}
+
+#[derive(Debug)]
+pub struct OldParseDiagnostic {
+    file: File,
+    error: ParseError,
+}
+
+impl OldParseDiagnostic {
+    pub fn new(file: File, error: ParseError) -> Self {
+        Self { file, error }
+    }
+}
+
+impl OldDiagnosticTrait for OldParseDiagnostic {
+    fn id(&self) -> DiagnosticId {
+        DiagnosticId::InvalidSyntax
+    }
+
+    fn message(&self) -> Cow<str> {
+        self.error.error.to_string().into()
+    }
+
+    fn span(&self) -> Option<Span> {
+        Some(Span::from(self.file).with_range(self.error.location))
+    }
+
+    fn severity(&self) -> Severity {
+        Severity::Error
     }
 }
