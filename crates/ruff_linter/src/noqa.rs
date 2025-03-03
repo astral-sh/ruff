@@ -38,7 +38,7 @@ pub fn generate_noqa_edits(
 ) -> Vec<Option<Edit>> {
     let file_directives = FileNoqaDirectives::extract(locator, comment_ranges, external, path);
     let exemption = FileExemption::from(&file_directives);
-    let directives = NoqaDirectives::from_commented_ranges(comment_ranges, path, locator);
+    let directives = NoqaDirectives::from_commented_ranges(comment_ranges, external, path, locator);
     let comments = find_noqa_comments(diagnostics, locator, &exemption, &directives, noqa_line_for);
     build_noqa_edits_by_diagnostic(comments, locator, line_ending)
 }
@@ -241,22 +241,30 @@ impl<'a> FileNoqaDirectives<'a> {
         let mut lines = vec![];
 
         for range in comment_ranges {
-            match ParsedFileExemption::try_extract(range, locator.contents()) {
-                Err(err) => {
-                    #[allow(deprecated)]
-                    let line = locator.compute_line_index(range.start());
-                    let path_display = relativize_path(path);
-                    warn!("Invalid `# ruff: noqa` directive at {path_display}:{line}: {err}");
-                }
-                Ok(Some(exemption)) => {
-                    if indentation_at_offset(range.start(), locator.contents()).is_none() {
+            let parsed = parse_file_exemption(range, locator.contents());
+            match parsed {
+                Ok(Some(ParsedNoqa {
+                    warnings,
+                    directive,
+                })) => {
+                    let no_indentation_at_offset =
+                        indentation_at_offset(range.start(), locator.contents()).is_none();
+                    if !warnings.is_empty() || no_indentation_at_offset {
                         #[allow(deprecated)]
                         let line = locator.compute_line_index(range.start());
                         let path_display = relativize_path(path);
-                        warn!("Unexpected `# ruff: noqa` directive at {path_display}:{line}. File-level suppression comments must appear on their own line. For line-level suppression, omit the `ruff:` prefix.");
-                        continue;
+
+                        for warning in warnings {
+                            warn!("Missing or joined rule code(s) at {path_display}:{line}: {warning}")
+                        }
+
+                        if no_indentation_at_offset {
+                            warn!("Unexpected `# ruff: noqa` directive at {path_display}:{line}. File-level suppression comments must appear on their own line. For line-level suppression, omit the `ruff:` prefix.");
+                            continue;
+                        }
                     }
 
+                    let exemption = ParsedFileExemption::from(directive);
                     let matches = match &exemption {
                         ParsedFileExemption::All => {
                             vec![]
@@ -289,10 +297,15 @@ impl<'a> FileNoqaDirectives<'a> {
                         matches,
                     });
                 }
+                Err(err) => {
+                    #[allow(deprecated)]
+                    let line = locator.compute_line_index(range.start());
+                    let path_display = relativize_path(path);
+                    warn!("Invalid `# ruff: noqa` directive at {path_display}:{line}: {err}");
+                }
                 Ok(None) => {}
-            }
+            };
         }
-
         Self(lines)
     }
 
@@ -711,6 +724,17 @@ enum ParseWarning {
     MissingDelimiter(TextRange),
 }
 
+impl Display for ParseWarning {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::MissingItem(_) => f.write_str("expected rule code between commas"),
+            Self::MissingDelimiter(_) => {
+                f.write_str("expected comma or space delimiter between codes")
+            }
+        }
+    }
+}
+
 impl Ranged for ParseWarning {
     fn range(&self) -> TextRange {
         match self {
@@ -788,7 +812,7 @@ fn add_noqa_inner(
     let directives = FileNoqaDirectives::extract(locator, comment_ranges, external, path);
     let exemption = FileExemption::from(&directives);
 
-    let directives = NoqaDirectives::from_commented_ranges(comment_ranges, path, locator);
+    let directives = NoqaDirectives::from_commented_ranges(comment_ranges, external, path, locator);
 
     let comments = find_noqa_comments(diagnostics, locator, &exemption, &directives, noqa_line_for);
 
@@ -1081,20 +1105,50 @@ pub(crate) struct NoqaDirectives<'a> {
 impl<'a> NoqaDirectives<'a> {
     pub(crate) fn from_commented_ranges(
         comment_ranges: &CommentRanges,
+        external: &[String],
         path: &Path,
         locator: &'a Locator<'a>,
     ) -> Self {
         let mut directives = Vec::new();
 
         for range in comment_ranges {
-            match Directive::try_extract(range, locator.contents()) {
-                Err(err) => {
-                    #[allow(deprecated)]
-                    let line = locator.compute_line_index(range.start());
-                    let path_display = relativize_path(path);
-                    warn!("Invalid `# noqa` directive on {path_display}:{line}: {err}");
-                }
-                Ok(Some(directive)) => {
+            let parsed = parse_inline_noqa(range, locator.contents());
+
+            match parsed {
+                Ok(Some(ParsedNoqa {
+                    warnings,
+                    directive,
+                })) => {
+                    if !warnings.is_empty() {
+                        #[allow(deprecated)]
+                        let line = locator.compute_line_index(range.start());
+                        let path_display = relativize_path(path);
+                        for warning in warnings {
+                            warn!("Missing or joined rule code(s) at {path_display}:{line}: {warning}")
+                        }
+                    }
+                    let directive = Directive::from(directive);
+                    if let Directive::Codes(codes) = &directive {
+                        // Warn on invalid rule codes.
+                        for code in &codes.codes {
+                            // Ignore externally-defined rules.
+                            if !external
+                                .iter()
+                                .any(|external| code.as_str().starts_with(external))
+                            {
+                                if Rule::from_code(
+                                    get_redirect_target(code.as_str()).unwrap_or(code.as_str()),
+                                )
+                                .is_err()
+                                {
+                                    #[allow(deprecated)]
+                                    let line = locator.compute_line_index(range.start());
+                                    let path_display = relativize_path(path);
+                                    warn!("Invalid rule code provided to `# noqa` at {path_display}:{line}: {code}");
+                                }
+                            }
+                        }
+                    }
                     // noqa comments are guaranteed to be single line.
                     let range = locator.line_range(range.start());
                     directives.push(NoqaDirectiveLine {
@@ -1103,6 +1157,12 @@ impl<'a> NoqaDirectives<'a> {
                         matches: Vec::new(),
                         includes_end: range.end() == locator.contents().text_len(),
                     });
+                }
+                Err(err) => {
+                    #[allow(deprecated)]
+                    let line = locator.compute_line_index(range.start());
+                    let path_display = relativize_path(path);
+                    warn!("Invalid `# noqa` directive on {path_display}:{line}: {err}");
                 }
                 Ok(None) => {}
             }
