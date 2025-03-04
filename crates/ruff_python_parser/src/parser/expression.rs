@@ -882,7 +882,6 @@ impl<'src> Parser<'src> {
                 self.parse_named_expression_or_higher(ExpressionContext::starred_conditional());
 
             if self.at_ts(NEWLINE_EOF_SET.union([TokenKind::Rsqb, TokenKind::Comma].into())) {
-                // check this here because if we don't return, we will emit a ParseError instead
                 if lower.is_unparenthesized_named_expr() {
                     self.add_unsupported_syntax_error(
                         UnsupportedSyntaxErrorKind::UnparenthesizedNamedExpr,
