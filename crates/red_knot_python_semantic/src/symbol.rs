@@ -504,14 +504,6 @@ fn symbol_impl<'db>(
 ) -> Symbol<'db> {
     let _span = tracing::trace_span!("symbol", ?name).entered();
 
-    // We don't need to check for `typing_extensions` here, because `typing_extensions.TYPE_CHECKING`
-    // is just a re-export of `typing.TYPE_CHECKING`.
-    if name == "TYPE_CHECKING"
-        && file_to_module(db, scope.file(db))
-            .is_some_and(|module| module.is_known(KnownModule::Typing))
-    {
-        return Symbol::bound(Type::BooleanLiteral(true));
-    }
     if name == "platform"
         && file_to_module(db, scope.file(db))
             .is_some_and(|module| module.is_known(KnownModule::Sys))

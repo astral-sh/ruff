@@ -83,9 +83,10 @@ use super::class_base::ClassBase;
 use super::context::{InNoTypeCheck, InferContext, WithDiagnostics};
 use super::diagnostic::{
     report_index_out_of_bounds, report_invalid_exception_caught, report_invalid_exception_cause,
-    report_invalid_exception_raised, report_non_subscriptable,
-    report_possibly_unresolved_reference, report_slice_step_size_zero, report_unresolved_reference,
-    INVALID_METACLASS, STATIC_ASSERT_ERROR, SUBCLASS_OF_FINAL_CLASS, TYPE_ASSERTION_FAILURE,
+    report_invalid_exception_raised, report_invalid_type_checking_constant,
+    report_non_subscriptable, report_possibly_unresolved_reference, report_slice_step_size_zero,
+    report_unresolved_reference, INVALID_METACLASS, STATIC_ASSERT_ERROR, SUBCLASS_OF_FINAL_CLASS,
+    TYPE_ASSERTION_FAILURE,
 };
 use super::slots::check_class_slots;
 use super::string_annotation::{
@@ -2153,6 +2154,15 @@ impl<'db> TypeInferenceBuilder<'db> {
                 // at runtime, but is always considered `True` in type checking.
                 // See mdtest/known_constants.md#user-defined-type_checking for details.
                 if &name.id == "TYPE_CHECKING" {
+                    if !matches!(
+                        value.as_boolean_literal_expr(),
+                        Some(ast::ExprBooleanLiteral { value: false, .. })
+                    ) {
+                        report_invalid_type_checking_constant(
+                            &self.context,
+                            assignment.name().into(),
+                        );
+                    }
                     Type::BooleanLiteral(true)
                 } else if self.in_stub() && value.is_ellipsis_literal_expr() {
                     Type::unknown()
@@ -2209,6 +2219,34 @@ impl<'db> TypeInferenceBuilder<'db> {
             DeferredExpressionState::from(self.are_all_types_deferred()),
         );
 
+        if target
+            .as_name_expr()
+            .is_some_and(|name| &name.id == "TYPE_CHECKING")
+        {
+            if !KnownClass::Bool
+                .to_instance(self.db())
+                .is_assignable_to(self.db(), declared_ty.inner_type())
+            {
+                // annotation not assignable from `bool` is an error
+                report_invalid_type_checking_constant(&self.context, assignment.into());
+            } else if self.in_stub()
+                && value
+                    .as_ref()
+                    .is_none_or(|value| value.is_ellipsis_literal_expr())
+            {
+                // stub file assigning nothing or `...` is fine
+            } else if !matches!(
+                value
+                    .as_ref()
+                    .and_then(|value| value.as_boolean_literal_expr()),
+                Some(ast::ExprBooleanLiteral { value: false, .. })
+            ) {
+                // otherwise, assigning something other than `False` is an error
+                report_invalid_type_checking_constant(&self.context, assignment.into());
+            }
+            declared_ty.inner = Type::BooleanLiteral(true);
+        }
+
         // Handle various singletons.
         if let Type::Instance(instance) = declared_ty.inner_type() {
             if instance
@@ -2229,7 +2267,12 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         if let Some(value) = value.as_deref() {
             let inferred_ty = self.infer_expression(value);
-            let inferred_ty = if self.in_stub() && value.is_ellipsis_literal_expr() {
+            let inferred_ty = if target
+                .as_name_expr()
+                .is_some_and(|name| &name.id == "TYPE_CHECKING")
+            {
+                Type::BooleanLiteral(true)
+            } else if self.in_stub() && value.is_ellipsis_literal_expr() {
                 declared_ty.inner_type()
             } else {
                 inferred_ty
