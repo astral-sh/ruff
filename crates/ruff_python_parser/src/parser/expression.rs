@@ -715,6 +715,8 @@ impl<'src> Parser<'src> {
                         // test_err parenthesized_kwarg_py38
                         // # parse_options: {"target-version": "3.8"}
                         // f((a)=1)
+                        // f((a) = 1)
+                        // f( ( a ) = 1)
 
                         if let Some(range) = parenthesized_range {
                             parser.add_unsupported_syntax_error(
