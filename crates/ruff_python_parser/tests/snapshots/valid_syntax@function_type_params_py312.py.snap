@@ -1,0 +1,65 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/function_type_params_py312.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..62,
+        body: [
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 44..61,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("foo"),
+                        range: 48..51,
+                    },
+                    type_params: Some(
+                        TypeParams {
+                            range: 51..54,
+                            type_params: [
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        range: 52..53,
+                                        name: Identifier {
+                                            id: Name("T"),
+                                            range: 52..53,
+                                        },
+                                        bound: None,
+                                        default: None,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    parameters: Parameters {
+                        range: 54..56,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 58..61,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 58..61,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
