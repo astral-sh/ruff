@@ -2693,6 +2693,7 @@ dependencies = [
  "ruff_notebook",
  "ruff_python_ast",
  "ruff_python_formatter",
+ "ruff_python_parser",
  "ruff_server",
  "ruff_source_file",
  "ruff_text_size",

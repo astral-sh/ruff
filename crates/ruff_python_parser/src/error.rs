@@ -450,16 +450,22 @@ pub enum UnsupportedSyntaxErrorKind {
     Walrus,
     ExceptStar,
     ParenthesizedKeywordArgumentName,
+    TypeAliasStatement,
+    TypeParamDefault,
 }
 
 impl Display for UnsupportedSyntaxError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let kind = match self.kind {
-            UnsupportedSyntaxErrorKind::Match => "`match` statement",
-            UnsupportedSyntaxErrorKind::Walrus => "named assignment expression (`:=`)",
-            UnsupportedSyntaxErrorKind::ExceptStar => "`except*`",
+            UnsupportedSyntaxErrorKind::Match => "Cannot use `match` statement",
+            UnsupportedSyntaxErrorKind::Walrus => "Cannot use named assignment expression (`:=`)",
+            UnsupportedSyntaxErrorKind::ExceptStar => "Cannot use `except*`",
             UnsupportedSyntaxErrorKind::ParenthesizedKeywordArgumentName => {
-                "parenthesized keyword argument name"
+                "Cannot use parenthesized keyword argument name"
+            }
+            UnsupportedSyntaxErrorKind::TypeAliasStatement => "Cannot use `type` alias statement",
+            UnsupportedSyntaxErrorKind::TypeParamDefault => {
+                "Cannot set default type for a type parameter"
             }
         };
 
@@ -467,7 +473,7 @@ impl Display for UnsupportedSyntaxError {
 
         write!(
             f,
-            "Cannot use {kind} on Python {} (syntax was {changed} in Python {changed_version})",
+            "{kind} on Python {} (syntax was {changed} in Python {changed_version})",
             self.target_version,
         )
     }
@@ -502,6 +508,8 @@ impl UnsupportedSyntaxErrorKind {
             UnsupportedSyntaxErrorKind::ParenthesizedKeywordArgumentName => {
                 (Change::Removed, PythonVersion::PY38)
             }
+            UnsupportedSyntaxErrorKind::TypeAliasStatement => (Change::Added, PythonVersion::PY312),
+            UnsupportedSyntaxErrorKind::TypeParamDefault => (Change::Added, PythonVersion::PY313),
         }
     }
 
@@ -520,7 +528,9 @@ impl UnsupportedSyntaxErrorKind {
         match self {
             UnsupportedSyntaxErrorKind::Match
             | UnsupportedSyntaxErrorKind::Walrus
-            | UnsupportedSyntaxErrorKind::ExceptStar => target_version < version,
+            | UnsupportedSyntaxErrorKind::ExceptStar
+            | UnsupportedSyntaxErrorKind::TypeAliasStatement
+            | UnsupportedSyntaxErrorKind::TypeParamDefault => target_version < version,
             UnsupportedSyntaxErrorKind::ParenthesizedKeywordArgumentName => {
                 target_version >= version
             }
