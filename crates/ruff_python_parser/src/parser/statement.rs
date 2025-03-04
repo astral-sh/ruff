@@ -3242,7 +3242,7 @@ impl<'src> Parser<'src> {
                 None
             };
 
-            let default_start = self.node_start();
+            let equal_token_start = self.node_start();
             let default = if self.eat(TokenKind::Equal) {
                 if self.at_expr() {
                     // test_err type_param_type_var_invalid_default_expr
@@ -3284,7 +3284,7 @@ impl<'src> Parser<'src> {
             if default.is_some() {
                 self.add_unsupported_syntax_error(
                     UnsupportedSyntaxErrorKind::TypeParamDefault,
-                    self.node_range(default_start),
+                    self.node_range(equal_token_start),
                 );
             }
 
