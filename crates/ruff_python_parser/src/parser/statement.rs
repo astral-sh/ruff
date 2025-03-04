@@ -899,6 +899,11 @@ impl<'src> Parser<'src> {
         // # parse_options: {"target-version": "3.11"}
         // type x = int
 
+        self.add_unsupported_syntax_error(
+            UnsupportedSyntaxErrorKind::TypeAliasStatement,
+            type_range,
+        );
+
         let mut name = Expr::Name(self.parse_name());
         helpers::set_expr_ctx(&mut name, ExprContext::Store);
 
@@ -917,11 +922,6 @@ impl<'src> Parser<'src> {
         // type x = yield from y
         // type x = x := 1
         let value = self.parse_conditional_expression_or_higher();
-
-        self.add_unsupported_syntax_error(
-            UnsupportedSyntaxErrorKind::TypeAliasStatement,
-            type_range,
-        );
 
         ast::StmtTypeAlias {
             name: Box::new(name),
