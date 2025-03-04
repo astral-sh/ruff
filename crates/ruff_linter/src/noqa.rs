@@ -36,159 +36,19 @@ pub fn generate_noqa_edits(
 ) -> Vec<Option<Edit>> {
     let file_directives = FileNoqaDirectives::extract(locator, comment_ranges, external, path);
     let exemption = FileExemption::from(&file_directives);
-    let directives = NoqaDirectives::from_commented_ranges(comment_ranges, path, locator);
+    let directives = NoqaDirectives::from_commented_ranges(comment_ranges, external, path, locator);
     let comments = find_noqa_comments(diagnostics, locator, &exemption, &directives, noqa_line_for);
     build_noqa_edits_by_diagnostic(comments, locator, line_ending)
 }
 
-/// A directive to ignore a set of rules for a given line of Python source code (e.g.,
-/// `# noqa: F401, F841`).
+/// A directive to ignore a set of rules either for a given line of Python source code or an entire file (e.g.,
+/// `# noqa: F401, F841` or `#ruff: noqa: F401, F841`).
 #[derive(Debug)]
 pub(crate) enum Directive<'a> {
     /// The `noqa` directive ignores all rules (e.g., `# noqa`).
     All(All),
     /// The `noqa` directive ignores specific rules (e.g., `# noqa: F401, F841`).
     Codes(Codes<'a>),
-}
-
-impl<'a> Directive<'a> {
-    /// Extract the noqa `Directive` from a line of Python source code.
-    pub(crate) fn try_extract(text: &'a str, offset: TextSize) -> Result<Option<Self>, ParseError> {
-        for (char_index, char) in text.char_indices() {
-            // Only bother checking for the `noqa` literal if the character is `n` or `N`.
-            if !matches!(char, 'n' | 'N') {
-                continue;
-            }
-
-            // Determine the start of the `noqa` literal.
-            if !matches!(
-                text[char_index..].as_bytes(),
-                [b'n' | b'N', b'o' | b'O', b'q' | b'Q', b'a' | b'A', ..]
-            ) {
-                continue;
-            }
-
-            let noqa_literal_start = char_index;
-            let noqa_literal_end = noqa_literal_start + "noqa".len();
-
-            // Determine the start of the comment.
-            let mut comment_start = noqa_literal_start;
-
-            // Trim any whitespace between the `#` character and the `noqa` literal.
-            comment_start = text[..comment_start].trim_end().len();
-
-            // The next character has to be the `#` character.
-            if !text[..comment_start].ends_with('#') {
-                continue;
-            }
-            comment_start -= '#'.len_utf8();
-
-            // If the next character is `:`, then it's a list of codes. Otherwise, it's a directive
-            // to ignore all rules.
-            let directive = match text[noqa_literal_end..].chars().next() {
-                Some(':') => {
-                    // E.g., `# noqa: F401, F841`.
-                    let mut codes_start = noqa_literal_end;
-
-                    // Skip the `:` character.
-                    codes_start += ':'.len_utf8();
-
-                    // Skip any whitespace between the `:` and the codes.
-                    codes_start += text[codes_start..]
-                        .find(|c: char| !c.is_whitespace())
-                        .unwrap_or(0);
-
-                    // Extract the comma-separated list of codes.
-                    let mut codes = vec![];
-                    let mut codes_end = codes_start;
-                    let mut leading_space = 0;
-                    while let Some(code) = Self::lex_code(&text[codes_end + leading_space..]) {
-                        codes_end += leading_space;
-                        codes.push(Code {
-                            code,
-                            range: TextRange::at(
-                                TextSize::try_from(codes_end).unwrap(),
-                                code.text_len(),
-                            )
-                            .add(offset),
-                        });
-
-                        codes_end += code.len();
-
-                        // Codes can be comma- or whitespace-delimited. Compute the length of the
-                        // delimiter, but only add it in the next iteration, once we find the next
-                        // code.
-                        if let Some(space_between) =
-                            text[codes_end..].find(|c: char| !(c.is_whitespace() || c == ','))
-                        {
-                            leading_space = space_between;
-                        } else {
-                            break;
-                        }
-                    }
-
-                    // If we didn't identify any codes, warn.
-                    if codes.is_empty() {
-                        return Err(ParseError::MissingCodes);
-                    }
-
-                    let range = TextRange::new(
-                        TextSize::try_from(comment_start).unwrap(),
-                        TextSize::try_from(codes_end).unwrap(),
-                    );
-
-                    Self::Codes(Codes {
-                        range: range.add(offset),
-                        codes,
-                    })
-                }
-                None | Some('#') => {
-                    // E.g., `# noqa` or `# noqa# ignore`.
-                    let range = TextRange::new(
-                        TextSize::try_from(comment_start).unwrap(),
-                        TextSize::try_from(noqa_literal_end).unwrap(),
-                    );
-                    Self::All(All {
-                        range: range.add(offset),
-                    })
-                }
-                Some(c) if c.is_whitespace() => {
-                    // E.g., `# noqa # ignore`.
-                    let range = TextRange::new(
-                        TextSize::try_from(comment_start).unwrap(),
-                        TextSize::try_from(noqa_literal_end).unwrap(),
-                    );
-                    Self::All(All {
-                        range: range.add(offset),
-                    })
-                }
-                _ => return Err(ParseError::InvalidSuffix),
-            };
-
-            return Ok(Some(directive));
-        }
-
-        Ok(None)
-    }
-
-    /// Lex an individual rule code (e.g., `F401`).
-    #[inline]
-    pub(crate) fn lex_code(line: &str) -> Option<&str> {
-        // Extract, e.g., the `F` in `F401`.
-        let prefix = line.chars().take_while(char::is_ascii_uppercase).count();
-        // Extract, e.g., the `401` in `F401`.
-        let suffix = line[prefix..]
-            .chars()
-            .take_while(char::is_ascii_digit)
-            .count();
-        if prefix > 0 && suffix > 0 {
-            // SAFETY: we can use `prefix` and `suffix` to index into `line` because we know that
-            // all characters in `line` are ASCII, i.e., a single byte.
-            Some(&line[..prefix + suffix])
-        } else {
-            None
-        }
-    }
 }
 
 #[derive(Debug)]
@@ -263,13 +123,23 @@ pub(crate) fn rule_is_ignored(
     code: Rule,
     offset: TextSize,
     noqa_line_for: &NoqaMapping,
+    comment_ranges: &CommentRanges,
     locator: &Locator,
 ) -> bool {
     let offset = noqa_line_for.resolve(offset);
     let line_range = locator.line_range(offset);
-    match Directive::try_extract(locator.slice(line_range), line_range.start()) {
-        Ok(Some(Directive::All(_))) => true,
-        Ok(Some(Directive::Codes(codes))) => codes.includes(code),
+    let &[comment_range] = comment_ranges.comments_in_range(line_range) else {
+        return false;
+    };
+    match parse_inline_noqa(comment_range, locator.contents()) {
+        Ok(Some(ParsedNoqa {
+            directive: Directive::All(_),
+            ..
+        })) => true,
+        Ok(Some(ParsedNoqa {
+            directive: Directive::Codes(codes),
+            ..
+        })) => codes.includes(code),
         _ => false,
     }
 }
@@ -315,7 +185,7 @@ impl<'a> From<&'a FileNoqaDirectives<'a>> for FileExemption<'a> {
         if directives
             .lines()
             .iter()
-            .any(|line| matches!(line.parsed_file_exemption, ParsedFileExemption::All))
+            .any(|line| matches!(line.parsed_file_exemption, Directive::All(_)))
         {
             FileExemption::All(codes)
         } else {
@@ -330,7 +200,7 @@ pub(crate) struct FileNoqaDirectiveLine<'a> {
     /// The range of the text line for which the noqa directive applies.
     pub(crate) range: TextRange,
     /// The blanket noqa directive.
-    pub(crate) parsed_file_exemption: ParsedFileExemption<'a>,
+    pub(crate) parsed_file_exemption: Directive<'a>,
     /// The codes that are ignored by the parsed exemptions.
     pub(crate) matches: Vec<NoqaCode>,
 }
@@ -358,27 +228,34 @@ impl<'a> FileNoqaDirectives<'a> {
         let mut lines = vec![];
 
         for range in comment_ranges {
-            match ParsedFileExemption::try_extract(range, locator.contents()) {
-                Err(err) => {
-                    #[allow(deprecated)]
-                    let line = locator.compute_line_index(range.start());
-                    let path_display = relativize_path(path);
-                    warn!("Invalid `# ruff: noqa` directive at {path_display}:{line}: {err}");
-                }
-                Ok(Some(exemption)) => {
-                    if indentation_at_offset(range.start(), locator.contents()).is_none() {
+            let parsed = parse_file_exemption(range, locator.contents());
+            match parsed {
+                Ok(Some(ParsedNoqa {
+                    warnings,
+                    directive,
+                })) => {
+                    let no_indentation_at_offset =
+                        indentation_at_offset(range.start(), locator.contents()).is_none();
+                    if !warnings.is_empty() || no_indentation_at_offset {
                         #[allow(deprecated)]
                         let line = locator.compute_line_index(range.start());
                         let path_display = relativize_path(path);
-                        warn!("Unexpected `# ruff: noqa` directive at {path_display}:{line}. File-level suppression comments must appear on their own line. For line-level suppression, omit the `ruff:` prefix.");
-                        continue;
+
+                        for warning in warnings {
+                            warn!("Missing or joined rule code(s) at {path_display}:{line}: {warning}");
+                        }
+
+                        if no_indentation_at_offset {
+                            warn!("Unexpected `# ruff: noqa` directive at {path_display}:{line}. File-level suppression comments must appear on their own line. For line-level suppression, omit the `ruff:` prefix.");
+                            continue;
+                        }
                     }
 
-                    let matches = match &exemption {
-                        ParsedFileExemption::All => {
+                    let matches = match &directive {
+                        Directive::All(_) => {
                             vec![]
                         }
-                        ParsedFileExemption::Codes(codes) => {
+                        Directive::Codes(codes) => {
                             codes.iter().filter_map(|code| {
                                 let code = code.as_str();
                                 // Ignore externally-defined rules.
@@ -402,14 +279,19 @@ impl<'a> FileNoqaDirectives<'a> {
 
                     lines.push(FileNoqaDirectiveLine {
                         range,
-                        parsed_file_exemption: exemption,
+                        parsed_file_exemption: directive,
                         matches,
                     });
                 }
+                Err(err) => {
+                    #[allow(deprecated)]
+                    let line = locator.compute_line_index(range.start());
+                    let path_display = relativize_path(path);
+                    warn!("Invalid `# ruff: noqa` directive at {path_display}:{line}: {err}");
+                }
                 Ok(None) => {}
-            }
+            };
         }
-
         Self(lines)
     }
 
@@ -418,156 +300,456 @@ impl<'a> FileNoqaDirectives<'a> {
     }
 }
 
-/// An individual file-level exemption (e.g., `# ruff: noqa` or `# ruff: noqa: F401, F841`). Like
-/// [`FileNoqaDirectives`], but only for a single line, as opposed to an aggregated set of exemptions
-/// across a source file.
+/// Output of parsed `noqa` directive.
 #[derive(Debug)]
-pub(crate) enum ParsedFileExemption<'a> {
-    /// The file-level exemption ignores all rules (e.g., `# ruff: noqa`).
-    All,
-    /// The file-level exemption ignores specific rules (e.g., `# ruff: noqa: F401, F841`).
-    Codes(Codes<'a>),
+pub(crate) struct ParsedNoqa<'a> {
+    warnings: Vec<ParseWarning>,
+    directive: Directive<'a>,
 }
 
-impl<'a> ParsedFileExemption<'a> {
-    /// Return a [`ParsedFileExemption`] for a given `comment_range` in `source`.
-    fn try_extract(comment_range: TextRange, source: &'a str) -> Result<Option<Self>, ParseError> {
-        let line = &source[comment_range];
-        let offset = comment_range.start();
-        let init_line_len = line.text_len();
+/// Parses in-line `noqa` comment, e.g. `# noqa: F401`
+pub(crate) fn parse_inline_noqa(
+    comment_range: TextRange,
+    source: &str,
+) -> Result<Option<ParsedNoqa<'_>>, ParseError> {
+    let line = &source[comment_range];
+    let offset = comment_range.start();
 
-        let line = Self::lex_whitespace(line);
-        let Some(line) = Self::lex_char(line, '#') else {
-            return Ok(None);
+    for (char_index, char) in line.char_indices() {
+        // Only bother checking for the `noqa` literal if the character is `n` or `N`.
+        if !matches!(char, 'n' | 'N') {
+            continue;
+        }
+
+        // Determine the start of the `noqa` literal.
+        if !matches!(
+            line[char_index..].as_bytes(),
+            [b'n' | b'N', b'o' | b'O', b'q' | b'Q', b'a' | b'A', ..]
+        ) {
+            continue;
+        }
+
+        let noqa_literal_start = char_index;
+        let noqa_literal_end = noqa_literal_start + "noqa".len();
+
+        // Determine the start of the comment.
+        let mut comment_start = noqa_literal_start;
+
+        // Trim whitespace between putative '#' and 'noqa' literal
+        comment_start = line[..comment_start].trim_end().len();
+
+        // If there is no '#', try again
+        if !line[..comment_start].ends_with('#') {
+            continue;
+        }
+        comment_start -= '#'.len_utf8();
+
+        let line = &line[noqa_literal_end..];
+
+        let parser = NoqaParser::default();
+        return Ok(Some(parser.parse(
+            line,
+            offset,
+            TextSize::try_from(comment_start).unwrap(),
+            TextSize::try_from(noqa_literal_end).unwrap(),
+        )?));
+    }
+    Ok(None)
+}
+
+/// Parses file-level exemption comment, e.g. `# ruff: noqa: F401`
+pub(crate) fn parse_file_exemption(
+    comment_range: TextRange,
+    source: &str,
+) -> Result<Option<ParsedNoqa<'_>>, ParseError> {
+    let line = &source[comment_range];
+    let offset = comment_range.start();
+
+    for (char_index, char) in line.char_indices() {
+        // Only bother checking for the `noqa` literal if the character is `n` or `N`.
+        if !matches!(char, 'n' | 'N') {
+            continue;
+        }
+
+        // Determine the start of the `noqa` literal.
+        if !matches!(
+            line[char_index..].as_bytes(),
+            [b'n' | b'N', b'o' | b'O', b'q' | b'Q', b'a' | b'A', ..]
+        ) {
+            continue;
+        }
+
+        let noqa_literal_start = char_index;
+        let noqa_literal_end = noqa_literal_start + "noqa".len();
+
+        // Determine the start of the comment.
+        let mut comment_start = noqa_literal_start;
+
+        // Trim whitespace between putative ':' and 'noqa' literal
+        comment_start = line[..comment_start].trim_end().len();
+
+        // If there is no ':', try again
+        if !line[..comment_start].ends_with(':') {
+            continue;
+        }
+        comment_start -= ':'.len_utf8();
+
+        // Trim whitespace to putative `ruff` or `flake8`
+        comment_start = line[..comment_start].trim_end().len();
+
+        let is_ruff_exemption = line[..comment_start].ends_with("ruff");
+        let is_flake8_exemption = line[..comment_start].ends_with("flake8");
+
+        if !is_ruff_exemption && !is_flake8_exemption {
+            continue;
+        }
+
+        if is_ruff_exemption {
+            comment_start -= "ruff".len();
+        }
+        if is_flake8_exemption {
+            comment_start -= "flake8".len();
+        }
+
+        // Trim whitespace to putative '#'
+        comment_start = line[..comment_start].trim_end().len();
+        if !line[..comment_start].ends_with('#') {
+            continue;
+        }
+        comment_start -= '#'.len_utf8();
+
+        let line = &line[noqa_literal_end..];
+
+        let parser = NoqaParser::default();
+        return Ok(Some(parser.parse(
+            line,
+            offset,
+            TextSize::try_from(comment_start).unwrap(),
+            TextSize::try_from(noqa_literal_end).unwrap(),
+        )?));
+    }
+    Ok(None)
+}
+
+#[derive(Default)]
+pub(crate) struct NoqaParser<'a> {
+    codes: Vec<Code<'a>>,
+    warnings: Vec<ParseWarning>,
+}
+
+impl<'a> NoqaParser<'a> {
+    /// Parses a generic `noqa` comment line.
+    ///
+    /// # Arguments
+    ///
+    /// * `line` - Line beginning at end of `noqa` literal
+    /// * `offset` - Offset of `noqa` comment start
+    /// * `comment_start` - Start of comment, relative to offset
+    /// * `noqa_literal_end` - End of `noqa` literal, relative to offset
+    fn parse(
+        mut self,
+        line: &'a str,
+        offset: TextSize,
+        comment_start: TextSize,
+        noqa_literal_end: TextSize,
+    ) -> Result<ParsedNoqa<'a>, ParseError> {
+        let directive = match line.chars().next() {
+            None => {
+                // Ex) `# noqa`
+                let range = TextRange::new(comment_start, noqa_literal_end).add(offset);
+                Directive::All(All { range })
+            }
+            Some(c) if c.is_ascii_whitespace() || c == '#' => {
+                // Ex) `# noqa#comment` or `# noqa comment`
+                let range = TextRange::new(comment_start, noqa_literal_end).add(offset);
+                Directive::All(All { range })
+            }
+            Some(':') => {
+                // Ex) `# noqa: F401,F841`
+                let line = &line[1..];
+                let line_offset = noqa_literal_end + offset + TextSize::new(1); // Add 1 for ':'
+                self.parse_items(line, line_offset)?;
+
+                let codes = self.codes;
+                let Some(last_code) = codes.last() else {
+                    return Err(ParseError::MissingCodes);
+                };
+                let codes_end = last_code.range.end();
+                let range = TextRange::new(comment_start + offset, codes_end);
+                Directive::Codes(Codes { range, codes })
+            }
+            _ => return Err(ParseError::InvalidSuffix),
         };
-        let comment_start = init_line_len - line.text_len() - '#'.text_len();
-        let line = Self::lex_whitespace(line);
 
-        let Some(line) = Self::lex_flake8(line).or_else(|| Self::lex_ruff(line)) else {
-            return Ok(None);
-        };
+        Ok(ParsedNoqa {
+            warnings: self.warnings,
+            directive,
+        })
+    }
 
-        let line = Self::lex_whitespace(line);
-        let Some(line) = Self::lex_char(line, ':') else {
-            return Ok(None);
-        };
-        let line = Self::lex_whitespace(line);
-        let Some(line) = Self::lex_noqa(line) else {
-            return Ok(None);
-        };
-        let line = Self::lex_whitespace(line);
+    /// Parses list of potential codes, separated by commas or whitespace
+    ///
+    /// The core logic is as follows:
+    /// - split into comma-separated segments,
+    /// - split each of these into whitespace-separated items,
+    /// - parse each item and push codes found
+    /// - stop when we find `#`, no codes in an item, or an error
+    ///
+    /// The complexity is mainly introduced to keep track of the
+    /// ranges of each code in the source text and for error recovery.
+    fn parse_items(&mut self, source: &'a str, initial_offset: TextSize) -> Result<(), ParseError> {
+        let mut remaining = source;
+        let mut curr = initial_offset;
 
-        Ok(Some(if line.is_empty() {
-            // Ex) `# ruff: noqa`
-            Self::All
-        } else {
-            // Ex) `# ruff: noqa: F401, F841`
-            let Some(line) = Self::lex_char(line, ':') else {
-                return Err(ParseError::InvalidSuffix);
-            };
-            let line = Self::lex_whitespace(line);
+        // Process each comma-separated segment
+        while !remaining.is_empty() {
+            // Ex) `F401  F841, F842` -> (`F401  F841`,true,`F842`)
+            //
+            // Note: `next_remaining` is guaranteed to be smaller than
+            // `remaining`, so the surrounding loop will terminate.
+            let (segment, has_comma, next_remaining) = Self::extract_next_segment(remaining);
+            remaining = next_remaining;
 
-            // Extract the codes from the line (e.g., `F401, F841`).
-            let mut codes = vec![];
-            let mut line = line;
-            while let Some(code) = Self::lex_code(line) {
-                let codes_end = init_line_len - line.text_len();
-                codes.push(Code {
-                    code,
-                    range: TextRange::at(codes_end, code.text_len()).add(offset),
-                });
-                line = &line[code.len()..];
+            let segment_start = curr;
 
-                // Codes can be comma- or whitespace-delimited.
-                if let Some(rest) = Self::lex_delimiter(line).map(Self::lex_whitespace) {
-                    line = rest;
-                } else {
-                    break;
+            // Handle empty segments (just whitespace between commas)
+            // Ex) `F401,  ,F841`
+            if Self::is_empty_segment(segment) {
+                let segment_len = TextSize::of(segment);
+                self.add_missing_item_warning(segment_start, segment_len);
+                curr = Self::advance_position(curr, segment_len, has_comma);
+                continue;
+            }
+
+            // Process the items within this segment
+            // Ex) `F401  F841`
+            // If an empty code list is found, stop parsing entirely
+            match self.parse_segment(segment, segment_start, has_comma)? {
+                Some(new_curr) => curr = new_curr,
+                None => return Ok(()), // Empty code list found, stop parsing
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Processes a single comma-separated segment
+    /// Returns Some(position) if processing should continue, or None if parsing should stop
+    fn parse_segment(
+        &mut self,
+        segment: &'a str,
+        segment_start: TextSize,
+        has_comma: bool,
+    ) -> Result<Option<TextSize>, ParseError> {
+        let mut item_remaining = segment;
+        let mut segment_curr = segment_start;
+
+        // Process each whitespace-separated item in the segment
+        while !item_remaining.is_empty() {
+            // Skip leading whitespace
+            let (non_ws_text, ws_len) = Self::skip_leading_whitespace(item_remaining);
+            item_remaining = non_ws_text;
+            segment_curr += ws_len;
+
+            if item_remaining.is_empty() {
+                break;
+            }
+
+            // Extract the next item
+            //
+            // Note: `next_remaining` is guaranteed to be have
+            // smaller size than `item_remaining`, so the surrounding
+            // loop will terminate.
+            let (item, next_remaining) = Self::extract_next_item(item_remaining);
+
+            // Parse the item into codes
+            match Self::parse_item(item)? {
+                ParsedItem::Continue(codes) => {
+                    segment_curr = self.process_codes(&codes, segment_curr);
                 }
-            }
+                // Ex) `F401#Comment`
+                ParsedItem::StopAtComment(codes) => {
+                    self.process_codes(&codes, segment_curr);
+                    return Ok(None);
+                }
+                // Ex) If we reach "Comment" in `F401 Comment`
+                ParsedItem::StopEmptyCodes => return Ok(None),
+            };
 
-            // If we didn't identify any codes, warn.
-            if codes.is_empty() {
-                return Err(ParseError::MissingCodes);
-            }
+            item_remaining = next_remaining;
+        }
 
-            let codes_end = init_line_len - line.text_len();
-            let range = TextRange::new(comment_start, codes_end);
-            Self::Codes(Codes {
-                range: range.add(offset),
-                codes,
-            })
-        }))
+        // Calculate the final position after processing this segment
+        let segment_len = TextSize::of(segment);
+        Ok(Some(Self::advance_position(
+            segment_start,
+            segment_len,
+            has_comma,
+        )))
     }
 
-    /// Lex optional leading whitespace.
-    #[inline]
-    fn lex_whitespace(line: &str) -> &str {
-        line.trim_start()
-    }
-
-    /// Lex a specific character, or return `None` if the character is not the first character in
-    /// the line.
-    #[inline]
-    fn lex_char(line: &str, c: char) -> Option<&str> {
-        let mut chars = line.chars();
-        if chars.next() == Some(c) {
-            Some(chars.as_str())
-        } else {
-            None
+    /// Parses single item in comma and whitespace delimited list.
+    ///
+    /// Returns code(s) found wrapped in parser state that dictates
+    /// whether to continue parsing.
+    ///
+    /// It is expected that this returns a single code, but for purposes
+    /// of error recovery we will parse, e.g., `F401F841` as two separate
+    /// codes and record a warning.
+    fn parse_item(item: &'a str) -> Result<ParsedItem<'a>, ParseError> {
+        let mut res = Vec::new();
+        let mut line = item;
+        while let Some((code, end)) = Self::parse_code(line) {
+            res.push(code);
+            line = &line[end..];
+        }
+        if res.is_empty() {
+            return Ok(ParsedItem::StopEmptyCodes);
+        };
+        match line.chars().next() {
+            // Ex) `# noqa: F401#Some comment`
+            Some('#') => Ok(ParsedItem::StopAtComment(res)),
+            // Ex) `# noqa: F401abc`
+            Some(_) if !res.is_empty() => Err(ParseError::InvalidCodeSuffix),
+            _ => Ok(ParsedItem::Continue(res)),
         }
     }
 
-    /// Lex the "flake8" prefix of a `noqa` directive.
+    /// Parse a single code, e.g. `F401` and record location of end of code
+    ///
+    /// Returns `None` if beginning of text does not match the regex
+    /// `[A-Z]+[0-9]+`.
     #[inline]
-    fn lex_flake8(line: &str) -> Option<&str> {
-        line.strip_prefix("flake8")
-    }
-
-    /// Lex the "ruff" prefix of a `noqa` directive.
-    #[inline]
-    fn lex_ruff(line: &str) -> Option<&str> {
-        line.strip_prefix("ruff")
-    }
-
-    /// Lex a `noqa` directive with case-insensitive matching.
-    #[inline]
-    fn lex_noqa(line: &str) -> Option<&str> {
-        match line.as_bytes() {
-            [b'n' | b'N', b'o' | b'O', b'q' | b'Q', b'a' | b'A', ..] => Some(&line["noqa".len()..]),
-            _ => None,
-        }
-    }
-
-    /// Lex a code delimiter, which can either be a comma or whitespace.
-    #[inline]
-    fn lex_delimiter(line: &str) -> Option<&str> {
-        let mut chars = line.chars();
-        if let Some(c) = chars.next() {
-            if c == ',' || c.is_whitespace() {
-                Some(chars.as_str())
-            } else {
-                None
-            }
-        } else {
-            None
-        }
-    }
-
-    /// Lex an individual rule code (e.g., `F401`).
-    #[inline]
-    fn lex_code(line: &str) -> Option<&str> {
-        // Extract, e.g., the `F` in `F401`.
-        let prefix = line.chars().take_while(char::is_ascii_uppercase).count();
-        // Extract, e.g., the `401` in `F401`.
-        let suffix = line[prefix..]
+    pub(crate) fn parse_code(text: &'a str) -> Option<(&'a str, usize)> {
+        let prefix = text.chars().take_while(char::is_ascii_uppercase).count();
+        let suffix = text[prefix..]
             .chars()
-            .take_while(char::is_ascii_alphanumeric)
+            .take_while(char::is_ascii_digit)
             .count();
         if prefix > 0 && suffix > 0 {
-            Some(&line[..prefix + suffix])
+            Some((&text[..prefix + suffix], prefix + suffix))
         } else {
             None
+        }
+    }
+
+    /// Processes a list of codes, adding them to the result and updating the current position
+    fn process_codes(&mut self, codes: &[&'a str], mut curr: TextSize) -> TextSize {
+        for (i, code) in codes.iter().enumerate() {
+            let code_len = TextSize::of(*code);
+
+            if i > 0 {
+                // Ex) `F401F841`
+                self.warnings
+                    .push(ParseWarning::MissingDelimiter(TextRange::at(
+                        curr, code_len,
+                    )));
+            }
+
+            self.codes.push(Code {
+                code,
+                range: TextRange::at(curr, code_len),
+            });
+
+            curr += code_len;
+        }
+
+        curr
+    }
+
+    /// Extracts the next comma-separated segment from the input
+    #[inline]
+    fn extract_next_segment(input: &'a str) -> (&'a str, bool, &'a str) {
+        if let Some(pos) = input.find(',') {
+            let segment = &input[..pos];
+            let next_remaining = &input[pos + 1..];
+            (segment, true, next_remaining)
+        } else {
+            (input, false, "")
+        }
+    }
+
+    /// Extracts the next whitespace-separated item from the input
+    #[inline]
+    fn extract_next_item(text: &'a str) -> (&'a str, &'a str) {
+        let item_end = text
+            .find(|c: char| char::is_ascii_whitespace(&c))
+            .unwrap_or(text.len());
+
+        let item = &text[..item_end];
+        let next_remaining = &text[item_end..];
+
+        (item, next_remaining)
+    }
+
+    /// Advances the current position based on segment length and comma presence
+    #[inline]
+    fn advance_position(curr: TextSize, segment_len: TextSize, has_comma: bool) -> TextSize {
+        let mut new_pos = curr + segment_len;
+        if has_comma {
+            new_pos += TextSize::new(1); // Add 1 for the comma
+        }
+        new_pos
+    }
+
+    /// Skips leading whitespace in a string and returns the remaining text and the length of whitespace skipped
+    #[inline]
+    fn skip_leading_whitespace(text: &'a str) -> (&'a str, TextSize) {
+        // Find the position of the first non-whitespace character (if any)
+        let non_ws_pos = text
+            .find(|c: char| !char::is_ascii_whitespace(&c))
+            .unwrap_or(text.len());
+
+        // Calculate whitespace length and return remaining text
+        let ws_len = TextSize::of(&text[..non_ws_pos]);
+        (&text[non_ws_pos..], ws_len)
+    }
+
+    /// Checks if a segment is empty (contains only whitespace)
+    #[inline]
+    fn is_empty_segment(segment: &str) -> bool {
+        segment.chars().all(|x| char::is_ascii_whitespace(&x))
+    }
+
+    /// Adds a warning for a missing item (empty segment between commas)
+    #[inline]
+    fn add_missing_item_warning(&mut self, start: TextSize, len: TextSize) {
+        self.warnings
+            .push(ParseWarning::MissingItem(TextRange::at(start, len)));
+    }
+}
+
+/// Represents result of parsing item in comma and whitespace-separated list.
+///
+/// Contains text of codes found wrapped in instruction on whether to continue.
+enum ParsedItem<'a> {
+    Continue(Vec<&'a str>),
+    StopAtComment(Vec<&'a str>),
+    StopEmptyCodes,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum ParseWarning {
+    MissingItem(TextRange),
+    MissingDelimiter(TextRange),
+}
+
+impl Display for ParseWarning {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::MissingItem(_) => f.write_str("expected rule code between commas"),
+            Self::MissingDelimiter(_) => {
+                f.write_str("expected comma or space delimiter between codes")
+            }
+        }
+    }
+}
+
+impl Ranged for ParseWarning {
+    fn range(&self) -> TextRange {
+        match *self {
+            ParseWarning::MissingItem(text_range) => text_range,
+            ParseWarning::MissingDelimiter(text_range) => text_range,
         }
     }
 }
@@ -579,6 +761,9 @@ pub(crate) enum ParseError {
     MissingCodes,
     /// The `noqa` directive used an invalid suffix (e.g., `# noqa; F401` instead of `# noqa: F401`).
     InvalidSuffix,
+    /// The `noqa` code matched the regex "[A-Z]+[0-9]+" with text remaining
+    /// (e.g. `# noqa: F401abc`)
+    InvalidCodeSuffix,
 }
 
 impl Display for ParseError {
@@ -587,6 +772,9 @@ impl Display for ParseError {
             ParseError::MissingCodes => fmt.write_str("expected a comma-separated list of codes (e.g., `# noqa: F401, F841`)."),
             ParseError::InvalidSuffix => {
                 fmt.write_str("expected `:` followed by a comma-separated list of codes (e.g., `# noqa: F401, F841`).")
+            }
+            ParseError::InvalidCodeSuffix => {
+                fmt.write_str("expected code to consist of uppercase letters followed by digits only (e.g. `F401`)")
             }
 
         }
@@ -634,7 +822,7 @@ fn add_noqa_inner(
     let directives = FileNoqaDirectives::extract(locator, comment_ranges, external, path);
     let exemption = FileExemption::from(&directives);
 
-    let directives = NoqaDirectives::from_commented_ranges(comment_ranges, path, locator);
+    let directives = NoqaDirectives::from_commented_ranges(comment_ranges, external, path, locator);
 
     let comments = find_noqa_comments(diagnostics, locator, &exemption, &directives, noqa_line_for);
 
@@ -927,20 +1115,49 @@ pub(crate) struct NoqaDirectives<'a> {
 impl<'a> NoqaDirectives<'a> {
     pub(crate) fn from_commented_ranges(
         comment_ranges: &CommentRanges,
+        external: &[String],
         path: &Path,
         locator: &'a Locator<'a>,
     ) -> Self {
         let mut directives = Vec::new();
 
         for range in comment_ranges {
-            match Directive::try_extract(locator.slice(range), range.start()) {
-                Err(err) => {
-                    #[allow(deprecated)]
-                    let line = locator.compute_line_index(range.start());
-                    let path_display = relativize_path(path);
-                    warn!("Invalid `# noqa` directive on {path_display}:{line}: {err}");
-                }
-                Ok(Some(directive)) => {
+            let parsed = parse_inline_noqa(range, locator.contents());
+
+            match parsed {
+                Ok(Some(ParsedNoqa {
+                    warnings,
+                    directive,
+                })) => {
+                    if !warnings.is_empty() {
+                        #[allow(deprecated)]
+                        let line = locator.compute_line_index(range.start());
+                        let path_display = relativize_path(path);
+                        for warning in warnings {
+                            warn!("Missing or joined rule code(s) at {path_display}:{line}: {warning}");
+                        }
+                    }
+                    if let Directive::Codes(codes) = &directive {
+                        // Warn on invalid rule codes.
+                        for code in &codes.codes {
+                            // Ignore externally-defined rules.
+                            if !external
+                                .iter()
+                                .any(|external| code.as_str().starts_with(external))
+                            {
+                                if Rule::from_code(
+                                    get_redirect_target(code.as_str()).unwrap_or(code.as_str()),
+                                )
+                                .is_err()
+                                {
+                                    #[allow(deprecated)]
+                                    let line = locator.compute_line_index(range.start());
+                                    let path_display = relativize_path(path);
+                                    warn!("Invalid rule code provided to `# noqa` at {path_display}:{line}: {code}");
+                                }
+                            }
+                        }
+                    }
                     // noqa comments are guaranteed to be single line.
                     let range = locator.line_range(range.start());
                     directives.push(NoqaDirectiveLine {
@@ -949,6 +1166,12 @@ impl<'a> NoqaDirectives<'a> {
                         matches: Vec::new(),
                         includes_end: range.end() == locator.contents().text_len(),
                     });
+                }
+                Err(err) => {
+                    #[allow(deprecated)]
+                    let line = locator.compute_line_index(range.start());
+                    let path_display = relativize_path(path);
+                    warn!("Invalid `# noqa` directive on {path_display}:{line}: {err}");
                 }
                 Ok(None) => {}
             }
@@ -1072,239 +1295,718 @@ mod tests {
     use ruff_source_file::LineEnding;
     use ruff_text_size::{TextLen, TextRange, TextSize};
 
-    use crate::noqa::{add_noqa_inner, Directive, NoqaMapping, ParsedFileExemption};
+    use crate::noqa::{
+        add_noqa_inner, parse_file_exemption, parse_inline_noqa, Directive, NoqaMapping, ParsedNoqa,
+    };
     use crate::rules::pycodestyle::rules::{AmbiguousVariableName, UselessSemicolon};
     use crate::rules::pyflakes::rules::UnusedVariable;
     use crate::rules::pyupgrade::rules::PrintfStringFormatting;
     use crate::{generate_noqa_edits, Locator};
 
+    fn assert_codes_match_slices(codes: &crate::noqa::Codes, source: &str) {
+        for code in codes.iter() {
+            assert_eq!(&source[code.range], code.code);
+        }
+    }
+
+    #[test]
+    fn noqa_range() {
+        let source = "# noqa: F401     F841, F841 # wiggle";
+        let directive = parse_inline_noqa(TextRange::up_to(source.text_len()), source);
+
+        if let Ok(Some(ParsedNoqa {
+            warnings: _,
+            directive: Directive::Codes(codes),
+        })) = directive
+        {
+            assert_codes_match_slices(&codes, source);
+        }
+    }
+
     #[test]
     fn noqa_all() {
         let source = "# noqa";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        let directive = parse_inline_noqa(TextRange::up_to(source.text_len()), source);
+        assert_debug_snapshot!(directive);
+        if let Ok(Some(ParsedNoqa {
+            warnings: _,
+            directive: Directive::Codes(codes),
+        })) = directive
+        {
+            assert_codes_match_slices(&codes, source);
+        }
     }
 
     #[test]
     fn noqa_code() {
         let source = "# noqa: F401";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        let directive = parse_inline_noqa(TextRange::up_to(source.text_len()), source);
+        assert_debug_snapshot!(directive);
+        if let Ok(Some(ParsedNoqa {
+            warnings: _,
+            directive: Directive::Codes(codes),
+        })) = directive
+        {
+            assert_codes_match_slices(&codes, source);
+        }
     }
 
     #[test]
     fn noqa_codes() {
         let source = "# noqa: F401, F841";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        let directive = parse_inline_noqa(TextRange::up_to(source.text_len()), source);
+        assert_debug_snapshot!(directive);
+        if let Ok(Some(ParsedNoqa {
+            warnings: _,
+            directive: Directive::Codes(codes),
+        })) = directive
+        {
+            assert_codes_match_slices(&codes, source);
+        }
     }
 
     #[test]
     fn noqa_all_case_insensitive() {
         let source = "# NOQA";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        let directive = parse_inline_noqa(TextRange::up_to(source.text_len()), source);
+        assert_debug_snapshot!(directive);
+        if let Ok(Some(ParsedNoqa {
+            warnings: _,
+            directive: Directive::Codes(codes),
+        })) = directive
+        {
+            assert_codes_match_slices(&codes, source);
+        }
     }
 
     #[test]
     fn noqa_code_case_insensitive() {
         let source = "# NOQA: F401";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        let directive = parse_inline_noqa(TextRange::up_to(source.text_len()), source);
+        assert_debug_snapshot!(directive);
+        if let Ok(Some(ParsedNoqa {
+            warnings: _,
+            directive: Directive::Codes(codes),
+        })) = directive
+        {
+            assert_codes_match_slices(&codes, source);
+        }
     }
 
     #[test]
     fn noqa_codes_case_insensitive() {
         let source = "# NOQA: F401, F841";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        let directive = parse_inline_noqa(TextRange::up_to(source.text_len()), source);
+        assert_debug_snapshot!(directive);
+        if let Ok(Some(ParsedNoqa {
+            warnings: _,
+            directive: Directive::Codes(codes),
+        })) = directive
+        {
+            assert_codes_match_slices(&codes, source);
+        }
     }
 
     #[test]
     fn noqa_leading_space() {
         let source = "#   # noqa: F401";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        let directive = parse_inline_noqa(TextRange::up_to(source.text_len()), source);
+        assert_debug_snapshot!(directive);
+        if let Ok(Some(ParsedNoqa {
+            warnings: _,
+            directive: Directive::Codes(codes),
+        })) = directive
+        {
+            assert_codes_match_slices(&codes, source);
+        }
     }
 
     #[test]
     fn noqa_trailing_space() {
         let source = "# noqa: F401   #";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        let directive = parse_inline_noqa(TextRange::up_to(source.text_len()), source);
+        assert_debug_snapshot!(directive);
+        if let Ok(Some(ParsedNoqa {
+            warnings: _,
+            directive: Directive::Codes(codes),
+        })) = directive
+        {
+            assert_codes_match_slices(&codes, source);
+        }
     }
 
     #[test]
     fn noqa_all_no_space() {
         let source = "#noqa";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        let directive = parse_inline_noqa(TextRange::up_to(source.text_len()), source);
+        assert_debug_snapshot!(directive);
+        if let Ok(Some(ParsedNoqa {
+            warnings: _,
+            directive: Directive::Codes(codes),
+        })) = directive
+        {
+            assert_codes_match_slices(&codes, source);
+        }
     }
 
     #[test]
     fn noqa_code_no_space() {
         let source = "#noqa:F401";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        let directive = parse_inline_noqa(TextRange::up_to(source.text_len()), source);
+        assert_debug_snapshot!(directive);
+        if let Ok(Some(ParsedNoqa {
+            warnings: _,
+            directive: Directive::Codes(codes),
+        })) = directive
+        {
+            assert_codes_match_slices(&codes, source);
+        }
     }
 
     #[test]
     fn noqa_codes_no_space() {
         let source = "#noqa:F401,F841";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        let directive = parse_inline_noqa(TextRange::up_to(source.text_len()), source);
+        assert_debug_snapshot!(directive);
+        if let Ok(Some(ParsedNoqa {
+            warnings: _,
+            directive: Directive::Codes(codes),
+        })) = directive
+        {
+            assert_codes_match_slices(&codes, source);
+        }
     }
 
     #[test]
     fn noqa_all_multi_space() {
         let source = "#  noqa";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        let directive = parse_inline_noqa(TextRange::up_to(source.text_len()), source);
+        assert_debug_snapshot!(directive);
+        if let Ok(Some(ParsedNoqa {
+            warnings: _,
+            directive: Directive::Codes(codes),
+        })) = directive
+        {
+            assert_codes_match_slices(&codes, source);
+        }
     }
 
     #[test]
     fn noqa_code_multi_space() {
         let source = "#  noqa: F401";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        let directive = parse_inline_noqa(TextRange::up_to(source.text_len()), source);
+        assert_debug_snapshot!(directive);
+        if let Ok(Some(ParsedNoqa {
+            warnings: _,
+            directive: Directive::Codes(codes),
+        })) = directive
+        {
+            assert_codes_match_slices(&codes, source);
+        }
     }
 
     #[test]
     fn noqa_codes_multi_space() {
         let source = "#  noqa: F401,  F841";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        let directive = parse_inline_noqa(TextRange::up_to(source.text_len()), source);
+        assert_debug_snapshot!(directive);
+        if let Ok(Some(ParsedNoqa {
+            warnings: _,
+            directive: Directive::Codes(codes),
+        })) = directive
+        {
+            assert_codes_match_slices(&codes, source);
+        }
+    }
+
+    #[test]
+    fn noqa_code_leading_hashes() {
+        let source = "###noqa: F401";
+        let directive = parse_inline_noqa(TextRange::up_to(source.text_len()), source);
+        assert_debug_snapshot!(directive);
+        if let Ok(Some(ParsedNoqa {
+            warnings: _,
+            directive: Directive::Codes(codes),
+        })) = directive
+        {
+            assert_codes_match_slices(&codes, source);
+        }
     }
 
     #[test]
     fn noqa_all_leading_comment() {
         let source = "# Some comment describing the noqa # noqa";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        let directive = parse_inline_noqa(TextRange::up_to(source.text_len()), source);
+        assert_debug_snapshot!(directive);
+        if let Ok(Some(ParsedNoqa {
+            warnings: _,
+            directive: Directive::Codes(codes),
+        })) = directive
+        {
+            assert_codes_match_slices(&codes, source);
+        }
     }
 
     #[test]
     fn noqa_code_leading_comment() {
         let source = "# Some comment describing the noqa # noqa: F401";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        let directive = parse_inline_noqa(TextRange::up_to(source.text_len()), source);
+        assert_debug_snapshot!(directive);
+        if let Ok(Some(ParsedNoqa {
+            warnings: _,
+            directive: Directive::Codes(codes),
+        })) = directive
+        {
+            assert_codes_match_slices(&codes, source);
+        }
     }
 
     #[test]
     fn noqa_codes_leading_comment() {
         let source = "# Some comment describing the noqa # noqa: F401, F841";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        let directive = parse_inline_noqa(TextRange::up_to(source.text_len()), source);
+        assert_debug_snapshot!(directive);
+        if let Ok(Some(ParsedNoqa {
+            warnings: _,
+            directive: Directive::Codes(codes),
+        })) = directive
+        {
+            assert_codes_match_slices(&codes, source);
+        }
     }
 
     #[test]
     fn noqa_all_trailing_comment() {
         let source = "# noqa # Some comment describing the noqa";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        let directive = parse_inline_noqa(TextRange::up_to(source.text_len()), source);
+        assert_debug_snapshot!(directive);
+        if let Ok(Some(ParsedNoqa {
+            warnings: _,
+            directive: Directive::Codes(codes),
+        })) = directive
+        {
+            assert_codes_match_slices(&codes, source);
+        }
     }
 
     #[test]
     fn noqa_code_trailing_comment() {
         let source = "# noqa: F401 # Some comment describing the noqa";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        let directive = parse_inline_noqa(TextRange::up_to(source.text_len()), source);
+        assert_debug_snapshot!(directive);
+        if let Ok(Some(ParsedNoqa {
+            warnings: _,
+            directive: Directive::Codes(codes),
+        })) = directive
+        {
+            assert_codes_match_slices(&codes, source);
+        }
     }
 
     #[test]
     fn noqa_codes_trailing_comment() {
         let source = "# noqa: F401, F841 # Some comment describing the noqa";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        let directive = parse_inline_noqa(TextRange::up_to(source.text_len()), source);
+        assert_debug_snapshot!(directive);
+        if let Ok(Some(ParsedNoqa {
+            warnings: _,
+            directive: Directive::Codes(codes),
+        })) = directive
+        {
+            assert_codes_match_slices(&codes, source);
+        }
     }
 
     #[test]
     fn noqa_invalid_codes() {
         let source = "# noqa: unused-import, F401, some other code";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        let directive = parse_inline_noqa(TextRange::up_to(source.text_len()), source);
+        assert_debug_snapshot!(directive);
+        if let Ok(Some(ParsedNoqa {
+            warnings: _,
+            directive: Directive::Codes(codes),
+        })) = directive
+        {
+            assert_codes_match_slices(&codes, source);
+        }
     }
 
     #[test]
     fn noqa_squashed_codes() {
         let source = "# noqa: F401F841";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        let directive = parse_inline_noqa(TextRange::up_to(source.text_len()), source);
+        assert_debug_snapshot!(directive);
+        if let Ok(Some(ParsedNoqa {
+            warnings: _,
+            directive: Directive::Codes(codes),
+        })) = directive
+        {
+            assert_codes_match_slices(&codes, source);
+        }
     }
 
     #[test]
     fn noqa_empty_comma() {
         let source = "# noqa: F401,,F841";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        let directive = parse_inline_noqa(TextRange::up_to(source.text_len()), source);
+        assert_debug_snapshot!(directive);
+        if let Ok(Some(ParsedNoqa {
+            warnings: _,
+            directive: Directive::Codes(codes),
+        })) = directive
+        {
+            assert_codes_match_slices(&codes, source);
+        }
     }
 
     #[test]
     fn noqa_empty_comma_space() {
         let source = "# noqa: F401, ,F841";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        let directive = parse_inline_noqa(TextRange::up_to(source.text_len()), source);
+        assert_debug_snapshot!(directive);
+        if let Ok(Some(ParsedNoqa {
+            warnings: _,
+            directive: Directive::Codes(codes),
+        })) = directive
+        {
+            assert_codes_match_slices(&codes, source);
+        }
     }
 
     #[test]
     fn noqa_non_code() {
         let source = "# noqa: F401 We're ignoring an import";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        let directive = parse_inline_noqa(TextRange::up_to(source.text_len()), source);
+        assert_debug_snapshot!(directive);
+        if let Ok(Some(ParsedNoqa {
+            warnings: _,
+            directive: Directive::Codes(codes),
+        })) = directive
+        {
+            assert_codes_match_slices(&codes, source);
+        }
+    }
+
+    #[test]
+    fn noqa_code_invalid_code_suffix() {
+        let source = "# noqa: F401abc";
+        let directive = parse_inline_noqa(TextRange::up_to(source.text_len()), source);
+        assert_debug_snapshot!(directive);
+        if let Ok(Some(ParsedNoqa {
+            warnings: _,
+            directive: Directive::Codes(codes),
+        })) = directive
+        {
+            assert_codes_match_slices(&codes, source);
+        }
     }
 
     #[test]
     fn noqa_invalid_suffix() {
         let source = "# noqa[F401]";
-        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+        let directive = parse_inline_noqa(TextRange::up_to(source.text_len()), source);
+        assert_debug_snapshot!(directive);
+        if let Ok(Some(ParsedNoqa {
+            warnings: _,
+            directive: Directive::Codes(codes),
+        })) = directive
+        {
+            assert_codes_match_slices(&codes, source);
+        }
     }
 
     #[test]
     fn flake8_exemption_all() {
         let source = "# flake8: noqa";
-        assert_debug_snapshot!(ParsedFileExemption::try_extract(
-            TextRange::up_to(source.text_len()),
-            source,
-        ));
+        let exemption = parse_file_exemption(TextRange::up_to(source.text_len()), source);
+        assert_debug_snapshot!(exemption);
+        if let Ok(Some(ParsedNoqa {
+            warnings: _,
+            directive: Directive::Codes(codes),
+        })) = exemption
+        {
+            assert_codes_match_slices(&codes, source);
+        }
     }
 
     #[test]
     fn ruff_exemption_all() {
         let source = "# ruff: noqa";
-        assert_debug_snapshot!(ParsedFileExemption::try_extract(
-            TextRange::up_to(source.text_len()),
-            source,
-        ));
+        let exemption = parse_file_exemption(TextRange::up_to(source.text_len()), source);
+        assert_debug_snapshot!(exemption);
+        if let Ok(Some(ParsedNoqa {
+            warnings: _,
+            directive: Directive::Codes(codes),
+        })) = exemption
+        {
+            assert_codes_match_slices(&codes, source);
+        }
     }
 
     #[test]
     fn flake8_exemption_all_no_space() {
         let source = "#flake8:noqa";
-        assert_debug_snapshot!(ParsedFileExemption::try_extract(
-            TextRange::up_to(source.text_len()),
-            source,
-        ));
+        let exemption = parse_file_exemption(TextRange::up_to(source.text_len()), source);
+        assert_debug_snapshot!(exemption);
+        if let Ok(Some(ParsedNoqa {
+            warnings: _,
+            directive: Directive::Codes(codes),
+        })) = exemption
+        {
+            assert_codes_match_slices(&codes, source);
+        }
     }
 
     #[test]
     fn ruff_exemption_all_no_space() {
         let source = "#ruff:noqa";
-        assert_debug_snapshot!(ParsedFileExemption::try_extract(
-            TextRange::up_to(source.text_len()),
-            source,
-        ));
+        let exemption = parse_file_exemption(TextRange::up_to(source.text_len()), source);
+        assert_debug_snapshot!(exemption);
+        if let Ok(Some(ParsedNoqa {
+            warnings: _,
+            directive: Directive::Codes(codes),
+        })) = exemption
+        {
+            assert_codes_match_slices(&codes, source);
+        }
     }
 
     #[test]
     fn flake8_exemption_codes() {
         // Note: Flake8 doesn't support this; it's treated as a blanket exemption.
         let source = "# flake8: noqa: F401, F841";
-        assert_debug_snapshot!(ParsedFileExemption::try_extract(
-            TextRange::up_to(source.text_len()),
-            source,
-        ));
+        let exemption = parse_file_exemption(TextRange::up_to(source.text_len()), source);
+        assert_debug_snapshot!(exemption);
+        if let Ok(Some(ParsedNoqa {
+            warnings: _,
+            directive: Directive::Codes(codes),
+        })) = exemption
+        {
+            assert_codes_match_slices(&codes, source);
+        }
     }
 
     #[test]
     fn ruff_exemption_codes() {
         let source = "# ruff: noqa: F401, F841";
-        assert_debug_snapshot!(ParsedFileExemption::try_extract(
-            TextRange::up_to(source.text_len()),
-            source,
-        ));
+        let exemption = parse_file_exemption(TextRange::up_to(source.text_len()), source);
+        assert_debug_snapshot!(exemption);
+        if let Ok(Some(ParsedNoqa {
+            warnings: _,
+            directive: Directive::Codes(codes),
+        })) = exemption
+        {
+            assert_codes_match_slices(&codes, source);
+        }
+    }
+    #[test]
+    fn ruff_exemption_codes_leading_hashes() {
+        let source = "#### ruff: noqa: F401, F841";
+        let exemption = parse_file_exemption(TextRange::up_to(source.text_len()), source);
+        assert_debug_snapshot!(exemption);
+        if let Ok(Some(ParsedNoqa {
+            warnings: _,
+            directive: Directive::Codes(codes),
+        })) = exemption
+        {
+            assert_codes_match_slices(&codes, source);
+        }
+    }
+
+    #[test]
+    fn ruff_exemption_squashed_codes() {
+        let source = "# ruff: noqa: F401F841";
+        let exemption = parse_file_exemption(TextRange::up_to(source.text_len()), source);
+        assert_debug_snapshot!(exemption);
+        if let Ok(Some(ParsedNoqa {
+            warnings: _,
+            directive: Directive::Codes(codes),
+        })) = exemption
+        {
+            assert_codes_match_slices(&codes, source);
+        }
+    }
+
+    #[test]
+    fn ruff_exemption_empty_comma() {
+        let source = "# ruff: noqa: F401,,F841";
+        let exemption = parse_file_exemption(TextRange::up_to(source.text_len()), source);
+        assert_debug_snapshot!(exemption);
+        if let Ok(Some(ParsedNoqa {
+            warnings: _,
+            directive: Directive::Codes(codes),
+        })) = exemption
+        {
+            assert_codes_match_slices(&codes, source);
+        }
+    }
+
+    #[test]
+    fn ruff_exemption_empty_comma_space() {
+        let source = "# ruff: noqa: F401, ,F841";
+        let exemption = parse_file_exemption(TextRange::up_to(source.text_len()), source);
+        assert_debug_snapshot!(exemption);
+        if let Ok(Some(ParsedNoqa {
+            warnings: _,
+            directive: Directive::Codes(codes),
+        })) = exemption
+        {
+            assert_codes_match_slices(&codes, source);
+        }
+    }
+
+    #[test]
+    fn ruff_exemption_invalid_code_suffix() {
+        let source = "# ruff: noqa: F401abc";
+        let exemption = parse_file_exemption(TextRange::up_to(source.text_len()), source);
+        assert_debug_snapshot!(exemption);
+        if let Ok(Some(ParsedNoqa {
+            warnings: _,
+            directive: Directive::Codes(codes),
+        })) = exemption
+        {
+            assert_codes_match_slices(&codes, source);
+        }
+    }
+
+    #[test]
+    fn ruff_exemption_code_leading_comment() {
+        let source = "# Leading comment # ruff: noqa: F401";
+        let exemption = parse_file_exemption(TextRange::up_to(source.text_len()), source);
+        assert_debug_snapshot!(exemption);
+        if let Ok(Some(ParsedNoqa {
+            warnings: _,
+            directive: Directive::Codes(codes),
+        })) = exemption
+        {
+            assert_codes_match_slices(&codes, source);
+        }
+    }
+
+    #[test]
+    fn ruff_exemption_code_trailing_comment() {
+        let source = "# ruff: noqa: F401 # Trailing comment";
+        let exemption = parse_file_exemption(TextRange::up_to(source.text_len()), source);
+        assert_debug_snapshot!(exemption);
+        if let Ok(Some(ParsedNoqa {
+            warnings: _,
+            directive: Directive::Codes(codes),
+        })) = exemption
+        {
+            assert_codes_match_slices(&codes, source);
+        }
+    }
+
+    #[test]
+    fn ruff_exemption_all_leading_comment() {
+        let source = "# Leading comment # ruff: noqa";
+        let exemption = parse_file_exemption(TextRange::up_to(source.text_len()), source);
+        assert_debug_snapshot!(exemption);
+        if let Ok(Some(ParsedNoqa {
+            warnings: _,
+            directive: Directive::Codes(codes),
+        })) = exemption
+        {
+            assert_codes_match_slices(&codes, source);
+        }
+    }
+
+    #[test]
+    fn ruff_exemption_all_trailing_comment() {
+        let source = "# ruff: noqa # Trailing comment";
+        let exemption = parse_file_exemption(TextRange::up_to(source.text_len()), source);
+        assert_debug_snapshot!(exemption);
+        if let Ok(Some(ParsedNoqa {
+            warnings: _,
+            directive: Directive::Codes(codes),
+        })) = exemption
+        {
+            assert_codes_match_slices(&codes, source);
+        }
+    }
+
+    #[test]
+    fn ruff_exemption_code_trailing_comment_no_space() {
+        let source = "# ruff: noqa: F401# And another comment";
+        let exemption = parse_file_exemption(TextRange::up_to(source.text_len()), source);
+        assert_debug_snapshot!(exemption);
+        if let Ok(Some(ParsedNoqa {
+            warnings: _,
+            directive: Directive::Codes(codes),
+        })) = exemption
+        {
+            assert_codes_match_slices(&codes, source);
+        }
+    }
+
+    #[test]
+    fn ruff_exemption_all_trailing_comment_no_space() {
+        let source = "# ruff: noqa# Trailing comment";
+        let exemption = parse_file_exemption(TextRange::up_to(source.text_len()), source);
+        assert_debug_snapshot!(exemption);
+        if let Ok(Some(ParsedNoqa {
+            warnings: _,
+            directive: Directive::Codes(codes),
+        })) = exemption
+        {
+            assert_codes_match_slices(&codes, source);
+        }
+    }
+
+    #[test]
+    fn ruff_exemption_all_trailing_comment_no_hash() {
+        let source = "# ruff: noqa Trailing comment";
+        let exemption = parse_file_exemption(TextRange::up_to(source.text_len()), source);
+        assert_debug_snapshot!(exemption);
+        if let Ok(Some(ParsedNoqa {
+            warnings: _,
+            directive: Directive::Codes(codes),
+        })) = exemption
+        {
+            assert_codes_match_slices(&codes, source);
+        }
+    }
+
+    #[test]
+    fn ruff_exemption_code_trailing_comment_no_hash() {
+        let source = "# ruff: noqa: F401 Trailing comment";
+        let exemption = parse_file_exemption(TextRange::up_to(source.text_len()), source);
+        assert_debug_snapshot!(exemption);
+        if let Ok(Some(ParsedNoqa {
+            warnings: _,
+            directive: Directive::Codes(codes),
+        })) = exemption
+        {
+            assert_codes_match_slices(&codes, source);
+        }
     }
 
     #[test]
     fn flake8_exemption_all_case_insensitive() {
         let source = "# flake8: NoQa";
-        assert_debug_snapshot!(ParsedFileExemption::try_extract(
-            TextRange::up_to(source.text_len()),
-            source,
-        ));
+        let exemption = parse_file_exemption(TextRange::up_to(source.text_len()), source);
+        assert_debug_snapshot!(exemption);
+        if let Ok(Some(ParsedNoqa {
+            warnings: _,
+            directive: Directive::Codes(codes),
+        })) = exemption
+        {
+            assert_codes_match_slices(&codes, source);
+        }
     }
 
     #[test]
     fn ruff_exemption_all_case_insensitive() {
         let source = "# ruff: NoQa";
-        assert_debug_snapshot!(ParsedFileExemption::try_extract(
-            TextRange::up_to(source.text_len()),
-            source,
-        ));
+        let exemption = parse_file_exemption(TextRange::up_to(source.text_len()), source);
+        assert_debug_snapshot!(exemption);
+        if let Ok(Some(ParsedNoqa {
+            warnings: _,
+            directive: Directive::Codes(codes),
+        })) = exemption
+        {
+            assert_codes_match_slices(&codes, source);
+        }
     }
 
     #[test]
