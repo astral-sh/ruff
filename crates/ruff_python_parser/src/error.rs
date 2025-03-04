@@ -485,7 +485,14 @@ pub enum UnsupportedSyntaxErrorKind {
     /// ## References
     ///
     /// - [Python 3.10 Other Language Changes](https://docs.python.org/3/whatsnew/3.10.html#other-language-changes)
-    UnparenthesizedNamedExpr,
+    UnparenthesizedNamedExpr(UnparenthesizedNamedExprKind),
+}
+
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub enum UnparenthesizedNamedExprKind {
+    SequenceIndex,
+    SetLiteral,
+    SetComprehension,
 }
 
 impl Display for UnsupportedSyntaxError {
@@ -494,9 +501,15 @@ impl Display for UnsupportedSyntaxError {
             UnsupportedSyntaxErrorKind::Match => "`match` statement",
             UnsupportedSyntaxErrorKind::Walrus => "named assignment expression (`:=`)",
             UnsupportedSyntaxErrorKind::ExceptStar => "`except*`",
-            UnsupportedSyntaxErrorKind::UnparenthesizedNamedExpr => {
-                "unparenthesized assignment expression"
-            }
+            UnsupportedSyntaxErrorKind::UnparenthesizedNamedExpr(
+                UnparenthesizedNamedExprKind::SequenceIndex,
+            ) => "unparenthesized assignment expression in a sequence index",
+            UnsupportedSyntaxErrorKind::UnparenthesizedNamedExpr(
+                UnparenthesizedNamedExprKind::SetLiteral,
+            ) => "unparenthesized assignment expression as an element in a set literal",
+            UnsupportedSyntaxErrorKind::UnparenthesizedNamedExpr(
+                UnparenthesizedNamedExprKind::SetComprehension,
+            ) => "unparenthesized assignment expression as an element in a set comprehension",
         };
         write!(
             f,
@@ -514,7 +527,7 @@ impl UnsupportedSyntaxErrorKind {
             UnsupportedSyntaxErrorKind::Match => PythonVersion::PY310,
             UnsupportedSyntaxErrorKind::Walrus => PythonVersion::PY38,
             UnsupportedSyntaxErrorKind::ExceptStar => PythonVersion::PY311,
-            UnsupportedSyntaxErrorKind::UnparenthesizedNamedExpr => PythonVersion::PY310,
+            UnsupportedSyntaxErrorKind::UnparenthesizedNamedExpr(_) => PythonVersion::PY310,
         }
     }
 }

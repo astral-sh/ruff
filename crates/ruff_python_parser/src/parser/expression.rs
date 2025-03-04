@@ -11,6 +11,7 @@ use ruff_python_ast::{
 };
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
+use crate::error::UnparenthesizedNamedExprKind;
 use crate::parser::progress::ParserProgress;
 use crate::parser::{helpers, FunctionKind, Parser};
 use crate::string::{parse_fstring_literal_element, parse_string_literal, StringType};
@@ -884,7 +885,9 @@ impl<'src> Parser<'src> {
             if self.at_ts(NEWLINE_EOF_SET.union([TokenKind::Rsqb, TokenKind::Comma].into())) {
                 if lower.is_unparenthesized_named_expr() {
                     self.add_unsupported_syntax_error(
-                        UnsupportedSyntaxErrorKind::UnparenthesizedNamedExpr,
+                        UnsupportedSyntaxErrorKind::UnparenthesizedNamedExpr(
+                            UnparenthesizedNamedExprKind::SequenceIndex,
+                        ),
                         lower.range(),
                     );
                 }
@@ -1664,7 +1667,9 @@ impl<'src> Parser<'src> {
                 // {last := x for x in range(3)}
                 if key_or_element.is_unparenthesized_named_expr() {
                     self.add_unsupported_syntax_error(
-                        UnsupportedSyntaxErrorKind::UnparenthesizedNamedExpr,
+                        UnsupportedSyntaxErrorKind::UnparenthesizedNamedExpr(
+                            UnparenthesizedNamedExprKind::SetComprehension,
+                        ),
                         key_or_element.range(),
                     );
                 }
@@ -1714,7 +1719,9 @@ impl<'src> Parser<'src> {
 
                 if key_or_element.is_unparenthesized_named_expr() {
                     self.add_unsupported_syntax_error(
-                        UnsupportedSyntaxErrorKind::UnparenthesizedNamedExpr,
+                        UnsupportedSyntaxErrorKind::UnparenthesizedNamedExpr(
+                            UnparenthesizedNamedExprKind::SetLiteral,
+                        ),
                         key_or_element.range(),
                     );
                 }
@@ -1882,7 +1889,9 @@ impl<'src> Parser<'src> {
 
             if parsed_expr.is_unparenthesized_named_expr() {
                 parser.add_unsupported_syntax_error(
-                    UnsupportedSyntaxErrorKind::UnparenthesizedNamedExpr,
+                    UnsupportedSyntaxErrorKind::UnparenthesizedNamedExpr(
+                        UnparenthesizedNamedExprKind::SetLiteral,
+                    ),
                     parsed_expr.range(),
                 );
             }

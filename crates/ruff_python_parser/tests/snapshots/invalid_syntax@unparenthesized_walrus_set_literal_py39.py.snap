@@ -162,7 +162,7 @@ Module(
   |
 1 | # parse_options: {"target-version": "3.9"}
 2 | {x := 1, 2, 3}
-  |  ^^^^^^ Syntax Error: Cannot use unparenthesized assignment expression on Python 3.9 (syntax was added in Python 3.10)
+  |  ^^^^^^ Syntax Error: Cannot use unparenthesized assignment expression as an element in a set literal on Python 3.9 (syntax was added in Python 3.10)
 3 | {1, x := 2, 3}
 4 | {1, 2, x := 3}
   |
@@ -172,7 +172,7 @@ Module(
 1 | # parse_options: {"target-version": "3.9"}
 2 | {x := 1, 2, 3}
 3 | {1, x := 2, 3}
-  |     ^^^^^^ Syntax Error: Cannot use unparenthesized assignment expression on Python 3.9 (syntax was added in Python 3.10)
+  |     ^^^^^^ Syntax Error: Cannot use unparenthesized assignment expression as an element in a set literal on Python 3.9 (syntax was added in Python 3.10)
 4 | {1, 2, x := 3}
   |
 
@@ -181,5 +181,5 @@ Module(
 2 | {x := 1, 2, 3}
 3 | {1, x := 2, 3}
 4 | {1, 2, x := 3}
-  |        ^^^^^^ Syntax Error: Cannot use unparenthesized assignment expression on Python 3.9 (syntax was added in Python 3.10)
+  |        ^^^^^^ Syntax Error: Cannot use unparenthesized assignment expression as an element in a set literal on Python 3.9 (syntax was added in Python 3.10)
   |
