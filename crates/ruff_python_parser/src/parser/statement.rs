@@ -3119,7 +3119,7 @@ impl<'src> Parser<'src> {
         // class Foo[T]: ...
 
         let range = self.node_range(start);
-        self.add_unsupported_syntax_error(UnsupportedSyntaxErrorKind::TypeParams, range);
+        self.add_unsupported_syntax_error(UnsupportedSyntaxErrorKind::TypeParameterList, range);
 
         ast::TypeParams { range, type_params }
     }

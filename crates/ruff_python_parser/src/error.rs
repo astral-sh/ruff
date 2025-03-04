@@ -477,7 +477,7 @@ pub enum UnsupportedSyntaxErrorKind {
     /// https://docs.python.org/3/reference/compound_stmts.html#type-parameter-lists
     /// [PEP 695]: https://peps.python.org/pep-0695/
     /// [`typing.TypeVar`]: https://docs.python.org/3/library/typing.html#typevar
-    TypeParams,
+    TypeParameterList,
 }
 
 impl Display for UnsupportedSyntaxError {
@@ -486,7 +486,7 @@ impl Display for UnsupportedSyntaxError {
             UnsupportedSyntaxErrorKind::Match => "`match` statement",
             UnsupportedSyntaxErrorKind::Walrus => "named assignment expression (`:=`)",
             UnsupportedSyntaxErrorKind::ExceptStar => "`except*`",
-            UnsupportedSyntaxErrorKind::TypeParams => "type parameter lists",
+            UnsupportedSyntaxErrorKind::TypeParameterList => "type parameter lists",
         };
         write!(
             f,
@@ -504,7 +504,7 @@ impl UnsupportedSyntaxErrorKind {
             UnsupportedSyntaxErrorKind::Match => PythonVersion::PY310,
             UnsupportedSyntaxErrorKind::Walrus => PythonVersion::PY38,
             UnsupportedSyntaxErrorKind::ExceptStar => PythonVersion::PY311,
-            UnsupportedSyntaxErrorKind::TypeParams => PythonVersion::PY312,
+            UnsupportedSyntaxErrorKind::TypeParameterList => PythonVersion::PY312,
         }
     }
 }
