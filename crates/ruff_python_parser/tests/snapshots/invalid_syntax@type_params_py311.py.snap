@@ -7,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/inline/err/type_params_py311.py
 ```
 Module(
     ModModule {
-        range: 0..149,
+        range: 0..140,
         body: [
             TypeAlias(
                 StmtTypeAlias {
@@ -111,7 +111,7 @@ Module(
             ),
             ClassDef(
                 StmtClassDef {
-                    range: 88..148,
+                    range: 88..139,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("Foo"),
@@ -119,7 +119,7 @@ Module(
                     },
                     type_params: Some(
                         TypeParams {
-                            range: 97..143,
+                            range: 97..134,
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
@@ -195,25 +195,6 @@ Module(
                                         default: None,
                                     },
                                 ),
-                                TypeVar(
-                                    TypeParamTypeVar {
-                                        range: 135..142,
-                                        name: Identifier {
-                                            id: Name("D"),
-                                            range: 135..136,
-                                        },
-                                        bound: None,
-                                        default: Some(
-                                            Name(
-                                                ExprName {
-                                                    range: 139..142,
-                                                    id: Name("int"),
-                                                    ctx: Load,
-                                                },
-                                            ),
-                                        ),
-                                    },
-                                ),
                             ],
                         },
                     ),
@@ -221,10 +202,10 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                range: 145..148,
+                                range: 136..139,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        range: 145..148,
+                                        range: 136..139,
                                     },
                                 ),
                             },
@@ -241,9 +222,18 @@ Module(
   |
 1 | # parse_options: {"target-version": "3.11"}
 2 | type List[T] = list | set
+  | ^^^^ Syntax Error: Cannot use `type` alias statement on Python 3.11 (syntax was added in Python 3.12)
+3 | def foo[T](): ...
+4 | class Foo[S: (str, bytes), T: float, *Ts, **P]: ...
+  |
+
+
+  |
+1 | # parse_options: {"target-version": "3.11"}
+2 | type List[T] = list | set
   |          ^^^ Syntax Error: Cannot use type parameter lists on Python 3.11 (syntax was added in Python 3.12)
 3 | def foo[T](): ...
-4 | class Foo[S: (str, bytes), T: float, *Ts, **P, D = int]: ...
+4 | class Foo[S: (str, bytes), T: float, *Ts, **P]: ...
   |
 
 
@@ -252,13 +242,13 @@ Module(
 2 | type List[T] = list | set
 3 | def foo[T](): ...
   |        ^^^ Syntax Error: Cannot use type parameter lists on Python 3.11 (syntax was added in Python 3.12)
-4 | class Foo[S: (str, bytes), T: float, *Ts, **P, D = int]: ...
+4 | class Foo[S: (str, bytes), T: float, *Ts, **P]: ...
   |
 
 
   |
 2 | type List[T] = list | set
 3 | def foo[T](): ...
-4 | class Foo[S: (str, bytes), T: float, *Ts, **P, D = int]: ...
-  |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Syntax Error: Cannot use type parameter lists on Python 3.11 (syntax was added in Python 3.12)
+4 | class Foo[S: (str, bytes), T: float, *Ts, **P]: ...
+  |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Syntax Error: Cannot use type parameter lists on Python 3.11 (syntax was added in Python 3.12)
   |
