@@ -82,10 +82,8 @@ reveal_type(c)  # revealed: C
 The typevars of a fully specialized generic class should no longer be visible:
 
 ```py
-# TODO: no error
 # TODO: revealed: int
-# error: [unresolved-attribute]
-reveal_type(C.x)  # revealed: Unknown
+reveal_type(c.x)  # revealed: T
 ```
 
 If the type parameter is not specified explicitly, and there are no constraints that let us infer a
