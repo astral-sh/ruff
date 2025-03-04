@@ -853,18 +853,6 @@ impl<'src> Parser<'src> {
         // indexes", which I take to mean subscripts. See
         // <https://docs.python.org/3/whatsnew/3.10.html#other-language-changes>.
 
-        // test_ok parenthesized_walrus_index_py39
-        // # parse_options: {"target-version": "3.9"}
-        // lst[(x:=1)]
-
-        // test_ok unparenthesized_walrus_index_py310
-        // # parse_options: {"target-version": "3.10"}
-        // lst[x:=1]
-
-        // test_err unparenthesized_walrus_index_py39
-        // # parse_options: {"target-version": "3.9"}
-        // lst[x:=1]
-
         // test_err walrus_slice
         // # even after 3.10, an unparenthesized walrus is not allowed in a slice
         // lst[x:=1:-1]
@@ -882,7 +870,19 @@ impl<'src> Parser<'src> {
             let lower =
                 self.parse_named_expression_or_higher(ExpressionContext::starred_conditional());
 
+            // This means we're in a subscript.
             if self.at_ts(NEWLINE_EOF_SET.union([TokenKind::Rsqb, TokenKind::Comma].into())) {
+                // test_ok parenthesized_walrus_index_py39
+                // # parse_options: {"target-version": "3.9"}
+                // lst[(x:=1)]
+
+                // test_ok unparenthesized_walrus_index_py310
+                // # parse_options: {"target-version": "3.10"}
+                // lst[x:=1]
+
+                // test_err unparenthesized_walrus_index_py39
+                // # parse_options: {"target-version": "3.9"}
+                // lst[x:=1]
                 if lower.is_unparenthesized_named_expr() {
                     self.add_unsupported_syntax_error(
                         UnsupportedSyntaxErrorKind::UnparenthesizedNamedExpr(
@@ -894,6 +894,7 @@ impl<'src> Parser<'src> {
                 return lower.expr;
             }
 
+            // Now we know we're in a slice.
             if !lower.is_parenthesized {
                 match lower.expr {
                     Expr::Starred(_) => {
