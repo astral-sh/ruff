@@ -449,6 +449,32 @@ pub enum UnsupportedSyntaxErrorKind {
     Match,
     Walrus,
     ExceptStar,
+    /// Represents the use of a [PEP 570] positional-only parameter before Python 3.8.
+    ///
+    /// ## Examples
+    ///
+    /// Python 3.8 added the `/` syntax for marking preceding parameters as positional-only:
+    ///
+    /// ```python
+    /// def foo(a, b, /, c): ...
+    /// ```
+    ///
+    /// This means `a` and `b` in this case can only be provided by position, not by name. In other
+    /// words, this code results in a `TypeError` at runtime:
+    ///
+    /// ```pycon
+    /// >>> def foo(a, b, /, c): ...
+    /// ...
+    /// >>> foo(a=1, b=2, c=3)
+    /// Traceback (most recent call last):
+    ///   File "<python-input-3>", line 1, in <module>
+    ///     foo(a=1, b=2, c=3)
+    ///     ~~~^^^^^^^^^^^^^^^
+    /// TypeError: foo() got some positional-only arguments passed as keyword arguments: 'a, b'
+    /// ```
+    ///
+    /// [PEP 570]: https://peps.python.org/pep-0570/
+    PositionalOnlyParameter,
     TypeAliasStatement,
     TypeParamDefault,
 }
@@ -459,6 +485,9 @@ impl Display for UnsupportedSyntaxError {
             UnsupportedSyntaxErrorKind::Match => "Cannot use `match` statement",
             UnsupportedSyntaxErrorKind::Walrus => "Cannot use named assignment expression (`:=`)",
             UnsupportedSyntaxErrorKind::ExceptStar => "Cannot use `except*`",
+            UnsupportedSyntaxErrorKind::PositionalOnlyParameter => {
+                "Cannot use positional-only parameter separator"
+            }
             UnsupportedSyntaxErrorKind::TypeAliasStatement => "Cannot use `type` alias statement",
             UnsupportedSyntaxErrorKind::TypeParamDefault => {
                 "Cannot set default type for a type parameter"
@@ -480,6 +509,7 @@ impl UnsupportedSyntaxErrorKind {
             UnsupportedSyntaxErrorKind::Match => PythonVersion::PY310,
             UnsupportedSyntaxErrorKind::Walrus => PythonVersion::PY38,
             UnsupportedSyntaxErrorKind::ExceptStar => PythonVersion::PY311,
+            UnsupportedSyntaxErrorKind::PositionalOnlyParameter => PythonVersion::PY38,
             UnsupportedSyntaxErrorKind::TypeAliasStatement => PythonVersion::PY312,
             UnsupportedSyntaxErrorKind::TypeParamDefault => PythonVersion::PY313,
         }
