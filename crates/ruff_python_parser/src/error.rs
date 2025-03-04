@@ -449,7 +449,43 @@ pub enum UnsupportedSyntaxErrorKind {
     Match,
     Walrus,
     ExceptStar,
-    UnparWalrus,
+    /// Represents the use of an unparenthesized named expression (`:=`) in a set literal, set
+    /// comprehension, or sequence index before Python 3.10.
+    ///
+    /// ## Examples
+    ///
+    /// These are allowed on Python 3.10:
+    ///
+    /// ```python
+    /// {x := 1, 2, 3}                 # set literal
+    /// {last := x for x in range(3)}  # set comprehension
+    /// lst[x := 1]                    # sequence index
+    /// ```
+    ///
+    /// But on Python 3.9 the named expression needs to be parenthesized:
+    ///
+    /// ```python
+    /// {(x := 1), 2, 3}                 # set literal
+    /// {(last := x) for x in range(3)}  # set comprehension
+    /// lst[(x := 1)]                    # sequence index
+    /// ```
+    ///
+    /// However, unparenthesized named expressions are never allowed in slices:
+    ///
+    /// ```python
+    /// lst[x:=1:-1]      # syntax error
+    /// lst[1:x:=1]       # syntax error
+    /// lst[1:3:x:=1]     # syntax error
+    ///
+    /// lst[(x:=1):-1]    # ok
+    /// lst[1:(x:=1)]     # ok
+    /// lst[1:3:(x:=1)]   # ok
+    /// ```
+    ///
+    /// ## References
+    ///
+    /// - [Python 3.10 Other Language Changes](https://docs.python.org/3/whatsnew/3.10.html#other-language-changes)
+    UnparenthesizedNamedExpr,
 }
 
 impl Display for UnsupportedSyntaxError {
@@ -458,7 +494,9 @@ impl Display for UnsupportedSyntaxError {
             UnsupportedSyntaxErrorKind::Match => "`match` statement",
             UnsupportedSyntaxErrorKind::Walrus => "named assignment expression (`:=`)",
             UnsupportedSyntaxErrorKind::ExceptStar => "`except*`",
-            UnsupportedSyntaxErrorKind::UnparWalrus => "unparenthesized assignment expression",
+            UnsupportedSyntaxErrorKind::UnparenthesizedNamedExpr => {
+                "unparenthesized assignment expression"
+            }
         };
         write!(
             f,
@@ -476,7 +514,7 @@ impl UnsupportedSyntaxErrorKind {
             UnsupportedSyntaxErrorKind::Match => PythonVersion::PY310,
             UnsupportedSyntaxErrorKind::Walrus => PythonVersion::PY38,
             UnsupportedSyntaxErrorKind::ExceptStar => PythonVersion::PY311,
-            UnsupportedSyntaxErrorKind::UnparWalrus => PythonVersion::PY310,
+            UnsupportedSyntaxErrorKind::UnparenthesizedNamedExpr => PythonVersion::PY310,
         }
     }
 }

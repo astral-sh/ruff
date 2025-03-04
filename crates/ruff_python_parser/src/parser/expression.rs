@@ -883,7 +883,7 @@ impl<'src> Parser<'src> {
                 // check this here because if we don't return, we will emit a ParseError instead
                 if lower.is_unparenthesized_named_expr() {
                     self.add_unsupported_syntax_error(
-                        UnsupportedSyntaxErrorKind::UnparWalrus,
+                        UnsupportedSyntaxErrorKind::UnparenthesizedNamedExpr,
                         lower.range(),
                     );
                 }
@@ -1663,7 +1663,7 @@ impl<'src> Parser<'src> {
                 // {last := x for x in range(3)}
                 if key_or_element.is_unparenthesized_named_expr() {
                     self.add_unsupported_syntax_error(
-                        UnsupportedSyntaxErrorKind::UnparWalrus,
+                        UnsupportedSyntaxErrorKind::UnparenthesizedNamedExpr,
                         key_or_element.range(),
                     );
                 }
@@ -1713,7 +1713,7 @@ impl<'src> Parser<'src> {
 
                 if key_or_element.is_unparenthesized_named_expr() {
                     self.add_unsupported_syntax_error(
-                        UnsupportedSyntaxErrorKind::UnparWalrus,
+                        UnsupportedSyntaxErrorKind::UnparenthesizedNamedExpr,
                         key_or_element.range(),
                     );
                 }
@@ -1881,7 +1881,7 @@ impl<'src> Parser<'src> {
 
             if parsed_expr.is_unparenthesized_named_expr() {
                 parser.add_unsupported_syntax_error(
-                    UnsupportedSyntaxErrorKind::UnparWalrus,
+                    UnsupportedSyntaxErrorKind::UnparenthesizedNamedExpr,
                     parsed_expr.range(),
                 );
             }
