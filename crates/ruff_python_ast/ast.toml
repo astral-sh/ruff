@@ -26,10 +26,28 @@
 #   Controls the name of the AnyNodeRef::is_foo_bar method.  The default is the
 #   group name in snake_case.
 #
-# rustdoc:
-#   A rustdoc comment that is added to the group's enums.
+# doc:
+#   A doc comment that is added to the group's enums.
 #
 # The following syntax node options are available:
+#
+# doc:
+#  A doc comment that is added to the syntax node struct.
+#
+# derives:
+# List of derives to add to the syntax node struct. Clone, Debug, PartialEq are added by default.
+#
+# fields:
+# List of fields in the syntax node struct. Each field is a table with the
+# following keys:
+# * name - The name of the field.
+# * type - The type of the field.  This can be a simple type name, or a type
+#   type field uses a special syntax to describe the rust type:
+#    * `Expr` - A single expression.
+#    * `Expr?` - Option type.
+#    * `Expr*` - A vector of Expr.
+#    * `&Expr*` - A boxed slice of Expr.
+#    These properties cannot be nested, for example we cannot create a vector of option types.
 #
 # variant:
 #   The name of the enum variant for this syntax node.  Defaults to the node
