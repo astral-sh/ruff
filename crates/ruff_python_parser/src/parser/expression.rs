@@ -849,10 +849,6 @@ impl<'src> Parser<'src> {
         const STEP_END_SET: TokenSet =
             TokenSet::new([TokenKind::Comma, TokenKind::Rsqb]).union(NEWLINE_EOF_SET);
 
-        // Python 3.10 allowed assignment expressions to be unparenthesized within "sequence
-        // indexes", which I take to mean subscripts. See
-        // <https://docs.python.org/3/whatsnew/3.10.html#other-language-changes>.
-
         // test_err walrus_slice
         // # even after 3.10, an unparenthesized walrus is not allowed in a slice
         // lst[x:=1:-1]
@@ -1646,12 +1642,6 @@ impl<'src> Parser<'src> {
                         &key_or_element,
                     );
                 }
-                // Python 3.10 allowed assignment expressions to be unparenthesized within set
-                // literals and set comprehensions. See
-                // <https://docs.python.org/3/whatsnew/3.10.html#other-language-changes>. In my
-                // testing, these are also allowed on 3.9, but they are included in the 3.10 release
-                // notes, so that's the cutoff used here.
-
                 // test_ok parenthesized_walrus_py39
                 // # parse_options: {"target-version": "3.9"}
                 // {(x := 1), 2, 3}
