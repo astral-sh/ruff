@@ -342,12 +342,38 @@ impl<T> Parsed<T> {
         self.errors
     }
 
-    /// Returns `true` if the parsed source code is valid i.e., it has no syntax errors.
+    /// Returns `true` if the parsed source code is valid i.e., it has no [`ParseError`]s.
     ///
-    /// Note that this does not include version-related
-    /// [`unsupported_syntax_errors`](Parsed::unsupported_syntax_errors).
-    pub fn is_valid(&self) -> bool {
+    /// Note that this does not include version-related [`UnsupportedSyntaxError`]s.
+    ///
+    /// See [`Parsed::has_no_syntax_errors`] for a version that takes these into account.
+    pub fn has_valid_syntax(&self) -> bool {
         self.errors.is_empty()
+    }
+
+    /// Returns `true` if the parsed source code is invalid i.e., it has [`ParseError`]s.
+    ///
+    /// Note that this does not include version-related [`UnsupportedSyntaxError`]s.
+    ///
+    /// See [`Parsed::has_no_syntax_errors`] for a version that takes these into account.
+    pub fn has_invalid_syntax(&self) -> bool {
+        !self.has_valid_syntax()
+    }
+
+    /// Returns `true` if the parsed source code does not contain any [`ParseError`]s *or*
+    /// [`UnsupportedSyntaxError`]s.
+    ///
+    /// See [`Parsed::has_valid_syntax`] for a version specific to [`ParseError`]s.
+    pub fn has_no_syntax_errors(&self) -> bool {
+        self.has_valid_syntax() && self.unsupported_syntax_errors.is_empty()
+    }
+
+    /// Returns `true` if the parsed source code contains any [`ParseError`]s *or*
+    /// [`UnsupportedSyntaxError`]s.
+    ///
+    /// See [`Parsed::has_invalid_syntax`] for a version specific to [`ParseError`]s.
+    pub fn has_syntax_errors(&self) -> bool {
+        !self.has_no_syntax_errors()
     }
 
     /// Returns the [`Parsed`] output as a [`Result`], returning [`Ok`] if it has no syntax errors,
@@ -356,7 +382,7 @@ impl<T> Parsed<T> {
     /// Note that any [`unsupported_syntax_errors`](Parsed::unsupported_syntax_errors) will not
     /// cause [`Err`] to be returned.
     pub fn as_result(&self) -> Result<&Parsed<T>, &[ParseError]> {
-        if self.is_valid() {
+        if self.has_valid_syntax() {
             Ok(self)
         } else {
             Err(&self.errors)
@@ -369,7 +395,7 @@ impl<T> Parsed<T> {
     /// Note that any [`unsupported_syntax_errors`](Parsed::unsupported_syntax_errors) will not
     /// cause [`Err`] to be returned.
     pub(crate) fn into_result(self) -> Result<Parsed<T>, ParseError> {
-        if self.is_valid() {
+        if self.has_valid_syntax() {
             Ok(self)
         } else {
             Err(self.into_errors().into_iter().next().unwrap())
