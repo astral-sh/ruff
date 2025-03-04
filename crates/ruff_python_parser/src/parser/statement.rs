@@ -3013,8 +3013,6 @@ impl<'src> Parser<'src> {
                         // test_err pos_only_py37
                         // # parse_options: {"target-version": "3.7"}
                         // def foo(a, /): ...
-
-                        // check here to avoid duplicate errors for multiple slashes detected above
                         parser.add_unsupported_syntax_error(
                             UnsupportedSyntaxErrorKind::PositionalOnlyParameter,
                             slash_range,
