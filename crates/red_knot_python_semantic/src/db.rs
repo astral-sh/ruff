@@ -153,6 +153,11 @@ pub(crate) mod tests {
             }
         }
 
+        pub(crate) fn with_custom_typeshed(mut self, path: &'a str) -> Self {
+            self.custom_typeshed = Some(SystemPathBuf::from(path));
+            self
+        }
+
         pub(crate) fn with_python_version(mut self, version: PythonVersion) -> Self {
             self.python_version = version;
             self
