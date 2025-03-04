@@ -888,9 +888,8 @@ impl<'src> Parser<'src> {
     /// See: <https://docs.python.org/3/reference/simple_stmts.html#the-type-statement>
     fn parse_type_alias_statement(&mut self) -> ast::StmtTypeAlias {
         let start = self.node_start();
+        let type_range = self.current_token_range();
         self.bump(TokenKind::Type);
-
-        let type_range = self.node_range(start);
 
         let mut name = Expr::Name(self.parse_name());
         helpers::set_expr_ctx(&mut name, ExprContext::Store);
