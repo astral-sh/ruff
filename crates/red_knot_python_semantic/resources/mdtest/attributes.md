@@ -356,9 +356,7 @@ class C:
 
 c_instance = C()
 
-# TODO: Should be `Unknown | int | None`
-# error: [unresolved-attribute]
-reveal_type(c_instance.x)  # revealed: Unknown
+reveal_type(c_instance.x)  # revealed: Unknown | int | None
 ```
 
 #### Attributes defined in comprehensions
