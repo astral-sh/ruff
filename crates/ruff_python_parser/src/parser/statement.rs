@@ -3243,6 +3243,7 @@ impl<'src> Parser<'src> {
                 None
             };
 
+            let equal_token_start = self.node_start();
             let default = if self.eat(TokenKind::Equal) {
                 if self.at_expr() {
                     // test_err type_param_type_var_invalid_default_expr
@@ -3267,6 +3268,26 @@ impl<'src> Parser<'src> {
             } else {
                 None
             };
+
+            // test_ok type_param_default_py313
+            // # parse_options: {"target-version": "3.13"}
+            // type X[T = int] = int
+            // def f[T = int](): ...
+            // class C[T = int](): ...
+
+            // test_err type_param_default_py312
+            // # parse_options: {"target-version": "3.12"}
+            // type X[T = int] = int
+            // def f[T = int](): ...
+            // class C[T = int](): ...
+            // class D[S, T = int, U = uint](): ...
+
+            if default.is_some() {
+                self.add_unsupported_syntax_error(
+                    UnsupportedSyntaxErrorKind::TypeParamDefault,
+                    self.node_range(equal_token_start),
+                );
+            }
 
             ast::TypeParam::TypeVar(ast::TypeParamTypeVar {
                 range: self.node_range(start),
