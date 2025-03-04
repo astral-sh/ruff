@@ -95,7 +95,7 @@ class DataDescriptor:
     def __get__(self, instance: object, owner: type | None = None) -> Literal["data"]:
         return "data"
 
-    def __set__(self, instance: int, value) -> None:
+    def __set__(self, instance: object, value: int) -> None:
         pass
 
 class NonDataDescriptor:
@@ -131,42 +131,6 @@ reveal_type(C.non_data_descriptor)  # revealed: Unknown | Literal["non-data"]
 # assignment does not call `DataDescriptor.__set__`. For this reason, we infer
 # `Unknown | …` for all (descriptor) attributes.
 C.data_descriptor = "something else"  # This is okay
-```
-
-## Descriptor protocol for class objects
-
-When a descriptor is accessed on a class object, the following precedence chain is used:
-
-- Data descriptor on the metaclass
-- Data or non-data descriptor on the class
-- Class attribute
-- Non-data descriptor on the metaclass
-
-```py
-from typing import Literal
-
-class DataDescriptor:
-    def __get__(self, instance: object, owner: type | None = None) -> Literal["data"]:
-        return "data"
-
-    def __set__(self, instance: int, value) -> None:
-        pass
-
-class NonDataDescriptor:
-    def __get__(self, instance: object, owner: type | None = None) -> Literal["non-data"]:
-        return "non-data"
-
-class Meta(type):
-    meta_data_descriptor: DataDescriptor = DataDescriptor()
-    meta_non_data_descriptor: NonDataDescriptor = NonDataDescriptor()
-
-class DescriptorsOnMetaClass(metaclass=Meta):
-    # meta_data_descriptor = "shadowed?"
-    # meta_non_data_descriptor = "shadowed?"
-    ...
-
-reveal_type(DescriptorsOnMetaClass.meta_data_descriptor)  # revealed: Literal["data"]
-reveal_type(DescriptorsOnMetaClass.meta_non_data_descriptor)  # revealed: Literal["non-data"]
 ```
 
 ## Possibly unbound descriptors, unions with other attributes
@@ -228,6 +192,180 @@ def _(flag: bool):
 
     # error: [possibly-unbound-attribute] "Attribute `data` on type `UnionWithInstanceAttribute` is possibly unbound"
     reveal_type(UnionWithInstanceAttribute().data)  # revealed: int | str
+```
+
+## Descriptor protocol for class objects
+
+When attributes are accessed on a class object, the following [precedence chain] is used:
+
+- Data descriptor on the metaclass
+- Data or non-data descriptor on the class
+- Class attribute
+- Non-data descriptor on the metaclass
+- Metaclass attribute
+
+To verify this, we define a data and a non-data descriptor:
+
+```py
+from typing import Literal, Any
+
+class DataDescriptor:
+    def __get__(self, instance: object, owner: type | None = None) -> Literal["data"]:
+        return "data"
+
+    def __set__(self, instance: object, value: str) -> None:
+        pass
+
+class NonDataDescriptor:
+    def __get__(self, instance: object, owner: type | None = None) -> Literal["non-data"]:
+        return "non-data"
+```
+
+First, we make sure that the descriptors are correctly accessed when defined on the metaclass or the
+class:
+
+```py
+class Meta1(type):
+    meta_data_descriptor: DataDescriptor = DataDescriptor()
+    meta_non_data_descriptor: NonDataDescriptor = NonDataDescriptor()
+
+class C1(metaclass=Meta1):
+    class_data_descriptor: DataDescriptor = DataDescriptor()
+    class_non_data_descriptor: NonDataDescriptor = NonDataDescriptor()
+
+reveal_type(C1.meta_data_descriptor)  # revealed: Literal["data"]
+reveal_type(C1.meta_non_data_descriptor)  # revealed: Literal["non-data"]
+
+reveal_type(C1.class_data_descriptor)  # revealed: Literal["data"]
+reveal_type(C1.class_non_data_descriptor)  # revealed: Literal["non-data"]
+```
+
+Next, we demonstrate that a *metaclass data descriptor* takes precedence over all class-level
+attributes:
+
+```py
+class Meta2(type):
+    meta_data_descriptor1: DataDescriptor = DataDescriptor()
+    meta_data_descriptor2: DataDescriptor = DataDescriptor()
+
+class ClassLevelDataDescriptor:
+    def __get__(self, instance: object, owner: type | None = None) -> Literal["class level data descriptor"]:
+        return "class level data descriptor"
+
+    def __set__(self, instance: object, value: str) -> None:
+        pass
+
+class C2(metaclass=Meta2):
+    meta_data_descriptor1: Literal["value on class"] = "value on class"
+    meta_data_descriptor2: ClassLevelDataDescriptor = ClassLevelDataDescriptor()
+
+reveal_type(C2.meta_data_descriptor1)  # revealed: Literal["data"]
+reveal_type(C2.meta_data_descriptor2)  # revealed: Literal["data"]
+```
+
+On the other hand, normal metaclass attributes and metaclass non-data descriptors are shadowed by
+class-level attributes (descriptor or not):
+
+```py
+class Meta3(type):
+    meta_attribute1: Literal["value on metaclass"] = "value on metaclass"
+    meta_attribute2: Literal["value on metaclass"] = "value on metaclass"
+    meta_non_data_descriptor1: NonDataDescriptor = NonDataDescriptor()
+    meta_non_data_descriptor2: NonDataDescriptor = NonDataDescriptor()
+
+class C3(metaclass=Meta3):
+    meta_attribute1: Literal["value on class"] = "value on class"
+    meta_attribute2: ClassLevelDataDescriptor = ClassLevelDataDescriptor()
+    meta_non_data_descriptor1: Literal["value on class"] = "value on class"
+    meta_non_data_descriptor2: ClassLevelDataDescriptor = ClassLevelDataDescriptor()
+
+reveal_type(C3.meta_attribute1)  # revealed: Literal["value on class"]
+reveal_type(C3.meta_attribute2)  # revealed: Literal["class level data descriptor"]
+reveal_type(C3.meta_non_data_descriptor1)  # revealed: Literal["value on class"]
+reveal_type(C3.meta_non_data_descriptor2)  # revealed: Literal["class level data descriptor"]
+```
+
+Finally, metaclass attributes and metaclass non-data descriptors are only accessible when they are
+not shadowed by class-level attributes:
+
+```py
+class Meta4(type):
+    meta_attribute: Literal["value on metaclass"] = "value on metaclass"
+    meta_non_data_descriptor: NonDataDescriptor = NonDataDescriptor()
+
+class C4(metaclass=Meta4): ...
+
+reveal_type(C4.meta_attribute)  # revealed: Literal["value on metaclass"]
+reveal_type(C4.meta_non_data_descriptor)  # revealed: Literal["non-data"]
+```
+
+When a metaclass data descriptor is possibly unbound, we union the result type of its `__get__`
+method with an underlying class level attribute, if present:
+
+```py
+def _(flag: bool):
+    class Meta5(type):
+        if flag:
+            meta_data_descriptor1: DataDescriptor = DataDescriptor()
+            meta_data_descriptor2: DataDescriptor = DataDescriptor()
+
+    class C5(metaclass=Meta5):
+        meta_data_descriptor1: Literal["value on class"] = "value on class"
+
+    reveal_type(C5.meta_data_descriptor1)  # revealed: Literal["value on class", "data"]
+    # error: [possibly-unbound-attribute]
+    reveal_type(C5.meta_data_descriptor2)  # revealed: Literal["data"]
+```
+
+When a class-level attribute is possibly unbound, we union its (descriptor protocol) type with the
+metaclass attribute (unless it's a data descriptor, which always takes precedence):
+
+```py
+def _(flag: bool):
+    class Meta6(type):
+        attribute1: DataDescriptor = DataDescriptor()
+        attribute2: NonDataDescriptor = NonDataDescriptor()
+        attribute3: Literal["value on metaclass"] = "value on metaclass"
+
+    class C6(metaclass=Meta6):
+        if flag:
+            attribute1: Literal["value on class"] = "value on class"
+            attribute2: Literal["value on class"] = "value on class"
+            attribute3: Literal["value on class"] = "value on class"
+            attribute4: Literal["value on class"] = "value on class"
+
+    reveal_type(C6.attribute1)  # revealed: Literal["data"]
+    reveal_type(C6.attribute2)  # revealed: Literal["value on class", "non-data"]
+    reveal_type(C6.attribute3)  # revealed: Literal["value on class", "value on metaclass"]
+    # error: [possibly-unbound-attribute]
+    reveal_type(C6.attribute4)  # revealed: Literal["value on class"]
+```
+
+Finally, we can also have unions of various types of attributes:
+
+```py
+def _(flag: bool):
+    class Meta7(type):
+        if flag:
+            union_of_metaclass_attributes: Literal[1] = 1
+            union_of_metaclass_data_descriptor_and_attribute: DataDescriptor = DataDescriptor()
+        else:
+            union_of_metaclass_attributes: Literal[2] = 2
+            union_of_metaclass_data_descriptor_and_attribute: Literal[2] = 2
+
+    class C7(metaclass=Meta7):
+        if flag:
+            union_of_class_attributes: Literal[1] = 1
+            union_of_class_data_descriptor_and_attribute: DataDescriptor = DataDescriptor()
+        else:
+            union_of_class_attributes: Literal[2] = 2
+            union_of_class_data_descriptor_and_attribute: Literal[2] = 2
+
+    reveal_type(C7.union_of_metaclass_attributes)  # revealed: Literal[1, 2]
+    # TODO: should be `Literal["data", 2]`
+    reveal_type(C7.union_of_metaclass_data_descriptor_and_attribute)  # revealed: Literal["data"]
+    reveal_type(C7.union_of_class_attributes)  # revealed: Literal[1, 2]
+    reveal_type(C7.union_of_class_data_descriptor_and_attribute)  # revealed: Literal["data", 2]
 ```
 
 ## Built-in `property` descriptor
@@ -533,4 +671,5 @@ wrapper_descriptor(f, None, type(f), "one too many")
 ```
 
 [descriptors]: https://docs.python.org/3/howto/descriptor.html
+[precedence chain]: https://github.com/python/cpython/blob/3.13/Objects/typeobject.c#L5393-L5481
 [simple example]: https://docs.python.org/3/howto/descriptor.html#simple-example-a-descriptor-that-returns-a-constant

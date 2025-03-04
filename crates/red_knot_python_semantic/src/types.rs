@@ -1836,7 +1836,17 @@ impl<'db> Type<'db> {
                             {
                                 let meta_descr_get =
                                     meta_attribute_ty.class_member(db, "__get__").0;
+
                                 if let Symbol::Type(meta_descr_get, _) = meta_descr_get {
+                                    let is_data = !meta_attribute_ty
+                                        .class_member(db, "__set__")
+                                        .0
+                                        .is_unbound()
+                                        || !meta_attribute_ty
+                                            .class_member(db, "__delete__")
+                                            .0
+                                            .is_unbound();
+
                                     let return_ty = Symbol::Type(
                                         meta_descr_get
                                             .try_call(
@@ -1851,8 +1861,7 @@ impl<'db> Type<'db> {
                                             .unwrap_or(Type::unknown()),
                                         meta_attribute_boundness,
                                     );
-                                    let is_data = !self.class_member(db, "__set__").0.is_unbound()
-                                        || !self.class_member(db, "__delete__").0.is_unbound();
+
                                     (return_ty, is_data)
                                 } else {
                                     (meta_attribute, false)
@@ -1879,7 +1888,7 @@ impl<'db> Type<'db> {
                                 class_attr_boundness,
                             )
                         } else {
-                            class_attr.0.clone() // TODO
+                            class_attr.0
                         };
 
                         match (
@@ -1898,16 +1907,13 @@ impl<'db> Type<'db> {
                                 Symbol::Type(_, _),
                             ) => SymbolAndQualifiers(
                                 Symbol::Type(
-                                    UnionType::from_elements(
-                                        db,
-                                        [class_attr_ty.clone(), meta_attr_ty.clone()],
-                                    ),
+                                    UnionType::from_elements(db, [class_attr_ty, *meta_attr_ty]),
                                     class_attr_boundness,
                                 ),
                                 class_attr_qualifiers,
                             ),
                             (Symbol::Type(_, _), false, Symbol::Type(_, Boundness::Bound)) => {
-                                class_attr
+                                SymbolAndQualifiers(class_attr_resolved, class_attr_qualifiers)
                             }
                             (
                                 Symbol::Type(meta_attr_ty, meta_attr_boundness),
@@ -1915,11 +1921,8 @@ impl<'db> Type<'db> {
                                 Symbol::Type(_, Boundness::PossiblyUnbound),
                             ) => SymbolAndQualifiers(
                                 Symbol::Type(
-                                    UnionType::from_elements(
-                                        db,
-                                        [class_attr_ty.clone(), meta_attr_ty.clone()],
-                                    ),
-                                    dbg!(*meta_attr_boundness),
+                                    UnionType::from_elements(db, [class_attr_ty, *meta_attr_ty]),
+                                    *meta_attr_boundness,
                                 ),
                                 class_attr_qualifiers,
                             ),
@@ -1934,7 +1937,9 @@ impl<'db> Type<'db> {
 
                         let meta_attribute = self.class_member(db, name);
 
-                        if let Symbol::Type(meta_attribute_ty, _) = meta_attribute.0 {
+                        if let Symbol::Type(meta_attribute_ty, meta_attribute_boundness) =
+                            meta_attribute.0
+                        {
                             let meta_descr_get = meta_attribute_ty.class_member(db, "__get__").0;
                             if let Symbol::Type(meta_descr_get, _) = meta_descr_get {
                                 Symbol::Type(
@@ -1949,7 +1954,7 @@ impl<'db> Type<'db> {
                                         )
                                         .map(|outcome| outcome.return_type(db))
                                         .unwrap_or(Type::unknown()),
-                                    Boundness::Bound,
+                                    meta_attribute_boundness,
                                 )
                                 .into()
                             } else {

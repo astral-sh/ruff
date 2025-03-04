@@ -479,12 +479,9 @@ impl<'db> Class<'db> {
 
         let attribute_assignments = attribute_assignments(db, class_body_scope);
 
-        let Some(attribute_assignments) = attribute_assignments
+        let attribute_assignments = attribute_assignments
             .as_deref()
-            .and_then(|assignments| assignments.get(name))
-        else {
-            return None;
-        };
+            .and_then(|assignments| assignments.get(name))?;
 
         for attribute_assignment in attribute_assignments {
             match attribute_assignment {
@@ -575,11 +572,10 @@ impl<'db> Class<'db> {
                     if !inferred.is_unbound() {
                         if declaredness == Boundness::Bound {
                             return Symbol::Unbound.into();
-                        } else {
-                            return Self::implicit_instance_attribute(db, body_scope, name)
-                                .map_or(Symbol::Unbound, Symbol::bound)
-                                .into();
                         }
+                        return Self::implicit_instance_attribute(db, body_scope, name)
+                            .map_or(Symbol::Unbound, Symbol::bound)
+                            .into();
                     }
 
                     if declaredness == Boundness::Bound {
