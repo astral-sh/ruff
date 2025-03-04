@@ -181,6 +181,8 @@ Note that the typing spec only mentions two specific versions of this rule:
 > A generic class definition that appears inside a generic function should not use type variables
 > that parameterize the generic function.
 
+and
+
 > A generic class nested in another generic class cannot use the same type variables.
 
 We assume that the more general form holds.
