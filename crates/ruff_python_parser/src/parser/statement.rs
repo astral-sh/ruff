@@ -888,7 +888,21 @@ impl<'src> Parser<'src> {
     /// See: <https://docs.python.org/3/reference/simple_stmts.html#the-type-statement>
     fn parse_type_alias_statement(&mut self) -> ast::StmtTypeAlias {
         let start = self.node_start();
+        let type_range = self.current_token_range();
         self.bump(TokenKind::Type);
+
+        // test_ok type_stmt_py312
+        // # parse_options: {"target-version": "3.12"}
+        // type x = int
+
+        // test_err type_stmt_py311
+        // # parse_options: {"target-version": "3.11"}
+        // type x = int
+
+        self.add_unsupported_syntax_error(
+            UnsupportedSyntaxErrorKind::TypeAliasStatement,
+            type_range,
+        );
 
         let mut name = Expr::Name(self.parse_name());
         helpers::set_expr_ctx(&mut name, ExprContext::Store);
