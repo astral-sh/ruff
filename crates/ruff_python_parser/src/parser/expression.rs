@@ -405,7 +405,7 @@ impl<'src> Parser<'src> {
 
         ParsedExpr {
             expr: self.parse_postfix_expression(lhs.expr, start),
-            parenthesized_range: lhs.parenthesized_range,
+            end_parenthesis: lhs.end_parenthesis,
         }
     }
 
@@ -705,7 +705,7 @@ impl<'src> Parser<'src> {
                     seen_keyword_argument = true;
                     let arg = if let ParsedExpr {
                         expr: Expr::Name(ident_expr),
-                        parenthesized_range,
+                        end_parenthesis,
                     } = parsed_expr
                     {
                         // test_ok parenthesized_kwarg_py37
@@ -718,10 +718,10 @@ impl<'src> Parser<'src> {
                         // f((a) = 1)
                         // f( ( a ) = 1)
 
-                        if let Some(range) = parenthesized_range {
+                        if let Some(end) = end_parenthesis {
                             parser.add_unsupported_syntax_error(
                                 UnsupportedSyntaxErrorKind::ParenthesizedKeywordArgumentName,
-                                range,
+                                TextRange::new(start, end),
                             );
                         }
 
@@ -1714,7 +1714,7 @@ impl<'src> Parser<'src> {
 
                 ParsedExpr {
                     expr: tuple.into(),
-                    parenthesized_range: None,
+                    end_parenthesis: None,
                 }
             }
             TokenKind::Async | TokenKind::For => {
@@ -1734,7 +1734,7 @@ impl<'src> Parser<'src> {
 
                 ParsedExpr {
                     expr: generator,
-                    parenthesized_range: None,
+                    end_parenthesis: None,
                 }
             }
             _ => {
@@ -1745,7 +1745,7 @@ impl<'src> Parser<'src> {
 
                 self.expect(TokenKind::Rpar);
 
-                parsed_expr.parenthesized_range = Some(self.node_range(start));
+                parsed_expr.end_parenthesis = Some(self.node_range(start).end());
                 parsed_expr
             }
         }
@@ -2351,7 +2351,8 @@ impl<'src> Parser<'src> {
 #[derive(Debug)]
 pub(super) struct ParsedExpr {
     pub(super) expr: Expr,
-    pub(super) parenthesized_range: Option<TextRange>,
+    /// Contains the location of the closing parenthesis, if the expression is parenthesized
+    pub(super) end_parenthesis: Option<TextSize>,
 }
 
 impl ParsedExpr {
@@ -2362,7 +2363,7 @@ impl ParsedExpr {
 
     #[inline]
     pub(super) const fn is_parenthesized(&self) -> bool {
-        self.parenthesized_range.is_some()
+        self.end_parenthesis.is_some()
     }
 }
 
@@ -2371,7 +2372,7 @@ impl From<Expr> for ParsedExpr {
     fn from(expr: Expr) -> Self {
         ParsedExpr {
             expr,
-            parenthesized_range: None,
+            end_parenthesis: None,
         }
     }
 }
