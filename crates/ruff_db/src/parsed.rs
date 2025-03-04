@@ -102,7 +102,7 @@ mod tests {
 
         let parsed = parsed_module(&db, file);
 
-        assert!(parsed.is_valid());
+        assert!(parsed.has_valid_syntax());
 
         Ok(())
     }
@@ -118,7 +118,7 @@ mod tests {
 
         let parsed = parsed_module(&db, file);
 
-        assert!(parsed.is_valid());
+        assert!(parsed.has_valid_syntax());
 
         Ok(())
     }
@@ -134,7 +134,7 @@ mod tests {
 
         let parsed = parsed_module(&db, virtual_file.file());
 
-        assert!(parsed.is_valid());
+        assert!(parsed.has_valid_syntax());
 
         Ok(())
     }
@@ -150,7 +150,7 @@ mod tests {
 
         let parsed = parsed_module(&db, virtual_file.file());
 
-        assert!(parsed.is_valid());
+        assert!(parsed.has_valid_syntax());
 
         Ok(())
     }
@@ -181,6 +181,6 @@ else:
 
         let parsed = parsed_module(&db, file);
 
-        assert!(parsed.is_valid());
+        assert!(parsed.has_valid_syntax());
     }
 }

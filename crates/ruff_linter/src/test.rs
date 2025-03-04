@@ -141,7 +141,7 @@ pub(crate) fn test_contents<'a>(
         target_version,
     );
 
-    let source_has_errors = !parsed.is_valid();
+    let source_has_errors = parsed.has_invalid_syntax();
 
     // Detect fixes that don't converge after multiple iterations.
     let mut iterations = 0;
@@ -207,7 +207,7 @@ pub(crate) fn test_contents<'a>(
                 target_version,
             );
 
-            if !parsed.is_valid() && !source_has_errors {
+            if parsed.has_invalid_syntax() && !source_has_errors {
                 // Previous fix introduced a syntax error, abort
                 let fixes = print_diagnostics(diagnostics, path, source_kind);
                 let syntax_errors =

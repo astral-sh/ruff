@@ -450,21 +450,27 @@ pub enum UnsupportedSyntaxErrorKind {
     Walrus,
     ExceptStar,
     PositionalOnlyParameter,
+    TypeAliasStatement,
+    TypeParamDefault,
 }
 
 impl Display for UnsupportedSyntaxError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let kind = match self.kind {
-            UnsupportedSyntaxErrorKind::Match => "`match` statement",
-            UnsupportedSyntaxErrorKind::Walrus => "named assignment expression (`:=`)",
-            UnsupportedSyntaxErrorKind::ExceptStar => "`except*`",
+            UnsupportedSyntaxErrorKind::Match => "Cannot use `match` statement",
+            UnsupportedSyntaxErrorKind::Walrus => "Cannot use named assignment expression (`:=`)",
+            UnsupportedSyntaxErrorKind::ExceptStar => "Cannot use `except*`",
             UnsupportedSyntaxErrorKind::PositionalOnlyParameter => {
-                "positional-only parameter separator"
+                "Cannot use positional-only parameter separator"
+            }
+            UnsupportedSyntaxErrorKind::TypeAliasStatement => "Cannot use `type` alias statement",
+            UnsupportedSyntaxErrorKind::TypeParamDefault => {
+                "Cannot set default type for a type parameter"
             }
         };
         write!(
             f,
-            "Cannot use {kind} on Python {} (syntax was added in Python {})",
+            "{kind} on Python {} (syntax was added in Python {})",
             self.target_version,
             self.kind.minimum_version(),
         )
@@ -479,6 +485,8 @@ impl UnsupportedSyntaxErrorKind {
             UnsupportedSyntaxErrorKind::Walrus => PythonVersion::PY38,
             UnsupportedSyntaxErrorKind::ExceptStar => PythonVersion::PY311,
             UnsupportedSyntaxErrorKind::PositionalOnlyParameter => PythonVersion::PY38,
+            UnsupportedSyntaxErrorKind::TypeAliasStatement => PythonVersion::PY312,
+            UnsupportedSyntaxErrorKind::TypeParamDefault => PythonVersion::PY313,
         }
     }
 }
