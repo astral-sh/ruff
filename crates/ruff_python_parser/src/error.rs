@@ -445,10 +445,17 @@ pub struct UnsupportedSyntaxError {
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
+pub enum StarTupleKind {
+    Return,
+    Yield,
+}
+
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum UnsupportedSyntaxErrorKind {
     Match,
     Walrus,
     ExceptStar,
+    StarTuple(StarTupleKind),
 }
 
 impl Display for UnsupportedSyntaxError {
@@ -457,6 +464,12 @@ impl Display for UnsupportedSyntaxError {
             UnsupportedSyntaxErrorKind::Match => "`match` statement",
             UnsupportedSyntaxErrorKind::Walrus => "named assignment expression (`:=`)",
             UnsupportedSyntaxErrorKind::ExceptStar => "`except*`",
+            UnsupportedSyntaxErrorKind::StarTuple(StarTupleKind::Return) => {
+                "iterable unpacking in return statements"
+            }
+            UnsupportedSyntaxErrorKind::StarTuple(StarTupleKind::Yield) => {
+                "iterable unpacking in yield statements"
+            }
         };
         write!(
             f,
@@ -474,6 +487,7 @@ impl UnsupportedSyntaxErrorKind {
             UnsupportedSyntaxErrorKind::Match => PythonVersion::PY310,
             UnsupportedSyntaxErrorKind::Walrus => PythonVersion::PY38,
             UnsupportedSyntaxErrorKind::ExceptStar => PythonVersion::PY311,
+            UnsupportedSyntaxErrorKind::StarTuple(_) => PythonVersion::PY38,
         }
     }
 }
