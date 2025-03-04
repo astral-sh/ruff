@@ -449,6 +449,31 @@ pub enum UnsupportedSyntaxErrorKind {
     Match,
     Walrus,
     ExceptStar,
+    /// Represents the use of a [PEP 570] positional-only parameter before Python 3.8.
+    ///
+    /// ## Examples
+    ///
+    /// Python 3.8 added the `/` syntax for marking preceding parameters as positional-only:
+    ///
+    /// ```python
+    /// def foo(a, b, /, c): ...
+    /// ```
+    ///
+    /// This means `a` and `b` in this case can only be provided by position, not by name. In other
+    /// words, this code results in a `TypeError` at runtime:
+    ///
+    /// ```pycon
+    /// >>> def foo(a, b, /, c): ...
+    /// ...
+    /// >>> foo(a=1, b=2, c=3)
+    /// Traceback (most recent call last):
+    ///   File "<python-input-3>", line 1, in <module>
+    ///     foo(a=1, b=2, c=3)
+    ///     ~~~^^^^^^^^^^^^^^^
+    /// TypeError: foo() got some positional-only arguments passed as keyword arguments: 'a, b'
+    /// ```
+    ///
+    /// [PEP 570]: https://peps.python.org/pep-0570/
     PositionalOnlyParameter,
     TypeAliasStatement,
     TypeParamDefault,
