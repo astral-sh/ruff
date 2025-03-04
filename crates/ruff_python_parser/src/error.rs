@@ -456,10 +456,10 @@ pub enum UnsupportedSyntaxErrorKind {
 impl Display for UnsupportedSyntaxError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let kind = match self.kind {
-            UnsupportedSyntaxErrorKind::Match => "`match` statement",
-            UnsupportedSyntaxErrorKind::Walrus => "named assignment expression (`:=`)",
-            UnsupportedSyntaxErrorKind::ExceptStar => "`except*`",
-            UnsupportedSyntaxErrorKind::TypeAliasStatement => "`type` statement",
+            UnsupportedSyntaxErrorKind::Match => "Cannot use `match` statement",
+            UnsupportedSyntaxErrorKind::Walrus => "Cannot use named assignment expression (`:=`)",
+            UnsupportedSyntaxErrorKind::ExceptStar => "Cannot use `except*`",
+            UnsupportedSyntaxErrorKind::TypeAliasStatement => "Cannot use `type` alias statement",
             UnsupportedSyntaxErrorKind::TypeParamDefault => {
                 "Cannot set default type for a type parameter"
             }

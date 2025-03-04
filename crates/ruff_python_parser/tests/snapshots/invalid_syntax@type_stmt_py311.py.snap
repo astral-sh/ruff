@@ -38,5 +38,5 @@ Module(
   |
 1 | # parse_options: {"target-version": "3.11"}
 2 | type x = int
-  | ^^^^ Syntax Error: Cannot use `type` statement on Python 3.11 (syntax was added in Python 3.12)
+  | ^^^^ Syntax Error: Cannot use `type` alias statement on Python 3.11 (syntax was added in Python 3.12)
   |
