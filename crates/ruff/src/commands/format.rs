@@ -11,6 +11,7 @@ use itertools::Itertools;
 use log::{error, warn};
 use rayon::iter::Either::{Left, Right};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use ruff_python_parser::ParseError;
 use rustc_hash::FxHashSet;
 use thiserror::Error;
 use tracing::debug;
@@ -406,8 +407,12 @@ pub(crate) fn format_source(
                 let formatted =
                     format_module_source(unformatted, options.clone()).map_err(|err| {
                         if let FormatModuleError::ParseError(err) = err {
+                            // Offset the error by the start of the cell
                             DisplayParseError::from_source_kind(
-                                err,
+                                ParseError {
+                                    error: err.error,
+                                    location: err.location.checked_add(*start).unwrap(),
+                                },
                                 path.map(Path::to_path_buf),
                                 source_kind,
                             )
