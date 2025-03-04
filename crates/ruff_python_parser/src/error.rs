@@ -450,6 +450,7 @@ pub enum UnsupportedSyntaxErrorKind {
     Walrus,
     ExceptStar,
     TypeStmt,
+    TypeParamDefault,
 }
 
 impl Display for UnsupportedSyntaxError {
@@ -459,10 +460,13 @@ impl Display for UnsupportedSyntaxError {
             UnsupportedSyntaxErrorKind::Walrus => "named assignment expression (`:=`)",
             UnsupportedSyntaxErrorKind::ExceptStar => "`except*`",
             UnsupportedSyntaxErrorKind::TypeStmt => "`type` statement",
+            UnsupportedSyntaxErrorKind::TypeParamDefault => {
+                "Cannot set default type for a type parameter"
+            }
         };
         write!(
             f,
-            "Cannot use {kind} on Python {} (syntax was added in Python {})",
+            "{kind} on Python {} (syntax was added in Python {})",
             self.target_version,
             self.kind.minimum_version(),
         )
@@ -477,6 +481,7 @@ impl UnsupportedSyntaxErrorKind {
             UnsupportedSyntaxErrorKind::Walrus => PythonVersion::PY38,
             UnsupportedSyntaxErrorKind::ExceptStar => PythonVersion::PY311,
             UnsupportedSyntaxErrorKind::TypeStmt => PythonVersion::PY312,
+            UnsupportedSyntaxErrorKind::TypeParamDefault => PythonVersion::PY313,
         }
     }
 }

@@ -2149,7 +2149,12 @@ impl<'db> TypeInferenceBuilder<'db> {
                 unpacked.expression_type(name_ast_id)
             }
             TargetKind::Name => {
-                if self.in_stub() && value.is_ellipsis_literal_expr() {
+                // `TYPE_CHECKING` is a special variable that should only be assigned `False`
+                // at runtime, but is always considered `True` in type checking.
+                // See mdtest/known_constants.md#user-defined-type_checking for details.
+                if &name.id == "TYPE_CHECKING" {
+                    Type::BooleanLiteral(true)
+                } else if self.in_stub() && value.is_ellipsis_literal_expr() {
                     Type::unknown()
                 } else {
                     value_ty

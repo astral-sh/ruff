@@ -1,0 +1,302 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/type_param_default_py312.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..149,
+        body: [
+            TypeAlias(
+                StmtTypeAlias {
+                    range: 44..65,
+                    name: Name(
+                        ExprName {
+                            range: 49..50,
+                            id: Name("X"),
+                            ctx: Store,
+                        },
+                    ),
+                    type_params: Some(
+                        TypeParams {
+                            range: 50..59,
+                            type_params: [
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        range: 51..58,
+                                        name: Identifier {
+                                            id: Name("T"),
+                                            range: 51..52,
+                                        },
+                                        bound: None,
+                                        default: Some(
+                                            Name(
+                                                ExprName {
+                                                    range: 55..58,
+                                                    id: Name("int"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    value: Name(
+                        ExprName {
+                            range: 62..65,
+                            id: Name("int"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 66..87,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("f"),
+                        range: 70..71,
+                    },
+                    type_params: Some(
+                        TypeParams {
+                            range: 71..80,
+                            type_params: [
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        range: 72..79,
+                                        name: Identifier {
+                                            id: Name("T"),
+                                            range: 72..73,
+                                        },
+                                        bound: None,
+                                        default: Some(
+                                            Name(
+                                                ExprName {
+                                                    range: 76..79,
+                                                    id: Name("int"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    parameters: Parameters {
+                        range: 80..82,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 84..87,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 84..87,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            ClassDef(
+                StmtClassDef {
+                    range: 88..111,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("C"),
+                        range: 94..95,
+                    },
+                    type_params: Some(
+                        TypeParams {
+                            range: 95..104,
+                            type_params: [
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        range: 96..103,
+                                        name: Identifier {
+                                            id: Name("T"),
+                                            range: 96..97,
+                                        },
+                                        bound: None,
+                                        default: Some(
+                                            Name(
+                                                ExprName {
+                                                    range: 100..103,
+                                                    id: Name("int"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    arguments: Some(
+                        Arguments {
+                            range: 104..106,
+                            args: [],
+                            keywords: [],
+                        },
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 108..111,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 108..111,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            ClassDef(
+                StmtClassDef {
+                    range: 112..148,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("D"),
+                        range: 118..119,
+                    },
+                    type_params: Some(
+                        TypeParams {
+                            range: 119..141,
+                            type_params: [
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        range: 120..121,
+                                        name: Identifier {
+                                            id: Name("S"),
+                                            range: 120..121,
+                                        },
+                                        bound: None,
+                                        default: None,
+                                    },
+                                ),
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        range: 123..130,
+                                        name: Identifier {
+                                            id: Name("T"),
+                                            range: 123..124,
+                                        },
+                                        bound: None,
+                                        default: Some(
+                                            Name(
+                                                ExprName {
+                                                    range: 127..130,
+                                                    id: Name("int"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ),
+                                    },
+                                ),
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        range: 132..140,
+                                        name: Identifier {
+                                            id: Name("U"),
+                                            range: 132..133,
+                                        },
+                                        bound: None,
+                                        default: Some(
+                                            Name(
+                                                ExprName {
+                                                    range: 136..140,
+                                                    id: Name("uint"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    arguments: Some(
+                        Arguments {
+                            range: 141..143,
+                            args: [],
+                            keywords: [],
+                        },
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 145..148,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 145..148,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Unsupported Syntax Errors
+
+  |
+1 | # parse_options: {"target-version": "3.12"}
+2 | type X[T = int] = int
+  |          ^^^^^ Syntax Error: Cannot set default type for a type parameter on Python 3.12 (syntax was added in Python 3.13)
+3 | def f[T = int](): ...
+4 | class C[T = int](): ...
+  |
+
+
+  |
+1 | # parse_options: {"target-version": "3.12"}
+2 | type X[T = int] = int
+3 | def f[T = int](): ...
+  |         ^^^^^ Syntax Error: Cannot set default type for a type parameter on Python 3.12 (syntax was added in Python 3.13)
+4 | class C[T = int](): ...
+5 | class D[S, T = int, U = uint](): ...
+  |
+
+
+  |
+2 | type X[T = int] = int
+3 | def f[T = int](): ...
+4 | class C[T = int](): ...
+  |           ^^^^^ Syntax Error: Cannot set default type for a type parameter on Python 3.12 (syntax was added in Python 3.13)
+5 | class D[S, T = int, U = uint](): ...
+  |
+
+
+  |
+3 | def f[T = int](): ...
+4 | class C[T = int](): ...
+5 | class D[S, T = int, U = uint](): ...
+  |              ^^^^^ Syntax Error: Cannot set default type for a type parameter on Python 3.12 (syntax was added in Python 3.13)
+  |
+
+
+  |
+3 | def f[T = int](): ...
+4 | class C[T = int](): ...
+5 | class D[S, T = int, U = uint](): ...
+  |                       ^^^^^^ Syntax Error: Cannot set default type for a type parameter on Python 3.12 (syntax was added in Python 3.13)
+  |
