@@ -1,0 +1,88 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/decorator_expression_eval_hack_py38.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..97,
+        body: [
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 45..96,
+                    is_async: false,
+                    decorator_list: [
+                        Decorator {
+                            range: 45..80,
+                            expression: Call(
+                                ExprCall {
+                                    range: 46..80,
+                                    func: Name(
+                                        ExprName {
+                                            range: 46..50,
+                                            id: Name("eval"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    arguments: Arguments {
+                                        range: 50..80,
+                                        args: [
+                                            StringLiteral(
+                                                ExprStringLiteral {
+                                                    range: 51..79,
+                                                    value: StringLiteralValue {
+                                                        inner: Single(
+                                                            StringLiteral {
+                                                                range: 51..79,
+                                                                value: "buttons[0].clicked.connect",
+                                                                flags: StringLiteralFlags {
+                                                                    quote_style: Double,
+                                                                    prefix: Empty,
+                                                                    triple_quoted: false,
+                                                                },
+                                                            },
+                                                        ),
+                                                    },
+                                                },
+                                            ),
+                                        ],
+                                        keywords: [],
+                                    },
+                                },
+                            ),
+                        },
+                    ],
+                    name: Identifier {
+                        id: Name("spam"),
+                        range: 85..89,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 89..91,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 93..96,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 93..96,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```

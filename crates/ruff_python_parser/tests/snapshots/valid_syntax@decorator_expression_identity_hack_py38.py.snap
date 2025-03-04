@@ -1,0 +1,161 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/decorator_expression_identity_hack_py38.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..111,
+        body: [
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 45..63,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("_"),
+                        range: 49..50,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 50..53,
+                        posonlyargs: [],
+                        args: [
+                            ParameterWithDefault {
+                                range: 51..52,
+                                parameter: Parameter {
+                                    range: 51..52,
+                                    name: Identifier {
+                                        id: Name("x"),
+                                        range: 51..52,
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                        ],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Return(
+                            StmtReturn {
+                                range: 55..63,
+                                value: Some(
+                                    Name(
+                                        ExprName {
+                                            range: 62..63,
+                                            id: Name("x"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 64..110,
+                    is_async: false,
+                    decorator_list: [
+                        Decorator {
+                            range: 64..94,
+                            expression: Call(
+                                ExprCall {
+                                    range: 65..94,
+                                    func: Name(
+                                        ExprName {
+                                            range: 65..66,
+                                            id: Name("_"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    arguments: Arguments {
+                                        range: 66..94,
+                                        args: [
+                                            Attribute(
+                                                ExprAttribute {
+                                                    range: 67..93,
+                                                    value: Attribute(
+                                                        ExprAttribute {
+                                                            range: 67..85,
+                                                            value: Subscript(
+                                                                ExprSubscript {
+                                                                    range: 67..77,
+                                                                    value: Name(
+                                                                        ExprName {
+                                                                            range: 67..74,
+                                                                            id: Name("buttons"),
+                                                                            ctx: Load,
+                                                                        },
+                                                                    ),
+                                                                    slice: NumberLiteral(
+                                                                        ExprNumberLiteral {
+                                                                            range: 75..76,
+                                                                            value: Int(
+                                                                                0,
+                                                                            ),
+                                                                        },
+                                                                    ),
+                                                                    ctx: Load,
+                                                                },
+                                                            ),
+                                                            attr: Identifier {
+                                                                id: Name("clicked"),
+                                                                range: 78..85,
+                                                            },
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    attr: Identifier {
+                                                        id: Name("connect"),
+                                                        range: 86..93,
+                                                    },
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ],
+                                        keywords: [],
+                                    },
+                                },
+                            ),
+                        },
+                    ],
+                    name: Identifier {
+                        id: Name("spam"),
+                        range: 99..103,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 103..105,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 107..110,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 107..110,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
