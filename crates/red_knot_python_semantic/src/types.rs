@@ -1604,6 +1604,14 @@ impl<'db> Type<'db> {
         instance: Type<'db>,
         owner: Type<'db>,
     ) -> (Option<Type<'db>>, bool) {
+        let _span = tracing::trace_span!(
+            "try_call_dunder_get",
+            self=%self.display(db),
+            instance=%instance.display(db),
+            owner=%owner.display(db),
+        )
+        .entered();
+
         let descr_get = self.class_member(db, "__get__").0;
 
         if let Symbol::Type(descr_get, descr_get_boundness) = descr_get {
@@ -1623,6 +1631,55 @@ impl<'db> Type<'db> {
             (return_ty, is_data_descriptor)
         } else {
             (None, false)
+        }
+    }
+
+    fn lookup_on_meta_type_and_try_call_dunder_get(
+        self: Type<'db>,
+        db: &'db dyn Db,
+        name: &str,
+    ) -> (SymbolAndQualifiers<'db>, bool) {
+        let _span = tracing::trace_span!(
+            "lookup_on_meta_type_and_try_call_dunder_get",
+            self=%self.display(db),
+            name,
+        )
+        .entered();
+
+        let class_member = self.class_member(db, name);
+
+        match class_member {
+            SymbolAndQualifiers(Symbol::Type(Type::Union(union), boundness), qualifiers) => (
+                SymbolAndQualifiers(
+                    union.map_with_boundness(db, |elem| {
+                        Symbol::Type(
+                            elem.try_call_dunder_get(db, self, self.to_meta_type(db))
+                                .0
+                                .unwrap_or(*elem),
+                            boundness,
+                        )
+                    }),
+                    qualifiers,
+                ),
+                false, // TODO
+            ),
+            SymbolAndQualifiers(Symbol::Type(Type::Intersection(_), _), _) => (
+                Symbol::todo("intersection of attribute types").into(),
+                false,
+            ),
+            SymbolAndQualifiers(Symbol::Type(attribute_ty, boundness), qualifiers) => {
+                let (return_ty, is_data_descriptor) =
+                    attribute_ty.try_call_dunder_get(db, self, self.to_meta_type(db));
+
+                (
+                    SymbolAndQualifiers(
+                        Symbol::Type(return_ty.unwrap_or(attribute_ty), boundness),
+                        qualifiers,
+                    ),
+                    is_data_descriptor,
+                )
+            }
+            _ => (class_member, false),
         }
     }
 
@@ -1851,27 +1908,8 @@ impl<'db> Type<'db> {
                     Symbol::Type(Type::Dynamic(_), _) => class_attr,
 
                     Symbol::Type(class_attr_ty, class_attr_boundness) => {
-                        let meta_type = self.to_meta_type(db);
-                        // TODO: handle unions of meta attributes
-                        let meta_attribute = self.class_member(db, name).0;
-
                         let (meta_attr_resolved, meta_is_data_descriptor) =
-                            if let Symbol::Type(meta_attribute_ty, meta_attribute_boundness) =
-                                meta_attribute
-                            {
-                                let (return_ty, is_data_descriptor) =
-                                    meta_attribute_ty.try_call_dunder_get(db, self, meta_type);
-
-                                (
-                                    Symbol::Type(
-                                        return_ty.unwrap_or(meta_attribute_ty),
-                                        meta_attribute_boundness,
-                                    ),
-                                    is_data_descriptor,
-                                )
-                            } else {
-                                (meta_attribute, false)
-                            };
+                            self.lookup_on_meta_type_and_try_call_dunder_get(db, name);
 
                         let (descr_get_return_ty, _) =
                             class_attr_ty.try_call_dunder_get(db, Type::none(db), self);
@@ -1881,14 +1919,12 @@ impl<'db> Type<'db> {
                         );
 
                         match (
-                            &meta_attr_resolved,
+                            &meta_attr_resolved.0,
                             meta_is_data_descriptor,
                             &class_attr_resolved,
                         ) {
                             (Symbol::Type(_, _), _, Symbol::Unbound)
-                            | (Symbol::Type(_, Boundness::Bound), true, _) => {
-                                meta_attr_resolved.into()
-                            }
+                            | (Symbol::Type(_, Boundness::Bound), true, _) => meta_attr_resolved,
                             (Symbol::Unbound, _, Symbol::Type(_, _)) => class_attr_resolved.into(),
                             (
                                 Symbol::Type(meta_attr_ty, Boundness::PossiblyUnbound),
@@ -1922,26 +1958,7 @@ impl<'db> Type<'db> {
                         // Did not find the attribute on the class; it could still be an attribute
                         // on the meta class
 
-                        let meta_type = self.to_meta_type(db);
-
-                        let meta_attribute = self.class_member(db, name);
-
-                        if let Symbol::Type(meta_attribute_ty, meta_attribute_boundness) =
-                            meta_attribute.0
-                        {
-                            let (return_ty, is_data_descriptor) =
-                                meta_attribute_ty.try_call_dunder_get(db, self, meta_type);
-
-                            SymbolAndQualifiers(
-                                Symbol::Type(
-                                    return_ty.unwrap_or(meta_attribute_ty),
-                                    meta_attribute_boundness,
-                                ),
-                                meta_attribute.1,
-                            )
-                        } else {
-                            meta_attribute
-                        }
+                        self.lookup_on_meta_type_and_try_call_dunder_get(db, name).0
                     }
                 }
             }
