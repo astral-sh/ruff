@@ -868,6 +868,11 @@ impl<'src> Parser<'src> {
         // # even after 3.10, an unparenthesized walrus is not allowed in a slice
         // lst[x:=1:-1]
 
+        // test_err walrus_slice_parse_error
+        // # parse_options: {"target-version": "3.9"}
+        // # before 3.10, only emit the parse error, not the unsupported syntax error
+        // lst[x:=1:-1]
+
         let start = self.node_start();
 
         let lower = if self.at_expr() {
