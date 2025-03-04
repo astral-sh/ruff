@@ -133,7 +133,7 @@ reveal_type(C.non_data_descriptor)  # revealed: Unknown | Literal["non-data"]
 C.data_descriptor = "something else"  # This is okay
 ```
 
-## Possibly unbound descriptors
+## Possibly unbound descriptor attributes
 
 ```py
 class DataDescriptor:
@@ -220,6 +220,8 @@ The descriptor protocol is recursive, i.e. looking up `__get__` can involve trig
 descriptor protocol on the callable:
 
 ```py
+from __future__ import annotations
+
 class ReturnedCallable2:
     def __call__(self, descriptor: Descriptor1, instance: None, owner: type[C]) -> int:
         return 1

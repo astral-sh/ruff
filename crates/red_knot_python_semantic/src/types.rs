@@ -1489,9 +1489,7 @@ impl<'db> Type<'db> {
             tracing::trace_span!("instance_variable", self=%self.display(db), name).entered();
 
         match self {
-            Type::Dynamic(_) => Symbol::bound(self).into(),
-
-            Type::Never => Symbol::todo("attribute lookup on Never").into(),
+            Type::Dynamic(_) | Type::Never => Symbol::bound(self).into(),
 
             Type::FunctionLiteral(_) => KnownClass::FunctionType
                 .to_instance(db)
@@ -1609,14 +1607,14 @@ impl<'db> Type<'db> {
     fn run_descriptor_protocol_instances(
         self,
         db: &'db dyn Db,
-        name: &str,
+        instance_variable_fallback: Option<&str>,
         class_attr: SymbolAndQualifiers<'db>,
         owner: Type<'db>,
     ) -> SymbolAndQualifiers<'db> {
         let _span = tracing::trace_span!(
             "run_descriptor_protocol_instances",
             self=%self.display(db),
-            name=%name,
+            instance_variable_fallback=?instance_variable_fallback,
             class_attr=?class_attr,
             owner=%owner.display(db),
         )
@@ -1624,12 +1622,23 @@ impl<'db> Type<'db> {
 
         match self {
             Type::Union(union) => union.map_with_boundness_and_qualifiers(db, |elem| {
-                elem.run_descriptor_protocol_instances(db, name, class_attr.clone(), owner)
+                elem.run_descriptor_protocol_instances(
+                    db,
+                    instance_variable_fallback,
+                    class_attr.clone(),
+                    owner,
+                )
             }),
-            Type::Intersection(intersection) => intersection
-                .map_with_boundness_and_qualifiers(db, |elem| {
-                    elem.run_descriptor_protocol_instances(db, name, class_attr.clone(), owner)
-                }),
+            Type::Intersection(intersection) => {
+                intersection.map_with_boundness_and_qualifiers(db, |elem| {
+                    elem.run_descriptor_protocol_instances(
+                        db,
+                        instance_variable_fallback,
+                        class_attr.clone(),
+                        owner,
+                    )
+                })
+            }
             _ => {
                 let class_attr_qualifiers = class_attr.1;
 
@@ -1638,7 +1647,7 @@ impl<'db> Type<'db> {
                         union.map_with_boundness(db, |elem| {
                             self.run_descriptor_protocol_instances(
                                 db,
-                                name,
+                                instance_variable_fallback,
                                 Symbol::Type(*elem, boundness).into(),
                                 owner,
                             )
@@ -1652,7 +1661,7 @@ impl<'db> Type<'db> {
                             intersection.map_with_boundness(db, |elem| {
                                 self.run_descriptor_protocol_instances(
                                     db,
-                                    name,
+                                    instance_variable_fallback,
                                     Symbol::Type(*elem, boundness).into(),
                                     owner,
                                 )
@@ -1667,12 +1676,7 @@ impl<'db> Type<'db> {
                     Symbol::Type(Type::Dynamic(_), _) => class_attr,
 
                     Symbol::Type(class_attr_ty, class_attr_boundness) => {
-                        let class_attr_meta_ty = class_attr_ty.to_meta_type(db);
-
-                        let descr_get = class_attr_meta_ty.member(db, "__get__").0;
-
-                        tracing::info!("self_meta = {}", class_attr_meta_ty.display(db));
-                        tracing::info!("descr_get = {:?}", descr_get);
+                        let descr_get = class_attr_ty.class_member(db, "__get__").0;
 
                         let (descr_get_return_ty, is_data_descriptor) =
                             if let Symbol::Type(descr_get, _) = descr_get {
@@ -1683,18 +1687,20 @@ impl<'db> Type<'db> {
                                     )
                                     .map(|outcome| Some(outcome.return_type(db)))
                                     .unwrap_or(None);
-                                let is_data_descriptor = !class_attr_meta_ty
-                                    .member(db, "__set__")
+                                let is_data_descriptor = !class_attr_ty
+                                    .class_member(db, "__set__")
                                     .0
                                     .is_unbound()
-                                    || !class_attr_meta_ty.member(db, "__delete__").0.is_unbound();
+                                    || !class_attr_ty.class_member(db, "__delete__").0.is_unbound();
 
                                 (return_ty, is_data_descriptor)
                             } else {
                                 (None, false)
                             };
 
-                        let instance_variable = self.instance_variable(db, name);
+                        let instance_variable = instance_variable_fallback
+                            .map(|name| self.instance_variable(db, name))
+                            .unwrap_or(Symbol::Unbound.into());
 
                         tracing::trace!("instance_variable = {:?}", instance_variable);
 
@@ -1765,7 +1771,9 @@ impl<'db> Type<'db> {
                             (None, _, Symbol::Unbound) => class_attr,
                         }
                     }
-                    Symbol::Unbound => self.instance_variable(db, name),
+                    Symbol::Unbound => instance_variable_fallback
+                        .map(|name| self.instance_variable(db, name))
+                        .unwrap_or(Symbol::Unbound.into()),
                 }
             }
         }
@@ -2067,7 +2075,7 @@ impl<'db> Type<'db> {
 
                 let class_attr = self.class_member(db, name);
 
-                self.run_descriptor_protocol_instances(db, name, class_attr, objtype)
+                self.run_descriptor_protocol_instances(db, Some(name), class_attr, objtype)
             }
 
             Type::SubclassOf(subclass_of_ty)
@@ -2810,8 +2818,9 @@ impl<'db> Type<'db> {
                 .entered();
 
         let meta_type = self.to_meta_type(db);
+        let callable = self.class_member(db, name);
 
-        match self.class_member(db, name).0 {
+        match callable.0 {
             Symbol::Type(mut callable_ty, mut boundness) => {
                 // Dunder methods are looked up on the meta type, but they invoke the descriptor
                 // protocol *as if they had been called on the instance itself*. This is why we
@@ -2820,12 +2829,7 @@ impl<'db> Type<'db> {
                 tracing::trace!("callable before = {}", callable_ty.display(db));
 
                 if let Symbol::Type(callable_ty_desc, boundness_desc) = self
-                    .run_descriptor_protocol_instances(
-                        db,
-                        name,
-                        Symbol::Type(callable_ty, boundness).into(),
-                        meta_type,
-                    )
+                    .run_descriptor_protocol_instances(db, None, callable, meta_type)
                     .0
                 {
                     callable_ty = callable_ty_desc;
@@ -2868,6 +2872,10 @@ impl<'db> Type<'db> {
     fn try_iterate(self, db: &'db dyn Db) -> Result<Type<'db>, IterationError<'db>> {
         if let Type::Tuple(tuple_type) = self {
             return Ok(UnionType::from_elements(db, tuple_type.elements(db)));
+        }
+
+        if self.is_never() {
+            return Ok(Type::Never);
         }
 
         let try_call_dunder_getitem = || {
