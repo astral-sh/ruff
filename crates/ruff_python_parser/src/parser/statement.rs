@@ -3016,7 +3016,7 @@ impl<'src> Parser<'src> {
 
                         // check here to avoid duplicate errors for multiple slashes detected above
                         parser.add_unsupported_syntax_error(
-                            UnsupportedSyntaxErrorKind::PosOnly,
+                            UnsupportedSyntaxErrorKind::PositionalOnlyParameter,
                             slash_range,
                         );
                     }
