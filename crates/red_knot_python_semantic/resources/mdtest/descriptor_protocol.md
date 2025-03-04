@@ -425,8 +425,7 @@ def _(flag: bool):
             union_of_class_data_descriptor_and_attribute: Literal[2] = 2
 
     reveal_type(C7.union_of_metaclass_attributes)  # revealed: Literal[1, 2]
-    # TODO: should be `Literal["data", 2]`
-    reveal_type(C7.union_of_metaclass_data_descriptor_and_attribute)  # revealed: Literal["data", 2] | DataDescriptor
+    reveal_type(C7.union_of_metaclass_data_descriptor_and_attribute)  # revealed: Literal["data", 2]
     reveal_type(C7.union_of_class_attributes)  # revealed: Literal[1, 2]
     reveal_type(C7.union_of_class_data_descriptor_and_attribute)  # revealed: Literal["data", 2]
 ```
