@@ -1641,21 +1641,20 @@ impl<'src> Parser<'src> {
                         ParseErrorType::IterableUnpackingInComprehension,
                         &key_or_element,
                     );
-                }
-                // test_ok parenthesized_named_expr_py39
-                // # parse_options: {"target-version": "3.9"}
-                // {(x := 1), 2, 3}
-                // {(last := x) for x in range(3)}
+                } else if key_or_element.is_unparenthesized_named_expr() {
+                    // test_ok parenthesized_named_expr_py39
+                    // # parse_options: {"target-version": "3.9"}
+                    // {(x := 1), 2, 3}
+                    // {(last := x) for x in range(3)}
 
-                // test_ok unparenthesized_named_expr_py310
-                // # parse_options: {"target-version": "3.10"}
-                // {x := 1, 2, 3}
-                // {last := x for x in range(3)}
+                    // test_ok unparenthesized_named_expr_py310
+                    // # parse_options: {"target-version": "3.10"}
+                    // {x := 1, 2, 3}
+                    // {last := x for x in range(3)}
 
-                // test_err unparenthesized_named_expr_set_comp_py39
-                // # parse_options: {"target-version": "3.9"}
-                // {last := x for x in range(3)}
-                else if key_or_element.is_unparenthesized_named_expr() {
+                    // test_err unparenthesized_named_expr_set_comp_py39
+                    // # parse_options: {"target-version": "3.9"}
+                    // {last := x for x in range(3)}
                     self.add_unsupported_syntax_error(
                         UnsupportedSyntaxErrorKind::UnparenthesizedNamedExpr(
                             UnparenthesizedNamedExprKind::SetComprehension,
