@@ -15,7 +15,7 @@ use red_knot_project::watch::ProjectWatcher;
 use red_knot_project::{watch, Db};
 use red_knot_project::{ProjectDatabase, ProjectMetadata};
 use red_knot_server::run_server;
-use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig, Severity};
+use ruff_db::diagnostic::{DisplayDiagnosticConfig, OldDiagnosticTrait, Severity};
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
 use salsa::plumbing::ZalsaDatabase;
 
@@ -354,8 +354,7 @@ enum MainLoopMessage {
     CheckWorkspace,
     CheckCompleted {
         /// The diagnostics that were found during the check.
-        result: Vec<Box<dyn Diagnostic>>,
-
+        result: Vec<Box<dyn OldDiagnosticTrait>>,
         revision: u64,
     },
     ApplyChanges(Vec<watch::ChangeEvent>),

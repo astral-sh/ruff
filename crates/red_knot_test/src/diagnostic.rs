@@ -2,7 +2,7 @@
 //!
 //! We don't assume that we will get the diagnostics in source order.
 
-use ruff_db::diagnostic::Diagnostic;
+use ruff_db::diagnostic::OldDiagnosticTrait;
 use ruff_source_file::{LineIndex, OneIndexed};
 use std::ops::{Deref, Range};
 
@@ -19,7 +19,7 @@ pub(crate) struct SortedDiagnostics<T> {
 
 impl<T> SortedDiagnostics<T>
 where
-    T: Diagnostic,
+    T: OldDiagnosticTrait,
 {
     pub(crate) fn new(diagnostics: impl IntoIterator<Item = T>, line_index: &LineIndex) -> Self {
         let mut diagnostics: Vec<_> = diagnostics
@@ -99,7 +99,7 @@ pub(crate) struct LineDiagnosticsIterator<'a, T> {
 
 impl<'a, T> Iterator for LineDiagnosticsIterator<'a, T>
 where
-    T: Diagnostic,
+    T: OldDiagnosticTrait,
 {
     type Item = LineDiagnostics<'a, T>;
 
@@ -115,7 +115,7 @@ where
     }
 }
 
-impl<T> std::iter::FusedIterator for LineDiagnosticsIterator<'_, T> where T: Diagnostic {}
+impl<T> std::iter::FusedIterator for LineDiagnosticsIterator<'_, T> where T: OldDiagnosticTrait {}
 
 /// All diagnostics that start on a single line of source code in one embedded Python file.
 #[derive(Debug)]
@@ -144,7 +144,7 @@ struct DiagnosticWithLine<T> {
 #[cfg(test)]
 mod tests {
     use crate::db::Db;
-    use crate::diagnostic::Diagnostic;
+    use crate::diagnostic::OldDiagnosticTrait;
     use ruff_db::diagnostic::{DiagnosticId, LintName, Severity, Span};
     use ruff_db::files::{system_path_to_file, File};
     use ruff_db::source::line_index;
@@ -190,7 +190,7 @@ mod tests {
         file: File,
     }
 
-    impl Diagnostic for DummyDiagnostic {
+    impl OldDiagnosticTrait for DummyDiagnostic {
         fn id(&self) -> DiagnosticId {
             DiagnosticId::Lint(LintName::of("dummy"))
         }
