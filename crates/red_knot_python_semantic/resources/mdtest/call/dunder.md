@@ -82,7 +82,7 @@ However, the attached dunder method *can* be called if accessed directly:
 reveal_type(this_fails.__getitem__(this_fails, 0))  # revealed: Unknown | str
 ```
 
-This also works if there is a partially-bound dunder method on the class:
+The instance-level method is also not called when the class-level method is present:
 
 ```py
 def external_getitem1(instance, key) -> str:
