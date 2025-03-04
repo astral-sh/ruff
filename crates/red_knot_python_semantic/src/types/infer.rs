@@ -2223,30 +2223,26 @@ impl<'db> TypeInferenceBuilder<'db> {
             .as_name_expr()
             .is_some_and(|name| &name.id == "TYPE_CHECKING")
         {
-            if !matches!(
+            if !KnownClass::Bool
+                .to_instance(self.db())
+                .is_assignable_to(self.db(), declared_ty.inner_type())
+            {
+                // annotation not assignable from `bool` is an error
+                report_invalid_type_checking_constant(&self.context, assignment.into());
+            } else if self.in_stub()
+                && value
+                    .as_ref()
+                    .is_none_or(|value| value.is_ellipsis_literal_expr())
+            {
+                // stub file assigning nothing or `...` is fine
+            } else if !matches!(
                 value
                     .as_ref()
                     .and_then(|value| value.as_boolean_literal_expr()),
                 Some(ast::ExprBooleanLiteral { value: false, .. })
             ) {
-                if !self.in_stub()
-                    || !value
-                        .as_ref()
-                        .is_none_or(|value| value.is_ellipsis_literal_expr())
-                    || !Type::BooleanLiteral(true)
-                        .is_assignable_to(self.db(), declared_ty.inner_type())
-                {
-                    report_invalid_type_checking_constant(&self.context, assignment.into());
-                }
-            } else if !Type::BooleanLiteral(true)
-                .is_assignable_to(self.db(), declared_ty.inner_type())
-            {
-                report_invalid_assignment(
-                    &self.context,
-                    assignment.into(),
-                    declared_ty.inner_type(),
-                    Type::BooleanLiteral(true),
-                );
+                // otherwise, assigning something other than `False` is an error
+                report_invalid_type_checking_constant(&self.context, assignment.into());
             }
             declared_ty.inner = Type::BooleanLiteral(true);
         }
