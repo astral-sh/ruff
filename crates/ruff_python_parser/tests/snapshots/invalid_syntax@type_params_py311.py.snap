@@ -231,15 +231,6 @@ Module(
   |
 1 | # parse_options: {"target-version": "3.11"}
 2 | type List[T] = list | set
-  |          ^^^ Syntax Error: Cannot use type parameter lists on Python 3.11 (syntax was added in Python 3.12)
-3 | def foo[T](): ...
-4 | class Foo[S: (str, bytes), T: float, *Ts, **P]: ...
-  |
-
-
-  |
-1 | # parse_options: {"target-version": "3.11"}
-2 | type List[T] = list | set
 3 | def foo[T](): ...
   |        ^^^ Syntax Error: Cannot use type parameter lists on Python 3.11 (syntax was added in Python 3.12)
 4 | class Foo[S: (str, bytes), T: float, *Ts, **P]: ...
