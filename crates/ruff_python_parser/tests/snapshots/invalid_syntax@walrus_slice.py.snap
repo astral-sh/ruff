@@ -7,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/inline/err/walrus_slice.py
 ```
 Module(
     ModModule {
-        range: 0..84,
+        range: 0..110,
         body: [
             Expr(
                 StmtExpr {
@@ -71,6 +71,127 @@ Module(
                     ),
                 },
             ),
+            Expr(
+                StmtExpr {
+                    range: 84..91,
+                    value: Subscript(
+                        ExprSubscript {
+                            range: 84..91,
+                            value: Name(
+                                ExprName {
+                                    range: 84..87,
+                                    id: Name("lst"),
+                                    ctx: Load,
+                                },
+                            ),
+                            slice: Slice(
+                                ExprSlice {
+                                    range: 88..91,
+                                    lower: Some(
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 88..89,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                    ),
+                                    upper: Some(
+                                        Name(
+                                            ExprName {
+                                                range: 90..91,
+                                                id: Name("x"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ),
+                                    step: None,
+                                },
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 93..94,
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 93..94,
+                            value: Int(
+                                1,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 96..105,
+                    value: Subscript(
+                        ExprSubscript {
+                            range: 96..105,
+                            value: Name(
+                                ExprName {
+                                    range: 96..99,
+                                    id: Name("lst"),
+                                    ctx: Load,
+                                },
+                            ),
+                            slice: Slice(
+                                ExprSlice {
+                                    range: 100..105,
+                                    lower: Some(
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 100..101,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                    ),
+                                    upper: Some(
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 102..103,
+                                                value: Int(
+                                                    3,
+                                                ),
+                                            },
+                                        ),
+                                    ),
+                                    step: Some(
+                                        Name(
+                                            ExprName {
+                                                range: 104..105,
+                                                id: Name("x"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ),
+                                },
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 107..108,
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 107..108,
+                            value: Int(
+                                1,
+                            ),
+                        },
+                    ),
+                },
+            ),
         ],
     },
 )
@@ -81,4 +202,57 @@ Module(
 1 | # even after 3.10, an unparenthesized walrus is not allowed in a slice
 2 | lst[x:=1:-1]
   |     ^^^^ Syntax Error: Unparenthesized named expression cannot be used here
+3 | lst[1:x:=1]
+4 | lst[1:3:x:=1]
+  |
+
+
+  |
+1 | # even after 3.10, an unparenthesized walrus is not allowed in a slice
+2 | lst[x:=1:-1]
+3 | lst[1:x:=1]
+  |        ^^ Syntax Error: Expected ']', found ':='
+4 | lst[1:3:x:=1]
+  |
+
+
+  |
+1 | # even after 3.10, an unparenthesized walrus is not allowed in a slice
+2 | lst[x:=1:-1]
+3 | lst[1:x:=1]
+  |           ^ Syntax Error: Expected a statement
+4 | lst[1:3:x:=1]
+  |
+
+
+  |
+1 | # even after 3.10, an unparenthesized walrus is not allowed in a slice
+2 | lst[x:=1:-1]
+3 | lst[1:x:=1]
+  |            ^ Syntax Error: Expected a statement
+4 | lst[1:3:x:=1]
+  |
+
+
+  |
+2 | lst[x:=1:-1]
+3 | lst[1:x:=1]
+4 | lst[1:3:x:=1]
+  |          ^^ Syntax Error: Expected ']', found ':='
+  |
+
+
+  |
+2 | lst[x:=1:-1]
+3 | lst[1:x:=1]
+4 | lst[1:3:x:=1]
+  |             ^ Syntax Error: Expected a statement
+  |
+
+
+  |
+2 | lst[x:=1:-1]
+3 | lst[1:x:=1]
+4 | lst[1:3:x:=1]
+  |              ^ Syntax Error: Expected a statement
   |
