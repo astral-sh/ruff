@@ -1277,6 +1277,7 @@ where
                             ast::Expr::Tuple(_) | ast::Expr::List(_) => {
                                 Some(CurrentAssignment::WithItem {
                                     item,
+                                    first: true,
                                     is_async: *is_async,
                                     unpack: Some(Unpack::new(
                                         self.db,
@@ -1295,6 +1296,8 @@ where
                                 item,
                                 is_async: *is_async,
                                 unpack: None,
+                                first: false, // arbitrary
+                                              // TODO: explain more
                             }),
                             ast::Expr::Attribute(ast::ExprAttribute {
                                 value: object,
@@ -1681,6 +1684,7 @@ where
                         }
                         Some(CurrentAssignment::WithItem {
                             item,
+                            first,
                             is_async,
                             unpack,
                         }) => {
@@ -1690,6 +1694,7 @@ where
                                     unpack,
                                     context_expr: &item.context_expr,
                                     name: name_node,
+                                    first,
                                     is_async,
                                 },
                             );
@@ -1699,7 +1704,9 @@ where
                 }
 
                 if let Some(
-                    CurrentAssignment::Assign { first, .. } | CurrentAssignment::For { first, .. },
+                    CurrentAssignment::Assign { first, .. }
+                    | CurrentAssignment::For { first, .. }
+                    | CurrentAssignment::WithItem { first, .. },
                 ) = self.current_assignment_mut()
                 {
                     *first = false;
@@ -1972,6 +1979,7 @@ enum CurrentAssignment<'a> {
     },
     WithItem {
         item: &'a ast::WithItem,
+        first: bool,
         is_async: bool,
         unpack: Option<Unpack<'a>>,
     },
