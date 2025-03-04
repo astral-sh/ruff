@@ -382,6 +382,8 @@ When a class-level attribute is possibly unbound, we union its (descriptor proto
 metaclass attribute (unless it's a data descriptor, which always takes precedence):
 
 ```py
+from typing import Any
+
 def _(flag: bool):
     class Meta6(type):
         attribute1: DataDescriptor = DataDescriptor()
@@ -424,7 +426,7 @@ def _(flag: bool):
 
     reveal_type(C7.union_of_metaclass_attributes)  # revealed: Literal[1, 2]
     # TODO: should be `Literal["data", 2]`
-    reveal_type(C7.union_of_metaclass_data_descriptor_and_attribute)  # revealed: Literal["data"]
+    reveal_type(C7.union_of_metaclass_data_descriptor_and_attribute)  # revealed: Literal["data", 2] | DataDescriptor
     reveal_type(C7.union_of_class_attributes)  # revealed: Literal[1, 2]
     reveal_type(C7.union_of_class_data_descriptor_and_attribute)  # revealed: Literal["data", 2]
 ```
@@ -600,7 +602,7 @@ reveal_type(C.meta_class_access)  # revealed: bytes
 
 # TODO: These should emit a diagnostic
 reveal_type(C().class_object_access)  # revealed: TailoredForClassObjectAccess
-reveal_type(C.instance_access)  # revealed: Unknown
+reveal_type(C.instance_access)  # revealed: TailoredForInstanceAccess
 ```
 
 ## Descriptors with incorrect `__get__` signature
@@ -615,7 +617,7 @@ class C:
     descriptor: Descriptor = Descriptor()
 
 # TODO: This should be an error
-reveal_type(C.descriptor)  # revealed: Unknown
+reveal_type(C.descriptor)  # revealed: Descriptor
 
 # TODO: This should be an error
 reveal_type(C().descriptor)  # revealed: Descriptor
@@ -633,11 +635,9 @@ def _(flag: bool):
     class C:
         descriptor: MaybeDescriptor = MaybeDescriptor()
 
-    # TODO: This should be `MaybeDescriptor | int`
-    reveal_type(C.descriptor)  # revealed: int
+    reveal_type(C.descriptor)  # revealed: int | MaybeDescriptor
 
-    # TODO: This should be `MaybeDescriptor | int`
-    reveal_type(C().descriptor)  # revealed: int
+    reveal_type(C().descriptor)  # revealed: int | MaybeDescriptor
 ```
 
 ## Dunder methods

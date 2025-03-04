@@ -764,8 +764,7 @@ def _(flag: bool):
             x = 2
 
     class C3(metaclass=Meta3): ...
-    # TODO: should be Unknown | Literal[1, 2]
-    reveal_type(C3.x)  # revealed: Unknown
+    reveal_type(C3.x)  # revealed: Unknown | Literal[1, 2]
 
     class Meta4(type):
         if flag:
@@ -774,8 +773,7 @@ def _(flag: bool):
             x = 2
 
     class C3(metaclass=Meta4): ...
-    # TODO: should be Unknown | Literal[1, 2]
-    reveal_type(C3.x)  # revealed: Unknown
+    reveal_type(C3.x)  # revealed: Unknown | Literal[1, 2]
 ```
 
 ## Inherited class attributes
