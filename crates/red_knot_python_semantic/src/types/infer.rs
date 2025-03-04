@@ -2149,8 +2149,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                 unpacked.expression_type(name_ast_id)
             }
             TargetKind::Name => {
-                // `TYPE_CHECKING` is a special variable that is used only during type checking
-                // and is interpreted as True regardless of the actual type of the value.
+                // `TYPE_CHECKING` is a special variable that should only be assigned `False`
+                // at runtime, but is always considered `True` in type checking.
                 // See mdtest/known_constants.md#user-defined-type_checking for details.
                 if &name.id == "TYPE_CHECKING" {
                     Type::BooleanLiteral(true)
