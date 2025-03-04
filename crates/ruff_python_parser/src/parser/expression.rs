@@ -7,7 +7,7 @@ use rustc_hash::{FxBuildHasher, FxHashSet};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{
     self as ast, BoolOp, CmpOp, ConversionFlag, Expr, ExprContext, FStringElement, FStringElements,
-    IpyEscapeKind, Number, Operator, PythonVersion, StringFlags, UnaryOp,
+    IpyEscapeKind, Number, Operator, StringFlags, UnaryOp,
 };
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
@@ -16,9 +16,7 @@ use crate::parser::{helpers, FunctionKind, Parser};
 use crate::string::{parse_fstring_literal_element, parse_string_literal, StringType};
 use crate::token::{TokenKind, TokenValue};
 use crate::token_set::TokenSet;
-use crate::{
-    FStringErrorType, Mode, ParseErrorType, UnsupportedSyntaxError, UnsupportedSyntaxErrorKind,
-};
+use crate::{FStringErrorType, Mode, ParseErrorType, UnsupportedSyntaxErrorKind};
 
 use super::{FStringElementsKind, Parenthesized, RecoveryContextKind};
 
@@ -722,15 +720,10 @@ impl<'src> Parser<'src> {
                         // `Parser::add_unsupported_syntax_error`. Parenthesized kwarg names were no
                         // longer allowed in 3.8
                         if let Some(range) = parenthesized_range {
-                            if parser.options.target_version > PythonVersion::PY37 {
-                                parser
-                                    .unsupported_syntax_errors
-                                    .push(UnsupportedSyntaxError {
-                                        kind: UnsupportedSyntaxErrorKind::ParenthesizedKeywordArgumentName,
-                                        range,
-                                        target_version: parser.options.target_version,
-                                    });
-                            }
+                            parser.add_unsupported_syntax_error(
+                                UnsupportedSyntaxErrorKind::ParenthesizedKeywordArgumentName,
+                                range,
+                            );
                         }
 
                         ast::Identifier {

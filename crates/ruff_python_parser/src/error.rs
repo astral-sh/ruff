@@ -462,29 +462,68 @@ impl Display for UnsupportedSyntaxError {
                 "parenthesized keyword argument name"
             }
         };
-        let changed = match self.kind {
-            UnsupportedSyntaxErrorKind::ParenthesizedKeywordArgumentName => "removed",
-            _ => "added",
-        };
+
+        let (changed, changed_version) = self.kind.changed_version();
 
         write!(
             f,
-            "Cannot use {kind} on Python {} (syntax was {changed} in Python {})",
+            "Cannot use {kind} on Python {} (syntax was {changed} in Python {changed_version})",
             self.target_version,
-            self.kind.minimum_version(),
         )
     }
 }
 
-impl UnsupportedSyntaxErrorKind {
-    /// The earliest allowed version for the syntax associated with this error.
-    pub const fn minimum_version(&self) -> PythonVersion {
+/// Represents the kind of change in Python syntax between versions.
+///
+/// Most changes so far have been additions (e.g. `match` and `type` statements), but others are
+/// removals (e.g. parenthesized keyword argument names).
+enum Change {
+    Added,
+    Removed,
+}
+
+impl Display for Change {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            UnsupportedSyntaxErrorKind::Match => PythonVersion::PY310,
-            UnsupportedSyntaxErrorKind::Walrus => PythonVersion::PY38,
-            UnsupportedSyntaxErrorKind::ExceptStar => PythonVersion::PY311,
-            // This is actually a *maximum* version in this case
-            UnsupportedSyntaxErrorKind::ParenthesizedKeywordArgumentName => PythonVersion::PY38,
+            Change::Added => f.write_str("added"),
+            Change::Removed => f.write_str("removed"),
+        }
+    }
+}
+
+impl UnsupportedSyntaxErrorKind {
+    /// Returns the Python version when the syntax associated with this error was changed, and the
+    /// type of [`Change`] (added or removed).
+    const fn changed_version(&self) -> (Change, PythonVersion) {
+        match self {
+            UnsupportedSyntaxErrorKind::Match => (Change::Added, PythonVersion::PY310),
+            UnsupportedSyntaxErrorKind::Walrus => (Change::Added, PythonVersion::PY38),
+            UnsupportedSyntaxErrorKind::ExceptStar => (Change::Added, PythonVersion::PY311),
+            UnsupportedSyntaxErrorKind::ParenthesizedKeywordArgumentName => {
+                (Change::Removed, PythonVersion::PY38)
+            }
+        }
+    }
+
+    /// Returns whether or not this kind of syntax is unsupported on `target_version`.
+    ///
+    /// ## Examples
+    ///
+    /// ```
+    /// assert!(UnsupportedSyntaxError::Match.is_unsupported(PythonVersion::PY39));
+    /// assert!(!UnsupportedSyntaxError::Match.is_unsupported(PythonVersion::PY310));
+    /// assert!(UnsupportedSyntaxError::ParenthesizedKeywordArgumentName.is_unsupported(PythonVersion::PY38));
+    /// assert!(!UnsupportedSyntaxError::ParenthesizedKeywordArgumentName.is_unsupported(PythonVersion::PY37));
+    /// ```
+    pub(crate) fn is_unsupported(&self, target_version: PythonVersion) -> bool {
+        let (_, version) = self.changed_version();
+        match self {
+            UnsupportedSyntaxErrorKind::Match
+            | UnsupportedSyntaxErrorKind::Walrus
+            | UnsupportedSyntaxErrorKind::ExceptStar => target_version < version,
+            UnsupportedSyntaxErrorKind::ParenthesizedKeywordArgumentName => {
+                target_version >= version
+            }
         }
     }
 }
