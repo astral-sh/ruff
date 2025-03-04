@@ -1,34 +1,76 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-RUF045.py:8:5: RUF045 Assignment without annotation found in dataclass body
+RUF045.py:23:5: RUF045 Assignment without annotation found in dataclass body
    |
- 6 | class C:
- 7 |     # Errors
- 8 |     no_annotation = r"foo"
+21 | class C(B):
+22 |     # Errors
+23 |     no_annotation = r"foo"
    |     ^^^^^^^^^^^^^ RUF045
- 9 |     missing = MISSING
-10 |     field = field()
+24 |     missing = MISSING
+25 |     field = field()
    |
    = help: Use `ClassVar[...]`
 
-RUF045.py:9:5: RUF045 Assignment without annotation found in dataclass body
+RUF045.py:24:5: RUF045 Assignment without annotation found in dataclass body
    |
- 7 |     # Errors
- 8 |     no_annotation = r"foo"
- 9 |     missing = MISSING
+22 |     # Errors
+23 |     no_annotation = r"foo"
+24 |     missing = MISSING
    |     ^^^^^^^ RUF045
-10 |     field = field()
+25 |     field = field()
    |
    = help: Use `ClassVar[...]`
 
-RUF045.py:10:5: RUF045 Assignment without annotation found in dataclass body
+RUF045.py:25:5: RUF045 Assignment without annotation found in dataclass body
    |
- 8 |     no_annotation = r"foo"
- 9 |     missing = MISSING
-10 |     field = field()
+23 |     no_annotation = r"foo"
+24 |     missing = MISSING
+25 |     field = field()
    |     ^^^^^ RUF045
-11 |
-12 |     # No errors
+26 |
+27 |     class_var_invalid_annotated = 42
+   |
+   = help: Use `ClassVar[...]`
+
+RUF045.py:27:5: RUF045 Assignment without annotation found in dataclass body
+   |
+25 |     field = field()
+26 |
+27 |     class_var_invalid_annotated = 42
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF045
+28 |     attribute = 42
+29 |     subscript = 42
+   |
+   = help: Use `ClassVar[...]`
+
+RUF045.py:28:5: RUF045 Assignment without annotation found in dataclass body
+   |
+27 |     class_var_invalid_annotated = 42
+28 |     attribute = 42
+   |     ^^^^^^^^^ RUF045
+29 |     subscript = 42
+30 |     class_var_inlegally_wrapped = 42
+   |
+   = help: Use `ClassVar[...]`
+
+RUF045.py:29:5: RUF045 Assignment without annotation found in dataclass body
+   |
+27 |     class_var_invalid_annotated = 42
+28 |     attribute = 42
+29 |     subscript = 42
+   |     ^^^^^^^^^ RUF045
+30 |     class_var_inlegally_wrapped = 42
+   |
+   = help: Use `ClassVar[...]`
+
+RUF045.py:30:5: RUF045 Assignment without annotation found in dataclass body
+   |
+28 |     attribute = 42
+29 |     subscript = 42
+30 |     class_var_inlegally_wrapped = 42
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF045
+31 |
+32 |     # No errors
    |
    = help: Use `ClassVar[...]`
