@@ -1,20 +1,4 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-UP028_1.py:128:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
-    |
-126 |   # https://github.com/astral-sh/ruff/issues/15540
-127 |   def f():
-128 | /     for a in 1,:
-129 | |         yield a
-    | |_______________^ UP028
-    |
-    = help: Replace with `yield from`
 
-ℹ Unsafe fix
-125 125 | 
-126 126 | # https://github.com/astral-sh/ruff/issues/15540
-127 127 | def f():
-128     |-    for a in 1,:
-129     |-        yield a
-    128 |+    yield from (1,)
