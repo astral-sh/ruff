@@ -436,11 +436,6 @@ pub struct UnsupportedSyntaxError {
     pub kind: UnsupportedSyntaxErrorKind,
     pub range: TextRange,
     /// The target [`PythonVersion`] for which this error was detected.
-    ///
-    /// This is different from the version reported by the
-    /// [`minimum_version`](UnsupportedSyntaxErrorKind::minimum_version) method, which is the
-    /// earliest allowed version for this piece of syntax. The `target_version` is primarily used
-    /// for user-facing error messages.
     pub target_version: PythonVersion,
 }
 
@@ -514,15 +509,6 @@ impl UnsupportedSyntaxErrorKind {
     }
 
     /// Returns whether or not this kind of syntax is unsupported on `target_version`.
-    ///
-    /// ## Examples
-    ///
-    /// ```
-    /// assert!(UnsupportedSyntaxError::Match.is_unsupported(PythonVersion::PY39));
-    /// assert!(!UnsupportedSyntaxError::Match.is_unsupported(PythonVersion::PY310));
-    /// assert!(UnsupportedSyntaxError::ParenthesizedKeywordArgumentName.is_unsupported(PythonVersion::PY38));
-    /// assert!(!UnsupportedSyntaxError::ParenthesizedKeywordArgumentName.is_unsupported(PythonVersion::PY37));
-    /// ```
     pub(crate) fn is_unsupported(self, target_version: PythonVersion) -> bool {
         let (_, version) = self.changed_version();
         match self {
