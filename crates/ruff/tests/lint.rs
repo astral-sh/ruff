@@ -3079,7 +3079,7 @@ from typing import Union;foo: Union[int, str] = 1
     let testpy_canon = testpy.canonicalize()?;
 
     insta::with_settings!({
-        filters => vec![(tempdir_filter(&testpy_canon).as_str(), "[TMP]/foo/test.py"),(tempdir_filter(&project_dir).as_str(), "[TMP]/"),(r"(?m)^foo\\test","foo/test")]
+        filters => vec![(tempdir_filter(&testpy_canon).as_str(), "[TMP]/foo/test.py"),(tempdir_filter(&project_dir).as_str(), "[TMP]/"),(r"foo\\","foo/")]
     }, {
         assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
             .args(STDIN_BASE_OPTIONS)
