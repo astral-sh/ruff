@@ -716,9 +716,6 @@ impl<'src> Parser<'src> {
                         // # parse_options: {"target-version": "3.8"}
                         // f((a)=1)
 
-                        // Note that this is a greater than check unlike inside
-                        // `Parser::add_unsupported_syntax_error`. Parenthesized kwarg names were no
-                        // longer allowed in 3.8
                         if let Some(range) = parenthesized_range {
                             parser.add_unsupported_syntax_error(
                                 UnsupportedSyntaxErrorKind::ParenthesizedKeywordArgumentName,
