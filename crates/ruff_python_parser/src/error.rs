@@ -458,7 +458,9 @@ impl Display for UnsupportedSyntaxError {
             UnsupportedSyntaxErrorKind::Match => "`match` statement",
             UnsupportedSyntaxErrorKind::Walrus => "named assignment expression (`:=`)",
             UnsupportedSyntaxErrorKind::ExceptStar => "`except*`",
-            UnsupportedSyntaxErrorKind::PositionalOnlyParameter => "positional-only parameters",
+            UnsupportedSyntaxErrorKind::PositionalOnlyParameter => {
+                "positional-only parameter separator"
+            }
         };
         write!(
             f,
