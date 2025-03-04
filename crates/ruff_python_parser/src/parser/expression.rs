@@ -726,7 +726,7 @@ impl<'src> Parser<'src> {
                                 parser
                                     .unsupported_syntax_errors
                                     .push(UnsupportedSyntaxError {
-                                        kind: UnsupportedSyntaxErrorKind::ParenKwargName,
+                                        kind: UnsupportedSyntaxErrorKind::ParenthesizedKeywordArgumentName,
                                         range,
                                         target_version: parser.options.target_version,
                                     });

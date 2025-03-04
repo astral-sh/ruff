@@ -449,7 +449,7 @@ pub enum UnsupportedSyntaxErrorKind {
     Match,
     Walrus,
     ExceptStar,
-    ParenKwargName,
+    ParenthesizedKeywordArgumentName,
 }
 
 impl Display for UnsupportedSyntaxError {
@@ -458,10 +458,12 @@ impl Display for UnsupportedSyntaxError {
             UnsupportedSyntaxErrorKind::Match => "`match` statement",
             UnsupportedSyntaxErrorKind::Walrus => "named assignment expression (`:=`)",
             UnsupportedSyntaxErrorKind::ExceptStar => "`except*`",
-            UnsupportedSyntaxErrorKind::ParenKwargName => "parenthesized keyword argument name",
+            UnsupportedSyntaxErrorKind::ParenthesizedKeywordArgumentName => {
+                "parenthesized keyword argument name"
+            }
         };
         let changed = match self.kind {
-            UnsupportedSyntaxErrorKind::ParenKwargName => "removed",
+            UnsupportedSyntaxErrorKind::ParenthesizedKeywordArgumentName => "removed",
             _ => "added",
         };
 
@@ -482,7 +484,7 @@ impl UnsupportedSyntaxErrorKind {
             UnsupportedSyntaxErrorKind::Walrus => PythonVersion::PY38,
             UnsupportedSyntaxErrorKind::ExceptStar => PythonVersion::PY311,
             // This is actually a *maximum* version in this case
-            UnsupportedSyntaxErrorKind::ParenKwargName => PythonVersion::PY38,
+            UnsupportedSyntaxErrorKind::ParenthesizedKeywordArgumentName => PythonVersion::PY38,
         }
     }
 }
