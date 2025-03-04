@@ -1490,9 +1490,9 @@ impl<'src> Parser<'src> {
         let start = self.node_start();
         self.bump(TokenKind::Except);
 
-        let star_position = self.node_start();
+        let star_token_range = self.current_token_range();
         let block_kind = if self.eat(TokenKind::Star) {
-            ExceptClauseKind::Star(TextRange::at(star_position, TextSize::from(1)))
+            ExceptClauseKind::Star(star_token_range)
         } else {
             ExceptClauseKind::Normal
         };
