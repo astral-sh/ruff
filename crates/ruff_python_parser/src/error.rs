@@ -449,7 +449,7 @@ pub enum UnsupportedSyntaxErrorKind {
     Match,
     Walrus,
     ExceptStar,
-    TypeStmt,
+    TypeAliasStatement,
     TypeParamDefault,
 }
 
@@ -459,7 +459,7 @@ impl Display for UnsupportedSyntaxError {
             UnsupportedSyntaxErrorKind::Match => "`match` statement",
             UnsupportedSyntaxErrorKind::Walrus => "named assignment expression (`:=`)",
             UnsupportedSyntaxErrorKind::ExceptStar => "`except*`",
-            UnsupportedSyntaxErrorKind::TypeStmt => "`type` statement",
+            UnsupportedSyntaxErrorKind::TypeAliasStatement => "`type` statement",
             UnsupportedSyntaxErrorKind::TypeParamDefault => {
                 "Cannot set default type for a type parameter"
             }
@@ -480,7 +480,7 @@ impl UnsupportedSyntaxErrorKind {
             UnsupportedSyntaxErrorKind::Match => PythonVersion::PY310,
             UnsupportedSyntaxErrorKind::Walrus => PythonVersion::PY38,
             UnsupportedSyntaxErrorKind::ExceptStar => PythonVersion::PY311,
-            UnsupportedSyntaxErrorKind::TypeStmt => PythonVersion::PY312,
+            UnsupportedSyntaxErrorKind::TypeAliasStatement => PythonVersion::PY312,
             UnsupportedSyntaxErrorKind::TypeParamDefault => PythonVersion::PY313,
         }
     }

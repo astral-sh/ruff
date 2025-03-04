@@ -918,7 +918,10 @@ impl<'src> Parser<'src> {
         // type x = x := 1
         let value = self.parse_conditional_expression_or_higher();
 
-        self.add_unsupported_syntax_error(UnsupportedSyntaxErrorKind::TypeStmt, type_range);
+        self.add_unsupported_syntax_error(
+            UnsupportedSyntaxErrorKind::TypeAliasStatement,
+            type_range,
+        );
 
         ast::StmtTypeAlias {
             name: Box::new(name),
