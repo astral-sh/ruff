@@ -2,7 +2,6 @@
 //! command-line options. Structure is optimized for internal usage, as opposed
 //! to external visibility or parsing.
 
-use path_absolutize::path_dedot;
 use regex::Regex;
 use rustc_hash::FxHashSet;
 use std::fmt::{Display, Formatter};
@@ -24,7 +23,7 @@ use crate::rules::{
     pep8_naming, pycodestyle, pydoclint, pydocstyle, pyflakes, pylint, pyupgrade, ruff,
 };
 use crate::settings::types::{CompiledPerFileIgnoreList, ExtensionMapping, FilePatternSet};
-use crate::{codes, RuleSelector};
+use crate::{codes, fs, RuleSelector};
 
 use super::line_width::IndentWidth;
 
@@ -414,7 +413,7 @@ impl LinterSettings {
             per_file_ignores: CompiledPerFileIgnoreList::default(),
             fix_safety: FixSafetyTable::default(),
 
-            src: vec![path_dedot::CWD.clone(), path_dedot::CWD.join("src")],
+            src: vec![fs::get_cwd().to_path_buf(), fs::get_cwd().join("src")],
             // Needs duplicating
             tab_size: IndentWidth::default(),
             line_length: LineLength::default(),
@@ -474,6 +473,6 @@ impl LinterSettings {
 
 impl Default for LinterSettings {
     fn default() -> Self {
-        Self::new(path_dedot::CWD.as_path())
+        Self::new(fs::get_cwd())
     }
 }

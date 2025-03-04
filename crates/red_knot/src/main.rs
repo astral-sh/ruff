@@ -107,6 +107,12 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         .transpose()?
         .unwrap_or_else(|| cwd.clone());
 
+    let check_paths: Vec<_> = args
+        .paths
+        .iter()
+        .map(|path| SystemPath::absolute(path, &cwd))
+        .collect();
+
     let system = OsSystem::new(cwd);
     let watch = args.watch;
     let exit_zero = args.exit_zero;
@@ -117,6 +123,10 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     project_metadata.apply_configuration_files(&system)?;
 
     let mut db = ProjectDatabase::new(project_metadata, system)?;
+
+    if !check_paths.is_empty() {
+        db.project().set_included_paths(&mut db, check_paths);
+    }
 
     let (main_loop, main_loop_cancellation_token) = MainLoop::new(cli_options);
 
@@ -255,27 +265,48 @@ impl MainLoop {
                             Severity::Error
                         };
 
-                    let failed = result
-                        .iter()
-                        .any(|diagnostic| diagnostic.severity() >= min_error_severity);
-
                     if check_revision == revision {
+                        if db.project().files(db).is_empty() {
+                            tracing::warn!("No python files found under the given path(s)");
+                        }
+
                         let mut stdout = stdout().lock();
-                        for diagnostic in result {
-                            writeln!(stdout, "{}", diagnostic.display(db, &display_config))?;
+
+                        if result.is_empty() {
+                            writeln!(stdout, "All checks passed!")?;
+
+                            if self.watcher.is_none() {
+                                return Ok(ExitStatus::Success);
+                            }
+                        } else {
+                            let mut failed = false;
+                            let diagnostics_count = result.len();
+
+                            for diagnostic in result {
+                                writeln!(stdout, "{}", diagnostic.display(db, &display_config))?;
+
+                                failed |= diagnostic.severity() >= min_error_severity;
+                            }
+
+                            writeln!(
+                                stdout,
+                                "Found {} diagnostic{}",
+                                diagnostics_count,
+                                if diagnostics_count > 1 { "s" } else { "" }
+                            )?;
+
+                            if self.watcher.is_none() {
+                                return Ok(if failed {
+                                    ExitStatus::Failure
+                                } else {
+                                    ExitStatus::Success
+                                });
+                            }
                         }
                     } else {
                         tracing::debug!(
                             "Discarding check result for outdated revision: current: {revision}, result revision: {check_revision}"
                         );
-                    }
-
-                    if self.watcher.is_none() {
-                        return Ok(if failed {
-                            ExitStatus::Failure
-                        } else {
-                            ExitStatus::Success
-                        });
                     }
 
                     tracing::trace!("Counts after last check:\n{}", countme::get_all());
@@ -322,7 +353,9 @@ impl MainLoopCancellationToken {
 enum MainLoopMessage {
     CheckWorkspace,
     CheckCompleted {
+        /// The diagnostics that were found during the check.
         result: Vec<Box<dyn Diagnostic>>,
+
         revision: u64,
     },
     ApplyChanges(Vec<watch::ChangeEvent>),

@@ -2782,3 +2782,85 @@ fn cache_syntax_errors() -> Result<()> {
 
     Ok(())
 }
+
+/// Regression test for <https://github.com/astral-sh/ruff/issues/9381> with very helpful
+/// reproduction repo here: <https://github.com/lucasfijen/example_ruff_glob_bug>
+#[test]
+fn cookiecutter_globbing() -> Result<()> {
+    // This is a simplified directory structure from the repo linked above. The essence of the
+    // problem is this `{{cookiecutter.repo_name}}` directory containing a config file with a glob.
+    // The absolute path of the glob contains the glob metacharacters `{{` and `}}` even though the
+    // user's glob does not.
+    let tempdir = TempDir::new()?;
+    let cookiecutter = tempdir.path().join("{{cookiecutter.repo_name}}");
+    let cookiecutter_toml = cookiecutter.join("pyproject.toml");
+    let tests = cookiecutter.join("tests");
+    fs::create_dir_all(&tests)?;
+    fs::write(
+        &cookiecutter_toml,
+        r#"tool.ruff.lint.per-file-ignores = { "tests/*" = ["F811"] }"#,
+    )?;
+    // F811 example from the docs to ensure the glob still works
+    let maintest = tests.join("maintest.py");
+    fs::write(maintest, "import foo\nimport bar\nimport foo")?;
+
+    insta::with_settings!({filters => vec![(r"\\", "/")]}, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+                .args(STDIN_BASE_OPTIONS)
+                .arg("--select=F811")
+                .current_dir(tempdir.path()), @r"
+			success: true
+			exit_code: 0
+			----- stdout -----
+			All checks passed!
+
+			----- stderr -----
+			");
+    });
+
+    // after removing the config file with the ignore, F811 applies, so the glob worked above
+    fs::remove_file(cookiecutter_toml)?;
+
+    insta::with_settings!({filters => vec![(r"\\", "/")]}, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+                .args(STDIN_BASE_OPTIONS)
+                .arg("--select=F811")
+                .current_dir(tempdir.path()), @r"
+			success: false
+			exit_code: 1
+			----- stdout -----
+			{{cookiecutter.repo_name}}/tests/maintest.py:3:8: F811 [*] Redefinition of unused `foo` from line 1
+			Found 1 error.
+			[*] 1 fixable with the `--fix` option.
+
+			----- stderr -----
+		");
+    });
+
+    Ok(())
+}
+
+/// Like the test above but exercises the non-absolute path case in `PerFile::new`
+#[test]
+fn cookiecutter_globbing_no_project_root() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let tempdir = tempdir.path().join("{{cookiecutter.repo_name}}");
+    fs::create_dir(&tempdir)?;
+
+    insta::with_settings!({filters => vec![(r"\\", "/")]}, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .current_dir(&tempdir)
+            .args(STDIN_BASE_OPTIONS)
+            .args(["--extend-per-file-ignores", "generated.py:Q"]), @r"
+		success: true
+		exit_code: 0
+		----- stdout -----
+		All checks passed!
+
+		----- stderr -----
+		warning: No Python files found under the given path(s)
+		");
+    });
+
+    Ok(())
+}
