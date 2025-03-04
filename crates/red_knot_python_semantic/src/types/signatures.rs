@@ -1,11 +1,11 @@
-use super::{definition_expression_type, Type};
+use super::{definition_expression_type, DynamicType, Type};
 use crate::Db;
 use crate::{semantic_index::definition::Definition, types::todo_type};
 use ruff_python_ast::{self as ast, name::Name};
 
 /// A typed callable signature.
-#[derive(Clone, Debug, PartialEq, Eq, salsa::Update)]
-pub(crate) struct Signature<'db> {
+#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
+pub struct Signature<'db> {
     /// Parameters, in source order.
     ///
     /// The ordering of parameters in a valid signature must be: first positional-only parameters,
@@ -68,7 +68,7 @@ impl<'db> Signature<'db> {
 }
 
 // TODO: use SmallVec here once invariance bug is fixed
-#[derive(Clone, Debug, PartialEq, Eq, salsa::Update)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
 pub(crate) struct Parameters<'db>(Vec<Parameter<'db>>);
 
 impl<'db> Parameters<'db> {
@@ -76,8 +76,17 @@ impl<'db> Parameters<'db> {
         Self(parameters.into_iter().collect())
     }
 
+    /// Create an empty [`Parameters`].
+    pub(crate) fn empty() -> Self {
+        Self(Vec::new())
+    }
+
+    pub(crate) fn as_slice(&self) -> &[Parameter<'db>] {
+        self.0.as_slice()
+    }
+
     /// Return todo parameters: (*args: Todo, **kwargs: Todo)
-    fn todo() -> Self {
+    pub(crate) fn todo() -> Self {
         Self(vec![
             Parameter {
                 name: Some(Name::new_static("args")),
@@ -87,6 +96,23 @@ impl<'db> Parameters<'db> {
             Parameter {
                 name: Some(Name::new_static("kwargs")),
                 annotated_ty: Some(todo_type!("todo signature **kwargs")),
+                kind: ParameterKind::KeywordVariadic,
+            },
+        ])
+    }
+
+    /// Return parameters that accepts any arguments i.e., `(*args: Any, **kwargs: Any)`
+    pub(crate) fn any() -> Self {
+        // TODO: Should this be represented using `(*Any, **Any)` instead?
+        Self(vec![
+            Parameter {
+                name: Some(Name::new_static("args")),
+                annotated_ty: Some(Type::Dynamic(DynamicType::Any)),
+                kind: ParameterKind::Variadic,
+            },
+            Parameter {
+                name: Some(Name::new_static("kwargs")),
+                annotated_ty: Some(Type::Dynamic(DynamicType::Any)),
                 kind: ParameterKind::KeywordVariadic,
             },
         ])
@@ -230,7 +256,7 @@ impl<'db> std::ops::Index<usize> for Parameters<'db> {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, salsa::Update)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
 pub(crate) struct Parameter<'db> {
     /// Parameter name.
     ///
@@ -270,6 +296,14 @@ impl<'db> Parameter<'db> {
                 .map(|annotation| definition_expression_type(db, definition, annotation)),
             kind,
         }
+    }
+
+    pub(crate) fn is_keyword_only(&self) -> bool {
+        matches!(self.kind, ParameterKind::KeywordOnly { .. })
+    }
+
+    pub(crate) fn is_positional_only(&self) -> bool {
+        matches!(self.kind, ParameterKind::PositionalOnly { .. })
     }
 
     pub(crate) fn is_variadic(&self) -> bool {
@@ -328,7 +362,7 @@ impl<'db> Parameter<'db> {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, salsa::Update)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
 pub(crate) enum ParameterKind<'db> {
     /// Positional-only parameter, e.g. `def f(x, /): ...`
     PositionalOnly { default_ty: Option<Type<'db>> },

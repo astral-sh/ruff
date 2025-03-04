@@ -56,12 +56,12 @@ use crate::symbol::{
 };
 use crate::types::call::{Argument, CallArguments, UnionCallError};
 use crate::types::diagnostic::{
-    report_invalid_arguments_to_annotated, report_invalid_assignment,
-    report_invalid_attribute_assignment, report_unresolved_module, TypeCheckDiagnostics,
-    CALL_NON_CALLABLE, CALL_POSSIBLY_UNBOUND_METHOD, CONFLICTING_DECLARATIONS,
-    CONFLICTING_METACLASS, CYCLIC_CLASS_DEFINITION, DIVISION_BY_ZERO, DUPLICATE_BASE,
-    INCONSISTENT_MRO, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE, INVALID_CONTEXT_MANAGER,
-    INVALID_DECLARATION, INVALID_PARAMETER_DEFAULT, INVALID_TYPE_FORM,
+    report_invalid_arguments_to_annotated, report_invalid_arguments_to_callable,
+    report_invalid_assignment, report_invalid_attribute_assignment, report_unresolved_module,
+    TypeCheckDiagnostics, CALL_NON_CALLABLE, CALL_POSSIBLY_UNBOUND_METHOD,
+    CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS, CYCLIC_CLASS_DEFINITION, DIVISION_BY_ZERO,
+    DUPLICATE_BASE, INCONSISTENT_MRO, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE,
+    INVALID_CONTEXT_MANAGER, INVALID_DECLARATION, INVALID_PARAMETER_DEFAULT, INVALID_TYPE_FORM,
     INVALID_TYPE_VARIABLE_CONSTRAINTS, POSSIBLY_UNBOUND_ATTRIBUTE, POSSIBLY_UNBOUND_IMPORT,
     UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_IMPORT, UNSUPPORTED_OPERATOR,
 };
@@ -70,10 +70,12 @@ use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     class::MetaclassErrorKind, todo_type, Class, DynamicType, FunctionType, InstanceType,
     IntersectionBuilder, IntersectionType, KnownClass, KnownFunction, KnownInstanceType,
-    MetaclassCandidate, SliceLiteralType, SubclassOfType, Symbol, SymbolAndQualifiers, Truthiness,
-    TupleType, Type, TypeAliasType, TypeAndQualifiers, TypeArrayDisplay, TypeQualifiers,
-    TypeVarBoundOrConstraints, TypeVarInstance, UnionBuilder, UnionType,
+    MetaclassCandidate, Parameter, Parameters, SliceLiteralType, SubclassOfType, Symbol,
+    SymbolAndQualifiers, Truthiness, TupleType, Type, TypeAliasType, TypeAndQualifiers,
+    TypeArrayDisplay, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarInstance, UnionBuilder,
+    UnionType,
 };
+use crate::types::{CallableType, GeneralCallableType, ParameterKind, Signature};
 use crate::unpack::Unpack;
 use crate::util::subscript::{PyIndex, PySlice};
 use crate::Db;
@@ -5652,14 +5654,16 @@ impl<'db> TypeInferenceBuilder<'db> {
 
             // TODO: an Ellipsis literal *on its own* does not have any meaning in annotation
             // expressions, but is meaningful in the context of a number of special forms.
-            ast::Expr::EllipsisLiteral(_literal) => todo_type!(),
+            ast::Expr::EllipsisLiteral(_literal) => {
+                todo_type!("ellipsis literal in type expression")
+            }
 
             // Other literals do not have meaningful values in the annotation expression context.
             // However, we will we want to handle these differently when working with special forms,
             // since (e.g.) `123` is not valid in an annotation expression but `Literal[123]` is.
-            ast::Expr::BytesLiteral(_literal) => todo_type!(),
-            ast::Expr::NumberLiteral(_literal) => todo_type!(),
-            ast::Expr::BooleanLiteral(_literal) => todo_type!(),
+            ast::Expr::BytesLiteral(literal) => self.infer_bytes_literal_expression(literal),
+            ast::Expr::NumberLiteral(literal) => self.infer_number_literal_expression(literal),
+            ast::Expr::BooleanLiteral(literal) => self.infer_boolean_literal_expression(literal),
 
             ast::Expr::Subscript(subscript) => {
                 let ast::ExprSubscript {
@@ -6059,8 +6063,78 @@ impl<'db> TypeInferenceBuilder<'db> {
                 todo_type!("Generic PEP-695 type alias")
             }
             KnownInstanceType::Callable => {
-                self.infer_type_expression(arguments_slice);
-                todo_type!("Callable types")
+                let ast::Expr::Tuple(ast::ExprTuple {
+                    elts: arguments, ..
+                }) = arguments_slice
+                else {
+                    report_invalid_arguments_to_callable(self.db(), &self.context, subscript);
+
+                    // If it's not a tuple, defer it to inferring the parameter types which could
+                    // return an `Err` if the expression is invalid in that position as well.
+                    let Ok(parameters) = self.infer_callable_parameter_types(arguments_slice)
+                    else {
+                        // TODO: Should we just use `Unknown` instead?
+                        return Type::Callable(CallableType::General(
+                            GeneralCallableType::unknown(self.db()),
+                        ));
+                    };
+
+                    let callable_type =
+                        Type::Callable(CallableType::General(GeneralCallableType::new(
+                            self.db(),
+                            Signature::new(parameters, Some(Type::unknown())),
+                        )));
+
+                    // `Parameters` is not a `Type` variant, so we're storing the outer callable
+                    // type on the arguments slice instead.
+                    self.store_expression_type(arguments_slice, callable_type);
+
+                    return callable_type;
+                };
+
+                if arguments.len() > 2 {
+                    report_invalid_arguments_to_callable(self.db(), &self.context, subscript);
+                    self.infer_type_expression(arguments_slice);
+                    // We can't reliably infer the callable type if there are more then 2 arguments
+                    // because we don't know which argument corresponds to either the parameters or
+                    // the return type.
+                    return Type::unknown();
+                }
+
+                let mut arguments = arguments.iter();
+
+                let Some(first_argument) = arguments.next() else {
+                    report_invalid_arguments_to_callable(self.db(), &self.context, subscript);
+                    self.infer_type_expression(arguments_slice);
+                    return Type::Callable(CallableType::General(GeneralCallableType::unknown(
+                        self.db(),
+                    )));
+                };
+
+                let Ok(parameters) = self.infer_callable_parameter_types(first_argument) else {
+                    // TODO: Should we just use `Unknown` instead?
+                    return Type::Callable(CallableType::General(GeneralCallableType::unknown(
+                        self.db(),
+                    )));
+                };
+
+                let return_type = match arguments.next() {
+                    Some(second_argument) => self.infer_type_expression(second_argument),
+                    None => {
+                        // TODO: We could attach a note stating that it's the return type that's
+                        // missing.
+                        report_invalid_arguments_to_callable(self.db(), &self.context, subscript);
+                        Type::unknown()
+                    }
+                };
+
+                let ty = Type::Callable(CallableType::General(GeneralCallableType::new(
+                    self.db(),
+                    Signature::new(parameters, Some(return_type)),
+                )));
+                self.store_expression_type(arguments_slice, ty);
+                self.store_expression_type(first_argument, ty);
+                ty
             }
 
             // Type API special forms
@@ -6308,6 +6382,87 @@ impl<'db> TypeInferenceBuilder<'db> {
             _ => {
                 self.infer_expression(parameters);
                 return Err(vec![parameters]);
+            }
+        })
+    }
+
+    /// Infer the first argument to a `typing.Callable` type expression and returns the
+    /// corresponding [`Parameters`].
+    ///
+    /// It returns an [`Err`] if the argument is invalid i.e., not a list of types, parameter
+    /// specification, `typing.Concatenate`, or `...`.
+    fn infer_callable_parameter_types(
+        &mut self,
+        parameters: &ast::Expr,
+    ) -> Result<Parameters<'db>, ()> {
+        Ok(match parameters {
+            ast::Expr::EllipsisLiteral(ast::ExprEllipsisLiteral { .. }) => Parameters::any(),
+            ast::Expr::List(ast::ExprList { elts: params, .. }) => {
+                let mut parameter_types = Vec::with_capacity(params.len());
+
+                // Whether to infer `Todo` for the parameters
+                let mut return_todo = false;
+
+                for param in params {
+                    let param_type = match self.infer_type_expression(param) {
+                        param_type @ (Type::IntLiteral(_)
+                        | Type::StringLiteral(_)
+                        | Type::BytesLiteral(_)
+                        | Type::BooleanLiteral(_)) => {
+                            self.context.report_lint(
+                                &INVALID_TYPE_FORM,
+                                param,
+                                format_args!(
+                                    "Invalid type `{}` in parameter list",
+                                    param_type.display(self.db())
+                                ),
+                            );
+                            Type::unknown()
+                        }
+                        param_type => param_type,
+                    };
+                    // This is similar to what we currently do for inferring tuple type expression.
+                    // We currently infer `Todo` for the parameters to avoid invalid diagnostics
+                    // when trying to check for assignability or any other relation. For example,
+                    // `*tuple[int, str]`, `Unpack[]`, etc. are not yet supported.
+                    return_todo |= param_type.is_todo()
+                        && matches!(param, ast::Expr::Starred(_) | ast::Expr::Subscript(_));
+                    parameter_types.push(param_type);
+                }
+
+                if return_todo {
+                    // TODO: `Unpack`
+                    Parameters::todo()
+                } else {
+                    Parameters::new(parameter_types.iter().map(|param_type| {
+                        Parameter::new(
+                            None,
+                            Some(*param_type),
+                            ParameterKind::PositionalOnly { default_ty: None },
+                        )
+                    }))
+                }
+            }
+            ast::Expr::Subscript(_) => {
+                // TODO: Support `Concatenate[...]`
+                Parameters::todo()
+            }
+            ast::Expr::Name(_) => {
+                // TODO: Parameter specification
+                Parameters::todo()
+            }
+            _ => {
+                self.context.report_lint(
+                    &INVALID_TYPE_FORM,
+                    parameters,
+                    format_args!(
+                        "The first argument to `{}` must be either a list of types, parameter specification, `{}`, or `...`",
+                        KnownInstanceType::Callable.repr(self.db()),
+                        KnownInstanceType::Concatenate.repr(self.db())
+                    ),
+                );
+                self.infer_type_expression(parameters);
+                return Err(());
             }
         })
     }
