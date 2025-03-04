@@ -32,40 +32,6 @@ If we set `TYPE_CHECKING = False` directly instead of importing it from the `typ
 still be treated as `True` during type checking. This behavior is for compatibility with other major
 type checkers, e.g. mypy and pyright.
 
-Only `False` is allowed to be assigned to `TYPE_CHECKING`, and any assignment other than `False`
-will result in an error.
-
-`constants.py`:
-
-```py
-TYPE_CHECKING = False
-
-# error: [invalid-type-checking-constant]
-TYPE_CHECKING = True
-# error: [invalid-type-checking-constant]
-TYPE_CHECKING: bool = True
-# error: [invalid-type-checking-constant]
-TYPE_CHECKING: int = 1
-# error: [invalid-assignment]
-TYPE_CHECKING: str = False
-
-TYPE_CHECKING: object = False
-reveal_type(TYPE_CHECKING)  # revealed: Literal[True]
-```
-
-`stub.pyi`:
-
-```pyi
-TYPE_CHECKING: bool
-```
-
-`invalid_stub.pyi`:
-
-```pyi
-# error: [invalid-assignment]
-TYPE_CHECKING: str
-```
-
 ```py
 TYPE_CHECKING = False
 reveal_type(TYPE_CHECKING)  # revealed: Literal[True]
@@ -80,12 +46,36 @@ reveal_type(type_checking)  # revealed: Literal[True]
 reveal_type(runtime)  # revealed: Unknown
 ```
 
+We can also define `TYPE_CHECKING` with a type annotation. The type must be one to which `False` can
+be assigned. Even in this case, the type of `TYPE_CHECKING` is still inferred to be `Literal[True]`.
+
+```py
+TYPE_CHECKING: object = False
+reveal_type(TYPE_CHECKING)  # revealed: Literal[True]
+if TYPE_CHECKING:
+    type_checking = True
+if not TYPE_CHECKING:
+    runtime = True
+
+reveal_type(type_checking)  # revealed: Literal[True]
+# error: [unresolved-reference]
+reveal_type(runtime)  # revealed: Unknown
+```
+
 ### Importing user-defined `TYPE_CHECKING`
 
 `constants.py`:
 
 ```py
 TYPE_CHECKING = False
+```
+
+`stub.pyi`:
+
+```pyi
+TYPE_CHECKING: bool
+# or
+TYPE_CHECKING: bool = ...
 ```
 
 ```py
@@ -97,6 +87,40 @@ reveal_type(TYPE_CHECKING)  # revealed: Literal[True]
 from stub import TYPE_CHECKING
 
 reveal_type(TYPE_CHECKING)  # revealed: Literal[True]
+```
+
+### Invalid assignment to `TYPE_CHECKING`
+
+Only `False` is allowed to be assigned to `TYPE_CHECKING`, and any assignment other than `False`
+will result in an error.
+
+```py
+# error: [invalid-type-checking-constant]
+TYPE_CHECKING = True
+# error: [invalid-type-checking-constant]
+TYPE_CHECKING: bool = True
+# error: [invalid-type-checking-constant]
+TYPE_CHECKING: int = 1
+# error: [invalid-assignment]
+TYPE_CHECKING: str = False
+```
+
+`invalid_stub.pyi`:
+
+```pyi
+from typing import Literal
+
+# error: [invalid-type-checking-constant]
+TYPE_CHECKING: str
+
+# error: [invalid-assignment]
+TYPE_CHECKING: str = False
+
+# error: [invalid-type-checking-constant]
+TYPE_CHECKING: object = "str"
+
+# error: [invalid-type-checking-constant]
+TYPE_CHECKING: Literal[False] = ...
 ```
 
 ### `typing_extensions` re-export

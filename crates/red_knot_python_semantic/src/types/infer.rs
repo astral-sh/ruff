@@ -2223,15 +2223,21 @@ impl<'db> TypeInferenceBuilder<'db> {
             .as_name_expr()
             .is_some_and(|name| &name.id == "TYPE_CHECKING")
         {
-            if !self.in_stub()
-                && !matches!(
-                    value
+            if !matches!(
+                value
+                    .as_ref()
+                    .and_then(|value| value.as_boolean_literal_expr()),
+                Some(ast::ExprBooleanLiteral { value: false, .. })
+            ) {
+                if !self.in_stub()
+                    || !value
                         .as_ref()
-                        .and_then(|value| value.as_boolean_literal_expr()),
-                    Some(ast::ExprBooleanLiteral { value: false, .. })
-                )
-            {
-                report_invalid_type_checking_constant(&self.context, assignment.into());
+                        .is_none_or(|value| value.is_ellipsis_literal_expr())
+                    || !Type::BooleanLiteral(true)
+                        .is_assignable_to(self.db(), declared_ty.inner_type())
+                {
+                    report_invalid_type_checking_constant(&self.context, assignment.into());
+                }
             } else if !Type::BooleanLiteral(true)
                 .is_assignable_to(self.db(), declared_ty.inner_type())
             {
