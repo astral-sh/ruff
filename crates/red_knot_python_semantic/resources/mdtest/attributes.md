@@ -714,8 +714,8 @@ from typing import Any, Literal
 def _(flag: bool):
     class Meta(type):
         meta_class_attribute_1: Literal["value in meta class"] = "value in meta class"
-        meta_class_attribute_2: Any = "value in meta class"
-        meta_class_attribute_3: Any = "value in meta class"
+        meta_class_attribute_2: Literal["value in meta class"] = "value in meta class"
+        meta_class_attribute_3: Literal["value in meta class"] = "value in meta class"
 
         if flag:
             meta_class_attribute_4: Literal["possible value in meta class"] = "possible value in meta class"
@@ -728,7 +728,7 @@ def _(flag: bool):
 
     reveal_type(C.meta_class_attribute_1)  # revealed: Literal["value in meta class"]
     reveal_type(C.meta_class_attribute_2)  # revealed: Literal["value in class body"]
-    reveal_type(C.meta_class_attribute_3)  # revealed: Literal["value in class body"] | Any
+    reveal_type(C.meta_class_attribute_3)  # revealed: Literal["value in class body", "value in meta class"]
     # error: [possibly-unbound-attribute]
     reveal_type(C.meta_class_attribute_4)  # revealed: Literal["possible value in meta class"]
 ```
@@ -745,14 +745,37 @@ def _(flag: bool):
         class C1:
             x = 2
 
+    reveal_type(C1.x)  # revealed: Unknown | Literal[1, 2]
+
     class C2:
         if flag:
             x = 3
         else:
             x = 4
 
-    reveal_type(C1.x)  # revealed: Unknown | Literal[1, 2]
     reveal_type(C2.x)  # revealed: Unknown | Literal[3, 4]
+
+    if flag:
+        class Meta3(type):
+            x = 1
+
+    else:
+        class Meta3(type):
+            x = 2
+
+    class C3(metaclass=Meta3): ...
+    # TODO: should be Unknown | Literal[1, 2]
+    reveal_type(C3.x)  # revealed: Unknown
+
+    class Meta4(type):
+        if flag:
+            x = 1
+        else:
+            x = 2
+
+    class C3(metaclass=Meta4): ...
+    # TODO: should be Unknown | Literal[1, 2]
+    reveal_type(C3.x)  # revealed: Unknown
 ```
 
 ## Inherited class attributes

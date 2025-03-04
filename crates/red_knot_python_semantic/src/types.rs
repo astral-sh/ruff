@@ -1361,6 +1361,8 @@ impl<'db> Type<'db> {
 
     #[must_use]
     fn class_member(&self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
+        let _span = tracing::trace_span!("class_member", self=%self.display(db), name).entered();
+
         match self {
             Type::Union(union) => {
                 union.map_with_boundness_and_qualifiers(db, |elem| elem.class_member(db, name))
@@ -1381,6 +1383,16 @@ impl<'db> Type<'db> {
             tracing::trace_span!("find_name_in_mro", self=%self.display(db), name).entered();
 
         match self {
+            Type::Union(union) => Some(union.map_with_boundness_and_qualifiers(db, |elem| {
+                elem.find_name_in_mro(db, name)
+                    .unwrap_or(Symbol::Unbound.into()) // TODO
+            })),
+            Type::Intersection(inter) => {
+                Some(inter.map_with_boundness_and_qualifiers(db, |elem| {
+                    elem.find_name_in_mro(db, name)
+                        .unwrap_or(Symbol::Unbound.into()) // TODO
+                }))
+            }
             Type::Never => Some(Symbol::bound(Type::Never).into()),
             Type::ClassLiteral(ClassLiteralType { class })
                 if class.is_known(db, KnownClass::FunctionType) && name == "__get__" =>
@@ -1829,6 +1841,7 @@ impl<'db> Type<'db> {
                     }
                     Symbol::Type(class_attr_ty, class_attr_boundness) => {
                         let meta_type = self.to_meta_type(db);
+                        // TODO: handle unions of meta attributes
                         let meta_attribute = self.class_member(db, name).0;
                         let (meta_attr_resolved, meta_is_data_descriptor) =
                             if let Symbol::Type(meta_attribute_ty, meta_attribute_boundness) =
