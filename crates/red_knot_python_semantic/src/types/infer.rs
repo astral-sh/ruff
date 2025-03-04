@@ -1625,8 +1625,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                 TargetKind::Sequence(unpack) => {
                     let unpacked = infer_unpack_types(self.db(), unpack);
                     let name_ast_id = name.scoped_expression_id(self.db(), self.scope());
-                    // TODO: only if first: true (also learn what that means)
-                    self.context.extend(unpacked);
+                    if with_item.is_first() {
+                        self.context.extend(unpacked);
+                    }
                     unpacked.expression_type(name_ast_id)
                 }
                 TargetKind::Name => self.infer_context_expression(

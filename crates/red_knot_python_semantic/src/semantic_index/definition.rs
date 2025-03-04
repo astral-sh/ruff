@@ -205,6 +205,7 @@ pub(crate) struct WithItemDefinitionNodeRef<'a> {
     pub(crate) unpack: Option<Unpack<'a>>,
     pub(crate) context_expr: &'a ast::Expr,
     pub(crate) name: &'a ast::ExprName,
+    pub(crate) first: bool,
     pub(crate) is_async: bool,
 }
 
@@ -328,11 +329,13 @@ impl<'db> DefinitionNodeRef<'db> {
                 unpack,
                 context_expr,
                 name,
+                first,
                 is_async,
             }) => DefinitionKind::WithItem(WithItemDefinitionKind {
                 target: TargetKind::from(unpack),
                 context_expr: AstNodeRef::new(parsed.clone(), context_expr),
                 name: AstNodeRef::new(parsed, name),
+                first,
                 is_async,
             }),
             DefinitionNodeRef::MatchPattern(MatchPatternDefinitionNodeRef {
@@ -400,6 +403,7 @@ impl<'db> DefinitionNodeRef<'db> {
             Self::WithItem(WithItemDefinitionNodeRef {
                 unpack: _,
                 context_expr: _,
+                first: _,
                 is_async: _,
                 name,
             }) => name.into(),
@@ -697,6 +701,7 @@ pub struct WithItemDefinitionKind<'db> {
     target: TargetKind<'db>,
     context_expr: AstNodeRef<ast::Expr>,
     name: AstNodeRef<ast::ExprName>,
+    first: bool,
     is_async: bool,
 }
 
@@ -711,6 +716,10 @@ impl<'db> WithItemDefinitionKind<'db> {
 
     pub(crate) fn name(&self) -> &ast::ExprName {
         self.name.node()
+    }
+
+    pub(crate) const fn is_first(&self) -> bool {
+        self.first
     }
 
     pub(crate) const fn is_async(&self) -> bool {
