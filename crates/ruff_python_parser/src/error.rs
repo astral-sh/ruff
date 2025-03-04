@@ -478,19 +478,25 @@ pub enum UnsupportedSyntaxErrorKind {
     /// [PEP 695]: https://peps.python.org/pep-0695/
     /// [`typing.TypeVar`]: https://docs.python.org/3/library/typing.html#typevar
     TypeParameterList,
+    TypeAliasStatement,
+    TypeParamDefault,
 }
 
 impl Display for UnsupportedSyntaxError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let kind = match self.kind {
-            UnsupportedSyntaxErrorKind::Match => "`match` statement",
-            UnsupportedSyntaxErrorKind::Walrus => "named assignment expression (`:=`)",
-            UnsupportedSyntaxErrorKind::ExceptStar => "`except*`",
-            UnsupportedSyntaxErrorKind::TypeParameterList => "type parameter lists",
+            UnsupportedSyntaxErrorKind::Match => "Cannot use `match` statement",
+            UnsupportedSyntaxErrorKind::Walrus => "Cannot use named assignment expression (`:=`)",
+            UnsupportedSyntaxErrorKind::ExceptStar => "Cannot use `except*`",
+            UnsupportedSyntaxErrorKind::TypeParameterList => "Cannot use type parameter lists",
+            UnsupportedSyntaxErrorKind::TypeAliasStatement => "Cannot use `type` alias statement",
+            UnsupportedSyntaxErrorKind::TypeParamDefault => {
+                "Cannot set default type for a type parameter"
+            }
         };
         write!(
             f,
-            "Cannot use {kind} on Python {} (syntax was added in Python {})",
+            "{kind} on Python {} (syntax was added in Python {})",
             self.target_version,
             self.kind.minimum_version(),
         )
@@ -505,6 +511,8 @@ impl UnsupportedSyntaxErrorKind {
             UnsupportedSyntaxErrorKind::Walrus => PythonVersion::PY38,
             UnsupportedSyntaxErrorKind::ExceptStar => PythonVersion::PY311,
             UnsupportedSyntaxErrorKind::TypeParameterList => PythonVersion::PY312,
+            UnsupportedSyntaxErrorKind::TypeAliasStatement => PythonVersion::PY312,
+            UnsupportedSyntaxErrorKind::TypeParamDefault => PythonVersion::PY313,
         }
     }
 }

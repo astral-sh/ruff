@@ -123,7 +123,20 @@ def f():
         yield x, y, x + y
 
 
-# https://github.com/astral-sh/ruff/issues/15540
 def f():
-    for a in 1,:
-        yield a
+    global some_global
+
+    for element in iterable:
+        some_global = element
+        yield some_global
+
+
+def f():
+    some_nonlocal = 1
+    
+    def g():
+        nonlocal some_nonlocal
+        
+        for element in iterable:
+            some_nonlocal = element
+            yield some_nonlocal

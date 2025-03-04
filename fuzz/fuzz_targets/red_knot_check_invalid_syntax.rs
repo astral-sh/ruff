@@ -135,7 +135,7 @@ fn do_fuzz(case: &[u8]) -> Corpus {
     };
 
     let parsed = parse_unchecked(code, ParseOptions::from(Mode::Module));
-    if parsed.is_valid() {
+    if parsed.has_valid_syntax() {
         return Corpus::Reject;
     }
 
