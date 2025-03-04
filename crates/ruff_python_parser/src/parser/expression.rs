@@ -1709,23 +1709,7 @@ impl<'src> Parser<'src> {
                     ))
                 }
             }
-            _ => {
-                // test_err unparenthesized_walrus_set_literal_py39
-                // # parse_options: {"target-version": "3.9"}
-                // {x := 1, 2, 3}
-                // {1, x := 2, 3}
-                // {1, 2, x := 3}
-
-                if key_or_element.is_unparenthesized_named_expr() {
-                    self.add_unsupported_syntax_error(
-                        UnsupportedSyntaxErrorKind::UnparenthesizedNamedExpr(
-                            UnparenthesizedNamedExprKind::SetLiteral,
-                        ),
-                        key_or_element.range(),
-                    );
-                }
-                Expr::Set(self.parse_set_expression(key_or_element.expr, start))
-            }
+            _ => Expr::Set(self.parse_set_expression(key_or_element, start)),
         }
     }
 
@@ -1875,12 +1859,27 @@ impl<'src> Parser<'src> {
     /// Parses a set expression.
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#set-displays>
-    fn parse_set_expression(&mut self, first_element: Expr, start: TextSize) -> ast::ExprSet {
+    fn parse_set_expression(&mut self, first_element: ParsedExpr, start: TextSize) -> ast::ExprSet {
         if !self.at_sequence_end() {
             self.expect(TokenKind::Comma);
         }
 
-        let mut elts = vec![first_element];
+        // test_err unparenthesized_walrus_set_literal_py39
+        // # parse_options: {"target-version": "3.9"}
+        // {x := 1, 2, 3}
+        // {1, x := 2, 3}
+        // {1, 2, x := 3}
+
+        if first_element.is_unparenthesized_named_expr() {
+            self.add_unsupported_syntax_error(
+                UnsupportedSyntaxErrorKind::UnparenthesizedNamedExpr(
+                    UnparenthesizedNamedExprKind::SetLiteral,
+                ),
+                first_element.range(),
+            );
+        }
+
+        let mut elts = vec![first_element.expr];
 
         self.parse_comma_separated_list(RecoveryContextKind::SetElements, |parser| {
             let parsed_expr =
