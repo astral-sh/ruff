@@ -133,7 +133,7 @@ reveal_type(C.non_data_descriptor)  # revealed: Unknown | Literal["non-data"]
 C.data_descriptor = "something else"  # This is okay
 ```
 
-## Possibly unbound descriptors, unions with other attributes
+## Possibly unbound descriptors
 
 ```py
 class DataDescriptor:
@@ -164,34 +164,93 @@ def _(flag: bool):
 
     # error: [possibly-unbound-attribute] "Attribute `data` on type `PossiblyUnbound` is possibly unbound"
     reveal_type(PossiblyUnbound().data)  # revealed: int
+```
 
-    class UnionWithClassAttribute:
-        if flag:
-            non_data: NonDataDescriptor = NonDataDescriptor()
-            data: DataDescriptor = DataDescriptor()
-        else:
-            non_data: str = "a"
-            data: str = "a"
+## Unions of descriptors and non-descriptor attributes
 
-    reveal_type(UnionWithClassAttribute.non_data)  # revealed: int | str
-    reveal_type(UnionWithClassAttribute.data)  # revealed: int | str
-    reveal_type(UnionWithClassAttribute().non_data)  # revealed: int | str
-    reveal_type(UnionWithClassAttribute().data)  # revealed: int | str
+```py
+from typing import Literal
 
-    class UnionWithInstanceAttribute:
-        if flag:
-            non_data: NonDataDescriptor = NonDataDescriptor()
-            data: DataDescriptor = DataDescriptor()
+def _(flag1: bool, flag2: bool, flag3: bool, flag4: bool, flag5: bool, flag6: bool, flag7: bool, flag8: bool):
+    if flag1:
+        class Descriptor:
+            if flag2:
+                def __get__(self, instance: object, owner: type | None = None) -> Literal[1]:
+                    return 1
+            else:
+                def __get__(self, instance: object, owner: type | None = None) -> Literal[2]:
+                    return 2
 
-        def f(self):
-            self.non_data: str = "a"
-            self.data: str = "a"
+    else:
+        class Descriptor:
+            def __get__(self, instance: object, owner: type | None = None) -> Literal[3]:
+                return 3
 
-    # error: [possibly-unbound-attribute] "Attribute `non_data` on type `UnionWithInstanceAttribute` is possibly unbound"
-    reveal_type(UnionWithInstanceAttribute().non_data)  # revealed: int | str
+    class OtherDescriptor:
+        def __get__(self, instance: object, owner: type | None = None) -> Literal[4]:
+            return 4
 
-    # error: [possibly-unbound-attribute] "Attribute `data` on type `UnionWithInstanceAttribute` is possibly unbound"
-    reveal_type(UnionWithInstanceAttribute().data)  # revealed: int | str
+    if flag4:
+        class C:
+            if flag5:
+                x: Descriptor | OtherDescriptor = Descriptor() if flag6 else OtherDescriptor()
+            else:
+                x: Literal[5] = 5
+
+    else:
+        class C:
+            if flag7:
+                x: Literal[6] = 6
+            else:
+                def __init__(self):
+                    self.x: Literal[7] = 7
+
+    class OtherC:
+        x: Literal[8] = 8
+
+    c = C() if flag8 else OtherC()
+
+    # error: [possibly-unbound-attribute]
+    reveal_type(c.x)  # revealed: Literal[1, 2, 3, 4, 5, 6, 7, 8]
+```
+
+## Recursive descriptors
+
+The descriptor protocol is recursive, i.e. looking up `__get__` can involve triggering the
+descriptor protocol on the callable:
+
+```py
+class ReturnedCallable2:
+    def __call__(self, descriptor: Descriptor1, instance: None, owner: type[C]) -> int:
+        return 1
+
+class ReturnedCallable1:
+    def __call__(self, descriptor: Descriptor2, instance: Callable1, owner: type[Callable1]) -> ReturnedCallable2:
+        return ReturnedCallable2()
+
+class Callable3:
+    def __call__(self, descriptor: Descriptor3, instance: Callable2, owner: type[Callable2]) -> ReturnedCallable1:
+        return ReturnedCallable1()
+
+class Descriptor3:
+    __get__: Callable3 = Callable3()
+
+class Callable2:
+    __call__: Descriptor3 = Descriptor3()
+
+class Descriptor2:
+    __get__: Callable2 = Callable2()
+
+class Callable1:
+    __call__: Descriptor2 = Descriptor2()
+
+class Descriptor1:
+    __get__: Callable1 = Callable1()
+
+class C:
+    d: Descriptor1 = Descriptor1()
+
+reveal_type(C.d)  # revealed: int
 ```
 
 ## Descriptor protocol for class objects
@@ -522,12 +581,20 @@ class TailoredForInstanceAccess:
     def __get__(self, instance: C, owner: type[C] | None = None) -> str:
         return "a"
 
-class C:
+class TailoredForMetaClassAccess:
+    def __get__(self, instance: type[C], owner: type[Meta]) -> bytes:
+        return b"a"
+
+class Meta(type):
+    meta_class_access: TailoredForMetaClassAccess = TailoredForMetaClassAccess()
+
+class C(metaclass=Meta):
     class_object_access: TailoredForClassObjectAccess = TailoredForClassObjectAccess()
     instance_access: TailoredForInstanceAccess = TailoredForInstanceAccess()
 
 reveal_type(C.class_object_access)  # revealed: int
 reveal_type(C().instance_access)  # revealed: str
+reveal_type(C.meta_class_access)  # revealed: bytes
 
 # TODO: These should emit a diagnostic
 reveal_type(C().class_object_access)  # revealed: TailoredForClassObjectAccess

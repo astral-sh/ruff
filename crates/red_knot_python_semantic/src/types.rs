@@ -1622,9 +1622,7 @@ impl<'db> Type<'db> {
         )
         .entered();
 
-        let instance = self;
-
-        match instance {
+        match self {
             Type::Union(union) => union.map_with_boundness_and_qualifiers(db, |elem| {
                 elem.run_descriptor_protocol_instances(db, name, class_attr.clone(), owner)
             }),
@@ -1636,38 +1634,38 @@ impl<'db> Type<'db> {
                 let class_attr_qualifiers = class_attr.1;
 
                 match class_attr.0 {
-                    // This branch is not strictly needed, but it short-circuits the lookup
-                    // of various dunder methods and calls that would otherwise be made.
-                    Symbol::Type(Type::Dynamic(_), _) => class_attr,
-
                     Symbol::Type(Type::Union(union), boundness) => SymbolAndQualifiers(
                         union.map_with_boundness(db, |elem| {
-                            instance
-                                .run_descriptor_protocol_instances(
+                            self.run_descriptor_protocol_instances(
+                                db,
+                                name,
+                                Symbol::Type(*elem, boundness).into(),
+                                owner,
+                            )
+                            .0
+                        }),
+                        class_attr_qualifiers,
+                    ),
+
+                    Symbol::Type(Type::Intersection(intersection), boundness) => {
+                        SymbolAndQualifiers(
+                            intersection.map_with_boundness(db, |elem| {
+                                self.run_descriptor_protocol_instances(
                                     db,
                                     name,
                                     Symbol::Type(*elem, boundness).into(),
                                     owner,
                                 )
                                 .0
-                        }),
-                        class_attr_qualifiers,
-                    ),
-                    Symbol::Type(Type::Intersection(intersection), boundness) => {
-                        SymbolAndQualifiers(
-                            intersection.map_with_boundness(db, |elem| {
-                                instance
-                                    .run_descriptor_protocol_instances(
-                                        db,
-                                        name,
-                                        Symbol::Type(*elem, boundness).into(),
-                                        owner,
-                                    )
-                                    .0
                             }),
                             class_attr_qualifiers,
                         )
                     }
+
+                    // This branch is not strictly needed, but it short-circuits the lookup
+                    // of various dunder methods and calls that would otherwise be made.
+                    Symbol::Type(Type::Dynamic(_), _) => class_attr,
+
                     Symbol::Type(class_attr_ty, class_attr_boundness) => {
                         let class_attr_meta_ty = class_attr_ty.to_meta_type(db);
 
@@ -1681,11 +1679,7 @@ impl<'db> Type<'db> {
                                 let return_ty = descr_get
                                     .try_call(
                                         db,
-                                        &CallArguments::positional([
-                                            class_attr_ty,
-                                            instance,
-                                            owner,
-                                        ]),
+                                        &CallArguments::positional([class_attr_ty, self, owner]),
                                     )
                                     .map(|outcome| Some(outcome.return_type(db)))
                                     .unwrap_or(None);
@@ -1700,7 +1694,7 @@ impl<'db> Type<'db> {
                                 (None, false)
                             };
 
-                        let instance_variable = instance.instance_variable(db, name);
+                        let instance_variable = self.instance_variable(db, name);
 
                         tracing::trace!("instance_variable = {:?}", instance_variable);
 
@@ -1771,7 +1765,7 @@ impl<'db> Type<'db> {
                             (None, _, Symbol::Unbound) => class_attr,
                         }
                     }
-                    Symbol::Unbound => instance.instance_variable(db, name),
+                    Symbol::Unbound => self.instance_variable(db, name),
                 }
             }
         }
@@ -1797,8 +1791,6 @@ impl<'db> Type<'db> {
         )
         .entered();
 
-        // TODO: Handle possible-unboundness and errors from `__get__` calls.
-
         match self {
             Type::Union(union) => union.map_with_boundness_and_qualifiers(db, |elem| {
                 elem.run_descriptor_protocol_classes(db, name, class_attr.clone())
@@ -1811,10 +1803,6 @@ impl<'db> Type<'db> {
                 let class_attr_qualifiers = class_attr.1;
 
                 match class_attr.0 {
-                    // This branch is not strictly needed, but it short-circuits the lookup
-                    // of various dunder methods and calls that would otherwise be made.
-                    Symbol::Type(Type::Dynamic(_), _) => class_attr,
-
                     Symbol::Type(Type::Union(union), boundness) => SymbolAndQualifiers(
                         union.map_with_boundness(db, |elem| {
                             self.run_descriptor_protocol_classes(
@@ -1826,6 +1814,7 @@ impl<'db> Type<'db> {
                         }),
                         class_attr_qualifiers,
                     ),
+
                     Symbol::Type(Type::Intersection(intersection), boundness) => {
                         SymbolAndQualifiers(
                             intersection.map_with_boundness(db, |elem| {
@@ -1839,6 +1828,11 @@ impl<'db> Type<'db> {
                             class_attr_qualifiers,
                         )
                     }
+
+                    // This branch is not strictly needed, but it short-circuits the lookup
+                    // of various dunder methods and calls that would otherwise be made.
+                    Symbol::Type(Type::Dynamic(_), _) => class_attr,
+
                     Symbol::Type(class_attr_ty, class_attr_boundness) => {
                         let meta_type = self.to_meta_type(db);
                         // TODO: handle unions of meta attributes
