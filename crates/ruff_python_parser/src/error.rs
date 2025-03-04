@@ -500,7 +500,7 @@ impl Display for Change {
 impl UnsupportedSyntaxErrorKind {
     /// Returns the Python version when the syntax associated with this error was changed, and the
     /// type of [`Change`] (added or removed).
-    const fn changed_version(&self) -> (Change, PythonVersion) {
+    const fn changed_version(self) -> (Change, PythonVersion) {
         match self {
             UnsupportedSyntaxErrorKind::Match => (Change::Added, PythonVersion::PY310),
             UnsupportedSyntaxErrorKind::Walrus => (Change::Added, PythonVersion::PY38),
@@ -523,7 +523,7 @@ impl UnsupportedSyntaxErrorKind {
     /// assert!(UnsupportedSyntaxError::ParenthesizedKeywordArgumentName.is_unsupported(PythonVersion::PY38));
     /// assert!(!UnsupportedSyntaxError::ParenthesizedKeywordArgumentName.is_unsupported(PythonVersion::PY37));
     /// ```
-    pub(crate) fn is_unsupported(&self, target_version: PythonVersion) -> bool {
+    pub(crate) fn is_unsupported(self, target_version: PythonVersion) -> bool {
         let (_, version) = self.changed_version();
         match self {
             UnsupportedSyntaxErrorKind::Match
