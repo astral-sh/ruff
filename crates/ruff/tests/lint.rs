@@ -2123,7 +2123,7 @@ requires-python = ">= 3.11"
         ----- stderr -----
         [ruff::resolve][DEBUG] Using Ruff default settings
         [ruff_workspace::pyproject][DEBUG] Detected minimum supported `requires-python` version: 3.11
-        [ruff::resolve][DEBUG] Derived `target-version` from found `requires-python`
+        [ruff::resolve][DEBUG] Derived `target-version` from found `requires-python`: Py311
         "###);
     });
     Ok(())
@@ -2182,7 +2182,7 @@ from typing import Union;foo: Union[int, str] = 1
         [ruff::resolve][DEBUG] Using configuration file (via parent) at: [TMP]/ruff.toml
         [ruff_workspace::pyproject][DEBUG] No `target-version` found in `ruff.toml`
         [ruff_workspace::pyproject][DEBUG] Detected minimum supported `requires-python` version: 3.11
-        [ruff_workspace::pyproject][DEBUG] Derived `target-version` from `requires-python` in `pyproject.toml`
+        [ruff_workspace::pyproject][DEBUG] Derived `target-version` from `requires-python` in `pyproject.toml`: Py311
         [ruff::diagnostics][DEBUG] Checking: [TMP]/test.py
         "###);
     });
@@ -2247,7 +2247,7 @@ from typing import Union;foo: Union[int, str] = 1
         ----- stderr -----
         [ruff::resolve][DEBUG] Using Ruff default settings
         [ruff_workspace::pyproject][DEBUG] Detected minimum supported `requires-python` version: 3.11
-        [ruff::resolve][DEBUG] Derived `target-version` from found `requires-python`
+        [ruff::resolve][DEBUG] Derived `target-version` from found `requires-python`: Py311
         [ruff::diagnostics][DEBUG] Checking: [TMP]/foo/test.py
         "###);
     });
@@ -2407,7 +2407,7 @@ from typing import Union;foo: Union[int, str] = 1
         [ruff::resolve][DEBUG] Using configuration file (via parent) at: [TMP]/ruff.toml
         [ruff_workspace::pyproject][DEBUG] No `target-version` found in `ruff.toml`
         [ruff_workspace::pyproject][DEBUG] Detected minimum supported `requires-python` version: 3.9
-        [ruff_workspace::pyproject][DEBUG] Derived `target-version` from `requires-python` in `pyproject.toml`
+        [ruff_workspace::pyproject][DEBUG] Derived `target-version` from `requires-python` in `pyproject.toml`: Py39
         [ruff::diagnostics][DEBUG] Checking: [TMP]/test.py
         "###);
     });
