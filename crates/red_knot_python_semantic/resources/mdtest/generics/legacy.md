@@ -1,5 +1,9 @@
 # Legacy type variables
 
+The tests in this file focus on how type variables are defined using the legacy notation. Most
+_uses_ of type variables are tested in other files in this directory; we do not duplicate every test
+for both type variable syntaxes.
+
 Unless otherwise specified, all quotations come from the [Generics][] section of the typing spec.
 
 [Generics]: https://typing.readthedocs.io/en/latest/spec/generics.html
