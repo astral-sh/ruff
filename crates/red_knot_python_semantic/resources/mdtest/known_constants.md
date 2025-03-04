@@ -32,12 +32,6 @@ If we set `TYPE_CHECKING = False` directly instead of importing it from the `typ
 still be treated as `True` during type checking. This behavior is for compatibility with other major
 type checkers, e.g. mypy and pyright.
 
-`constants.py`:
-
-```py
-TYPE_CHECKING = False
-```
-
 ```py
 TYPE_CHECKING = False
 reveal_type(TYPE_CHECKING)  # revealed: Literal[True]
@@ -50,7 +44,17 @@ if not TYPE_CHECKING:
 reveal_type(type_checking)  # revealed: Literal[True]
 # error: [unresolved-reference]
 reveal_type(runtime)  # revealed: Unknown
+```
 
+### Importing user-defined `TYPE_CHECKING`
+
+`constants.py`:
+
+```py
+TYPE_CHECKING = False
+```
+
+```py
 from constants import TYPE_CHECKING
 
 # constants.TYPE_CHECKING is modifiable, but it is still treated as True.
