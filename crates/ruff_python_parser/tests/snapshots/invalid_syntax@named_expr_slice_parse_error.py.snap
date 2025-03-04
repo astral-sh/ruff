@@ -1,6 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
-input_file: crates/ruff_python_parser/resources/inline/err/walrus_slice_parse_error.py
+input_file: crates/ruff_python_parser/resources/inline/err/named_expr_slice_parse_error.py
 ---
 ## AST
 

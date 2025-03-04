@@ -1,6 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
-input_file: crates/ruff_python_parser/resources/inline/err/unparenthesized_walrus_set_literal_py39.py
+input_file: crates/ruff_python_parser/resources/inline/err/unparenthesized_named_expr_set_literal_py39.py
 ---
 ## AST
 

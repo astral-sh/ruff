@@ -1,20 +1,20 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
-input_file: crates/ruff_python_parser/resources/inline/ok/unparenthesized_walrus_py310.py
+input_file: crates/ruff_python_parser/resources/inline/ok/parenthesized_named_expr_py39.py
 ---
 ## AST
 
 ```
 Module(
     ModModule {
-        range: 0..89,
+        range: 0..92,
         body: [
             Expr(
                 StmtExpr {
-                    range: 44..58,
+                    range: 43..59,
                     value: Set(
                         ExprSet {
-                            range: 44..58,
+                            range: 43..59,
                             elts: [
                                 Named(
                                     ExprNamed {
@@ -38,7 +38,7 @@ Module(
                                 ),
                                 NumberLiteral(
                                     ExprNumberLiteral {
-                                        range: 53..54,
+                                        range: 54..55,
                                         value: Int(
                                             2,
                                         ),
@@ -46,7 +46,7 @@ Module(
                                 ),
                                 NumberLiteral(
                                     ExprNumberLiteral {
-                                        range: 56..57,
+                                        range: 57..58,
                                         value: Int(
                                             3,
                                         ),
@@ -59,23 +59,23 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 59..88,
+                    range: 60..91,
                     value: SetComp(
                         ExprSetComp {
-                            range: 59..88,
+                            range: 60..91,
                             elt: Named(
                                 ExprNamed {
-                                    range: 60..69,
+                                    range: 62..71,
                                     target: Name(
                                         ExprName {
-                                            range: 60..64,
+                                            range: 62..66,
                                             id: Name("last"),
                                             ctx: Store,
                                         },
                                     ),
                                     value: Name(
                                         ExprName {
-                                            range: 68..69,
+                                            range: 70..71,
                                             id: Name("x"),
                                             ctx: Load,
                                         },
@@ -84,30 +84,30 @@ Module(
                             ),
                             generators: [
                                 Comprehension {
-                                    range: 70..87,
+                                    range: 73..90,
                                     target: Name(
                                         ExprName {
-                                            range: 74..75,
+                                            range: 77..78,
                                             id: Name("x"),
                                             ctx: Store,
                                         },
                                     ),
                                     iter: Call(
                                         ExprCall {
-                                            range: 79..87,
+                                            range: 82..90,
                                             func: Name(
                                                 ExprName {
-                                                    range: 79..84,
+                                                    range: 82..87,
                                                     id: Name("range"),
                                                     ctx: Load,
                                                 },
                                             ),
                                             arguments: Arguments {
-                                                range: 84..87,
+                                                range: 87..90,
                                                 args: [
                                                     NumberLiteral(
                                                         ExprNumberLiteral {
-                                                            range: 85..86,
+                                                            range: 88..89,
                                                             value: Int(
                                                                 3,
                                                             ),

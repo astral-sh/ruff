@@ -1,40 +1,40 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
-input_file: crates/ruff_python_parser/resources/inline/err/unparenthesized_walrus_index_py39.py
+input_file: crates/ruff_python_parser/resources/inline/ok/unparenthesized_named_expr_index_py310.py
 ---
 ## AST
 
 ```
 Module(
     ModModule {
-        range: 0..53,
+        range: 0..54,
         body: [
             Expr(
                 StmtExpr {
-                    range: 43..52,
+                    range: 44..53,
                     value: Subscript(
                         ExprSubscript {
-                            range: 43..52,
+                            range: 44..53,
                             value: Name(
                                 ExprName {
-                                    range: 43..46,
+                                    range: 44..47,
                                     id: Name("lst"),
                                     ctx: Load,
                                 },
                             ),
                             slice: Named(
                                 ExprNamed {
-                                    range: 47..51,
+                                    range: 48..52,
                                     target: Name(
                                         ExprName {
-                                            range: 47..48,
+                                            range: 48..49,
                                             id: Name("x"),
                                             ctx: Store,
                                         },
                                     ),
                                     value: NumberLiteral(
                                         ExprNumberLiteral {
-                                            range: 50..51,
+                                            range: 51..52,
                                             value: Int(
                                                 1,
                                             ),
@@ -51,10 +51,3 @@ Module(
     },
 )
 ```
-## Unsupported Syntax Errors
-
-  |
-1 | # parse_options: {"target-version": "3.9"}
-2 | lst[x:=1]
-  |     ^^^^ Syntax Error: Cannot use unparenthesized assignment expression in a sequence index on Python 3.9 (syntax was added in Python 3.10)
-  |

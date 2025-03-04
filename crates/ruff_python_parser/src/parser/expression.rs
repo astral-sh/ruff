@@ -849,13 +849,13 @@ impl<'src> Parser<'src> {
         const STEP_END_SET: TokenSet =
             TokenSet::new([TokenKind::Comma, TokenKind::Rsqb]).union(NEWLINE_EOF_SET);
 
-        // test_err walrus_slice
-        // # even after 3.10, an unparenthesized walrus is not allowed in a slice
+        // test_err named_expr_slice
+        // # even after 3.10, an unparenthesized named expression is not allowed in a slice
         // lst[x:=1:-1]
         // lst[1:x:=1]
         // lst[1:3:x:=1]
 
-        // test_err walrus_slice_parse_error
+        // test_err named_expr_slice_parse_error
         // # parse_options: {"target-version": "3.9"}
         // # before 3.10, only emit the parse error, not the unsupported syntax error
         // lst[x:=1:-1]
@@ -868,15 +868,15 @@ impl<'src> Parser<'src> {
 
             // This means we're in a subscript.
             if self.at_ts(NEWLINE_EOF_SET.union([TokenKind::Rsqb, TokenKind::Comma].into())) {
-                // test_ok parenthesized_walrus_index_py39
+                // test_ok parenthesized_named_expr_index_py39
                 // # parse_options: {"target-version": "3.9"}
                 // lst[(x:=1)]
 
-                // test_ok unparenthesized_walrus_index_py310
+                // test_ok unparenthesized_named_expr_index_py310
                 // # parse_options: {"target-version": "3.10"}
                 // lst[x:=1]
 
-                // test_err unparenthesized_walrus_index_py39
+                // test_err unparenthesized_named_expr_index_py39
                 // # parse_options: {"target-version": "3.9"}
                 // lst[x:=1]
                 if lower.is_unparenthesized_named_expr() {
@@ -1642,17 +1642,17 @@ impl<'src> Parser<'src> {
                         &key_or_element,
                     );
                 }
-                // test_ok parenthesized_walrus_py39
+                // test_ok parenthesized_named_expr_py39
                 // # parse_options: {"target-version": "3.9"}
                 // {(x := 1), 2, 3}
                 // {(last := x) for x in range(3)}
 
-                // test_ok unparenthesized_walrus_py310
+                // test_ok unparenthesized_named_expr_py310
                 // # parse_options: {"target-version": "3.10"}
                 // {x := 1, 2, 3}
                 // {last := x for x in range(3)}
 
-                // test_err unparenthesized_walrus_set_comp_py39
+                // test_err unparenthesized_named_expr_set_comp_py39
                 // # parse_options: {"target-version": "3.9"}
                 // {last := x for x in range(3)}
                 else if key_or_element.is_unparenthesized_named_expr() {
@@ -1855,7 +1855,7 @@ impl<'src> Parser<'src> {
             self.expect(TokenKind::Comma);
         }
 
-        // test_err unparenthesized_walrus_set_literal_py39
+        // test_err unparenthesized_named_expr_set_literal_py39
         // # parse_options: {"target-version": "3.9"}
         // {x := 1, 2, 3}
         // {1, x := 2, 3}

@@ -1,23 +1,23 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
-input_file: crates/ruff_python_parser/resources/inline/ok/unparenthesized_walrus_index_py310.py
+input_file: crates/ruff_python_parser/resources/inline/ok/parenthesized_named_expr_index_py39.py
 ---
 ## AST
 
 ```
 Module(
     ModModule {
-        range: 0..54,
+        range: 0..55,
         body: [
             Expr(
                 StmtExpr {
-                    range: 44..53,
+                    range: 43..54,
                     value: Subscript(
                         ExprSubscript {
-                            range: 44..53,
+                            range: 43..54,
                             value: Name(
                                 ExprName {
-                                    range: 44..47,
+                                    range: 43..46,
                                     id: Name("lst"),
                                     ctx: Load,
                                 },

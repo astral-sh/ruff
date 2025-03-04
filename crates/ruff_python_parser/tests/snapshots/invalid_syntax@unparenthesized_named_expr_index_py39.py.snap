@@ -1,20 +1,20 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
-input_file: crates/ruff_python_parser/resources/inline/ok/parenthesized_walrus_index_py39.py
+input_file: crates/ruff_python_parser/resources/inline/err/unparenthesized_named_expr_index_py39.py
 ---
 ## AST
 
 ```
 Module(
     ModModule {
-        range: 0..55,
+        range: 0..53,
         body: [
             Expr(
                 StmtExpr {
-                    range: 43..54,
+                    range: 43..52,
                     value: Subscript(
                         ExprSubscript {
-                            range: 43..54,
+                            range: 43..52,
                             value: Name(
                                 ExprName {
                                     range: 43..46,
@@ -24,17 +24,17 @@ Module(
                             ),
                             slice: Named(
                                 ExprNamed {
-                                    range: 48..52,
+                                    range: 47..51,
                                     target: Name(
                                         ExprName {
-                                            range: 48..49,
+                                            range: 47..48,
                                             id: Name("x"),
                                             ctx: Store,
                                         },
                                     ),
                                     value: NumberLiteral(
                                         ExprNumberLiteral {
-                                            range: 51..52,
+                                            range: 50..51,
                                             value: Int(
                                                 1,
                                             ),
@@ -51,3 +51,10 @@ Module(
     },
 )
 ```
+## Unsupported Syntax Errors
+
+  |
+1 | # parse_options: {"target-version": "3.9"}
+2 | lst[x:=1]
+  |     ^^^^ Syntax Error: Cannot use unparenthesized assignment expression in a sequence index on Python 3.9 (syntax was added in Python 3.10)
+  |
