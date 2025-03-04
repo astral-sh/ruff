@@ -7,11 +7,11 @@ input_file: crates/ruff_python_parser/resources/inline/err/except_star_py310.py
 ```
 Module(
     ModModule {
-        range: 0..99,
+        range: 0..126,
         body: [
             Try(
                 StmtTry {
-                    range: 44..98,
+                    range: 44..125,
                     body: [
                         Expr(
                             StmtExpr {
@@ -79,6 +79,33 @@ Module(
                                 ],
                             },
                         ),
+                        ExceptHandler(
+                            ExceptHandlerExceptHandler {
+                                range: 99..125,
+                                type_: Some(
+                                    Name(
+                                        ExprName {
+                                            range: 115..120,
+                                            id: Name("Error"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ),
+                                name: None,
+                                body: [
+                                    Expr(
+                                        StmtExpr {
+                                            range: 122..125,
+                                            value: EllipsisLiteral(
+                                                ExprEllipsisLiteral {
+                                                    range: 122..125,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
                     ],
                     orelse: [],
                     finalbody: [],
@@ -97,6 +124,7 @@ Module(
 3 | except* ValueError: ...
   |       ^ Syntax Error: Cannot use `except*` on Python 3.10 (syntax was added in Python 3.11)
 4 | except* KeyError: ...
+5 | except    *     Error: ...
   |
 
 
@@ -105,4 +133,13 @@ Module(
 3 | except* ValueError: ...
 4 | except* KeyError: ...
   |       ^ Syntax Error: Cannot use `except*` on Python 3.10 (syntax was added in Python 3.11)
+5 | except    *     Error: ...
+  |
+
+
+  |
+3 | except* ValueError: ...
+4 | except* KeyError: ...
+5 | except    *     Error: ...
+  |           ^ Syntax Error: Cannot use `except*` on Python 3.10 (syntax was added in Python 3.11)
   |
