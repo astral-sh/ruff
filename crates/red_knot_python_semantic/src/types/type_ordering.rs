@@ -26,6 +26,11 @@ pub(super) fn union_elements_ordering<'db>(left: &Type<'db>, right: &Type<'db>) 
     }
 
     match (left, right) {
+        (Type::Callable(CallableType::General(_)), _)
+        | (_, Type::Callable(CallableType::General(_))) => {
+            todo!()
+        }
+
         (Type::Never, _) => Ordering::Less,
         (_, Type::Never) => Ordering::Greater,
 

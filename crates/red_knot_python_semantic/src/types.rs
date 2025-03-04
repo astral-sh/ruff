@@ -630,6 +630,8 @@ impl<'db> Type<'db> {
                     .is_subtype_of(db, target)
             }
 
+            (Type::Callable(CallableType::General(_)), _) => todo!(),
+
             // A fully static heterogenous tuple type `A` is a subtype of a fully static heterogeneous tuple type `B`
             // iff the two tuple types have the same number of elements and each element-type in `A` is a subtype
             // of the element-type at the same index in `B`. (Now say that 5 times fast.)
@@ -914,6 +916,9 @@ impl<'db> Type<'db> {
     /// wrong `false` answers in some cases.
     pub(crate) fn is_disjoint_from(self, db: &'db dyn Db, other: Type<'db>) -> bool {
         match (self, other) {
+            (Type::Callable(CallableType::General(_)), _)
+            | (_, Type::Callable(CallableType::General(_))) => todo!(),
+
             (Type::Never, _) | (_, Type::Never) => true,
 
             (Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => false,
@@ -1206,6 +1211,7 @@ impl<'db> Type<'db> {
     /// Returns true if the type does not contain any gradual forms (as a sub-part).
     pub(crate) fn is_fully_static(&self, db: &'db dyn Db) -> bool {
         match self {
+            Type::Callable(CallableType::General(_)) => todo!(),
             Type::Dynamic(_) => false,
             Type::Never
             | Type::FunctionLiteral(..)
@@ -1262,6 +1268,7 @@ impl<'db> Type<'db> {
     /// for more complicated types that are actually singletons.
     pub(crate) fn is_singleton(self, db: &'db dyn Db) -> bool {
         match self {
+            Type::Callable(CallableType::General(_)) => todo!(),
             Type::Dynamic(_)
             | Type::Never
             | Type::IntLiteral(..)
@@ -1320,6 +1327,7 @@ impl<'db> Type<'db> {
     /// Return true if this type is non-empty and all inhabitants of this type compare equal.
     pub(crate) fn is_single_valued(self, db: &'db dyn Db) -> bool {
         match self {
+            Type::Callable(CallableType::General(_)) => todo!(),
             Type::FunctionLiteral(..)
             | Type::Callable(
                 CallableType::BoundMethod(..)
@@ -1366,6 +1374,8 @@ impl<'db> Type<'db> {
     #[must_use]
     fn static_member(&self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
         match self {
+            Type::Callable(CallableType::General(_)) => todo!(),
+
             Type::Dynamic(_) => Symbol::bound(self),
 
             Type::Never => Symbol::todo("attribute lookup on Never"),
@@ -1564,6 +1574,8 @@ impl<'db> Type<'db> {
         }
 
         match self {
+            Type::Callable(CallableType::General(_)) => todo!(),
+
             Type::FunctionLiteral(function) if name == "__get__" => Symbol::bound(Type::Callable(
                 CallableType::MethodWrapperDunderGet(*function),
             )),
@@ -2592,6 +2604,9 @@ impl<'db> Type<'db> {
             Type::KnownInstance(KnownInstanceType::Unknown) => Ok(Type::unknown()),
             Type::KnownInstance(KnownInstanceType::AlwaysTruthy) => Ok(Type::AlwaysTruthy),
             Type::KnownInstance(KnownInstanceType::AlwaysFalsy) => Ok(Type::AlwaysFalsy),
+            Type::KnownInstance(KnownInstanceType::Callable) => Ok(Type::Callable(
+                CallableType::General(GeneralCallableType::any(db)),
+            )),
             Type::KnownInstance(_) => Ok(todo_type!(
                 "Invalid or unsupported `KnownInstanceType` in `Type::to_type_expression`"
             )),
@@ -2646,6 +2661,7 @@ impl<'db> Type<'db> {
     #[must_use]
     pub fn to_meta_type(&self, db: &'db dyn Db) -> Type<'db> {
         match self {
+            Type::Callable(CallableType::General(_)) => todo!(),
             Type::Never => Type::Never,
             Type::Instance(InstanceType { class }) => SubclassOfType::from(db, *class),
             Type::KnownInstance(known_instance) => known_instance.class().to_class_literal(db),
@@ -3715,9 +3731,29 @@ pub struct BoundMethodType<'db> {
     self_instance: Type<'db>,
 }
 
+#[salsa::interned]
+pub struct GeneralCallableType<'db> {
+    signature: Signature<'db>,
+}
+
+impl<'db> GeneralCallableType<'db> {
+    pub(crate) fn any(db: &'db dyn Db) -> Self {
+        GeneralCallableType::new(db, Signature::any())
+    }
+
+    pub(crate) fn unknown(db: &'db dyn Db) -> Self {
+        GeneralCallableType::new(
+            db,
+            Signature::new(Parameters::empty(), Some(Type::unknown())),
+        )
+    }
+}
+
 /// A type that represents callable objects.
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, salsa::Update)]
 pub enum CallableType<'db> {
+    General(GeneralCallableType<'db>),
+
     /// Represents a callable `instance.method` where `instance` is an instance of a class
     /// and `method` is a method (of that class).
     ///
