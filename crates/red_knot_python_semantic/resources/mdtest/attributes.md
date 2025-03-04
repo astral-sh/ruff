@@ -155,7 +155,9 @@ reveal_type(c_instance.declared_in_body_and_init)  # revealed: str | None
 
 reveal_type(c_instance.declared_in_body_defined_in_init)  # revealed: str | None
 
-reveal_type(c_instance.bound_in_body_declared_in_init)  # revealed: str | None
+# TODO: This should be `str | None`. Fixing this requires an overhaul of the `Symbol` API,
+# which is planned in https://github.com/astral-sh/ruff/issues/14297
+reveal_type(c_instance.bound_in_body_declared_in_init)  # revealed: Unknown | str | None
 
 reveal_type(c_instance.bound_in_body_and_init)  # revealed: Unknown | None | Literal["a"]
 ```
@@ -704,6 +706,33 @@ reveal_type(Derived().declared_in_body)  # revealed: int | None
 reveal_type(Derived().defined_in_init)  # revealed: str | None
 ```
 
+## Attributes defined on the meta class
+
+```py
+from typing import Any, Literal
+
+def _(flag: bool):
+    class Meta(type):
+        meta_class_attribute_1: Literal["value in meta class"] = "value in meta class"
+        meta_class_attribute_2: Literal["value in meta class"] = "value in meta class"
+        meta_class_attribute_3: Literal["value in meta class"] = "value in meta class"
+
+        if flag:
+            meta_class_attribute_4: Literal["possible value in meta class"] = "possible value in meta class"
+
+    class C(metaclass=Meta):
+        meta_class_attribute_2: Literal["value in class body"] = "value in class body"
+
+        if flag:
+            meta_class_attribute_3: Literal["value in class body"] = "value in class body"
+
+    reveal_type(C.meta_class_attribute_1)  # revealed: Literal["value in meta class"]
+    reveal_type(C.meta_class_attribute_2)  # revealed: Literal["value in class body"]
+    reveal_type(C.meta_class_attribute_3)  # revealed: Literal["value in class body", "value in meta class"]
+    # error: [possibly-unbound-attribute]
+    reveal_type(C.meta_class_attribute_4)  # revealed: Literal["possible value in meta class"]
+```
+
 ## Union of attributes
 
 ```py
@@ -716,14 +745,35 @@ def _(flag: bool):
         class C1:
             x = 2
 
+    reveal_type(C1.x)  # revealed: Unknown | Literal[1, 2]
+
     class C2:
         if flag:
             x = 3
         else:
             x = 4
 
-    reveal_type(C1.x)  # revealed: Unknown | Literal[1, 2]
     reveal_type(C2.x)  # revealed: Unknown | Literal[3, 4]
+
+    if flag:
+        class Meta3(type):
+            x = 1
+
+    else:
+        class Meta3(type):
+            x = 2
+
+    class C3(metaclass=Meta3): ...
+    reveal_type(C3.x)  # revealed: Unknown | Literal[1, 2]
+
+    class Meta4(type):
+        if flag:
+            x = 1
+        else:
+            x = 2
+
+    class C3(metaclass=Meta4): ...
+    reveal_type(C3.x)  # revealed: Unknown | Literal[1, 2]
 ```
 
 ## Inherited class attributes
@@ -883,7 +933,7 @@ def _(flag: bool):
                 self.x = 1
 
     # error: [possibly-unbound-attribute]
-    reveal_type(Foo().x)  # revealed: int
+    reveal_type(Foo().x)  # revealed: int | Unknown
 ```
 
 #### Possibly unbound
@@ -1105,8 +1155,8 @@ Most attribute accesses on bool-literal types are delegated to `builtins.bool`, 
 bools are instances of that class:
 
 ```py
-reveal_type(True.__and__)  # revealed: @Todo(overloaded method)
-reveal_type(False.__or__)  # revealed: @Todo(overloaded method)
+reveal_type(True.__and__)  # revealed: <bound method `__and__` of `Literal[True]`>
+reveal_type(False.__or__)  # revealed: <bound method `__or__` of `Literal[False]`>
 ```
 
 Some attributes are special-cased, however:

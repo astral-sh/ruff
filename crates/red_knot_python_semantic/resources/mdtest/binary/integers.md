@@ -10,8 +10,7 @@ reveal_type(-3 // 3)  # revealed: Literal[-1]
 reveal_type(-3 / 3)  # revealed: float
 reveal_type(5 % 3)  # revealed: Literal[2]
 
-# TODO: Should emit `unsupported-operator` but we don't understand the bases of `str`, so we think
-#       it inherits `Unknown`, so we think `str.__radd__` is `Unknown` instead of nonexistent.
+# error: [unsupported-operator] "Operator `+` is unsupported between objects of type `Literal[2]` and `Literal["f"]`"
 reveal_type(2 + "f")  # revealed: Unknown
 
 def lhs(x: int):

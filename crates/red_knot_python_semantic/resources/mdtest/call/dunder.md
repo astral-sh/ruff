@@ -79,11 +79,30 @@ reveal_type(this_fails[0])  # revealed: Unknown
 However, the attached dunder method *can* be called if accessed directly:
 
 ```py
-# TODO: `this_fails.__getitem__` is incorrectly treated as a bound method. This
-# should be fixed with https://github.com/astral-sh/ruff/issues/16367
-# error: [too-many-positional-arguments]
-# error: [invalid-argument-type]
 reveal_type(this_fails.__getitem__(this_fails, 0))  # revealed: Unknown | str
+```
+
+This also works if there is a partially-bound dunder method on the class:
+
+```py
+def external_getitem1(instance, key) -> str:
+    return "a"
+
+def external_getitem2(key) -> int:
+    return 1
+
+def _(flag: bool):
+    class ThisFails:
+        if flag:
+            __getitem__ = external_getitem1
+
+        def __init__(self):
+            self.__getitem__ = external_getitem2
+
+    this_fails = ThisFails()
+
+    # error: [call-possibly-unbound-method]
+    reveal_type(this_fails[0])  # revealed: Unknown | str
 ```
 
 ## When the dunder is not a method
@@ -125,4 +144,62 @@ class ClassWithDescriptorDunder:
 class_with_descriptor_dunder = ClassWithDescriptorDunder()
 
 reveal_type(class_with_descriptor_dunder[0])  # revealed: str
+```
+
+## Dunders can not be overwritten on instances
+
+```py
+class C:
+    def __init__(self):
+        # TODO: should be an error
+        self.__getitem__ = None
+
+    def __getitem__(self, key: int) -> str:
+        return str(key)
+
+reveal_type(C()[0])  # revealed: str
+reveal_type(C().__getitem__(0))  # revealed: str
+```
+
+## Calling a union of dunder methods
+
+```py
+def _(flag: bool):
+    class C:
+        if flag:
+            def __getitem__(self, key: int) -> str:
+                return str(key)
+        else:
+            def __getitem__(self, key: int) -> bytes:
+                return key
+
+    c = C()
+    reveal_type(c[0])  # revealed: str | bytes
+
+    if flag:
+        class D:
+            def __getitem__(self, key: int) -> str:
+                return str(key)
+
+    else:
+        class D:
+            def __getitem__(self, key: int) -> bytes:
+                return key
+
+    d = D()
+    reveal_type(d[0])  # revealed: str | bytes
+```
+
+## Calling a possibly-unbound dunder method
+
+```py
+def _(flag: bool):
+    class C:
+        if flag:
+            def __getitem__(self, key: int) -> str:
+                return str(key)
+
+    c = C()
+    # error: [call-possibly-unbound-method]
+    reveal_type(c[0])  # revealed: str
 ```
