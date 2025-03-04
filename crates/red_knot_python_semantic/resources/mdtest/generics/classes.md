@@ -59,15 +59,6 @@ class D(C[T]): ...
 
 ## Inferring generic class parameters
 
-When an unspecialized generic class is constructed (class C[T]: …; c = C()) we examine the
-constructor arguments and the type context (that is, the expected type from an annotation, if any)
-and attempt to solve the types of all its type variables based on the constraints applied by the
-constructor argument types, the type context, and the inherent bounds/constraints/defaults of the
-type variables, in order to create a specialization of the generic class and a Type::Instance from
-that specialized generic alias. If there are no constructor arguments and there is no type context,
-the lack of additional constraints on the type variables will lead to implicitly building the
-default specialization
-
 The type parameter can be specified explicitly:
 
 ```py
