@@ -115,8 +115,8 @@ pub fn resolve(
                 .as_ref()
                 .unwrap_or(&path_dedot::CWD.as_path()),
         );
-        if fallback.is_some() {
-            debug!("Derived `target-version` from found `requires-python`");
+        if let Some(version) = fallback {
+            debug!("Derived `target-version` from found `requires-python`: {version:?}");
         }
         config.target_version = fallback.map(ast::PythonVersion::from);
     }
