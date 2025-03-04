@@ -1645,7 +1645,6 @@ impl<'src> Parser<'src> {
                         &key_or_element,
                     );
                 }
-
                 // Python 3.10 allowed assignment expressions to be unparenthesized within set
                 // literals and set comprehensions. See
                 // <https://docs.python.org/3/whatsnew/3.10.html#other-language-changes>. In my
@@ -1665,7 +1664,7 @@ impl<'src> Parser<'src> {
                 // test_err unparenthesized_walrus_set_comp_py39
                 // # parse_options: {"target-version": "3.9"}
                 // {last := x for x in range(3)}
-                if key_or_element.is_unparenthesized_named_expr() {
+                else if key_or_element.is_unparenthesized_named_expr() {
                     self.add_unsupported_syntax_error(
                         UnsupportedSyntaxErrorKind::UnparenthesizedNamedExpr(
                             UnparenthesizedNamedExprKind::SetComprehension,
