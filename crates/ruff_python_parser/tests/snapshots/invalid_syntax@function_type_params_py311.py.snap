@@ -7,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/inline/err/function_type_params_
 ```
 Module(
     ModModule {
-        range: 0..62,
+        range: 0..79,
         body: [
             FunctionDef(
                 StmtFunctionDef {
@@ -59,14 +59,63 @@ Module(
                     ],
                 },
             ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 62..78,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("foo"),
+                        range: 66..69,
+                    },
+                    type_params: Some(
+                        TypeParams {
+                            range: 69..71,
+                            type_params: [],
+                        },
+                    ),
+                    parameters: Parameters {
+                        range: 71..73,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 75..78,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 75..78,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
         ],
     },
 )
 ```
+## Errors
+
+  |
+1 | # parse_options: {"target-version": "3.11"}
+2 | def foo[T](): ...
+3 | def foo[](): ...
+  |         ^ Syntax Error: Type parameter list cannot be empty
+  |
+
+
 ## Unsupported Syntax Errors
 
   |
 1 | # parse_options: {"target-version": "3.11"}
 2 | def foo[T](): ...
   |        ^^^ Syntax Error: Cannot use type parameter lists on Python 3.11 (syntax was added in Python 3.12)
+3 | def foo[](): ...
   |

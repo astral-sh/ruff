@@ -7,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/inline/err/class_type_params_py3
 ```
 Module(
     ModModule {
-        range: 0..96,
+        range: 0..113,
         body: [
             ClassDef(
                 StmtClassDef {
@@ -113,14 +113,54 @@ Module(
                     ],
                 },
             ),
+            ClassDef(
+                StmtClassDef {
+                    range: 96..112,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("Foo"),
+                        range: 102..105,
+                    },
+                    type_params: Some(
+                        TypeParams {
+                            range: 105..107,
+                            type_params: [],
+                        },
+                    ),
+                    arguments: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 109..112,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 109..112,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
         ],
     },
 )
 ```
+## Errors
+
+  |
+1 | # parse_options: {"target-version": "3.11"}
+2 | class Foo[S: (str, bytes), T: float, *Ts, **P]: ...
+3 | class Foo[]: ...
+  |           ^ Syntax Error: Type parameter list cannot be empty
+  |
+
+
 ## Unsupported Syntax Errors
 
   |
 1 | # parse_options: {"target-version": "3.11"}
 2 | class Foo[S: (str, bytes), T: float, *Ts, **P]: ...
   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Syntax Error: Cannot use type parameter lists on Python 3.11 (syntax was added in Python 3.12)
+3 | class Foo[]: ...
   |

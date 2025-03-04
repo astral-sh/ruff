@@ -1793,6 +1793,7 @@ impl<'src> Parser<'src> {
         // test_err function_type_params_py311
         // # parse_options: {"target-version": "3.11"}
         // def foo[T](): ...
+        // def foo[](): ...
         if let Some(ast::TypeParams { range, type_params }) = &type_params {
             // Only emit the `ParseError` for an empty parameter list instead of also including an
             // `UnsupportedSyntaxError`.
@@ -1925,6 +1926,7 @@ impl<'src> Parser<'src> {
         // test_err class_type_params_py311
         // # parse_options: {"target-version": "3.11"}
         // class Foo[S: (str, bytes), T: float, *Ts, **P]: ...
+        // class Foo[]: ...
         if let Some(ast::TypeParams { range, type_params }) = &type_params {
             // Only emit the `ParseError` for an empty parameter list instead of also including an
             // `UnsupportedSyntaxError`.
