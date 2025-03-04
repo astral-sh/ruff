@@ -121,7 +121,7 @@ other:
 
 ```py
 # TODO: error
-wrong_innards: E[int] = E('five')
+wrong_innards: E[int] = E("five")
 ```
 
 ## Generic subclass
@@ -148,18 +148,17 @@ reveal_type(Sub[int].x)  # revealed: Unknown
 ## Cyclic class definition
 
 A class can use itself as the type parameter of one of its superclasses. (This is also known as the
-[curiously recurring template pattern][CRTP] or [F-bounded quantification][f-bound].)
-
-[CRTP]: https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern
-[f-bound]: https://en.wikipedia.org/wiki/Bounded_quantification#F-bounded_quantification
+[curiously recurring template pattern][crtp] or [F-bounded quantification][f-bound].)
 
 Here, `Sub` is not a generic class, since it fills its superclass's type parameter (with itself).
 
 ```py
 class Base[T]: ...
-
 class Sub(Base[Sub]): ...
 
 # TODO: revealed: Literal[Sub]
 reveal_type(Sub)  # revealed: Unknown
 ```
+
+[crtp]: https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern
+[f-bound]: https://en.wikipedia.org/wiki/Bounded_quantification#F-bounded_quantification

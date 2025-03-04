@@ -3,8 +3,6 @@
 Most of these tests come from the [Scoping rules for type variables][scoping] section of the typing
 spec.
 
-[scoping]: https://typing.readthedocs.io/en/latest/spec/generics.html#scoping-rules-for-type-variables
-
 ## Typevar used outside of generic function or class
 
 Typevars may only be used in generic function or class definitions.
@@ -12,7 +10,7 @@ Typevars may only be used in generic function or class definitions.
 ```py
 from typing import TypeVar
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 # TODO: error
 x: T
@@ -37,13 +35,13 @@ new distinct typevar for each occurrence.
 ```py
 from typing import TypeVar
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 def f1(x: T) -> T: ...
 def f2(x: T) -> T: ...
 
 f1(1)
-f2('a')
+f2("a")
 ```
 
 ## Typevar inferred multiple times
@@ -62,7 +60,7 @@ def f[T](x: T) -> T: ...
 f(1)
 # TODO: no error
 # error: [invalid-argument-type]
-f('a')
+f("a")
 ```
 
 ## Class methods can mention class typevars
@@ -84,7 +82,7 @@ c.m1(1)
 c.m2(1)
 # TODO: expected type `int`
 # error: [invalid-argument-type] "Object of type `Literal["string"]` cannot be assigned to parameter 2 (`x`) of bound method `m2`; expected type `T`"
-c.m2('string')
+c.m2("string")
 ```
 
 ## Class methods can mention other typevars
@@ -95,8 +93,8 @@ c.m2('string')
 ```py
 from typing import TypeVar, Generic
 
-T = TypeVar('T')
-S = TypeVar('S')
+T = TypeVar("T")
+S = TypeVar("S")
 
 # TODO: no error
 # error: [invalid-base]
@@ -105,7 +103,7 @@ class Legacy(Generic[T]):
 
 legacy: Legacy[int] = Legacy()
 # TODO: revealed: str
-reveal_type(legacy.m(1, 'string'))  # revealed: @Todo(Invalid or unsupported `Instance` in `Type::to_type_expression`)
+reveal_type(legacy.m(1, "string"))  # revealed: @Todo(Invalid or unsupported `Instance` in `Type::to_type_expression`)
 ```
 
 With PEP 695 syntax, it is clearer that the method uses a separate typevar:
@@ -119,7 +117,7 @@ c: C[int] = C()
 # TODO: revealed: str
 # error: [invalid-argument-type]
 # error: [invalid-argument-type]
-reveal_type(c.m(1, 'string'))  # revealed: S
+reveal_type(c.m(1, "string"))  # revealed: S
 ```
 
 ## Unbound typevars
@@ -132,8 +130,8 @@ This is true with the legacy syntax, as well:
 ```py
 from typing import TypeVar, Generic
 
-T = TypeVar('T')
-S = TypeVar('S')
+T = TypeVar("T")
+S = TypeVar("S")
 
 def f(x: T) -> None:
     x: list[T] = []
@@ -158,7 +156,7 @@ unbound typevars:
 ```py
 from typing import TypeVar
 
-S = TypeVar('S')
+S = TypeVar("S")
 
 def f[T](x: T) -> None:
     x: list[T] = []
@@ -214,10 +212,8 @@ from typing import Iterable
 
 def f[T](x: T, y: T) -> None:
     class Ok[S]: ...
-
     # TODO: error
     class Bad1[T]: ...
-
     # TODO: error
     class Bad2(Iterable[T]): ...
 ```
@@ -229,10 +225,8 @@ from typing import Iterable
 
 class C[T]:
     class Ok1[S]: ...
-
     # TODO: error
     class Bad1[T]: ...
-
     # TODO: error
     class Bad2(Iterable[T]): ...
 ```
@@ -251,6 +245,7 @@ class C[T]:
         bad: list[T] = []
 
     class Inner[S]: ...
-
     ok2: Inner[T]
 ```
+
+[scoping]: https://typing.readthedocs.io/en/latest/spec/generics.html#scoping-rules-for-type-variables

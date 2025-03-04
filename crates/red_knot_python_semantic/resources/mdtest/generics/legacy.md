@@ -4,9 +4,7 @@ The tests in this file focus on how type variables are defined using the legacy 
 _uses_ of type variables are tested in other files in this directory; we do not duplicate every test
 for both type variable syntaxes.
 
-Unless otherwise specified, all quotations come from the [Generics][] section of the typing spec.
-
-[Generics]: https://typing.readthedocs.io/en/latest/spec/generics.html
+Unless otherwise specified, all quotations come from the [Generics] section of the typing spec.
 
 ## Type variables
 
@@ -20,7 +18,7 @@ in newer Python releases.
 ```py
 from typing import TypeVar
 
-T = TypeVar('T')
+T = TypeVar("T")
 ```
 
 ### Directly assigned to a variable
@@ -32,7 +30,7 @@ T = TypeVar('T')
 from typing import TypeVar
 
 # TODO: error
-TestList = list[TypeVar('W')]
+TestList = list[TypeVar("W")]
 ```
 
 ### `TypeVar` parameter must match variable name
@@ -43,7 +41,7 @@ TestList = list[TypeVar('W')]
 from typing import TypeVar
 
 # TODO: error
-T = TypeVar('Q')
+T = TypeVar("Q")
 ```
 
 ### No redefinition
@@ -53,10 +51,10 @@ T = TypeVar('Q')
 ```py
 from typing import TypeVar
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 # TODO: error
-T = TypeVar('T')
+T = TypeVar("T")
 ```
 
 ### Cannot have only one constraint
@@ -68,5 +66,7 @@ T = TypeVar('T')
 from typing import TypeVar
 
 # TODO: error: [invalid-type-variable-constraints]
-T = TypeVar('T', int)
+T = TypeVar("T", int)
 ```
+
+[generics]: https://typing.readthedocs.io/en/latest/spec/generics.html

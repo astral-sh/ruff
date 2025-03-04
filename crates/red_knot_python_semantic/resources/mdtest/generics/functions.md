@@ -26,7 +26,7 @@ reveal_type(f(True))  # revealed: T
 # TODO: no error
 # TODO: revealed: str
 # error: [invalid-argument-type]
-reveal_type(f('string'))  # revealed: T
+reveal_type(f("string"))  # revealed: T
 ```
 
 ## Inferring “deep” generic parameter types
