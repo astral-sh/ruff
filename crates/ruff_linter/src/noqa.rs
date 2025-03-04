@@ -309,10 +309,6 @@ pub(crate) struct ParsedNoqa<'a> {
     directive: Directive<'a>,
 }
 
-/// Marks the beginning of an in-line `noqa` directive
-static NOQA_DIRECTIVE_PREFIX: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"#\s*[nN][oO][qQ][aA]").unwrap());
-
 /// Marks the beginning of a file-level exemption comment
 static FILE_EXEMPTION_PREFIX: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"#\s*(?:ruff|flake8)\s*:\s*[nN][oO][qQ][aA]").unwrap());
@@ -322,7 +318,49 @@ pub(crate) fn parse_inline_noqa(
     comment_range: TextRange,
     source: &str,
 ) -> Result<Option<ParsedNoqa<'_>>, ParseError> {
-    parse_noqa_with_prefix(comment_range, source, &NOQA_DIRECTIVE_PREFIX)
+    let line = &source[comment_range];
+    let offset = comment_range.start();
+
+    for (char_index, char) in line.char_indices() {
+        // Only bother checking for the `noqa` literal if the character is `n` or `N`.
+        if !matches!(char, 'n' | 'N') {
+            continue;
+        }
+
+        // Determine the start of the `noqa` literal.
+        if !matches!(
+            line[char_index..].as_bytes(),
+            [b'n' | b'N', b'o' | b'O', b'q' | b'Q', b'a' | b'A', ..]
+        ) {
+            continue;
+        }
+
+        let noqa_literal_start = char_index;
+        let noqa_literal_end = noqa_literal_start + "noqa".len();
+
+        // Determine the start of the comment.
+        let mut comment_start = noqa_literal_start;
+
+        // Trim whitespace between putative '#' and 'noqa' literal
+        comment_start = line[..comment_start].trim_end().len();
+
+        // If there is no '#', try again
+        if !line[..comment_start].ends_with('#') {
+            continue;
+        }
+        comment_start -= '#'.len_utf8();
+
+        let line = &line[noqa_literal_end..];
+
+        let parser = NoqaParser::default();
+        return Ok(Some(parser.parse(
+            line,
+            offset,
+            TextSize::try_from(comment_start).unwrap(),
+            TextSize::try_from(noqa_literal_end).unwrap(),
+        )?));
+    }
+    Ok(None)
 }
 
 /// Parses file-level exemption comment, e.g. `# ruff: noqa: F401`
