@@ -1,0 +1,129 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/function_type_params_py311.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..79,
+        body: [
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 44..61,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("foo"),
+                        range: 48..51,
+                    },
+                    type_params: Some(
+                        TypeParams {
+                            range: 51..54,
+                            type_params: [
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        range: 52..53,
+                                        name: Identifier {
+                                            id: Name("T"),
+                                            range: 52..53,
+                                        },
+                                        bound: None,
+                                        default: None,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    parameters: Parameters {
+                        range: 54..56,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 58..61,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 58..61,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 62..78,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("foo"),
+                        range: 66..69,
+                    },
+                    type_params: Some(
+                        TypeParams {
+                            range: 69..71,
+                            type_params: [],
+                        },
+                    ),
+                    parameters: Parameters {
+                        range: 71..73,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 75..78,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 75..78,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | # parse_options: {"target-version": "3.11"}
+2 | def foo[T](): ...
+3 | def foo[](): ...
+  |         ^ Syntax Error: Type parameter list cannot be empty
+  |
+
+
+## Unsupported Syntax Errors
+
+  |
+1 | # parse_options: {"target-version": "3.11"}
+2 | def foo[T](): ...
+  |        ^^^ Syntax Error: Cannot use type parameter lists on Python 3.11 (syntax was added in Python 3.12)
+3 | def foo[](): ...
+  |
+
+
+  |
+1 | # parse_options: {"target-version": "3.11"}
+2 | def foo[T](): ...
+3 | def foo[](): ...
+  |        ^^ Syntax Error: Cannot use type parameter lists on Python 3.11 (syntax was added in Python 3.12)
+  |
