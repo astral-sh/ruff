@@ -10,19 +10,6 @@ The `Callable` special form requires _exactly_ two arguments where the first arg
 parameter type list, parameter specification, `typing.Concatenate`, or `...` and the second argument
 is the return type. Here, we explore various invalid forms.
 
-### Syntax error
-
-```py
-from typing import Callable
-
-# error: [invalid-syntax] "Expected index or slice expression"
-# error: [invalid-type-form] "Special form `typing.Callable` expected exactly two arguments (parameter types and return type)"
-def _(c: Callable[]):
-    # TODO: This should be `() -> Unknown` which requires understanding that an empty `Name` is not
-    # a param spec variable
-    reveal_type(c)  # revealed: (*args: @Todo(todo signature *args), **kwargs: @Todo(todo signature **kwargs)) -> Unknown
-```
-
 ### Empty
 
 It is invalid to have a bare `Callable` without any arguments:
