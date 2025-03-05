@@ -112,3 +112,70 @@ def unions_are_different(t1: int | str, t2: int | str) -> int | str:
     # error: [unsupported-operator] "Operator `+` is unsupported between objects of type `int | str` and `int | str`"
     return t1 + t2
 ```
+
+## Typevar inference is a unification problem
+
+When inferring typevar assignments in a generic function call, we cannot simply solve constraints
+eagerly for each parameter in turn. We must solve a unification problem involving all of the
+parameters simultaneously.
+
+```py
+def two_params[T](x: T, y: T) -> T:
+    return x
+
+# TODO: no error
+# TODO: revealed: str
+# error: [invalid-argument-type]
+# error: [invalid-argument-type]
+reveal_type(two_params("a", "b"))  # revealed: T
+
+# TODO: no error
+# TODO: revealed: str | int
+# error: [invalid-argument-type]
+# error: [invalid-argument-type]
+reveal_type(two_params("a", 1))  # revealed: T
+```
+
+```py
+def param_with_union[T](x: T | int, y: T) -> T:
+    return y
+
+# TODO: no error
+# TODO: revealed: str
+# error: [invalid-argument-type]
+reveal_type(param_with_union(1, "a"))  # revealed: T
+
+# TODO: no error
+# TODO: revealed: str
+# error: [invalid-argument-type]
+# error: [invalid-argument-type]
+reveal_type(param_with_union("a", "a"))  # revealed: T
+
+# TODO: no error
+# TODO: revealed: int
+# error: [invalid-argument-type]
+reveal_type(param_with_union(1, 1))  # revealed: T
+
+# TODO: no error
+# TODO: revealed: str | int
+# error: [invalid-argument-type]
+# error: [invalid-argument-type]
+reveal_type(param_with_union("a", 1))  # revealed: T
+```
+
+```py
+def tuple_param[T, S](x: T | S, y: tuple[T, S]) -> tuple[T, S]:
+    return y
+
+# TODO: no error
+# TODO: revealed: tuple[str, int]
+# error: [invalid-argument-type]
+# error: [invalid-argument-type]
+reveal_type(tuple_param("a", ("a", 1)))  # revealed: tuple[T, S]
+
+# TODO: no error
+# TODO: revealed: tuple[str, int]
+# error: [invalid-argument-type]
+# error: [invalid-argument-type]
+reveal_type(tuple_param(1, ("a", 1)))  # revealed: tuple[T, S]
+```
