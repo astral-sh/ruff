@@ -60,11 +60,14 @@ reveal_type(c)  # revealed: Literal[4]
 
 ### Uneven unpacking (1)
 
+If there are not enough or too many values ​​when unpacking, the type of all variables is inferred
+to be `Unknown`. This is a different behavior from pyright, but the same as mypy.
+
 ```py
 # error: [invalid-assignment] "Not enough values to unpack (expected 3, got 2)"
 (a, b, c) = (1, 2)
-reveal_type(a)  # revealed: Literal[1]
-reveal_type(b)  # revealed: Literal[2]
+reveal_type(a)  # revealed: Unknown
+reveal_type(b)  # revealed: Unknown
 reveal_type(c)  # revealed: Unknown
 ```
 
@@ -73,8 +76,30 @@ reveal_type(c)  # revealed: Unknown
 ```py
 # error: [invalid-assignment] "Too many values to unpack (expected 2, got 3)"
 (a, b) = (1, 2, 3)
+reveal_type(a)  # revealed: Unknown
+reveal_type(b)  # revealed: Unknown
+```
+
+### Nested uneven unpacking (1)
+
+```py
+# error: [invalid-assignment] "Not enough values to unpack (expected 2, got 1)"
+(a, (b, c), d) = (1, (2,), 3)
 reveal_type(a)  # revealed: Literal[1]
-reveal_type(b)  # revealed: Literal[2]
+reveal_type(b)  # revealed: Unknown
+reveal_type(c)  # revealed: Unknown
+reveal_type(d)  # revealed: Literal[3]
+```
+
+### Nested uneven unpacking (2)
+
+```py
+# error: [invalid-assignment] "Too many values to unpack (expected 2, got 3)"
+(a, (b, c), d) = (1, (2, 3, 4), 5)
+reveal_type(a)  # revealed: Literal[1]
+reveal_type(b)  # revealed: Unknown
+reveal_type(c)  # revealed: Unknown
+reveal_type(d)  # revealed: Literal[5]
 ```
 
 ### Starred expression (1)
@@ -82,10 +107,10 @@ reveal_type(b)  # revealed: Literal[2]
 ```py
 # error: [invalid-assignment] "Not enough values to unpack (expected 3 or more, got 2)"
 [a, *b, c, d] = (1, 2)
-reveal_type(a)  # revealed: Literal[1]
+reveal_type(a)  # revealed: Unknown
 # TODO: Should be list[Any] once support for assigning to starred expression is added
 reveal_type(b)  # revealed: @Todo(starred unpacking)
-reveal_type(c)  # revealed: Literal[2]
+reveal_type(c)  # revealed: Unknown
 reveal_type(d)  # revealed: Unknown
 ```
 
@@ -135,7 +160,7 @@ reveal_type(c)  # revealed: @Todo(starred unpacking)
 ```py
 # error: [invalid-assignment] "Not enough values to unpack (expected 5 or more, got 1)"
 (a, b, c, *d, e, f) = (1,)
-reveal_type(a)  # revealed: Literal[1]
+reveal_type(a)  # revealed: Unknown
 reveal_type(b)  # revealed: Unknown
 reveal_type(c)  # revealed: Unknown
 reveal_type(d)  # revealed: @Todo(starred unpacking)
@@ -201,8 +226,8 @@ reveal_type(b)  # revealed: LiteralString
 ```py
 # error: [invalid-assignment] "Not enough values to unpack (expected 3, got 2)"
 a, b, c = "ab"
-reveal_type(a)  # revealed: LiteralString
-reveal_type(b)  # revealed: LiteralString
+reveal_type(a)  # revealed: Unknown
+reveal_type(b)  # revealed: Unknown
 reveal_type(c)  # revealed: Unknown
 ```
 
@@ -211,8 +236,8 @@ reveal_type(c)  # revealed: Unknown
 ```py
 # error: [invalid-assignment] "Too many values to unpack (expected 2, got 3)"
 a, b = "abc"
-reveal_type(a)  # revealed: LiteralString
-reveal_type(b)  # revealed: LiteralString
+reveal_type(a)  # revealed: Unknown
+reveal_type(b)  # revealed: Unknown
 ```
 
 ### Starred expression (1)
@@ -220,10 +245,19 @@ reveal_type(b)  # revealed: LiteralString
 ```py
 # error: [invalid-assignment] "Not enough values to unpack (expected 3 or more, got 2)"
 (a, *b, c, d) = "ab"
-reveal_type(a)  # revealed: LiteralString
+reveal_type(a)  # revealed: Unknown
 # TODO: Should be list[LiteralString] once support for assigning to starred expression is added
 reveal_type(b)  # revealed: @Todo(starred unpacking)
-reveal_type(c)  # revealed: LiteralString
+reveal_type(c)  # revealed: Unknown
+reveal_type(d)  # revealed: Unknown
+```
+
+```py
+# error: [invalid-assignment] "Not enough values to unpack (expected 3 or more, got 1)"
+(a, b, *c, d) = "a"
+reveal_type(a)  # revealed: Unknown
+reveal_type(b)  # revealed: Unknown
+reveal_type(c)  # revealed: @Todo(starred unpacking)
 reveal_type(d)  # revealed: Unknown
 ```
 
@@ -274,7 +308,7 @@ reveal_type(c)  # revealed: @Todo(starred unpacking)
 # error: [invalid-assignment] "Not enough values to unpack (expected 2, got 1)"
 (a, b) = "é"
 
-reveal_type(a)  # revealed: LiteralString
+reveal_type(a)  # revealed: Unknown
 reveal_type(b)  # revealed: Unknown
 ```
 
@@ -284,7 +318,7 @@ reveal_type(b)  # revealed: Unknown
 # error: [invalid-assignment] "Not enough values to unpack (expected 2, got 1)"
 (a, b) = "\u9e6c"
 
-reveal_type(a)  # revealed: LiteralString
+reveal_type(a)  # revealed: Unknown
 reveal_type(b)  # revealed: Unknown
 ```
 
@@ -294,7 +328,7 @@ reveal_type(b)  # revealed: Unknown
 # error: [invalid-assignment] "Not enough values to unpack (expected 2, got 1)"
 (a, b) = "\U0010ffff"
 
-reveal_type(a)  # revealed: LiteralString
+reveal_type(a)  # revealed: Unknown
 reveal_type(b)  # revealed: Unknown
 ```
 
@@ -388,8 +422,8 @@ def _(arg: tuple[int, bytes, int] | tuple[int, int, str, int, bytes]):
     # error: [invalid-assignment] "Too many values to unpack (expected 2, got 3)"
     # error: [invalid-assignment] "Too many values to unpack (expected 2, got 5)"
     a, b = arg
-    reveal_type(a)  # revealed: int
-    reveal_type(b)  # revealed: bytes | int
+    reveal_type(a)  # revealed: Unknown
+    reveal_type(b)  # revealed: Unknown
 ```
 
 ### Size mismatch (2)
@@ -399,8 +433,8 @@ def _(arg: tuple[int, bytes] | tuple[int, str]):
     # error: [invalid-assignment] "Not enough values to unpack (expected 3, got 2)"
     # error: [invalid-assignment] "Not enough values to unpack (expected 3, got 2)"
     a, b, c = arg
-    reveal_type(a)  # revealed: int
-    reveal_type(b)  # revealed: bytes | str
+    reveal_type(a)  # revealed: Unknown
+    reveal_type(b)  # revealed: Unknown
     reveal_type(c)  # revealed: Unknown
 ```
 
@@ -542,7 +576,7 @@ for a, b in ((1, 2), ("a", "b")):
 # error: "Object of type `Literal[4]` is not iterable"
 # error: [invalid-assignment] "Not enough values to unpack (expected 2, got 1)"
 for a, b in (1, 2, (3, "a"), 4, (5, "b"), "c"):
-    reveal_type(a)  # revealed: Unknown | Literal[3, 5] | LiteralString
+    reveal_type(a)  # revealed: Unknown | Literal[3, 5]
     reveal_type(b)  # revealed: Unknown | Literal["a", "b"]
 ```
 
