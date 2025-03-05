@@ -10,6 +10,7 @@
 
 use anyhow::Context;
 use red_knot_python_semantic::PythonPlatform;
+use ruff_db::system::{SystemPath, SystemPathBuf};
 use ruff_python_ast::PythonVersion;
 use serde::Deserialize;
 
@@ -36,10 +37,16 @@ impl MarkdownTestConfig {
             .and_then(|env| env.python_platform.clone())
     }
 
-    pub(crate) fn typeshed(&self) -> Option<&str> {
+    pub(crate) fn typeshed(&self) -> Option<&SystemPath> {
         self.environment
             .as_ref()
             .and_then(|env| env.typeshed.as_deref())
+    }
+
+    pub(crate) fn extra_paths(&self) -> Option<&[SystemPathBuf]> {
+        self.environment
+            .as_ref()
+            .and_then(|env| env.extra_paths.as_deref())
     }
 }
 
@@ -53,7 +60,10 @@ pub(crate) struct Environment {
     pub(crate) python_platform: Option<PythonPlatform>,
 
     /// Path to a custom typeshed directory.
-    pub(crate) typeshed: Option<String>,
+    pub(crate) typeshed: Option<SystemPathBuf>,
+
+    /// Additional search paths to consider when resolving modules.
+    pub(crate) extra_paths: Option<Vec<SystemPathBuf>>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
