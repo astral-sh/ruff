@@ -444,6 +444,7 @@ pub struct UnsupportedSyntaxError {
     pub target_version: PythonVersion,
 }
 
+/// The type of tuple unpacking for [`UnsupportedSyntaxErrorKind::StarTuple`].
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum StarTupleKind {
     Return,
@@ -455,6 +456,53 @@ pub enum UnsupportedSyntaxErrorKind {
     Match,
     Walrus,
     ExceptStar,
+    /// Represents the use of unparenthesized tuple unpacking in a `return` statement or `yield`
+    /// expression before Python 3.8.
+    ///
+    /// ## Examples
+    ///
+    /// Before Python 3.8, this syntax was allowed:
+    ///
+    /// ```python
+    /// rest = (4, 5, 6)
+    ///
+    /// def f():
+    ///     t = 1, 2, 3, *rest
+    ///     return t
+    ///
+    /// def g():
+    ///     t = 1, 2, 3, *rest
+    ///     yield t
+    /// ```
+    ///
+    /// But this was not:
+    ///
+    /// ```python
+    /// rest = (4, 5, 6)
+    ///
+    /// def f():
+    ///     return 1, 2, 3, *rest
+    ///
+    /// def g():
+    ///     yield 1, 2, 3, *rest
+    /// ```
+    ///
+    /// Instead, parentheses were required in the `return` and `yield` cases:
+    ///
+    /// ```python
+    /// rest = (4, 5, 6)
+    ///
+    /// def f():
+    ///     return (1, 2, 3, *rest)
+    ///
+    /// def g():
+    ///     yield (1, 2, 3, *rest)
+    /// ```
+    ///
+    /// This was reported in [BPO 32117] and updated in Python 3.8 to allow the unparenthesized
+    /// form.
+    ///
+    /// [BPO 32117]: https://github.com/python/cpython/issues/76298
     StarTuple(StarTupleKind),
     /// Represents the use of a [PEP 570] positional-only parameter before Python 3.8.
     ///
