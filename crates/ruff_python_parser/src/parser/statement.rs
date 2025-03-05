@@ -5,7 +5,8 @@ use rustc_hash::{FxBuildHasher, FxHashSet};
 
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{
-    self as ast, ExceptHandler, Expr, ExprContext, IpyEscapeKind, Operator, Stmt, WithItem,
+    self as ast, ExceptHandler, Expr, ExprContext, IpyEscapeKind, Operator, PythonVersion, Stmt,
+    WithItem,
 };
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -2654,6 +2655,56 @@ impl<'src> Parser<'src> {
             let decorator_start = self.node_start();
             self.bump(TokenKind::At);
 
+            let parsed_expr = self.parse_named_expression_or_higher(ExpressionContext::default());
+
+            if self.options.target_version < PythonVersion::PY39 {
+                // test_ok decorator_expression_dotted_ident_py38
+                // # parse_options: { "target-version": "3.8" }
+                // @buttons.clicked.connect
+                // def spam(): ...
+
+                // test_ok decorator_expression_identity_hack_py38
+                // # parse_options: { "target-version": "3.8" }
+                // def _(x): return x
+                // @_(buttons[0].clicked.connect)
+                // def spam(): ...
+
+                // test_ok decorator_expression_eval_hack_py38
+                // # parse_options: { "target-version": "3.8" }
+                // @eval("buttons[0].clicked.connect")
+                // def spam(): ...
+
+                // test_ok decorator_expression_py39
+                // # parse_options: { "target-version": "3.9" }
+                // @buttons[0].clicked.connect
+                // def spam(): ...
+                // @(x := lambda x: x)(foo)
+                // def bar(): ...
+
+                // test_err decorator_expression_py38
+                // # parse_options: { "target-version": "3.8" }
+                // @buttons[0].clicked.connect
+                // def spam(): ...
+
+                // test_err decorator_named_expression_py37
+                // # parse_options: { "target-version": "3.7" }
+                // @(x := lambda x: x)(foo)
+                // def bar(): ...
+                let allowed_decorator = match &parsed_expr.expr {
+                    Expr::Call(expr_call) => {
+                        helpers::is_name_or_attribute_expression(&expr_call.func)
+                    }
+                    expr => helpers::is_name_or_attribute_expression(expr),
+                };
+
+                if !allowed_decorator {
+                    self.add_unsupported_syntax_error(
+                        UnsupportedSyntaxErrorKind::RelaxedDecorator,
+                        parsed_expr.range(),
+                    );
+                }
+            }
+
             // test_err decorator_invalid_expression
             // @*x
             // @(*x)
@@ -2661,7 +2712,6 @@ impl<'src> Parser<'src> {
             // @yield x
             // @yield from x
             // def foo(): ...
-            let parsed_expr = self.parse_named_expression_or_higher(ExpressionContext::default());
 
             decorators.push(ast::Decorator {
                 expression: parsed_expr.expr,

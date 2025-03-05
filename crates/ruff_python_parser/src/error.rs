@@ -504,6 +504,37 @@ pub enum UnsupportedSyntaxErrorKind {
     ///
     /// [BPO 32117]: https://github.com/python/cpython/issues/76298
     StarTuple(StarTupleKind),
+    /// Represents the use of a "relaxed" [PEP 614] decorator before Python 3.9.
+    ///
+    /// ## Examples
+    ///
+    /// Prior to Python 3.9, decorators were defined to be [`dotted_name`]s, optionally followed by
+    /// an argument list. For example:
+    ///
+    /// ```python
+    /// @buttons.clicked.connect
+    /// def foo(): ...
+    ///
+    /// @buttons.clicked.connect(1, 2, 3)
+    /// def foo(): ...
+    /// ```
+    ///
+    /// As pointed out in the PEP, this prevented reasonable extensions like subscripts:
+    ///
+    /// ```python
+    /// buttons = [QPushButton(f'Button {i}') for i in range(10)]
+    ///
+    /// @buttons[0].clicked.connect
+    /// def spam(): ...
+    /// ```
+    ///
+    /// Python 3.9 removed these restrictions and expanded the [decorator grammar] to include any
+    /// assignment expression and include cases like the example above.
+    ///
+    /// [PEP 614]: https://peps.python.org/pep-0614/
+    /// [`dotted_name`]: https://docs.python.org/3.8/reference/compound_stmts.html#grammar-token-dotted-name
+    /// [decorator grammar]: https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-decorator
+    RelaxedDecorator,
     /// Represents the use of a [PEP 570] positional-only parameter before Python 3.8.
     ///
     /// ## Examples
@@ -574,6 +605,7 @@ impl Display for UnsupportedSyntaxError {
             UnsupportedSyntaxErrorKind::StarTuple(StarTupleKind::Yield) => {
                 "Cannot use iterable unpacking in yield expressions"
             }
+            UnsupportedSyntaxErrorKind::RelaxedDecorator => "Unsupported expression in decorators",
             UnsupportedSyntaxErrorKind::PositionalOnlyParameter => {
                 "Cannot use positional-only parameter separator"
             }
@@ -600,6 +632,7 @@ impl UnsupportedSyntaxErrorKind {
             UnsupportedSyntaxErrorKind::Walrus => PythonVersion::PY38,
             UnsupportedSyntaxErrorKind::ExceptStar => PythonVersion::PY311,
             UnsupportedSyntaxErrorKind::StarTuple(_) => PythonVersion::PY38,
+            UnsupportedSyntaxErrorKind::RelaxedDecorator => PythonVersion::PY39,
             UnsupportedSyntaxErrorKind::PositionalOnlyParameter => PythonVersion::PY38,
             UnsupportedSyntaxErrorKind::TypeParameterList => PythonVersion::PY312,
             UnsupportedSyntaxErrorKind::TypeAliasStatement => PythonVersion::PY312,
