@@ -56,11 +56,13 @@ to a different type each time.
 def f[T](x: T) -> T: ...
 
 # TODO: no error
+# TODO: revealed: int or Literal[1]
 # error: [invalid-argument-type]
-f(1)
+reveal_type(f(1))  # revealed: T
 # TODO: no error
+# TODO: revealed: str or Literal["a"]
 # error: [invalid-argument-type]
-f("a")
+reveal_type(f("a"))  # revealed: T
 ```
 
 ## Methods can mention class typevars
