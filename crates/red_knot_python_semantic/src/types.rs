@@ -2617,33 +2617,65 @@ impl<'db> Type<'db> {
             // TODO annotated return type on `__new__` or metaclass `__call__`
             // TODO check call vs signatures of `__new__` and/or `__init__`
             Type::ClassLiteral(ClassLiteralType { class }) => {
+                let return_ty = match class.known(db) {
+                    // TODO: We should check the call signature and error if the bool call doesn't have the
+                    //   right signature and return a binding error.
+
+                    // If the class is the builtin-bool class (for example `bool(1)`), we try to
+                    // return the specific truthiness value of the input arg, `Literal[True]` for
+                    // the example above.
+                    Some(KnownClass::Bool) => arguments
+                        .first_argument()
+                        .map(|arg| arg.bool(db).into_type(db))
+                        .unwrap_or(Type::BooleanLiteral(false)),
+
+                    // TODO: Don't ignore the second and third arguments to `str`
+                    //   https://github.com/astral-sh/ruff/pull/16161#discussion_r1958425568
+                    Some(KnownClass::Str) => arguments
+                        .first_argument()
+                        .map(|arg| arg.str(db))
+                        .unwrap_or_else(|| Type::string_literal(db, "")),
+
+                    Some(KnownClass::Type) => arguments
+                        .exactly_one_argument()
+                        .map(|arg| arg.to_meta_type(db))
+                        .unwrap_or_else(|| KnownClass::Type.to_instance(db)),
+
+                    // TODO: check signatures of other KnownClass constructors
+                    Some(_) => Type::Instance(InstanceType { class }),
+
+                    // User defined class
+                    None => {
+                        let instance_ty = Type::Instance(InstanceType { class });
+
+                        // Try calling __init__ to check arguments before returning the instance type
+                        match instance_ty.try_call_dunder(db, "__init__", arguments) {
+                            Err(CallDunderError::Call(error)) => {
+                                // If the call to `__init__` fails return inner error directly
+                                return Err(error);
+                            }
+                            // Turn "possibly unbound object of type `Literal['__init__']`"
+                            // into "`X` not callable (possibly unbound `__init__` method)"
+                            Err(CallDunderError::PossiblyUnbound(outcome)) => {
+                                return Err(CallError::PossiblyUnboundDunderCall {
+                                    called_type: self,
+                                    outcome: Box::new(outcome),
+                                });
+                            }
+                            Err(CallDunderError::MethodNotAvailable) => {
+                                // No `__init__` method available, return the instance type
+                                instance_ty
+                            }
+                            Ok(_) => {
+                                // If the call to `__init__` is successful, return the instance type
+                                instance_ty
+                            }
+                        }
+                    }
+                };
+
                 Ok(CallOutcome::Single(CallBinding::from_return_type(
-                    match class.known(db) {
-                        // TODO: We should check the call signature and error if the bool call doesn't have the
-                        //   right signature and return a binding error.
-
-                        // If the class is the builtin-bool class (for example `bool(1)`), we try to
-                        // return the specific truthiness value of the input arg, `Literal[True]` for
-                        // the example above.
-                        Some(KnownClass::Bool) => arguments
-                            .first_argument()
-                            .map(|arg| arg.bool(db).into_type(db))
-                            .unwrap_or(Type::BooleanLiteral(false)),
-
-                        // TODO: Don't ignore the second and third arguments to `str`
-                        //   https://github.com/astral-sh/ruff/pull/16161#discussion_r1958425568
-                        Some(KnownClass::Str) => arguments
-                            .first_argument()
-                            .map(|arg| arg.str(db))
-                            .unwrap_or_else(|| Type::string_literal(db, "")),
-
-                        Some(KnownClass::Type) => arguments
-                            .exactly_one_argument()
-                            .map(|arg| arg.to_meta_type(db))
-                            .unwrap_or_else(|| KnownClass::Type.to_instance(db)),
-
-                        _ => Type::Instance(InstanceType { class }),
-                    },
+                    return_ty,
                 )))
             }
 
