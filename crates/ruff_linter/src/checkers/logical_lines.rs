@@ -13,9 +13,9 @@ use crate::rules::pycodestyle::rules::logical_lines::{
     space_around_operator, whitespace_around_keywords, whitespace_around_named_parameter_equals,
     whitespace_before_comment, whitespace_before_parameters, LogicalLines, TokenFlags,
 };
+use crate::rules::ruff::rules::indented_form_feed;
 use crate::settings::LinterSettings;
 use crate::Locator;
-use crate::rules::ruff::rules::indented_form_feed;
 
 /// Return the amount of indentation, expanding tabs to the next multiple of the settings' tab size.
 pub(crate) fn expand_indent(line: &str, indent_width: IndentWidth) -> usize {
@@ -195,7 +195,6 @@ pub(crate) fn check_logical_lines(
             prev_line = Some(line);
             prev_indent_level = Some(indent_level);
         }
-
     }
     context.diagnostics
 }
