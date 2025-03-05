@@ -7,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/inline/ok/iter_unpack_return_py3
 ```
 Module(
     ModModule {
-        range: 0..121,
+        range: 0..91,
         body: [
             Assign(
                 StmtAssign {
@@ -126,87 +126,6 @@ Module(
                                             parenthesized: false,
                                         },
                                     ),
-                                ),
-                            },
-                        ),
-                    ],
-                },
-            ),
-            FunctionDef(
-                StmtFunctionDef {
-                    range: 91..120,
-                    is_async: false,
-                    decorator_list: [],
-                    name: Identifier {
-                        id: Name("g"),
-                        range: 95..96,
-                    },
-                    type_params: None,
-                    parameters: Parameters {
-                        range: 96..98,
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
-                    },
-                    returns: None,
-                    body: [
-                        Expr(
-                            StmtExpr {
-                                range: 100..120,
-                                value: Yield(
-                                    ExprYield {
-                                        range: 100..120,
-                                        value: Some(
-                                            Tuple(
-                                                ExprTuple {
-                                                    range: 106..120,
-                                                    elts: [
-                                                        NumberLiteral(
-                                                            ExprNumberLiteral {
-                                                                range: 106..107,
-                                                                value: Int(
-                                                                    1,
-                                                                ),
-                                                            },
-                                                        ),
-                                                        NumberLiteral(
-                                                            ExprNumberLiteral {
-                                                                range: 109..110,
-                                                                value: Int(
-                                                                    2,
-                                                                ),
-                                                            },
-                                                        ),
-                                                        NumberLiteral(
-                                                            ExprNumberLiteral {
-                                                                range: 112..113,
-                                                                value: Int(
-                                                                    3,
-                                                                ),
-                                                            },
-                                                        ),
-                                                        Starred(
-                                                            ExprStarred {
-                                                                range: 115..120,
-                                                                value: Name(
-                                                                    ExprName {
-                                                                        range: 116..120,
-                                                                        id: Name("rest"),
-                                                                        ctx: Load,
-                                                                    },
-                                                                ),
-                                                                ctx: Load,
-                                                            },
-                                                        ),
-                                                    ],
-                                                    ctx: Load,
-                                                    parenthesized: false,
-                                                },
-                                            ),
-                                        ),
-                                    },
                                 ),
                             },
                         ),

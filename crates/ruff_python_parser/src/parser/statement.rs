@@ -299,6 +299,20 @@ impl<'src> Parser<'src> {
                     value: Some(expr), ..
                 }) = &parsed_expr.expr
                 {
+                    // test_ok iter_unpack_yield_py37
+                    // # parse_options: {"target-version": "3.7"}
+                    // rest = (4, 5, 6)
+                    // def g(): yield (1, 2, 3, *rest)
+
+                    // test_ok iter_unpack_yield_py38
+                    // # parse_options: {"target-version": "3.8"}
+                    // rest = (4, 5, 6)
+                    // def g(): yield 1, 2, 3, *rest
+
+                    // test_err iter_unpack_yield_py37
+                    // # parse_options: {"target-version": "3.7"}
+                    // rest = (4, 5, 6)
+                    // def g(): yield 1, 2, 3, *rest
                     self.check_tuple_unpacking(expr, StarTupleKind::Yield);
                 }
 
@@ -402,20 +416,16 @@ impl<'src> Parser<'src> {
             // # parse_options: {"target-version": "3.7"}
             // rest = (4, 5, 6)
             // def f(): return (1, 2, 3, *rest)
-            // def g(): yield (1, 2, 3, *rest)
 
             // test_ok iter_unpack_return_py38
             // # parse_options: {"target-version": "3.8"}
             // rest = (4, 5, 6)
             // def f(): return 1, 2, 3, *rest
-            // def g(): yield 1, 2, 3, *rest
 
             // test_err iter_unpack_return_py37
             // # parse_options: {"target-version": "3.7"}
             // rest = (4, 5, 6)
             // def f(): return 1, 2, 3, *rest
-            // def g(): yield 1, 2, 3, *rest
-
             self.check_tuple_unpacking(&parsed_expr, StarTupleKind::Return);
 
             Box::new(parsed_expr.expr)
