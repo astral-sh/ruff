@@ -3471,7 +3471,6 @@ impl<'db> ContextManagerErrorKind<'db> {
         }
     }
 
-    // TODO: consistency between "does not" and "doesn't"
     fn format_call_dunder_error(call_dunder_error: &CallDunderError<'db>, name: &str) -> String {
         match call_dunder_error {
             CallDunderError::MethodNotAvailable => format!("it doesn't implement `{name}`"),

@@ -1268,8 +1268,7 @@ where
                     optional_vars,
                 } in items
                 {
-                    // TODO: yes this name is terrible
-                    let context_expr_expr = self.add_standalone_expression(context_expr);
+                    let context_manager = self.add_standalone_expression(context_expr);
                     self.visit_expr(context_expr);
                     if let Some(optional_vars) = optional_vars.as_deref() {
                         self.add_standalone_expression(context_expr);
@@ -1287,7 +1286,7 @@ where
                                         unsafe {
                                             AstNodeRef::new(self.module.clone(), optional_vars)
                                         },
-                                        UnpackValue::ContextManager(context_expr_expr),
+                                        UnpackValue::ContextManager(context_manager),
                                         countme::Count::default(),
                                     )),
                                 })
@@ -1296,8 +1295,8 @@ where
                                 item,
                                 is_async: *is_async,
                                 unpack: None,
-                                first: false, // arbitrary
-                                              // TODO: explain more
+                                // `false` is arbitrary here---we don't actually use it other than in the actual unpacks
+                                first: false,
                             }),
                             ast::Expr::Attribute(ast::ExprAttribute {
                                 value: object,
@@ -1307,9 +1306,7 @@ where
                                 self.register_attribute_assignment(
                                     object,
                                     attr,
-                                    AttributeAssignment::ContextManager {
-                                        context_manager: context_expr_expr,
-                                    },
+                                    AttributeAssignment::ContextManager { context_manager },
                                 );
                                 None
                             }
