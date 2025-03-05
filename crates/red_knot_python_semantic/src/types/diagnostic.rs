@@ -1151,3 +1151,18 @@ pub(crate) fn report_invalid_arguments_to_annotated<'db>(
         ),
     );
 }
+
+pub(crate) fn report_invalid_arguments_to_callable<'db>(
+    db: &'db dyn Db,
+    context: &InferContext<'db>,
+    subscript: &ast::ExprSubscript,
+) {
+    context.report_lint(
+        &INVALID_TYPE_FORM,
+        subscript,
+        format_args!(
+            "Special form `{}` expected exactly two arguments (parameter types and return type)",
+            KnownInstanceType::Callable.repr(db)
+        ),
+    );
+}

@@ -29,6 +29,8 @@ def i(callback: Callable[Concatenate[int, P], R_co], *args: P.args, **kwargs: P.
     # TODO: should understand the annotation
     reveal_type(kwargs)  # revealed: dict
 
+    # TODO: fix this
+    # error: [call-non-callable]
     return callback(42, *args, **kwargs)
 
 class Foo:
