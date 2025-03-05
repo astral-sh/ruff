@@ -72,7 +72,7 @@ fn compute_diagnostics(snapshot: &DocumentSnapshot, db: &ProjectDatabase) -> Vec
 
 fn to_lsp_diagnostic(
     db: &dyn Db,
-    diagnostic: &dyn ruff_db::diagnostic::Diagnostic,
+    diagnostic: &dyn ruff_db::diagnostic::OldDiagnosticTrait,
     encoding: crate::PositionEncoding,
 ) -> Diagnostic {
     let range = if let Some(span) = diagnostic.span() {

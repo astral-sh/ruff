@@ -71,8 +71,8 @@ html,
 
 @font-face {
     font-family: "Alliance Text";
-    src: url("../fonts/Alliance-TextRegular.woff2") format("woff2"),
-    url("../fonts/Alliance-TextRegular.woff") format("woff");
+    src: url("https://static.astral.sh/fonts/Alliance-TextRegular.woff2") format("woff2"),
+    url("https://static.astral.sh/fonts/Alliance-TextRegular.woff") format("woff");
     font-weight: normal;
     font-style: normal;
     font-display: block;
@@ -80,8 +80,8 @@ html,
 
 @font-face {
     font-family: "Alliance Text";
-    src: url("../fonts/Alliance-TextMedium.woff2") format("woff2"),
-    url("../fonts/Alliance-TextMedium.woff") format("woff");
+    src: url("https://static.astral.sh/fonts/Alliance-TextMedium.woff2") format("woff2"),
+    url("https://static.astral.sh/fonts/Alliance-TextMedium.woff") format("woff");
     font-weight: 500;
     font-style: normal;
     font-display: block;
@@ -89,8 +89,8 @@ html,
 
 @font-face {
     font-family: "Alliance Platt";
-    src: url("../fonts/Alliance-PlattMedium.woff2") format("woff2"),
-    url("../fonts/Alliance-PlattMedium.woff") format("woff");
+    src: url("https://static.astral.sh/fonts/Alliance-PlattMedium.woff2") format("woff2"),
+    url("https://static.astral.sh/fonts/Alliance-PlattMedium.woff") format("woff");
     font-weight: 500;
     font-style: normal;
     font-display: block;
@@ -98,8 +98,8 @@ html,
 
 @font-face {
     font-family: "Alliance Platt";
-    src: url("../fonts/Alliance-PlattRegular.woff2") format("woff2"),
-    url("../fonts/Alliance-PlattRegular.woff") format("woff");
+    src: url("https://static.astral.sh/fonts/Alliance-PlattRegular.woff2") format("woff2"),
+    url("https://static.astral.sh/fonts/Alliance-PlattRegular.woff") format("woff");
     font-weight: normal;
     font-style: normal;
     font-display: block;

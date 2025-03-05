@@ -8,7 +8,9 @@ use crate::types::string_annotation::{
 };
 use crate::types::{ClassLiteralType, KnownInstanceType, Type};
 use crate::{declare_lint, Db};
-use ruff_db::diagnostic::{Diagnostic, DiagnosticId, SecondaryDiagnosticMessage, Severity, Span};
+use ruff_db::diagnostic::{
+    DiagnosticId, OldDiagnosticTrait, OldSecondaryDiagnosticMessage, Severity, Span,
+};
 use ruff_db::files::File;
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::TextRange;
@@ -39,6 +41,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_METACLASS);
     registry.register_lint(&INVALID_PARAMETER_DEFAULT);
     registry.register_lint(&INVALID_RAISE);
+    registry.register_lint(&INVALID_TYPE_CHECKING_CONSTANT);
     registry.register_lint(&INVALID_TYPE_FORM);
     registry.register_lint(&INVALID_TYPE_VARIABLE_CONSTRAINTS);
     registry.register_lint(&MISSING_ARGUMENT);
@@ -407,6 +410,24 @@ declare_lint! {
     /// - [Python documentation: Built-in Exceptions](https://docs.python.org/3/library/exceptions.html#built-in-exceptions)
     pub(crate) static INVALID_RAISE = {
         summary: "detects `raise` statements that raise invalid exceptions or use invalid causes",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for a value other than `False` assigned to the `TYPE_CHECKING` variable, or an
+    /// annotation not assignable from `bool`.
+    ///
+    /// ## Why is this bad?
+    /// The name `TYPE_CHECKING` is reserved for a flag that can be used to provide conditional
+    /// code seen only by the type checker, and not at runtime. Normally this flag is imported from
+    /// `typing` or `typing_extensions`, but it can also be defined locally. If defined locally, it
+    /// must be assigned the value `False` at runtime; the type checker will consider its value to
+    /// be `True`. If annotated, it must be annotated as a type that can accept `bool` values.
+    pub(crate) static INVALID_TYPE_CHECKING_CONSTANT = {
+        summary: "detects invalid TYPE_CHECKING constant assignments",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
@@ -809,7 +830,7 @@ pub struct TypeCheckDiagnostic {
     pub(crate) range: TextRange,
     pub(crate) severity: Severity,
     pub(crate) file: File,
-    pub(crate) secondary_messages: Vec<SecondaryDiagnosticMessage>,
+    pub(crate) secondary_messages: Vec<OldSecondaryDiagnosticMessage>,
 }
 
 impl TypeCheckDiagnostic {
@@ -826,7 +847,7 @@ impl TypeCheckDiagnostic {
     }
 }
 
-impl Diagnostic for TypeCheckDiagnostic {
+impl OldDiagnosticTrait for TypeCheckDiagnostic {
     fn id(&self) -> DiagnosticId {
         self.id
     }
@@ -839,7 +860,7 @@ impl Diagnostic for TypeCheckDiagnostic {
         Some(Span::from(self.file).with_range(self.range))
     }
 
-    fn secondary_messages(&self) -> &[SecondaryDiagnosticMessage] {
+    fn secondary_messages(&self) -> &[OldSecondaryDiagnosticMessage] {
         &self.secondary_messages
     }
 
@@ -1039,6 +1060,14 @@ pub(super) fn report_invalid_attribute_assignment(
             source_ty.display(context.db()),
             target_ty.display(context.db()),
         ),
+    );
+}
+
+pub(super) fn report_invalid_type_checking_constant(context: &InferContext, node: AnyNodeRef) {
+    context.report_lint(
+        &INVALID_TYPE_CHECKING_CONSTANT,
+        node,
+        format_args!("The name TYPE_CHECKING is reserved for use as a flag; only False can be assigned to it.",),
     );
 }
 
