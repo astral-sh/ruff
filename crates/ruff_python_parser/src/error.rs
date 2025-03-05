@@ -510,16 +510,10 @@ impl UnsupportedSyntaxErrorKind {
 
     /// Returns whether or not this kind of syntax is unsupported on `target_version`.
     pub(crate) fn is_unsupported(self, target_version: PythonVersion) -> bool {
-        let (_, version) = self.changed_version();
-        match self {
-            UnsupportedSyntaxErrorKind::Match
-            | UnsupportedSyntaxErrorKind::Walrus
-            | UnsupportedSyntaxErrorKind::ExceptStar
-            | UnsupportedSyntaxErrorKind::TypeAliasStatement
-            | UnsupportedSyntaxErrorKind::TypeParamDefault => target_version < version,
-            UnsupportedSyntaxErrorKind::ParenthesizedKeywordArgumentName => {
-                target_version >= version
-            }
+        let (change, version) = self.changed_version();
+        match change {
+            Change::Added => target_version < version,
+            Change::Removed => target_version >= version,
         }
     }
 }
