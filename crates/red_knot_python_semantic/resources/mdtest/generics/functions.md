@@ -217,3 +217,28 @@ reveal_type(tuple_param("a", ("a", 1)))  # revealed: tuple[T, S]
 # error: [invalid-argument-type]
 reveal_type(tuple_param(1, ("a", 1)))  # revealed: tuple[T, S]
 ```
+
+## Inferring nested generic function calls
+
+We can infer type assignments in nested calls to multiple generic functions. If they use the same
+type variable, we do not confuse the two; `T@f` and `T@g` have separate types in each example below.
+
+```py
+def f[T](x: T) -> tuple[T, int]:
+    return (x, 1)
+
+def g[T](x: T) -> T | None:
+    return x
+
+# TODO: no error
+# TODO: revealed: tuple[str | None, int]
+# error: [invalid-argument-type]
+# error: [invalid-argument-type]
+reveal_type(f(g("a")))  # revealed: tuple[T, int]
+
+# TODO: no error
+# TODO: revealed: tuple[str, int] | None
+# error: [invalid-argument-type]
+# error: [invalid-argument-type]
+reveal_type(g(f("a")))  # revealed: T | None
+```
