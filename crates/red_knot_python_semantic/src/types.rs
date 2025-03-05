@@ -1649,6 +1649,10 @@ impl<'db> Type<'db> {
         .entered();
 
         match class_member {
+            // This branch is not strictly needed, but it short-circuits the lookup
+            // of various dunder methods and calls that would otherwise be made.
+            SymbolAndQualifiers(Symbol::Type(Type::Dynamic(_), _), _) => (class_member, true),
+
             SymbolAndQualifiers(Symbol::Type(Type::Union(union), boundness), qualifiers) => (
                 SymbolAndQualifiers(
                     union.map_with_boundness(db, |elem| {
@@ -1661,7 +1665,11 @@ impl<'db> Type<'db> {
                     }),
                     qualifiers,
                 ),
-                false, // TODO
+                // TODO: avoid the duplication here:
+                union
+                    .elements(db)
+                    .iter()
+                    .all(|elem| elem.try_call_dunder_get(db, instance, owner).1),
             ),
             SymbolAndQualifiers(
                 Symbol::Type(Type::Intersection(intersection), boundness),
@@ -1705,154 +1713,94 @@ impl<'db> Type<'db> {
     fn run_descriptor_protocol_instances(
         self,
         db: &'db dyn Db,
-        instance_variable_fallback: Option<&str>,
-        class_attr: SymbolAndQualifiers<'db>,
-        owner: Type<'db>,
+        name: &str,
+        instance_variable_fallback: bool,
     ) -> SymbolAndQualifiers<'db> {
         let _span = tracing::trace_span!(
             "run_descriptor_protocol_instances",
             self=%self.display(db),
             instance_variable_fallback=?instance_variable_fallback,
-            class_attr=?class_attr,
-            owner=%owner.display(db),
         )
         .entered();
 
         match self {
             Type::Union(union) => union.map_with_boundness_and_qualifiers(db, |elem| {
-                elem.run_descriptor_protocol_instances(
-                    db,
-                    instance_variable_fallback,
-                    class_attr.clone(),
-                    owner,
-                )
+                elem.run_descriptor_protocol_instances(db, name, instance_variable_fallback)
             }),
-            Type::Intersection(intersection) => {
-                intersection.map_with_boundness_and_qualifiers(db, |elem| {
-                    elem.run_descriptor_protocol_instances(
-                        db,
-                        instance_variable_fallback,
-                        class_attr.clone(),
-                        owner,
-                    )
-                })
-            }
+            Type::Intersection(intersection) => intersection
+                .map_with_boundness_and_qualifiers(db, |elem| {
+                    elem.run_descriptor_protocol_instances(db, name, instance_variable_fallback)
+                }),
             _ => {
-                let class_attr_qualifiers = class_attr.1;
+                let (
+                    SymbolAndQualifiers(class_attr_resolved, class_attr_qualifiers),
+                    is_data_descriptor,
+                ) = Self::try_call_dunder_get_on_class_member(
+                    db,
+                    name,
+                    self.class_member(db, name),
+                    self,
+                    self.to_meta_type(db),
+                );
 
-                match class_attr.0 {
-                    Symbol::Type(Type::Union(union), boundness) => SymbolAndQualifiers(
-                        union.map_with_boundness(db, |elem| {
-                            self.run_descriptor_protocol_instances(
-                                db,
-                                instance_variable_fallback,
-                                Symbol::Type(*elem, boundness).into(),
-                                owner,
-                            )
-                            .0
-                        }),
-                        class_attr_qualifiers,
-                    ),
+                let instance_variable = if instance_variable_fallback {
+                    self.instance_variable(db, name)
+                } else {
+                    Symbol::Unbound.into()
+                };
 
-                    Symbol::Type(Type::Intersection(intersection), boundness) => {
-                        SymbolAndQualifiers(
-                            intersection.map_with_boundness(db, |elem| {
-                                self.run_descriptor_protocol_instances(
-                                    db,
-                                    instance_variable_fallback,
-                                    Symbol::Type(*elem, boundness).into(),
-                                    owner,
-                                )
-                                .0
-                            }),
-                            class_attr_qualifiers,
-                        )
+                tracing::trace!("instance_variable = {:?}", instance_variable);
+
+                eprintln!("class_attr_resolved = {:?}", class_attr_resolved);
+                eprintln!("is_data_descriptor = {:?}", is_data_descriptor);
+                eprintln!("instance_variable = {:?}", instance_variable.0);
+
+                match (
+                    class_attr_resolved,
+                    is_data_descriptor,
+                    &instance_variable.0,
+                ) {
+                    (class_attr_resolved @ Symbol::Type(_, _), _, Symbol::Unbound) => {
+                        SymbolAndQualifiers(class_attr_resolved, class_attr_qualifiers)
                     }
-
-                    // This branch is not strictly needed, but it short-circuits the lookup
-                    // of various dunder methods and calls that would otherwise be made.
-                    Symbol::Type(Type::Dynamic(_), _) => class_attr,
-
-                    Symbol::Type(class_attr_ty, class_attr_boundness) => {
-                        let (descr_get_return_ty, is_data_descriptor) =
-                            class_attr_ty.try_call_dunder_get(db, self, owner);
-
-                        let instance_variable = instance_variable_fallback
-                            .map(|name| self.instance_variable(db, name))
-                            .unwrap_or(Symbol::Unbound.into());
-
-                        tracing::trace!("instance_variable = {:?}", instance_variable);
-
-                        // eprintln!("descr_get_return_ty = {:?}", descr_get_return_ty);
-                        // eprintln!("is_data_descriptor = {:?}", is_data_descriptor);
-                        // eprintln!("instance_variable = {:?}", instance_variable.0);
-
-                        match (
-                            descr_get_return_ty,
-                            is_data_descriptor,
-                            &instance_variable.0,
-                        ) {
-                            (Some(return_ty), _, Symbol::Unbound) => SymbolAndQualifiers(
-                                Symbol::Type(return_ty, class_attr_boundness),
+                    (
+                        Symbol::Type(class_attr_resolved_ty, class_attr_boundness),
+                        true,
+                        Symbol::Type(instance_variable_ty, instance_variable_boundness),
+                    ) => {
+                        if class_attr_boundness == Boundness::Bound {
+                            SymbolAndQualifiers(
+                                Symbol::Type(class_attr_resolved_ty, Boundness::Bound),
                                 class_attr_qualifiers,
-                            ),
-                            (
-                                Some(return_ty),
-                                true,
-                                Symbol::Type(instance_variable_ty, instance_variable_boundness),
-                            ) => {
-                                if class_attr_boundness == Boundness::Bound {
-                                    SymbolAndQualifiers(
-                                        Symbol::Type(return_ty, Boundness::Bound),
-                                        class_attr_qualifiers,
-                                    )
-                                } else {
-                                    SymbolAndQualifiers(
-                                        Symbol::Type(
-                                            UnionType::from_elements(
-                                                db,
-                                                [return_ty, *instance_variable_ty],
-                                            ),
-                                            class_attr_boundness.min(*instance_variable_boundness),
-                                        ),
-                                        class_attr_qualifiers,
-                                    )
-                                }
-                            }
-                            (
-                                Some(return_ty),
-                                false,
-                                Symbol::Type(instance_variable_ty, instance_variable_boundness),
-                            ) => SymbolAndQualifiers(
+                            )
+                        } else {
+                            SymbolAndQualifiers(
                                 Symbol::Type(
                                     UnionType::from_elements(
                                         db,
-                                        [return_ty, *instance_variable_ty],
+                                        [class_attr_resolved_ty, *instance_variable_ty],
                                     ),
                                     class_attr_boundness.min(*instance_variable_boundness),
                                 ),
                                 class_attr_qualifiers,
-                            ),
-                            (
-                                None,
-                                _,
-                                Symbol::Type(instance_variable_ty, instance_variable_boundness),
-                            ) => SymbolAndQualifiers(
-                                Symbol::Type(
-                                    UnionType::from_elements(
-                                        db,
-                                        [class_attr_ty, *instance_variable_ty],
-                                    ),
-                                    class_attr_boundness.min(*instance_variable_boundness),
-                                ),
-                                class_attr_qualifiers,
-                            ),
-                            (None, _, Symbol::Unbound) => class_attr,
+                            )
                         }
                     }
-                    Symbol::Unbound => instance_variable_fallback
-                        .map(|name| self.instance_variable(db, name))
-                        .unwrap_or(Symbol::Unbound.into()),
+                    (
+                        Symbol::Type(class_attr_resolved_ty, class_attr_boundness),
+                        false,
+                        Symbol::Type(instance_variable_ty, instance_variable_boundness),
+                    ) => SymbolAndQualifiers(
+                        Symbol::Type(
+                            UnionType::from_elements(
+                                db,
+                                [class_attr_resolved_ty, *instance_variable_ty],
+                            ),
+                            class_attr_boundness.min(*instance_variable_boundness),
+                        ),
+                        class_attr_qualifiers,
+                    ),
+                    (Symbol::Unbound, _, _) => instance_variable,
                 }
             }
         }
@@ -2026,13 +1974,7 @@ impl<'db> Type<'db> {
             | Type::SliceLiteral(..)
             | Type::Tuple(..)
             | Type::KnownInstance(..)
-            | Type::FunctionLiteral(..) => {
-                let objtype = self.to_meta_type(db);
-
-                let class_attr = self.class_member(db, name);
-
-                self.run_descriptor_protocol_instances(db, Some(name), class_attr, objtype)
-            }
+            | Type::FunctionLiteral(..) => self.run_descriptor_protocol_instances(db, name, true),
 
             Type::SubclassOf(subclass_of_ty)
                 if subclass_of_ty.subclass_of().is_dynamic()
@@ -2770,7 +2712,7 @@ impl<'db> Type<'db> {
             tracing::trace_span!("try_call_dunder", self=%self.display(db), name, ?arguments)
                 .entered();
 
-        let meta_type = self.to_meta_type(db);
+        // TODO: avoid looking this up twice (here and in `run_descriptor_protocol_instances`)?
         let callable = self.class_member(db, name);
 
         match callable.0 {
@@ -2781,9 +2723,8 @@ impl<'db> Type<'db> {
 
                 tracing::trace!("callable before = {}", callable_ty.display(db));
 
-                if let Symbol::Type(callable_ty_desc, boundness_desc) = self
-                    .run_descriptor_protocol_instances(db, None, callable, meta_type)
-                    .0
+                if let Symbol::Type(callable_ty_desc, boundness_desc) =
+                    self.run_descriptor_protocol_instances(db, name, false).0
                 {
                     callable_ty = callable_ty_desc;
                     boundness = boundness_desc;
