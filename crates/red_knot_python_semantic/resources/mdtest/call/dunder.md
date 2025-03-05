@@ -46,6 +46,17 @@ class DunderOnMetaClass(metaclass=Meta):
 reveal_type(DunderOnMetaClass[0])  # revealed: str
 ```
 
+If the dunder method is only present on the class itself, it will not be called:
+
+```py
+class ClassWithNormalDunder:
+    def __getitem__(self, key: int) -> str:
+        return str(key)
+
+# error: [non-subscriptable]
+ClassWithNormalDunder[0]
+```
+
 ## Operating on instances
 
 When invoking a dunder method on an instance of a class, it is looked up on the class:

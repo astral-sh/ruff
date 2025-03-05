@@ -1714,7 +1714,7 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         name: &str,
         with_fallback: F,
-        fallback_shadoes_non_data_descriptor: bool,
+        fallback_shadows_non_data_descriptor: bool,
     ) -> SymbolAndQualifiers<'db>
     where
         F: Fn(Type<'db>) -> SymbolAndQualifiers<'db> + Clone,
@@ -1732,7 +1732,7 @@ impl<'db> Type<'db> {
                     db,
                     name,
                     with_fallback.clone(),
-                    fallback_shadoes_non_data_descriptor,
+                    fallback_shadows_non_data_descriptor,
                 )
             }),
             Type::Intersection(intersection) => {
@@ -1741,7 +1741,7 @@ impl<'db> Type<'db> {
                         db,
                         name,
                         with_fallback.clone(),
-                        fallback_shadoes_non_data_descriptor,
+                        fallback_shadows_non_data_descriptor,
                     )
                 })
             }
@@ -1778,7 +1778,7 @@ impl<'db> Type<'db> {
                         meta_attr_qualifiers.union(fallback_qualifiers),
                     ),
                     (Symbol::Type(_, _), false, fallback @ Symbol::Type(_, Boundness::Bound))
-                        if fallback_shadoes_non_data_descriptor =>
+                        if fallback_shadows_non_data_descriptor =>
                     {
                         SymbolAndQualifiers(fallback, fallback_qualifiers)
                     }
@@ -1805,12 +1805,12 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         name: &str,
-        instance_variable_fallback: bool,
+        with_fallback: bool,
     ) -> SymbolAndQualifiers<'db> {
         let _span = tracing::trace_span!(
             "run_descriptor_protocol_instances",
             self=%self.display(db),
-            instance_variable_fallback=?instance_variable_fallback,
+            with_fallback=?with_fallback,
         )
         .entered();
 
@@ -1818,7 +1818,7 @@ impl<'db> Type<'db> {
             db,
             name,
             |object| {
-                if instance_variable_fallback {
+                if with_fallback {
                     object.instance_variable(db, name)
                 } else {
                     Symbol::Unbound.into()
@@ -1832,6 +1832,7 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         name: &str,
+        with_fallback: bool,
     ) -> SymbolAndQualifiers<'db> {
         let _span = tracing::trace_span!(
             "run_descriptor_protocol_classes",
@@ -1844,15 +1845,19 @@ impl<'db> Type<'db> {
             db,
             name,
             |object| {
-                let class_attr_plain = object.find_name_in_mro(db, name).expect("TODO");
-                Self::try_call_dunder_get_on_class_member(
-                    db,
-                    name,
-                    class_attr_plain,
-                    Type::none(db),
-                    object,
-                )
-                .0
+                if with_fallback {
+                    let class_attr_plain = object.find_name_in_mro(db, name).expect("TODO");
+                    Self::try_call_dunder_get_on_class_member(
+                        db,
+                        name,
+                        class_attr_plain,
+                        Type::none(db),
+                        object,
+                    )
+                    .0
+                } else {
+                    Symbol::Unbound.into()
+                }
             },
             true,
         )
@@ -1867,6 +1872,25 @@ impl<'db> Type<'db> {
     /// lookup, like a failed `__get__` call on a descriptor.
     #[must_use]
     pub(crate) fn member(&self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
+        self.member_impl(db, name, true)
+    }
+
+    #[must_use]
+    pub(crate) fn member_without_instance_fallback(
+        &self,
+        db: &'db dyn Db,
+        name: &str,
+    ) -> SymbolAndQualifiers<'db> {
+        self.member_impl(db, name, false)
+    }
+
+    #[must_use]
+    pub(crate) fn member_impl(
+        &self,
+        db: &'db dyn Db,
+        name: &str,
+        with_fallback: bool,
+    ) -> SymbolAndQualifiers<'db> {
         let _span = tracing::trace_span!("member", self=%self.display(db), name).entered();
 
         if name == "__class__" {
@@ -1935,6 +1959,13 @@ impl<'db> Type<'db> {
                 Symbol::bound(Type::IntLiteral(i64::from(*bool_value))).into()
             }
 
+            Type::SubclassOf(subclass_of_ty)
+                if subclass_of_ty.subclass_of().is_dynamic()
+                    && matches!(name, "__get__" | "__set__" | "__delete__") =>
+            {
+                Symbol::bound(Type::unknown()).into()
+            }
+
             Type::Instance(..)
             | Type::BooleanLiteral(..)
             | Type::IntLiteral(..)
@@ -1944,13 +1975,8 @@ impl<'db> Type<'db> {
             | Type::SliceLiteral(..)
             | Type::Tuple(..)
             | Type::KnownInstance(..)
-            | Type::FunctionLiteral(..) => self.run_descriptor_protocol_instances(db, name, true),
-
-            Type::SubclassOf(subclass_of_ty)
-                if subclass_of_ty.subclass_of().is_dynamic()
-                    && matches!(name, "__get__" | "__set__" | "__delete__") =>
-            {
-                Symbol::bound(Type::unknown()).into()
+            | Type::FunctionLiteral(..) => {
+                self.run_descriptor_protocol_instances(db, name, with_fallback)
             }
 
             Type::ClassLiteral(..) | Type::SubclassOf(..) => {
@@ -1958,7 +1984,7 @@ impl<'db> Type<'db> {
                     return self.find_name_in_mro(db, name).expect("TODO");
                 }
 
-                self.run_descriptor_protocol_classes(db, name)
+                self.run_descriptor_protocol_classes(db, name, with_fallback)
             }
             Type::Union(union) => union
                 .map_with_boundness(db, |elem| elem.member(db, name).0)
@@ -2682,34 +2708,14 @@ impl<'db> Type<'db> {
             tracing::trace_span!("try_call_dunder", self=%self.display(db), name, ?arguments)
                 .entered();
 
-        // TODO: avoid looking this up twice (here and in `run_descriptor_protocol_instances`)?
-        let callable = self.class_member(db, name);
-
-        match callable.0 {
-            Symbol::Type(mut callable_ty, mut boundness) => {
-                // Dunder methods are looked up on the meta type, but they invoke the descriptor
-                // protocol *as if they had been called on the instance itself*. This is why we
-                // pass `Some(self)` for the `instance` argument here.
-
-                tracing::trace!("callable before = {}", callable_ty.display(db));
-
-                if let Symbol::Type(callable_ty_desc, boundness_desc) =
-                    self.run_descriptor_protocol_instances(db, name, false).0
-                {
-                    callable_ty = callable_ty_desc;
-                    boundness = boundness_desc;
-                }
-
-                tracing::trace!("callable after = {}", callable_ty.display(db));
-
-                let result = callable_ty.try_call(db, arguments);
-
-                tracing::trace!("result = {:?}", result);
+        match self.member_without_instance_fallback(db, name).0 {
+            Symbol::Type(dunder_callbable, boundness) => {
+                let result = dunder_callbable.try_call(db, arguments)?;
 
                 if boundness == Boundness::Bound {
-                    Ok(result?)
+                    Ok(result)
                 } else {
-                    Err(CallDunderError::PossiblyUnbound(result?))
+                    Err(CallDunderError::PossiblyUnbound(result))
                 }
             }
             Symbol::Unbound => Err(CallDunderError::MethodNotAvailable),
