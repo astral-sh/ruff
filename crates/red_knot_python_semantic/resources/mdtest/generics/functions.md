@@ -58,9 +58,9 @@ def good_param[T: int](x: T) -> None:
 ```
 
 If the function is annotated as returning the typevar, this means that the upper bound is _not_
-assignable to that typevar, since return types are contravariant. In `bad`, we can infer that `x +
-1` has type `int`. But `T` might be instantiated with a narrower type than `int`, and so the return
-value is not guaranteed to be compatible for all `T: int`.
+assignable to that typevar, since return types are contravariant. In `bad`, we can infer that
+`x + 1` has type `int`. But `T` might be instantiated with a narrower type than `int`, and so the
+return value is not guaranteed to be compatible for all `T: int`.
 
 ```py
 def good_return[T: int](x: T) -> T:

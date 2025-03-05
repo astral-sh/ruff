@@ -165,6 +165,7 @@ reveal_type(Sub)  # revealed: Literal[Sub]
 
 ```py
 class Base[T]: ...
+
 # TODO: no error
 # error: [non-subscriptable]
 class Sub(Base["Sub"]): ...
@@ -176,6 +177,7 @@ reveal_type(Sub)  # revealed: Literal[Sub]
 
 ```py
 class Base[T]: ...
+
 # TODO: error: [unresolved-reference]
 class Sub(Base[Sub]): ...
 ```
