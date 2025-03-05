@@ -118,7 +118,7 @@ fn infer_definition_types_cycle_recovery<'db>(
     input: Definition<'db>,
 ) -> TypeInference<'db> {
     tracing::trace!("infer_definition_types_cycle_recovery");
-    TypeInference::empty(input.scope(db), Some(todo_type!("cycle recovery")))
+    TypeInference::cycle_fallback(input.scope(db), todo_type!("cycle recovery"))
 }
 
 /// Infer all types for a [`Definition`] (including sub-expressions).
@@ -282,11 +282,13 @@ pub(crate) struct TypeInference<'db> {
     scope: ScopeId<'db>,
 
     /// The fallback type for missing expressions/bindings/declarations.
-    missing_ty: Option<Type<'db>>,
+    ///
+    /// This is used only when constructing a cycle-recovery `TypeInference`.
+    cycle_fallback_type: Option<Type<'db>>,
 }
 
 impl<'db> TypeInference<'db> {
-    pub(crate) fn empty(scope: ScopeId<'db>, missing_ty: Option<Type<'db>>) -> Self {
+    pub(crate) fn empty(scope: ScopeId<'db>) -> Self {
         Self {
             expressions: FxHashMap::default(),
             bindings: FxHashMap::default(),
@@ -294,28 +296,47 @@ impl<'db> TypeInference<'db> {
             deferred: FxHashSet::default(),
             diagnostics: TypeCheckDiagnostics::default(),
             scope,
-            missing_ty,
+            cycle_fallback_type: None,
+        }
+    }
+
+    fn cycle_fallback(scope: ScopeId<'db>, cycle_fallback_type: Type<'db>) -> Self {
+        Self {
+            expressions: FxHashMap::default(),
+            bindings: FxHashMap::default(),
+            declarations: FxHashMap::default(),
+            deferred: FxHashSet::default(),
+            diagnostics: TypeCheckDiagnostics::default(),
+            scope,
+            cycle_fallback_type: Some(cycle_fallback_type),
         }
     }
 
     #[track_caller]
     pub(crate) fn expression_type(&self, expression: ScopedExpressionId) -> Type<'db> {
-        self.try_expression_type(expression).unwrap_or_else(|| {
-            self.missing_ty
-                .expect("missing expression type and no missing_ty")
-        })
+        self.try_expression_type(expression).expect(
+            "expression should belong to this TypeInference region and
+            TypeInferenceBuilder should have inferred a type for it",
+        )
     }
 
     pub(crate) fn try_expression_type(&self, expression: ScopedExpressionId) -> Option<Type<'db>> {
-        self.expressions.get(&expression).copied()
+        self.expressions
+            .get(&expression)
+            .copied()
+            .or(self.cycle_fallback_type)
     }
 
     #[track_caller]
     pub(crate) fn binding_type(&self, definition: Definition<'db>) -> Type<'db> {
-        self.bindings.get(&definition).copied().unwrap_or_else(|| {
-            self.missing_ty
-                .expect("missing binding type and no missing_ty")
-        })
+        self.bindings
+            .get(&definition)
+            .copied()
+            .or(self.cycle_fallback_type)
+            .expect(
+                "definition should belong to this TypeInference region and
+                TypeInferenceBuilder should have inferred a type for it",
+            )
     }
 
     #[track_caller]
@@ -323,11 +344,11 @@ impl<'db> TypeInference<'db> {
         self.declarations
             .get(&definition)
             .copied()
-            .unwrap_or_else(|| {
-                self.missing_ty
-                    .expect("missing declaration type and no missing_ty")
-                    .into()
-            })
+            .or(self.cycle_fallback_type.map(Into::into))
+            .expect(
+                "definition should belong to this TypeInference region and
+                TypeInferenceBuilder should have inferred a type for it",
+            )
     }
 
     pub(crate) fn diagnostics(&self) -> &TypeCheckDiagnostics {
@@ -454,7 +475,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             index,
             region,
             deferred_state: DeferredExpressionState::None,
-            types: TypeInference::empty(scope, None),
+            types: TypeInference::empty(scope),
         }
     }
 
