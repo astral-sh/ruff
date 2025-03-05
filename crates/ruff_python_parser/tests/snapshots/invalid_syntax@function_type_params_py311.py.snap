@@ -119,3 +119,11 @@ Module(
   |        ^^^ Syntax Error: Cannot use type parameter lists on Python 3.11 (syntax was added in Python 3.12)
 3 | def foo[](): ...
   |
+
+
+  |
+1 | # parse_options: {"target-version": "3.11"}
+2 | def foo[T](): ...
+3 | def foo[](): ...
+  |        ^^ Syntax Error: Cannot use type parameter lists on Python 3.11 (syntax was added in Python 3.12)
+  |

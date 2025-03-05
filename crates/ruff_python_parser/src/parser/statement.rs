@@ -1794,15 +1794,11 @@ impl<'src> Parser<'src> {
         // # parse_options: {"target-version": "3.11"}
         // def foo[T](): ...
         // def foo[](): ...
-        if let Some(ast::TypeParams { range, type_params }) = &type_params {
-            // Only emit the `ParseError` for an empty parameter list instead of also including an
-            // `UnsupportedSyntaxError`.
-            if !type_params.is_empty() {
-                self.add_unsupported_syntax_error(
-                    UnsupportedSyntaxErrorKind::TypeParameterList,
-                    *range,
-                );
-            }
+        if let Some(ast::TypeParams { range, .. }) = &type_params {
+            self.add_unsupported_syntax_error(
+                UnsupportedSyntaxErrorKind::TypeParameterList,
+                *range,
+            );
         }
 
         // test_ok function_def_parameter_range
@@ -1927,15 +1923,11 @@ impl<'src> Parser<'src> {
         // # parse_options: {"target-version": "3.11"}
         // class Foo[S: (str, bytes), T: float, *Ts, **P]: ...
         // class Foo[]: ...
-        if let Some(ast::TypeParams { range, type_params }) = &type_params {
-            // Only emit the `ParseError` for an empty parameter list instead of also including an
-            // `UnsupportedSyntaxError`.
-            if !type_params.is_empty() {
-                self.add_unsupported_syntax_error(
-                    UnsupportedSyntaxErrorKind::TypeParameterList,
-                    *range,
-                );
-            }
+        if let Some(ast::TypeParams { range, .. }) = &type_params {
+            self.add_unsupported_syntax_error(
+                UnsupportedSyntaxErrorKind::TypeParameterList,
+                *range,
+            );
         }
 
         // test_ok class_def_arguments
