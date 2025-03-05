@@ -334,7 +334,7 @@ impl Configuration {
                     .unwrap_or_default(),
                 flake8_bandit: lint
                     .flake8_bandit
-                    .map(Flake8BanditOptions::into_settings)
+                    .map(|flake8_bandit| flake8_bandit.into_settings(lint.ruff.as_ref()))
                     .unwrap_or_default(),
                 flake8_boolean_trap: lint
                     .flake8_boolean_trap
