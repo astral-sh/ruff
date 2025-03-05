@@ -3172,7 +3172,11 @@ impl std::fmt::Display for DynamicType {
             // `DynamicType::Todo`'s display should be explicit that is not a valid display of
             // any other type
             DynamicType::Todo(todo) => write!(f, "@Todo{todo}"),
-            DynamicType::TodoProtocol => f.write_str("@Todo(protocol)"),
+            DynamicType::TodoProtocol => f.write_str(if cfg!(debug_assertions) {
+                "@Todo(protocol)"
+            } else {
+                "@Todo"
+            }),
         }
     }
 }
