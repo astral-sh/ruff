@@ -43,3 +43,15 @@ pub(super) const fn token_kind_to_cmp_op(tokens: [TokenKind; 2]) -> Option<CmpOp
         _ => return None,
     })
 }
+
+/// Helper for `parse_decorators` to determine if `expr` is a [`dotted_name`] from the decorator
+/// grammar before Python 3.9.
+///
+/// [`dotted_name`]: https://docs.python.org/3.8/reference/compound_stmts.html#grammar-token-dotted-name
+pub(super) fn is_name_or_attribute_expression(expr: &Expr) -> bool {
+    match expr {
+        Expr::Attribute(attr) => is_name_or_attribute_expression(&attr.value),
+        Expr::Name(_) => true,
+        _ => false,
+    }
+}
