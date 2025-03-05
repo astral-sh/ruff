@@ -63,6 +63,11 @@ impl<'db> Unpacker<'db> {
             });
         }
 
+        if value.is_context_manager() {
+            // If value is a context manager, then the type that needs to be unpacked is the result of entering the context
+            value_ty = value_ty.enter(self.db());
+        }
+
         self.unpack_inner(target, value.as_any_node_ref(self.db()), value_ty);
     }
 
