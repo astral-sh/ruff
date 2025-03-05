@@ -6,6 +6,7 @@ use call::{CallDunderError, CallError};
 use context::InferContext;
 use diagnostic::NOT_ITERABLE;
 use ruff_db::files::File;
+use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast};
 use ruff_text_size::{Ranged, TextRange};
 use type_ordering::union_elements_ordering;
@@ -1395,19 +1396,18 @@ impl<'db> Type<'db> {
     }
 
     #[must_use]
-    fn class_member(&self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
-        let _span = tracing::trace_span!("class_member", self=%self.display(db), name).entered();
+    #[salsa::tracked]
+    fn class_member(self, db: &'db dyn Db, name: Name) -> SymbolAndQualifiers<'db> {
+        // let _span = tracing::trace_span!("class_member", self = self.display(db)).entered();
 
         match self {
-            Type::Union(union) => {
-                union.map_with_boundness_and_qualifiers(db, |elem| elem.class_member(db, name))
-            }
-            Type::Intersection(inter) => {
-                inter.map_with_boundness_and_qualifiers(db, |elem| elem.class_member(db, name))
-            }
+            Type::Union(union) => union
+                .map_with_boundness_and_qualifiers(db, |elem| elem.class_member(db, name.clone())),
+            Type::Intersection(inter) => inter
+                .map_with_boundness_and_qualifiers(db, |elem| elem.class_member(db, name.clone())),
             _ => self
                 .to_meta_type(db)
-                .find_name_in_mro(db, name)
+                .find_name_in_mro(db, name.as_str())
                 .expect("was called on meta type"),
         }
     }
@@ -1501,7 +1501,7 @@ impl<'db> Type<'db> {
 
         if let Type::ModuleLiteral(module) = self {
             module.static_member(db, name)
-        } else if let symbol @ Symbol::Type(_, _) = self.class_member(db, name).symbol {
+        } else if let symbol @ Symbol::Type(_, _) = self.class_member(db, name.into()).symbol {
             symbol
         } else if let Some(symbol @ Symbol::Type(_, _)) =
             self.find_name_in_mro(db, name).map(|inner| inner.symbol)
@@ -1653,7 +1653,7 @@ impl<'db> Type<'db> {
         )
         .entered();
 
-        let descr_get = self.class_member(db, "__get__").symbol;
+        let descr_get = self.class_member(db, "__get__".into()).symbol;
 
         if let Symbol::Type(descr_get, descr_get_boundness) = descr_get {
             let return_ty = descr_get
@@ -1667,8 +1667,11 @@ impl<'db> Type<'db> {
                 })
                 .ok()?;
 
-            let descriptor_kind = if self.class_member(db, "__set__").symbol.is_unbound()
-                && self.class_member(db, "__delete__").symbol.is_unbound()
+            let descriptor_kind = if self.class_member(db, "__set__".into()).symbol.is_unbound()
+                && self
+                    .class_member(db, "__delete__".into())
+                    .symbol
+                    .is_unbound()
             {
                 AttributeKind::NormalOrNonDataDescriptor
             } else {
@@ -1787,7 +1790,7 @@ impl<'db> Type<'db> {
         ) = Self::try_call_dunder_get_on_attribute(
             db,
             name,
-            self.class_member(db, name),
+            self.class_member(db, name.into()),
             self,
             self.to_meta_type(db),
         );
@@ -1945,7 +1948,7 @@ impl<'db> Type<'db> {
             Type::ModuleLiteral(module) => module.static_member(db, name).into(),
 
             Type::Dynamic(..) | Type::Never | Type::AlwaysFalsy | Type::AlwaysTruthy => {
-                self.class_member(db, name)
+                self.class_member(db, name.into())
             }
 
             Type::Instance(..)
