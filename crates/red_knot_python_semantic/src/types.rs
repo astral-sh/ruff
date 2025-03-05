@@ -1661,10 +1661,10 @@ impl<'db> Type<'db> {
         }
     }
 
-    fn try_call_dunder_get_on_class_member(
+    fn try_call_dunder_get_on_attribute(
         db: &'db dyn Db,
         name: &str,
-        class_member: SymbolAndQualifiers<'db>,
+        attribute: SymbolAndQualifiers<'db>,
         instance: Type<'db>,
         owner: Type<'db>,
     ) -> (SymbolAndQualifiers<'db>, AttributeKind) {
@@ -1675,7 +1675,7 @@ impl<'db> Type<'db> {
         )
         .entered();
 
-        match class_member {
+        match attribute {
             // This branch is not strictly needed, but it short-circuits the lookup
             // of various dunder methods and calls that would otherwise be made.
             //
@@ -1685,7 +1685,7 @@ impl<'db> Type<'db> {
             SymbolAndQualifiers {
                 symbol: Symbol::Type(Type::Dynamic(_), _),
                 qualifiers: _,
-            } => (class_member, AttributeKind::DataDescriptor),
+            } => (attribute, AttributeKind::DataDescriptor),
 
             SymbolAndQualifiers {
                 symbol: Symbol::Type(Type::Union(union), boundness),
@@ -1737,10 +1737,10 @@ impl<'db> Type<'db> {
                         attribute_kind,
                     )
                 } else {
-                    (class_member, AttributeKind::NormalOrNonDataDescriptor)
+                    (attribute, AttributeKind::NormalOrNonDataDescriptor)
                 }
             }
-            _ => (class_member, AttributeKind::NormalOrNonDataDescriptor),
+            _ => (attribute, AttributeKind::NormalOrNonDataDescriptor),
         }
     }
 
@@ -1761,87 +1761,65 @@ impl<'db> Type<'db> {
         )
         .entered();
 
-        match self {
-            Type::Union(union) => union.map_with_boundness_and_qualifiers(db, |elem| {
-                elem.invoke_descriptor_protocol(
-                    db,
-                    name,
-                    retrieve_fallback.clone(),
-                    fallback_shadows_non_data_descriptor,
-                )
-            }),
-            Type::Intersection(intersection) => {
-                intersection.map_with_boundness_and_qualifiers(db, |elem| {
-                    elem.invoke_descriptor_protocol(
-                        db,
-                        name,
-                        retrieve_fallback.clone(),
-                        fallback_shadows_non_data_descriptor,
-                    )
-                })
+        let (
+            SymbolAndQualifiers {
+                symbol: meta_attr_resolved,
+                qualifiers: meta_attr_qualifiers,
+            },
+            is_data_descriptor,
+        ) = Self::try_call_dunder_get_on_attribute(
+            db,
+            name,
+            self.class_member(db, name),
+            self,
+            self.to_meta_type(db),
+        );
+
+        let SymbolAndQualifiers {
+            symbol: fallback,
+            qualifiers: fallback_qualifiers,
+        } = retrieve_fallback(self);
+
+        match (meta_attr_resolved, is_data_descriptor, fallback) {
+            (meta_attr_resolved @ Symbol::Type(_, _), _, Symbol::Unbound) => {
+                meta_attr_resolved.with_qualifiers(meta_attr_qualifiers)
             }
-            _ => {
-                let (
-                    SymbolAndQualifiers {
-                        symbol: meta_attr_resolved,
-                        qualifiers: meta_attr_qualifiers,
-                    },
-                    is_data_descriptor,
-                ) = Self::try_call_dunder_get_on_class_member(
-                    db,
-                    name,
-                    self.class_member(db, name),
-                    self,
-                    self.to_meta_type(db),
-                );
 
-                let SymbolAndQualifiers {
-                    symbol: fallback,
-                    qualifiers: fallback_qualifiers,
-                } = retrieve_fallback(self);
+            (
+                meta_attr_resolved @ Symbol::Type(_, Boundness::Bound),
+                AttributeKind::DataDescriptor,
+                _,
+            ) => meta_attr_resolved.with_qualifiers(meta_attr_qualifiers),
 
-                match (meta_attr_resolved, is_data_descriptor, fallback) {
-                    (meta_attr_resolved @ Symbol::Type(_, _), _, Symbol::Unbound) => {
-                        meta_attr_resolved.with_qualifiers(meta_attr_qualifiers)
-                    }
+            (
+                Symbol::Type(meta_attr_ty, Boundness::PossiblyUnbound),
+                AttributeKind::DataDescriptor,
+                Symbol::Type(fallback_ty, fallback_boundness),
+            ) => Symbol::Type(
+                UnionType::from_elements(db, [meta_attr_ty, fallback_ty]),
+                fallback_boundness,
+            )
+            .with_qualifiers(meta_attr_qualifiers.union(fallback_qualifiers)),
 
-                    (
-                        meta_attr_resolved @ Symbol::Type(_, Boundness::Bound),
-                        AttributeKind::DataDescriptor,
-                        _,
-                    ) => meta_attr_resolved.with_qualifiers(meta_attr_qualifiers),
-
-                    (
-                        Symbol::Type(meta_attr_ty, Boundness::PossiblyUnbound),
-                        AttributeKind::DataDescriptor,
-                        Symbol::Type(fallback_ty, fallback_boundness),
-                    ) => Symbol::Type(
-                        UnionType::from_elements(db, [meta_attr_ty, fallback_ty]),
-                        fallback_boundness,
-                    )
-                    .with_qualifiers(meta_attr_qualifiers.union(fallback_qualifiers)),
-
-                    (
-                        Symbol::Type(_, _),
-                        AttributeKind::NormalOrNonDataDescriptor,
-                        fallback @ Symbol::Type(_, Boundness::Bound),
-                    ) if fallback_shadows_non_data_descriptor => {
-                        fallback.with_qualifiers(fallback_qualifiers)
-                    }
-
-                    (
-                        Symbol::Type(meta_attr_ty, meta_attr_boundness),
-                        AttributeKind::NormalOrNonDataDescriptor,
-                        Symbol::Type(fallback_ty, fallback_boundness),
-                    ) => Symbol::Type(
-                        UnionType::from_elements(db, [meta_attr_ty, fallback_ty]),
-                        meta_attr_boundness.max(fallback_boundness),
-                    )
-                    .with_qualifiers(meta_attr_qualifiers.union(fallback_qualifiers)),
-
-                    (Symbol::Unbound, _, fallback) => fallback.with_qualifiers(fallback_qualifiers),
-                }
+            (
+                Symbol::Type(_, _),
+                AttributeKind::NormalOrNonDataDescriptor,
+                fallback @ Symbol::Type(_, Boundness::Bound),
+            ) if fallback_shadows_non_data_descriptor => {
+                fallback.with_qualifiers(fallback_qualifiers)
             }
+
+            (
+                Symbol::Type(meta_attr_ty, meta_attr_boundness),
+                AttributeKind::NormalOrNonDataDescriptor,
+                Symbol::Type(fallback_ty, fallback_boundness),
+            ) => Symbol::Type(
+                UnionType::from_elements(db, [meta_attr_ty, fallback_ty]),
+                meta_attr_boundness.max(fallback_boundness),
+            )
+            .with_qualifiers(meta_attr_qualifiers.union(fallback_qualifiers)),
+
+            (Symbol::Unbound, _, fallback) => fallback.with_qualifiers(fallback_qualifiers),
         }
     }
 
@@ -1891,7 +1869,7 @@ impl<'db> Type<'db> {
             |object| {
                 if with_fallback {
                     let class_attr_plain = object.find_name_in_mro(db, name).expect("TODO");
-                    Self::try_call_dunder_get_on_class_member(
+                    Self::try_call_dunder_get_on_attribute(
                         db,
                         name,
                         class_attr_plain,
