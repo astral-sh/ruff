@@ -7,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/inline/ok/decorator_expression_p
 ```
 Module(
     ModModule {
-        range: 0..89,
+        range: 0..129,
         body: [
             FunctionDef(
                 StmtFunctionDef {
@@ -80,6 +80,108 @@ Module(
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
                                         range: 85..88,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 89..128,
+                    is_async: false,
+                    decorator_list: [
+                        Decorator {
+                            range: 89..113,
+                            expression: Call(
+                                ExprCall {
+                                    range: 90..113,
+                                    func: Named(
+                                        ExprNamed {
+                                            range: 91..107,
+                                            target: Name(
+                                                ExprName {
+                                                    range: 91..92,
+                                                    id: Name("x"),
+                                                    ctx: Store,
+                                                },
+                                            ),
+                                            value: Lambda(
+                                                ExprLambda {
+                                                    range: 96..107,
+                                                    parameters: Some(
+                                                        Parameters {
+                                                            range: 103..104,
+                                                            posonlyargs: [],
+                                                            args: [
+                                                                ParameterWithDefault {
+                                                                    range: 103..104,
+                                                                    parameter: Parameter {
+                                                                        range: 103..104,
+                                                                        name: Identifier {
+                                                                            id: Name("x"),
+                                                                            range: 103..104,
+                                                                        },
+                                                                        annotation: None,
+                                                                    },
+                                                                    default: None,
+                                                                },
+                                                            ],
+                                                            vararg: None,
+                                                            kwonlyargs: [],
+                                                            kwarg: None,
+                                                        },
+                                                    ),
+                                                    body: Name(
+                                                        ExprName {
+                                                            range: 106..107,
+                                                            id: Name("x"),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                    arguments: Arguments {
+                                        range: 108..113,
+                                        args: [
+                                            Name(
+                                                ExprName {
+                                                    range: 109..112,
+                                                    id: Name("foo"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ],
+                                        keywords: [],
+                                    },
+                                },
+                            ),
+                        },
+                    ],
+                    name: Identifier {
+                        id: Name("bar"),
+                        range: 118..121,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 121..123,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 125..128,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 125..128,
                                     },
                                 ),
                             },

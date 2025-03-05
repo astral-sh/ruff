@@ -2578,11 +2578,18 @@ impl<'src> Parser<'src> {
                 // # parse_options: { "target-version": "3.9" }
                 // @buttons[0].clicked.connect
                 // def spam(): ...
+                // @(x := lambda x: x)(foo)
+                // def bar(): ...
 
                 // test_err decorator_expression_py38
                 // # parse_options: { "target-version": "3.8" }
                 // @buttons[0].clicked.connect
                 // def spam(): ...
+
+                // test_err decorator_named_expression_py37
+                // # parse_options: { "target-version": "3.7" }
+                // @(x := lambda x: x)(foo)
+                // def bar(): ...
                 let allowed_decorator = match &parsed_expr.expr {
                     Expr::Call(expr_call) => {
                         helpers::is_name_or_attribute_expression(&expr_call.func)
