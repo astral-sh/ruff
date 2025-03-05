@@ -2543,32 +2543,6 @@ impl<'src> Parser<'src> {
         let mut decorators = vec![];
         let mut progress = ParserProgress::default();
 
-        // test_ok decorator_expression_dotted_ident_py38
-        // # parse_options: { "target-version": "3.8" }
-        // @buttons.clicked.connect
-        // def spam(): ...
-
-        // test_ok decorator_expression_identity_hack_py38
-        // # parse_options: { "target-version": "3.8" }
-        // def _(x): return x
-        // @_(buttons[0].clicked.connect)
-        // def spam(): ...
-
-        // test_ok decorator_expression_eval_hack_py38
-        // # parse_options: { "target-version": "3.8" }
-        // @eval("buttons[0].clicked.connect")
-        // def spam(): ...
-
-        // test_ok decorator_expression_py39
-        // # parse_options: { "target-version": "3.9" }
-        // @buttons[0].clicked.connect
-        // def spam(): ...
-
-        // test_err decorator_expression_py38
-        // # parse_options: { "target-version": "3.8" }
-        // @buttons[0].clicked.connect
-        // def spam(): ...
-
         // test_err decorator_missing_expression
         // @def foo(): ...
         // @
@@ -2584,6 +2558,31 @@ impl<'src> Parser<'src> {
             let parsed_expr = self.parse_named_expression_or_higher(ExpressionContext::default());
 
             if self.options.target_version < PythonVersion::PY39 {
+                // test_ok decorator_expression_dotted_ident_py38
+                // # parse_options: { "target-version": "3.8" }
+                // @buttons.clicked.connect
+                // def spam(): ...
+
+                // test_ok decorator_expression_identity_hack_py38
+                // # parse_options: { "target-version": "3.8" }
+                // def _(x): return x
+                // @_(buttons[0].clicked.connect)
+                // def spam(): ...
+
+                // test_ok decorator_expression_eval_hack_py38
+                // # parse_options: { "target-version": "3.8" }
+                // @eval("buttons[0].clicked.connect")
+                // def spam(): ...
+
+                // test_ok decorator_expression_py39
+                // # parse_options: { "target-version": "3.9" }
+                // @buttons[0].clicked.connect
+                // def spam(): ...
+
+                // test_err decorator_expression_py38
+                // # parse_options: { "target-version": "3.8" }
+                // @buttons[0].clicked.connect
+                // def spam(): ...
                 let allowed_decorator = match &parsed_expr.expr {
                     Expr::Call(expr_call) => {
                         helpers::is_name_or_attribute_expression(&expr_call.func)
