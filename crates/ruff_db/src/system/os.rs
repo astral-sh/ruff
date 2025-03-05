@@ -1,9 +1,9 @@
+use filetime::FileTime;
+use ruff_notebook::{Notebook, NotebookError};
+use rustc_hash::FxHashSet;
+use std::panic::RefUnwindSafe;
 use std::sync::Arc;
 use std::{any::Any, path::PathBuf};
-
-use filetime::FileTime;
-
-use ruff_notebook::{Notebook, NotebookError};
 
 use crate::system::{
     DirectoryEntry, FileType, GlobError, GlobErrorKind, Metadata, Result, System, SystemPath,
@@ -24,6 +24,8 @@ pub struct OsSystem {
 #[derive(Default, Debug)]
 struct OsSystemInner {
     cwd: SystemPathBuf,
+
+    real_case_cache: RealCaseCache,
 
     /// Overrides the user's configuration directory for testing.
     /// This is an `Option<Option<..>>` to allow setting an override of `None`.
@@ -100,6 +102,27 @@ impl System for OsSystem {
 
     fn path_exists(&self, path: &SystemPath) -> bool {
         path.as_std_path().exists()
+    }
+
+    fn path_exists_case_sensitive(&self, path: &SystemPath, prefix: &SystemPath) -> Result<bool> {
+        // Decide what to do if prefix isn't a prefix
+        debug_assert!(
+            path.strip_prefix(prefix).is_ok(),
+            "prefix `{prefix}` should be a prefix of `{path}`"
+        );
+
+        // Iterate over the sub-paths up to prefix and check if they match the casing as on disk.
+        for ancestor in path.ancestors() {
+            if ancestor == prefix {
+                break;
+            }
+
+            if !self.inner.real_case_cache.has_name_case(ancestor)? {
+                return Ok(false);
+            }
+        }
+
+        Ok(true)
     }
 
     fn current_directory(&self) -> &SystemPath {
@@ -199,6 +222,82 @@ impl WritableSystem for OsSystem {
     fn create_directory_all(&self, path: &SystemPath) -> Result<()> {
         std::fs::create_dir_all(path.as_std_path())
     }
+}
+
+#[derive(Debug, Default)]
+struct RealCaseCache {
+    by_lower_case: dashmap::DashMap<SystemPathBuf, ListedDirectory>,
+}
+
+impl RealCaseCache {
+    fn has_name_case(&self, path: &SystemPath) -> Result<bool> {
+        // TODO: Skip if the FS is known to be case-sensitive.
+        // TODO: Consider using `GetFinalPathNameByHandleW` on windows
+        // TODO: Consider using `fcntl(F_GETPATH)` on macOS (https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man2/fcntl.2.html)
+
+        let Some(parent) = path.parent() else {
+            // TODO: Decide what to return for the root path
+            return Ok(true);
+        };
+
+        // TODO: decide what to return for the root path or files ending in `..`
+        let Some(file_name) = path.file_name() else {
+            return Ok(false);
+        };
+
+        let lower_case_path = SystemPathBuf::from(parent.as_str().to_lowercase());
+        let last_modification_time =
+            FileTime::from_last_modification_time(&parent.as_std_path().metadata()?);
+
+        let entry = self.by_lower_case.entry(lower_case_path);
+
+        if let dashmap::Entry::Occupied(entry) = &entry {
+            // Only do a cached lookup if the directory hasn't changed.
+            if entry.get().last_modification_time == last_modification_time {
+                tracing::trace!("Use cached 'real-case' entry for directory `{}`", parent);
+                return Ok(entry.get().names.contains(file_name));
+            }
+        }
+
+        tracing::trace!(
+            "Reading directory `{}` to determine the real casing of paths",
+            parent
+        );
+        let start = std::time::Instant::now();
+        let mut names = FxHashSet::default();
+
+        for entry in parent.as_std_path().read_dir()? {
+            let Ok(entry) = entry else {
+                continue;
+            };
+
+            let Ok(name) = entry.file_name().into_string() else {
+                continue;
+            };
+
+            names.insert(name);
+        }
+
+        let directory = entry.insert(ListedDirectory {
+            last_modification_time,
+            names,
+        });
+
+        tracing::trace!(
+            "Caching the real casing of `{parent}` took {:?}",
+            start.elapsed()
+        );
+
+        Ok(directory.names.contains(file_name))
+    }
+}
+
+impl RefUnwindSafe for RealCaseCache {}
+
+#[derive(Debug, Eq, PartialEq)]
+struct ListedDirectory {
+    last_modification_time: filetime::FileTime,
+    names: FxHashSet<String>,
 }
 
 #[derive(Debug)]
