@@ -604,14 +604,30 @@ fn resolve_name(db: &dyn Db, name: &ModuleName) -> Option<(SearchPath, File, Mod
 /// resolving modules.
 fn resolve_file_module(module: &ModulePath, resolver_state: &ResolverContext) -> Option<File> {
     // Stubs have precedence over source files
-    module
+    let file = module
         .with_pyi_extension()
         .to_file(resolver_state)
         .or_else(|| {
             module
                 .with_py_extension()
                 .and_then(|path| path.to_file(resolver_state))
-        })
+        })?;
+
+    // For system files, test if the path has the correct casing.
+    // We can skip this step for vendored files or virtual files because
+    // those file systems are case sensitive (we wouldn't get to this point).
+    if let Some(path) = file.path(resolver_state.db).as_system_path() {
+        if !resolver_state
+            .db
+            .system()
+            .path_exists_case_sensitive(path, module.search_path().as_system_path().unwrap())
+            .unwrap_or(true)
+        {
+            return None;
+        }
+    }
+
+    Some(file)
 }
 
 fn resolve_package<'a, 'db, I>(

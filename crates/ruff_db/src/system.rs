@@ -89,6 +89,8 @@ pub trait System: Debug {
         self.path_metadata(path).is_ok()
     }
 
+    fn path_exists_case_sensitive(&self, path: &SystemPath, prefix: &SystemPath) -> Result<bool>;
+
     /// Returns `true` if `path` exists and is a directory.
     fn is_directory(&self, path: &SystemPath) -> bool {
         self.path_metadata(path)
