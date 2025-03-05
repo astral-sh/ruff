@@ -1634,26 +1634,26 @@ impl<'db> Type<'db> {
         }
     }
 
-    fn lookup_on_meta_type_and_try_call_dunder_get(
-        self: Type<'db>,
+    fn try_call_dunder_get_on_class_member(
         db: &'db dyn Db,
         name: &str,
+        class_member: SymbolAndQualifiers<'db>,
+        instance: Type<'db>,
+        owner: Type<'db>,
     ) -> (SymbolAndQualifiers<'db>, bool) {
         let _span = tracing::trace_span!(
-            "lookup_on_meta_type_and_try_call_dunder_get",
-            self=%self.display(db),
+            "try_call_dunder_get_on_class_member",
+            instance=%instance.display(db),
             name,
         )
         .entered();
-
-        let class_member = self.class_member(db, name);
 
         match class_member {
             SymbolAndQualifiers(Symbol::Type(Type::Union(union), boundness), qualifiers) => (
                 SymbolAndQualifiers(
                     union.map_with_boundness(db, |elem| {
                         Symbol::Type(
-                            elem.try_call_dunder_get(db, self, self.to_meta_type(db))
+                            elem.try_call_dunder_get(db, instance, owner)
                                 .0
                                 .unwrap_or(*elem),
                             boundness,
@@ -1663,13 +1663,26 @@ impl<'db> Type<'db> {
                 ),
                 false, // TODO
             ),
-            SymbolAndQualifiers(Symbol::Type(Type::Intersection(_), _), _) => (
-                Symbol::todo("intersection of attribute types").into(),
-                false,
+            SymbolAndQualifiers(
+                Symbol::Type(Type::Intersection(intersection), boundness),
+                qualifiers,
+            ) => (
+                SymbolAndQualifiers(
+                    intersection.map_with_boundness(db, |elem| {
+                        Symbol::Type(
+                            elem.try_call_dunder_get(db, instance, owner)
+                                .0
+                                .unwrap_or(*elem),
+                            boundness,
+                        )
+                    }),
+                    qualifiers,
+                ),
+                false, // TODO
             ),
             SymbolAndQualifiers(Symbol::Type(attribute_ty, boundness), qualifiers) => {
                 let (return_ty, is_data_descriptor) =
-                    attribute_ty.try_call_dunder_get(db, self, self.to_meta_type(db));
+                    attribute_ty.try_call_dunder_get(db, instance, owner);
 
                 (
                     SymbolAndQualifiers(
@@ -1845,121 +1858,83 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Call the `__get__(instance, owner)` method on a type, and get the return
-    /// type of the call.
-    ///
-    /// If `__get__` is not defined on the type, this method returns `Ok(None)`.
-    /// If the call to `__get__` fails, this method returns an error.
     // #[salsa::tracked]
     fn run_descriptor_protocol_classes(
         self,
         db: &'db dyn Db,
         name: &str,
-        class_attr: SymbolAndQualifiers<'db>,
     ) -> SymbolAndQualifiers<'db> {
         let _span = tracing::trace_span!(
             "run_descriptor_protocol_classes",
             self=%self.display(db),
             name=%name,
-            class_attr=?class_attr,
         )
         .entered();
 
         match self {
             Type::Union(union) => union.map_with_boundness_and_qualifiers(db, |elem| {
-                elem.run_descriptor_protocol_classes(db, name, class_attr.clone())
+                elem.run_descriptor_protocol_classes(db, name)
             }),
             Type::Intersection(intersection) => intersection
                 .map_with_boundness_and_qualifiers(db, |elem| {
-                    elem.run_descriptor_protocol_classes(db, name, class_attr.clone())
+                    elem.run_descriptor_protocol_classes(db, name)
                 }),
             _ => {
-                let class_attr_qualifiers = class_attr.1;
+                let (meta_attr_resolved, meta_is_data_descriptor) =
+                    Self::try_call_dunder_get_on_class_member(
+                        db,
+                        name,
+                        self.class_member(db, name),
+                        self,
+                        self.to_meta_type(db),
+                    );
 
-                match class_attr.0 {
-                    Symbol::Type(Type::Union(union), boundness) => SymbolAndQualifiers(
-                        union.map_with_boundness(db, |elem| {
-                            self.run_descriptor_protocol_classes(
-                                db,
-                                name,
-                                Symbol::Type(*elem, boundness).into(),
-                            )
-                            .0
-                        }),
+                let class_attr_plain = self.find_name_in_mro(db, name).expect("TODO");
+
+                let SymbolAndQualifiers(class_attr_resolved, class_attr_qualifiers) =
+                    Self::try_call_dunder_get_on_class_member(
+                        db,
+                        name,
+                        class_attr_plain,
+                        Type::none(db),
+                        self,
+                    )
+                    .0;
+
+                match (
+                    &meta_attr_resolved.0,
+                    meta_is_data_descriptor,
+                    &class_attr_resolved,
+                ) {
+                    (Symbol::Type(_, _), _, Symbol::Unbound)
+                    | (Symbol::Type(_, Boundness::Bound), true, _) => meta_attr_resolved,
+                    (Symbol::Unbound, _, Symbol::Type(_, _)) => class_attr_resolved.into(),
+                    (
+                        Symbol::Type(meta_attr_ty, Boundness::PossiblyUnbound),
+                        _,
+                        Symbol::Type(class_attr_ty, class_attr_boundness),
+                    ) => SymbolAndQualifiers(
+                        Symbol::Type(
+                            UnionType::from_elements(db, [*class_attr_ty, *meta_attr_ty]),
+                            *class_attr_boundness,
+                        ),
                         class_attr_qualifiers,
                     ),
-
-                    Symbol::Type(Type::Intersection(intersection), boundness) => {
-                        SymbolAndQualifiers(
-                            intersection.map_with_boundness(db, |elem| {
-                                self.run_descriptor_protocol_classes(
-                                    db,
-                                    name,
-                                    Symbol::Type(*elem, boundness).into(),
-                                )
-                                .0
-                            }),
-                            class_attr_qualifiers,
-                        )
+                    (Symbol::Type(_, _), false, Symbol::Type(_, Boundness::Bound)) => {
+                        SymbolAndQualifiers(class_attr_resolved, class_attr_qualifiers)
                     }
-
-                    // This branch is not strictly needed, but it short-circuits the lookup
-                    // of various dunder methods and calls that would otherwise be made.
-                    Symbol::Type(Type::Dynamic(_), _) => class_attr,
-
-                    Symbol::Type(class_attr_ty, class_attr_boundness) => {
-                        let (meta_attr_resolved, meta_is_data_descriptor) =
-                            self.lookup_on_meta_type_and_try_call_dunder_get(db, name);
-
-                        let (descr_get_return_ty, _) =
-                            class_attr_ty.try_call_dunder_get(db, Type::none(db), self);
-                        let class_attr_resolved = Symbol::Type(
-                            descr_get_return_ty.unwrap_or(class_attr_ty),
-                            class_attr_boundness,
-                        );
-
-                        match (
-                            &meta_attr_resolved.0,
-                            meta_is_data_descriptor,
-                            &class_attr_resolved,
-                        ) {
-                            (Symbol::Type(_, _), _, Symbol::Unbound)
-                            | (Symbol::Type(_, Boundness::Bound), true, _) => meta_attr_resolved,
-                            (Symbol::Unbound, _, Symbol::Type(_, _)) => class_attr_resolved.into(),
-                            (
-                                Symbol::Type(meta_attr_ty, Boundness::PossiblyUnbound),
-                                _,
-                                Symbol::Type(_, _),
-                            ) => SymbolAndQualifiers(
-                                Symbol::Type(
-                                    UnionType::from_elements(db, [class_attr_ty, *meta_attr_ty]),
-                                    class_attr_boundness,
-                                ),
-                                class_attr_qualifiers,
-                            ),
-                            (Symbol::Type(_, _), false, Symbol::Type(_, Boundness::Bound)) => {
-                                SymbolAndQualifiers(class_attr_resolved, class_attr_qualifiers)
-                            }
-                            (
-                                Symbol::Type(meta_attr_ty, meta_attr_boundness),
-                                false,
-                                Symbol::Type(_, Boundness::PossiblyUnbound),
-                            ) => SymbolAndQualifiers(
-                                Symbol::Type(
-                                    UnionType::from_elements(db, [class_attr_ty, *meta_attr_ty]),
-                                    *meta_attr_boundness,
-                                ),
-                                class_attr_qualifiers,
-                            ),
-                            (Symbol::Unbound, _, Symbol::Unbound) => Symbol::Unbound.into(),
-                        }
-                    }
-                    Symbol::Unbound => {
-                        // Did not find the attribute on the class; it could still be an attribute
-                        // on the meta class
-
-                        self.lookup_on_meta_type_and_try_call_dunder_get(db, name).0
-                    }
+                    (
+                        Symbol::Type(meta_attr_ty, meta_attr_boundness),
+                        false,
+                        Symbol::Type(class_attr_ty, Boundness::PossiblyUnbound),
+                    ) => SymbolAndQualifiers(
+                        Symbol::Type(
+                            UnionType::from_elements(db, [*class_attr_ty, *meta_attr_ty]),
+                            *meta_attr_boundness,
+                        ),
+                        class_attr_qualifiers,
+                    ),
+                    (Symbol::Unbound, _, Symbol::Unbound) => Symbol::Unbound.into(),
                 }
             }
         }
@@ -2067,14 +2042,11 @@ impl<'db> Type<'db> {
             }
 
             Type::ClassLiteral(..) | Type::SubclassOf(..) => {
-                let cls_var = self.find_name_in_mro(db, name).expect("TODO");
-                tracing::info!("class => cls_var = {:?}", cls_var);
-
                 if name == "__mro__" {
-                    return cls_var;
+                    return self.find_name_in_mro(db, name).expect("TODO");
                 }
 
-                self.run_descriptor_protocol_classes(db, name, cls_var)
+                self.run_descriptor_protocol_classes(db, name)
             }
             Type::Union(union) => union
                 .map_with_boundness(db, |elem| elem.member(db, name).0)
