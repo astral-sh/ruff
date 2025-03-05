@@ -210,7 +210,6 @@ def _(flag1: bool, flag2: bool, flag3: bool, flag4: bool, flag5: bool, flag6: bo
 
     c = C() if flag8 else OtherC()
 
-    # error: [possibly-unbound-attribute]
     reveal_type(c.x)  # revealed: Literal[1, 2, 3, 4, 5, 6, 7, 8]
 ```
 
@@ -373,7 +372,7 @@ def _(flag: bool):
     class C5(metaclass=Meta5):
         meta_data_descriptor1: Literal["value on class"] = "value on class"
 
-    reveal_type(C5.meta_data_descriptor1)  # revealed: Literal["value on class", "data"]
+    reveal_type(C5.meta_data_descriptor1)  # revealed: Literal["data", "value on class"]
     # error: [possibly-unbound-attribute]
     reveal_type(C5.meta_data_descriptor2)  # revealed: Literal["data"]
 ```

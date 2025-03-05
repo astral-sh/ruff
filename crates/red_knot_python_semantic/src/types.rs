@@ -1754,39 +1754,30 @@ impl<'db> Type<'db> {
                     (meta_attr_resolved @ Symbol::Type(_, _), _, Symbol::Unbound) => {
                         SymbolAndQualifiers(meta_attr_resolved, meta_attr_qualifiers)
                     }
-                    (
-                        Symbol::Type(meta_attr_ty, meta_attr_boundness),
-                        true,
-                        Symbol::Type(fallback_ty, fallback_boundness),
-                    ) => {
-                        if meta_attr_boundness == Boundness::Bound {
-                            SymbolAndQualifiers(
-                                Symbol::Type(meta_attr_ty, Boundness::Bound),
-                                meta_attr_qualifiers,
-                            )
-                        } else {
-                            SymbolAndQualifiers(
-                                Symbol::Type(
-                                    UnionType::from_elements(db, [meta_attr_ty, fallback_ty]),
-                                    meta_attr_boundness.min(fallback_boundness),
-                                ),
-                                meta_attr_qualifiers,
-                            )
-                        }
+                    (meta_attr_resolved @ Symbol::Type(_, Boundness::Bound), true, _) => {
+                        SymbolAndQualifiers(meta_attr_resolved, meta_attr_qualifiers)
                     }
                     (
-                        Symbol::Type(class_attr_resolved_ty, class_attr_boundness),
-                        false,
-                        Symbol::Type(instance_variable_ty, instance_variable_boundness),
+                        Symbol::Type(meta_attr_ty, Boundness::PossiblyUnbound),
+                        true,
+                        Symbol::Type(fallback_ty, fallback_boundness),
                     ) => SymbolAndQualifiers(
                         Symbol::Type(
-                            UnionType::from_elements(
-                                db,
-                                [class_attr_resolved_ty, instance_variable_ty],
-                            ),
-                            class_attr_boundness.min(instance_variable_boundness),
+                            UnionType::from_elements(db, [meta_attr_ty, fallback_ty]),
+                            fallback_boundness,
                         ),
-                        meta_attr_qualifiers,
+                        meta_attr_qualifiers.union(fallback_qualifiers),
+                    ),
+                    (
+                        Symbol::Type(meta_attr_ty, meta_attr_boundness),
+                        false,
+                        Symbol::Type(fallback_ty, fallback_boundness),
+                    ) => SymbolAndQualifiers(
+                        Symbol::Type(
+                            UnionType::from_elements(db, [meta_attr_ty, fallback_ty]),
+                            meta_attr_boundness.max(fallback_boundness),
+                        ),
+                        meta_attr_qualifiers.union(fallback_qualifiers),
                     ),
                     (Symbol::Unbound, _, fallback) => {
                         SymbolAndQualifiers(fallback, fallback_qualifiers)
@@ -1829,9 +1820,8 @@ impl<'db> Type<'db> {
                     self.to_meta_type(db),
                 );
 
-                let class_attr_plain = self.find_name_in_mro(db, name).expect("TODO");
-
-                let SymbolAndQualifiers(fallback, fallback_qualifiers) =
+                let SymbolAndQualifiers(fallback, fallback_qualifiers) = {
+                    let class_attr_plain = self.find_name_in_mro(db, name).expect("TODO");
                     Self::try_call_dunder_get_on_class_member(
                         db,
                         name,
@@ -1839,7 +1829,8 @@ impl<'db> Type<'db> {
                         Type::none(db),
                         self,
                     )
-                    .0;
+                    .0
+                };
 
                 match (meta_attr_resolved, is_data_descriptor, fallback) {
                     (meta_attr_resolved @ Symbol::Type(_, _), _, Symbol::Unbound) => {
@@ -1850,14 +1841,14 @@ impl<'db> Type<'db> {
                     }
                     (
                         Symbol::Type(meta_attr_ty, Boundness::PossiblyUnbound),
-                        _,
+                        true,
                         Symbol::Type(fallback_ty, fallback_boundness),
                     ) => SymbolAndQualifiers(
                         Symbol::Type(
-                            UnionType::from_elements(db, [fallback_ty, meta_attr_ty]),
+                            UnionType::from_elements(db, [meta_attr_ty, fallback_ty]),
                             fallback_boundness,
                         ),
-                        fallback_qualifiers,
+                        meta_attr_qualifiers.union(fallback_qualifiers),
                     ),
                     (Symbol::Type(_, _), false, fallback @ Symbol::Type(_, Boundness::Bound)) => {
                         SymbolAndQualifiers(fallback, fallback_qualifiers)
@@ -1865,13 +1856,13 @@ impl<'db> Type<'db> {
                     (
                         Symbol::Type(meta_attr_ty, meta_attr_boundness),
                         false,
-                        Symbol::Type(fallback_ty, Boundness::PossiblyUnbound),
+                        Symbol::Type(fallback_ty, fallback_boundness),
                     ) => SymbolAndQualifiers(
                         Symbol::Type(
                             UnionType::from_elements(db, [fallback_ty, meta_attr_ty]),
-                            meta_attr_boundness,
+                            meta_attr_boundness.max(fallback_boundness),
                         ),
-                        fallback_qualifiers,
+                        meta_attr_qualifiers.union(fallback_qualifiers),
                     ),
                     (Symbol::Unbound, _, fallback) => {
                         SymbolAndQualifiers(fallback, fallback_qualifiers)

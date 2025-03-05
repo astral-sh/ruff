@@ -30,6 +30,13 @@ impl Boundness {
             (Boundness::Bound, Boundness::Bound) => Boundness::Bound,
         }
     }
+
+    pub(crate) const fn max(self, other: Self) -> Self {
+        match (self, other) {
+            (Boundness::Bound, _) | (_, Boundness::Bound) => Boundness::Bound,
+            (Boundness::PossiblyUnbound, Boundness::PossiblyUnbound) => Boundness::PossiblyUnbound,
+        }
+    }
 }
 
 /// The result of a symbol lookup, which can either be a (possibly unbound) type
