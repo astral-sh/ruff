@@ -45,21 +45,28 @@ def f[T](x: list[T]) -> T: ...
 reveal_type(f([1.0, 2.0]))  # revealed: T
 ```
 
-## Return type uses actual typevar, not upper bound
+## Typevar constraints
 
-If a function is annotated as returning a typevar, the return type must be an instance of the actual
-typevar, and not just something assignable to its upper bound.
-
-In `bad`, we can infer that `x + 1` has type `int`, since `int.__add__` is defined to return `int`,
-and Liskov requires that any subtype `T` of `int` has a compatible implementation of `__add__`. But
-`T` might be instantiated with a narrower type than `int`, and so the return value is not guaranteed
-to be compatible for all `T: int`.
+If a type parameter has an upper bound, that upper bound constrains which types can be used for that
+typevar. This effectively adds the upper bound as an intersection to every appearance of the typevar
+in the function.
 
 ```py
-def good[T: int](x: T) -> T:
+def good_param[T: int](x: T) -> None:
+    # TODO: revealed: T & int
+    reveal_type(x)  # revealed: T
+```
+
+If the function is annotated as returning the typevar, this means that the upper bound is _not_
+assignable to that typevar, since return types are contravariant. In `bad`, we can infer that `x +
+1` has type `int`. But `T` might be instantiated with a narrower type than `int`, and so the return
+value is not guaranteed to be compatible for all `T: int`.
+
+```py
+def good_return[T: int](x: T) -> T:
     return x
 
-def bad[T: int](x: T) -> T:
+def bad_return[T: int](x: T) -> T:
     # TODO: error: int is not assignable to T
     # error: [unsupported-operator] "Operator `+` is unsupported between objects of type `T` and `Literal[1]`"
     return x + 1
