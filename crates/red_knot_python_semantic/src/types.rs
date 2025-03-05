@@ -127,7 +127,7 @@ fn definition_expression_type<'db>(
 /// define a `__get__` method, while data descriptors additionally define a `__set__`
 /// method or a `__delete__` method. This enum is used to categorize attributes into two
 /// groups: (1) data descriptors and (2) normal attributes or non-data descriptors.
-#[derive(Clone, Debug, Copy)]
+#[derive(Clone, Debug, Copy, PartialEq, Eq, Hash, salsa::Update)]
 enum AttributeKind {
     DataDescriptor,
     NormalOrNonDataDescriptor,
@@ -273,6 +273,7 @@ pub enum Type<'db> {
     // TODO protocols, callable types, overloads, generics, type vars
 }
 
+#[salsa::tracked]
 impl<'db> Type<'db> {
     pub const fn any() -> Self {
         Self::Dynamic(DynamicType::Any)
@@ -1637,8 +1638,9 @@ impl<'db> Type<'db> {
     ///
     /// If `__get__` is not defined on the meta type, this method returns
     /// `None`.
+    #[salsa::tracked]
     fn try_call_dunder_get(
-        self: Type<'db>,
+        self,
         db: &'db dyn Db,
         instance: Type<'db>,
         owner: Type<'db>,
