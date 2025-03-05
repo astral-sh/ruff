@@ -458,8 +458,14 @@ fn symbol_by_id<'db>(
             // a diagnostic if we see it being modified externally. In type inference, we
             // can assign a "narrow" type to it even if it is not *declared*. This means, we
             // do not have to call [`widen_type_for_undeclared_public_symbol`].
-            let is_considered_non_modifiable =
-                symbol_table(db, scope).symbol(symbol_id).name() == "__slots__";
+            //
+            // `TYPE_CHECKING` is a special variable that should only be assigned `False`
+            // at runtime, but is always considered `True` in type checking.
+            // See mdtest/known_constants.md#user-defined-type_checking for details.
+            let is_considered_non_modifiable = matches!(
+                symbol_table(db, scope).symbol(symbol_id).name().as_str(),
+                "__slots__" | "TYPE_CHECKING"
+            );
 
             widen_type_for_undeclared_public_symbol(db, inferred, is_considered_non_modifiable)
                 .into()
@@ -500,14 +506,6 @@ fn symbol_impl<'db>(
 ) -> Symbol<'db> {
     let _span = tracing::trace_span!("symbol", ?name).entered();
 
-    // We don't need to check for `typing_extensions` here, because `typing_extensions.TYPE_CHECKING`
-    // is just a re-export of `typing.TYPE_CHECKING`.
-    if name == "TYPE_CHECKING"
-        && file_to_module(db, scope.file(db))
-            .is_some_and(|module| module.is_known(KnownModule::Typing))
-    {
-        return Symbol::bound(Type::BooleanLiteral(true));
-    }
     if name == "platform"
         && file_to_module(db, scope.file(db))
             .is_some_and(|module| module.is_known(KnownModule::Sys))

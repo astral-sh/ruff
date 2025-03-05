@@ -456,24 +456,88 @@ pub enum UnsupportedSyntaxErrorKind {
     Walrus,
     ExceptStar,
     StarTuple(StarTupleKind),
+    /// Represents the use of a [PEP 570] positional-only parameter before Python 3.8.
+    ///
+    /// ## Examples
+    ///
+    /// Python 3.8 added the `/` syntax for marking preceding parameters as positional-only:
+    ///
+    /// ```python
+    /// def foo(a, b, /, c): ...
+    /// ```
+    ///
+    /// This means `a` and `b` in this case can only be provided by position, not by name. In other
+    /// words, this code results in a `TypeError` at runtime:
+    ///
+    /// ```pycon
+    /// >>> def foo(a, b, /, c): ...
+    /// ...
+    /// >>> foo(a=1, b=2, c=3)
+    /// Traceback (most recent call last):
+    ///   File "<python-input-3>", line 1, in <module>
+    ///     foo(a=1, b=2, c=3)
+    ///     ~~~^^^^^^^^^^^^^^^
+    /// TypeError: foo() got some positional-only arguments passed as keyword arguments: 'a, b'
+    /// ```
+    ///
+    /// [PEP 570]: https://peps.python.org/pep-0570/
+    PositionalOnlyParameter,
+    /// Represents the use of a [type parameter list] before Python 3.12.
+    ///
+    /// ## Examples
+    ///
+    /// Before Python 3.12, generic parameters had to be declared separately using a class like
+    /// [`typing.TypeVar`], which could then be used in a function or class definition:
+    ///
+    /// ```python
+    /// from typing import Generic, TypeVar
+    ///
+    /// T = TypeVar("T")
+    ///
+    /// def f(t: T): ...
+    /// class C(Generic[T]): ...
+    /// ```
+    ///
+    /// [PEP 695], included in Python 3.12, introduced the new type parameter syntax, which allows
+    /// these to be written more compactly and without a separate type variable:
+    ///
+    /// ```python
+    /// def f[T](t: T): ...
+    /// class C[T]: ...
+    /// ```
+    ///
+    /// [type parameter list]: https://docs.python.org/3/reference/compound_stmts.html#type-parameter-lists
+    /// [PEP 695]: https://peps.python.org/pep-0695/
+    /// [`typing.TypeVar`]: https://docs.python.org/3/library/typing.html#typevar
+    TypeParameterList,
+    TypeAliasStatement,
+    TypeParamDefault,
 }
 
 impl Display for UnsupportedSyntaxError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let kind = match self.kind {
-            UnsupportedSyntaxErrorKind::Match => "`match` statement",
-            UnsupportedSyntaxErrorKind::Walrus => "named assignment expression (`:=`)",
-            UnsupportedSyntaxErrorKind::ExceptStar => "`except*`",
+            UnsupportedSyntaxErrorKind::Match => "Cannot use `match` statement",
+            UnsupportedSyntaxErrorKind::Walrus => "Cannot use named assignment expression (`:=`)",
+            UnsupportedSyntaxErrorKind::ExceptStar => "Cannot use `except*`",
             UnsupportedSyntaxErrorKind::StarTuple(StarTupleKind::Return) => {
-                "iterable unpacking in return statements"
+                "Cannot use iterable unpacking in return statements"
             }
             UnsupportedSyntaxErrorKind::StarTuple(StarTupleKind::Yield) => {
-                "iterable unpacking in yield statements"
+                "Cannot use iterable unpacking in yield statements"
+            }
+            UnsupportedSyntaxErrorKind::PositionalOnlyParameter => {
+                "Cannot use positional-only parameter separator"
+            }
+            UnsupportedSyntaxErrorKind::TypeParameterList => "Cannot use type parameter lists",
+            UnsupportedSyntaxErrorKind::TypeAliasStatement => "Cannot use `type` alias statement",
+            UnsupportedSyntaxErrorKind::TypeParamDefault => {
+                "Cannot set default type for a type parameter"
             }
         };
         write!(
             f,
-            "Cannot use {kind} on Python {} (syntax was added in Python {})",
+            "{kind} on Python {} (syntax was added in Python {})",
             self.target_version,
             self.kind.minimum_version(),
         )
@@ -488,6 +552,10 @@ impl UnsupportedSyntaxErrorKind {
             UnsupportedSyntaxErrorKind::Walrus => PythonVersion::PY38,
             UnsupportedSyntaxErrorKind::ExceptStar => PythonVersion::PY311,
             UnsupportedSyntaxErrorKind::StarTuple(_) => PythonVersion::PY38,
+            UnsupportedSyntaxErrorKind::PositionalOnlyParameter => PythonVersion::PY38,
+            UnsupportedSyntaxErrorKind::TypeParameterList => PythonVersion::PY312,
+            UnsupportedSyntaxErrorKind::TypeAliasStatement => PythonVersion::PY312,
+            UnsupportedSyntaxErrorKind::TypeParamDefault => PythonVersion::PY313,
         }
     }
 }
