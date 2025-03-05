@@ -2414,10 +2414,6 @@ impl ExprName {
     pub fn id(&self) -> &Name {
         &self.id
     }
-
-    pub fn is_valid(&self) -> bool {
-        self.ctx != ExprContext::Invalid
-    }
 }
 
 /// See also [List](https://docs.python.org/3/library/ast.html#ast.List)
