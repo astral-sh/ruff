@@ -7,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/inline/err/iter_unpack_yield_py3
 ```
 Module(
     ModModule {
-        range: 0..90,
+        range: 0..128,
         body: [
             Assign(
                 StmtAssign {
@@ -137,6 +137,103 @@ Module(
                     ],
                 },
             ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 90..127,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("h"),
+                        range: 94..95,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 95..97,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 99..127,
+                                value: Yield(
+                                    ExprYield {
+                                        range: 99..127,
+                                        value: Some(
+                                            Tuple(
+                                                ExprTuple {
+                                                    range: 105..127,
+                                                    elts: [
+                                                        NumberLiteral(
+                                                            ExprNumberLiteral {
+                                                                range: 105..106,
+                                                                value: Int(
+                                                                    1,
+                                                                ),
+                                                            },
+                                                        ),
+                                                        Yield(
+                                                            ExprYield {
+                                                                range: 109..123,
+                                                                value: Some(
+                                                                    Tuple(
+                                                                        ExprTuple {
+                                                                            range: 115..123,
+                                                                            elts: [
+                                                                                NumberLiteral(
+                                                                                    ExprNumberLiteral {
+                                                                                        range: 115..116,
+                                                                                        value: Int(
+                                                                                            2,
+                                                                                        ),
+                                                                                    },
+                                                                                ),
+                                                                                Starred(
+                                                                                    ExprStarred {
+                                                                                        range: 118..123,
+                                                                                        value: Name(
+                                                                                            ExprName {
+                                                                                                range: 119..123,
+                                                                                                id: Name("rest"),
+                                                                                                ctx: Load,
+                                                                                            },
+                                                                                        ),
+                                                                                        ctx: Load,
+                                                                                    },
+                                                                                ),
+                                                                            ],
+                                                                            ctx: Load,
+                                                                            parenthesized: false,
+                                                                        },
+                                                                    ),
+                                                                ),
+                                                            },
+                                                        ),
+                                                        NumberLiteral(
+                                                            ExprNumberLiteral {
+                                                                range: 126..127,
+                                                                value: Int(
+                                                                    3,
+                                                                ),
+                                                            },
+                                                        ),
+                                                    ],
+                                                    ctx: Load,
+                                                    parenthesized: false,
+                                                },
+                                            ),
+                                        ),
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
         ],
     },
 )
@@ -148,4 +245,13 @@ Module(
 2 | rest = (4, 5, 6)
 3 | def g(): yield 1, 2, 3, *rest
   |                         ^^^^^ Syntax Error: Cannot use iterable unpacking in yield statements on Python 3.7 (syntax was added in Python 3.8)
+4 | def h(): yield 1, (yield 2, *rest), 3
+  |
+
+
+  |
+2 | rest = (4, 5, 6)
+3 | def g(): yield 1, 2, 3, *rest
+4 | def h(): yield 1, (yield 2, *rest), 3
+  |                             ^^^^^ Syntax Error: Cannot use iterable unpacking in yield statements on Python 3.7 (syntax was added in Python 3.8)
   |

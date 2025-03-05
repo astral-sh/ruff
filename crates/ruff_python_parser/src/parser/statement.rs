@@ -295,27 +295,6 @@ impl<'src> Parser<'src> {
                 let parsed_expr =
                     self.parse_expression_list(ExpressionContext::yield_or_starred_bitwise_or());
 
-                if let Expr::Yield(ast::ExprYield {
-                    value: Some(expr), ..
-                }) = &parsed_expr.expr
-                {
-                    // test_ok iter_unpack_yield_py37
-                    // # parse_options: {"target-version": "3.7"}
-                    // rest = (4, 5, 6)
-                    // def g(): yield (1, 2, 3, *rest)
-
-                    // test_ok iter_unpack_yield_py38
-                    // # parse_options: {"target-version": "3.8"}
-                    // rest = (4, 5, 6)
-                    // def g(): yield 1, 2, 3, *rest
-
-                    // test_err iter_unpack_yield_py37
-                    // # parse_options: {"target-version": "3.7"}
-                    // rest = (4, 5, 6)
-                    // def g(): yield 1, 2, 3, *rest
-                    self.check_tuple_unpacking(expr, StarTupleKind::Yield);
-                }
-
                 if self.at(TokenKind::Equal) {
                     Stmt::Assign(self.parse_assign_statement(parsed_expr, start))
                 } else if self.at(TokenKind::Colon) {
@@ -426,6 +405,18 @@ impl<'src> Parser<'src> {
             // # parse_options: {"target-version": "3.7"}
             // rest = (4, 5, 6)
             // def f(): return 1, 2, 3, *rest
+
+            // TODO(brent) this should be invalid (raise a `ParseError`, not just an
+            // `UnsupportedSyntaxError`) as it's unsupported by every Python version I've tried
+            // (3.7, 3.8, and 3.13)
+            // test_err iter_unpack_return
+            // # invalid on every Python version
+            // def f(): return *rest
+
+            // test_err iter_unpack_return_todo
+            // # TODO(brent) this is accepted by 3.7 and 3.8 but not 3.13 (at least).
+            // # looks like a separate change from the tuple unpacking checked here
+            // def i(): return 1, (*rest)
             self.check_tuple_unpacking(&parsed_expr, StarTupleKind::Return);
 
             Box::new(parsed_expr.expr)
@@ -442,7 +433,7 @@ impl<'src> Parser<'src> {
     ///
     /// This method can be used to check for tuple unpacking in return and yield statements, which
     /// are only allowed in Python 3.8 and later: <https://github.com/python/cpython/issues/76298>.
-    fn check_tuple_unpacking(&mut self, expr: &Expr, kind: StarTupleKind) {
+    pub(crate) fn check_tuple_unpacking(&mut self, expr: &Expr, kind: StarTupleKind) {
         let kind = UnsupportedSyntaxErrorKind::StarTuple(kind);
         if self.options.target_version >= kind.minimum_version() {
             return;
