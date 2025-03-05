@@ -139,6 +139,18 @@ enum InstanceFallbackShadowsNonDataDescriptor {
     No,
 }
 
+/// Dunder methods are looked up on the meta type of a type without potentially falling
+/// back on attributes on the type itself. For example, when implicitly invoked on an
+/// instance, dunder methods are not looked up as instance attributes. And when invoked
+/// on a class, dunder methods are only looked up on the meta class, not the class itself.
+///
+/// All other attributes use the `WithInstanceFallback` policy.
+#[derive(Clone, Debug, Copy, PartialEq)]
+enum MemberLookupPolicy {
+    WithInstanceFallback,
+    NoInstanceFallback,
+}
+
 impl AttributeKind {
     const fn is_data(self) -> bool {
         matches!(self, Self::DataDescriptor)
@@ -1835,24 +1847,15 @@ impl<'db> Type<'db> {
     /// lookup, like a failed `__get__` call on a descriptor.
     #[must_use]
     pub(crate) fn member(&self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
-        self.member_impl(db, name, true)
+        self.member_lookup_with_policy(db, name, MemberLookupPolicy::WithInstanceFallback)
     }
 
     #[must_use]
-    pub(crate) fn member_without_instance_fallback(
+    fn member_lookup_with_policy(
         &self,
         db: &'db dyn Db,
         name: &str,
-    ) -> SymbolAndQualifiers<'db> {
-        self.member_impl(db, name, false)
-    }
-
-    #[must_use]
-    pub(crate) fn member_impl(
-        &self,
-        db: &'db dyn Db,
-        name: &str,
-        with_fallback: bool,
+        policy: MemberLookupPolicy,
     ) -> SymbolAndQualifiers<'db> {
         let _span = tracing::trace_span!("member", self=%self.display(db), name).entered();
 
@@ -1937,6 +1940,12 @@ impl<'db> Type<'db> {
                 Symbol::bound(Type::unknown()).into()
             }
 
+            Type::ModuleLiteral(module) => module.static_member(db, name).into(),
+
+            Type::Dynamic(..) | Type::Never | Type::AlwaysFalsy | Type::AlwaysTruthy => {
+                self.class_member(db, name)
+            }
+
             Type::Instance(..)
             | Type::BooleanLiteral(..)
             | Type::IntLiteral(..)
@@ -1947,7 +1956,7 @@ impl<'db> Type<'db> {
             | Type::Tuple(..)
             | Type::KnownInstance(..)
             | Type::FunctionLiteral(..) => {
-                if with_fallback {
+                if policy == MemberLookupPolicy::WithInstanceFallback {
                     self.invoke_descriptor_protocol(
                         db,
                         name,
@@ -1973,7 +1982,7 @@ impl<'db> Type<'db> {
                     return class_attr_plain;
                 }
 
-                if with_fallback {
+                if policy == MemberLookupPolicy::WithInstanceFallback {
                     let class_attr_fallback = Self::try_call_dunder_get_on_attribute(
                         db,
                         name,
@@ -1997,12 +2006,6 @@ impl<'db> Type<'db> {
                         InstanceFallbackShadowsNonDataDescriptor::No,
                     )
                 }
-            }
-
-            Type::ModuleLiteral(module) => module.static_member(db, name).into(),
-
-            Type::Dynamic(..) | Type::Never | Type::AlwaysFalsy | Type::AlwaysTruthy => {
-                self.class_member(db, name)
             }
         }
     }
@@ -2714,7 +2717,10 @@ impl<'db> Type<'db> {
             tracing::trace_span!("try_call_dunder", self=%self.display(db), name, ?arguments)
                 .entered();
 
-        match self.member_without_instance_fallback(db, name).symbol {
+        match self
+            .member_lookup_with_policy(db, name, MemberLookupPolicy::NoInstanceFallback)
+            .symbol
+        {
             Symbol::Type(dunder_callbable, boundness) => {
                 let result = dunder_callbable.try_call(db, arguments)?;
 
