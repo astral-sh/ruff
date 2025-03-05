@@ -473,8 +473,7 @@ pub enum UnsupportedSyntaxErrorKind {
     /// class C[T]: ...
     /// ```
     ///
-    /// [type parameter list]:
-    /// https://docs.python.org/3/reference/compound_stmts.html#type-parameter-lists
+    /// [type parameter list]: https://docs.python.org/3/reference/compound_stmts.html#type-parameter-lists
     /// [PEP 695]: https://peps.python.org/pep-0695/
     /// [`typing.TypeVar`]: https://docs.python.org/3/library/typing.html#typevar
     TypeParameterList,
