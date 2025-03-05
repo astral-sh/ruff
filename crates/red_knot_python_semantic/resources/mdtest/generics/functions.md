@@ -1,5 +1,43 @@
 # Generic functions
 
+## Typevar must be used at least twice
+
+If you're only using a typevar for a single parameter, you don't need the typevar — just use
+`object` (or the typevar's upper bound):
+
+```py
+# TODO: error, should be (x: object)
+def typevar_not_needed[T](x: T) -> None:
+    pass
+
+# TODO: error, should be (x: int)
+def bounded_typevar_not_needed[T: int](x: T) -> None:
+    pass
+```
+
+Typevars are only needed if you use them more than once. For instance, to specify that two
+parameters must both have the same type:
+
+```py
+def two_params[T](x: T, y: T) -> T:
+    return x
+```
+
+or to specify that a return value is the same as a parameter:
+
+```py
+def return_value[T](x: T) -> T:
+    return x
+```
+
+Each typevar must also appear _somewhere_ in the parameter list:
+
+```py
+def absurd[T]() -> T:
+    # There's no way to construct a T!
+    ...
+```
+
 ## Inferring generic function parameter types
 
 If the type of a generic function parameter is a typevar, then we can infer what type that typevar
