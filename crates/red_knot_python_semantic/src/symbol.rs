@@ -22,15 +22,6 @@ pub(crate) enum Boundness {
 }
 
 impl Boundness {
-    pub(crate) const fn min(self, other: Self) -> Self {
-        match (self, other) {
-            (Boundness::PossiblyUnbound, _) | (_, Boundness::PossiblyUnbound) => {
-                Boundness::PossiblyUnbound
-            }
-            (Boundness::Bound, Boundness::Bound) => Boundness::Bound,
-        }
-    }
-
     pub(crate) const fn max(self, other: Self) -> Self {
         match (self, other) {
             (Boundness::Bound, _) | (_, Boundness::Bound) => Boundness::Bound,

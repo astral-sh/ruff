@@ -1598,6 +1598,11 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Call the `__get__(instance, owner)` method on a type, and get the return
+    /// type of the call.
+    ///
+    /// If `__get__` is not defined on the type, this method returns `Ok(None)`.
+    /// If the call to `__get__` fails, this method returns an error.
     fn try_call_dunder_get(
         self: Type<'db>,
         db: &'db dyn Db,
@@ -1704,33 +1709,42 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Call the `__get__(instance, owner)` method on a type, and get the return
-    /// type of the call.
-    ///
-    /// If `__get__` is not defined on the type, this method returns `Ok(None)`.
-    /// If the call to `__get__` fails, this method returns an error.
-    // #[salsa::tracked]
-    fn run_descriptor_protocol_instances(
+    fn run_descriptor_protocol<F>(
         self,
         db: &'db dyn Db,
         name: &str,
-        instance_variable_fallback: bool,
-    ) -> SymbolAndQualifiers<'db> {
+        with_fallback: F,
+        fallback_shadoes_non_data_descriptor: bool,
+    ) -> SymbolAndQualifiers<'db>
+    where
+        F: Fn(Type<'db>) -> SymbolAndQualifiers<'db> + Clone,
+    {
         let _span = tracing::trace_span!(
-            "run_descriptor_protocol_instances",
+            "run_descriptor_protocol",
             self=%self.display(db),
-            instance_variable_fallback=?instance_variable_fallback,
+            name=%name,
         )
         .entered();
 
         match self {
             Type::Union(union) => union.map_with_boundness_and_qualifiers(db, |elem| {
-                elem.run_descriptor_protocol_instances(db, name, instance_variable_fallback)
+                elem.run_descriptor_protocol(
+                    db,
+                    name,
+                    with_fallback.clone(),
+                    fallback_shadoes_non_data_descriptor,
+                )
             }),
-            Type::Intersection(intersection) => intersection
-                .map_with_boundness_and_qualifiers(db, |elem| {
-                    elem.run_descriptor_protocol_instances(db, name, instance_variable_fallback)
-                }),
+            Type::Intersection(intersection) => {
+                intersection.map_with_boundness_and_qualifiers(db, |elem| {
+                    elem.run_descriptor_protocol(
+                        db,
+                        name,
+                        with_fallback.clone(),
+                        fallback_shadoes_non_data_descriptor,
+                    )
+                })
+            }
             _ => {
                 let (
                     SymbolAndQualifiers(meta_attr_resolved, meta_attr_qualifiers),
@@ -1743,12 +1757,7 @@ impl<'db> Type<'db> {
                     self.to_meta_type(db),
                 );
 
-                let SymbolAndQualifiers(fallback, fallback_qualifiers) =
-                    if instance_variable_fallback {
-                        self.instance_variable(db, name)
-                    } else {
-                        Symbol::Unbound.into()
-                    };
+                let SymbolAndQualifiers(fallback, fallback_qualifiers) = with_fallback(self);
 
                 match (meta_attr_resolved, is_data_descriptor, fallback) {
                     (meta_attr_resolved @ Symbol::Type(_, _), _, Symbol::Unbound) => {
@@ -1768,6 +1777,11 @@ impl<'db> Type<'db> {
                         ),
                         meta_attr_qualifiers.union(fallback_qualifiers),
                     ),
+                    (Symbol::Type(_, _), false, fallback @ Symbol::Type(_, Boundness::Bound))
+                        if fallback_shadoes_non_data_descriptor =>
+                    {
+                        SymbolAndQualifiers(fallback, fallback_qualifiers)
+                    }
                     (
                         Symbol::Type(meta_attr_ty, meta_attr_boundness),
                         false,
@@ -1787,7 +1801,33 @@ impl<'db> Type<'db> {
         }
     }
 
-    // #[salsa::tracked]
+    fn run_descriptor_protocol_instances(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        instance_variable_fallback: bool,
+    ) -> SymbolAndQualifiers<'db> {
+        let _span = tracing::trace_span!(
+            "run_descriptor_protocol_instances",
+            self=%self.display(db),
+            instance_variable_fallback=?instance_variable_fallback,
+        )
+        .entered();
+
+        self.run_descriptor_protocol(
+            db,
+            name,
+            |object| {
+                if instance_variable_fallback {
+                    object.instance_variable(db, name)
+                } else {
+                    Symbol::Unbound.into()
+                }
+            },
+            false,
+        )
+    }
+
     fn run_descriptor_protocol_classes(
         self,
         db: &'db dyn Db,
@@ -1800,76 +1840,22 @@ impl<'db> Type<'db> {
         )
         .entered();
 
-        match self {
-            Type::Union(union) => union.map_with_boundness_and_qualifiers(db, |elem| {
-                elem.run_descriptor_protocol_classes(db, name)
-            }),
-            Type::Intersection(intersection) => intersection
-                .map_with_boundness_and_qualifiers(db, |elem| {
-                    elem.run_descriptor_protocol_classes(db, name)
-                }),
-            _ => {
-                let (
-                    SymbolAndQualifiers(meta_attr_resolved, meta_attr_qualifiers),
-                    is_data_descriptor,
-                ) = Self::try_call_dunder_get_on_class_member(
+        self.run_descriptor_protocol(
+            db,
+            name,
+            |object| {
+                let class_attr_plain = object.find_name_in_mro(db, name).expect("TODO");
+                Self::try_call_dunder_get_on_class_member(
                     db,
                     name,
-                    self.class_member(db, name),
-                    self,
-                    self.to_meta_type(db),
-                );
-
-                let SymbolAndQualifiers(fallback, fallback_qualifiers) = {
-                    let class_attr_plain = self.find_name_in_mro(db, name).expect("TODO");
-                    Self::try_call_dunder_get_on_class_member(
-                        db,
-                        name,
-                        class_attr_plain,
-                        Type::none(db),
-                        self,
-                    )
-                    .0
-                };
-
-                match (meta_attr_resolved, is_data_descriptor, fallback) {
-                    (meta_attr_resolved @ Symbol::Type(_, _), _, Symbol::Unbound) => {
-                        SymbolAndQualifiers(meta_attr_resolved, meta_attr_qualifiers)
-                    }
-                    (meta_attr_resolved @ Symbol::Type(_, Boundness::Bound), true, _) => {
-                        SymbolAndQualifiers(meta_attr_resolved, meta_attr_qualifiers)
-                    }
-                    (
-                        Symbol::Type(meta_attr_ty, Boundness::PossiblyUnbound),
-                        true,
-                        Symbol::Type(fallback_ty, fallback_boundness),
-                    ) => SymbolAndQualifiers(
-                        Symbol::Type(
-                            UnionType::from_elements(db, [meta_attr_ty, fallback_ty]),
-                            fallback_boundness,
-                        ),
-                        meta_attr_qualifiers.union(fallback_qualifiers),
-                    ),
-                    (Symbol::Type(_, _), false, fallback @ Symbol::Type(_, Boundness::Bound)) => {
-                        SymbolAndQualifiers(fallback, fallback_qualifiers)
-                    }
-                    (
-                        Symbol::Type(meta_attr_ty, meta_attr_boundness),
-                        false,
-                        Symbol::Type(fallback_ty, fallback_boundness),
-                    ) => SymbolAndQualifiers(
-                        Symbol::Type(
-                            UnionType::from_elements(db, [fallback_ty, meta_attr_ty]),
-                            meta_attr_boundness.max(fallback_boundness),
-                        ),
-                        meta_attr_qualifiers.union(fallback_qualifiers),
-                    ),
-                    (Symbol::Unbound, _, fallback) => {
-                        SymbolAndQualifiers(fallback, fallback_qualifiers)
-                    }
-                }
-            }
-        }
+                    class_attr_plain,
+                    Type::none(db),
+                    object,
+                )
+                .0
+            },
+            true,
+        )
     }
 
     /// Access an attribute of this type, potentially invoking the descriptor protocol.

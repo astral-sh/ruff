@@ -728,7 +728,7 @@ def _(flag: bool):
 
     reveal_type(C.meta_class_attribute_1)  # revealed: Literal["value in meta class"]
     reveal_type(C.meta_class_attribute_2)  # revealed: Literal["value in class body"]
-    reveal_type(C.meta_class_attribute_3)  # revealed: Literal["value in class body", "value in meta class"]
+    reveal_type(C.meta_class_attribute_3)  # revealed: Literal["value in meta class", "value in class body"]
     # error: [possibly-unbound-attribute]
     reveal_type(C.meta_class_attribute_4)  # revealed: Literal["possible value in meta class"]
 ```

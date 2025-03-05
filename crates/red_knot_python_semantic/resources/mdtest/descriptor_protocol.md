@@ -397,8 +397,8 @@ def _(flag: bool):
             attribute4: Literal["value on class"] = "value on class"
 
     reveal_type(C6.attribute1)  # revealed: Literal["data"]
-    reveal_type(C6.attribute2)  # revealed: Literal["value on class", "non-data"]
-    reveal_type(C6.attribute3)  # revealed: Literal["value on class", "value on metaclass"]
+    reveal_type(C6.attribute2)  # revealed: Literal["non-data", "value on class"]
+    reveal_type(C6.attribute3)  # revealed: Literal["value on metaclass", "value on class"]
     # error: [possibly-unbound-attribute]
     reveal_type(C6.attribute4)  # revealed: Literal["value on class"]
 ```

@@ -304,7 +304,7 @@ class E(metaclass=Meta):
         def f(arg: int) -> Any:
             return "a"
 
-reveal_type(E.f(1))  # revealed: Any | str
+reveal_type(E.f(1))  # revealed: str | Any
 ```
 
 ## `@classmethod`
