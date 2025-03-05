@@ -5,11 +5,15 @@
 If the type of a generic function parameter is a typevar, then we can infer what type that typevar
 is bound to at each call site.
 
+TODO: Note that some of the TODO revealed types have two options, since we haven't decided yet
+whether we want to infer a more specific `Literal` type where possible, or use heuristics to weaken
+the inferred type to e.g. `int`.
+
 ```py
 def f[T](x: T) -> T: ...
 
 # TODO: no error
-# TODO: revealed: int
+# TODO: revealed: int or Literal[1]
 # error: [invalid-argument-type]
 reveal_type(f(1))  # revealed: T
 
@@ -19,12 +23,12 @@ reveal_type(f(1))  # revealed: T
 reveal_type(f(1.0))  # revealed: T
 
 # TODO: no error
-# TODO: revealed: bool
+# TODO: revealed: bool or Literal[true]
 # error: [invalid-argument-type]
 reveal_type(f(True))  # revealed: T
 
 # TODO: no error
-# TODO: revealed: str
+# TODO: revealed: str or Literal["string"]
 # error: [invalid-argument-type]
 reveal_type(f("string"))  # revealed: T
 ```

@@ -110,8 +110,8 @@ parameter:
 class E[T]:
     def __init__(self, x: T) -> None: ...
 
-# TODO: revealed: E[float]
-reveal_type(E(1.0))  # revealed: E
+# TODO: revealed: E[int] or E[Literal[1]]
+reveal_type(E(1))  # revealed: E
 ```
 
 The types inferred from a type context and from a constructor parameter must be consistent with each
