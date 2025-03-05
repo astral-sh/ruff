@@ -111,27 +111,14 @@ pub(crate) fn infer_scope_types<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Ty
     TypeInferenceBuilder::new(db, InferenceRegion::Scope(scope), index).finish()
 }
 
-/// Cycle recovery for [`infer_definition_types()`]: for now, just [`Type::unknown`]
-/// TODO fixpoint iteration
+/// TODO temporary cycle recovery for [`infer_definition_types()`], pending fixpoint iteration
 fn infer_definition_types_cycle_recovery<'db>(
     db: &'db dyn Db,
     _cycle: &salsa::Cycle,
     input: Definition<'db>,
 ) -> TypeInference<'db> {
     tracing::trace!("infer_definition_types_cycle_recovery");
-    let mut inference = TypeInference::empty(input.scope(db));
-    let category = input.kind(db).category(input.file(db).is_stub(db.upcast()));
-    if category.is_declaration() {
-        inference
-            .declarations
-            .insert(input, TypeAndQualifiers::unknown());
-    }
-    if category.is_binding() {
-        inference.bindings.insert(input, Type::unknown());
-    }
-    // TODO we don't fill in expression types for the cycle-participant definitions, which can
-    // later cause a panic when looking up an expression type.
-    inference
+    TypeInference::cycle_fallback(input.scope(db), todo_type!("cycle recovery"))
 }
 
 /// Infer all types for a [`Definition`] (including sub-expressions).
@@ -291,8 +278,13 @@ pub(crate) struct TypeInference<'db> {
     /// The diagnostics for this region.
     diagnostics: TypeCheckDiagnostics,
 
-    /// The scope belong to this region.
+    /// The scope this region is part of.
     scope: ScopeId<'db>,
+
+    /// The fallback type for missing expressions/bindings/declarations.
+    ///
+    /// This is used only when constructing a cycle-recovery `TypeInference`.
+    cycle_fallback_type: Option<Type<'db>>,
 }
 
 impl<'db> TypeInference<'db> {
@@ -304,26 +296,59 @@ impl<'db> TypeInference<'db> {
             deferred: FxHashSet::default(),
             diagnostics: TypeCheckDiagnostics::default(),
             scope,
+            cycle_fallback_type: None,
+        }
+    }
+
+    fn cycle_fallback(scope: ScopeId<'db>, cycle_fallback_type: Type<'db>) -> Self {
+        Self {
+            expressions: FxHashMap::default(),
+            bindings: FxHashMap::default(),
+            declarations: FxHashMap::default(),
+            deferred: FxHashSet::default(),
+            diagnostics: TypeCheckDiagnostics::default(),
+            scope,
+            cycle_fallback_type: Some(cycle_fallback_type),
         }
     }
 
     #[track_caller]
     pub(crate) fn expression_type(&self, expression: ScopedExpressionId) -> Type<'db> {
-        self.expressions[&expression]
+        self.try_expression_type(expression).expect(
+            "expression should belong to this TypeInference region and
+            TypeInferenceBuilder should have inferred a type for it",
+        )
     }
 
     pub(crate) fn try_expression_type(&self, expression: ScopedExpressionId) -> Option<Type<'db>> {
-        self.expressions.get(&expression).copied()
+        self.expressions
+            .get(&expression)
+            .copied()
+            .or(self.cycle_fallback_type)
     }
 
     #[track_caller]
     pub(crate) fn binding_type(&self, definition: Definition<'db>) -> Type<'db> {
-        self.bindings[&definition]
+        self.bindings
+            .get(&definition)
+            .copied()
+            .or(self.cycle_fallback_type)
+            .expect(
+                "definition should belong to this TypeInference region and
+                TypeInferenceBuilder should have inferred a type for it",
+            )
     }
 
     #[track_caller]
     pub(crate) fn declaration_type(&self, definition: Definition<'db>) -> TypeAndQualifiers<'db> {
-        self.declarations[&definition]
+        self.declarations
+            .get(&definition)
+            .copied()
+            .or(self.cycle_fallback_type.map(Into::into))
+            .expect(
+                "definition should belong to this TypeInference region and
+                TypeInferenceBuilder should have inferred a type for it",
+            )
     }
 
     pub(crate) fn diagnostics(&self) -> &TypeCheckDiagnostics {

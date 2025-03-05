@@ -445,6 +445,63 @@ pub enum UnsupportedSyntaxErrorKind {
     Walrus,
     ExceptStar,
     ParenthesizedKeywordArgumentName,
+    /// Represents the use of a "relaxed" [PEP 614] decorator before Python 3.9.
+    ///
+    /// ## Examples
+    ///
+    /// Prior to Python 3.9, decorators were defined to be [`dotted_name`]s, optionally followed by
+    /// an argument list. For example:
+    ///
+    /// ```python
+    /// @buttons.clicked.connect
+    /// def foo(): ...
+    ///
+    /// @buttons.clicked.connect(1, 2, 3)
+    /// def foo(): ...
+    /// ```
+    ///
+    /// As pointed out in the PEP, this prevented reasonable extensions like subscripts:
+    ///
+    /// ```python
+    /// buttons = [QPushButton(f'Button {i}') for i in range(10)]
+    ///
+    /// @buttons[0].clicked.connect
+    /// def spam(): ...
+    /// ```
+    ///
+    /// Python 3.9 removed these restrictions and expanded the [decorator grammar] to include any
+    /// assignment expression and include cases like the example above.
+    ///
+    /// [PEP 614]: https://peps.python.org/pep-0614/
+    /// [`dotted_name`]: https://docs.python.org/3.8/reference/compound_stmts.html#grammar-token-dotted-name
+    /// [decorator grammar]: https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-decorator
+    RelaxedDecorator,
+    /// Represents the use of a [PEP 570] positional-only parameter before Python 3.8.
+    ///
+    /// ## Examples
+    ///
+    /// Python 3.8 added the `/` syntax for marking preceding parameters as positional-only:
+    ///
+    /// ```python
+    /// def foo(a, b, /, c): ...
+    /// ```
+    ///
+    /// This means `a` and `b` in this case can only be provided by position, not by name. In other
+    /// words, this code results in a `TypeError` at runtime:
+    ///
+    /// ```pycon
+    /// >>> def foo(a, b, /, c): ...
+    /// ...
+    /// >>> foo(a=1, b=2, c=3)
+    /// Traceback (most recent call last):
+    ///   File "<python-input-3>", line 1, in <module>
+    ///     foo(a=1, b=2, c=3)
+    ///     ~~~^^^^^^^^^^^^^^^
+    /// TypeError: foo() got some positional-only arguments passed as keyword arguments: 'a, b'
+    /// ```
+    ///
+    /// [PEP 570]: https://peps.python.org/pep-0570/
+    PositionalOnlyParameter,
     /// Represents the use of a [type parameter list] before Python 3.12.
     ///
     /// ## Examples
@@ -485,6 +542,10 @@ impl Display for UnsupportedSyntaxError {
             UnsupportedSyntaxErrorKind::ExceptStar => "Cannot use `except*`",
             UnsupportedSyntaxErrorKind::ParenthesizedKeywordArgumentName => {
                 "Cannot use parenthesized keyword argument name"
+            }
+            UnsupportedSyntaxErrorKind::RelaxedDecorator => "Unsupported expression in decorators",
+            UnsupportedSyntaxErrorKind::PositionalOnlyParameter => {
+                "Cannot use positional-only parameter separator"
             }
             UnsupportedSyntaxErrorKind::TypeParameterList => "Cannot use type parameter lists",
             UnsupportedSyntaxErrorKind::TypeAliasStatement => "Cannot use `type` alias statement",
@@ -528,6 +589,10 @@ impl UnsupportedSyntaxErrorKind {
             UnsupportedSyntaxErrorKind::Match => Change::Added(PythonVersion::PY310),
             UnsupportedSyntaxErrorKind::Walrus => Change::Added(PythonVersion::PY38),
             UnsupportedSyntaxErrorKind::ExceptStar => Change::Added(PythonVersion::PY311),
+            UnsupportedSyntaxErrorKind::RelaxedDecorator => Change::Added(PythonVersion::PY39),
+            UnsupportedSyntaxErrorKind::PositionalOnlyParameter => {
+                Change::Added(PythonVersion::PY38)
+            }
             UnsupportedSyntaxErrorKind::ParenthesizedKeywordArgumentName => {
                 Change::Removed(PythonVersion::PY38)
             }

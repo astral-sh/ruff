@@ -1,0 +1,3 @@
+# parse_options: { "target-version": "3.7" }
+@(x := lambda x: x)(foo)
+def bar(): ...
