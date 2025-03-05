@@ -1712,18 +1712,18 @@ impl<'db> Type<'db> {
         }
     }
 
-    fn run_descriptor_protocol<F>(
+    fn invoke_descriptor_protocol<F>(
         self,
         db: &'db dyn Db,
         name: &str,
-        with_fallback: F,
+        retrieve_fallback: F,
         fallback_shadows_non_data_descriptor: bool,
     ) -> SymbolAndQualifiers<'db>
     where
         F: Fn(Type<'db>) -> SymbolAndQualifiers<'db> + Clone,
     {
         let _span = tracing::trace_span!(
-            "run_descriptor_protocol",
+            "invoke_descriptor_protocol",
             self=%self.display(db),
             name=%name,
         )
@@ -1731,19 +1731,19 @@ impl<'db> Type<'db> {
 
         match self {
             Type::Union(union) => union.map_with_boundness_and_qualifiers(db, |elem| {
-                elem.run_descriptor_protocol(
+                elem.invoke_descriptor_protocol(
                     db,
                     name,
-                    with_fallback.clone(),
+                    retrieve_fallback.clone(),
                     fallback_shadows_non_data_descriptor,
                 )
             }),
             Type::Intersection(intersection) => {
                 intersection.map_with_boundness_and_qualifiers(db, |elem| {
-                    elem.run_descriptor_protocol(
+                    elem.invoke_descriptor_protocol(
                         db,
                         name,
-                        with_fallback.clone(),
+                        retrieve_fallback.clone(),
                         fallback_shadows_non_data_descriptor,
                     )
                 })
@@ -1766,7 +1766,7 @@ impl<'db> Type<'db> {
                 let SymbolAndQualifiers {
                     symbol: fallback,
                     qualifiers: fallback_qualifiers,
-                } = with_fallback(self);
+                } = retrieve_fallback(self);
 
                 match (meta_attr_resolved, is_data_descriptor, fallback) {
                     (meta_attr_resolved @ Symbol::Type(_, _), _, Symbol::Unbound) => {
@@ -1822,7 +1822,7 @@ impl<'db> Type<'db> {
         )
         .entered();
 
-        self.run_descriptor_protocol(
+        self.invoke_descriptor_protocol(
             db,
             name,
             |object| {
@@ -1849,7 +1849,7 @@ impl<'db> Type<'db> {
         )
         .entered();
 
-        self.run_descriptor_protocol(
+        self.invoke_descriptor_protocol(
             db,
             name,
             |object| {
