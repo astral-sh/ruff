@@ -64,7 +64,7 @@ impl Workspace {
     pub fn open_file(&mut self, path: &str, contents: &str) -> Result<FileHandle, Error> {
         self.system
             .fs
-            .write_file(path, contents)
+            .write_file_all(path, contents)
             .map_err(into_error)?;
 
         let file = system_path_to_file(&self.db, path).expect("File to exist");

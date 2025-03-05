@@ -7,7 +7,7 @@ use ruff_notebook::{Notebook, NotebookError};
 
 use crate::system::{
     DirectoryEntry, FileType, GlobError, GlobErrorKind, Metadata, Result, System, SystemPath,
-    SystemPathBuf, SystemVirtualPath,
+    SystemPathBuf, SystemVirtualPath, WritableSystem,
 };
 
 use super::walk_directory::{
@@ -188,6 +188,16 @@ impl System for OsSystem {
                 file_type: file_type.into(),
             })
         })))
+    }
+}
+
+impl WritableSystem for OsSystem {
+    fn write_file(&self, path: &SystemPath, content: &str) -> Result<()> {
+        std::fs::write(path.as_std_path(), content)
+    }
+
+    fn create_directory_all(&self, path: &SystemPath) -> Result<()> {
+        std::fs::create_dir_all(path.as_std_path())
     }
 }
 

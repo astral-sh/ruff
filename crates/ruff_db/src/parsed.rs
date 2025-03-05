@@ -85,7 +85,9 @@ impl Eq for ParsedModule {}
 mod tests {
     use crate::files::{system_path_to_file, vendored_path_to_file};
     use crate::parsed::parsed_module;
-    use crate::system::{DbWithTestSystem, SystemPath, SystemVirtualPath};
+    use crate::system::{
+        DbWithTestSystem, DbWithWritableSystem as _, SystemPath, SystemVirtualPath,
+    };
     use crate::tests::TestDb;
     use crate::vendored::{VendoredFileSystemBuilder, VendoredPath};
     use crate::Db;
@@ -96,7 +98,7 @@ mod tests {
         let mut db = TestDb::new();
         let path = "test.py";
 
-        db.write_file(path, "x = 10".to_string())?;
+        db.write_file(path, "x = 10")?;
 
         let file = system_path_to_file(&db, path).unwrap();
 
@@ -112,7 +114,7 @@ mod tests {
         let mut db = TestDb::new();
         let path = SystemPath::new("test.ipynb");
 
-        db.write_file(path, "%timeit a = b".to_string())?;
+        db.write_file(path, "%timeit a = b")?;
 
         let file = system_path_to_file(&db, path).unwrap();
 

@@ -1,6 +1,11 @@
 # Case Sensitive Imports
 
-TODO: This test should use the real file system instead of the memory file system.
+```toml
+# TODO: This test should use the real file system instead of the memory file system.
+# but we can't change the file system yet because the tests would then start failing for 
+# case-insensitive file systems.
+#system = "os"
+```
 
 Python's import system is case-sensitive even on case-insensitive file system. This means, importing
 a module `a` should fail if the file in the search paths is named `A.py`. See
@@ -64,8 +69,8 @@ class A:
 ```
 
 ```python
-from a import A as ALower
 from A import A as AUpper
+from a import A as ALower
 
 reveal_type(AUpper().x)  # revealed: int
 reveal_type(ALower().x)  # revealed: str
