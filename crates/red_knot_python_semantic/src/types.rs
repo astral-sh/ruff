@@ -2861,6 +2861,7 @@ impl<'db> Type<'db> {
                 enter_ret_ty: enter.return_type(db),
                 exit_error,
             }),
+            // TODO: Use the `exit_ty` to determine if any raised exception is suppressed.
             (Err(enter_error), Ok(_)) => Err(ContextManagerErrorKind::Enter(enter_error)),
             (Err(enter_error), Err(exit_error)) => Err(ContextManagerErrorKind::EnterAndExit {
                 enter_error,
@@ -3477,6 +3478,9 @@ impl<'db> ContextManagerErrorKind<'db> {
             CallDunderError::PossiblyUnbound(_) => {
                 format!("the method `{name}` is possibly unbound")
             }
+            // TODO: Use more specific error messages for the different error cases.
+            //  E.g. hint toward the union variant that doesn't correctly implement enter,
+            //  distinguish between a not callable `__enter__` attribute and a wrong signature.
             CallDunderError::Call(_) => format!("it does not correctly implement `{name}`"),
         }
     }
