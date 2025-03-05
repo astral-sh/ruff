@@ -12,7 +12,7 @@ use anyhow::Context;
 use red_knot_python_semantic::PythonPlatform;
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use ruff_python_ast::PythonVersion;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Debug, Default, Clone)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
@@ -20,6 +20,11 @@ pub(crate) struct MarkdownTestConfig {
     pub(crate) environment: Option<Environment>,
 
     pub(crate) log: Option<Log>,
+
+    /// The [`ruff_db::system::System`] to use for tests.
+    ///
+    /// Defaults to the case-sensitive [`ruff_db::system::InMemorySystem`].
+    pub(crate) system: Option<SystemKind>,
 }
 
 impl MarkdownTestConfig {
@@ -73,4 +78,20 @@ pub(crate) enum Log {
     Bool(bool),
     /// Enable logging and only show filters that match the given [env-filter](https://docs.rs/tracing-subscriber/latest/tracing_subscriber/filter/struct.EnvFilter.html)
     Filter(String),
+}
+
+/// The system to use for tests.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Deserialize, Serialize, Default)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum SystemKind {
+    /// Use an in-memory system with a case sensitive file system..
+    ///
+    /// This is recommended for all tests because it's fast.
+    #[default]
+    InMemory,
+
+    /// Use the os system.
+    ///
+    /// This system should only be used when testing system or OS specific behavior.
+    Os,
 }
