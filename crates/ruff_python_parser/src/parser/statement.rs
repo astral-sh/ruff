@@ -1967,6 +1967,43 @@ impl<'src> Parser<'src> {
     ///
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#the-with-statement>
     fn parse_with_statement(&mut self, start: TextSize) -> ast::StmtWith {
+        // test_ok parenthesized_context_manager_py38
+        // # parse_options: {"target-version": "3.8"}
+        // with (x, y) as foo:
+        //     pass
+        //
+        // with (x,
+        //     y) as foo:
+        //     pass
+        //
+        // with (x,
+        // y):
+        //     pass
+        //
+        // with (
+        //     x,
+        // ):
+        //     pass
+        //
+        // with (
+        //     x,
+        //     y
+        // ) as foo:
+        //     pass
+        //
+        // with x, (
+        //     y
+        // ): pass
+        //
+        // with x as foo, (
+        // y
+        // ) as bar:
+        //     pass
+        //
+        // with x() as foo, (
+        //     y()
+        // ) as bar:
+        //     pass
         self.bump(TokenKind::With);
 
         let items = self.parse_with_items();

@@ -536,6 +536,7 @@ pub enum UnsupportedSyntaxErrorKind {
     TypeParameterList,
     TypeAliasStatement,
     TypeParamDefault,
+    ParenthesizedContextManager,
 }
 
 impl Display for UnsupportedSyntaxError {
@@ -552,6 +553,9 @@ impl Display for UnsupportedSyntaxError {
             UnsupportedSyntaxErrorKind::TypeAliasStatement => "Cannot use `type` alias statement",
             UnsupportedSyntaxErrorKind::TypeParamDefault => {
                 "Cannot set default type for a type parameter"
+            }
+            UnsupportedSyntaxErrorKind::ParenthesizedContextManager => {
+                "Invalid parentheses around context manager"
             }
         };
         write!(
@@ -575,6 +579,7 @@ impl UnsupportedSyntaxErrorKind {
             UnsupportedSyntaxErrorKind::TypeParameterList => PythonVersion::PY312,
             UnsupportedSyntaxErrorKind::TypeAliasStatement => PythonVersion::PY312,
             UnsupportedSyntaxErrorKind::TypeParamDefault => PythonVersion::PY313,
+            UnsupportedSyntaxErrorKind::ParenthesizedContextManager => PythonVersion::PY39,
         }
     }
 }
