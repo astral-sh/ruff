@@ -123,6 +123,22 @@ fn definition_expression_type<'db>(
     }
 }
 
+/// The descriptor protocol distiguishes two kinds of descriptors. Non-data descriptors
+/// define a `__get__` method, while data descriptors additionally define a `__set__`
+/// method or a `__delete__` method. This enum is used to categorize attributes into two
+/// groups: (1) data descriptors and (2) normal attributes or non-data descriptors.
+#[derive(Clone, Debug, Copy)]
+enum AttributeKind {
+    DataDescriptor,
+    NormalOrNonDataDescriptor,
+}
+
+impl AttributeKind {
+    const fn is_data(self) -> bool {
+        matches!(self, Self::DataDescriptor)
+    }
+}
+
 /// Meta data for `Type::Todo`, which represents a known limitation in red-knot.
 #[cfg(debug_assertions)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
@@ -1596,17 +1612,19 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Call the `__get__(instance, owner)` method on a type, and get the return
-    /// type of the call.
+    /// Look up `__get__` on the meta type of self, and call it with the
+    /// arguments `self`, `instance`, and `owner`. `__get__` is different
+    /// than other dunder methods in that it is not looked up using the
+    /// descriptor protocol itself.
     ///
-    /// If `__get__` is not defined on the type, this method returns `Ok(None)`.
-    /// If the call to `__get__` fails, this method returns an error.
+    /// If `__get__` is not defined on the meta type, this method returns
+    /// `None`.
     fn try_call_dunder_get(
         self: Type<'db>,
         db: &'db dyn Db,
         instance: Type<'db>,
         owner: Type<'db>,
-    ) -> (Option<Type<'db>>, bool) {
+    ) -> Option<(Type<'db>, AttributeKind)> {
         let _span = tracing::trace_span!(
             "try_call_dunder_get",
             self=%self.display(db),
@@ -1621,19 +1639,25 @@ impl<'db> Type<'db> {
             let return_ty = descr_get
                 .try_call(db, &CallArguments::positional([self, instance, owner]))
                 .map(|outcome| {
-                    Some(if descr_get_boundness == Boundness::Bound {
+                    if descr_get_boundness == Boundness::Bound {
                         outcome.return_type(db)
                     } else {
                         UnionType::from_elements(db, [outcome.return_type(db), self])
-                    })
+                    }
                 })
-                .unwrap_or(None);
-            let is_data_descriptor = !self.class_member(db, "__set__").symbol.is_unbound()
-                || !self.class_member(db, "__delete__").symbol.is_unbound();
+                .ok()?;
 
-            (return_ty, is_data_descriptor)
+            let descriptor_kind = if self.class_member(db, "__set__").symbol.is_unbound()
+                && self.class_member(db, "__delete__").symbol.is_unbound()
+            {
+                AttributeKind::NormalOrNonDataDescriptor
+            } else {
+                AttributeKind::DataDescriptor
+            };
+
+            Some((return_ty, descriptor_kind))
         } else {
-            (None, false)
+            None
         }
     }
 
@@ -1643,7 +1667,7 @@ impl<'db> Type<'db> {
         class_member: SymbolAndQualifiers<'db>,
         instance: Type<'db>,
         owner: Type<'db>,
-    ) -> (SymbolAndQualifiers<'db>, bool) {
+    ) -> (SymbolAndQualifiers<'db>, AttributeKind) {
         let _span = tracing::trace_span!(
             "try_call_dunder_get_on_class_member",
             instance=%instance.display(db),
@@ -1654,10 +1678,14 @@ impl<'db> Type<'db> {
         match class_member {
             // This branch is not strictly needed, but it short-circuits the lookup
             // of various dunder methods and calls that would otherwise be made.
+            //
+            // Note that dynamic types act like data descriptors. They do have a
+            // `__get__` and a `__set__` method (of type `Type::Dynamic`), because
+            // they do have an attribute of every possible name.
             SymbolAndQualifiers {
                 symbol: Symbol::Type(Type::Dynamic(_), _),
                 qualifiers: _,
-            } => (class_member, true),
+            } => (class_member, AttributeKind::DataDescriptor),
 
             SymbolAndQualifiers {
                 symbol: Symbol::Type(Type::Union(union), boundness),
@@ -1667,17 +1695,20 @@ impl<'db> Type<'db> {
                     .map_with_boundness(db, |elem| {
                         Symbol::Type(
                             elem.try_call_dunder_get(db, instance, owner)
-                                .0
-                                .unwrap_or(*elem),
+                                .map_or(*elem, |(ty, _)| ty),
                             boundness,
                         )
                     })
                     .with_qualifiers(qualifiers),
                 // TODO: avoid the duplication here:
-                union
-                    .elements(db)
-                    .iter()
-                    .all(|elem| elem.try_call_dunder_get(db, instance, owner).1),
+                if union.elements(db).iter().all(|elem| {
+                    elem.try_call_dunder_get(db, instance, owner)
+                        .is_some_and(|(_, kind)| kind.is_data())
+                }) {
+                    AttributeKind::DataDescriptor
+                } else {
+                    AttributeKind::NormalOrNonDataDescriptor
+                },
             ),
             SymbolAndQualifiers {
                 symbol: Symbol::Type(Type::Intersection(intersection), boundness),
@@ -1687,28 +1718,29 @@ impl<'db> Type<'db> {
                     .map_with_boundness(db, |elem| {
                         Symbol::Type(
                             elem.try_call_dunder_get(db, instance, owner)
-                                .0
-                                .unwrap_or(*elem),
+                                .map_or(*elem, |(ty, _)| ty),
                             boundness,
                         )
                     })
                     .with_qualifiers(qualifiers),
-                false, // TODO
+                AttributeKind::NormalOrNonDataDescriptor, // TODO
             ),
             SymbolAndQualifiers {
                 symbol: Symbol::Type(attribute_ty, boundness),
                 qualifiers,
             } => {
-                let (return_ty, is_data_descriptor) =
-                    attribute_ty.try_call_dunder_get(db, instance, owner);
-
-                (
-                    Symbol::Type(return_ty.unwrap_or(attribute_ty), boundness)
-                        .with_qualifiers(qualifiers),
-                    is_data_descriptor,
-                )
+                if let Some((return_ty, attribute_kind)) =
+                    attribute_ty.try_call_dunder_get(db, instance, owner)
+                {
+                    (
+                        Symbol::Type(return_ty, boundness).with_qualifiers(qualifiers),
+                        attribute_kind,
+                    )
+                } else {
+                    (class_member, AttributeKind::NormalOrNonDataDescriptor)
+                }
             }
-            _ => (class_member, false),
+            _ => (class_member, AttributeKind::NormalOrNonDataDescriptor),
         }
     }
 
@@ -1773,13 +1805,15 @@ impl<'db> Type<'db> {
                         meta_attr_resolved.with_qualifiers(meta_attr_qualifiers)
                     }
 
-                    (meta_attr_resolved @ Symbol::Type(_, Boundness::Bound), true, _) => {
-                        meta_attr_resolved.with_qualifiers(meta_attr_qualifiers)
-                    }
+                    (
+                        meta_attr_resolved @ Symbol::Type(_, Boundness::Bound),
+                        AttributeKind::DataDescriptor,
+                        _,
+                    ) => meta_attr_resolved.with_qualifiers(meta_attr_qualifiers),
 
                     (
                         Symbol::Type(meta_attr_ty, Boundness::PossiblyUnbound),
-                        true,
+                        AttributeKind::DataDescriptor,
                         Symbol::Type(fallback_ty, fallback_boundness),
                     ) => Symbol::Type(
                         UnionType::from_elements(db, [meta_attr_ty, fallback_ty]),
@@ -1787,15 +1821,17 @@ impl<'db> Type<'db> {
                     )
                     .with_qualifiers(meta_attr_qualifiers.union(fallback_qualifiers)),
 
-                    (Symbol::Type(_, _), false, fallback @ Symbol::Type(_, Boundness::Bound))
-                        if fallback_shadows_non_data_descriptor =>
-                    {
+                    (
+                        Symbol::Type(_, _),
+                        AttributeKind::NormalOrNonDataDescriptor,
+                        fallback @ Symbol::Type(_, Boundness::Bound),
+                    ) if fallback_shadows_non_data_descriptor => {
                         fallback.with_qualifiers(fallback_qualifiers)
                     }
 
                     (
                         Symbol::Type(meta_attr_ty, meta_attr_boundness),
-                        false,
+                        AttributeKind::NormalOrNonDataDescriptor,
                         Symbol::Type(fallback_ty, fallback_boundness),
                     ) => Symbol::Type(
                         UnionType::from_elements(db, [meta_attr_ty, fallback_ty]),
