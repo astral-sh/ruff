@@ -1,0 +1,240 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/iter_unpack_yield_py38.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..128,
+        body: [
+            Assign(
+                StmtAssign {
+                    range: 43..59,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 43..47,
+                                id: Name("rest"),
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: Tuple(
+                        ExprTuple {
+                            range: 50..59,
+                            elts: [
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 51..52,
+                                        value: Int(
+                                            4,
+                                        ),
+                                    },
+                                ),
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 54..55,
+                                        value: Int(
+                                            5,
+                                        ),
+                                    },
+                                ),
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 57..58,
+                                        value: Int(
+                                            6,
+                                        ),
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                            parenthesized: true,
+                        },
+                    ),
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 60..89,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("g"),
+                        range: 64..65,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 65..67,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 69..89,
+                                value: Yield(
+                                    ExprYield {
+                                        range: 69..89,
+                                        value: Some(
+                                            Tuple(
+                                                ExprTuple {
+                                                    range: 75..89,
+                                                    elts: [
+                                                        NumberLiteral(
+                                                            ExprNumberLiteral {
+                                                                range: 75..76,
+                                                                value: Int(
+                                                                    1,
+                                                                ),
+                                                            },
+                                                        ),
+                                                        NumberLiteral(
+                                                            ExprNumberLiteral {
+                                                                range: 78..79,
+                                                                value: Int(
+                                                                    2,
+                                                                ),
+                                                            },
+                                                        ),
+                                                        NumberLiteral(
+                                                            ExprNumberLiteral {
+                                                                range: 81..82,
+                                                                value: Int(
+                                                                    3,
+                                                                ),
+                                                            },
+                                                        ),
+                                                        Starred(
+                                                            ExprStarred {
+                                                                range: 84..89,
+                                                                value: Name(
+                                                                    ExprName {
+                                                                        range: 85..89,
+                                                                        id: Name("rest"),
+                                                                        ctx: Load,
+                                                                    },
+                                                                ),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                    ],
+                                                    ctx: Load,
+                                                    parenthesized: false,
+                                                },
+                                            ),
+                                        ),
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 90..127,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("h"),
+                        range: 94..95,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 95..97,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 99..127,
+                                value: Yield(
+                                    ExprYield {
+                                        range: 99..127,
+                                        value: Some(
+                                            Tuple(
+                                                ExprTuple {
+                                                    range: 105..127,
+                                                    elts: [
+                                                        NumberLiteral(
+                                                            ExprNumberLiteral {
+                                                                range: 105..106,
+                                                                value: Int(
+                                                                    1,
+                                                                ),
+                                                            },
+                                                        ),
+                                                        Yield(
+                                                            ExprYield {
+                                                                range: 109..123,
+                                                                value: Some(
+                                                                    Tuple(
+                                                                        ExprTuple {
+                                                                            range: 115..123,
+                                                                            elts: [
+                                                                                NumberLiteral(
+                                                                                    ExprNumberLiteral {
+                                                                                        range: 115..116,
+                                                                                        value: Int(
+                                                                                            2,
+                                                                                        ),
+                                                                                    },
+                                                                                ),
+                                                                                Starred(
+                                                                                    ExprStarred {
+                                                                                        range: 118..123,
+                                                                                        value: Name(
+                                                                                            ExprName {
+                                                                                                range: 119..123,
+                                                                                                id: Name("rest"),
+                                                                                                ctx: Load,
+                                                                                            },
+                                                                                        ),
+                                                                                        ctx: Load,
+                                                                                    },
+                                                                                ),
+                                                                            ],
+                                                                            ctx: Load,
+                                                                            parenthesized: false,
+                                                                        },
+                                                                    ),
+                                                                ),
+                                                            },
+                                                        ),
+                                                        NumberLiteral(
+                                                            ExprNumberLiteral {
+                                                                range: 126..127,
+                                                                value: Int(
+                                                                    3,
+                                                                ),
+                                                            },
+                                                        ),
+                                                    ],
+                                                    ctx: Load,
+                                                    parenthesized: false,
+                                                },
+                                            ),
+                                        ),
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
