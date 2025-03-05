@@ -136,6 +136,10 @@ impl System for LSPSystem {
         self.os_system.canonicalize_path(path)
     }
 
+    fn path_exists_case_sensitive(&self, path: &SystemPath, prefix: &SystemPath) -> Result<bool> {
+        self.os_system.path_exists_case_sensitive(path, prefix)
+    }
+
     fn read_to_string(&self, path: &SystemPath) -> Result<String> {
         let document = self.system_path_to_document_ref(path)?;
 

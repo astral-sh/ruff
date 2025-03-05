@@ -4,7 +4,7 @@
 # TODO: This test should use the real file system instead of the memory file system.
 # but we can't change the file system yet because the tests would then start failing for 
 # case-insensitive file systems.
-#system = "os"
+system = "os"
 ```
 
 Python's import system is case-sensitive even on case-insensitive file system. This means, importing

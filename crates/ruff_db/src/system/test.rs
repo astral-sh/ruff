@@ -130,6 +130,10 @@ impl System for TestSystem {
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
         self
     }
+
+    fn path_exists_case_sensitive(&self, path: &SystemPath, prefix: &SystemPath) -> Result<bool> {
+        self.system().path_exists_case_sensitive(path, prefix)
+    }
 }
 
 impl Default for TestSystem {
@@ -348,6 +352,12 @@ impl System for InMemorySystem {
 
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
         self
+    }
+
+    #[inline]
+    fn path_exists_case_sensitive(&self, path: &SystemPath, _prefix: &SystemPath) -> Result<bool> {
+        // The memory file system is case-sensitive.
+        Ok(self.path_exists(path))
     }
 }
 

@@ -211,6 +211,15 @@ impl System for MdtestSystem {
         self.as_system().read_virtual_path_to_notebook(path)
     }
 
+    fn path_exists_case_sensitive(
+        &self,
+        path: &SystemPath,
+        prefix: &SystemPath,
+    ) -> ruff_db::system::Result<bool> {
+        self.as_system()
+            .path_exists_case_sensitive(&self.normalize_path(path), &self.normalize_path(prefix))
+    }
+
     fn current_directory(&self) -> &SystemPath {
         self.as_system().current_directory()
     }
