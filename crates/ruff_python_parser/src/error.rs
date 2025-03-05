@@ -464,12 +464,11 @@ impl Display for UnsupportedSyntaxError {
             }
         };
 
-        let (changed, changed_version) = self.kind.changed_version();
-
         write!(
             f,
-            "{kind} on Python {} (syntax was {changed} in Python {changed_version})",
+            "{kind} on Python {} (syntax was {changed})",
             self.target_version,
+            changed = self.kind.changed_version(),
         )
     }
 }
@@ -479,15 +478,15 @@ impl Display for UnsupportedSyntaxError {
 /// Most changes so far have been additions (e.g. `match` and `type` statements), but others are
 /// removals (e.g. parenthesized keyword argument names).
 enum Change {
-    Added,
-    Removed,
+    Added(PythonVersion),
+    Removed(PythonVersion),
 }
 
 impl Display for Change {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Change::Added => f.write_str("added"),
-            Change::Removed => f.write_str("removed"),
+            Change::Added(version) => write!(f, "added in Python {version}"),
+            Change::Removed(version) => write!(f, "removed in Python {version}"),
         }
     }
 }
@@ -495,25 +494,24 @@ impl Display for Change {
 impl UnsupportedSyntaxErrorKind {
     /// Returns the Python version when the syntax associated with this error was changed, and the
     /// type of [`Change`] (added or removed).
-    const fn changed_version(self) -> (Change, PythonVersion) {
+    const fn changed_version(self) -> Change {
         match self {
-            UnsupportedSyntaxErrorKind::Match => (Change::Added, PythonVersion::PY310),
-            UnsupportedSyntaxErrorKind::Walrus => (Change::Added, PythonVersion::PY38),
-            UnsupportedSyntaxErrorKind::ExceptStar => (Change::Added, PythonVersion::PY311),
+            UnsupportedSyntaxErrorKind::Match => Change::Added(PythonVersion::PY310),
+            UnsupportedSyntaxErrorKind::Walrus => Change::Added(PythonVersion::PY38),
+            UnsupportedSyntaxErrorKind::ExceptStar => Change::Added(PythonVersion::PY311),
             UnsupportedSyntaxErrorKind::ParenthesizedKeywordArgumentName => {
-                (Change::Removed, PythonVersion::PY38)
+                Change::Removed(PythonVersion::PY38)
             }
-            UnsupportedSyntaxErrorKind::TypeAliasStatement => (Change::Added, PythonVersion::PY312),
-            UnsupportedSyntaxErrorKind::TypeParamDefault => (Change::Added, PythonVersion::PY313),
+            UnsupportedSyntaxErrorKind::TypeAliasStatement => Change::Added(PythonVersion::PY312),
+            UnsupportedSyntaxErrorKind::TypeParamDefault => Change::Added(PythonVersion::PY313),
         }
     }
 
     /// Returns whether or not this kind of syntax is unsupported on `target_version`.
     pub(crate) fn is_unsupported(self, target_version: PythonVersion) -> bool {
-        let (change, version) = self.changed_version();
-        match change {
-            Change::Added => target_version < version,
-            Change::Removed => target_version >= version,
+        match self.changed_version() {
+            Change::Added(version) => target_version < version,
+            Change::Removed(version) => target_version >= version,
         }
     }
 }
