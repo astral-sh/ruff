@@ -1750,16 +1750,13 @@ impl<'db> Type<'db> {
         }
     }
 
-    fn invoke_descriptor_protocol<F>(
+    fn invoke_descriptor_protocol(
         self,
         db: &'db dyn Db,
         name: &str,
-        retrieve_fallback: F,
+        fallback: SymbolAndQualifiers<'db>,
         policy: InstanceFallbackShadowsNonDataDescriptor,
-    ) -> SymbolAndQualifiers<'db>
-    where
-        F: Fn(Type<'db>) -> SymbolAndQualifiers<'db> + Clone,
-    {
+    ) -> SymbolAndQualifiers<'db> {
         let _span = tracing::trace_span!(
             "invoke_descriptor_protocol",
             self=%self.display(db),
@@ -1784,7 +1781,7 @@ impl<'db> Type<'db> {
         let SymbolAndQualifiers {
             symbol: fallback,
             qualifiers: fallback_qualifiers,
-        } = retrieve_fallback(self);
+        } = fallback;
 
         match (meta_attr, meta_attr_kind, fallback) {
             (meta_attr_resolved @ Symbol::Type(_, _), _, Symbol::Unbound) => {
@@ -1954,50 +1951,49 @@ impl<'db> Type<'db> {
                     self.invoke_descriptor_protocol(
                         db,
                         name,
-                        |object| object.instance_variable(db, name),
+                        self.instance_variable(db, name),
                         InstanceFallbackShadowsNonDataDescriptor::No,
                     )
                 } else {
                     self.invoke_descriptor_protocol(
                         db,
                         name,
-                        |_| Symbol::Unbound.into(),
+                        Symbol::Unbound.into(),
                         InstanceFallbackShadowsNonDataDescriptor::No,
                     )
                 }
             }
 
             Type::ClassLiteral(..) | Type::SubclassOf(..) => {
+                let class_attr_plain = self.find_name_in_mro(db, name).expect(
+                    "Calling `find_name_in_mro` on class literals and subclass-of types returns `Some` result",
+                );
+
                 if name == "__mro__" {
-                    return self.find_name_in_mro(db, name).expect(
-                        "Calling `find_name_in_mro` on class literals and subclass-of types returns `Some` result",
-                    );
+                    return class_attr_plain;
                 }
 
                 if with_fallback {
+                    let class_attr_fallback = Self::try_call_dunder_get_on_attribute(
+                        db,
+                        name,
+                        class_attr_plain,
+                        Type::none(db),
+                        *self,
+                    )
+                    .0;
+
                     self.invoke_descriptor_protocol(
-                            db,
-                            name,
-                            |object| {
-                                let class_attr_plain = object
-                                    .find_name_in_mro(db, name)
-                                    .expect("run_descriptor_protocol_classes is only called with class-like types");
-                                Self::try_call_dunder_get_on_attribute(
-                                    db,
-                                    name,
-                                    class_attr_plain,
-                                    Type::none(db),
-                                    object,
-                                )
-                                .0
-                            },
-                            InstanceFallbackShadowsNonDataDescriptor::Yes,
-                        )
+                        db,
+                        name,
+                        class_attr_fallback,
+                        InstanceFallbackShadowsNonDataDescriptor::Yes,
+                    )
                 } else {
                     self.invoke_descriptor_protocol(
                         db,
                         name,
-                        |_| Symbol::Unbound.into(),
+                        Symbol::Unbound.into(),
                         InstanceFallbackShadowsNonDataDescriptor::No,
                     )
                 }
