@@ -1508,38 +1508,33 @@ impl<'db> Type<'db> {
         {
             symbol
         } else {
-            self.instance_variable(db, name).symbol
+            self.instance_member(db, name).symbol
         }
     }
 
-    /// Access an attribute of this type without invoking the descriptor protocol. This
-    /// method corresponds to `inspect.getattr_static(<object of type 'self'>, name)`.
-    ///
-    /// See also: [`Type::member`]
     #[must_use]
-    fn instance_variable(&self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
-        let _span =
-            tracing::trace_span!("instance_variable", self=%self.display(db), name).entered();
+    fn instance_member(&self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
+        let _span = tracing::trace_span!("instance_member", self=%self.display(db), name).entered();
 
         match self {
             Type::Dynamic(_) | Type::Never => Symbol::bound(self).into(),
 
             Type::FunctionLiteral(_) => KnownClass::FunctionType
                 .to_instance(db)
-                .instance_variable(db, name),
+                .instance_member(db, name),
 
             Type::Callable(CallableType::BoundMethod(_)) => KnownClass::MethodType
                 .to_instance(db)
-                .instance_variable(db, name),
+                .instance_member(db, name),
             Type::Callable(CallableType::MethodWrapperDunderGet(_)) => {
                 KnownClass::MethodWrapperType
                     .to_instance(db)
-                    .instance_variable(db, name)
+                    .instance_member(db, name)
             }
             Type::Callable(CallableType::WrapperDescriptorDunderGet) => {
                 KnownClass::WrapperDescriptorType
                     .to_instance(db)
-                    .instance_variable(db, name)
+                    .instance_member(db, name)
             }
 
             Type::ModuleLiteral(_) => Symbol::Unbound.into(), // TODO: fallback to instance
@@ -1578,47 +1573,41 @@ impl<'db> Type<'db> {
             },
 
             Type::Union(union) => {
-                union.map_with_boundness_and_qualifiers(db, |elem| elem.instance_variable(db, name))
+                union.map_with_boundness_and_qualifiers(db, |elem| elem.instance_member(db, name))
             }
 
             Type::Intersection(intersection) => intersection
-                .map_with_boundness_and_qualifiers(db, |elem| elem.instance_variable(db, name)),
+                .map_with_boundness_and_qualifiers(db, |elem| elem.instance_member(db, name)),
 
             Type::IntLiteral(_) => match name {
                 "real" | "numerator" => Symbol::bound(self).into(),
                 // TODO more attributes could probably be usefully special-cased
-                _ => KnownClass::Int.to_instance(db).instance_variable(db, name),
+                _ => KnownClass::Int.to_instance(db).instance_member(db, name),
             },
 
             Type::BooleanLiteral(bool_value) => match name {
                 "real" | "numerator" => {
                     Symbol::bound(Type::IntLiteral(i64::from(*bool_value))).into()
                 }
-                _ => KnownClass::Bool.to_instance(db).instance_variable(db, name),
+                _ => KnownClass::Bool.to_instance(db).instance_member(db, name),
             },
 
             Type::StringLiteral(_) | Type::LiteralString => {
-                KnownClass::Str.to_instance(db).instance_variable(db, name)
+                KnownClass::Str.to_instance(db).instance_member(db, name)
             }
 
-            Type::BytesLiteral(_) => KnownClass::Bytes
-                .to_instance(db)
-                .instance_variable(db, name),
+            Type::BytesLiteral(_) => KnownClass::Bytes.to_instance(db).instance_member(db, name),
 
             // We could plausibly special-case `start`, `step`, and `stop` here,
             // but it doesn't seem worth the complexity given the very narrow range of places
             // where we infer `SliceLiteral` types.
-            Type::SliceLiteral(_) => KnownClass::Slice
-                .to_instance(db)
-                .instance_variable(db, name),
+            Type::SliceLiteral(_) => KnownClass::Slice.to_instance(db).instance_member(db, name),
 
             Type::Tuple(_) => {
                 // TODO: We might want to special case some attributes here, as the stubs
                 // for `builtins.tuple` assume that `self` is a homogeneous tuple, while
                 // we're explicitly modeling heterogeneous tuples using `Type::Tuple`.
-                KnownClass::Tuple
-                    .to_instance(db)
-                    .instance_variable(db, name)
+                KnownClass::Tuple.to_instance(db).instance_member(db, name)
             }
 
             Type::AlwaysTruthy | Type::AlwaysFalsy => match name {
@@ -1626,7 +1615,7 @@ impl<'db> Type<'db> {
                     // TODO should be `Callable[[], Literal[True/False]]`
                     Symbol::todo("`__bool__` for `AlwaysTruthy`/`AlwaysFalsy` Type variants").into()
                 }
-                _ => Type::object(db).instance_variable(db, name),
+                _ => Type::object(db).instance_member(db, name),
             },
         }
     }
@@ -1965,7 +1954,7 @@ impl<'db> Type<'db> {
                     self.invoke_descriptor_protocol(
                         db,
                         name,
-                        self.instance_variable(db, name),
+                        self.instance_member(db, name),
                         InstanceFallbackShadowsNonDataDescriptor::No,
                     )
                 } else {
