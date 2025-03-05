@@ -96,6 +96,6 @@ Module(
   |
 1 | # parse_options: { "target-version": "3.8" }
 2 | @buttons[0].clicked.connect
-  |  ^^^^^^^^^^^^^^^^^^^^^^^^^^ Syntax Error: Cannot use named expression in decorator on Python 3.8 (syntax was added in Python 3.9)
+  |  ^^^^^^^^^^^^^^^^^^^^^^^^^^ Syntax Error: Unsupported expression in decorators on Python 3.8 (syntax was added in Python 3.9)
 3 | def spam(): ...
   |

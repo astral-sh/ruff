@@ -544,9 +544,7 @@ impl Display for UnsupportedSyntaxError {
             UnsupportedSyntaxErrorKind::Match => "Cannot use `match` statement",
             UnsupportedSyntaxErrorKind::Walrus => "Cannot use named assignment expression (`:=`)",
             UnsupportedSyntaxErrorKind::ExceptStar => "Cannot use `except*`",
-            UnsupportedSyntaxErrorKind::RelaxedDecorator => {
-                "Cannot use named expression in decorator"
-            }
+            UnsupportedSyntaxErrorKind::RelaxedDecorator => "Unsupported expression in decorators",
             UnsupportedSyntaxErrorKind::PositionalOnlyParameter => {
                 "Cannot use positional-only parameter separator"
             }
