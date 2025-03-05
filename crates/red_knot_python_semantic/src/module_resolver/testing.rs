@@ -1,4 +1,6 @@
-use ruff_db::system::{DbWithTestSystem, SystemPath, SystemPathBuf};
+use ruff_db::system::{
+    DbWithTestSystem as _, DbWithWritableSystem as _, SystemPath, SystemPathBuf,
+};
 use ruff_db::vendored::VendoredPathBuf;
 use ruff_python_ast::PythonVersion;
 

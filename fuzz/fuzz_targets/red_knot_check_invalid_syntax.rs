@@ -14,7 +14,9 @@ use red_knot_python_semantic::{
     PythonPlatform, SearchPathSettings,
 };
 use ruff_db::files::{system_path_to_file, File, Files};
-use ruff_db::system::{DbWithTestSystem, System, SystemPathBuf, TestSystem};
+use ruff_db::system::{
+    DbWithTestSystem, DbWithWritableSystem as _, System, SystemPathBuf, TestSystem,
+};
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_db::{Db as SourceDb, Upcast};
 use ruff_python_ast::PythonVersion;

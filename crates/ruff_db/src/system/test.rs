@@ -1,6 +1,5 @@
 use glob::PatternError;
 use ruff_notebook::{Notebook, NotebookError};
-use ruff_python_trivia::textwrap;
 use std::panic::RefUnwindSafe;
 use std::sync::{Arc, Mutex};
 
@@ -12,6 +11,7 @@ use crate::system::{
 use crate::Db;
 
 use super::walk_directory::WalkDirectoryBuilder;
+use super::WritableSystem;
 
 /// System implementation intended for testing.
 ///
@@ -22,10 +22,16 @@ use super::walk_directory::WalkDirectoryBuilder;
 /// Don't use this system for production code. It's intended for testing only.
 #[derive(Debug, Clone)]
 pub struct TestSystem {
-    inner: Arc<dyn System + RefUnwindSafe + Send + Sync>,
+    inner: Arc<dyn WritableSystem + RefUnwindSafe + Send + Sync>,
 }
 
 impl TestSystem {
+    pub fn new(inner: impl WritableSystem + RefUnwindSafe + Send + Sync + 'static) -> Self {
+        Self {
+            inner: Arc::new(inner),
+        }
+    }
+
     /// Returns the [`InMemorySystem`].
     ///
     /// ## Panics
@@ -50,12 +56,12 @@ impl TestSystem {
 
     fn use_system<S>(&mut self, system: S)
     where
-        S: System + Send + Sync + RefUnwindSafe + 'static,
+        S: WritableSystem + Send + Sync + RefUnwindSafe + 'static,
     {
         self.inner = Arc::new(system);
     }
 
-    pub fn system(&self) -> &dyn System {
+    pub fn system(&self) -> &dyn WritableSystem {
         &*self.inner
     }
 }
@@ -134,6 +140,73 @@ impl Default for TestSystem {
     }
 }
 
+impl WritableSystem for TestSystem {
+    fn write_file(&self, path: &SystemPath, content: &str) -> Result<()> {
+        self.system().write_file(path, content)
+    }
+
+    fn create_directory_all(&self, path: &SystemPath) -> Result<()> {
+        self.system().create_directory_all(path)
+    }
+}
+
+/// Extension trait for databases that use a [`WritableSystem`].
+///
+/// Provides various helper function that ease testing.
+pub trait DbWithWritableSystem: Db + Sized {
+    type System: WritableSystem;
+
+    fn writable_system(&self) -> &Self::System;
+
+    /// Writes the content of the given file and notifies the Db about the change.
+    fn write_file(&mut self, path: impl AsRef<SystemPath>, content: impl AsRef<str>) -> Result<()> {
+        let path = path.as_ref();
+        match self.writable_system().write_file(path, content.as_ref()) {
+            Ok(()) => {
+                File::sync_path(self, path);
+                Ok(())
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                if let Some(parent) = path.parent() {
+                    self.writable_system().create_directory_all(parent)?;
+
+                    for ancestor in parent.ancestors() {
+                        File::sync_path(self, ancestor);
+                    }
+
+                    self.writable_system().write_file(path, content.as_ref())?;
+                    File::sync_path(self, path);
+
+                    Ok(())
+                } else {
+                    Err(error)
+                }
+            }
+            err => err,
+        }
+    }
+
+    /// Writes auto-dedented text to a file.
+    fn write_dedented(&mut self, path: &str, content: &str) -> Result<()> {
+        self.write_file(path, ruff_python_trivia::textwrap::dedent(content))?;
+        Ok(())
+    }
+
+    /// Writes the content of the given files and notifies the Db about the change.
+    fn write_files<P, C, I>(&mut self, files: I) -> Result<()>
+    where
+        I: IntoIterator<Item = (P, C)>,
+        P: AsRef<SystemPath>,
+        C: AsRef<str>,
+    {
+        for (path, content) in files {
+            self.write_file(path, content)?;
+        }
+
+        Ok(())
+    }
+}
+
 /// Extension trait for databases that use [`TestSystem`].
 ///
 /// Provides various helper function that ease testing.
@@ -141,35 +214,6 @@ pub trait DbWithTestSystem: Db + Sized {
     fn test_system(&self) -> &TestSystem;
 
     fn test_system_mut(&mut self) -> &mut TestSystem;
-
-    /// Writes the content of the given file and notifies the Db about the change.
-    ///
-    /// ## Panics
-    /// If the db isn't using the [`InMemorySystem`].
-    fn write_file(&mut self, path: impl AsRef<SystemPath>, content: impl ToString) -> Result<()> {
-        let path = path.as_ref();
-
-        let memory_fs = self.test_system().memory_file_system();
-
-        let sync_ancestors = path
-            .parent()
-            .is_some_and(|parent| !memory_fs.exists(parent));
-        let result = memory_fs.write_file(path, content);
-
-        if result.is_ok() {
-            File::sync_path(self, path);
-
-            // Sync the ancestor paths if the path's parent
-            // directory didn't exist before.
-            if sync_ancestors {
-                for ancestor in path.ancestors() {
-                    File::sync_path(self, ancestor);
-                }
-            }
-        }
-
-        result
-    }
 
     /// Writes the content of the given virtual file.
     ///
@@ -182,32 +226,6 @@ pub trait DbWithTestSystem: Db + Sized {
             .write_virtual_file(path, content);
     }
 
-    /// Writes auto-dedented text to a file.
-    ///
-    /// ## Panics
-    /// If the db isn't using the [`InMemorySystem`].
-    fn write_dedented(&mut self, path: &str, content: &str) -> crate::system::Result<()> {
-        self.write_file(path, textwrap::dedent(content))?;
-        Ok(())
-    }
-
-    /// Writes the content of the given files and notifies the Db about the change.
-    ///
-    /// ## Panics
-    /// If the db isn't using the [`InMemorySystem`].
-    fn write_files<P, C, I>(&mut self, files: I) -> crate::system::Result<()>
-    where
-        I: IntoIterator<Item = (P, C)>,
-        P: AsRef<SystemPath>,
-        C: ToString,
-    {
-        for (path, content) in files {
-            self.write_file(path, content)?;
-        }
-
-        Ok(())
-    }
-
     /// Uses the given system instead of the testing system.
     ///
     /// This useful for testing advanced file system features like permissions, symlinks, etc.
@@ -215,7 +233,7 @@ pub trait DbWithTestSystem: Db + Sized {
     /// Note that any files written to the memory file system won't be copied over.
     fn use_system<S>(&mut self, os: S)
     where
-        S: System + Send + Sync + RefUnwindSafe + 'static,
+        S: WritableSystem + Send + Sync + RefUnwindSafe + 'static,
     {
         self.test_system_mut().use_system(os);
     }
@@ -229,6 +247,17 @@ pub trait DbWithTestSystem: Db + Sized {
     }
 }
 
+impl<T> DbWithWritableSystem for T
+where
+    T: DbWithTestSystem,
+{
+    type System = TestSystem;
+
+    fn writable_system(&self) -> &Self::System {
+        self.test_system()
+    }
+}
+
 #[derive(Default, Debug)]
 pub struct InMemorySystem {
     user_config_directory: Mutex<Option<SystemPathBuf>>,
@@ -236,6 +265,13 @@ pub struct InMemorySystem {
 }
 
 impl InMemorySystem {
+    pub fn new(cwd: SystemPathBuf) -> Self {
+        Self {
+            user_config_directory: Mutex::new(None),
+            memory_fs: MemoryFileSystem::with_current_directory(cwd),
+        }
+    }
+
     pub fn fs(&self) -> &MemoryFileSystem {
         &self.memory_fs
     }
@@ -312,5 +348,15 @@ impl System for InMemorySystem {
 
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
         self
+    }
+}
+
+impl WritableSystem for InMemorySystem {
+    fn write_file(&self, path: &SystemPath, content: &str) -> Result<()> {
+        self.memory_fs.write_file(path, content)
+    }
+
+    fn create_directory_all(&self, path: &SystemPath) -> Result<()> {
+        self.memory_fs.create_directory_all(path)
     }
 }

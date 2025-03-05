@@ -409,7 +409,7 @@ impl FusedIterator for ChildrenIter<'_> {}
 mod tests {
     use ruff_db::files::{system_path_to_file, File};
     use ruff_db::parsed::parsed_module;
-    use ruff_db::system::DbWithTestSystem;
+    use ruff_db::system::DbWithWritableSystem as _;
     use ruff_python_ast as ast;
     use ruff_text_size::{Ranged, TextRange};
 
@@ -440,7 +440,7 @@ mod tests {
         file: File,
     }
 
-    fn test_case(content: impl ToString) -> TestCase {
+    fn test_case(content: impl AsRef<str>) -> TestCase {
         let mut db = TestDb::new();
         db.write_file("test.py", content).unwrap();
 
