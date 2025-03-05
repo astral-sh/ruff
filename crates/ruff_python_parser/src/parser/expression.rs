@@ -405,7 +405,7 @@ impl<'src> Parser<'src> {
 
         ParsedExpr {
             expr: self.parse_postfix_expression(lhs.expr, start),
-            is_parenthesized: lhs.is_parenthesized,
+            end_parenthesis: lhs.end_parenthesis,
         }
     }
 
@@ -419,7 +419,7 @@ impl<'src> Parser<'src> {
     fn parse_expression_with_bitwise_or_precedence(&mut self) -> ParsedExpr {
         let parsed_expr = self.parse_conditional_expression_or_higher();
 
-        if parsed_expr.is_parenthesized {
+        if parsed_expr.is_parenthesized() {
             // Parentheses resets the precedence, so we don't need to validate it.
             return parsed_expr;
         }
@@ -703,7 +703,28 @@ impl<'src> Parser<'src> {
 
                 if parser.eat(TokenKind::Equal) {
                     seen_keyword_argument = true;
-                    let arg = if let Expr::Name(ident_expr) = parsed_expr.expr {
+                    let arg = if let ParsedExpr {
+                        expr: Expr::Name(ident_expr),
+                        end_parenthesis,
+                    } = parsed_expr
+                    {
+                        // test_ok parenthesized_kwarg_py37
+                        // # parse_options: {"target-version": "3.7"}
+                        // f((a)=1)
+
+                        // test_err parenthesized_kwarg_py38
+                        // # parse_options: {"target-version": "3.8"}
+                        // f((a)=1)
+                        // f((a) = 1)
+                        // f( ( a ) = 1)
+
+                        if let Some(end) = end_parenthesis {
+                            parser.add_unsupported_syntax_error(
+                                UnsupportedSyntaxErrorKind::ParenthesizedKeywordArgumentName,
+                                TextRange::new(start, end),
+                            );
+                        }
+
                         ast::Identifier {
                             id: ident_expr.id,
                             range: ident_expr.range,
@@ -857,7 +878,7 @@ impl<'src> Parser<'src> {
                 return lower.expr;
             }
 
-            if !lower.is_parenthesized {
+            if !lower.is_parenthesized() {
                 match lower.expr {
                     Expr::Starred(_) => {
                         self.add_error(ParseErrorType::InvalidStarredExpressionUsage, &lower);
@@ -1403,7 +1424,7 @@ impl<'src> Parser<'src> {
         // f"{*yield x}"
         let value = self.parse_expression_list(ExpressionContext::yield_or_starred_bitwise_or());
 
-        if !value.is_parenthesized && value.expr.is_lambda_expr() {
+        if !value.is_parenthesized() && value.expr.is_lambda_expr() {
             // TODO(dhruvmanila): This requires making some changes in lambda expression
             // parsing logic to handle the emitted `FStringMiddle` token in case the
             // lambda expression is not parenthesized.
@@ -1614,7 +1635,7 @@ impl<'src> Parser<'src> {
             TokenKind::Colon => {
                 // Now, we know that it's either a dictionary expression or a dictionary comprehension.
                 // In either case, the key is limited to an `expression`.
-                if !key_or_element.is_parenthesized {
+                if !key_or_element.is_parenthesized() {
                     match key_or_element.expr {
                         Expr::Starred(_) => self.add_error(
                             ParseErrorType::InvalidStarredExpressionUsage,
@@ -1693,7 +1714,7 @@ impl<'src> Parser<'src> {
 
                 ParsedExpr {
                     expr: tuple.into(),
-                    is_parenthesized: false,
+                    end_parenthesis: None,
                 }
             }
             TokenKind::Async | TokenKind::For => {
@@ -1713,7 +1734,7 @@ impl<'src> Parser<'src> {
 
                 ParsedExpr {
                     expr: generator,
-                    is_parenthesized: false,
+                    end_parenthesis: None,
                 }
             }
             _ => {
@@ -1724,7 +1745,7 @@ impl<'src> Parser<'src> {
 
                 self.expect(TokenKind::Rpar);
 
-                parsed_expr.is_parenthesized = true;
+                parsed_expr.end_parenthesis = Some(self.node_range(start).end());
                 parsed_expr
             }
         }
@@ -2330,13 +2351,19 @@ impl<'src> Parser<'src> {
 #[derive(Debug)]
 pub(super) struct ParsedExpr {
     pub(super) expr: Expr,
-    pub(super) is_parenthesized: bool,
+    /// Contains the location of the closing parenthesis, if the expression is parenthesized
+    pub(super) end_parenthesis: Option<TextSize>,
 }
 
 impl ParsedExpr {
     #[inline]
     pub(super) const fn is_unparenthesized_starred_expr(&self) -> bool {
-        !self.is_parenthesized && self.expr.is_starred_expr()
+        !self.is_parenthesized() && self.expr.is_starred_expr()
+    }
+
+    #[inline]
+    pub(super) const fn is_parenthesized(&self) -> bool {
+        self.end_parenthesis.is_some()
     }
 }
 
@@ -2345,7 +2372,7 @@ impl From<Expr> for ParsedExpr {
     fn from(expr: Expr) -> Self {
         ParsedExpr {
             expr,
-            is_parenthesized: false,
+            end_parenthesis: None,
         }
     }
 }

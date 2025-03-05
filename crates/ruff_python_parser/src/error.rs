@@ -436,11 +436,6 @@ pub struct UnsupportedSyntaxError {
     pub kind: UnsupportedSyntaxErrorKind,
     pub range: TextRange,
     /// The target [`PythonVersion`] for which this error was detected.
-    ///
-    /// This is different from the version reported by the
-    /// [`minimum_version`](UnsupportedSyntaxErrorKind::minimum_version) method, which is the
-    /// earliest allowed version for this piece of syntax. The `target_version` is primarily used
-    /// for user-facing error messages.
     pub target_version: PythonVersion,
 }
 
@@ -449,6 +444,7 @@ pub enum UnsupportedSyntaxErrorKind {
     Match,
     Walrus,
     ExceptStar,
+    ParenthesizedKeywordArgumentName,
     /// Represents the use of a "relaxed" [PEP 614] decorator before Python 3.9.
     ///
     /// ## Examples
@@ -544,6 +540,9 @@ impl Display for UnsupportedSyntaxError {
             UnsupportedSyntaxErrorKind::Match => "Cannot use `match` statement",
             UnsupportedSyntaxErrorKind::Walrus => "Cannot use named assignment expression (`:=`)",
             UnsupportedSyntaxErrorKind::ExceptStar => "Cannot use `except*`",
+            UnsupportedSyntaxErrorKind::ParenthesizedKeywordArgumentName => {
+                "Cannot use parenthesized keyword argument name"
+            }
             UnsupportedSyntaxErrorKind::RelaxedDecorator => "Unsupported expression in decorators",
             UnsupportedSyntaxErrorKind::PositionalOnlyParameter => {
                 "Cannot use positional-only parameter separator"
@@ -554,27 +553,60 @@ impl Display for UnsupportedSyntaxError {
                 "Cannot set default type for a type parameter"
             }
         };
+
         write!(
             f,
-            "{kind} on Python {} (syntax was added in Python {})",
+            "{kind} on Python {} (syntax was {changed})",
             self.target_version,
-            self.kind.minimum_version(),
+            changed = self.kind.changed_version(),
         )
     }
 }
 
-impl UnsupportedSyntaxErrorKind {
-    /// The earliest allowed version for the syntax associated with this error.
-    pub const fn minimum_version(&self) -> PythonVersion {
+/// Represents the kind of change in Python syntax between versions.
+///
+/// Most changes so far have been additions (e.g. `match` and `type` statements), but others are
+/// removals (e.g. parenthesized keyword argument names).
+enum Change {
+    Added(PythonVersion),
+    Removed(PythonVersion),
+}
+
+impl Display for Change {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            UnsupportedSyntaxErrorKind::Match => PythonVersion::PY310,
-            UnsupportedSyntaxErrorKind::Walrus => PythonVersion::PY38,
-            UnsupportedSyntaxErrorKind::ExceptStar => PythonVersion::PY311,
-            UnsupportedSyntaxErrorKind::RelaxedDecorator => PythonVersion::PY39,
-            UnsupportedSyntaxErrorKind::PositionalOnlyParameter => PythonVersion::PY38,
-            UnsupportedSyntaxErrorKind::TypeParameterList => PythonVersion::PY312,
-            UnsupportedSyntaxErrorKind::TypeAliasStatement => PythonVersion::PY312,
-            UnsupportedSyntaxErrorKind::TypeParamDefault => PythonVersion::PY313,
+            Change::Added(version) => write!(f, "added in Python {version}"),
+            Change::Removed(version) => write!(f, "removed in Python {version}"),
+        }
+    }
+}
+
+impl UnsupportedSyntaxErrorKind {
+    /// Returns the Python version when the syntax associated with this error was changed, and the
+    /// type of [`Change`] (added or removed).
+    const fn changed_version(self) -> Change {
+        match self {
+            UnsupportedSyntaxErrorKind::Match => Change::Added(PythonVersion::PY310),
+            UnsupportedSyntaxErrorKind::Walrus => Change::Added(PythonVersion::PY38),
+            UnsupportedSyntaxErrorKind::ExceptStar => Change::Added(PythonVersion::PY311),
+            UnsupportedSyntaxErrorKind::RelaxedDecorator => Change::Added(PythonVersion::PY39),
+            UnsupportedSyntaxErrorKind::PositionalOnlyParameter => {
+                Change::Added(PythonVersion::PY38)
+            }
+            UnsupportedSyntaxErrorKind::ParenthesizedKeywordArgumentName => {
+                Change::Removed(PythonVersion::PY38)
+            }
+            UnsupportedSyntaxErrorKind::TypeParameterList => Change::Added(PythonVersion::PY312),
+            UnsupportedSyntaxErrorKind::TypeAliasStatement => Change::Added(PythonVersion::PY312),
+            UnsupportedSyntaxErrorKind::TypeParamDefault => Change::Added(PythonVersion::PY313),
+        }
+    }
+
+    /// Returns whether or not this kind of syntax is unsupported on `target_version`.
+    pub(crate) fn is_unsupported(self, target_version: PythonVersion) -> bool {
+        match self.changed_version() {
+            Change::Added(version) => target_version < version,
+            Change::Removed(version) => target_version >= version,
         }
     }
 }
