@@ -1,0 +1,80 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/parenthesized_context_manager_py38.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..74,
+        body: [
+            With(
+                StmtWith {
+                    range: 43..73,
+                    is_async: false,
+                    items: [
+                        WithItem {
+                            range: 49..57,
+                            context_expr: Name(
+                                ExprName {
+                                    range: 49..52,
+                                    id: Name("foo"),
+                                    ctx: Load,
+                                },
+                            ),
+                            optional_vars: Some(
+                                Name(
+                                    ExprName {
+                                        range: 56..57,
+                                        id: Name("x"),
+                                        ctx: Store,
+                                    },
+                                ),
+                            ),
+                        },
+                        WithItem {
+                            range: 59..67,
+                            context_expr: Name(
+                                ExprName {
+                                    range: 59..62,
+                                    id: Name("bar"),
+                                    ctx: Load,
+                                },
+                            ),
+                            optional_vars: Some(
+                                Name(
+                                    ExprName {
+                                        range: 66..67,
+                                        id: Name("y"),
+                                        ctx: Store,
+                                    },
+                                ),
+                            ),
+                        },
+                    ],
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 70..73,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 70..73,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Unsupported Syntax Errors
+
+  |
+1 | # parse_options: {"target-version": "3.8"}
+2 | with (foo as x, bar as y): ...
+  |      ^ Syntax Error: Cannot use parentheses within a `with` statement on Python 3.8 (syntax was added in Python 3.9)
+  |

@@ -1967,43 +1967,6 @@ impl<'src> Parser<'src> {
     ///
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#the-with-statement>
     fn parse_with_statement(&mut self, start: TextSize) -> ast::StmtWith {
-        // test_ok parenthesized_context_manager_py38
-        // # parse_options: {"target-version": "3.8"}
-        // with (x, y) as foo:
-        //     pass
-        //
-        // with (x,
-        //     y) as foo:
-        //     pass
-        //
-        // with (x,
-        // y):
-        //     pass
-        //
-        // with (
-        //     x,
-        // ):
-        //     pass
-        //
-        // with (
-        //     x,
-        //     y
-        // ) as foo:
-        //     pass
-        //
-        // with x, (
-        //     y
-        // ): pass
-        //
-        // with x as foo, (
-        // y
-        // ) as bar:
-        //     pass
-        //
-        // with x() as foo, (
-        //     y()
-        // ) as bar:
-        //     pass
         self.bump(TokenKind::With);
 
         let items = self.parse_with_items();
@@ -2099,6 +2062,7 @@ impl<'src> Parser<'src> {
         // We'll start with the assumption that the with items are parenthesized.
         let mut with_item_kind = WithItemKind::Parenthesized;
 
+        let open_paren_range = self.current_token_range();
         self.bump(TokenKind::Lpar);
 
         let mut parsed_with_items = vec![];
@@ -2140,6 +2104,17 @@ impl<'src> Parser<'src> {
                 };
                 self.add_error(error, &parsed_with_item.item.context_expr);
             }
+            // test_ok parenthesized_context_manager_py39
+            // # parse_options: {"target-version": "3.9"}
+            // with (foo as x, bar as y): ...
+
+            // test_err parenthesized_context_manager_py38
+            // # parse_options: {"target-version": "3.8"}
+            // with (foo as x, bar as y): ...
+            self.add_unsupported_syntax_error(
+                UnsupportedSyntaxErrorKind::ParenthesizedContextManager,
+                open_paren_range,
+            );
         } else if self.at(TokenKind::Rpar)
             // test_err with_items_parenthesized_missing_colon
             // # `)` followed by a newline

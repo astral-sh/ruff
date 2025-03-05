@@ -555,7 +555,7 @@ impl Display for UnsupportedSyntaxError {
                 "Cannot set default type for a type parameter"
             }
             UnsupportedSyntaxErrorKind::ParenthesizedContextManager => {
-                "Invalid parentheses around context manager"
+                "Cannot use parentheses within a `with` statement"
             }
         };
         write!(
