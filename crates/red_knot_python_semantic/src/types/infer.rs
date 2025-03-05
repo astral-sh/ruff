@@ -281,12 +281,12 @@ pub(crate) struct TypeInference<'db> {
     /// The scope this region is part of.
     scope: ScopeId<'db>,
 
-    /// The fallback type for all expressions/bindings/declarations.
-    fallback_ty: Option<Type<'db>>,
+    /// The fallback type for missing expressions/bindings/declarations.
+    missing_ty: Option<Type<'db>>,
 }
 
 impl<'db> TypeInference<'db> {
-    pub(crate) fn empty(scope: ScopeId<'db>, fallback_ty: Option<Type<'db>>) -> Self {
+    pub(crate) fn empty(scope: ScopeId<'db>, missing_ty: Option<Type<'db>>) -> Self {
         Self {
             expressions: FxHashMap::default(),
             bindings: FxHashMap::default(),
@@ -294,17 +294,16 @@ impl<'db> TypeInference<'db> {
             deferred: FxHashSet::default(),
             diagnostics: TypeCheckDiagnostics::default(),
             scope,
-            fallback_ty,
+            missing_ty,
         }
     }
 
     #[track_caller]
     pub(crate) fn expression_type(&self, expression: ScopedExpressionId) -> Type<'db> {
-        if let Some(fallback) = self.fallback_ty {
-            self.try_expression_type(expression).unwrap_or(fallback)
-        } else {
-            self.expressions[&expression]
-        }
+        self.try_expression_type(expression).unwrap_or_else(|| {
+            self.missing_ty
+                .expect("missing expression type and no missing_ty")
+        })
     }
 
     pub(crate) fn try_expression_type(&self, expression: ScopedExpressionId) -> Option<Type<'db>> {
@@ -313,23 +312,22 @@ impl<'db> TypeInference<'db> {
 
     #[track_caller]
     pub(crate) fn binding_type(&self, definition: Definition<'db>) -> Type<'db> {
-        if let Some(fallback) = self.fallback_ty {
-            self.bindings.get(&definition).copied().unwrap_or(fallback)
-        } else {
-            self.bindings[&definition]
-        }
+        self.bindings.get(&definition).copied().unwrap_or_else(|| {
+            self.missing_ty
+                .expect("missing binding type and no missing_ty")
+        })
     }
 
     #[track_caller]
     pub(crate) fn declaration_type(&self, definition: Definition<'db>) -> TypeAndQualifiers<'db> {
-        if let Some(fallback) = self.fallback_ty {
-            self.declarations
-                .get(&definition)
-                .copied()
-                .unwrap_or(fallback.into())
-        } else {
-            self.declarations[&definition]
-        }
+        self.declarations
+            .get(&definition)
+            .copied()
+            .unwrap_or_else(|| {
+                self.missing_ty
+                    .expect("missing declaration type and no missing_ty")
+                    .into()
+            })
     }
 
     pub(crate) fn diagnostics(&self) -> &TypeCheckDiagnostics {
