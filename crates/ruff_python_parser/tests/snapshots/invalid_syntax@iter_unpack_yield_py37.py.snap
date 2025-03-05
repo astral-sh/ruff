@@ -244,7 +244,7 @@ Module(
 1 | # parse_options: {"target-version": "3.7"}
 2 | rest = (4, 5, 6)
 3 | def g(): yield 1, 2, 3, *rest
-  |                         ^^^^^ Syntax Error: Cannot use iterable unpacking in yield statements on Python 3.7 (syntax was added in Python 3.8)
+  |                         ^^^^^ Syntax Error: Cannot use iterable unpacking in yield expressions on Python 3.7 (syntax was added in Python 3.8)
 4 | def h(): yield 1, (yield 2, *rest), 3
   |
 
@@ -253,5 +253,5 @@ Module(
 2 | rest = (4, 5, 6)
 3 | def g(): yield 1, 2, 3, *rest
 4 | def h(): yield 1, (yield 2, *rest), 3
-  |                             ^^^^^ Syntax Error: Cannot use iterable unpacking in yield statements on Python 3.7 (syntax was added in Python 3.8)
+  |                             ^^^^^ Syntax Error: Cannot use iterable unpacking in yield expressions on Python 3.7 (syntax was added in Python 3.8)
   |

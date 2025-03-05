@@ -572,7 +572,7 @@ impl Display for UnsupportedSyntaxError {
                 "Cannot use iterable unpacking in return statements"
             }
             UnsupportedSyntaxErrorKind::StarTuple(StarTupleKind::Yield) => {
-                "Cannot use iterable unpacking in yield statements"
+                "Cannot use iterable unpacking in yield expressions"
             }
             UnsupportedSyntaxErrorKind::PositionalOnlyParameter => {
                 "Cannot use positional-only parameter separator"
