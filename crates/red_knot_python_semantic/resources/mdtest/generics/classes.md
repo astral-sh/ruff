@@ -150,12 +150,34 @@ A class can use itself as the type parameter of one of its superclasses. (This i
 
 Here, `Sub` is not a generic class, since it fills its superclass's type parameter (with itself).
 
-```py
+`stub.pyi`:
+
+```pyi
 class Base[T]: ...
+# TODO: no error
+# error: [non-subscriptable]
 class Sub(Base[Sub]): ...
 
-# TODO: revealed: Literal[Sub]
-reveal_type(Sub)  # revealed: Unknown
+reveal_type(Sub)  # revealed: Literal[Sub]
+```
+
+`string_annotation.py`:
+
+```py
+class Base[T]: ...
+# TODO: no error
+# error: [non-subscriptable]
+class Sub(Base["Sub"]): ...
+
+reveal_type(Sub)  # revealed: Literal[Sub]
+```
+
+`bare_annotation.py`:
+
+```py
+class Base[T]: ...
+# TODO: error: [unresolved-reference]
+class Sub(Base[Sub]): ...
 ```
 
 [crtp]: https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern
