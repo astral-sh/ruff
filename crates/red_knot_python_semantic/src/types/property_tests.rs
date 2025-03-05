@@ -100,14 +100,16 @@ impl Ty {
             Ty::BooleanLiteral(b) => Type::BooleanLiteral(b),
             Ty::LiteralString => Type::LiteralString,
             Ty::BytesLiteral(s) => Type::bytes_literal(db, s.as_bytes()),
-            Ty::BuiltinInstance(s) => builtins_symbol(db, s).0.expect_type().to_instance(db),
+            Ty::BuiltinInstance(s) => builtins_symbol(db, s).symbol.expect_type().to_instance(db),
             Ty::AbcInstance(s) => known_module_symbol(db, KnownModule::Abc, s)
-                .0
+                .symbol
                 .expect_type()
                 .to_instance(db),
-            Ty::AbcClassLiteral(s) => known_module_symbol(db, KnownModule::Abc, s).0.expect_type(),
+            Ty::AbcClassLiteral(s) => known_module_symbol(db, KnownModule::Abc, s)
+                .symbol
+                .expect_type(),
             Ty::TypingLiteral => Type::KnownInstance(KnownInstanceType::Literal),
-            Ty::BuiltinClassLiteral(s) => builtins_symbol(db, s).0.expect_type(),
+            Ty::BuiltinClassLiteral(s) => builtins_symbol(db, s).symbol.expect_type(),
             Ty::KnownClassInstance(known_class) => known_class.to_instance(db),
             Ty::Union(tys) => {
                 UnionType::from_elements(db, tys.into_iter().map(|ty| ty.into_type(db)))
@@ -130,7 +132,7 @@ impl Ty {
             Ty::SubclassOfBuiltinClass(s) => SubclassOfType::from(
                 db,
                 builtins_symbol(db, s)
-                    .0
+                    .symbol
                     .expect_type()
                     .expect_class_literal()
                     .class,
@@ -138,17 +140,17 @@ impl Ty {
             Ty::SubclassOfAbcClass(s) => SubclassOfType::from(
                 db,
                 known_module_symbol(db, KnownModule::Abc, s)
-                    .0
+                    .symbol
                     .expect_type()
                     .expect_class_literal()
                     .class,
             ),
             Ty::AlwaysTruthy => Type::AlwaysTruthy,
             Ty::AlwaysFalsy => Type::AlwaysFalsy,
-            Ty::BuiltinsFunction(name) => builtins_symbol(db, name).0.expect_type(),
+            Ty::BuiltinsFunction(name) => builtins_symbol(db, name).symbol.expect_type(),
             Ty::BuiltinsBoundMethod { class, method } => {
-                let builtins_class = builtins_symbol(db, class).0.expect_type();
-                let function = builtins_class.class_member(db, method).0.expect_type();
+                let builtins_class = builtins_symbol(db, class).symbol.expect_type();
+                let function = builtins_class.class_member(db, method).symbol.expect_type();
 
                 create_bound_method(db, function, builtins_class)
             }

@@ -95,20 +95,28 @@ impl<'db> Symbol<'db> {
             Symbol::Unbound => Symbol::Unbound,
         }
     }
+
+    #[must_use]
+    pub(crate) fn with_qualifiers(self, qualifiers: TypeQualifiers) -> SymbolAndQualifiers<'db> {
+        SymbolAndQualifiers {
+            symbol: self,
+            qualifiers,
+        }
+    }
 }
 
 impl<'db> From<LookupResult<'db>> for SymbolAndQualifiers<'db> {
     fn from(value: LookupResult<'db>) -> Self {
         match value {
-            Ok(type_and_qualifiers) => SymbolAndQualifiers(
-                Symbol::Type(type_and_qualifiers.inner_type(), Boundness::Bound),
-                type_and_qualifiers.qualifiers(),
-            ),
+            Ok(type_and_qualifiers) => {
+                Symbol::Type(type_and_qualifiers.inner_type(), Boundness::Bound)
+                    .with_qualifiers(type_and_qualifiers.qualifiers())
+            }
             Err(LookupError::Unbound) => Symbol::Unbound.into(),
-            Err(LookupError::PossiblyUnbound(type_and_qualifiers)) => SymbolAndQualifiers(
-                Symbol::Type(type_and_qualifiers.inner_type(), Boundness::PossiblyUnbound),
-                type_and_qualifiers.qualifiers(),
-            ),
+            Err(LookupError::PossiblyUnbound(type_and_qualifiers)) => {
+                Symbol::Type(type_and_qualifiers.inner_type(), Boundness::PossiblyUnbound)
+                    .with_qualifiers(type_and_qualifiers.qualifiers())
+            }
         }
     }
 }
@@ -180,7 +188,11 @@ pub(crate) fn class_symbol<'db>(
                 return symbol_and_quals;
             }
 
-            if let SymbolAndQualifiers(Symbol::Type(ty, _), qualifiers) = symbol_and_quals {
+            if let SymbolAndQualifiers {
+                symbol: Symbol::Type(ty, _),
+                qualifiers,
+            } = symbol_and_quals
+            {
                 // Otherwise, we need to check if the symbol has bindings
                 let use_def = use_def_map(db, scope);
                 let bindings = use_def.public_bindings(symbol);
@@ -190,9 +202,9 @@ pub(crate) fn class_symbol<'db>(
                 // TODO: we should not need to calculate inferred type second time. This is a temporary
                 // solution until the notion of Boundness and Declaredness is split. See #16036, #16264
                 match inferred {
-                    Symbol::Unbound => SymbolAndQualifiers(Symbol::Unbound, qualifiers),
+                    Symbol::Unbound => Symbol::Unbound.with_qualifiers(qualifiers),
                     Symbol::Type(_, boundness) => {
-                        SymbolAndQualifiers(Symbol::Type(ty, boundness), qualifiers)
+                        Symbol::Type(ty, boundness).with_qualifiers(qualifiers)
                     }
                 }
             } else {
@@ -382,7 +394,10 @@ pub(crate) type SymbolFromDeclarationsResult<'db> =
 ///
 /// [`CLASS_VAR`]: crate::types::TypeQualifiers::CLASS_VAR
 #[derive(Debug, Clone, PartialEq, Eq, salsa::Update)]
-pub(crate) struct SymbolAndQualifiers<'db>(pub(crate) Symbol<'db>, pub(crate) TypeQualifiers);
+pub(crate) struct SymbolAndQualifiers<'db> {
+    pub(crate) symbol: Symbol<'db>,
+    pub(crate) qualifiers: TypeQualifiers,
+}
 
 impl<'db> SymbolAndQualifiers<'db> {
     /// Constructor that creates a [`SymbolAndQualifiers`] instance with a [`TodoType`] type
@@ -390,12 +405,15 @@ impl<'db> SymbolAndQualifiers<'db> {
     ///
     /// [`TodoType`]: crate::types::TodoType
     pub(crate) fn todo(message: &'static str) -> Self {
-        Self(Symbol::todo(message), TypeQualifiers::empty())
+        Self {
+            symbol: Symbol::todo(message),
+            qualifiers: TypeQualifiers::empty(),
+        }
     }
 
     /// Returns `true` if the symbol has a `ClassVar` type qualifier.
     pub(crate) fn is_class_var(&self) -> bool {
-        self.1.contains(TypeQualifiers::CLASS_VAR)
+        self.qualifiers.contains(TypeQualifiers::CLASS_VAR)
     }
 
     /// Safely unwrap the symbol into a [`Type`].
@@ -416,13 +434,20 @@ impl<'db> SymbolAndQualifiers<'db> {
     /// and the `Err` variant represents a symbol that is either definitely or possibly unbound.
     pub(crate) fn into_lookup_result(self) -> LookupResult<'db> {
         match self {
-            SymbolAndQualifiers(Symbol::Type(ty, Boundness::Bound), qualifiers) => {
-                Ok(TypeAndQualifiers::new(ty, qualifiers))
-            }
-            SymbolAndQualifiers(Symbol::Type(ty, Boundness::PossiblyUnbound), qualifiers) => Err(
-                LookupError::PossiblyUnbound(TypeAndQualifiers::new(ty, qualifiers)),
-            ),
-            SymbolAndQualifiers(Symbol::Unbound, _) => Err(LookupError::Unbound),
+            SymbolAndQualifiers {
+                symbol: Symbol::Type(ty, Boundness::Bound),
+                qualifiers,
+            } => Ok(TypeAndQualifiers::new(ty, qualifiers)),
+            SymbolAndQualifiers {
+                symbol: Symbol::Type(ty, Boundness::PossiblyUnbound),
+                qualifiers,
+            } => Err(LookupError::PossiblyUnbound(TypeAndQualifiers::new(
+                ty, qualifiers,
+            ))),
+            SymbolAndQualifiers {
+                symbol: Symbol::Unbound,
+                qualifiers: _,
+            } => Err(LookupError::Unbound),
         }
     }
 
@@ -450,7 +475,7 @@ impl<'db> SymbolAndQualifiers<'db> {
 
 impl<'db> From<Symbol<'db>> for SymbolAndQualifiers<'db> {
     fn from(symbol: Symbol<'db>) -> Self {
-        SymbolAndQualifiers(symbol, TypeQualifiers::empty())
+        symbol.with_qualifiers(TypeQualifiers::empty())
     }
 }
 
@@ -471,11 +496,17 @@ fn symbol_by_id<'db>(
 
     match declared {
         // Symbol is declared, trust the declared type
-        Ok(symbol_and_quals @ SymbolAndQualifiers(Symbol::Type(_, Boundness::Bound), _)) => {
-            symbol_and_quals
-        }
+        Ok(
+            symbol_and_quals @ SymbolAndQualifiers {
+                symbol: Symbol::Type(_, Boundness::Bound),
+                qualifiers: _,
+            },
+        ) => symbol_and_quals,
         // Symbol is possibly declared
-        Ok(SymbolAndQualifiers(Symbol::Type(declared_ty, Boundness::PossiblyUnbound), quals)) => {
+        Ok(SymbolAndQualifiers {
+            symbol: Symbol::Type(declared_ty, Boundness::PossiblyUnbound),
+            qualifiers,
+        }) => {
             let bindings = use_def.public_bindings(symbol_id);
             let inferred = symbol_from_bindings_impl(db, bindings, requires_explicit_reexport);
 
@@ -494,10 +525,13 @@ fn symbol_by_id<'db>(
                 ),
             };
 
-            SymbolAndQualifiers(symbol, quals)
+            SymbolAndQualifiers { symbol, qualifiers }
         }
         // Symbol is undeclared, return the union of `Unknown` with the inferred type
-        Ok(SymbolAndQualifiers(Symbol::Unbound, _)) => {
+        Ok(SymbolAndQualifiers {
+            symbol: Symbol::Unbound,
+            qualifiers: _,
+        }) => {
             let bindings = use_def.public_bindings(symbol_id);
             let inferred = symbol_from_bindings_impl(db, bindings, requires_explicit_reexport);
 
@@ -519,13 +553,10 @@ fn symbol_by_id<'db>(
                 .into()
         }
         // Symbol has conflicting declared types
-        Err((declared_ty, _)) => {
+        Err((declared, _)) => {
             // Intentionally ignore conflicting declared types; that's not our problem,
             // it's the problem of the module we are importing from.
-            SymbolAndQualifiers(
-                Symbol::bound(declared_ty.inner_type()),
-                declared_ty.qualifiers(),
-            )
+            Symbol::bound(declared.inner_type()).with_qualifiers(declared.qualifiers())
         }
     }
 
@@ -717,7 +748,7 @@ fn symbol_from_declarations_impl<'db>(
 
     if let Some(first) = types.next() {
         let mut conflicting: Vec<Type<'db>> = vec![];
-        let declared_ty = if let Some(second) = types.next() {
+        let declared = if let Some(second) = types.next() {
             let ty_first = first.inner_type();
             let mut qualifiers = first.qualifiers();
 
@@ -743,13 +774,11 @@ fn symbol_from_declarations_impl<'db>(
                 Truthiness::Ambiguous => Boundness::PossiblyUnbound,
             };
 
-            Ok(SymbolAndQualifiers(
-                Symbol::Type(declared_ty.inner_type(), boundness),
-                declared_ty.qualifiers(),
-            ))
+            Ok(Symbol::Type(declared.inner_type(), boundness)
+                .with_qualifiers(declared.qualifiers()))
         } else {
             Err((
-                declared_ty,
+                declared,
                 std::iter::once(first.inner_type())
                     .chain(conflicting)
                     .collect(),
@@ -986,19 +1015,19 @@ mod tests {
     #[test]
     fn implicit_builtin_globals() {
         let db = setup_db();
-        assert_bound_string_symbol(&db, builtins_symbol(&db, "__name__").0);
+        assert_bound_string_symbol(&db, builtins_symbol(&db, "__name__").symbol);
     }
 
     #[test]
     fn implicit_typing_globals() {
         let db = setup_db();
-        assert_bound_string_symbol(&db, typing_symbol(&db, "__name__").0);
+        assert_bound_string_symbol(&db, typing_symbol(&db, "__name__").symbol);
     }
 
     #[test]
     fn implicit_typing_extensions_globals() {
         let db = setup_db();
-        assert_bound_string_symbol(&db, typing_extensions_symbol(&db, "__name__").0);
+        assert_bound_string_symbol(&db, typing_extensions_symbol(&db, "__name__").symbol);
     }
 
     #[test]
@@ -1006,7 +1035,7 @@ mod tests {
         let db = setup_db();
         assert_bound_string_symbol(
             &db,
-            known_module_symbol(&db, KnownModule::Sys, "__name__").0,
+            known_module_symbol(&db, KnownModule::Sys, "__name__").symbol,
         );
     }
 }

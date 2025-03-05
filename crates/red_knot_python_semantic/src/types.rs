@@ -1466,16 +1466,14 @@ impl<'db> Type<'db> {
 
         if let Type::ModuleLiteral(module) = self {
             module.static_member(db, name)
-        } else if let symbol @ SymbolAndQualifiers(Symbol::Type(_, _), _) =
-            self.class_member(db, name)
+        } else if let symbol @ Symbol::Type(_, _) = self.class_member(db, name).symbol {
+            symbol
+        } else if let Some(symbol @ Symbol::Type(_, _)) =
+            self.find_name_in_mro(db, name).map(|inner| inner.symbol)
         {
-            symbol.0
-        } else if let Some(symbol @ SymbolAndQualifiers(Symbol::Type(_, _), _)) =
-            self.find_name_in_mro(db, name)
-        {
-            symbol.0
+            symbol
         } else {
-            self.instance_variable(db, name).0
+            self.instance_variable(db, name).symbol
         }
     }
 
@@ -1617,7 +1615,7 @@ impl<'db> Type<'db> {
         )
         .entered();
 
-        let descr_get = self.class_member(db, "__get__").0;
+        let descr_get = self.class_member(db, "__get__").symbol;
 
         if let Symbol::Type(descr_get, descr_get_boundness) = descr_get {
             let return_ty = descr_get
@@ -1630,8 +1628,8 @@ impl<'db> Type<'db> {
                     })
                 })
                 .unwrap_or(None);
-            let is_data_descriptor = !self.class_member(db, "__set__").0.is_unbound()
-                || !self.class_member(db, "__delete__").0.is_unbound();
+            let is_data_descriptor = !self.class_member(db, "__set__").symbol.is_unbound()
+                || !self.class_member(db, "__delete__").symbol.is_unbound();
 
             (return_ty, is_data_descriptor)
         } else {
@@ -1656,52 +1654,57 @@ impl<'db> Type<'db> {
         match class_member {
             // This branch is not strictly needed, but it short-circuits the lookup
             // of various dunder methods and calls that would otherwise be made.
-            SymbolAndQualifiers(Symbol::Type(Type::Dynamic(_), _), _) => (class_member, true),
+            SymbolAndQualifiers {
+                symbol: Symbol::Type(Type::Dynamic(_), _),
+                qualifiers: _,
+            } => (class_member, true),
 
-            SymbolAndQualifiers(Symbol::Type(Type::Union(union), boundness), qualifiers) => (
-                SymbolAndQualifiers(
-                    union.map_with_boundness(db, |elem| {
+            SymbolAndQualifiers {
+                symbol: Symbol::Type(Type::Union(union), boundness),
+                qualifiers,
+            } => (
+                union
+                    .map_with_boundness(db, |elem| {
                         Symbol::Type(
                             elem.try_call_dunder_get(db, instance, owner)
                                 .0
                                 .unwrap_or(*elem),
                             boundness,
                         )
-                    }),
-                    qualifiers,
-                ),
+                    })
+                    .with_qualifiers(qualifiers),
                 // TODO: avoid the duplication here:
                 union
                     .elements(db)
                     .iter()
                     .all(|elem| elem.try_call_dunder_get(db, instance, owner).1),
             ),
-            SymbolAndQualifiers(
-                Symbol::Type(Type::Intersection(intersection), boundness),
+            SymbolAndQualifiers {
+                symbol: Symbol::Type(Type::Intersection(intersection), boundness),
                 qualifiers,
-            ) => (
-                SymbolAndQualifiers(
-                    intersection.map_with_boundness(db, |elem| {
+            } => (
+                intersection
+                    .map_with_boundness(db, |elem| {
                         Symbol::Type(
                             elem.try_call_dunder_get(db, instance, owner)
                                 .0
                                 .unwrap_or(*elem),
                             boundness,
                         )
-                    }),
-                    qualifiers,
-                ),
+                    })
+                    .with_qualifiers(qualifiers),
                 false, // TODO
             ),
-            SymbolAndQualifiers(Symbol::Type(attribute_ty, boundness), qualifiers) => {
+            SymbolAndQualifiers {
+                symbol: Symbol::Type(attribute_ty, boundness),
+                qualifiers,
+            } => {
                 let (return_ty, is_data_descriptor) =
                     attribute_ty.try_call_dunder_get(db, instance, owner);
 
                 (
-                    SymbolAndQualifiers(
-                        Symbol::Type(return_ty.unwrap_or(attribute_ty), boundness),
-                        qualifiers,
-                    ),
+                    Symbol::Type(return_ty.unwrap_or(attribute_ty), boundness)
+                        .with_qualifiers(qualifiers),
                     is_data_descriptor,
                 )
             }
@@ -1747,7 +1750,10 @@ impl<'db> Type<'db> {
             }
             _ => {
                 let (
-                    SymbolAndQualifiers(meta_attr_resolved, meta_attr_qualifiers),
+                    SymbolAndQualifiers {
+                        symbol: meta_attr_resolved,
+                        qualifiers: meta_attr_qualifiers,
+                    },
                     is_data_descriptor,
                 ) = Self::try_call_dunder_get_on_class_member(
                     db,
@@ -1757,45 +1763,47 @@ impl<'db> Type<'db> {
                     self.to_meta_type(db),
                 );
 
-                let SymbolAndQualifiers(fallback, fallback_qualifiers) = with_fallback(self);
+                let SymbolAndQualifiers {
+                    symbol: fallback,
+                    qualifiers: fallback_qualifiers,
+                } = with_fallback(self);
 
                 match (meta_attr_resolved, is_data_descriptor, fallback) {
                     (meta_attr_resolved @ Symbol::Type(_, _), _, Symbol::Unbound) => {
-                        SymbolAndQualifiers(meta_attr_resolved, meta_attr_qualifiers)
+                        meta_attr_resolved.with_qualifiers(meta_attr_qualifiers)
                     }
+
                     (meta_attr_resolved @ Symbol::Type(_, Boundness::Bound), true, _) => {
-                        SymbolAndQualifiers(meta_attr_resolved, meta_attr_qualifiers)
+                        meta_attr_resolved.with_qualifiers(meta_attr_qualifiers)
                     }
+
                     (
                         Symbol::Type(meta_attr_ty, Boundness::PossiblyUnbound),
                         true,
                         Symbol::Type(fallback_ty, fallback_boundness),
-                    ) => SymbolAndQualifiers(
-                        Symbol::Type(
-                            UnionType::from_elements(db, [meta_attr_ty, fallback_ty]),
-                            fallback_boundness,
-                        ),
-                        meta_attr_qualifiers.union(fallback_qualifiers),
-                    ),
+                    ) => Symbol::Type(
+                        UnionType::from_elements(db, [meta_attr_ty, fallback_ty]),
+                        fallback_boundness,
+                    )
+                    .with_qualifiers(meta_attr_qualifiers.union(fallback_qualifiers)),
+
                     (Symbol::Type(_, _), false, fallback @ Symbol::Type(_, Boundness::Bound))
                         if fallback_shadows_non_data_descriptor =>
                     {
-                        SymbolAndQualifiers(fallback, fallback_qualifiers)
+                        fallback.with_qualifiers(fallback_qualifiers)
                     }
+
                     (
                         Symbol::Type(meta_attr_ty, meta_attr_boundness),
                         false,
                         Symbol::Type(fallback_ty, fallback_boundness),
-                    ) => SymbolAndQualifiers(
-                        Symbol::Type(
-                            UnionType::from_elements(db, [meta_attr_ty, fallback_ty]),
-                            meta_attr_boundness.max(fallback_boundness),
-                        ),
-                        meta_attr_qualifiers.union(fallback_qualifiers),
-                    ),
-                    (Symbol::Unbound, _, fallback) => {
-                        SymbolAndQualifiers(fallback, fallback_qualifiers)
-                    }
+                    ) => Symbol::Type(
+                        UnionType::from_elements(db, [meta_attr_ty, fallback_ty]),
+                        meta_attr_boundness.max(fallback_boundness),
+                    )
+                    .with_qualifiers(meta_attr_qualifiers.union(fallback_qualifiers)),
+
+                    (Symbol::Unbound, _, fallback) => fallback.with_qualifiers(fallback_qualifiers),
                 }
             }
         }
@@ -1987,10 +1995,10 @@ impl<'db> Type<'db> {
                 self.run_descriptor_protocol_classes(db, name, with_fallback)
             }
             Type::Union(union) => union
-                .map_with_boundness(db, |elem| elem.member(db, name).0)
+                .map_with_boundness(db, |elem| elem.member(db, name).symbol)
                 .into(),
             Type::Intersection(intersection) => intersection
-                .map_with_boundness(db, |elem| elem.member(db, name).0)
+                .map_with_boundness(db, |elem| elem.member(db, name).symbol)
                 .into(),
 
             Type::ModuleLiteral(module) => module.static_member(db, name).into(),
@@ -2708,7 +2716,7 @@ impl<'db> Type<'db> {
             tracing::trace_span!("try_call_dunder", self=%self.display(db), name, ?arguments)
                 .entered();
 
-        match self.member_without_instance_fallback(db, name).0 {
+        match self.member_without_instance_fallback(db, name).symbol {
             Symbol::Type(dunder_callbable, boundness) => {
                 let result = dunder_callbable.try_call(db, arguments)?;
 
@@ -4253,7 +4261,7 @@ impl<'db> ModuleLiteralType<'db> {
             return KnownClass::ModuleType
                 .to_instance(db)
                 .member(db, "__dict__")
-                .0;
+                .symbol;
         }
 
         // If the file that originally imported the module has also imported a submodule
@@ -4277,7 +4285,7 @@ impl<'db> ModuleLiteralType<'db> {
             }
         }
 
-        imported_symbol(db, &self.module(db), name).0
+        imported_symbol(db, &self.module(db), name).symbol
     }
 }
 
@@ -4392,13 +4400,16 @@ impl<'db> UnionType<'db> {
         mut transform_fn: impl FnMut(&Type<'db>) -> SymbolAndQualifiers<'db>,
     ) -> SymbolAndQualifiers<'db> {
         let mut builder = UnionBuilder::new(db);
-        let mut type_qualifiers = TypeQualifiers::empty();
+        let mut qualifiers = TypeQualifiers::empty();
 
         let mut all_unbound = true;
         let mut possibly_unbound = false;
         for ty in self.elements(db) {
-            let SymbolAndQualifiers(ty_member, new_qualifiers) = transform_fn(ty);
-            type_qualifiers |= new_qualifiers;
+            let SymbolAndQualifiers {
+                symbol: ty_member,
+                qualifiers: new_qualifiers,
+            } = transform_fn(ty);
+            qualifiers |= new_qualifiers;
             match ty_member {
                 Symbol::Unbound => {
                     possibly_unbound = true;
@@ -4413,8 +4424,8 @@ impl<'db> UnionType<'db> {
                 }
             }
         }
-        SymbolAndQualifiers(
-            if all_unbound {
+        SymbolAndQualifiers {
+            symbol: if all_unbound {
                 Symbol::Unbound
             } else {
                 Symbol::Type(
@@ -4426,8 +4437,8 @@ impl<'db> UnionType<'db> {
                     },
                 )
             },
-            type_qualifiers,
-        )
+            qualifiers,
+        }
     }
 
     pub fn is_fully_static(self, db: &'db dyn Db) -> bool {
@@ -4707,14 +4718,17 @@ impl<'db> IntersectionType<'db> {
         }
 
         let mut builder = IntersectionBuilder::new(db);
-        let mut type_qualifiers = TypeQualifiers::empty();
+        let mut qualifiers = TypeQualifiers::empty();
 
         let mut any_unbound = false;
         let mut any_possibly_unbound = false;
         for ty in self.positive(db) {
-            let SymbolAndQualifiers(ty_member, new_qualifiers) = transform_fn(ty);
-            type_qualifiers |= new_qualifiers;
-            match ty_member {
+            let SymbolAndQualifiers {
+                symbol: member,
+                qualifiers: new_qualifiers,
+            } = transform_fn(ty);
+            qualifiers |= new_qualifiers;
+            match member {
                 Symbol::Unbound => {
                     any_unbound = true;
                 }
@@ -4728,8 +4742,8 @@ impl<'db> IntersectionType<'db> {
             }
         }
 
-        SymbolAndQualifiers(
-            if any_unbound {
+        SymbolAndQualifiers {
+            symbol: if any_unbound {
                 Symbol::Unbound
             } else {
                 Symbol::Type(
@@ -4741,8 +4755,8 @@ impl<'db> IntersectionType<'db> {
                     },
                 )
             },
-            type_qualifiers,
-        )
+            qualifiers,
+        }
     }
 }
 
@@ -4891,9 +4905,10 @@ pub(crate) mod tests {
             .build()
             .unwrap();
 
-        let typing_no_default = typing_symbol(&db, "NoDefault").0.expect_type();
-        let typing_extensions_no_default =
-            typing_extensions_symbol(&db, "NoDefault").0.expect_type();
+        let typing_no_default = typing_symbol(&db, "NoDefault").symbol.expect_type();
+        let typing_extensions_no_default = typing_extensions_symbol(&db, "NoDefault")
+            .symbol
+            .expect_type();
 
         assert_eq!(typing_no_default.display(&db).to_string(), "NoDefault");
         assert_eq!(
@@ -4925,7 +4940,7 @@ pub(crate) mod tests {
         )?;
 
         let bar = system_path_to_file(&db, "src/bar.py")?;
-        let a = global_symbol(&db, bar, "a").0;
+        let a = global_symbol(&db, bar, "a").symbol;
 
         assert_eq!(
             a.expect_type(),
@@ -4944,7 +4959,7 @@ pub(crate) mod tests {
         )?;
         db.clear_salsa_events();
 
-        let a = global_symbol(&db, bar, "a").0;
+        let a = global_symbol(&db, bar, "a").symbol;
 
         assert_eq!(
             a.expect_type(),
@@ -5046,7 +5061,7 @@ pub(crate) mod tests {
             };
 
             let function_body_scope = known_module_symbol(&db, module, function_name)
-                .0
+                .symbol
                 .expect_type()
                 .expect_function_literal()
                 .body_scope(&db);

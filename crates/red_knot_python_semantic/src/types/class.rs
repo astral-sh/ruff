@@ -366,20 +366,26 @@ impl<'db> Class<'db> {
             dynamic_type_to_intersect_with,
         ) {
             (symbol_and_qualifiers, None) => symbol_and_qualifiers,
-            (SymbolAndQualifiers(Symbol::Type(ty, _), qualifiers), Some(dynamic_type)) => {
-                SymbolAndQualifiers(
-                    Symbol::bound(
-                        IntersectionBuilder::new(db)
-                            .add_positive(ty)
-                            .add_positive(dynamic_type)
-                            .build(),
-                    ),
+            (
+                SymbolAndQualifiers {
+                    symbol: Symbol::Type(ty, _),
                     qualifiers,
-                )
-            }
-            (SymbolAndQualifiers(Symbol::Unbound, _), Some(dynamic_type)) => {
-                Symbol::bound(dynamic_type).into()
-            }
+                },
+                Some(dynamic_type),
+            ) => Symbol::bound(
+                IntersectionBuilder::new(db)
+                    .add_positive(ty)
+                    .add_positive(dynamic_type)
+                    .build(),
+            )
+            .with_qualifiers(qualifiers),
+            (
+                SymbolAndQualifiers {
+                    symbol: Symbol::Unbound,
+                    qualifiers,
+                },
+                Some(dynamic_type),
+            ) => Symbol::bound(dynamic_type).with_qualifiers(qualifiers),
         }
     }
 
@@ -423,8 +429,10 @@ impl<'db> Class<'db> {
                     );
                 }
                 ClassBase::Class(class) => {
-                    if let member @ SymbolAndQualifiers(Symbol::Type(ty, boundness), qualifiers) =
-                        class.own_instance_member(db, name)
+                    if let member @ SymbolAndQualifiers {
+                        symbol: Symbol::Type(ty, boundness),
+                        qualifiers,
+                    } = class.own_instance_member(db, name)
                     {
                         // TODO: We could raise a diagnostic here if there are conflicting type qualifiers
                         union_qualifiers |= qualifiers;
@@ -435,10 +443,8 @@ impl<'db> Class<'db> {
                                 return member;
                             }
 
-                            return SymbolAndQualifiers(
-                                Symbol::bound(union.add(ty).build()),
-                                union_qualifiers,
-                            );
+                            return Symbol::bound(union.add(ty).build())
+                                .with_qualifiers(union_qualifiers);
                         }
 
                         // If we see a possibly-unbound symbol, we need to keep looking
@@ -450,15 +456,13 @@ impl<'db> Class<'db> {
         }
 
         if union.is_empty() {
-            SymbolAndQualifiers(Symbol::Unbound, TypeQualifiers::empty())
+            Symbol::Unbound.with_qualifiers(TypeQualifiers::empty())
         } else {
             // If we have reached this point, we know that we have only seen possibly-unbound symbols.
             // This means that the final result is still possibly-unbound.
 
-            SymbolAndQualifiers(
-                Symbol::Type(union.build(), Boundness::PossiblyUnbound),
-                union_qualifiers,
-            )
+            Symbol::Type(union.build(), Boundness::PossiblyUnbound)
+                .with_qualifiers(union_qualifiers)
         }
     }
 
@@ -560,10 +564,10 @@ impl<'db> Class<'db> {
             tracing::debug!(?declared_and_qualifiers, "found declared attribute");
 
             match declared_and_qualifiers {
-                Ok(SymbolAndQualifiers(
-                    declared @ Symbol::Type(declared_ty, declaredness),
+                Ok(SymbolAndQualifiers {
+                    symbol: declared @ Symbol::Type(declared_ty, declaredness),
                     qualifiers,
-                )) => {
+                }) => {
                     // The attribute is declared in the class body.
 
                     // Make sure it's not bound in the body
@@ -579,22 +583,23 @@ impl<'db> Class<'db> {
                     }
 
                     if declaredness == Boundness::Bound {
-                        SymbolAndQualifiers(declared, qualifiers)
+                        declared.with_qualifiers(qualifiers)
                     } else {
                         match Self::implicit_instance_attribute(db, body_scope, name) {
-                            None => SymbolAndQualifiers(declared, qualifiers),
-                            Some(implicit_ty) => SymbolAndQualifiers(
-                                Symbol::Type(
-                                    UnionType::from_elements(db, [declared_ty, implicit_ty]),
-                                    declaredness,
-                                ),
-                                qualifiers,
-                            ),
+                            None => declared.with_qualifiers(qualifiers),
+                            Some(implicit_ty) => Symbol::Type(
+                                UnionType::from_elements(db, [declared_ty, implicit_ty]),
+                                declaredness,
+                            )
+                            .with_qualifiers(qualifiers),
                         }
                     }
                 }
 
-                Ok(SymbolAndQualifiers(Symbol::Unbound, _)) => {
+                Ok(SymbolAndQualifiers {
+                    symbol: Symbol::Unbound,
+                    qualifiers: _,
+                }) => {
                     // The attribute is not *declared* in the class body. It could still be declared/bound
                     // in a method.
 
@@ -602,7 +607,7 @@ impl<'db> Class<'db> {
                         .map_or(Symbol::Unbound, Symbol::bound)
                         .into()
                 }
-                Err((declared_ty, _conflicting_declarations)) => {
+                Err((declared, _conflicting_declarations)) => {
                     // Make sure it's not bound in the body
                     let bindings = use_def.public_bindings(symbol_id);
                     let inferred = symbol_from_bindings(db, bindings);
@@ -611,10 +616,7 @@ impl<'db> Class<'db> {
                     }
 
                     // There are conflicting declarations for this attribute in the class body.
-                    SymbolAndQualifiers(
-                        Symbol::bound(declared_ty.inner_type()),
-                        declared_ty.qualifiers(),
-                    )
+                    Symbol::bound(declared.inner_type()).with_qualifiers(declared.qualifiers())
                 }
             }
         } else {
@@ -923,7 +925,7 @@ impl<'db> KnownClass {
 
     pub(crate) fn to_class_literal(self, db: &'db dyn Db) -> Type<'db> {
         known_module_symbol(db, self.canonical_module(db), self.as_str(db))
-            .0
+            .symbol
             .ignore_possibly_unbound()
             .unwrap_or(Type::unknown())
     }
@@ -939,7 +941,7 @@ impl<'db> KnownClass {
     /// *and* `class` is a subclass of `other`.
     pub(super) fn is_subclass_of(self, db: &'db dyn Db, other: Class<'db>) -> bool {
         known_module_symbol(db, self.canonical_module(db), self.as_str(db))
-            .0
+            .symbol
             .ignore_possibly_unbound()
             .and_then(Type::into_class_literal)
             .is_some_and(|ClassLiteralType { class }| class.is_subclass_of(db, other))
