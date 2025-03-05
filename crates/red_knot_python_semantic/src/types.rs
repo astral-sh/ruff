@@ -1437,8 +1437,8 @@ impl<'db> Type<'db> {
 
             // Hard code this knowledge, as we need to look this up often.
             Type::ClassLiteral(ClassLiteralType { class })
-                if class.is_known(db, KnownClass::FunctionType) && name == "__set__"
-                    || name == "__delete___" =>
+                if class.is_known(db, KnownClass::FunctionType)
+                    && (name == "__set__" || name == "__delete___") =>
             {
                 Some(Symbol::Unbound.into())
             }
@@ -1840,7 +1840,8 @@ impl<'db> Type<'db> {
     /// TODO: We should return a `Result` here to handle errors that can appear during attribute
     /// lookup, like a failed `__get__` call on a descriptor.
     #[must_use]
-    pub(crate) fn member(&self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
+    #[salsa::tracked]
+    pub(crate) fn member(self, db: &'db dyn Db, name: Name) -> SymbolAndQualifiers<'db> {
         self.member_lookup_with_policy(db, name, MemberLookupPolicy::WithInstanceFallback)
     }
 
@@ -1848,22 +1849,24 @@ impl<'db> Type<'db> {
     fn member_lookup_with_policy(
         &self,
         db: &'db dyn Db,
-        name: &str,
+        name: Name,
         policy: MemberLookupPolicy,
     ) -> SymbolAndQualifiers<'db> {
-        let _span = tracing::trace_span!("member", self=%self.display(db), name).entered();
+        let _span = tracing::trace_span!("member", self=%self.display(db), ?name).entered();
 
         if name == "__class__" {
             return Symbol::bound(self.to_meta_type(db)).into();
         }
 
+        let name_str = name.as_str();
+
         match self {
             Type::Union(union) => union
-                .map_with_boundness(db, |elem| elem.member(db, name).symbol)
+                .map_with_boundness(db, |elem| elem.member(db, name.clone()).symbol)
                 .into(),
 
             Type::Intersection(intersection) => intersection
-                .map_with_boundness(db, |elem| elem.member(db, name).symbol)
+                .map_with_boundness(db, |elem| elem.member(db, name.clone()).symbol)
                 .into(),
 
             Type::FunctionLiteral(function) if name == "__get__" => Symbol::bound(Type::Callable(
@@ -1877,7 +1880,7 @@ impl<'db> Type<'db> {
                 Symbol::bound(Type::Callable(CallableType::WrapperDescriptorDunderGet)).into()
             }
 
-            Type::Callable(CallableType::BoundMethod(bound_method)) => match name {
+            Type::Callable(CallableType::BoundMethod(bound_method)) => match name_str {
                 "__self__" => Symbol::bound(bound_method.self_instance(db)).into(),
                 "__func__" => {
                     Symbol::bound(Type::FunctionLiteral(bound_method.function(db))).into()
@@ -1885,11 +1888,12 @@ impl<'db> Type<'db> {
                 _ => {
                     KnownClass::MethodType
                         .to_instance(db)
-                        .member(db, name)
+                        .member(db, name.clone())
                         .or_fall_back_to(db, || {
                             // If an attribute is not available on the bound method object,
                             // it will be looked up on the underlying function object:
-                            Type::FunctionLiteral(bound_method.function(db)).member(db, name)
+                            Type::FunctionLiteral(bound_method.function(db))
+                                .member(db, name.clone())
                         })
                 }
             },
@@ -1920,25 +1924,25 @@ impl<'db> Type<'db> {
                 ))
                 .into()
             }
-            Type::IntLiteral(_) if matches!(name, "real" | "numerator") => {
+            Type::IntLiteral(_) if matches!(name_str, "real" | "numerator") => {
                 Symbol::bound(self).into()
             }
-            Type::BooleanLiteral(bool_value) if matches!(name, "real" | "numerator") => {
+            Type::BooleanLiteral(bool_value) if matches!(name_str, "real" | "numerator") => {
                 Symbol::bound(Type::IntLiteral(i64::from(*bool_value))).into()
             }
 
             Type::SubclassOf(subclass_of_ty)
                 if subclass_of_ty.subclass_of().is_dynamic()
-                    && matches!(name, "__get__" | "__set__" | "__delete__") =>
+                    && matches!(name_str, "__get__" | "__set__" | "__delete__") =>
             {
                 Symbol::bound(Type::unknown()).into()
             }
 
-            Type::ModuleLiteral(module) => module.static_member(db, name).into(),
+            Type::ModuleLiteral(module) => module.static_member(db, name_str).into(),
 
-            Type::Dynamic(..) | Type::Never | Type::AlwaysFalsy | Type::AlwaysTruthy => {
-                self.class_member(db, name.into())
-            }
+            Type::Dynamic(..) | Type::Never => Symbol::bound(self).into(),
+
+            Type::AlwaysFalsy | Type::AlwaysTruthy => self.class_member(db, name),
 
             Type::Instance(..)
             | Type::BooleanLiteral(..)
@@ -1953,14 +1957,14 @@ impl<'db> Type<'db> {
                 if policy == MemberLookupPolicy::WithInstanceFallback {
                     self.invoke_descriptor_protocol(
                         db,
-                        name,
-                        self.instance_member(db, name),
+                        name_str,
+                        self.instance_member(db, name_str),
                         InstanceFallbackShadowsNonDataDescriptor::No,
                     )
                 } else {
                     self.invoke_descriptor_protocol(
                         db,
-                        name,
+                        name_str,
                         Symbol::Unbound.into(),
                         InstanceFallbackShadowsNonDataDescriptor::No,
                     )
@@ -1968,7 +1972,7 @@ impl<'db> Type<'db> {
             }
 
             Type::ClassLiteral(..) | Type::SubclassOf(..) => {
-                let class_attr_plain = self.find_name_in_mro(db, name).expect(
+                let class_attr_plain = self.find_name_in_mro(db, name_str).expect(
                     "Calling `find_name_in_mro` on class literals and subclass-of types returns `Some` result",
                 );
 
@@ -1979,7 +1983,7 @@ impl<'db> Type<'db> {
                 if policy == MemberLookupPolicy::WithInstanceFallback {
                     let class_attr_fallback = Self::try_call_dunder_get_on_attribute(
                         db,
-                        name,
+                        name_str,
                         class_attr_plain,
                         Type::none(db),
                         *self,
@@ -1988,14 +1992,14 @@ impl<'db> Type<'db> {
 
                     self.invoke_descriptor_protocol(
                         db,
-                        name,
+                        name_str,
                         class_attr_fallback,
                         InstanceFallbackShadowsNonDataDescriptor::Yes,
                     )
                 } else {
                     self.invoke_descriptor_protocol(
                         db,
-                        name,
+                        name_str,
                         Symbol::Unbound.into(),
                         InstanceFallbackShadowsNonDataDescriptor::No,
                     )
@@ -2712,7 +2716,7 @@ impl<'db> Type<'db> {
                 .entered();
 
         match self
-            .member_lookup_with_policy(db, name, MemberLookupPolicy::NoInstanceFallback)
+            .member_lookup_with_policy(db, name.into(), MemberLookupPolicy::NoInstanceFallback)
             .symbol
         {
             Symbol::Type(dunder_callbable, boundness) => {
@@ -4258,7 +4262,7 @@ impl<'db> ModuleLiteralType<'db> {
         if name == "__dict__" {
             return KnownClass::ModuleType
                 .to_instance(db)
-                .member(db, "__dict__")
+                .member(db, "__dict__".into())
                 .symbol;
         }
 
