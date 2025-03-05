@@ -458,12 +458,14 @@ fn symbol_by_id<'db>(
             // a diagnostic if we see it being modified externally. In type inference, we
             // can assign a "narrow" type to it even if it is not *declared*. This means, we
             // do not have to call [`widen_type_for_undeclared_public_symbol`].
+            //
             // `TYPE_CHECKING` is a special variable that should only be assigned `False`
             // at runtime, but is always considered `True` in type checking.
             // See mdtest/known_constants.md#user-defined-type_checking for details.
-            let is_considered_non_modifiable = symbol_table(db, scope).symbol(symbol_id).name()
-                == "__slots__"
-                || symbol_table(db, scope).symbol(symbol_id).name() == "TYPE_CHECKING";
+            let is_considered_non_modifiable = matches!(
+                symbol_table(db, scope).symbol(symbol_id).name().as_str(),
+                "__slots__" | "TYPE_CHECKING"
+            );
 
             widen_type_for_undeclared_public_symbol(db, inferred, is_considered_non_modifiable)
                 .into()

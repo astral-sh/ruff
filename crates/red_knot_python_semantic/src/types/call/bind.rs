@@ -6,7 +6,7 @@ use crate::types::diagnostic::{
 };
 use crate::types::signatures::Parameter;
 use crate::types::{todo_type, CallableType, UnionType};
-use ruff_db::diagnostic::{SecondaryDiagnosticMessage, Span};
+use ruff_db::diagnostic::{OldSecondaryDiagnosticMessage, Span};
 use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
@@ -388,7 +388,7 @@ impl<'db> CallBindingError<'db> {
                 if let Some(span) =
                     Self::parameter_span_from_index(context.db(), callable_ty, parameter.index)
                 {
-                    messages.push(SecondaryDiagnosticMessage::new(
+                    messages.push(OldSecondaryDiagnosticMessage::new(
                         span,
                         "parameter declared in function definition here",
                     ));

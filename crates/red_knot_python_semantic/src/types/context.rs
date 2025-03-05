@@ -2,7 +2,7 @@ use std::fmt;
 
 use drop_bomb::DebugDropBomb;
 use ruff_db::{
-    diagnostic::{DiagnosticId, SecondaryDiagnosticMessage, Severity},
+    diagnostic::{DiagnosticId, OldSecondaryDiagnosticMessage, Severity},
     files::File,
 };
 use ruff_text_size::{Ranged, TextRange};
@@ -84,7 +84,7 @@ impl<'db> InferContext<'db> {
         lint: &'static LintMetadata,
         ranged: T,
         message: fmt::Arguments,
-        secondary_messages: Vec<SecondaryDiagnosticMessage>,
+        secondary_messages: Vec<OldSecondaryDiagnosticMessage>,
     ) where
         T: Ranged,
     {
@@ -136,7 +136,7 @@ impl<'db> InferContext<'db> {
         id: DiagnosticId,
         severity: Severity,
         message: fmt::Arguments,
-        secondary_messages: Vec<SecondaryDiagnosticMessage>,
+        secondary_messages: Vec<OldSecondaryDiagnosticMessage>,
     ) where
         T: Ranged,
     {

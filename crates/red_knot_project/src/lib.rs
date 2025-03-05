@@ -9,7 +9,7 @@ pub use metadata::{ProjectDiscoveryError, ProjectMetadata};
 use red_knot_python_semantic::lint::{LintRegistry, LintRegistryBuilder, RuleSelection};
 use red_knot_python_semantic::register_lints;
 use red_knot_python_semantic::types::check_types;
-use ruff_db::diagnostic::{Diagnostic, DiagnosticId, ParseDiagnostic, Severity, Span};
+use ruff_db::diagnostic::{DiagnosticId, OldDiagnosticTrait, OldParseDiagnostic, Severity, Span};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::{source_text, SourceTextError};
@@ -163,22 +163,22 @@ impl Project {
     }
 
     /// Checks all open files in the project and its dependencies.
-    pub(crate) fn check(self, db: &ProjectDatabase) -> Vec<Box<dyn Diagnostic>> {
+    pub(crate) fn check(self, db: &ProjectDatabase) -> Vec<Box<dyn OldDiagnosticTrait>> {
         let project_span = tracing::debug_span!("Project::check");
         let _span = project_span.enter();
 
         tracing::debug!("Checking project '{name}'", name = self.name(db));
 
-        let mut diagnostics: Vec<Box<dyn Diagnostic>> = Vec::new();
+        let mut diagnostics: Vec<Box<dyn OldDiagnosticTrait>> = Vec::new();
         diagnostics.extend(self.settings_diagnostics(db).iter().map(|diagnostic| {
-            let diagnostic: Box<dyn Diagnostic> = Box::new(diagnostic.clone());
+            let diagnostic: Box<dyn OldDiagnosticTrait> = Box::new(diagnostic.clone());
             diagnostic
         }));
 
         let files = ProjectFiles::new(db, self);
 
         diagnostics.extend(files.diagnostics().iter().cloned().map(|diagnostic| {
-            let diagnostic: Box<dyn Diagnostic> = Box::new(diagnostic);
+            let diagnostic: Box<dyn OldDiagnosticTrait> = Box::new(diagnostic);
             diagnostic
         }));
 
@@ -207,12 +207,12 @@ impl Project {
         Arc::into_inner(result).unwrap().into_inner().unwrap()
     }
 
-    pub(crate) fn check_file(self, db: &dyn Db, file: File) -> Vec<Box<dyn Diagnostic>> {
+    pub(crate) fn check_file(self, db: &dyn Db, file: File) -> Vec<Box<dyn OldDiagnosticTrait>> {
         let mut file_diagnostics: Vec<_> = self
             .settings_diagnostics(db)
             .iter()
             .map(|diagnostic| {
-                let diagnostic: Box<dyn Diagnostic> = Box::new(diagnostic.clone());
+                let diagnostic: Box<dyn OldDiagnosticTrait> = Box::new(diagnostic.clone());
                 diagnostic
             })
             .collect();
@@ -397,8 +397,8 @@ impl Project {
     }
 }
 
-fn check_file_impl(db: &dyn Db, file: File) -> Vec<Box<dyn Diagnostic>> {
-    let mut diagnostics: Vec<Box<dyn Diagnostic>> = Vec::new();
+fn check_file_impl(db: &dyn Db, file: File) -> Vec<Box<dyn OldDiagnosticTrait>> {
+    let mut diagnostics: Vec<Box<dyn OldDiagnosticTrait>> = Vec::new();
 
     // Abort checking if there are IO errors.
     let source = source_text(db.upcast(), file);
@@ -413,12 +413,13 @@ fn check_file_impl(db: &dyn Db, file: File) -> Vec<Box<dyn Diagnostic>> {
 
     let parsed = parsed_module(db.upcast(), file);
     diagnostics.extend(parsed.errors().iter().map(|error| {
-        let diagnostic: Box<dyn Diagnostic> = Box::new(ParseDiagnostic::new(file, error.clone()));
+        let diagnostic: Box<dyn OldDiagnosticTrait> =
+            Box::new(OldParseDiagnostic::new(file, error.clone()));
         diagnostic
     }));
 
     diagnostics.extend(check_types(db.upcast(), file).iter().map(|diagnostic| {
-        let boxed: Box<dyn Diagnostic> = Box::new(diagnostic.clone());
+        let boxed: Box<dyn OldDiagnosticTrait> = Box::new(diagnostic.clone());
         boxed
     }));
 
@@ -492,7 +493,7 @@ pub struct IOErrorDiagnostic {
     error: IOErrorKind,
 }
 
-impl Diagnostic for IOErrorDiagnostic {
+impl OldDiagnosticTrait for IOErrorDiagnostic {
     fn id(&self) -> DiagnosticId {
         DiagnosticId::Io
     }
@@ -524,7 +525,7 @@ mod tests {
     use crate::db::tests::TestDb;
     use crate::{check_file_impl, ProjectMetadata};
     use red_knot_python_semantic::types::check_types;
-    use ruff_db::diagnostic::Diagnostic;
+    use ruff_db::diagnostic::OldDiagnosticTrait;
     use ruff_db::files::system_path_to_file;
     use ruff_db::source::source_text;
     use ruff_db::system::{DbWithTestSystem, SystemPath, SystemPathBuf};

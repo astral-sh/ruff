@@ -1786,6 +1786,21 @@ impl<'src> Parser<'src> {
         // x = 10
         let type_params = self.try_parse_type_params();
 
+        // test_ok function_type_params_py312
+        // # parse_options: {"target-version": "3.12"}
+        // def foo[T](): ...
+
+        // test_err function_type_params_py311
+        // # parse_options: {"target-version": "3.11"}
+        // def foo[T](): ...
+        // def foo[](): ...
+        if let Some(ast::TypeParams { range, .. }) = &type_params {
+            self.add_unsupported_syntax_error(
+                UnsupportedSyntaxErrorKind::TypeParameterList,
+                *range,
+            );
+        }
+
         // test_ok function_def_parameter_range
         // def foo(
         //     first: int,
@@ -1899,6 +1914,21 @@ impl<'src> Parser<'src> {
         //     pass
         // x = 10
         let type_params = self.try_parse_type_params();
+
+        // test_ok class_type_params_py312
+        // # parse_options: {"target-version": "3.12"}
+        // class Foo[S: (str, bytes), T: float, *Ts, **P]: ...
+
+        // test_err class_type_params_py311
+        // # parse_options: {"target-version": "3.11"}
+        // class Foo[S: (str, bytes), T: float, *Ts, **P]: ...
+        // class Foo[]: ...
+        if let Some(ast::TypeParams { range, .. }) = &type_params {
+            self.add_unsupported_syntax_error(
+                UnsupportedSyntaxErrorKind::TypeParameterList,
+                *range,
+            );
+        }
 
         // test_ok class_def_arguments
         // class Foo: ...

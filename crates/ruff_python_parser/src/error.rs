@@ -445,6 +445,34 @@ pub enum UnsupportedSyntaxErrorKind {
     Walrus,
     ExceptStar,
     ParenthesizedKeywordArgumentName,
+    /// Represents the use of a [type parameter list] before Python 3.12.
+    ///
+    /// ## Examples
+    ///
+    /// Before Python 3.12, generic parameters had to be declared separately using a class like
+    /// [`typing.TypeVar`], which could then be used in a function or class definition:
+    ///
+    /// ```python
+    /// from typing import Generic, TypeVar
+    ///
+    /// T = TypeVar("T")
+    ///
+    /// def f(t: T): ...
+    /// class C(Generic[T]): ...
+    /// ```
+    ///
+    /// [PEP 695], included in Python 3.12, introduced the new type parameter syntax, which allows
+    /// these to be written more compactly and without a separate type variable:
+    ///
+    /// ```python
+    /// def f[T](t: T): ...
+    /// class C[T]: ...
+    /// ```
+    ///
+    /// [type parameter list]: https://docs.python.org/3/reference/compound_stmts.html#type-parameter-lists
+    /// [PEP 695]: https://peps.python.org/pep-0695/
+    /// [`typing.TypeVar`]: https://docs.python.org/3/library/typing.html#typevar
+    TypeParameterList,
     TypeAliasStatement,
     TypeParamDefault,
 }
@@ -458,6 +486,7 @@ impl Display for UnsupportedSyntaxError {
             UnsupportedSyntaxErrorKind::ParenthesizedKeywordArgumentName => {
                 "Cannot use parenthesized keyword argument name"
             }
+            UnsupportedSyntaxErrorKind::TypeParameterList => "Cannot use type parameter lists",
             UnsupportedSyntaxErrorKind::TypeAliasStatement => "Cannot use `type` alias statement",
             UnsupportedSyntaxErrorKind::TypeParamDefault => {
                 "Cannot set default type for a type parameter"
@@ -502,6 +531,7 @@ impl UnsupportedSyntaxErrorKind {
             UnsupportedSyntaxErrorKind::ParenthesizedKeywordArgumentName => {
                 Change::Removed(PythonVersion::PY38)
             }
+            UnsupportedSyntaxErrorKind::TypeParameterList => Change::Added(PythonVersion::PY312),
             UnsupportedSyntaxErrorKind::TypeAliasStatement => Change::Added(PythonVersion::PY312),
             UnsupportedSyntaxErrorKind::TypeParamDefault => Change::Added(PythonVersion::PY313),
         }
