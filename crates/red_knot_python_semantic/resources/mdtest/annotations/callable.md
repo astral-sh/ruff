@@ -1,7 +1,8 @@
 # Callable
 
 References:
-* <https://typing.readthedocs.io/en/latest/spec/callables.html#callable>
+
+- <https://typing.readthedocs.io/en/latest/spec/callables.html#callable>
 
 ## Invalid forms
 
@@ -127,8 +128,8 @@ def _(c: Callable[[int, str], Callable[[int], int]]):
 
 ## Gradual form
 
-The `Callable` special form supports the use of `...` in place of the list of parameter types. This is a
-[gradual form] indicating that the type is consistent with any input signature:
+The `Callable` special form supports the use of `...` in place of the list of parameter types. This
+is a [gradual form] indicating that the type is consistent with any input signature:
 
 ```py
 from typing import Callable
