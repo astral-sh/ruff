@@ -3050,6 +3050,21 @@ impl<'src> Parser<'src> {
                         // first time, otherwise it's a user error.
                         std::mem::swap(&mut parameters.args, &mut parameters.posonlyargs);
                         seen_positional_only_separator = true;
+
+                        // test_ok pos_only_py38
+                        // # parse_options: {"target-version": "3.8"}
+                        // def foo(a, /): ...
+
+                        // test_err pos_only_py37
+                        // # parse_options: {"target-version": "3.7"}
+                        // def foo(a, /): ...
+                        // def foo(a, /, b, /): ...
+                        // def foo(a, *args, /, b): ...
+                        // def foo(a, //): ...
+                        parser.add_unsupported_syntax_error(
+                            UnsupportedSyntaxErrorKind::PositionalOnlyParameter,
+                            slash_range,
+                        );
                     }
 
                     last_keyword_only_separator_range = None;
