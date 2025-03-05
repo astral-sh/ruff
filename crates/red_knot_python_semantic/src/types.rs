@@ -630,7 +630,10 @@ impl<'db> Type<'db> {
                     .is_subtype_of(db, target)
             }
 
-            (Type::Callable(CallableType::General(_)), _) => todo!(),
+            (Type::Callable(CallableType::General(_)), _) => {
+                // TODO: Implement subtyping for general callable types
+                false
+            }
 
             // A fully static heterogenous tuple type `A` is a subtype of a fully static heterogeneous tuple type `B`
             // iff the two tuple types have the same number of elements and each element-type in `A` is a subtype
@@ -916,9 +919,6 @@ impl<'db> Type<'db> {
     /// wrong `false` answers in some cases.
     pub(crate) fn is_disjoint_from(self, db: &'db dyn Db, other: Type<'db>) -> bool {
         match (self, other) {
-            (Type::Callable(CallableType::General(_)), _)
-            | (_, Type::Callable(CallableType::General(_))) => todo!(),
-
             (Type::Never, _) | (_, Type::Never) => true,
 
             (Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => false,
@@ -1205,6 +1205,12 @@ impl<'db> Type<'db> {
                 // TODO: add checks for the above cases once we support them
                 instance.is_disjoint_from(db, KnownClass::Tuple.to_instance(db))
             }
+
+            (Type::Callable(CallableType::General(_)), _)
+            | (_, Type::Callable(CallableType::General(_))) => {
+                // TODO: Implement disjointness for general callable types
+                false
+            }
         }
     }
 
@@ -1270,7 +1276,6 @@ impl<'db> Type<'db> {
     /// for more complicated types that are actually singletons.
     pub(crate) fn is_singleton(self, db: &'db dyn Db) -> bool {
         match self {
-            Type::Callable(CallableType::General(_)) => todo!(),
             Type::Dynamic(_)
             | Type::Never
             | Type::IntLiteral(..)
@@ -1323,13 +1328,16 @@ impl<'db> Type<'db> {
                 false
             }
             Type::AlwaysTruthy | Type::AlwaysFalsy => false,
+            Type::Callable(CallableType::General(_)) => {
+                // TODO: Check if the callable type is a singleton
+                false
+            }
         }
     }
 
     /// Return true if this type is non-empty and all inhabitants of this type compare equal.
     pub(crate) fn is_single_valued(self, db: &'db dyn Db) -> bool {
         match self {
-            Type::Callable(CallableType::General(_)) => todo!(),
             Type::FunctionLiteral(..)
             | Type::Callable(
                 CallableType::BoundMethod(..)
@@ -1366,6 +1374,11 @@ impl<'db> Type<'db> {
             | Type::LiteralString
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy => false,
+
+            Type::Callable(CallableType::General(_)) => {
+                // TODO: Check if the callable type is single-valued
+                false
+            }
         }
     }
 
@@ -1376,8 +1389,6 @@ impl<'db> Type<'db> {
     #[must_use]
     fn static_member(&self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
         match self {
-            Type::Callable(CallableType::General(_)) => todo!(),
-
             Type::Dynamic(_) => Symbol::bound(self),
 
             Type::Never => Symbol::todo("attribute lookup on Never"),
@@ -1398,6 +1409,10 @@ impl<'db> Type<'db> {
                 KnownClass::WrapperDescriptorType
                     .to_instance(db)
                     .static_member(db, name)
+            }
+            Type::Callable(CallableType::General(_)) => {
+                // TODO
+                Symbol::todo("static member lookup on general callable type")
             }
 
             Type::ModuleLiteral(module) => module.static_member(db, name),
@@ -1576,8 +1591,6 @@ impl<'db> Type<'db> {
         }
 
         match self {
-            Type::Callable(CallableType::General(_)) => todo!(),
-
             Type::FunctionLiteral(function) if name == "__get__" => Symbol::bound(Type::Callable(
                 CallableType::MethodWrapperDunderGet(*function),
             )),
@@ -1605,6 +1618,10 @@ impl<'db> Type<'db> {
                 KnownClass::WrapperDescriptorType
                     .to_instance(db)
                     .member(db, name)
+            }
+            Type::Callable(CallableType::General(_)) => {
+                // TODO
+                Symbol::todo("member lookup on general callable type")
             }
 
             Type::Instance(..)
@@ -2664,7 +2681,6 @@ impl<'db> Type<'db> {
     #[must_use]
     pub fn to_meta_type(&self, db: &'db dyn Db) -> Type<'db> {
         match self {
-            Type::Callable(CallableType::General(_)) => todo!(),
             Type::Never => Type::Never,
             Type::Instance(InstanceType { class }) => SubclassOfType::from(db, *class),
             Type::KnownInstance(known_instance) => known_instance.class().to_class_literal(db),
@@ -2682,6 +2698,10 @@ impl<'db> Type<'db> {
             }
             Type::Callable(CallableType::WrapperDescriptorDunderGet) => {
                 KnownClass::WrapperDescriptorType.to_class_literal(db)
+            }
+            Type::Callable(CallableType::General(_)) => {
+                // TODO
+                todo_type!(".to_meta_type() for general callable type")
             }
             Type::ModuleLiteral(_) => KnownClass::ModuleType.to_class_literal(db),
             Type::Tuple(_) => KnownClass::Tuple.to_class_literal(db),
@@ -3739,6 +3759,8 @@ pub struct BoundMethodType<'db> {
     self_instance: Type<'db>,
 }
 
+/// This type represents a general callable type that are used to represent `typing.Callable`
+/// and `lambda` expressions.
 #[salsa::interned]
 pub struct GeneralCallableType<'db> {
     signature: Signature<'db>,
@@ -3758,6 +3780,7 @@ impl<'db> GeneralCallableType<'db> {
 /// A type that represents callable objects.
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, salsa::Update)]
 pub enum CallableType<'db> {
+    /// Represents a general callable type.
     General(GeneralCallableType<'db>),
 
     /// Represents a callable `instance.method` where `instance` is an instance of a class
