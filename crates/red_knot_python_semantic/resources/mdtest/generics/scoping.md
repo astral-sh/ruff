@@ -63,7 +63,7 @@ f(1)
 f("a")
 ```
 
-## Class methods can mention class typevars
+## Methods can mention class typevars
 
 > A type variable used in a method of a generic class that coincides with one of the variables that
 > parameterize this class is always bound to that variable.
@@ -85,7 +85,7 @@ c.m2(1)
 c.m2("string")
 ```
 
-## Class methods can mention other typevars
+## Methods can mention other typevars
 
 > A type variable used in a method that does not match any of the variables that parameterize the
 > class makes this method a generic function in that variable.
@@ -125,7 +125,7 @@ reveal_type(c.m(1, "string"))  # revealed: S
 > Unbound type variables should not appear in the bodies of generic functions, or in the class
 > bodies apart from method definitions.
 
-This is true with the legacy syntax, as well:
+This is true with the legacy syntax:
 
 ```py
 from typing import TypeVar, Generic
