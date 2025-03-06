@@ -2,8 +2,8 @@
 
 ## No init or new
 
-Here we statically infer that there is no custom `__init__` or `__new__` method defined on the
-class, hence the call to the constructor is only valid with no arguments.
+Every class has `object` in it's MRO, so if no `__init__` method is provided, we fall back to
+`object.__init__`, which can only be called with zero arguments:
 
 ```py
 class Foo: ...
