@@ -28,7 +28,7 @@ impl Db {
         let rule_selection = RuleSelection::from_registry(default_lint_registry());
 
         Self {
-            system: MdtestSystem::in_memory(SystemPathBuf::from("/")),
+            system: MdtestSystem::in_memory(),
             storage: salsa::Storage::default(),
             vendored: red_knot_vendored::file_system().clone(),
             files: Files::default(),
@@ -36,21 +36,14 @@ impl Db {
         }
     }
 
-    pub(crate) fn reset_fs(&mut self) {
-        match &*self.system.0 {
-            MdtestSystemInner::InMemory(in_memory) => {
-                in_memory.fs().remove_all();
-            }
-            MdtestSystemInner::Os { .. } => {
-                self.system = MdtestSystem::in_memory(SystemPathBuf::from("/"));
-            }
-        }
-
+    pub(crate) fn use_os_system_with_temp_dir(&mut self, cwd: SystemPathBuf, temp_dir: TempDir) {
+        self.system.with_os(cwd, temp_dir);
         Files::sync_all(self);
     }
 
-    pub(crate) fn with_tempdir_fs(&mut self, cwd: SystemPathBuf, temp_dir: TempDir) {
-        self.system.with_os(cwd, temp_dir);
+    pub(crate) fn use_in_memory_system(&mut self) {
+        self.system.with_in_memory();
+        Files::sync_all(self);
     }
 
     pub(crate) fn create_directory_all(&self, path: &SystemPath) -> ruff_db::system::Result<()> {
@@ -122,10 +115,10 @@ enum MdtestSystemInner {
 }
 
 impl MdtestSystem {
-    fn in_memory(cwd: SystemPathBuf) -> Self {
-        Self(Arc::new(MdtestSystemInner::InMemory(InMemorySystem::new(
-            cwd,
-        ))))
+    fn in_memory() -> Self {
+        Self(Arc::new(MdtestSystemInner::InMemory(
+            InMemorySystem::default(),
+        )))
     }
 
     fn as_system(&self) -> &dyn WritableSystem {
@@ -140,6 +133,14 @@ impl MdtestSystem {
             os_system: OsSystem::new(cwd),
             _temp_dir: temp_dir,
         });
+    }
+
+    fn with_in_memory(&mut self) {
+        if let MdtestSystemInner::InMemory(in_memory) = &*self.0 {
+            in_memory.fs().remove_all();
+        } else {
+            self.0 = Arc::new(MdtestSystemInner::InMemory(InMemorySystem::default()));
+        }
     }
 
     fn normalize_path<'a>(&self, path: &'a SystemPath) -> Cow<'a, SystemPath> {

@@ -57,9 +57,6 @@ pub fn run(
             Log::Filter(filter) => setup_logging_with_filter(filter),
         });
 
-        // Remove all files so that the db is in a "fresh" state.
-        db.reset_fs();
-
         if let Err(failures) = run_test(&mut db, relative_fixture_path, snapshot_path, &test) {
             any_failures = true;
             println!("\n{}\n", test.name().bold().underline());
@@ -104,16 +101,22 @@ fn run_test(
     snapshot_path: &Utf8Path,
     test: &parser::MarkdownTest,
 ) -> Result<(), Failures> {
-    if SystemKind::Os == test.configuration().system.unwrap_or_default() {
-        let dir = tempfile::TempDir::new().expect("Creating a temporary directory to succeed");
-        let root_path = dir
-            .path()
-            .canonicalize()
-            .expect("Canonicalizing to succeed");
-        let root_path = SystemPathBuf::from_path_buf(root_path)
-            .expect("Temp directory to be a valid UTF8 path");
+    // Initialize the system and remove all files and directories to reset the system to a clean state.
+    match test.configuration().system.unwrap_or_default() {
+        SystemKind::InMemory => {
+            db.use_in_memory_system();
+        }
+        SystemKind::Os => {
+            let dir = tempfile::TempDir::new().expect("Creating a temporary directory to succeed");
+            let root_path = dir
+                .path()
+                .canonicalize()
+                .expect("Canonicalizing to succeed");
+            let root_path = SystemPathBuf::from_path_buf(root_path)
+                .expect("Temp directory to be a valid UTF8 path");
 
-        db.with_tempdir_fs(root_path, dir);
+            db.use_os_system_with_temp_dir(root_path, dir);
+        }
     }
 
     let project_root = SystemPathBuf::from("/src");
