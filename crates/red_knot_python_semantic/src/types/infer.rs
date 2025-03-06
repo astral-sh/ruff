@@ -276,7 +276,7 @@ pub(crate) struct TypeInference<'db> {
     deferred: FxHashSet<Definition<'db>>,
 
     /// The return type of this region, if it is a function body.
-    return_type: Option<Type<'db>>,
+    return_type: Vec<Type<'db>>,
 
     /// The diagnostics for this region.
     diagnostics: TypeCheckDiagnostics,
@@ -297,7 +297,7 @@ impl<'db> TypeInference<'db> {
             bindings: FxHashMap::default(),
             declarations: FxHashMap::default(),
             deferred: FxHashSet::default(),
-            return_type: None,
+            return_type: vec![],
             diagnostics: TypeCheckDiagnostics::default(),
             scope,
             cycle_fallback_type: None,
@@ -310,7 +310,7 @@ impl<'db> TypeInference<'db> {
             bindings: FxHashMap::default(),
             declarations: FxHashMap::default(),
             deferred: FxHashSet::default(),
-            return_type: None,
+            return_type: vec![],
             diagnostics: TypeCheckDiagnostics::default(),
             scope,
             cycle_fallback_type: Some(cycle_fallback_type),
@@ -1051,12 +1051,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn set_return_type(&mut self, inferred_ty: Type<'db>) {
-        if let Some(existing) = self.types.return_type {
-            self.types.return_type =
-                Some(UnionType::from_elements(self.db(), [existing, inferred_ty]));
-        } else {
-            self.types.return_type = Some(inferred_ty);
-        }
+        self.types.return_type.push(inferred_ty);
     }
 
     fn infer_module(&mut self, module: &ast::ModModule) {
@@ -1139,10 +1134,11 @@ impl<'db> TypeInferenceBuilder<'db> {
             if is_suite_empty(&function.body) {
                 return;
             }
-            let inferred_ty = self
-                .types
-                .return_type
-                .unwrap_or(KnownClass::NoneType.to_instance(self.db()));
+            let inferred_ty = if self.types.return_type.is_empty() {
+                KnownClass::NoneType.to_instance(self.db())
+            } else {
+                UnionType::from_elements(self.db(), self.types.return_type.iter().copied())
+            };
             if !inferred_ty.is_assignable_to(self.db(), declared_ty) {
                 report_invalid_return_type(
                     &self.context,
