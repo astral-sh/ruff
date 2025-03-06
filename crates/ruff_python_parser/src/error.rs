@@ -436,12 +436,14 @@ pub struct UnsupportedSyntaxError {
     pub kind: UnsupportedSyntaxErrorKind,
     pub range: TextRange,
     /// The target [`PythonVersion`] for which this error was detected.
-    ///
-    /// This is different from the version reported by the
-    /// [`minimum_version`](UnsupportedSyntaxErrorKind::minimum_version) method, which is the
-    /// earliest allowed version for this piece of syntax. The `target_version` is primarily used
-    /// for user-facing error messages.
     pub target_version: PythonVersion,
+}
+
+/// The type of tuple unpacking for [`UnsupportedSyntaxErrorKind::StarTuple`].
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub enum StarTupleKind {
+    Return,
+    Yield,
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -449,6 +451,76 @@ pub enum UnsupportedSyntaxErrorKind {
     Match,
     Walrus,
     ExceptStar,
+
+    /// Represents the use of a parenthesized keyword argument name after Python 3.8.
+    ///
+    /// ## Example
+    ///
+    /// From [BPO 34641] it sounds like this was only accidentally supported and was removed when
+    /// noticed. Code like this used to be valid:
+    ///
+    /// ```python
+    /// f((a)=1)
+    /// ```
+    ///
+    /// After Python 3.8, you have to omit the parentheses around `a`:
+    ///
+    /// ```python
+    /// f(a=1)
+    /// ```
+    ///
+    /// [BPO 34641]: https://github.com/python/cpython/issues/78822
+    ParenthesizedKeywordArgumentName,
+
+    /// Represents the use of unparenthesized tuple unpacking in a `return` statement or `yield`
+    /// expression before Python 3.8.
+    ///
+    /// ## Examples
+    ///
+    /// Before Python 3.8, this syntax was allowed:
+    ///
+    /// ```python
+    /// rest = (4, 5, 6)
+    ///
+    /// def f():
+    ///     t = 1, 2, 3, *rest
+    ///     return t
+    ///
+    /// def g():
+    ///     t = 1, 2, 3, *rest
+    ///     yield t
+    /// ```
+    ///
+    /// But this was not:
+    ///
+    /// ```python
+    /// rest = (4, 5, 6)
+    ///
+    /// def f():
+    ///     return 1, 2, 3, *rest
+    ///
+    /// def g():
+    ///     yield 1, 2, 3, *rest
+    /// ```
+    ///
+    /// Instead, parentheses were required in the `return` and `yield` cases:
+    ///
+    /// ```python
+    /// rest = (4, 5, 6)
+    ///
+    /// def f():
+    ///     return (1, 2, 3, *rest)
+    ///
+    /// def g():
+    ///     yield (1, 2, 3, *rest)
+    /// ```
+    ///
+    /// This was reported in [BPO 32117] and updated in Python 3.8 to allow the unparenthesized
+    /// form.
+    ///
+    /// [BPO 32117]: https://github.com/python/cpython/issues/76298
+    StarTuple(StarTupleKind),
+
     /// Represents the use of a "relaxed" [PEP 614] decorator before Python 3.9.
     ///
     /// ## Examples
@@ -480,6 +552,7 @@ pub enum UnsupportedSyntaxErrorKind {
     /// [`dotted_name`]: https://docs.python.org/3.8/reference/compound_stmts.html#grammar-token-dotted-name
     /// [decorator grammar]: https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-decorator
     RelaxedDecorator,
+
     /// Represents the use of a [PEP 570] positional-only parameter before Python 3.8.
     ///
     /// ## Examples
@@ -506,6 +579,7 @@ pub enum UnsupportedSyntaxErrorKind {
     ///
     /// [PEP 570]: https://peps.python.org/pep-0570/
     PositionalOnlyParameter,
+
     /// Represents the use of a [type parameter list] before Python 3.12.
     ///
     /// ## Examples
@@ -584,6 +658,15 @@ impl Display for UnsupportedSyntaxError {
             UnsupportedSyntaxErrorKind::Match => "Cannot use `match` statement",
             UnsupportedSyntaxErrorKind::Walrus => "Cannot use named assignment expression (`:=`)",
             UnsupportedSyntaxErrorKind::ExceptStar => "Cannot use `except*`",
+            UnsupportedSyntaxErrorKind::ParenthesizedKeywordArgumentName => {
+                "Cannot use parenthesized keyword argument name"
+            }
+            UnsupportedSyntaxErrorKind::StarTuple(StarTupleKind::Return) => {
+                "Cannot use iterable unpacking in return statements"
+            }
+            UnsupportedSyntaxErrorKind::StarTuple(StarTupleKind::Yield) => {
+                "Cannot use iterable unpacking in yield expressions"
+            }
             UnsupportedSyntaxErrorKind::RelaxedDecorator => "Unsupported expression in decorators",
             UnsupportedSyntaxErrorKind::PositionalOnlyParameter => {
                 "Cannot use positional-only parameter separator"
@@ -597,29 +680,67 @@ impl Display for UnsupportedSyntaxError {
                 "Cannot use parentheses within a `with` statement"
             }
         };
+
         write!(
             f,
-            "{kind} on Python {} (syntax was added in Python {})",
+            "{kind} on Python {} (syntax was {changed})",
             self.target_version,
-            self.kind.minimum_version(),
+            changed = self.kind.changed_version(),
         )
     }
 }
 
-impl UnsupportedSyntaxErrorKind {
-    /// The earliest allowed version for the syntax associated with this error.
-    pub const fn minimum_version(&self) -> PythonVersion {
+/// Represents the kind of change in Python syntax between versions.
+enum Change {
+    Added(PythonVersion),
+    Removed(PythonVersion),
+}
+
+impl Display for Change {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            UnsupportedSyntaxErrorKind::Match => PythonVersion::PY310,
-            UnsupportedSyntaxErrorKind::Walrus => PythonVersion::PY38,
-            UnsupportedSyntaxErrorKind::ExceptStar => PythonVersion::PY311,
-            UnsupportedSyntaxErrorKind::RelaxedDecorator => PythonVersion::PY39,
-            UnsupportedSyntaxErrorKind::PositionalOnlyParameter => PythonVersion::PY38,
-            UnsupportedSyntaxErrorKind::TypeParameterList => PythonVersion::PY312,
-            UnsupportedSyntaxErrorKind::TypeAliasStatement => PythonVersion::PY312,
-            UnsupportedSyntaxErrorKind::TypeParamDefault => PythonVersion::PY313,
-            UnsupportedSyntaxErrorKind::ParenthesizedContextManager => PythonVersion::PY39,
+            Change::Added(version) => write!(f, "added in Python {version}"),
+            Change::Removed(version) => write!(f, "removed in Python {version}"),
         }
+    }
+}
+
+impl UnsupportedSyntaxErrorKind {
+    /// Returns the Python version when the syntax associated with this error was changed, and the
+    /// type of [`Change`] (added or removed).
+    const fn changed_version(self) -> Change {
+        match self {
+            UnsupportedSyntaxErrorKind::Match => Change::Added(PythonVersion::PY310),
+            UnsupportedSyntaxErrorKind::Walrus => Change::Added(PythonVersion::PY38),
+            UnsupportedSyntaxErrorKind::ExceptStar => Change::Added(PythonVersion::PY311),
+            UnsupportedSyntaxErrorKind::StarTuple(_) => Change::Added(PythonVersion::PY38),
+            UnsupportedSyntaxErrorKind::RelaxedDecorator => Change::Added(PythonVersion::PY39),
+            UnsupportedSyntaxErrorKind::PositionalOnlyParameter => {
+                Change::Added(PythonVersion::PY38)
+            }
+            UnsupportedSyntaxErrorKind::ParenthesizedKeywordArgumentName => {
+                Change::Removed(PythonVersion::PY38)
+            }
+            UnsupportedSyntaxErrorKind::TypeParameterList => Change::Added(PythonVersion::PY312),
+            UnsupportedSyntaxErrorKind::TypeAliasStatement => Change::Added(PythonVersion::PY312),
+            UnsupportedSyntaxErrorKind::TypeParamDefault => Change::Added(PythonVersion::PY313),
+            UnsupportedSyntaxErrorKind::ParenthesizedContextManager => {
+                Change::Added(PythonVersion::PY39)
+            }
+        }
+    }
+
+    /// Returns whether or not this kind of syntax is unsupported on `target_version`.
+    pub(crate) fn is_unsupported(self, target_version: PythonVersion) -> bool {
+        match self.changed_version() {
+            Change::Added(version) => target_version < version,
+            Change::Removed(version) => target_version >= version,
+        }
+    }
+
+    /// Returns `true` if this kind of syntax is supported on `target_version`.
+    pub(crate) fn is_supported(self, target_version: PythonVersion) -> bool {
+        !self.is_unsupported(target_version)
     }
 }
 

@@ -1366,9 +1366,7 @@ impl<'db> Type<'db> {
     #[must_use]
     fn static_member(&self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
         match self {
-            Type::Dynamic(_) => Symbol::bound(self),
-
-            Type::Never => Symbol::todo("attribute lookup on Never"),
+            Type::Dynamic(_) | Type::Never => Symbol::bound(self),
 
             Type::FunctionLiteral(_) => KnownClass::FunctionType
                 .to_instance(db)
@@ -2267,8 +2265,11 @@ impl<'db> Type<'db> {
                     })
             }
 
-            // Dynamic types are callable, and the return type is the same dynamic type
-            Type::Dynamic(_) => Ok(CallOutcome::Single(CallBinding::from_return_type(self))),
+            // Dynamic types are callable, and the return type is the same dynamic type. Similarly,
+            // `Never` is always callable and returns `Never`.
+            Type::Dynamic(_) | Type::Never => {
+                Ok(CallOutcome::Single(CallBinding::from_return_type(self)))
+            }
 
             Type::Union(union) => {
                 CallOutcome::try_call_union(db, union, |element| element.try_call(db, arguments))
@@ -4350,7 +4351,7 @@ pub(crate) mod tests {
     };
     use ruff_db::files::system_path_to_file;
     use ruff_db::parsed::parsed_module;
-    use ruff_db::system::DbWithTestSystem;
+    use ruff_db::system::DbWithWritableSystem as _;
     use ruff_db::testing::assert_function_query_was_not_run;
     use ruff_python_ast::PythonVersion;
     use strum::IntoEnumIterator;
