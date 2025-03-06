@@ -8,7 +8,7 @@ Ok(
             warnings: [],
             directive: All(
                 All {
-                    range: 0..10,
+                    range: 18..30,
                 },
             ),
         },

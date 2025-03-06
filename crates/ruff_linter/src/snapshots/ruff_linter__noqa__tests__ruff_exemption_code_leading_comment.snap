@@ -1,6 +1,6 @@
 ---
 source: crates/ruff_linter/src/noqa.rs
-expression: directive
+expression: exemption
 ---
 Ok(
     Some(
@@ -8,15 +8,11 @@ Ok(
             warnings: [],
             directive: Codes(
                 Codes {
-                    range: 0..15,
+                    range: 18..36,
                     codes: [
                         Code {
                             code: "F401",
-                            range: 6..10,
-                        },
-                        Code {
-                            code: "F841",
-                            range: 11..15,
+                            range: 32..36,
                         },
                     ],
                 },
