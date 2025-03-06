@@ -51,7 +51,6 @@ const NEW_LINE: u8 = b'\n';
 
 /// RUF054
 pub(crate) fn indented_form_feed(line: &LogicalLine) -> Option<Diagnostic> {
-    println!("{:?}", line.tokens());
     println!("{:?}", line.text());
     println!("-----------");
     let bytes_line = line.text().as_bytes();
