@@ -1256,6 +1256,10 @@ impl<'db> Type<'db> {
             }
             Type::Union(union) => union.is_fully_static(db),
             Type::Intersection(intersection) => intersection.is_fully_static(db),
+            // TODO: Once we support them, make sure that we return `false` for other types
+            // containing gradual forms such as `tuple[Any, ...]`.
+            // Conversely, make sure to return `true` for homogeneous tuples such as
+            // `tuple[int, ...]`, once we add support for them.
             Type::Tuple(tuple) => tuple
                 .elements(db)
                 .iter()
@@ -1263,10 +1267,7 @@ impl<'db> Type<'db> {
             Type::Callable(CallableType::General(_)) => {
                 // TODO: `Callable[..., str]` is not fully static
                 false
-            } // TODO: Once we support them, make sure that we return `false` for other types
-              // containing gradual forms such as `tuple[Any, ...]`.
-              // Conversely, make sure to return `true` for homogeneous tuples such as
-              // `tuple[int, ...]`, once we add support for them.
+            }
         }
     }
 
@@ -2623,10 +2624,12 @@ impl<'db> Type<'db> {
             Type::KnownInstance(KnownInstanceType::Unknown) => Ok(Type::unknown()),
             Type::KnownInstance(KnownInstanceType::AlwaysTruthy) => Ok(Type::AlwaysTruthy),
             Type::KnownInstance(KnownInstanceType::AlwaysFalsy) => Ok(Type::AlwaysFalsy),
-            Type::KnownInstance(KnownInstanceType::Callable) => Err(InvalidTypeExpressionError {
-                invalid_expressions: smallvec::smallvec![InvalidTypeExpression::BareCallable],
-                fallback_type: Type::unknown(),
-            }),
+            Type::KnownInstance(KnownInstanceType::Callable) => {
+                // TODO: Use an opt-in rule for a bare `Callable`
+                Ok(Type::Callable(CallableType::General(
+                    GeneralCallableType::unknown(db),
+                )))
+            }
             Type::KnownInstance(_) => Ok(todo_type!(
                 "Invalid or unsupported `KnownInstanceType` in `Type::to_type_expression`"
             )),
@@ -2897,8 +2900,6 @@ enum InvalidTypeExpression<'db> {
     BareAnnotated,
     /// `x: Literal` is invalid as an annotation
     BareLiteral,
-    /// `def f(x: Callable)` is invalid as an annotation
-    BareCallable,
     /// The `ClassVar` type qualifier was used in a type expression
     ClassVarInTypeExpression,
     /// The `Final` type qualifier was used in a type expression
@@ -2922,9 +2923,6 @@ impl<'db> InvalidTypeExpression<'db> {
                     ),
                     InvalidTypeExpression::BareLiteral => f.write_str(
                         "`Literal` requires at least one argument when used in a type expression"
-                    ),
-                    InvalidTypeExpression::BareCallable => f.write_str(
-                        "`Callable` requires exactly two arguments when used in a type expression"
                     ),
                     InvalidTypeExpression::ClassVarInTypeExpression => f.write_str(
                         "Type qualifier `typing.ClassVar` is not allowed in type expressions (only in annotation expressions)"
@@ -3763,16 +3761,16 @@ pub struct BoundMethodType<'db> {
 /// and `lambda` expressions.
 #[salsa::interned]
 pub struct GeneralCallableType<'db> {
+    #[return_ref]
     signature: Signature<'db>,
 }
 
 impl<'db> GeneralCallableType<'db> {
-    /// Create a general callable type which accepts no parameters and returns an `Unknown` type
-    /// i.e., a callable with the signature `Callable[[], Unknown]`.
+    /// Create a general callable type which accepts any parameters and returns an `Unknown` type.
     pub(crate) fn unknown(db: &'db dyn Db) -> Self {
         GeneralCallableType::new(
             db,
-            Signature::new(Parameters::empty(), Some(Type::unknown())),
+            Signature::new(Parameters::unknown(), Some(Type::unknown())),
         )
     }
 }

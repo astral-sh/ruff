@@ -5658,12 +5658,20 @@ impl<'db> TypeInferenceBuilder<'db> {
                 todo_type!("ellipsis literal in type expression")
             }
 
-            // Other literals do not have meaningful values in the annotation expression context.
-            // However, we will we want to handle these differently when working with special forms,
-            // since (e.g.) `123` is not valid in an annotation expression but `Literal[123]` is.
-            ast::Expr::BytesLiteral(literal) => self.infer_bytes_literal_expression(literal),
-            ast::Expr::NumberLiteral(literal) => self.infer_number_literal_expression(literal),
-            ast::Expr::BooleanLiteral(literal) => self.infer_boolean_literal_expression(literal),
+            // Other literals are not valid in the type expression context. However, we will still
+            // want to handle these differently when working with special forms, since (e.g.) `123`
+            // is not valid in an annotation expression but `Literal[123]` is. These are handled in
+            // the respective special form handlers.
+            ast::Expr::BytesLiteral(_)
+            | ast::Expr::NumberLiteral(_)
+            | ast::Expr::BooleanLiteral(_) => {
+                self.context.report_lint(
+                    &INVALID_TYPE_FORM,
+                    expression,
+                    format_args!("Invalid type expression"),
+                );
+                Type::unknown()
+            }
 
             ast::Expr::Subscript(subscript) => {
                 let ast::ExprSubscript {
@@ -6070,14 +6078,11 @@ impl<'db> TypeInferenceBuilder<'db> {
                     report_invalid_arguments_to_callable(self.db(), &self.context, subscript);
 
                     // If it's not a tuple, defer it to inferring the parameter types which could
-                    // return an `Err` if the expression is invalid in that position as well.
-                    let Ok(parameters) = self.infer_callable_parameter_types(arguments_slice)
-                    else {
-                        // TODO: Should we just use `Unknown` instead?
-                        return Type::Callable(CallableType::General(
-                            GeneralCallableType::unknown(self.db()),
-                        ));
-                    };
+                    // return an `Err` if the expression is invalid in that position. In which
+                    // case, we'll fallback to using an unknown list of parameters.
+                    let parameters = self
+                        .infer_callable_parameter_types(arguments_slice)
+                        .unwrap_or_else(|()| Parameters::unknown());
 
                     let callable_type =
                         Type::Callable(CallableType::General(GeneralCallableType::new(
@@ -6111,12 +6116,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                     )));
                 };
 
-                let Ok(parameters) = self.infer_callable_parameter_types(first_argument) else {
-                    // TODO: Should we just use `Unknown` instead?
-                    return Type::Callable(CallableType::General(GeneralCallableType::unknown(
-                        self.db(),
-                    )));
-                };
+                let parameters = self
+                    .infer_callable_parameter_types(first_argument)
+                    .unwrap_or_else(|()| Parameters::unknown());
 
                 let return_type = match arguments.next() {
                     Some(second_argument) => self.infer_type_expression(second_argument),
@@ -6396,7 +6398,9 @@ impl<'db> TypeInferenceBuilder<'db> {
         parameters: &ast::Expr,
     ) -> Result<Parameters<'db>, ()> {
         Ok(match parameters {
-            ast::Expr::EllipsisLiteral(ast::ExprEllipsisLiteral { .. }) => Parameters::any(),
+            ast::Expr::EllipsisLiteral(ast::ExprEllipsisLiteral { .. }) => {
+                Parameters::gradual_form()
+            }
             ast::Expr::List(ast::ExprList { elts: params, .. }) => {
                 let mut parameter_types = Vec::with_capacity(params.len());
 
@@ -6404,23 +6408,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let mut return_todo = false;
 
                 for param in params {
-                    let param_type = match self.infer_type_expression(param) {
-                        param_type @ (Type::IntLiteral(_)
-                        | Type::StringLiteral(_)
-                        | Type::BytesLiteral(_)
-                        | Type::BooleanLiteral(_)) => {
-                            self.context.report_lint(
-                                &INVALID_TYPE_FORM,
-                                param,
-                                format_args!(
-                                    "Invalid type `{}` in parameter list",
-                                    param_type.display(self.db())
-                                ),
-                            );
-                            Type::unknown()
-                        }
-                        param_type => param_type,
-                    };
+                    let param_type = self.infer_type_expression(param);
                     // This is similar to what we currently do for inferring tuple type expression.
                     // We currently infer `Todo` for the parameters to avoid invalid diagnostics
                     // when trying to check for assignability or any other relation. For example,
@@ -6447,11 +6435,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                 // TODO: Support `Concatenate[...]`
                 Parameters::todo()
             }
-            ast::Expr::Name(_) => {
-                // TODO: Parameter specification
-                Parameters::todo()
-            }
             _ => {
+                // TODO: Check whether `Expr::Name` is a parameter specification
                 self.context.report_lint(
                     &INVALID_TYPE_FORM,
                     parameters,
@@ -6461,7 +6446,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                         KnownInstanceType::Concatenate.repr(self.db())
                     ),
                 );
-                self.infer_type_expression(parameters);
                 return Err(());
             }
         })
