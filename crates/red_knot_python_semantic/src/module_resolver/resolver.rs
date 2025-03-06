@@ -735,9 +735,8 @@ impl<'db> ResolverContext<'db> {
 
 #[cfg(test)]
 mod tests {
-    use anyhow::Context;
     use ruff_db::files::{system_path_to_file, File, FilePath};
-    use ruff_db::system::{DbWithTestSystem as _, DbWithWritableSystem as _, OsSystem};
+    use ruff_db::system::{DbWithTestSystem as _, DbWithWritableSystem as _};
     use ruff_db::testing::{
         assert_const_function_query_was_not_run, assert_function_query_was_not_run,
     };
@@ -1863,6 +1862,9 @@ not_a_directory
     #[test]
     #[cfg(unix)]
     fn case_sensitive_resolution_with_symlinked_directory() -> anyhow::Result<()> {
+        use anyhow::Context;
+        use ruff_db::system::OsSystem;
+
         let temp_dir = tempfile::TempDir::new()?;
         let root = SystemPathBuf::from_path_buf(
             temp_dir

@@ -229,13 +229,31 @@ impl OsSystem {
     /// This is faster than the slow path, because it requires a single system call for each path
     /// instead of at least one system call for each component between `path` and `prefix`.
     ///
-    /// However, using `canonlcalize` to resolve the path's casing doesn't work if `path` is a symlink
-    /// because `canonicalize` then returns the symlink's target and not the symlink's source path.
+    /// However, using `canonicalize` to resolve the path's casing doesn't work in two cases:
+    /// * if `path` is a symlink because `canonicalize` then returns the symlink's target and not the symlink's source path.
+    /// * on Windows: If `path` is a mapped network drive because `canonicalize` then returns the UNC path
+    ///   (e.g. `Z:\` is mapped to `\\server\share` and `canonicalize` then returns `\\?\UNC\server\share`).
     ///
-    /// Symlinks should be rare enough that this fast path is worth when they are not used.
-    /// The implementation falls back to the slow path if a user does use symlinks or mapped network drives.
+    /// Symlinks and mapped network drives should be rare enough that this fast path is worth trying first,
+    /// even if it comes at a cost for those rare use cases.
     fn path_exists_case_sensitive_fast(&self, path: &SystemPath) -> Option<bool> {
-        let simplified = path.simplified();
+        // This is a more forgiving version of `dunce::simplified` that removes all `\\?\` prefixes on Windows.
+        // We use this more forgiving version because we don't intend on using either path for anything other than comparison
+        // and the prefix is only relevant when passing the path to other programs and its longer than 200 something
+        // characters.
+        fn simplify_ignore_verbatim(path: &SystemPath) -> &SystemPath {
+            if cfg!(windows) {
+                if path.as_utf8_path().as_str().starts_with(r"\\?\") {
+                    SystemPath::new(&path.as_utf8_path().as_str()[r"\\?\".len()..])
+                } else {
+                    path
+                }
+            } else {
+                path
+            }
+        }
+
+        let simplified = simplify_ignore_verbatim(path);
 
         let Ok(canonicalized) = simplified.as_std_path().canonicalize() else {
             // The path doesn't exist or can't be accessed. The path doesn't exist.
@@ -245,18 +263,17 @@ impl OsSystem {
         let Ok(canonicalized) = SystemPathBuf::from_path_buf(canonicalized) else {
             // The original path is valid UTF8 but the canonicalized path isn't. This definitely suggests
             // that a symlink is involved. Fall back to the slow path.
-            tracing::debug!("Falling back to the slow case-sensitive path existence check because the canonicalized path of `{path}` is not valid UTF-8");
+            tracing::debug!("Falling back to the slow case-sensitive path existence check because the canonicalized path of `{simplified}` is not valid UTF-8");
             return None;
         };
 
-        let simplified_canonicalized = canonicalized.simplified();
+        let simplified_canonicalized = simplify_ignore_verbatim(&canonicalized);
 
         // Test if the paths differ by anything other than casing. If so, that suggests that
         // `path` pointed to a symlink (or some other none reversible path normalization happened).
         // In this case, fall back to the slow path.
-
         if simplified_canonicalized.as_str().to_lowercase() != simplified.as_str().to_lowercase() {
-            tracing::debug!("Falling back to the slow case-sensitive path existence check for `{path}` because the canonicalized path `{simplified_canonicalized}` differs not only by casing");
+            tracing::debug!("Falling back to the slow case-sensitive path existence check for `{simplified}` because the canonicalized path `{simplified_canonicalized}` differs not only by casing");
             return None;
         }
 
@@ -607,7 +624,8 @@ pub(super) mod testing {
 }
 
 #[cfg(not(unix))]
-fn detect_case_sensitive(path: &SystemPath) -> Option<bool> {
+fn detect_case_sensitive(_path: &SystemPath) -> Option<bool> {
+    // 99% of windows systems aren't case sensitive Don't bother checking.
     None
 }
 
