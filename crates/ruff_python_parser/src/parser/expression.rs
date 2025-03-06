@@ -11,7 +11,7 @@ use ruff_python_ast::{
 };
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
-use crate::error::StarTupleKind;
+use crate::error::{FStringKind, StarTupleKind};
 use crate::parser::progress::ParserProgress;
 use crate::parser::{helpers, FunctionKind, Parser};
 use crate::string::{parse_fstring_literal_element, parse_string_literal, StringType};
@@ -1356,7 +1356,7 @@ impl<'src> Parser<'src> {
                     continue;
                 };
                 self.add_unsupported_syntax_error(
-                    UnsupportedSyntaxErrorKind::Pep701FString,
+                    UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::Backslash),
                     TextRange::at(expr.range.start() + slash_index, TextSize::from(1)),
                 )
             };
@@ -1366,7 +1366,7 @@ impl<'src> Parser<'src> {
                     continue;
                 };
                 self.add_unsupported_syntax_error(
-                    UnsupportedSyntaxErrorKind::Pep701FString,
+                    UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::Comment),
                     TextRange::at(expr.range.start() + comment_index, TextSize::from(1)),
                 )
             };
@@ -1376,7 +1376,7 @@ impl<'src> Parser<'src> {
                     continue;
                 };
                 self.add_unsupported_syntax_error(
-                    UnsupportedSyntaxErrorKind::Pep701FString,
+                    UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::NestedQuote),
                     TextRange::at(expr.range.start() + quote_index, TextSize::from(1)),
                 )
             };

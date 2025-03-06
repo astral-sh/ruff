@@ -446,6 +446,14 @@ pub enum StarTupleKind {
     Yield,
 }
 
+/// The type of PEP 701 f-string error for [`UnsupportedSyntaxErrorKind::Pep701FString`].
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub enum FStringKind {
+    Backslash,
+    Comment,
+    NestedQuote,
+}
+
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum UnsupportedSyntaxErrorKind {
     Match,
@@ -637,7 +645,7 @@ pub enum UnsupportedSyntaxErrorKind {
     /// valid.
     ///
     /// [PEP 701]: https://peps.python.org/pep-0701/
-    Pep701FString,
+    Pep701FString(FStringKind),
 }
 
 impl Display for UnsupportedSyntaxError {
@@ -664,9 +672,15 @@ impl Display for UnsupportedSyntaxError {
             UnsupportedSyntaxErrorKind::TypeParamDefault => {
                 "Cannot set default type for a type parameter"
             }
-            // TODO(brent) pyright has special error messages for nested quotes and escape
-            // sequences but doesn't actually detect the issue with comments
-            UnsupportedSyntaxErrorKind::Pep701FString => "Cannot use PEP 701 f-strings",
+            UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::Backslash) => {
+                "Cannot use an escape sequence (backslash) in f-strings"
+            }
+            UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::Comment) => {
+                "Cannot use comments in f-strings"
+            }
+            UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::NestedQuote) => {
+                "Cannot reuse outer quote character in f-strings"
+            }
         };
 
         write!(
@@ -712,7 +726,7 @@ impl UnsupportedSyntaxErrorKind {
             UnsupportedSyntaxErrorKind::TypeParameterList => Change::Added(PythonVersion::PY312),
             UnsupportedSyntaxErrorKind::TypeAliasStatement => Change::Added(PythonVersion::PY312),
             UnsupportedSyntaxErrorKind::TypeParamDefault => Change::Added(PythonVersion::PY313),
-            UnsupportedSyntaxErrorKind::Pep701FString => Change::Added(PythonVersion::PY312),
+            UnsupportedSyntaxErrorKind::Pep701FString(_) => Change::Added(PythonVersion::PY312),
         }
     }
 
