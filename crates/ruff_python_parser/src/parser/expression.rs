@@ -1326,7 +1326,10 @@ impl<'src> Parser<'src> {
         let start = self.node_start();
         let flags = self.tokens.current_flags().as_any_string_flags();
 
-        // TODO(brent) move these to the right place
+        self.bump(TokenKind::FStringStart);
+        let elements = self.parse_fstring_elements(flags, FStringElementsKind::Regular);
+
+        self.expect(TokenKind::FStringEnd);
 
         // test_ok pep701_f_string_py312
         // # parse_options: {"target-version": "3.12"}
@@ -1346,10 +1349,38 @@ impl<'src> Parser<'src> {
         // }'''
         // f"{f"{f"{f"{f"{f"{1+1}"}"}"}"}"}"  # arbitrary nesting
 
-        self.bump(TokenKind::FStringStart);
-        let elements = self.parse_fstring_elements(flags, FStringElementsKind::Regular);
+        let quote_str = flags.quote_str();
+        for expr in elements.expressions() {
+            if let Some(slash_index) = self.source[expr.range].find('\\') {
+                let Ok(slash_index) = TextSize::try_from(slash_index) else {
+                    continue;
+                };
+                self.add_unsupported_syntax_error(
+                    UnsupportedSyntaxErrorKind::Pep701FString,
+                    TextRange::at(expr.range.start() + slash_index, TextSize::from(1)),
+                )
+            };
 
-        self.expect(TokenKind::FStringEnd);
+            if let Some(comment_index) = self.source[expr.range].find('#') {
+                let Ok(comment_index) = TextSize::try_from(comment_index) else {
+                    continue;
+                };
+                self.add_unsupported_syntax_error(
+                    UnsupportedSyntaxErrorKind::Pep701FString,
+                    TextRange::at(expr.range.start() + comment_index, TextSize::from(1)),
+                )
+            };
+
+            if let Some(quote_index) = self.source[expr.range].find(quote_str) {
+                let Ok(quote_index) = TextSize::try_from(quote_index) else {
+                    continue;
+                };
+                self.add_unsupported_syntax_error(
+                    UnsupportedSyntaxErrorKind::Pep701FString,
+                    TextRange::at(expr.range.start() + quote_index, TextSize::from(1)),
+                )
+            };
+        }
 
         ast::FString {
             elements,
