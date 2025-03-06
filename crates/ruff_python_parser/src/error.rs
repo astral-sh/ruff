@@ -568,6 +568,7 @@ pub enum UnsupportedSyntaxErrorKind {
     ///   bar,
     ///   baz,
     /// ) as tup: ...  # also okay, binding the tuple
+    /// ```
     ///
     /// This restriction was lifted in 3.9 but formally included in the [release notes] for 3.10.
     ///
