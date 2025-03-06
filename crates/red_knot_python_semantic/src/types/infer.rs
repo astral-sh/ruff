@@ -57,11 +57,11 @@ use crate::symbol::{
 use crate::types::call::{Argument, CallArguments, UnionCallError};
 use crate::types::diagnostic::{
     report_invalid_arguments_to_annotated, report_invalid_assignment,
-    report_invalid_attribute_assignment, report_unresolved_module, TypeCheckDiagnostics,
-    CALL_NON_CALLABLE, CALL_POSSIBLY_UNBOUND_METHOD, CONFLICTING_DECLARATIONS,
-    CONFLICTING_METACLASS, CYCLIC_CLASS_DEFINITION, DIVISION_BY_ZERO, DUPLICATE_BASE,
-    INCONSISTENT_MRO, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE, INVALID_CONTEXT_MANAGER,
-    INVALID_DECLARATION, INVALID_PARAMETER_DEFAULT, INVALID_TYPE_FORM,
+    report_invalid_attribute_assignment, report_invalid_return_type, report_unresolved_module,
+    TypeCheckDiagnostics, CALL_NON_CALLABLE, CALL_POSSIBLY_UNBOUND_METHOD,
+    CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS, CYCLIC_CLASS_DEFINITION, DIVISION_BY_ZERO,
+    DUPLICATE_BASE, INCONSISTENT_MRO, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE,
+    INVALID_CONTEXT_MANAGER, INVALID_DECLARATION, INVALID_PARAMETER_DEFAULT, INVALID_TYPE_FORM,
     INVALID_TYPE_VARIABLE_CONSTRAINTS, POSSIBLY_UNBOUND_ATTRIBUTE, POSSIBLY_UNBOUND_IMPORT,
     UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_IMPORT, UNSUPPORTED_OPERATOR,
 };
@@ -275,6 +275,9 @@ pub(crate) struct TypeInference<'db> {
     /// The definitions that are deferred.
     deferred: FxHashSet<Definition<'db>>,
 
+    /// The return type of this region, if it is a function body.
+    return_type: Option<Type<'db>>,
+
     /// The diagnostics for this region.
     diagnostics: TypeCheckDiagnostics,
 
@@ -294,6 +297,7 @@ impl<'db> TypeInference<'db> {
             bindings: FxHashMap::default(),
             declarations: FxHashMap::default(),
             deferred: FxHashSet::default(),
+            return_type: None,
             diagnostics: TypeCheckDiagnostics::default(),
             scope,
             cycle_fallback_type: None,
@@ -306,6 +310,7 @@ impl<'db> TypeInference<'db> {
             bindings: FxHashMap::default(),
             declarations: FxHashMap::default(),
             deferred: FxHashSet::default(),
+            return_type: None,
             diagnostics: TypeCheckDiagnostics::default(),
             scope,
             cycle_fallback_type: Some(cycle_fallback_type),
@@ -1045,6 +1050,15 @@ impl<'db> TypeInferenceBuilder<'db> {
         );
     }
 
+    fn set_return_type(&mut self, inferred_ty: Type<'db>) {
+        if let Some(existing) = self.types.return_type {
+            self.types.return_type =
+                Some(UnionType::from_elements(self.db(), [existing, inferred_ty]));
+        } else {
+            self.types.return_type = Some(inferred_ty);
+        }
+    }
+
     fn infer_module(&mut self, module: &ast::ModModule) {
         self.infer_body(&module.body);
     }
@@ -1101,6 +1115,43 @@ impl<'db> TypeInferenceBuilder<'db> {
             self.infer_definition(parameter);
         }
         self.infer_body(&function.body);
+
+        if let Some(declared_ty) = function
+            .returns
+            .as_deref()
+            .map(|ret| self.file_expression_type(ret))
+        {
+            fn is_suite_empty(suite: &[ast::Stmt]) -> bool {
+                let mut saw_ellipsis = false;
+                for statement in suite {
+                    if let Some(expr) = statement.as_expr_stmt() {
+                        if expr.value.is_ellipsis_literal_expr() {
+                            saw_ellipsis = true;
+                        } else if expr.value.is_string_literal_expr() {
+                            // docstring
+                        } else {
+                            return false;
+                        }
+                    }
+                }
+                saw_ellipsis
+            }
+            if is_suite_empty(&function.body) {
+                return;
+            }
+            let inferred_ty = self
+                .types
+                .return_type
+                .unwrap_or(KnownClass::NoneType.to_instance(self.db()));
+            if !inferred_ty.is_assignable_to(self.db(), declared_ty) {
+                report_invalid_return_type(
+                    &self.context,
+                    function.into(),
+                    declared_ty,
+                    inferred_ty,
+                );
+            }
+        }
     }
 
     fn infer_body(&mut self, suite: &[ast::Stmt]) {
@@ -2650,6 +2701,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                 report_invalid_exception_cause(&self.context, cause, cause_type);
             }
         }
+
+        self.set_return_type(Type::Never);
     }
 
     /// Given a `from .foo import bar` relative import, resolve the relative module
@@ -2823,7 +2876,9 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn infer_return_statement(&mut self, ret: &ast::StmtReturn) {
-        self.infer_optional_expression(ret.value.as_deref());
+        if let Some(ty) = self.infer_optional_expression(ret.value.as_deref()) {
+            self.set_return_type(ty);
+        }
     }
 
     fn infer_delete_statement(&mut self, delete: &ast::StmtDelete) {

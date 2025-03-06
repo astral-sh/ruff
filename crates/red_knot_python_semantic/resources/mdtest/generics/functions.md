@@ -115,6 +115,7 @@ def bad_return[T: int](x: T) -> T:
 If a typevar appears multiple times in a function signature, all occurrences have the same type.
 
 ```py
+# error: [invalid-return-type]
 def different_types[T, S](cond: bool, t: T, s: S) -> T:
     if cond:
         return t

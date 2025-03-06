@@ -154,7 +154,7 @@ reveal_type(B() >= A())  # revealed: LeReturnType
 
 class C:
     def __gt__(self, other: C) -> EqReturnType:
-        return 42
+        return EqReturnType()
 
     def __ge__(self, other: C) -> NeReturnType:
         return NeReturnType()

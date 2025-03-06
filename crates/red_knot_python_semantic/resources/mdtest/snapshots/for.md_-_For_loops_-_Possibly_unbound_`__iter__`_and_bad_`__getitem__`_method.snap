@@ -26,7 +26,7 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/loops/for.md
 12 |         # invalid signature because it only accepts a `str`,
 13 |         # but the old-style iteration protocol will pass it an `int`
 14 |         def __getitem__(self, key: str) -> bytes:
-15 |             return 42
+15 |             return bytes()
 16 | 
 17 |     # error: [not-iterable]
 18 |     for x in Iterable():

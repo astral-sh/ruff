@@ -33,6 +33,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INCONSISTENT_MRO);
     registry.register_lint(&INDEX_OUT_OF_BOUNDS);
     registry.register_lint(&INVALID_ARGUMENT_TYPE);
+    registry.register_lint(&INVALID_RETURN_TYPE);
     registry.register_lint(&INVALID_ASSIGNMENT);
     registry.register_lint(&INVALID_BASE);
     registry.register_lint(&INVALID_CONTEXT_MANAGER);
@@ -255,6 +256,15 @@ declare_lint! {
     /// ```
     pub(crate) static INVALID_ARGUMENT_TYPE = {
         summary: "detects call arguments whose type is not assignable to the corresponding typed parameter",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// TODO #14889
+    pub(crate) static INVALID_RETURN_TYPE = {
+        summary: "detects the return value that can't be assigned to the return type",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
@@ -1059,6 +1069,23 @@ pub(super) fn report_invalid_attribute_assignment(
             "Object of type `{}` is not assignable to attribute `{attribute_name}` of type `{}`",
             source_ty.display(context.db()),
             target_ty.display(context.db()),
+        ),
+    );
+}
+
+pub(super) fn report_invalid_return_type(
+    context: &InferContext,
+    node: AnyNodeRef,
+    expected_ty: Type,
+    actual_ty: Type,
+) {
+    context.report_lint(
+        &INVALID_RETURN_TYPE,
+        node,
+        format_args!(
+            "Object of type `{}` is not assignable to return type `{}`",
+            actual_ty.display(context.db()),
+            expected_ty.display(context.db())
         ),
     );
 }
