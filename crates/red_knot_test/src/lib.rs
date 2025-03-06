@@ -9,7 +9,7 @@ use ruff_db::diagnostic::{DisplayDiagnosticConfig, OldDiagnosticTrait, OldParseD
 use ruff_db::files::{system_path_to_file, File, Files};
 use ruff_db::panic::catch_unwind;
 use ruff_db::parsed::parsed_module;
-use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
+use ruff_db::system::{DbWithTestSystem, SystemPath, SystemPathBuf};
 use ruff_db::testing::{setup_logging, setup_logging_with_filter};
 use ruff_source_file::{LineIndex, OneIndexed};
 use std::fmt::Write;
@@ -106,7 +106,7 @@ fn run_test(
 ) -> Result<(), Failures> {
     let project_root = db.project_root().to_path_buf();
     let src_path = SystemPathBuf::from("/src");
-    let custom_typeshed_path = test.configuration().typeshed().map(SystemPathBuf::from);
+    let custom_typeshed_path = test.configuration().typeshed().map(SystemPath::to_path_buf);
     let mut typeshed_files = vec![];
     let mut has_custom_versions_file = false;
 
@@ -118,8 +118,8 @@ fn run_test(
             }
 
             assert!(
-                matches!(embedded.lang, "py" | "pyi" | "text"),
-                "Supported file types are: py, pyi, text"
+                matches!(embedded.lang, "py" | "pyi" | "python" | "text"),
+                "Supported file types are: py (or python), pyi, text, and ignore"
             );
 
             let full_path = embedded.full_path(&project_root);
@@ -178,7 +178,11 @@ fn run_test(
                 python_platform: test.configuration().python_platform().unwrap_or_default(),
                 search_paths: SearchPathSettings {
                     src_roots: vec![src_path],
-                    extra_paths: vec![],
+                    extra_paths: test
+                        .configuration()
+                        .extra_paths()
+                        .unwrap_or_default()
+                        .to_vec(),
                     custom_typeshed: custom_typeshed_path,
                     python_path: PythonPath::KnownSitePackages(vec![]),
                 },
