@@ -69,6 +69,20 @@ static EXPECTED_DIAGNOSTICS: &[KeyDiagnosticFields] = &[
     ),
     // We don't handle intersections in `is_assignable_to` yet
     (
+        DiagnosticId::lint("invalid-return-type"),
+        Some("/src/tomllib/_parser.py"),
+        Some(5626..6199),
+        Cow::Borrowed("Object of type `bool | @Todo & ~AlwaysFalsy | @Todo` is not assignable to return type `bool`"),
+        Severity::Error,
+    ),
+    (
+        DiagnosticId::lint("invalid-return-type"),
+        Some("/src/tomllib/_parser.py"),
+        Some(6346..6818),
+        Cow::Borrowed("Object of type `Unknown | Unknown & dict | @Todo & dict` is not assignable to return type `dict`"),
+        Severity::Error,
+    ),
+    (
         DiagnosticId::lint("invalid-argument-type"),
         Some("/src/tomllib/_parser.py"),
         Some(20158..20172),
