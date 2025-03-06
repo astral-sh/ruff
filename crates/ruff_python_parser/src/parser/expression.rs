@@ -1349,37 +1349,42 @@ impl<'src> Parser<'src> {
         // }'''
         // f"{f"{f"{f"{f"{f"{1+1}"}"}"}"}"}"  # arbitrary nesting
 
-        let quote_str = flags.quote_str();
-        for expr in elements.expressions() {
-            if let Some(slash_index) = self.source[expr.range].find('\\') {
-                let Ok(slash_index) = TextSize::try_from(slash_index) else {
-                    continue;
+        // the inner variant here doesn't matter, just checking if PEP 701 f-strings are supported
+        if UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::NestedQuote)
+            .is_unsupported(self.options.target_version)
+        {
+            let quote_str = flags.quote_str();
+            for expr in elements.expressions() {
+                if let Some(slash_index) = self.source[expr.range].find('\\') {
+                    let Ok(slash_index) = TextSize::try_from(slash_index) else {
+                        continue;
+                    };
+                    self.add_unsupported_syntax_error(
+                        UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::Backslash),
+                        TextRange::at(expr.range.start() + slash_index, TextSize::from(1)),
+                    )
                 };
-                self.add_unsupported_syntax_error(
-                    UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::Backslash),
-                    TextRange::at(expr.range.start() + slash_index, TextSize::from(1)),
-                )
-            };
 
-            if let Some(comment_index) = self.source[expr.range].find('#') {
-                let Ok(comment_index) = TextSize::try_from(comment_index) else {
-                    continue;
+                if let Some(comment_index) = self.source[expr.range].find('#') {
+                    let Ok(comment_index) = TextSize::try_from(comment_index) else {
+                        continue;
+                    };
+                    self.add_unsupported_syntax_error(
+                        UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::Comment),
+                        TextRange::at(expr.range.start() + comment_index, TextSize::from(1)),
+                    )
                 };
-                self.add_unsupported_syntax_error(
-                    UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::Comment),
-                    TextRange::at(expr.range.start() + comment_index, TextSize::from(1)),
-                )
-            };
 
-            if let Some(quote_index) = self.source[expr.range].find(quote_str) {
-                let Ok(quote_index) = TextSize::try_from(quote_index) else {
-                    continue;
+                if let Some(quote_index) = self.source[expr.range].find(quote_str) {
+                    let Ok(quote_index) = TextSize::try_from(quote_index) else {
+                        continue;
+                    };
+                    self.add_unsupported_syntax_error(
+                        UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::NestedQuote),
+                        TextRange::at(expr.range.start() + quote_index, TextSize::from(1)),
+                    )
                 };
-                self.add_unsupported_syntax_error(
-                    UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::NestedQuote),
-                    TextRange::at(expr.range.start() + quote_index, TextSize::from(1)),
-                )
-            };
+            }
         }
 
         ast::FString {
