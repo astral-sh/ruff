@@ -1362,7 +1362,7 @@ impl<'src> Parser<'src> {
                     self.add_unsupported_syntax_error(
                         UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::Backslash),
                         TextRange::at(expr.range.start() + slash_index, TextSize::from(1)),
-                    )
+                    );
                 };
 
                 if let Some(comment_index) = self.source[expr.range].find('#') {
@@ -1372,7 +1372,7 @@ impl<'src> Parser<'src> {
                     self.add_unsupported_syntax_error(
                         UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::Comment),
                         TextRange::at(expr.range.start() + comment_index, TextSize::from(1)),
-                    )
+                    );
                 };
 
                 if let Some(quote_index) = self.source[expr.range].find(quote_str) {
@@ -1382,7 +1382,7 @@ impl<'src> Parser<'src> {
                     self.add_unsupported_syntax_error(
                         UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::NestedQuote),
                         TextRange::at(expr.range.start() + quote_index, TextSize::from(1)),
-                    )
+                    );
                 };
             }
         }
