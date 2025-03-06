@@ -441,6 +441,16 @@
             }
           ]
         },
+        "invalid-return-type": {
+          "title": "detects the return value that can't be assigned to the return type",
+          "description": "TODO #14889",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "invalid-syntax-in-forward-annotation": {
           "title": "detects invalid syntax in forward annotations",
           "description": "TODO #14889",
