@@ -444,6 +444,24 @@ pub enum UnsupportedSyntaxErrorKind {
     Match,
     Walrus,
     ExceptStar,
+    /// Represents the use of a parenthesized keyword argument name after Python 3.8.
+    ///
+    /// ## Example
+    ///
+    /// From [BPO 34641] it sounds like this was only accidentally supported and was removed when
+    /// noticed. Code like this used to be valid:
+    ///
+    /// ```python
+    /// f((a)=1)
+    /// ```
+    ///
+    /// After Python 3.8, you have to omit the parentheses around `a`:
+    ///
+    /// ```python
+    /// f(a=1)
+    /// ```
+    ///
+    /// [BPO 34641]: https://github.com/python/cpython/issues/78822
     ParenthesizedKeywordArgumentName,
     /// Represents the use of a "relaxed" [PEP 614] decorator before Python 3.9.
     ///
