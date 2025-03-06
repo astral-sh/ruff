@@ -79,6 +79,9 @@ pub(crate) struct Parameters<'db> {
     /// as in `Callable[..., int]` and the variadic arguments in `lambda` expression as in
     /// `lambda *args, **kwargs: None`.
     ///
+    /// The display implementation utilizes this flag to use `...` instead of displaying the
+    /// individual variadic and keyword-variadic parameters.
+    ///
     /// Note: This flag is also used to indicate invalid forms of `Callable` annotations.
     is_gradual: bool,
 }
@@ -118,15 +121,29 @@ impl<'db> Parameters<'db> {
         }
     }
 
+    /// Return parameters that represents a gradual form using `...` as the only parameter.
+    ///
+    /// Internally, this is represented as `(*Any, **Any)` that accepts parameters of any type.
     pub(crate) fn gradual_form() -> Self {
-        let mut parameters = Self::any();
-        parameters.is_gradual = true;
-        parameters
+        Self {
+            value: vec![
+                Parameter {
+                    name: None,
+                    annotated_ty: Some(Type::Dynamic(DynamicType::Any)),
+                    kind: ParameterKind::Variadic,
+                },
+                Parameter {
+                    name: None,
+                    annotated_ty: Some(Type::Dynamic(DynamicType::Any)),
+                    kind: ParameterKind::KeywordVariadic,
+                },
+            ],
+            is_gradual: true,
+        }
     }
 
     /// Return parameters that accepts any arguments i.e., `(*args: Unknown, **kwargs: Unknown)`
     pub(crate) fn unknown() -> Self {
-        // TODO: Should this be represented using `(*Unknown, **Unknown)` instead?
         Self {
             value: vec![
                 Parameter {
@@ -141,26 +158,6 @@ impl<'db> Parameters<'db> {
                 },
             ],
             is_gradual: true,
-        }
-    }
-
-    /// Return parameters that accepts any arguments i.e., `(*args: Any, **kwargs: Any)`
-    pub(crate) fn any() -> Self {
-        // TODO: Should this be represented using `(*Any, **Any)` instead?
-        Self {
-            value: vec![
-                Parameter {
-                    name: Some(Name::new_static("args")),
-                    annotated_ty: Some(Type::Dynamic(DynamicType::Any)),
-                    kind: ParameterKind::Variadic,
-                },
-                Parameter {
-                    name: Some(Name::new_static("kwargs")),
-                    annotated_ty: Some(Type::Dynamic(DynamicType::Any)),
-                    kind: ParameterKind::KeywordVariadic,
-                },
-            ],
-            is_gradual: false,
         }
     }
 
