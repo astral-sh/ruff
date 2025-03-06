@@ -51,24 +51,16 @@ the inferred type to e.g. `int`.
 def f[T](x: T) -> T:
     return x
 
-# TODO: no error
 # TODO: revealed: int or Literal[1]
-# error: [invalid-argument-type]
 reveal_type(f(1))  # revealed: T
 
-# TODO: no error
 # TODO: revealed: float
-# error: [invalid-argument-type]
 reveal_type(f(1.0))  # revealed: T
 
-# TODO: no error
 # TODO: revealed: bool or Literal[true]
-# error: [invalid-argument-type]
 reveal_type(f(True))  # revealed: T
 
-# TODO: no error
 # TODO: revealed: str or Literal["string"]
-# error: [invalid-argument-type]
 reveal_type(f("string"))  # revealed: T
 ```
 
@@ -108,7 +100,6 @@ def good_return[T: int](x: T) -> T:
 
 def bad_return[T: int](x: T) -> T:
     # TODO: error: int is not assignable to T
-    # error: [unsupported-operator] "Operator `+` is unsupported between objects of type `T` and `Literal[1]`"
     return x + 1
 ```
 
@@ -163,16 +154,10 @@ parameters simultaneously.
 def two_params[T](x: T, y: T) -> T:
     return x
 
-# TODO: no error
 # TODO: revealed: str
-# error: [invalid-argument-type]
-# error: [invalid-argument-type]
 reveal_type(two_params("a", "b"))  # revealed: T
 
-# TODO: no error
 # TODO: revealed: str | int
-# error: [invalid-argument-type]
-# error: [invalid-argument-type]
 reveal_type(two_params("a", 1))  # revealed: T
 ```
 
@@ -180,26 +165,16 @@ reveal_type(two_params("a", 1))  # revealed: T
 def param_with_union[T](x: T | int, y: T) -> T:
     return y
 
-# TODO: no error
 # TODO: revealed: str
-# error: [invalid-argument-type]
 reveal_type(param_with_union(1, "a"))  # revealed: T
 
-# TODO: no error
 # TODO: revealed: str
-# error: [invalid-argument-type]
-# error: [invalid-argument-type]
 reveal_type(param_with_union("a", "a"))  # revealed: T
 
-# TODO: no error
 # TODO: revealed: int
-# error: [invalid-argument-type]
 reveal_type(param_with_union(1, 1))  # revealed: T
 
-# TODO: no error
 # TODO: revealed: str | int
-# error: [invalid-argument-type]
-# error: [invalid-argument-type]
 reveal_type(param_with_union("a", 1))  # revealed: T
 ```
 
@@ -207,16 +182,10 @@ reveal_type(param_with_union("a", 1))  # revealed: T
 def tuple_param[T, S](x: T | S, y: tuple[T, S]) -> tuple[T, S]:
     return y
 
-# TODO: no error
 # TODO: revealed: tuple[str, int]
-# error: [invalid-argument-type]
-# error: [invalid-argument-type]
 reveal_type(tuple_param("a", ("a", 1)))  # revealed: tuple[T, S]
 
-# TODO: no error
 # TODO: revealed: tuple[str, int]
-# error: [invalid-argument-type]
-# error: [invalid-argument-type]
 reveal_type(tuple_param(1, ("a", 1)))  # revealed: tuple[T, S]
 ```
 
@@ -232,15 +201,9 @@ def f[T](x: T) -> tuple[T, int]:
 def g[T](x: T) -> T | None:
     return x
 
-# TODO: no error
 # TODO: revealed: tuple[str | None, int]
-# error: [invalid-argument-type]
-# error: [invalid-argument-type]
 reveal_type(f(g("a")))  # revealed: tuple[T, int]
 
-# TODO: no error
 # TODO: revealed: tuple[str, int] | None
-# error: [invalid-argument-type]
-# error: [invalid-argument-type]
 reveal_type(g(f("a")))  # revealed: T | None
 ```

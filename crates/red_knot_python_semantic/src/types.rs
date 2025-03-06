@@ -767,6 +767,11 @@ impl<'db> Type<'db> {
             (Type::Dynamic(_), _) => true,
             (_, Type::Dynamic(_)) => true,
 
+            // TODO: For now we are treating a TypeVar as Any, and allowing it to be assignable-to
+            // and assignable-from any other type.
+            (_, Type::KnownInstance(KnownInstanceType::TypeVar(_))) => true,
+            (Type::KnownInstance(KnownInstanceType::TypeVar(_)), _) => true,
+
             // All types are assignable to `object`.
             // TODO this special case might be removable once the below cases are comprehensive
             (_, Type::Instance(InstanceType { class })) if class.is_object(db) => true,
@@ -2598,6 +2603,48 @@ impl<'db> Type<'db> {
                                 Some(KnownClass::Type.to_instance(db)),
                             ),
                         ],
+                    );
+                    Signatures::single(signature)
+                }
+
+                Some(KnownClass::TypeVar) => {
+                    // ```py
+                    // class TypeVar:
+                    //     def __new__(
+                    //         cls,
+                    //         name: str,
+                    //         *constraints: Any,
+                    //         bound: Any | None = None,
+                    //         contravariant: bool = False,
+                    //         covariant: bool = False,
+                    //         infer_variance: bool = False,
+                    //         default: Any = ...,
+                    //     ) -> Self: ...
+                    // ```
+                    let signature = CallableSignature::single(
+                        self,
+                        Signature::new(
+                            Parameters::new([
+                                Parameter::positional_or_keyword(Name::new_static("name"))
+                                    .with_annotated_type(Type::LiteralString),
+                                Parameter::variadic(Name::new_static("constraints"))
+                                    .type_form()
+                                    .with_annotated_type(Type::any()),
+                                Parameter::keyword_only(Name::new_static("bound"))
+                                    .type_form()
+                                    .with_annotated_type(UnionType::from_elements(
+                                        db,
+                                        [Type::any(), Type::none(db)],
+                                    ))
+                                    .with_default_type(Type::none(db)),
+                                Parameter::keyword_only(Name::new_static("default"))
+                                    .type_form()
+                                    .with_annotated_type(Type::any())
+                                    // TODO: ellipsis or typing.NoDefault
+                                    .with_default_type(Type::none(db)),
+                            ]),
+                            Some(KnownClass::TypeVar.to_instance(db)),
+                        ),
                     );
                     Signatures::single(signature)
                 }
