@@ -6089,18 +6089,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     return callable_type;
                 };
 
-                if arguments.len() > 2 {
-                    report_invalid_arguments_to_callable(self.db(), &self.context, subscript);
-                    self.infer_type_expression(arguments_slice);
-                    // We can't reliably infer the callable type if there are more then 2 arguments
-                    // because we don't know which argument corresponds to either the parameters or
-                    // the return type.
-                    return Type::unknown();
-                }
-
-                let mut arguments = arguments.iter();
-
-                let Some(first_argument) = arguments.next() else {
+                let [first_argument, second_argument] = arguments.as_slice() else {
                     report_invalid_arguments_to_callable(self.db(), &self.context, subscript);
                     self.infer_type_expression(arguments_slice);
                     return Type::Callable(CallableType::General(GeneralCallableType::unknown(
@@ -6108,27 +6097,27 @@ impl<'db> TypeInferenceBuilder<'db> {
                     )));
                 };
 
-                let parameters = self
-                    .infer_callable_parameter_types(first_argument)
-                    .unwrap_or_else(|()| Parameters::unknown());
-
-                let return_type = match arguments.next() {
-                    Some(second_argument) => self.infer_type_expression(second_argument),
-                    None => {
-                        // TODO: We could attach a note stating that it's the return type that's
-                        // missing.
-                        report_invalid_arguments_to_callable(self.db(), &self.context, subscript);
-                        Type::unknown()
-                    }
+                let Ok(parameters) = self.infer_callable_parameter_types(first_argument) else {
+                    self.infer_type_expression(arguments_slice);
+                    return Type::Callable(CallableType::General(GeneralCallableType::unknown(
+                        self.db(),
+                    )));
                 };
 
-                let ty = Type::Callable(CallableType::General(GeneralCallableType::new(
-                    self.db(),
-                    Signature::new(parameters, Some(return_type)),
-                )));
-                self.store_expression_type(arguments_slice, ty);
-                self.store_expression_type(first_argument, ty);
-                ty
+                let return_type = self.infer_type_expression(second_argument);
+
+                let callable_type =
+                    Type::Callable(CallableType::General(GeneralCallableType::new(
+                        self.db(),
+                        Signature::new(parameters, Some(return_type)),
+                    )));
+
+                // `Signature` / `Parameters` are not a `Type` variant, so we're storing the outer
+                // callable type on the these expressions instead.
+                self.store_expression_type(arguments_slice, callable_type);
+                self.store_expression_type(first_argument, callable_type);
+
+                callable_type
             }
 
             // Type API special forms

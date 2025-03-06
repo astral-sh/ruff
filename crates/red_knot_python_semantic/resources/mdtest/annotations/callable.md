@@ -33,7 +33,7 @@ from typing import Callable
 
 # error: [invalid-type-form] "The first argument to `typing.Callable` must be either a list of types, parameter specification, `typing.Concatenate`, or `...`"
 def _(c: Callable[int, str]):
-    reveal_type(c)  # revealed: (...) -> str
+    reveal_type(c)  # revealed: (...) -> Unknown
 ```
 
 Or, when it's a literal type:
@@ -41,7 +41,7 @@ Or, when it's a literal type:
 ```py
 # error: [invalid-type-form] "The first argument to `typing.Callable` must be either a list of types, parameter specification, `typing.Concatenate`, or `...`"
 def _(c: Callable[42, str]):
-    reveal_type(c)  # revealed: (...) -> str
+    reveal_type(c)  # revealed: (...) -> Unknown
 ```
 
 Or, when one of the parameter type is invalid in the list:
@@ -82,7 +82,7 @@ from typing import Callable
 
 # error: [invalid-type-form] "Special form `typing.Callable` expected exactly two arguments (parameter types and return type)"
 def _(c: Callable[[int], str, str]):
-    reveal_type(c)  # revealed: Unknown
+    reveal_type(c)  # revealed: (...) -> Unknown
 ```
 
 ## Simple
@@ -160,7 +160,7 @@ from typing_extensions import Callable
 # TODO: Not an error; remove once `ParamSpec` is supported
 # error: [invalid-type-form]
 def _[**P1](c: Callable[P1, int]):
-    reveal_type(c)  # revealed: (...) -> int
+    reveal_type(c)  # revealed: (...) -> Unknown
 ```
 
 And, using the legacy syntax:
@@ -173,7 +173,7 @@ P2 = ParamSpec("P2")
 # TODO: Not an error; remove once `ParamSpec` is supported
 # error: [invalid-type-form]
 def _(c: Callable[P2, int]):
-    reveal_type(c)  # revealed: (...) -> int
+    reveal_type(c)  # revealed: (...) -> Unknown
 ```
 
 ## Using `typing.Unpack`
