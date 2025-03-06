@@ -89,6 +89,15 @@ pub trait System: Debug {
         self.path_metadata(path).is_ok()
     }
 
+    /// Returns `true` if `path` exists on disk using the exact casing as specified in `path` for the parts after `prefix`.
+    ///
+    /// This is the same as [`Self::path_exists`] on case-sensitive systems.
+    ///
+    /// ## The use of prefix
+    ///
+    /// Prefix is only intended as an optimization for systems that can't efficiently check
+    /// if an entire path exists with the exact casing as specified in `path`. However,
+    /// implementations are allowed to check the casing of the entire path if they can do so efficiently.
     fn path_exists_case_sensitive(&self, path: &SystemPath, prefix: &SystemPath) -> Result<bool>;
 
     /// Returns `true` if `path` exists and is a directory.

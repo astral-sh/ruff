@@ -735,8 +735,9 @@ impl<'db> ResolverContext<'db> {
 
 #[cfg(test)]
 mod tests {
+    use anyhow::Context;
     use ruff_db::files::{system_path_to_file, File, FilePath};
-    use ruff_db::system::{DbWithTestSystem as _, DbWithWritableSystem as _};
+    use ruff_db::system::{DbWithTestSystem as _, DbWithWritableSystem as _, OsSystem};
     use ruff_db::testing::{
         assert_const_function_query_was_not_run, assert_function_query_was_not_run,
     };
@@ -1857,5 +1858,70 @@ not_a_directory
         // second `site-packages` directory
         let a_module = resolve_module(&db, &a_module_name).unwrap();
         assert_eq!(a_module.file().path(&db), &system_site_packages_location);
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn case_sensitive_resolution_with_symlinked_directory() -> anyhow::Result<()> {
+        let temp_dir = tempfile::TempDir::new()?;
+        let root = SystemPathBuf::from_path_buf(
+            temp_dir
+                .path()
+                .canonicalize()
+                .context("Failed to canonicalized path")?,
+        )
+        .expect("UTF8 path for temp dir");
+
+        let mut db = TestDb::new();
+
+        let src = root.join("src");
+        let a_package_target = root.join("a-package");
+        let a_src = src.join("a");
+
+        db.use_system(OsSystem::new(&root));
+
+        db.write_file(
+            a_package_target.join("__init__.py"),
+            "class Foo: x: int = 4",
+        )
+        .context("Failed to write `a-package/__init__.py`")?;
+
+        db.write_file(src.join("main.py"), "print('Hy')")
+            .context("Failed to write `main.py`")?;
+
+        // The symlink triggers the slow-path in the `OsSystem`'s `exists_path_case_sensitive`
+        // code because canonicalizing the path for `a/__init__.py` results in `a-package/__init__.py`
+        std::os::unix::fs::symlink(a_package_target.as_std_path(), a_src.as_std_path())
+            .context("Failed to symlink `src/a` to `a-package`")?;
+
+        Program::from_settings(
+            &db,
+            ProgramSettings {
+                python_version: PythonVersion::default(),
+                python_platform: PythonPlatform::default(),
+                search_paths: SearchPathSettings {
+                    extra_paths: vec![],
+                    src_roots: vec![src],
+                    custom_typeshed: None,
+                    python_path: PythonPath::KnownSitePackages(vec![]),
+                },
+            },
+        )
+        .expect("Valid program settings");
+
+        // Now try to resolve the module `A` (note the capital `A` instead of `a`).
+        let a_module_name = ModuleName::new_static("A").unwrap();
+        assert_eq!(resolve_module(&db, &a_module_name), None);
+
+        // Now lookup the same module using the lowercase `a` and it should resolve to the file in the system site-packages
+        let a_module_name = ModuleName::new_static("a").unwrap();
+        let a_module = resolve_module(&db, &a_module_name).expect("a.py to resolve");
+        assert!(a_module
+            .file()
+            .path(&db)
+            .as_str()
+            .ends_with("src/a/__init__.py"),);
+
+        Ok(())
     }
 }
