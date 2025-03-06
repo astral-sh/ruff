@@ -638,6 +638,33 @@ pub enum UnsupportedSyntaxErrorKind {
     ///
     /// [PEP 646]: https://peps.python.org/pep-0646/#change-1-star-expressions-in-indexes
     StarExpressionInIndex,
+
+    /// Represents the use of a [PEP 646] star annotations in a function definition.
+    ///
+    /// ## Examples
+    ///
+    /// Before Python 3.11, star annotations were not allowed in function definitions. This
+    /// restriction was lifted in [PEP 646] to allow type annotations for `typing.TypeVarTuple`,
+    /// also added in Python 3.11:
+    ///
+    /// ```python
+    /// from typing import TypeVarTuple
+    ///
+    /// Ts = TypeVarTuple('Ts')
+    ///
+    /// def foo(*args: *Ts): ...
+    /// ```
+    ///
+    /// Unlike [`UnsupportedSyntaxErrorKind::StarExpressionInIndex`], this does not include any
+    /// other annotation positions:
+    ///
+    /// ```python
+    /// x: *Ts                # Syntax error
+    /// def foo(x: *Ts): ...  # Syntax error
+    /// ```
+    ///
+    /// [PEP 646]: https://peps.python.org/pep-0646/#change-1-star-expressions-in-indexes
+    StarAnnotation,
 }
 
 impl Display for UnsupportedSyntaxError {
@@ -667,6 +694,7 @@ impl Display for UnsupportedSyntaxError {
             UnsupportedSyntaxErrorKind::StarExpressionInIndex => {
                 "Cannot use star expression in index"
             }
+            UnsupportedSyntaxErrorKind::StarAnnotation => "Cannot use star annotation",
         };
 
         write!(
@@ -715,6 +743,7 @@ impl UnsupportedSyntaxErrorKind {
             UnsupportedSyntaxErrorKind::StarExpressionInIndex => {
                 Change::Added(PythonVersion::PY311)
             }
+            UnsupportedSyntaxErrorKind::StarAnnotation => Change::Added(PythonVersion::PY311),
         }
     }
 
