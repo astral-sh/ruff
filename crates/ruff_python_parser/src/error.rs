@@ -444,11 +444,68 @@ pub struct UnsupportedSyntaxError {
     pub target_version: PythonVersion,
 }
 
+/// The type of tuple unpacking for [`UnsupportedSyntaxErrorKind::StarTuple`].
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub enum StarTupleKind {
+    Return,
+    Yield,
+}
+
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum UnsupportedSyntaxErrorKind {
     Match,
     Walrus,
     ExceptStar,
+
+    /// Represents the use of unparenthesized tuple unpacking in a `return` statement or `yield`
+    /// expression before Python 3.8.
+    ///
+    /// ## Examples
+    ///
+    /// Before Python 3.8, this syntax was allowed:
+    ///
+    /// ```python
+    /// rest = (4, 5, 6)
+    ///
+    /// def f():
+    ///     t = 1, 2, 3, *rest
+    ///     return t
+    ///
+    /// def g():
+    ///     t = 1, 2, 3, *rest
+    ///     yield t
+    /// ```
+    ///
+    /// But this was not:
+    ///
+    /// ```python
+    /// rest = (4, 5, 6)
+    ///
+    /// def f():
+    ///     return 1, 2, 3, *rest
+    ///
+    /// def g():
+    ///     yield 1, 2, 3, *rest
+    /// ```
+    ///
+    /// Instead, parentheses were required in the `return` and `yield` cases:
+    ///
+    /// ```python
+    /// rest = (4, 5, 6)
+    ///
+    /// def f():
+    ///     return (1, 2, 3, *rest)
+    ///
+    /// def g():
+    ///     yield (1, 2, 3, *rest)
+    /// ```
+    ///
+    /// This was reported in [BPO 32117] and updated in Python 3.8 to allow the unparenthesized
+    /// form.
+    ///
+    /// [BPO 32117]: https://github.com/python/cpython/issues/76298
+    StarTuple(StarTupleKind),
+
     /// Represents the use of a "relaxed" [PEP 614] decorator before Python 3.9.
     ///
     /// ## Examples
@@ -480,6 +537,7 @@ pub enum UnsupportedSyntaxErrorKind {
     /// [`dotted_name`]: https://docs.python.org/3.8/reference/compound_stmts.html#grammar-token-dotted-name
     /// [decorator grammar]: https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-decorator
     RelaxedDecorator,
+
     /// Represents the use of a [PEP 570] positional-only parameter before Python 3.8.
     ///
     /// ## Examples
@@ -506,6 +564,7 @@ pub enum UnsupportedSyntaxErrorKind {
     ///
     /// [PEP 570]: https://peps.python.org/pep-0570/
     PositionalOnlyParameter,
+
     /// Represents the use of a [type parameter list] before Python 3.12.
     ///
     /// ## Examples
@@ -544,6 +603,12 @@ impl Display for UnsupportedSyntaxError {
             UnsupportedSyntaxErrorKind::Match => "Cannot use `match` statement",
             UnsupportedSyntaxErrorKind::Walrus => "Cannot use named assignment expression (`:=`)",
             UnsupportedSyntaxErrorKind::ExceptStar => "Cannot use `except*`",
+            UnsupportedSyntaxErrorKind::StarTuple(StarTupleKind::Return) => {
+                "Cannot use iterable unpacking in return statements"
+            }
+            UnsupportedSyntaxErrorKind::StarTuple(StarTupleKind::Yield) => {
+                "Cannot use iterable unpacking in yield expressions"
+            }
             UnsupportedSyntaxErrorKind::RelaxedDecorator => "Unsupported expression in decorators",
             UnsupportedSyntaxErrorKind::PositionalOnlyParameter => {
                 "Cannot use positional-only parameter separator"
@@ -570,6 +635,7 @@ impl UnsupportedSyntaxErrorKind {
             UnsupportedSyntaxErrorKind::Match => PythonVersion::PY310,
             UnsupportedSyntaxErrorKind::Walrus => PythonVersion::PY38,
             UnsupportedSyntaxErrorKind::ExceptStar => PythonVersion::PY311,
+            UnsupportedSyntaxErrorKind::StarTuple(_) => PythonVersion::PY38,
             UnsupportedSyntaxErrorKind::RelaxedDecorator => PythonVersion::PY39,
             UnsupportedSyntaxErrorKind::PositionalOnlyParameter => PythonVersion::PY38,
             UnsupportedSyntaxErrorKind::TypeParameterList => PythonVersion::PY312,
