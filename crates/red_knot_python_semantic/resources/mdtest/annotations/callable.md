@@ -15,7 +15,7 @@ is the return type. Here, we explore various invalid forms.
 
 ### Empty
 
-It is invalid to have a bare `Callable` without any arguments:
+A bare `Callable` without any type arguments:
 
 ```py
 from typing import Callable
