@@ -101,8 +101,7 @@ from typing import Callable
 
 # error: [invalid-syntax] "Expected index or slice expression"
 # error: [invalid-type-form] "Special form `typing.Callable` expected exactly two arguments (parameter types and return type)"
+# error: [invalid-type-form] "The first argument to `typing.Callable` must be either a list of types, parameter specification, `typing.Concatenate`, or `...`"
 def _(c: Callable[]):
-    # TODO: This should be `() -> Unknown` which requires understanding that an empty `Name` is not
-    # a param spec variable
-    reveal_type(c)  # revealed: (*args: @Todo(todo signature *args), **kwargs: @Todo(todo signature **kwargs)) -> Unknown
+    reveal_type(c)  # revealed: (...) -> Unknown
 ```

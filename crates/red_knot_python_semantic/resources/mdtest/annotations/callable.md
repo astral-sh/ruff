@@ -47,10 +47,8 @@ def _(c: Callable[42, str]):
 Or, when one of the parameter type is invalid in the list:
 
 ```py
-# error: [invalid-type-form] "Invalid type expression"
-# error: [invalid-type-form] "Invalid type expression"
 def _(c: Callable[[int, 42, str, False], None]):
-    reveal_type(c)  # revealed: (int, Unknown, str, Unknown, /) -> None
+    reveal_type(c)  # revealed: (int, @Todo(number literal in type expression), str, @Todo(boolean literal in type expression), /) -> None
 ```
 
 ### Missing return type

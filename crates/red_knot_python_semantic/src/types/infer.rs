@@ -5658,20 +5658,12 @@ impl<'db> TypeInferenceBuilder<'db> {
                 todo_type!("ellipsis literal in type expression")
             }
 
-            // Other literals are not valid in the type expression context. However, we will still
-            // want to handle these differently when working with special forms, since (e.g.) `123`
-            // is not valid in an annotation expression but `Literal[123]` is. These are handled in
-            // the respective special form handlers.
-            ast::Expr::BytesLiteral(_)
-            | ast::Expr::NumberLiteral(_)
-            | ast::Expr::BooleanLiteral(_) => {
-                self.context.report_lint(
-                    &INVALID_TYPE_FORM,
-                    expression,
-                    format_args!("Invalid type expression"),
-                );
-                Type::unknown()
-            }
+            // Other literals do not have meaningful values in the annotation expression context.
+            // However, we will we want to handle these differently when working with special forms,
+            // since (e.g.) `123` is not valid in an annotation expression but `Literal[123]` is.
+            ast::Expr::BytesLiteral(_literal) => todo_type!("bytes literal in type expression"),
+            ast::Expr::NumberLiteral(_literal) => todo_type!("number literal in type expression"),
+            ast::Expr::BooleanLiteral(_literal) => todo_type!("boolean literal in type expression"),
 
             ast::Expr::Subscript(subscript) => {
                 let ast::ExprSubscript {
