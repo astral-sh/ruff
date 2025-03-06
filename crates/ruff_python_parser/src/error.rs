@@ -536,6 +536,43 @@ pub enum UnsupportedSyntaxErrorKind {
     TypeParameterList,
     TypeAliasStatement,
     TypeParamDefault,
+
+    /// Represents the use of a parenthesized `with` item before Python 3.9.
+    ///
+    /// ## Examples
+    ///
+    /// As described in [BPO 12782], `with` uses like this were not allowed on Python 3.8:
+    ///
+    /// ```python
+    /// with (open("a_really_long_foo") as foo,
+    ///       open("a_really_long_bar") as bar):
+    ///     pass
+    /// ```
+    ///
+    /// because parentheses were not allowed within the `with` statement itself [1]. However,
+    /// parenthesized expressions were still allowed, including the cases below, so the issue can be
+    /// pretty subtle and relates specifically to parenthesized items with `as` bindings.
+    ///
+    /// ```python
+    /// with (foo, bar): ...  # okay
+    /// with (
+    ///   open('foo.txt')) as foo: ...  # also okay
+    /// with (
+    ///   foo,
+    ///   bar,
+    ///   baz,
+    /// ): ...  # also okay, just a tuple
+    /// with (
+    ///   foo,
+    ///   bar,
+    ///   baz,
+    /// ) as tup: ...  # also okay, binding the tuple
+    ///
+    /// This restriction was lifted in 3.9 but formally included in the [release notes] for 3.10.
+    ///
+    /// [BPO 12782]: https://github.com/python/cpython/issues/56991
+    /// [1]: https://github.com/python/cpython/issues/56991#issuecomment-1093555141
+    /// [release notes]: https://docs.python.org/3/whatsnew/3.10.html#summary-release-highlights
     ParenthesizedContextManager,
 }
 
