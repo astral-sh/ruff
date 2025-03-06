@@ -119,7 +119,7 @@ fn run_test(
 
             assert!(
                 matches!(embedded.lang, "py" | "pyi" | "python" | "text"),
-                "Supported file types are: py, pyi, text"
+                "Supported file types are: py (or python), pyi, text, and ignore"
             );
 
             let full_path = embedded.full_path(&project_root);
