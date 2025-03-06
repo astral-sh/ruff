@@ -701,6 +701,7 @@ impl<'src> Parser<'src> {
                     }
                 }
 
+                let arg_range = parser.node_range(start);
                 if parser.eat(TokenKind::Equal) {
                     seen_keyword_argument = true;
                     let arg = if let ParsedExpr {
@@ -718,10 +719,10 @@ impl<'src> Parser<'src> {
                         // f((a) = 1)
                         // f( ( a ) = 1)
 
-                        if let Some(end) = end_parenthesis {
+                        if end_parenthesis.is_some() {
                             parser.add_unsupported_syntax_error(
                                 UnsupportedSyntaxErrorKind::ParenthesizedKeywordArgumentName,
-                                TextRange::new(start, end),
+                                arg_range,
                             );
                         }
 
