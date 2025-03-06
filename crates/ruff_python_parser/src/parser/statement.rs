@@ -424,7 +424,7 @@ impl<'src> Parser<'src> {
     /// are only allowed in Python 3.8 and later: <https://github.com/python/cpython/issues/76298>.
     pub(crate) fn check_tuple_unpacking(&mut self, expr: &Expr, kind: StarTupleKind) {
         let kind = UnsupportedSyntaxErrorKind::StarTuple(kind);
-        if self.options.target_version >= kind.minimum_version() {
+        if kind.is_supported(self.options.target_version) {
             return;
         }
 

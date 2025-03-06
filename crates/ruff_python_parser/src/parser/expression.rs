@@ -702,9 +702,31 @@ impl<'src> Parser<'src> {
                     }
                 }
 
+                let arg_range = parser.node_range(start);
                 if parser.eat(TokenKind::Equal) {
                     seen_keyword_argument = true;
-                    let arg = if let Expr::Name(ident_expr) = parsed_expr.expr {
+                    let arg = if let ParsedExpr {
+                        expr: Expr::Name(ident_expr),
+                        is_parenthesized,
+                    } = parsed_expr
+                    {
+                        // test_ok parenthesized_kwarg_py37
+                        // # parse_options: {"target-version": "3.7"}
+                        // f((a)=1)
+
+                        // test_err parenthesized_kwarg_py38
+                        // # parse_options: {"target-version": "3.8"}
+                        // f((a)=1)
+                        // f((a) = 1)
+                        // f( ( a ) = 1)
+
+                        if is_parenthesized {
+                            parser.add_unsupported_syntax_error(
+                                UnsupportedSyntaxErrorKind::ParenthesizedKeywordArgumentName,
+                                arg_range,
+                            );
+                        }
+
                         ast::Identifier {
                             id: ident_expr.id,
                             range: ident_expr.range,
