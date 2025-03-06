@@ -5,7 +5,7 @@ References:
 - <https://typing.readthedocs.io/en/latest/spec/callables.html#callable>
 
 TODO: Use `collections.abc` as importing from `typing` is deprecated but this requires support for
-`*` imports. See: https://docs.python.org/3/library/typing.html#deprecated-aliases.
+`*` imports. See: <https://docs.python.org/3/library/typing.html#deprecated-aliases>.
 
 ## Invalid forms
 
@@ -48,7 +48,8 @@ Or, when one of the parameter type is invalid in the list:
 
 ```py
 def _(c: Callable[[int, 42, str, False], None]):
-    reveal_type(c)  # revealed: (int, @Todo(number literal in type expression), str, @Todo(boolean literal in type expression), /) -> None
+    # revealed: (int, @Todo(number literal in type expression), str, @Todo(boolean literal in type expression), /) -> None
+    reveal_type(c)
 ```
 
 ### Missing return type
