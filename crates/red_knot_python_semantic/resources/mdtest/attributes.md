@@ -1209,6 +1209,17 @@ class C:
 reveal_type(C().x)  # revealed: Unknown
 ```
 
+### Accessing attributes on `Never`
+
+Arbitrary attributes can be accessed on `Never` without emitting any errors:
+
+```py
+from typing_extensions import Never
+
+def f(never: Never):
+    reveal_type(never.arbitrary_attribute)  # revealed: Never
+```
+
 ### Builtin types attributes
 
 This test can probably be removed eventually, but we currently include it because we do not yet
