@@ -1326,6 +1326,17 @@ impl<'src> Parser<'src> {
         let start = self.node_start();
         let flags = self.tokens.current_flags().as_any_string_flags();
 
+        // TODO(brent) move these to the right place
+
+        // test_ok pep701_f_string_py312
+        // # parse_options: {"target-version": "3.12"}
+        // f'Magic wand: { bag['wand'] }'     # nested quotes
+        // f"{'\n'.join(a)}"                  # escape sequence
+        // f'''A complex trick: {
+        //     bag['bag']                     # comment
+        // }'''
+        // f"{f"{f"{f"{f"{f"{1+1}"}"}"}"}"}"  # arbitrary nesting
+
         self.bump(TokenKind::FStringStart);
         let elements = self.parse_fstring_elements(flags, FStringElementsKind::Regular);
 
