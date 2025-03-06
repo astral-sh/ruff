@@ -223,6 +223,10 @@ impl System for LSPSystem {
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
     }
+
+    fn is_case_sensitive(&self) -> Option<bool> {
+        self.os_system.is_case_sensitive()
+    }
 }
 
 fn not_a_text_document(path: impl Display) -> std::io::Error {

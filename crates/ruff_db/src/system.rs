@@ -100,6 +100,10 @@ pub trait System: Debug {
     /// implementations are allowed to check the casing of the entire path if they can do so efficiently.
     fn path_exists_case_sensitive(&self, path: &SystemPath, prefix: &SystemPath) -> Result<bool>;
 
+    /// Returns `Some(true)` if the system is case-sensitive, `Some(false)` if it is case-insensitive
+    /// and `None` if querying the information failed.
+    fn is_case_sensitive(&self) -> Option<bool>;
+
     /// Returns `true` if `path` exists and is a directory.
     fn is_directory(&self, path: &SystemPath) -> bool {
         self.path_metadata(path)

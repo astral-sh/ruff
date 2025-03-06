@@ -268,6 +268,10 @@ impl System for WasmSystem {
         Ok(self.path_exists(path))
     }
 
+    fn is_case_sensitive(&self) -> Option<bool> {
+        Some(true)
+    }
+
     fn current_directory(&self) -> &SystemPath {
         self.fs.current_directory()
     }

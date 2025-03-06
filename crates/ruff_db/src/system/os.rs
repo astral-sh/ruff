@@ -16,7 +16,7 @@ use super::walk_directory::{
 };
 
 /// A system implementation that uses the OS file system.
-#[derive(Default, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub struct OsSystem {
     inner: Arc<OsSystemInner>,
 }
@@ -26,6 +26,8 @@ struct OsSystemInner {
     cwd: SystemPathBuf,
 
     real_case_cache: CaseSensitivePathsCache,
+
+    case_sensitive: Option<bool>,
 
     /// Overrides the user's configuration directory for testing.
     /// This is an `Option<Option<..>>` to allow setting an override of `None`.
@@ -38,11 +40,25 @@ impl OsSystem {
         let cwd = cwd.as_ref();
         assert!(cwd.as_utf8_path().is_absolute());
 
+        let case_sensitive = detect_case_sensitive(cwd);
+
+        tracing::debug!(
+            "Architecture: {}, OS: {}, case-sensitive: {}",
+            std::env::consts::ARCH,
+            std::env::consts::OS,
+            match case_sensitive {
+                Some(true) => "yes",
+                Some(false) => "no",
+                None => "unknown",
+            }
+        );
+
         Self {
             // Spreading `..Default` because it isn't possible to feature gate the initializer of a single field.
             #[allow(clippy::needless_update)]
             inner: Arc::new(OsSystemInner {
                 cwd: cwd.to_path_buf(),
+                case_sensitive,
                 ..Default::default()
             }),
         }
@@ -105,9 +121,17 @@ impl System for OsSystem {
     }
 
     fn path_exists_case_sensitive(&self, path: &SystemPath, prefix: &SystemPath) -> Result<bool> {
-        self.path_exists_case_sensitive_fast(path)
-            .map(Ok)
-            .unwrap_or_else(|| self.path_exists_case_sensitive_slow(path, prefix))
+        if self.is_case_sensitive() == Some(true) {
+            Ok(self.path_exists(path))
+        } else {
+            self.path_exists_case_sensitive_fast(path)
+                .map(Ok)
+                .unwrap_or_else(|| self.path_exists_case_sensitive_slow(path, prefix))
+        }
+    }
+
+    fn is_case_sensitive(&self) -> Option<bool> {
+        self.inner.case_sensitive
     }
 
     fn current_directory(&self) -> &SystemPath {
@@ -267,6 +291,15 @@ impl WritableSystem for OsSystem {
 
     fn create_directory_all(&self, path: &SystemPath) -> Result<()> {
         std::fs::create_dir_all(path.as_std_path())
+    }
+}
+
+impl Default for OsSystem {
+    fn default() -> Self {
+        Self::new(
+            SystemPathBuf::from_path_buf(std::env::current_dir().unwrap_or_default())
+                .unwrap_or_default(),
+        )
     }
 }
 
@@ -568,6 +601,38 @@ pub(super) mod testing {
                 self.system.inner.user_config_directory_override.try_lock()
             {
                 *directory_override = self.previous.take();
+            }
+        }
+    }
+}
+
+#[cfg(not(unix))]
+fn detect_case_sensitive(path: &SystemPath) -> Option<bool> {
+    None
+}
+
+#[cfg(unix)]
+fn detect_case_sensitive(path: &SystemPath) -> Option<bool> {
+    use std::os::unix::fs::MetadataExt;
+
+    let original_case_metadata = path.as_std_path().metadata().ok()?;
+
+    let upper_case = SystemPathBuf::from(path.as_str().to_uppercase());
+    if &*upper_case == path {
+        return None;
+    }
+
+    match upper_case.as_std_path().metadata() {
+        // When querying the path in all upper case succeeds that either:
+        // * means the file system is case sensitive if the paths have different inodes
+        // * the file system is case insensitive if the paths have the same inodes
+        Ok(uppercase_meta) => Some(uppercase_meta.ino() != original_case_metadata.ino()),
+        // In the error case, the file system is case sensitive if the file in all upper case doesn't exist.
+        Err(error) => {
+            if error.kind() == std::io::ErrorKind::NotFound {
+                Some(true)
+            } else {
+                None
             }
         }
     }

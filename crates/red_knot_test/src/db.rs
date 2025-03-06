@@ -220,6 +220,10 @@ impl System for MdtestSystem {
             .path_exists_case_sensitive(&self.normalize_path(path), &self.normalize_path(prefix))
     }
 
+    fn is_case_sensitive(&self) -> Option<bool> {
+        self.as_system().is_case_sensitive()
+    }
+
     fn current_directory(&self) -> &SystemPath {
         self.as_system().current_directory()
     }

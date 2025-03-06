@@ -134,6 +134,10 @@ impl System for TestSystem {
     fn path_exists_case_sensitive(&self, path: &SystemPath, prefix: &SystemPath) -> Result<bool> {
         self.system().path_exists_case_sensitive(path, prefix)
     }
+
+    fn is_case_sensitive(&self) -> Option<bool> {
+        self.system().is_case_sensitive()
+    }
 }
 
 impl Default for TestSystem {
@@ -358,6 +362,10 @@ impl System for InMemorySystem {
     fn path_exists_case_sensitive(&self, path: &SystemPath, _prefix: &SystemPath) -> Result<bool> {
         // The memory file system is case-sensitive.
         Ok(self.path_exists(path))
+    }
+
+    fn is_case_sensitive(&self) -> Option<bool> {
+        Some(true)
     }
 }
 
