@@ -610,6 +610,34 @@ pub enum UnsupportedSyntaxErrorKind {
     TypeParameterList,
     TypeAliasStatement,
     TypeParamDefault,
+
+    /// Represents the use of a [PEP 701] f-string before Python 3.12.
+    ///
+    /// ## Examples
+    ///
+    /// As described in the PEP, each of these cases were invalid before Python 3.12:
+    ///
+    /// ```python
+    /// # nested quotes
+    /// f'Magic wand: { bag['wand'] }'
+    ///
+    /// # escape characters
+    /// f"{'\n'.join(a)}"
+    ///
+    /// # comments
+    /// f'''A complex trick: {
+    ///     bag['bag']  # recursive bags!
+    /// }'''
+    ///
+    /// # arbitrary nesting
+    /// f"{f"{f"{f"{f"{f"{1+1}"}"}"}"}"}"
+    /// ```
+    ///
+    /// These restrictions were lifted in Python 3.12, meaning that all of these examples are now
+    /// valid.
+    ///
+    /// [PEP 701]: https://peps.python.org/pep-0701/
+    Pep701FString,
 }
 
 impl Display for UnsupportedSyntaxError {
@@ -636,6 +664,9 @@ impl Display for UnsupportedSyntaxError {
             UnsupportedSyntaxErrorKind::TypeParamDefault => {
                 "Cannot set default type for a type parameter"
             }
+            // TODO(brent) pyright has special error messages for nested quotes and escape
+            // sequences but doesn't actually detect the issue with comments
+            UnsupportedSyntaxErrorKind::Pep701FString => "Cannot use PEP 701 f-strings",
         };
 
         write!(
@@ -681,6 +712,7 @@ impl UnsupportedSyntaxErrorKind {
             UnsupportedSyntaxErrorKind::TypeParameterList => Change::Added(PythonVersion::PY312),
             UnsupportedSyntaxErrorKind::TypeAliasStatement => Change::Added(PythonVersion::PY312),
             UnsupportedSyntaxErrorKind::TypeParamDefault => Change::Added(PythonVersion::PY313),
+            UnsupportedSyntaxErrorKind::Pep701FString => Change::Added(PythonVersion::PY312),
         }
     }
 
