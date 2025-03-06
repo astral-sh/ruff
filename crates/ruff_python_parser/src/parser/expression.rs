@@ -2108,18 +2108,6 @@ impl<'src> Parser<'src> {
             // rest = (4, 5, 6)
             // def g(): yield 1, 2, 3, *rest
             // def h(): yield 1, (yield 2, *rest), 3
-
-            // TODO(brent) this should be invalid (raise a `ParseError`, not just an
-            // `UnsupportedSyntaxError`) as it's unsupported by every Python version I've tried
-            // (3.7, 3.8, and 3.13)
-            // test_err iter_unpack_yield
-            // # invalid on every Python version
-            // def f(): yield *rest
-
-            // test_err iter_unpack_yield_todo
-            // # TODO(brent) this is accepted by 3.7 and 3.8 but not 3.13 (at least)
-            // # looks like a separate change from the tuple unpacking checked here
-            // def i(): yield 1, (*rest)
             self.check_tuple_unpacking(&parsed_expr, StarTupleKind::Yield);
 
             Box::new(parsed_expr.expr)
