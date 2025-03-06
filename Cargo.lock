@@ -2541,6 +2541,7 @@ dependencies = [
  "regex",
  "ruff_db",
  "ruff_index",
+ "ruff_notebook",
  "ruff_python_ast",
  "ruff_python_trivia",
  "ruff_source_file",
@@ -2549,6 +2550,7 @@ dependencies = [
  "salsa",
  "serde",
  "smallvec",
+ "tempfile",
  "thiserror 2.0.11",
  "toml",
 ]

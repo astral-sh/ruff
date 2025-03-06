@@ -349,7 +349,7 @@ mod tests {
     use super::FailuresByLine;
     use ruff_db::diagnostic::{DiagnosticId, OldDiagnosticTrait, Severity, Span};
     use ruff_db::files::{system_path_to_file, File};
-    use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
+    use ruff_db::system::DbWithWritableSystem as _;
     use ruff_python_trivia::textwrap::dedent;
     use ruff_source_file::OneIndexed;
     use ruff_text_size::TextRange;
@@ -413,7 +413,7 @@ mod tests {
     ) -> Result<(), FailuresByLine> {
         colored::control::set_override(false);
 
-        let mut db = crate::db::Db::setup(SystemPathBuf::from("/src"));
+        let mut db = crate::db::Db::setup();
         db.write_file("/src/test.py", source).unwrap();
         let file = system_path_to_file(&db, "/src/test.py").unwrap();
 

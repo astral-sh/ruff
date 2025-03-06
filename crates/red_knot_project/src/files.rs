@@ -255,7 +255,7 @@ mod tests {
     use crate::files::Index;
     use crate::ProjectMetadata;
     use ruff_db::files::system_path_to_file;
-    use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
+    use ruff_db::system::{DbWithWritableSystem as _, SystemPathBuf};
     use ruff_python_ast::name::Name;
 
     #[test]

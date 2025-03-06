@@ -117,7 +117,7 @@ fn run_corpus_tests(pattern: &str) -> anyhow::Result<()> {
         let code = std::fs::read_to_string(source)?;
 
         let mut check_with_file_name = |path: &SystemPath| {
-            memory_fs.write_file(path, &code).unwrap();
+            memory_fs.write_file_all(path, &code).unwrap();
             File::sync_path(&mut db, path);
 
             // this test is only asserting that we can pull every expression type without a panic

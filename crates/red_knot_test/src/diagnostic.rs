@@ -148,14 +148,14 @@ mod tests {
     use ruff_db::diagnostic::{DiagnosticId, LintName, Severity, Span};
     use ruff_db::files::{system_path_to_file, File};
     use ruff_db::source::line_index;
-    use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
+    use ruff_db::system::DbWithWritableSystem as _;
     use ruff_source_file::OneIndexed;
     use ruff_text_size::{TextRange, TextSize};
     use std::borrow::Cow;
 
     #[test]
     fn sort_and_group() {
-        let mut db = Db::setup(SystemPathBuf::from("/src"));
+        let mut db = Db::setup();
         db.write_file("/src/test.py", "one\ntwo\n").unwrap();
         let file = system_path_to_file(&db, "/src/test.py").unwrap();
         let lines = line_index(&db, file);

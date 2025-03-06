@@ -106,7 +106,7 @@ fn setup_case() -> Case {
     let system = TestSystem::default();
     let fs = system.memory_file_system().clone();
 
-    fs.write_files(
+    fs.write_files_all(
         TOMLLIB_FILES
             .iter()
             .map(|file| (tomllib_path(file), file.code().to_string())),
@@ -173,7 +173,7 @@ fn benchmark_incremental(criterion: &mut Criterion) {
         assert_diagnostics(&case.db, &result);
 
         case.fs
-            .write_file(
+            .write_file_all(
                 &case.re_path,
                 format!("{}\n# A comment\n", source_text(&case.db, case.re).as_str()),
             )
