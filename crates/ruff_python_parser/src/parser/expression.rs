@@ -1337,6 +1337,15 @@ impl<'src> Parser<'src> {
         // }'''
         // f"{f"{f"{f"{f"{f"{1+1}"}"}"}"}"}"  # arbitrary nesting
 
+        // test_err pep701_f_string_py311
+        // # parse_options: {"target-version": "3.11"}
+        // f'Magic wand: { bag['wand'] }'     # nested quotes
+        // f"{'\n'.join(a)}"                  # escape sequence
+        // f'''A complex trick: {
+        //     bag['bag']                     # comment
+        // }'''
+        // f"{f"{f"{f"{f"{f"{1+1}"}"}"}"}"}"  # arbitrary nesting
+
         self.bump(TokenKind::FStringStart);
         let elements = self.parse_fstring_elements(flags, FStringElementsKind::Regular);
 
