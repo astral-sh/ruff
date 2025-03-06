@@ -564,9 +564,6 @@ impl Display for UnsupportedSyntaxError {
 }
 
 /// Represents the kind of change in Python syntax between versions.
-///
-/// Most changes so far have been additions (e.g. `match` and `type` statements), but others are
-/// removals (e.g. parenthesized keyword argument names).
 enum Change {
     Added(PythonVersion),
     Removed(PythonVersion),
