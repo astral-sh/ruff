@@ -549,9 +549,10 @@ pub enum UnsupportedSyntaxErrorKind {
     ///     pass
     /// ```
     ///
-    /// because parentheses were not allowed within the `with` statement itself [1]. However,
-    /// parenthesized expressions were still allowed, including the cases below, so the issue can be
-    /// pretty subtle and relates specifically to parenthesized items with `as` bindings.
+    /// because parentheses were not allowed within the `with` statement itself (see [this comment]
+    /// in particular). However, parenthesized expressions were still allowed, including the cases
+    /// below, so the issue can be pretty subtle and relates specifically to parenthesized items
+    /// with `as` bindings.
     ///
     /// ```python
     /// with (foo, bar): ...  # okay
@@ -571,7 +572,7 @@ pub enum UnsupportedSyntaxErrorKind {
     /// This restriction was lifted in 3.9 but formally included in the [release notes] for 3.10.
     ///
     /// [BPO 12782]: https://github.com/python/cpython/issues/56991
-    /// [1]: https://github.com/python/cpython/issues/56991#issuecomment-1093555141
+    /// [this comment]: https://github.com/python/cpython/issues/56991#issuecomment-1093555141
     /// [release notes]: https://docs.python.org/3/whatsnew/3.10.html#summary-release-highlights
     ParenthesizedContextManager,
 }
