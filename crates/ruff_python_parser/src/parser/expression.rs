@@ -7,7 +7,7 @@ use rustc_hash::{FxBuildHasher, FxHashSet};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{
     self as ast, BoolOp, CmpOp, ConversionFlag, Expr, ExprContext, FStringElement, FStringElements,
-    IpyEscapeKind, Number, Operator, StringFlags, UnaryOp,
+    IpyEscapeKind, Number, Operator, OperatorPrecedence, StringFlags, UnaryOp,
 };
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
@@ -228,7 +228,7 @@ impl<'src> Parser<'src> {
     ///
     /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
     fn parse_simple_expression(&mut self, context: ExpressionContext) -> ParsedExpr {
-        self.parse_binary_expression_or_higher(OperatorPrecedence::Initial, context)
+        self.parse_binary_expression_or_higher(OperatorPrecedence::None, context)
     }
 
     /// Parses a binary expression using the [Pratt parsing algorithm].
@@ -272,6 +272,13 @@ impl<'src> Parser<'src> {
 
             let new_precedence = operator.precedence();
 
+            // NOTE TO SELF (todo: delete this comment before merging):
+            // At this point in the code, if we ever compare a BitXor to a BitOr, the result will
+            // be wrong (when we're using ast's OperatorPrecedence) bc of ast has BitXorOr and
+            // OldOperatorPrecedence has BitOr *and* BitXor
+            //
+            // So we need to change this logic to work if there's a single BitXorOr variant of
+            // OperatorPrecedence. I think that might fix the problem!
             let stop_at_current_operator = if new_precedence.is_right_associative() {
                 new_precedence < left_precedence
             } else {
@@ -360,7 +367,7 @@ impl<'src> Parser<'src> {
             TokenKind::Star => {
                 let starred_expr = self.parse_starred_expression(context);
 
-                if left_precedence > OperatorPrecedence::Initial
+                if left_precedence > OperatorPrecedence::None
                     || !context.is_starred_expression_allowed()
                 {
                     self.add_error(ParseErrorType::InvalidStarredExpressionUsage, &starred_expr);
@@ -393,7 +400,7 @@ impl<'src> Parser<'src> {
             TokenKind::Yield => {
                 let expr = self.parse_yield_expression();
 
-                if left_precedence > OperatorPrecedence::Initial
+                if left_precedence > OperatorPrecedence::None
                     || !context.is_yield_expression_allowed()
                 {
                     self.add_error(ParseErrorType::InvalidYieldExpressionUsage, &expr);
@@ -2596,6 +2603,7 @@ impl Ranged for ParsedExpr {
     }
 }
 
+/*
 /// Represents the precedence levels for various operators and expressions of Python.
 /// Variants at the top have lower precedence and variants at the bottom have
 /// higher precedence.
@@ -2606,7 +2614,7 @@ impl Ranged for ParsedExpr {
 ///
 /// See: <https://docs.python.org/3/reference/expressions.html#operator-precedence>
 #[derive(Debug, Ord, Eq, PartialEq, PartialOrd, Copy, Clone)]
-pub(super) enum OperatorPrecedence {
+pub(super) enum OldOperatorPrecedence {
     /// The initial precedence when parsing an expression.
     Initial,
     /// Precedence of boolean `or` operator.
@@ -2639,13 +2647,14 @@ pub(super) enum OperatorPrecedence {
     Await,
 }
 
-impl OperatorPrecedence {
+impl OldOperatorPrecedence {
     /// Returns `true` if the precedence is right-associative i.e., the operations are evaluated
     /// from right to left.
     fn is_right_associative(self) -> bool {
-        matches!(self, OperatorPrecedence::Exponent)
+        matches!(self, OldOperatorPrecedence::Exponent)
     }
 }
+*/
 
 #[derive(Debug)]
 enum BinaryLikeOperator {
@@ -2678,44 +2687,46 @@ impl BinaryLikeOperator {
     }
 }
 
-impl From<BoolOp> for OperatorPrecedence {
+/*
+impl From<BoolOp> for OldOperatorPrecedence {
     #[inline]
     fn from(op: BoolOp) -> Self {
         match op {
-            BoolOp::And => OperatorPrecedence::And,
-            BoolOp::Or => OperatorPrecedence::Or,
+            BoolOp::And => OldOperatorPrecedence::And,
+            BoolOp::Or => OldOperatorPrecedence::Or,
         }
     }
 }
 
-impl From<UnaryOp> for OperatorPrecedence {
+impl From<UnaryOp> for OldOperatorPrecedence {
     #[inline]
     fn from(op: UnaryOp) -> Self {
         match op {
-            UnaryOp::Not => OperatorPrecedence::Not,
-            _ => OperatorPrecedence::PosNegBitNot,
+            UnaryOp::Not => OldOperatorPrecedence::Not,
+            _ => OldOperatorPrecedence::PosNegBitNot,
         }
     }
 }
 
-impl From<Operator> for OperatorPrecedence {
+impl From<Operator> for OldOperatorPrecedence {
     #[inline]
     fn from(op: Operator) -> Self {
         match op {
-            Operator::Add | Operator::Sub => OperatorPrecedence::AddSub,
+            Operator::Add | Operator::Sub => OldOperatorPrecedence::AddSub,
             Operator::Mult
             | Operator::Div
             | Operator::FloorDiv
             | Operator::Mod
-            | Operator::MatMult => OperatorPrecedence::MulDivRemain,
-            Operator::BitAnd => OperatorPrecedence::BitAnd,
-            Operator::BitOr => OperatorPrecedence::BitOr,
-            Operator::BitXor => OperatorPrecedence::BitXor,
-            Operator::LShift | Operator::RShift => OperatorPrecedence::LeftRightShift,
-            Operator::Pow => OperatorPrecedence::Exponent,
+            | Operator::MatMult => OldOperatorPrecedence::MulDivRemain,
+            Operator::BitAnd => OldOperatorPrecedence::BitAnd,
+            Operator::BitOr => OldOperatorPrecedence::BitOr,
+            Operator::BitXor => OldOperatorPrecedence::BitXor,
+            Operator::LShift | Operator::RShift => OldOperatorPrecedence::LeftRightShift,
+            Operator::Pow => OldOperatorPrecedence::Exponent,
         }
     }
 }
+*/
 
 /// Represents the precedence used for parsing the value part of a starred expression.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
