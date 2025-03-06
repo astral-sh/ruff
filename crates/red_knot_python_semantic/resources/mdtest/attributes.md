@@ -1218,6 +1218,9 @@ from typing_extensions import Never
 
 def f(never: Never):
     reveal_type(never.arbitrary_attribute)  # revealed: Never
+
+    # Assigning `Never` to an attribute on `Never` is also allowed:
+    never.another_attribute = never
 ```
 
 ### Builtin types attributes
