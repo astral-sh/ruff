@@ -7,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/inline/err/pep701_f_string_py311
 ```
 Module(
     ModModule {
-        range: 0..276,
+        range: 0..403,
         body: [
             Expr(
                 StmtExpr {
@@ -432,6 +432,152 @@ Module(
                     ),
                 },
             ),
+            Expr(
+                StmtExpr {
+                    range: 276..310,
+                    value: FString(
+                        ExprFString {
+                            range: 276..310,
+                            value: FStringValue {
+                                inner: Single(
+                                    FString(
+                                        FString {
+                                            range: 276..310,
+                                            elements: [
+                                                Expression(
+                                                    FStringExpressionElement {
+                                                        range: 278..303,
+                                                        expression: FString(
+                                                            ExprFString {
+                                                                range: 279..302,
+                                                                value: FStringValue {
+                                                                    inner: Single(
+                                                                        FString(
+                                                                            FString {
+                                                                                range: 279..302,
+                                                                                elements: [
+                                                                                    Expression(
+                                                                                        FStringExpressionElement {
+                                                                                            range: 283..293,
+                                                                                            expression: StringLiteral(
+                                                                                                ExprStringLiteral {
+                                                                                                    range: 284..292,
+                                                                                                    value: StringLiteralValue {
+                                                                                                        inner: Single(
+                                                                                                            StringLiteral {
+                                                                                                                range: 284..292,
+                                                                                                                value: "nested",
+                                                                                                                flags: StringLiteralFlags {
+                                                                                                                    quote_style: Double,
+                                                                                                                    prefix: Empty,
+                                                                                                                    triple_quoted: false,
+                                                                                                                },
+                                                                                                            },
+                                                                                                        ),
+                                                                                                    },
+                                                                                                },
+                                                                                            ),
+                                                                                            debug_text: None,
+                                                                                            conversion: None,
+                                                                                            format_spec: None,
+                                                                                        },
+                                                                                    ),
+                                                                                    Literal(
+                                                                                        FStringLiteralElement {
+                                                                                            range: 293..299,
+                                                                                            value: " inner",
+                                                                                        },
+                                                                                    ),
+                                                                                ],
+                                                                                flags: FStringFlags {
+                                                                                    quote_style: Single,
+                                                                                    prefix: Regular,
+                                                                                    triple_quoted: true,
+                                                                                },
+                                                                            },
+                                                                        ),
+                                                                    ),
+                                                                },
+                                                            },
+                                                        ),
+                                                        debug_text: None,
+                                                        conversion: None,
+                                                        format_spec: None,
+                                                    },
+                                                ),
+                                                Literal(
+                                                    FStringLiteralElement {
+                                                        range: 303..309,
+                                                        value: " outer",
+                                                    },
+                                                ),
+                                            ],
+                                            flags: FStringFlags {
+                                                quote_style: Double,
+                                                prefix: Regular,
+                                                triple_quoted: false,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 336..359,
+                    value: FString(
+                        ExprFString {
+                            range: 336..359,
+                            value: FStringValue {
+                                inner: Single(
+                                    FString(
+                                        FString {
+                                            range: 336..359,
+                                            elements: [
+                                                Literal(
+                                                    FStringLiteralElement {
+                                                        range: 338..343,
+                                                        value: "test ",
+                                                    },
+                                                ),
+                                                Expression(
+                                                    FStringExpressionElement {
+                                                        range: 343..353,
+                                                        expression: Name(
+                                                            ExprName {
+                                                                range: 344..345,
+                                                                id: Name("a"),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                        debug_text: None,
+                                                        conversion: None,
+                                                        format_spec: None,
+                                                    },
+                                                ),
+                                                Literal(
+                                                    FStringLiteralElement {
+                                                        range: 353..358,
+                                                        value: " more",
+                                                    },
+                                                ),
+                                            ],
+                                            flags: FStringFlags {
+                                                quote_style: Double,
+                                                prefix: Regular,
+                                                triple_quoted: false,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
         ],
     },
 )
@@ -472,6 +618,8 @@ Module(
 6 | }'''
 7 | f"{f"{f"{f"{f"{f"{1+1}"}"}"}"}"}"  # arbitrary nesting
   |                 ^ Syntax Error: Cannot reuse outer quote character in f-strings on Python 3.11 (syntax was added in Python 3.12)
+8 | f"{f'''{"nested"} inner'''} outer" # nested (triple) quotes
+9 | f"test {a \
   |
 
 
@@ -480,6 +628,8 @@ Module(
 6 | }'''
 7 | f"{f"{f"{f"{f"{f"{1+1}"}"}"}"}"}"  # arbitrary nesting
   |              ^ Syntax Error: Cannot reuse outer quote character in f-strings on Python 3.11 (syntax was added in Python 3.12)
+8 | f"{f'''{"nested"} inner'''} outer" # nested (triple) quotes
+9 | f"test {a \
   |
 
 
@@ -488,6 +638,8 @@ Module(
 6 | }'''
 7 | f"{f"{f"{f"{f"{f"{1+1}"}"}"}"}"}"  # arbitrary nesting
   |           ^ Syntax Error: Cannot reuse outer quote character in f-strings on Python 3.11 (syntax was added in Python 3.12)
+8 | f"{f'''{"nested"} inner'''} outer" # nested (triple) quotes
+9 | f"test {a \
   |
 
 
@@ -496,6 +648,8 @@ Module(
 6 | }'''
 7 | f"{f"{f"{f"{f"{f"{1+1}"}"}"}"}"}"  # arbitrary nesting
   |        ^ Syntax Error: Cannot reuse outer quote character in f-strings on Python 3.11 (syntax was added in Python 3.12)
+8 | f"{f'''{"nested"} inner'''} outer" # nested (triple) quotes
+9 | f"test {a \
   |
 
 
@@ -504,4 +658,25 @@ Module(
 6 | }'''
 7 | f"{f"{f"{f"{f"{f"{1+1}"}"}"}"}"}"  # arbitrary nesting
   |     ^ Syntax Error: Cannot reuse outer quote character in f-strings on Python 3.11 (syntax was added in Python 3.12)
+8 | f"{f'''{"nested"} inner'''} outer" # nested (triple) quotes
+9 | f"test {a \
   |
+
+
+   |
+ 6 | }'''
+ 7 | f"{f"{f"{f"{f"{f"{1+1}"}"}"}"}"}"  # arbitrary nesting
+ 8 | f"{f'''{"nested"} inner'''} outer" # nested (triple) quotes
+   |         ^ Syntax Error: Cannot reuse outer quote character in f-strings on Python 3.11 (syntax was added in Python 3.12)
+ 9 | f"test {a \
+10 |     } more"                        # line continuation
+   |
+
+
+   |
+ 7 | f"{f"{f"{f"{f"{f"{1+1}"}"}"}"}"}"  # arbitrary nesting
+ 8 | f"{f'''{"nested"} inner'''} outer" # nested (triple) quotes
+ 9 | f"test {a \
+   |           ^ Syntax Error: Cannot use an escape sequence (backslash) in f-strings on Python 3.11 (syntax was added in Python 3.12)
+10 |     } more"                        # line continuation
+   |

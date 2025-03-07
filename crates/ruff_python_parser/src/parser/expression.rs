@@ -1339,6 +1339,9 @@ impl<'src> Parser<'src> {
         //     bag['bag']                     # comment
         // }'''
         // f"{f"{f"{f"{f"{f"{1+1}"}"}"}"}"}"  # arbitrary nesting
+        // f"{f'''{"nested"} inner'''} outer" # nested (triple) quotes
+        // f"test {a \
+        //     } more"                        # line continuation
 
         // test_err pep701_f_string_py311
         // # parse_options: {"target-version": "3.11"}
@@ -1348,6 +1351,9 @@ impl<'src> Parser<'src> {
         //     bag['bag']                     # comment
         // }'''
         // f"{f"{f"{f"{f"{f"{1+1}"}"}"}"}"}"  # arbitrary nesting
+        // f"{f'''{"nested"} inner'''} outer" # nested (triple) quotes
+        // f"test {a \
+        //     } more"                        # line continuation
 
         // the inner variant here doesn't matter, just checking if PEP 701 f-strings are supported
         if UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::NestedQuote)
