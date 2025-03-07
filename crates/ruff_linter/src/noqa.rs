@@ -463,9 +463,7 @@ impl<'a> NoqaLexer<'a> {
     /// beginning of the `noqa` comment, which is earlier
     /// than the offset that marks the beginning of the codes.
     fn lex(mut self, comment_start: TextSize) -> Result<NoqaLexerOutput<'a>, LexicalError> {
-        if self.cursor.first().is_ascii_whitespace()
-            || self.cursor.first() == '#'
-            || self.cursor.is_eof()
+        if self.cursor.first().is_whitespace() || self.cursor.first() == '#' || self.cursor.is_eof()
         {
             return Ok(NoqaLexerOutput {
                 warnings: self.warnings,
