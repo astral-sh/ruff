@@ -1301,6 +1301,12 @@ impl<'db> Type<'db> {
             | Type::ClassLiteral(..)
             | Type::ModuleLiteral(..)
             | Type::KnownInstance(..) => true,
+            Type::Callable(CallableType::General(_)) => {
+                // A general callable type is never a singleton because for any given signature,
+                // there could be any number of distinct objects that are all callable with that
+                // signature.
+                false
+            }
             Type::Instance(InstanceType { class }) => {
                 class.known(db).is_some_and(KnownClass::is_singleton)
             }
@@ -1329,10 +1335,6 @@ impl<'db> Type<'db> {
                 false
             }
             Type::AlwaysTruthy | Type::AlwaysFalsy => false,
-            Type::Callable(CallableType::General(_)) => {
-                // TODO: Check if the callable type is a singleton
-                false
-            }
         }
     }
 
@@ -1374,12 +1376,8 @@ impl<'db> Type<'db> {
             | Type::Intersection(..)
             | Type::LiteralString
             | Type::AlwaysTruthy
-            | Type::AlwaysFalsy => false,
-
-            Type::Callable(CallableType::General(_)) => {
-                // TODO: Check if the callable type is single-valued
-                false
-            }
+            | Type::AlwaysFalsy
+            | Type::Callable(CallableType::General(_)) => false,
         }
     }
 
