@@ -6,7 +6,6 @@
 
 - \[`ruff`\] Add new rule `RUF059`: Unused unpacked assignment ([#16449](https://github.com/astral-sh/ruff/pull/16449))
 - \[`syntax-errors`\] Detect assignment expressions before Python 3.8 ([#16383](https://github.com/astral-sh/ruff/pull/16383))
-- \[`syntax-errors`\] Limit `except*` range to `*` ([#16473](https://github.com/astral-sh/ruff/pull/16473))
 - \[`syntax-errors`\] Named expressions in decorators before Python 3.9 ([#16386](https://github.com/astral-sh/ruff/pull/16386))
 - \[`syntax-errors`\] Parenthesized keyword argument names after Python 3.8 ([#16482](https://github.com/astral-sh/ruff/pull/16482))
 - \[`syntax-errors`\] Positional-only parameters before Python 3.8 ([#16481](https://github.com/astral-sh/ruff/pull/16481))
