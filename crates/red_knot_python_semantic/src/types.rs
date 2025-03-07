@@ -3474,7 +3474,7 @@ impl<'db> ContextManagerErrorKind<'db> {
 
     fn format_call_dunder_error(call_dunder_error: &CallDunderError<'db>, name: &str) -> String {
         match call_dunder_error {
-            CallDunderError::MethodNotAvailable => format!("it doesn't implement `{name}`"),
+            CallDunderError::MethodNotAvailable => format!("it does not implement `{name}`"),
             CallDunderError::PossiblyUnbound(_) => {
                 format!("the method `{name}` is possibly unbound")
             }

@@ -1883,6 +1883,10 @@ where
                     | CurrentAssignment::For {
                         unpack: Some(unpack),
                         ..
+                    }
+                    | CurrentAssignment::WithItem {
+                        unpack: Some(unpack),
+                        ..
                     },
                 ) = self.current_assignment()
                 {
