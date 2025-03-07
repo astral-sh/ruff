@@ -201,7 +201,6 @@ pub(crate) struct AssignmentDefinitionNodeRef<'a> {
 
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct WithItemDefinitionNodeRef<'a> {
-    // outer Option is whether we bind the expression or not, inner is whether it's unpacked
     pub(crate) unpack: Option<Unpack<'a>>,
     pub(crate) context_expr: &'a ast::Expr,
     pub(crate) name: &'a ast::ExprName,
