@@ -679,3 +679,11 @@ with ContextManager() as (a, *b):
     # TODO: Should be list[int] once support for assigning to starred expression is added
     reveal_type(b)  # revealed: @Todo(starred unpacking)
 ```
+
+### Invalid context manager expression
+
+```py
+# error: [unresolved-reference] "Name `nonexistant` used when not defined"
+with nonexistant as x:
+    reveal_type(x)  # revealed: Unknown
+```
