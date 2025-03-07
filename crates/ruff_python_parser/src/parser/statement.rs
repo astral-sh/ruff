@@ -2855,9 +2855,23 @@ impl<'src> Parser<'src> {
                             // def foo(*args: *int or str): ...
                             // def foo(*args: *yield x): ...
                             // # def foo(*args: **int): ...
-                            self.parse_conditional_expression_or_higher_impl(
+                            let parsed_expr = self.parse_conditional_expression_or_higher_impl(
                                 ExpressionContext::starred_bitwise_or(),
-                            )
+                            );
+
+                            // test_ok param_with_star_annotation_py311
+                            // # parse_options: {"target-version": "3.11"}
+                            // def foo(*args: *Ts): ...
+
+                            // test_err param_with_star_annotation_py310
+                            // # parse_options: {"target-version": "3.10"}
+                            // def foo(*args: *Ts): ...
+                            self.add_unsupported_syntax_error(
+                                UnsupportedSyntaxErrorKind::StarAnnotation,
+                                parsed_expr.range(),
+                            );
+
+                            parsed_expr
                         }
                         AllowStarAnnotation::No => {
                             // test_ok param_with_annotation
