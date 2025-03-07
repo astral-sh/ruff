@@ -81,6 +81,18 @@ impl<'db> CallOutcome<'db> {
             Self::Union(bindings) => bindings,
         }
     }
+
+    /// Sets the return type of the call.
+    pub(super) fn set_return_type(&mut self, return_ty: Type<'db>) {
+        match self {
+            Self::Single(binding) => binding.set_return_type(return_ty),
+            Self::Union(bindings) => {
+                for binding in bindings {
+                    binding.set_return_type(return_ty);
+                }
+            }
+        }
+    }
 }
 
 /// The reason why calling a type failed.

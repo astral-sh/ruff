@@ -2697,7 +2697,10 @@ impl<'db> Type<'db> {
                                         }))
                                     }
                                     CallError::PossiblyUnboundDunderCall { .. } => {
-                                        unreachable!("`__init__` can't be unbound on a class, as all classes have `object` in MRO, which has `__init__`. This fail indicates an error in typeshed");
+                                        tracing::warn!("Inferred `__init__` as possibly unbound on a class. All classes have `object` in MRO, so this is not possible. This indicates an error in typeshed.");
+
+                                        // We return None (see the logic for `NotCallable` above).
+                                        None
                                     }
                                     CallError::BindingError { mut binding } => {
                                         binding.set_return_type(instance_ty);
@@ -2713,25 +2716,41 @@ impl<'db> Type<'db> {
                                 Err,
                             )
                         }
-                        // Turn "possibly unbound object of type `Literal['__init__']`"
-                        // into "`X` not callable (possibly unbound `__init__` method)"
-                        Err(
-                            CallDunderError::PossiblyUnbound(_)
-                            | CallDunderError::MethodNotAvailable,
-                        ) => {
-                            unreachable!("`__init__` can't be unbound on a class, as all classes have `object` in MRO, which has `__init__`. This fail indicates an error in typeshed");
+                        // If we are using vendored typeshed, it should be impossible to have missing
+                        // or unbound `__init__` methods on classes, as all classes have `object` in MRO,
+                        // hence we emit user warnings for these cases.
+                        Err(CallDunderError::PossiblyUnbound(mut outcome)) => {
+                            tracing::warn!("Inferred `__init__` as possibly unbound on a class. All classes have `object` in MRO, so this is not possible. This indicates an error in typeshed.");
+
+                            outcome.set_return_type(instance_ty);
+                            Ok(outcome)
+                        }
+                        Err(CallDunderError::MethodNotAvailable) => {
+                            tracing::warn!("Inferred `__init__` as unbound on a class. All classes have `object` in MRO, so this is not possible. This indicates an error in typeshed.");
+
+                            // Fallback by explicitly checking against a single argument call
+                            let fallback_init_signature = Signature::new(
+                                Parameters::new([Parameter::new(
+                                    Some("self".into()),
+                                    Some(instance_ty),
+                                    ParameterKind::PositionalOnly { default_ty: None },
+                                )]),
+                                Some(Type::none(db)),
+                            );
+
+                            let binding = bind_call(db, arguments, &fallback_init_signature, self);
+
+                            if binding.has_binding_errors() {
+                                Err(CallError::BindingError { binding })
+                            } else {
+                                Ok(CallOutcome::Single(binding))
+                            }
                         }
                         // If the call to `__init__` is successful, we need to emit the resulting
                         // binding (which may include errors) and but replace the return type with instance type.
-                        Ok(CallOutcome::Single(mut binding)) => {
-                            binding.set_return_type(instance_ty);
-                            Ok(CallOutcome::Single(binding))
-                        }
-                        Ok(CallOutcome::Union(mut union)) => {
-                            for binding in &mut union {
-                                binding.set_return_type(instance_ty);
-                            }
-                            Ok(CallOutcome::Union(union))
+                        Ok(mut outcome) => {
+                            outcome.set_return_type(instance_ty);
+                            Ok(outcome)
                         }
                     }
                 }
