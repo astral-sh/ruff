@@ -3,7 +3,7 @@
 //! This checker is not responsible for traversing the AST itself. Instead, its
 //! [`SyntaxChecker::enter_stmt`] method should be called on every node by a parent `Visitor`.
 
-use ruff_python_ast::{PythonVersion, Stmt, StmtExpr, StmtImportFrom, StmtMatch};
+use ruff_python_ast::{PythonVersion, Stmt, StmtExpr, StmtImportFrom};
 use ruff_text_size::TextRange;
 
 pub struct SyntaxChecker {
@@ -43,28 +43,21 @@ pub struct SyntaxError {
 impl SyntaxError {
     pub fn message(&self) -> String {
         match self.kind {
-            SyntaxErrorKind::MatchBeforePy310 => format!(
-                "Cannot use `match` statement on Python {major}.{minor} (syntax was new in Python 3.10)",
-                major = self.target_version.major,
-                minor = self.target_version.minor,
-            ),
             SyntaxErrorKind::LateFutureImport => {
-				"__future__ imports must be at the top of the file".to_string()
-			}
+                "__future__ imports must be at the top of the file".to_string()
+            }
         }
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SyntaxErrorKind {
-    MatchBeforePy310,
     LateFutureImport,
 }
 
 impl SyntaxErrorKind {
     pub const fn as_str(self) -> &'static str {
         match self {
-            SyntaxErrorKind::MatchBeforePy310 => "match-before-python-310",
             SyntaxErrorKind::LateFutureImport => "late-future-import",
         }
     }
@@ -72,26 +65,14 @@ impl SyntaxErrorKind {
 
 impl SyntaxChecker {
     fn check(&mut self, stmt: &ruff_python_ast::Stmt) {
-        match stmt {
-            Stmt::Match(StmtMatch { range, .. }) => {
-                if self.target_version < PythonVersion::PY310 {
-                    self.errors.push(SyntaxError {
-                        kind: SyntaxErrorKind::MatchBeforePy310,
-                        range: *range,
-                        target_version: self.target_version,
-                    });
-                }
+        if let Stmt::ImportFrom(StmtImportFrom { range, module, .. }) = stmt {
+            if self.seen_futures_boundary && matches!(module.as_deref(), Some("__future__")) {
+                self.errors.push(SyntaxError {
+                    kind: SyntaxErrorKind::LateFutureImport,
+                    range: *range,
+                    target_version: self.target_version,
+                });
             }
-            Stmt::ImportFrom(StmtImportFrom { range, module, .. }) => {
-                if self.seen_futures_boundary && matches!(module.as_deref(), Some("__future__")) {
-                    self.errors.push(SyntaxError {
-                        kind: SyntaxErrorKind::LateFutureImport,
-                        range: *range,
-                        target_version: self.target_version,
-                    });
-                }
-            }
-            _ => {}
         }
     }
 
@@ -123,6 +104,8 @@ impl SyntaxChecker {
 
 #[cfg(test)]
 mod tests {
+    #![allow(unused)] // TODO(brent)
+
     use std::path::Path;
 
     use insta::assert_debug_snapshot;
@@ -141,40 +124,5 @@ mod tests {
             checker.enter_stmt(stmt);
         }
         checker.errors
-    }
-
-    #[test]
-    fn match_before_py310() {
-        assert_debug_snapshot!(test_snippet(
-            r#"
-match var:
-    case 1:
-        print("it's one")
-"#,
-            PythonVersion::PY39,
-        ), @r"
-        [
-            SyntaxError {
-                kind: MatchBeforePy310,
-                range: 1..49,
-                target_version: PythonVersion {
-                    major: 3,
-                    minor: 9,
-                },
-            },
-        ]
-        ");
-    }
-
-    #[test]
-    fn match_on_py310() {
-        assert_debug_snapshot!(test_snippet(
-            r#"
-match var:
-    case 1:
-        print("it's one")
-"#,
-            PythonVersion::PY310,
-        ), @"[]");
     }
 }

@@ -2759,12 +2759,6 @@ pub(crate) fn check_ast(
 
 fn try_diagnostic_from_syntax_error(error: &SyntaxError, checker: &Checker) -> Option<Diagnostic> {
     match error.kind {
-        SyntaxErrorKind::MatchBeforePy310 => Some(Diagnostic::new(
-            crate::rules::syntax::VersionSyntaxError {
-                message: error.message(),
-            },
-            error.range,
-        )),
         SyntaxErrorKind::LateFutureImport if checker.enabled(Rule::LateFutureImport) => {
             Some(Diagnostic::new(LateFutureImport, error.range))
         }
