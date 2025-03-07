@@ -1164,6 +1164,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     report_invalid_return_type(
                         &self.context,
                         invalid.range,
+                        function.returns.as_ref().unwrap().range(),
                         declared_ty,
                         invalid.ty,
                     );
@@ -1173,6 +1174,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     report_invalid_return_type(
                         &self.context,
                         function.range(),
+                        function.returns.as_ref().unwrap().range(),
                         declared_ty,
                         inferred_ty,
                     );

@@ -1075,18 +1075,27 @@ pub(super) fn report_invalid_attribute_assignment(
 
 pub(super) fn report_invalid_return_type(
     context: &InferContext,
-    ranged: impl Ranged,
+    object_range: impl Ranged,
+    return_type_range: impl Ranged,
     expected_ty: Type,
     actual_ty: Type,
 ) {
-    context.report_lint(
+    let return_type_span = Span::from(context.file()).with_range(return_type_range.range());
+    context.report_lint_with_secondary_messages(
         &INVALID_RETURN_TYPE,
-        ranged,
+        object_range,
         format_args!(
             "Object of type `{}` is not assignable to return type `{}`",
             actual_ty.display(context.db()),
             expected_ty.display(context.db())
         ),
+        vec![OldSecondaryDiagnosticMessage::new(
+            return_type_span,
+            format!(
+                "Return type is declared here as `{}`",
+                expected_ty.display(context.db())
+            ),
+        )],
     );
 }
 
