@@ -1032,6 +1032,7 @@ where
                                     self.db,
                                     self.file,
                                     self.current_scope(),
+                                    // SAFETY: `target` belongs to the `self.module` tree
                                     #[allow(unsafe_code)]
                                     unsafe {
                                         AstNodeRef::new(self.module.clone(), target)
@@ -1282,6 +1283,7 @@ where
                                         self.db,
                                         self.file,
                                         self.current_scope(),
+                                        // SAFETY: the node `optional_vars` belongs to the `self.module` tree
                                         #[allow(unsafe_code)]
                                         unsafe {
                                             AstNodeRef::new(self.module.clone(), optional_vars)
@@ -1352,6 +1354,7 @@ where
                             self.db,
                             self.file,
                             self.current_scope(),
+                            // SAFETY: the node `target` belongs to the `self.module` tree
                             #[allow(unsafe_code)]
                             unsafe {
                                 AstNodeRef::new(self.module.clone(), target)

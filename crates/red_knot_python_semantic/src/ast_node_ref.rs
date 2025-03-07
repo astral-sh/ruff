@@ -45,7 +45,7 @@ pub struct AstNodeRef<T> {
 
 #[allow(unsafe_code)]
 impl<T> AstNodeRef<T> {
-    /// Creates a new `AstNodeRef` that reference `node`. The `parsed` is the [`ParsedModule`] to
+    /// Creates a new `AstNodeRef` that references `node`. The `parsed` is the [`ParsedModule`] to
     /// which the `AstNodeRef` belongs.
     ///
     /// ## Safety
