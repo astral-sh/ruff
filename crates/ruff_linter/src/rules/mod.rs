@@ -56,5 +56,4 @@ pub mod pylint;
 pub mod pyupgrade;
 pub mod refurb;
 pub mod ruff;
-pub mod syntax;
 pub mod tryceratops;
