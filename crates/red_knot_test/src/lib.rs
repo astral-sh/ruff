@@ -231,9 +231,7 @@ fn run_test(
                 })
                 .collect();
 
-            let (type_diagnostics, _syntax_diagnostics) = match catch_unwind(|| {
-                check_types(db, test_file.file)
-            }) {
+            let type_diagnostics = match catch_unwind(|| check_types(db, test_file.file)) {
                 Ok(type_diagnostics) => type_diagnostics,
                 Err(info) => {
                     let mut by_line = matcher::FailuresByLine::default();
