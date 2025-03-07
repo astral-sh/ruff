@@ -6422,9 +6422,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     &INVALID_TYPE_FORM,
                     parameters,
                     format_args!(
-                        "The first argument to `{}` must be either a list of types, parameter specification, `{}`, or `...`",
-                        KnownInstanceType::Callable.repr(self.db()),
-                        KnownInstanceType::Concatenate.repr(self.db())
+                        "The first argument to `Callable` must be either a list of types, ParamSpec, Concatenate, or `...`",
                     ),
                 );
                 return Err(());

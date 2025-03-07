@@ -31,7 +31,7 @@ When it's not a list:
 ```py
 from typing import Callable
 
-# error: [invalid-type-form] "The first argument to `typing.Callable` must be either a list of types, parameter specification, `typing.Concatenate`, or `...`"
+# error: [invalid-type-form] "The first argument to `Callable` must be either a list of types, ParamSpec, Concatenate, or `...`"
 def _(c: Callable[int, str]):
     reveal_type(c)  # revealed: (...) -> Unknown
 ```
@@ -39,7 +39,7 @@ def _(c: Callable[int, str]):
 Or, when it's a literal type:
 
 ```py
-# error: [invalid-type-form] "The first argument to `typing.Callable` must be either a list of types, parameter specification, `typing.Concatenate`, or `...`"
+# error: [invalid-type-form] "The first argument to `Callable` must be either a list of types, ParamSpec, Concatenate, or `...`"
 def _(c: Callable[42, str]):
     reveal_type(c)  # revealed: (...) -> Unknown
 ```
