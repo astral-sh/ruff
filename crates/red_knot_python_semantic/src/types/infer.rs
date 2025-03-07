@@ -6755,7 +6755,7 @@ mod tests {
             assert_eq!(var_ty.display(&db).to_string(), var);
 
             let expected_name_ty = format!(r#"Literal["{var}"]"#);
-            let name_ty = var_ty.member(&db, "__name__".into()).symbol.expect_type();
+            let name_ty = var_ty.member(&db, "__name__").symbol.expect_type();
             assert_eq!(name_ty.display(&db).to_string(), expected_name_ty);
 
             let KnownInstanceType::TypeVar(typevar) = var_ty.expect_known_instance() else {
