@@ -3354,21 +3354,86 @@ impl<'db> TypeInferenceBuilder<'db> {
         let ast::ExprLambda {
             range: _,
             parameters,
-            body: _,
+            body,
         } = lambda_expression;
 
-        if let Some(parameters) = parameters {
-            for default in parameters
-                .iter_non_variadic_params()
-                .filter_map(|param| param.default.as_deref())
-            {
-                self.infer_expression(default);
-            }
+        let parameters = if let Some(parameters) = parameters {
+            let positional_only = parameters
+                .posonlyargs
+                .iter()
+                .map(|parameter| {
+                    Parameter::new(
+                        Some(parameter.name().id.clone()),
+                        None,
+                        ParameterKind::PositionalOnly {
+                            default_ty: parameter
+                                .default()
+                                .map(|default| self.infer_expression(default)),
+                        },
+                    )
+                })
+                .collect::<Vec<_>>();
+            let positional_or_keyword = parameters
+                .args
+                .iter()
+                .map(|parameter| {
+                    Parameter::new(
+                        Some(parameter.name().id.clone()),
+                        None,
+                        ParameterKind::PositionalOrKeyword {
+                            default_ty: parameter
+                                .default()
+                                .map(|default| self.infer_expression(default)),
+                        },
+                    )
+                })
+                .collect::<Vec<_>>();
+            let variadic = parameters.vararg.as_ref().map(|parameter| {
+                Parameter::new(
+                    Some(parameter.name.id.clone()),
+                    None,
+                    ParameterKind::Variadic,
+                )
+            });
+            let keyword_only = parameters
+                .kwonlyargs
+                .iter()
+                .map(|parameter| {
+                    Parameter::new(
+                        Some(parameter.name().id.clone()),
+                        None,
+                        ParameterKind::KeywordOnly {
+                            default_ty: parameter
+                                .default()
+                                .map(|default| self.infer_expression(default)),
+                        },
+                    )
+                })
+                .collect::<Vec<_>>();
+            let keyword_variadic = parameters.kwarg.as_ref().map(|parameter| {
+                Parameter::new(
+                    Some(parameter.name.id.clone()),
+                    None,
+                    ParameterKind::KeywordVariadic,
+                )
+            });
 
-            self.infer_parameters(parameters);
-        }
+            Parameters::new(
+                positional_only
+                    .into_iter()
+                    .chain(positional_or_keyword)
+                    .chain(variadic)
+                    .chain(keyword_only)
+                    .chain(keyword_variadic),
+            )
+        } else {
+            Parameters::empty()
+        };
 
-        todo_type!("typing.Callable type")
+        Type::Callable(CallableType::General(GeneralCallableType::new(
+            self.db(),
+            Signature::new(parameters, Some(self.file_expression_type(&**body))),
+        )))
     }
 
     fn infer_call_expression(&mut self, call_expression: &ast::ExprCall) -> Type<'db> {
