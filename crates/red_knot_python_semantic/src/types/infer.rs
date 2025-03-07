@@ -1592,14 +1592,18 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = with_statement;
         for item in items {
             let target = item.optional_vars.as_deref();
-            if let Some(ast::Expr::Name(name)) = target {
-                self.infer_definition(name);
+            // TODO infer definitions in unpacking assignment
+            if let Some(target) = target {
+                self.infer_target(target, &item.context_expr, |db, ctx_manager_ty| {
+                    // TODO: `infer_with_statement_definition` reports a diagnostic if `ctx_manager_ty` isn't a context manager
+                    //  but only if the target is a name. We should report a diagnostic here if the target isn't a name:
+                    //  `with not_context_manager as a.x: ...
+                    ctx_manager_ty.enter(db)
+                });
             } else {
-                // TODO infer definitions in unpacking assignment
-
                 // Call into the context expression inference to validate that it evaluates
                 // to a valid context manager.
-                let context_expression_ty = self.infer_standalone_expression(&item.context_expr);
+                let context_expression_ty = self.infer_expression(&item.context_expr);
                 self.infer_context_expression(&item.context_expr, context_expression_ty, *is_async);
                 self.infer_optional_expression(target);
             }

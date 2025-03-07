@@ -680,10 +680,31 @@ with ContextManager() as (a, *b):
     reveal_type(b)  # revealed: @Todo(starred unpacking)
 ```
 
-### Invalid context manager expression
+### Unbound context manager expression
 
 ```py
+# TODO: should only be one diagnostic
 # error: [unresolved-reference] "Name `nonexistant` used when not defined"
-with nonexistant as x:
+# error: [unresolved-reference] "Name `nonexistant` used when not defined"
+# error: [unresolved-reference] "Name `nonexistant` used when not defined"
+with nonexistant as (x, y):
     reveal_type(x)  # revealed: Unknown
+    reveal_type(y)  # revealed: Unknown
+```
+
+### Invalid unpacking
+
+```py
+class ContextManager:
+    def __enter__(self) -> tuple[int, str]:
+        return (1, "a")
+
+    def __exit__(self, *args) -> None:
+        pass
+
+# error: [invalid-assignment] "Not enough values to unpack (expected 3, got 2)"
+with ContextManager() as (a, b, c):
+    reveal_type(a)  # revealed: int
+    reveal_type(b)  # revealed: str
+    reveal_type(c)  # revealed: Unknown
 ```
