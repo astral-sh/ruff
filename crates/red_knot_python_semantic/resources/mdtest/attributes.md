@@ -709,7 +709,7 @@ reveal_type(Derived().defined_in_init)  # revealed: str | None
 ## Accessing attributes on class objects
 
 When accessing attributes on class objects, they are always looked up on the type of the class
-object first, i.e. on the meta class:
+object first, i.e. on the metaclass:
 
 ```py
 from typing import Literal
@@ -788,7 +788,7 @@ def _(flag1: bool, flag2: bool):
 
 ## Union of attributes
 
-If the (meta) class is a union type or if the attribute on the (meta) class has a union type, we
+If the (meta)class is a union type or if the attribute on the (meta) class has a union type, we
 infer those union types accordingly:
 
 ```py

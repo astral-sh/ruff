@@ -6,8 +6,8 @@ use call::{CallDunderError, CallError};
 use context::InferContext;
 use diagnostic::NOT_ITERABLE;
 use ruff_db::files::File;
+use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
-use ruff_python_ast::{self as ast};
 use ruff_text_size::{Ranged, TextRange};
 use type_ordering::union_elements_ordering;
 
@@ -1418,17 +1418,17 @@ impl<'db> Type<'db> {
         match self {
             Type::Union(union) => Some(union.map_with_boundness_and_qualifiers(db, |elem| {
                 elem.find_name_in_mro(db, name)
-                    // If some elements are classes, and some are not, we simply fall back to Unbound for the non-class
+                    // If some elements are classes, and some are not, we simply fall back to `Unbound` for the non-class
                     // elements instead of short-circuiting the whole result to `None`. We would need a more detailed
-                    // return type otherwise, and since `find_name_in_mro` is usualled via `class_member`, this is not
-                    // a problem.
-                    .unwrap_or(Symbol::Unbound.into())
+                    // return type otherwise, and since `find_name_in_mro` is usually called via `class_member`, this is
+                    // not a problem.
+                    .unwrap_or_default()
             })),
             Type::Intersection(inter) => {
                 Some(inter.map_with_boundness_and_qualifiers(db, |elem| {
                     elem.find_name_in_mro(db, name)
                         // Fall back to Unbound, similar to the union case (see above).
-                        .unwrap_or(Symbol::Unbound.into())
+                        .unwrap_or_default()
                 }))
             }
 
@@ -1988,7 +1988,7 @@ impl<'db> Type<'db> {
 
             Type::ClassLiteral(..) | Type::SubclassOf(..) => {
                 let class_attr_plain = self.find_name_in_mro(db, name_str).expect(
-                    "Calling `find_name_in_mro` on class literals and subclass-of types returns `Some` result",
+                    "Calling `find_name_in_mro` on class literals and subclass-of types should always return `Some`",
                 );
 
                 if name == "__mro__" {

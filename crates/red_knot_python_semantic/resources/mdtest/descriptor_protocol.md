@@ -34,11 +34,9 @@ reveal_type(C.ten)  # revealed: Literal[10]
 c.ten = 10
 C.ten = 10
 
-# TODO: This should be an error (as the wrong type is being implicitly passed to `Ten.__set__`).
 # error: [invalid-assignment] "Object of type `Literal[11]` is not assignable to attribute `ten` of type `Literal[10]`"
 c.ten = 11
 
-# TODO: same as above
 # error: [invalid-assignment] "Object of type `Literal[11]` is not assignable to attribute `ten` of type `Literal[10]`"
 C.ten = 11
 ```
@@ -511,12 +509,12 @@ class TailoredForInstanceAccess:
     def __get__(self, instance: C, owner: type[C] | None = None) -> str:
         return "a"
 
-class TailoredForMetaClassAccess:
+class TailoredForMetaclassAccess:
     def __get__(self, instance: type[C], owner: type[Meta]) -> bytes:
         return b"a"
 
 class Meta(type):
-    meta_class_access: TailoredForMetaClassAccess = TailoredForMetaClassAccess()
+    metaclass_access: TailoredForMetaclassAccess = TailoredForMetaclassAccess()
 
 class C(metaclass=Meta):
     class_object_access: TailoredForClassObjectAccess = TailoredForClassObjectAccess()
@@ -524,7 +522,7 @@ class C(metaclass=Meta):
 
 reveal_type(C.class_object_access)  # revealed: int
 reveal_type(C().instance_access)  # revealed: str
-reveal_type(C.meta_class_access)  # revealed: bytes
+reveal_type(C.metaclass_access)  # revealed: bytes
 
 # TODO: These should emit a diagnostic
 reveal_type(C().class_object_access)  # revealed: TailoredForClassObjectAccess
@@ -602,7 +600,7 @@ def _(flag: bool):
 ## Descriptors with non-function `__get__` callables that are descriptors themselves
 
 The descriptor protocol is recursive, i.e. looking up `__get__` can involve triggering the
-descriptor protocol on the callables `__call__` method:
+descriptor protocol on the callable's `__call__` method:
 
 ```py
 from __future__ import annotations

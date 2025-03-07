@@ -264,7 +264,7 @@ the class itself. This also creates a bound method that is bound to the class ob
 from __future__ import annotations
 
 class Meta(type):
-    def f(cls: type[C | D | E], arg: int) -> str:
+    def f(cls, arg: int) -> str:
         return "a"
 
 class C(metaclass=Meta):
@@ -281,7 +281,7 @@ The method `f` can not be accessed from an instance of the class:
 C().f
 ```
 
-A metaclass function can be shadowed by a class method:
+A metaclass function can be shadowed by a method on the class:
 
 ```py
 from typing import Any, Literal

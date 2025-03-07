@@ -230,9 +230,9 @@ from typing import Iterable
 
 class C[T]:
     class Ok1[S]: ...
-    # TODO: error
+    # TODO: error for reuse of typevar
     class Bad1[T]: ...
-    # TODO: error
+    # TODO: no non-subscriptable error, error for reuse of typevar
     # error: [non-subscriptable]
     class Bad2(Iterable[T]): ...
 ```

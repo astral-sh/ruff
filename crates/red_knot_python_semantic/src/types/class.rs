@@ -338,7 +338,7 @@ impl<'db> Class<'db> {
         for superclass in self.iter_mro(db) {
             match superclass {
                 ClassBase::Dynamic(DynamicType::TodoProtocol) => {
-                    // TODO: We currently skip protocols when looking up class members, in order to
+                    // TODO: We currently skip `Protocol` when looking up class members, in order to
                     // avoid creating many dynamic types in our test suite that would otherwise
                     // result from looking up attributes on builtin types like `str`, `list`, `tuple`
                 }
@@ -413,7 +413,7 @@ impl<'db> Class<'db> {
         for superclass in self.iter_mro(db) {
             match superclass {
                 ClassBase::Dynamic(DynamicType::TodoProtocol) => {
-                    // TODO: We currently skip protocols when looking up instance members, in order to
+                    // TODO: We currently skip `Protocol` when looking up instance members, in order to
                     // avoid creating many dynamic types in our test suite that would otherwise
                     // result from looking up attributes on builtin types like `str`, `list`, `tuple`
                 }

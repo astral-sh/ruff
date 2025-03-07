@@ -83,6 +83,12 @@ class E(metaclass=Meta): ...
 reveal_type(inspect.getattr_static(E, "attr"))  # revealed: int
 ```
 
+Metaclass attributes can not be added when probing an instance of the class:
+
+```py
+reveal_type(inspect.getattr_static(E(), "attr", "non_existent"))  # revealed: Literal["non_existent"]
+```
+
 ## Error cases
 
 We can only infer precise types if the attribute is a literal string. In all other cases, we fall

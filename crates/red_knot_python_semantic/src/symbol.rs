@@ -211,7 +211,7 @@ pub(crate) fn class_symbol<'db>(
                 Symbol::Unbound.into()
             }
         })
-        .unwrap_or(Symbol::Unbound.into())
+        .unwrap_or_default()
 }
 
 /// Infers the public type of an explicit module-global symbol as seen from within the same file.
@@ -301,7 +301,7 @@ pub(crate) fn builtins_symbol<'db>(db: &'db dyn Db, symbol: &str) -> SymbolAndQu
                 module_type_implicit_global_symbol(db, symbol)
             })
         })
-        .unwrap_or(Symbol::Unbound.into())
+        .unwrap_or_default()
 }
 
 /// Lookup the type of `symbol` in a given known module.
@@ -314,7 +314,7 @@ pub(crate) fn known_module_symbol<'db>(
 ) -> SymbolAndQualifiers<'db> {
     resolve_module(db, &known_module.name())
         .map(|module| imported_symbol(db, &module, symbol))
-        .unwrap_or(Symbol::Unbound.into())
+        .unwrap_or_default()
 }
 
 /// Lookup the type of `symbol` in the `typing` module namespace.
@@ -399,6 +399,15 @@ pub(crate) type SymbolFromDeclarationsResult<'db> =
 pub(crate) struct SymbolAndQualifiers<'db> {
     pub(crate) symbol: Symbol<'db>,
     pub(crate) qualifiers: TypeQualifiers,
+}
+
+impl Default for SymbolAndQualifiers<'_> {
+    fn default() -> Self {
+        SymbolAndQualifiers {
+            symbol: Symbol::Unbound,
+            qualifiers: TypeQualifiers::empty(),
+        }
+    }
 }
 
 impl<'db> SymbolAndQualifiers<'db> {
@@ -604,7 +613,7 @@ fn symbol_impl<'db>(
     symbol_table(db, scope)
         .symbol_id_by_name(name)
         .map(|symbol| symbol_by_id(db, scope, symbol, requires_explicit_reexport))
-        .unwrap_or(Symbol::Unbound.into())
+        .unwrap_or_default()
 }
 
 /// Implementation of [`symbol_from_bindings`].
