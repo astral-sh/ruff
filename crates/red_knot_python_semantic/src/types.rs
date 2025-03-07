@@ -1860,8 +1860,8 @@ impl<'db> Type<'db> {
     /// TODO: We should return a `Result` here to handle errors that can appear during attribute
     /// lookup, like a failed `__get__` call on a descriptor.
     #[must_use]
-    pub(crate) fn member(self, db: &'db dyn Db, name: Name) -> SymbolAndQualifiers<'db> {
-        self.member_lookup_with_policy(db, name, MemberLookupPolicy::WithInstanceFallback)
+    pub(crate) fn member(self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
+        self.member_lookup_with_policy(db, name.into(), MemberLookupPolicy::WithInstanceFallback)
     }
 
     /// Similar to [`Type::member`], but allows the caller to specify what policy should be used
@@ -1881,11 +1881,11 @@ impl<'db> Type<'db> {
 
         match self {
             Type::Union(union) => union
-                .map_with_boundness(db, |elem| elem.member(db, name.clone()).symbol)
+                .map_with_boundness(db, |elem| elem.member(db, &name).symbol)
                 .into(),
 
             Type::Intersection(intersection) => intersection
-                .map_with_boundness(db, |elem| elem.member(db, name.clone()).symbol)
+                .map_with_boundness(db, |elem| elem.member(db, &name).symbol)
                 .into(),
 
             Type::Dynamic(..) | Type::Never => Symbol::bound(self).into(),
@@ -1909,24 +1909,23 @@ impl<'db> Type<'db> {
                 _ => {
                     KnownClass::MethodType
                         .to_instance(db)
-                        .member(db, name.clone())
+                        .member(db, &name)
                         .or_fall_back_to(db, || {
                             // If an attribute is not available on the bound method object,
                             // it will be looked up on the underlying function object:
-                            Type::FunctionLiteral(bound_method.function(db))
-                                .member(db, name.clone())
+                            Type::FunctionLiteral(bound_method.function(db)).member(db, &name)
                         })
                 }
             },
             Type::Callable(CallableType::MethodWrapperDunderGet(_)) => {
                 KnownClass::MethodWrapperType
                     .to_instance(db)
-                    .member(db, name)
+                    .member(db, &name)
             }
             Type::Callable(CallableType::WrapperDescriptorDunderGet) => {
                 KnownClass::WrapperDescriptorType
                     .to_instance(db)
-                    .member(db, name)
+                    .member(db, &name)
             }
 
             Type::Instance(InstanceType { class })
@@ -4259,7 +4258,7 @@ impl<'db> ModuleLiteralType<'db> {
         if name == "__dict__" {
             return KnownClass::ModuleType
                 .to_instance(db)
-                .member(db, "__dict__".into())
+                .member(db, "__dict__")
                 .symbol;
         }
 

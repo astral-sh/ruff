@@ -277,9 +277,7 @@ pub(crate) fn imported_symbol<'db>(
         if name == "__getattr__" {
             Symbol::Unbound.into()
         } else {
-            KnownClass::ModuleType
-                .to_instance(db)
-                .member(db, name.into())
+            KnownClass::ModuleType.to_instance(db).member(db, name)
         }
     })
 }
@@ -837,9 +835,7 @@ mod implicit_globals {
             .iter()
             .any(|module_type_member| &**module_type_member == name)
         {
-            KnownClass::ModuleType
-                .to_instance(db)
-                .member(db, name.into())
+            KnownClass::ModuleType.to_instance(db).member(db, name)
         } else {
             Symbol::Unbound.into()
         }

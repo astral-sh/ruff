@@ -1658,12 +1658,8 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         let context_manager_ty = context_expression_ty.to_meta_type(self.db());
 
-        let enter = context_manager_ty
-            .member(self.db(), "__enter__".into())
-            .symbol;
-        let exit = context_manager_ty
-            .member(self.db(), "__exit__".into())
-            .symbol;
+        let enter = context_manager_ty.member(self.db(), "__enter__").symbol;
+        let exit = context_manager_ty.member(self.db(), "__exit__").symbol;
 
         // TODO: Make use of Protocols when we support it (the manager be assignable to `contextlib.AbstractContextManager`).
         match (enter, exit) {
@@ -2775,7 +2771,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = alias;
 
         // First try loading the requested attribute from the module.
-        if let Symbol::Type(ty, boundness) = module_ty.member(self.db(), name.id.clone()).symbol {
+        if let Symbol::Type(ty, boundness) = module_ty.member(self.db(), &name.id).symbol {
             if boundness == Boundness::PossiblyUnbound {
                 // TODO: Consider loading _both_ the attribute and any submodule and unioning them
                 // together if the attribute exists but is possibly-unbound.
@@ -3811,7 +3807,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let db = self.db();
 
         value_type
-            .member(db, attr.id.clone())
+            .member(db, &attr.id)
             .unwrap_with_diagnostic(|lookup_error| match lookup_error {
                 LookupError::Unbound(_) => {
                     let bound_on_instance = match value_type {
@@ -3885,7 +3881,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                 let symbol = match value_ty {
                     Type::Instance(_) => {
-                        let instance_member = value_ty.member(self.db(), attr.id.clone());
+                        let instance_member = value_ty.member(self.db(), &attr.id);
                         if instance_member.is_class_var() {
                             self.context.report_lint(
                                 &INVALID_ATTRIBUTE_ACCESS,
@@ -3900,7 +3896,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         instance_member.symbol
                     }
                     Type::ClassLiteral(_) | Type::SubclassOf(_) => {
-                        let class_member = value_ty.member(self.db(), attr.id.clone()).symbol;
+                        let class_member = value_ty.member(self.db(), &attr.id).symbol;
 
                         if class_member.is_unbound() {
                             let class = match value_ty {
@@ -3931,7 +3927,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                         class_member
                     }
-                    _ => value_ty.member(self.db(), attr.id.clone()).symbol,
+                    _ => value_ty.member(self.db(), &attr.id).symbol,
                 };
 
                 // TODO: The unbound-case might also yield a diagnostic, but we can not activate
@@ -4255,14 +4251,11 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let right_class = right_ty.to_meta_type(self.db());
                 if left_ty != right_ty && right_ty.is_subtype_of(self.db(), left_ty) {
                     let reflected_dunder = op.reflected_dunder();
-                    let rhs_reflected = right_class
-                        .member(self.db(), reflected_dunder.into())
-                        .symbol;
+                    let rhs_reflected = right_class.member(self.db(), reflected_dunder).symbol;
                     // TODO: if `rhs_reflected` is possibly unbound, we should union the two possible
                     // CallOutcomes together
                     if !rhs_reflected.is_unbound()
-                        && rhs_reflected
-                            != left_class.member(self.db(), reflected_dunder.into()).symbol
+                        && rhs_reflected != left_class.member(self.db(), reflected_dunder).symbol
                     {
                         return right_ty
                             .try_call_dunder(
@@ -5315,9 +5308,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                 // despite the fact that there will be no corresponding `__class_getitem__`
                 // method in these `sys.version_info` branches.
                 if value_ty.is_subtype_of(self.db(), KnownClass::Type.to_instance(self.db())) {
-                    let dunder_class_getitem_method = value_ty
-                        .member(self.db(), "__class_getitem__".into())
-                        .symbol;
+                    let dunder_class_getitem_method =
+                        value_ty.member(self.db(), "__class_getitem__").symbol;
 
                     match dunder_class_getitem_method {
                         Symbol::Unbound => {}
@@ -6349,7 +6341,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let value_ty = self.infer_expression(value);
                 // TODO: Check that value type is enum otherwise return None
                 value_ty
-                    .member(self.db(), attr.id.clone())
+                    .member(self.db(), &attr.id)
                     .symbol
                     .ignore_possibly_unbound()
                     .unwrap_or(Type::unknown())
