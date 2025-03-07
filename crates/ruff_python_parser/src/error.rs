@@ -616,6 +616,32 @@ pub enum UnsupportedSyntaxErrorKind {
     TypeParameterList,
     TypeAliasStatement,
     TypeParamDefault,
+
+    /// Represents the use of tuple unpacking in a `for` statement iterator clause before Python
+    /// 3.9.
+    ///
+    /// ## Examples
+    ///
+    /// Like [`UnsupportedSyntaxError::StarTuple`] in `return` and `yield` statements, prior to
+    /// Python 3.9, tuple unpacking in the iterator clause of a `for` statement required parentheses:
+    ///
+    /// ```python
+    /// # valid on Python 3.8 and earlier
+    /// for i in (*a, *b): ...
+    /// ```
+    ///
+    /// Omitting the parentheses was invalid:
+    ///
+    /// ```python
+    /// for i in *a, *b: ...  # SyntaxError
+    /// ```
+    ///
+    /// This was changed as part of the [PEG parser rewrite] included in Python 3.9 but not
+    /// documented directly until the [Python 3.11 release].
+    ///
+    /// [PEG parser rewrite]: https://peps.python.org/pep-0617/
+    /// [Python 3.11 release]: https://docs.python.org/3/whatsnew/3.11.html#other-language-changes
+    UnparenthesizedUnpackInFor,
 }
 
 impl Display for UnsupportedSyntaxError {
@@ -641,6 +667,9 @@ impl Display for UnsupportedSyntaxError {
             UnsupportedSyntaxErrorKind::TypeAliasStatement => "Cannot use `type` alias statement",
             UnsupportedSyntaxErrorKind::TypeParamDefault => {
                 "Cannot set default type for a type parameter"
+            }
+            UnsupportedSyntaxErrorKind::UnparenthesizedUnpackInFor => {
+                "Cannot use iterable unpacking in `for` statements"
             }
         };
 
@@ -687,6 +716,9 @@ impl UnsupportedSyntaxErrorKind {
             UnsupportedSyntaxErrorKind::TypeParameterList => Change::Added(PythonVersion::PY312),
             UnsupportedSyntaxErrorKind::TypeAliasStatement => Change::Added(PythonVersion::PY312),
             UnsupportedSyntaxErrorKind::TypeParamDefault => Change::Added(PythonVersion::PY313),
+            UnsupportedSyntaxErrorKind::UnparenthesizedUnpackInFor => {
+                Change::Added(PythonVersion::PY39)
+            }
         }
     }
 
