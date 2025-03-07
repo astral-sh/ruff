@@ -121,7 +121,7 @@ impl<'db> Unpacker<'db> {
                     if let Some(tuple_ty) = ty.into_tuple() {
                         let tuple_ty_elements = self.tuple_ty_elements(target, elts, tuple_ty);
 
-                        match elts.len().cmp(&tuple_ty_elements.len()) {
+                        let length_mismatch = match elts.len().cmp(&tuple_ty_elements.len()) {
                             Ordering::Less => {
                                 self.context.report_lint(
                                     &INVALID_ASSIGNMENT,
@@ -132,6 +132,7 @@ impl<'db> Unpacker<'db> {
                                         tuple_ty_elements.len()
                                     ),
                                 );
+                                true
                             }
                             Ordering::Greater => {
                                 self.context.report_lint(
@@ -143,13 +144,18 @@ impl<'db> Unpacker<'db> {
                                         tuple_ty_elements.len()
                                     ),
                                 );
+                                true
                             }
-                            Ordering::Equal => {}
-                        }
+                            Ordering::Equal => false,
+                        };
 
                         for (index, ty) in tuple_ty_elements.iter().enumerate() {
                             if let Some(element_types) = target_types.get_mut(index) {
-                                element_types.push(*ty);
+                                if length_mismatch {
+                                    element_types.push(Type::unknown());
+                                } else {
+                                    element_types.push(*ty);
+                                }
                             }
                         }
                     } else {
@@ -243,15 +249,7 @@ impl<'db> Unpacker<'db> {
                 ),
             );
 
-            let mut element_types = tuple_ty.elements(self.db()).to_vec();
-
-            // Subtract 1 to insert the starred expression type at the correct
-            // index.
-            element_types.resize(targets.len() - 1, Type::unknown());
-            // TODO: This should be `list[Unknown]`
-            element_types.insert(starred_index, todo_type!("starred unpacking"));
-
-            Cow::Owned(element_types)
+            Cow::Owned(vec![Type::unknown(); targets.len()])
         }
     }
 
