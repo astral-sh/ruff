@@ -75,8 +75,7 @@ def _(flag: bool):
 
     f = Foo()
 
-    # TODO: We should emit an `unsupported-operator` error here, possibly with the information
-    # that `Foo.__iadd__` may be unbound as additional context.
+    # error: [unsupported-operator] "Operator `+=` is unsupported between objects of type `Foo` and `Literal["Hello, world!"]`"
     f += "Hello, world!"
 
     reveal_type(f)  # revealed: int | Unknown
