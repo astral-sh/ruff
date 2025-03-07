@@ -2615,68 +2615,126 @@ impl<'db> Type<'db> {
             }
 
             // TODO annotated return type on `__new__` or metaclass `__call__`
-            // TODO check call vs signatures of `__new__` and/or `__init__`
+            // TODO check call vs signatures of standalone `__new__` or in combination with `__init__`
             Type::ClassLiteral(ClassLiteralType { class }) => {
-                let return_ty = match class.known(db) {
-                    // TODO: We should check the call signature and error if the bool call doesn't have the
-                    //   right signature and return a binding error.
+                if let Some(known_class) = class.known(db) {
+                    Ok(CallOutcome::Single(CallBinding::from_return_type(
+                        match known_class {
+                            // TODO: We should check the call signature and error if the bool call doesn't have the
+                            //   right signature and return a binding error.
 
-                    // If the class is the builtin-bool class (for example `bool(1)`), we try to
-                    // return the specific truthiness value of the input arg, `Literal[True]` for
-                    // the example above.
-                    Some(KnownClass::Bool) => arguments
-                        .first_argument()
-                        .map(|arg| arg.bool(db).into_type(db))
-                        .unwrap_or(Type::BooleanLiteral(false)),
+                            // If the class is the builtin-bool class (for example `bool(1)`), we try to
+                            // return the specific truthiness value of the input arg, `Literal[True]` for
+                            // the example above.
+                            KnownClass::Bool => arguments
+                                .first_argument()
+                                .map(|arg| arg.bool(db).into_type(db))
+                                .unwrap_or(Type::BooleanLiteral(false)),
 
-                    // TODO: Don't ignore the second and third arguments to `str`
-                    //   https://github.com/astral-sh/ruff/pull/16161#discussion_r1958425568
-                    Some(KnownClass::Str) => arguments
-                        .first_argument()
-                        .map(|arg| arg.str(db))
-                        .unwrap_or_else(|| Type::string_literal(db, "")),
+                            // TODO: Don't ignore the second and third arguments to `str`
+                            //   https://github.com/astral-sh/ruff/pull/16161#discussion_r1958425568
+                            KnownClass::Str => arguments
+                                .first_argument()
+                                .map(|arg| arg.str(db))
+                                .unwrap_or_else(|| Type::string_literal(db, "")),
 
-                    Some(KnownClass::Type) => arguments
-                        .exactly_one_argument()
-                        .map(|arg| arg.to_meta_type(db))
-                        .unwrap_or_else(|| KnownClass::Type.to_instance(db)),
+                            KnownClass::Type => arguments
+                                .exactly_one_argument()
+                                .map(|arg| arg.to_meta_type(db))
+                                .unwrap_or_else(|| KnownClass::Type.to_instance(db)),
 
-                    // TODO: check signatures of other KnownClass constructors
-                    Some(_) => Type::Instance(InstanceType { class }),
-
+                            // TODO: remove a dedicated branch when `__new__` handling is added.
+                            // at that point the regular logic should be able to check signatures
+                            // of other KnownClass constructors against typeshed.
+                            _ => Type::Instance(InstanceType { class }),
+                        },
+                    )))
+                } else {
                     // User defined class
-                    None => {
-                        let instance_ty = Type::Instance(InstanceType { class });
+                    let instance_ty = Type::Instance(InstanceType { class });
 
-                        // Try calling __init__ to check arguments before returning the instance type
-                        match instance_ty.try_call_dunder(db, "__init__", arguments) {
-                            Err(CallDunderError::Call(error)) => {
-                                // If the call to `__init__` fails return inner error directly
-                                return Err(error);
+                    // Try calling __init__ to check arguments before returning the instance type
+                    match instance_ty.try_call_dunder(db, "__init__", arguments) {
+                        Err(CallDunderError::Call(error)) => {
+                            // If the call to `__init__` fails we want to return inner error directly
+                            // but ensure that the fallback return type is the instance type.
+
+                            fn replace_return_type<'db>(
+                                error: CallError<'db>,
+                                instance_ty: Type<'db>,
+                            ) -> Option<CallError<'db>> {
+                                match error {
+                                    CallError::NotCallable { .. } => {
+                                        // Instead of trying to emit a diagnostic at call site, these should be
+                                        // caught at the definition site of the class. Here we return Ok with the
+                                        // instance type to ensure that the return type is correct.
+                                        None
+                                    }
+                                    CallError::Union(UnionCallError {
+                                        mut bindings,
+                                        errors,
+                                        called_type,
+                                    }) => {
+                                        // We need to recursively replace the return type of each binding
+                                        // inside the union, and traverse nested errors.
+                                        for binding in &mut bindings {
+                                            binding.set_return_type(instance_ty);
+                                        }
+
+                                        let mut replaced_errors = Vec::with_capacity(errors.len());
+                                        for error in errors {
+                                            if let Some(replaced_error) =
+                                                replace_return_type(error, instance_ty)
+                                            {
+                                                replaced_errors.push(replaced_error);
+                                            }
+                                        }
+
+                                        Some(CallError::Union(UnionCallError {
+                                            bindings,
+                                            errors: replaced_errors.into_boxed_slice(),
+                                            called_type,
+                                        }))
+                                    }
+                                    CallError::PossiblyUnboundDunderCall { .. } => {
+                                        unreachable!("`__init__` can't be unbound on a class, as all classes have `object` in MRO, which has `__init__`. This fail indicates an error in typeshed");
+                                    }
+                                    CallError::BindingError { mut binding } => {
+                                        binding.set_return_type(instance_ty);
+                                        Some(CallError::BindingError { binding })
+                                    }
+                                }
                             }
-                            // Turn "possibly unbound object of type `Literal['__init__']`"
-                            // into "`X` not callable (possibly unbound `__init__` method)"
-                            Err(CallDunderError::PossiblyUnbound(outcome)) => {
-                                return Err(CallError::PossiblyUnboundDunderCall {
-                                    called_type: self,
-                                    outcome: Box::new(outcome),
-                                });
+
+                            replace_return_type(error, instance_ty).map_or(
+                                Ok(CallOutcome::Single(CallBinding::from_return_type(
+                                    instance_ty,
+                                ))),
+                                Err,
+                            )
+                        }
+                        // Turn "possibly unbound object of type `Literal['__init__']`"
+                        // into "`X` not callable (possibly unbound `__init__` method)"
+                        Err(
+                            CallDunderError::PossiblyUnbound(_)
+                            | CallDunderError::MethodNotAvailable,
+                        ) => {
+                            unreachable!("`__init__` can't be unbound on a class, as all classes have `object` in MRO, which has `__init__`. This fail indicates an error in typeshed");
+                        }
+                        // If the call to `__init__` is successful, we need to emit the resulting
+                        // binding (which may include errors) and but replace the return type with instance type.
+                        Ok(CallOutcome::Single(mut binding)) => {
+                            binding.set_return_type(instance_ty);
+                            Ok(CallOutcome::Single(binding))
+                        }
+                        Ok(CallOutcome::Union(mut union)) => {
+                            for binding in &mut union {
+                                binding.set_return_type(instance_ty);
                             }
-                            Err(CallDunderError::MethodNotAvailable) => {
-                                // No `__init__` method available, return the instance type
-                                instance_ty
-                            }
-                            Ok(_) => {
-                                // If the call to `__init__` is successful, return the instance type
-                                instance_ty
-                            }
+                            Ok(CallOutcome::Union(union))
                         }
                     }
-                };
-
-                Ok(CallOutcome::Single(CallBinding::from_return_type(
-                    return_ty,
-                )))
+                }
             }
 
             instance_ty @ Type::Instance(_) => {

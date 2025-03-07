@@ -103,8 +103,8 @@ pub(crate) fn bind_call<'db>(
                 first_excess_argument_index,
                 num_synthetic_args,
             ),
-            expected_positional_count: parameters.positional().count(),
-            provided_positional_count: next_positional,
+            expected_positional_count: parameters.positional().count() - num_synthetic_args,
+            provided_positional_count: next_positional - num_synthetic_args,
         });
     }
     let mut missing = vec![];
