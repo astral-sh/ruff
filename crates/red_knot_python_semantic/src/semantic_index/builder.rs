@@ -1269,10 +1269,9 @@ where
                     optional_vars,
                 } in items
                 {
-                    let context_manager = self.add_standalone_expression(context_expr);
                     self.visit_expr(context_expr);
                     if let Some(optional_vars) = optional_vars.as_deref() {
-                        self.add_standalone_expression(context_expr);
+                        let context_manager = self.add_standalone_expression(context_expr);
                         let current_assignment = match optional_vars {
                             ast::Expr::Tuple(_) | ast::Expr::List(_) => {
                                 Some(CurrentAssignment::WithItem {
