@@ -1737,15 +1737,12 @@ impl<'db> Type<'db> {
 
             SymbolAndQualifiers {
                 symbol: Symbol::Type(attribute_ty, boundness),
-                qualifiers,
+                qualifiers: _,
             } => {
                 if let Some((return_ty, attribute_kind)) =
                     attribute_ty.try_call_dunder_get(db, instance, owner)
                 {
-                    (
-                        Symbol::Type(return_ty, boundness).with_qualifiers(qualifiers),
-                        attribute_kind,
-                    )
+                    (Symbol::Type(return_ty, boundness).into(), attribute_kind)
                 } else {
                     (attribute, AttributeKind::NormalOrNonDataDescriptor)
                 }
