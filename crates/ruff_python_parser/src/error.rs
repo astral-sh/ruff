@@ -1,7 +1,7 @@
 use std::fmt::{self, Display};
 
 use ruff_python_ast::PythonVersion;
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::TokenKind;
 
@@ -439,14 +439,20 @@ pub struct UnsupportedSyntaxError {
     pub target_version: PythonVersion,
 }
 
+impl Ranged for UnsupportedSyntaxError {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
+
 /// The type of tuple unpacking for [`UnsupportedSyntaxErrorKind::StarTuple`].
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum StarTupleKind {
     Return,
     Yield,
 }
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum UnsupportedSyntaxErrorKind {
     Match,
     Walrus,
