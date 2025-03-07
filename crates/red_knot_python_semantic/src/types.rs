@@ -1492,12 +1492,14 @@ impl<'db> Type<'db> {
             }
             Type::SubclassOf(subclass_of_ty) => subclass_of_ty.find_name_in_mro(db, name),
 
+            // We eagerly normalize type[object], i.e. Type::SubclassOf(object) to `type`, i.e. Type::Instance(type).
+            // So looking up a name in the MRO of `Type::Instance(type)` is equivalent to looking up the name in the
+            // MRO of the class `object`.
             Type::Instance(InstanceType { class }) if class.is_known(db, KnownClass::Type) => {
                 KnownClass::Object
                     .to_class_literal(db)
                     .find_name_in_mro(db, name)
             }
-
             Type::FunctionLiteral(_)
             | Type::Callable(_)
             | Type::ModuleLiteral(_)
