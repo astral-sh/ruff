@@ -152,6 +152,32 @@ impl<'db> CallError<'db> {
         self.return_type(db).unwrap_or(Type::unknown())
     }
 
+    /// Sets the return type of the call.
+    pub(super) fn set_return_type(&mut self, return_ty: Type<'db>) {
+        match self {
+            CallError::NotCallable { .. } => {}
+            CallError::Union(UnionCallError {
+                bindings, errors, ..
+            }) => {
+                // We need to recursively replace the return type of each binding
+                // inside the union, and traverse nested errors.
+                for binding in bindings {
+                    binding.set_return_type(return_ty);
+                }
+
+                for error in errors {
+                    error.set_return_type(return_ty);
+                }
+            }
+            CallError::PossiblyUnboundDunderCall { outcome, .. } => {
+                outcome.set_return_type(return_ty);
+            }
+            CallError::BindingError { binding } => {
+                binding.set_return_type(return_ty);
+            }
+        }
+    }
+
     /// The resolved type that was not callable.
     ///
     /// For unions, returns the union type itself, which may contain a mix of callable and

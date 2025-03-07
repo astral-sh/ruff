@@ -2655,66 +2655,33 @@ impl<'db> Type<'db> {
 
                     // Try calling __init__ to check arguments before returning the instance type
                     match instance_ty.try_call_dunder(db, "__init__", arguments) {
-                        Err(CallDunderError::Call(error)) => {
+                        Err(CallDunderError::Call(mut error)) => {
                             // If the call to `__init__` fails we want to return inner error directly
                             // but ensure that the fallback return type is the instance type.
 
-                            fn replace_return_type<'db>(
-                                error: CallError<'db>,
-                                instance_ty: Type<'db>,
-                            ) -> Option<CallError<'db>> {
-                                match error {
-                                    CallError::NotCallable { .. } => {
-                                        // Instead of trying to emit a diagnostic at call site, these should be
-                                        // caught at the definition site of the class. Here we return Ok with the
-                                        // instance type to ensure that the return type is correct.
-                                        None
-                                    }
-                                    CallError::Union(UnionCallError {
-                                        mut bindings,
-                                        errors,
-                                        called_type,
-                                    }) => {
-                                        // We need to recursively replace the return type of each binding
-                                        // inside the union, and traverse nested errors.
-                                        for binding in &mut bindings {
-                                            binding.set_return_type(instance_ty);
-                                        }
+                            match error {
+                                CallError::NotCallable { .. } => {
+                                    // Instead of trying to emit a diagnostic at call site, these should be
+                                    // caught at the definition site of the class. Here we return Ok with the
+                                    // instance type to ensure that the return type is correct.
+                                    Ok(CallOutcome::Single(CallBinding::from_return_type(
+                                        instance_ty,
+                                    )))
+                                }
+                                CallError::PossiblyUnboundDunderCall { .. } => {
+                                    tracing::warn!("Inferred `__init__` as possibly unbound on a class. All classes have `object` in MRO, so this is not possible. This indicates an error in typeshed.");
 
-                                        let mut replaced_errors = Vec::with_capacity(errors.len());
-                                        for error in errors {
-                                            if let Some(replaced_error) =
-                                                replace_return_type(error, instance_ty)
-                                            {
-                                                replaced_errors.push(replaced_error);
-                                            }
-                                        }
-
-                                        Some(CallError::Union(UnionCallError {
-                                            bindings,
-                                            errors: replaced_errors.into_boxed_slice(),
-                                            called_type,
-                                        }))
-                                    }
-                                    CallError::PossiblyUnboundDunderCall { .. } => {
-                                        tracing::warn!("Inferred `__init__` as possibly unbound on a class. All classes have `object` in MRO, so this is not possible. This indicates an error in typeshed.");
-
-                                        // We return None (see the logic for `NotCallable` above).
-                                        None
-                                    }
-                                    CallError::BindingError { mut binding } => {
-                                        binding.set_return_type(instance_ty);
-                                        Some(CallError::BindingError { binding })
-                                    }
+                                    // We return None (see the logic for `NotCallable` above).
+                                    Ok(CallOutcome::Single(CallBinding::from_return_type(
+                                        instance_ty,
+                                    )))
+                                }
+                                CallError::Union(_) | CallError::BindingError { .. } => {
+                                    // Replace the return type and return as Err
+                                    error.set_return_type(instance_ty);
+                                    Err(error)
                                 }
                             }
-
-                            replace_return_type(error, instance_ty).map_or(
-                                Ok(CallOutcome::Single(CallBinding::from_return_type(
-                                    instance_ty,
-                                ))),
-                                Err,
-                            )
                         }
                         // If we are using vendored typeshed, it should be impossible to have missing
                         // or unbound `__init__` methods on classes, as all classes have `object` in MRO,
