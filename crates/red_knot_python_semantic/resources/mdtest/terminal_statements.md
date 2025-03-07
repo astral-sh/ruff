@@ -652,6 +652,7 @@ def f(cond: bool) -> str:
     x = "before"
     if cond:
         reveal_type(x)  # revealed: Literal["before"]
+        # error: [invalid-return-type]
         return
         x = "after-return"
         # TODO: no unresolved-reference error

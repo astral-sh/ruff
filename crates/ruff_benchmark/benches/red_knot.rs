@@ -71,14 +71,14 @@ static EXPECTED_DIAGNOSTICS: &[KeyDiagnosticFields] = &[
     (
         DiagnosticId::lint("invalid-return-type"),
         Some("/src/tomllib/_parser.py"),
-        Some(5626..6199),
-        Cow::Borrowed("Object of type `bool | @Todo & ~AlwaysFalsy | @Todo` is not assignable to return type `bool`"),
+        Some(6122..6178),
+        Cow::Borrowed("Object of type `@Todo & ~AlwaysFalsy | @Todo` is not assignable to return type `bool`"),
         Severity::Error,
     ),
     (
         DiagnosticId::lint("invalid-return-type"),
         Some("/src/tomllib/_parser.py"),
-        Some(6346..6818),
+        Some(6814..6818),
         Cow::Borrowed("Object of type `Unknown | Unknown & dict | @Todo & dict` is not assignable to return type `dict`"),
         Severity::Error,
     ),

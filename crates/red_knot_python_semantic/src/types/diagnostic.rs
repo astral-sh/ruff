@@ -13,7 +13,7 @@ use ruff_db::diagnostic::{
 };
 use ruff_db::files::File;
 use ruff_python_ast::{self as ast, AnyNodeRef};
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 use std::borrow::Cow;
 use std::fmt::Formatter;
@@ -1075,13 +1075,13 @@ pub(super) fn report_invalid_attribute_assignment(
 
 pub(super) fn report_invalid_return_type(
     context: &InferContext,
-    node: AnyNodeRef,
+    ranged: impl Ranged,
     expected_ty: Type,
     actual_ty: Type,
 ) {
     context.report_lint(
         &INVALID_RETURN_TYPE,
-        node,
+        ranged,
         format_args!(
             "Object of type `{}` is not assignable to return type `{}`",
             actual_ty.display(context.db()),

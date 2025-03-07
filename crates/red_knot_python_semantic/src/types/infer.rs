@@ -260,6 +260,12 @@ impl<'db> InferenceRegion<'db> {
     }
 }
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq, salsa::Update)]
+struct TypeAndRange<'db> {
+    ty: Type<'db>,
+    range: TextRange,
+}
+
 /// The inferred types for a single region.
 #[derive(Debug, Eq, PartialEq, salsa::Update)]
 pub(crate) struct TypeInference<'db> {
@@ -275,8 +281,8 @@ pub(crate) struct TypeInference<'db> {
     /// The definitions that are deferred.
     deferred: FxHashSet<Definition<'db>>,
 
-    /// The return type of this region, if it is a function body.
-    return_type: Vec<Type<'db>>,
+    /// The returned types and their corresponding ranges of this region, if it is a function body.
+    return_types_and_ranges: Vec<TypeAndRange<'db>>,
 
     /// The diagnostics for this region.
     diagnostics: TypeCheckDiagnostics,
@@ -297,7 +303,7 @@ impl<'db> TypeInference<'db> {
             bindings: FxHashMap::default(),
             declarations: FxHashMap::default(),
             deferred: FxHashSet::default(),
-            return_type: vec![],
+            return_types_and_ranges: vec![],
             diagnostics: TypeCheckDiagnostics::default(),
             scope,
             cycle_fallback_type: None,
@@ -310,7 +316,7 @@ impl<'db> TypeInference<'db> {
             bindings: FxHashMap::default(),
             declarations: FxHashMap::default(),
             deferred: FxHashSet::default(),
-            return_type: vec![],
+            return_types_and_ranges: vec![],
             diagnostics: TypeCheckDiagnostics::default(),
             scope,
             cycle_fallback_type: Some(cycle_fallback_type),
@@ -1050,8 +1056,10 @@ impl<'db> TypeInferenceBuilder<'db> {
         );
     }
 
-    fn set_return_type(&mut self, inferred_ty: Type<'db>) {
-        self.types.return_type.push(inferred_ty);
+    fn set_return_type(&mut self, ty: Type<'db>, range: TextRange) {
+        self.types
+            .return_types_and_ranges
+            .push(TypeAndRange { ty, range });
     }
 
     fn infer_module(&mut self, module: &ast::ModModule) {
@@ -1134,18 +1142,41 @@ impl<'db> TypeInferenceBuilder<'db> {
             if is_suite_empty(&function.body) {
                 return;
             }
-            let inferred_ty = if self.types.return_type.is_empty() {
+            let inferred_ty = if self.types.return_types_and_ranges.is_empty() {
                 KnownClass::NoneType.to_instance(self.db())
             } else {
-                UnionType::from_elements(self.db(), self.types.return_type.iter().copied())
+                UnionType::from_elements(
+                    self.db(),
+                    self.types
+                        .return_types_and_ranges
+                        .iter()
+                        .map(|ty_range| ty_range.ty),
+                )
             };
             if !inferred_ty.is_assignable_to(self.db(), declared_ty) {
-                report_invalid_return_type(
-                    &self.context,
-                    function.into(),
-                    declared_ty,
-                    inferred_ty,
-                );
+                let mut reported = false;
+                for invalid in self
+                    .types
+                    .return_types_and_ranges
+                    .iter()
+                    .filter(|ty_range| !ty_range.ty.is_assignable_to(self.db(), declared_ty))
+                {
+                    report_invalid_return_type(
+                        &self.context,
+                        invalid.range,
+                        declared_ty,
+                        invalid.ty,
+                    );
+                    reported = true;
+                }
+                if !reported {
+                    report_invalid_return_type(
+                        &self.context,
+                        function.range(),
+                        declared_ty,
+                        inferred_ty,
+                    );
+                }
             }
         }
     }
@@ -2698,7 +2729,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
         }
 
-        self.set_return_type(Type::Never);
+        let range = cause.as_ref().map_or(raise.range(), |cause| cause.range());
+        self.set_return_type(Type::Never, range);
     }
 
     /// Given a `from .foo import bar` relative import, resolve the relative module
@@ -2873,7 +2905,13 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     fn infer_return_statement(&mut self, ret: &ast::StmtReturn) {
         if let Some(ty) = self.infer_optional_expression(ret.value.as_deref()) {
-            self.set_return_type(ty);
+            let range = ret
+                .value
+                .as_ref()
+                .map_or(ret.range(), |value| value.range());
+            self.set_return_type(ty, range);
+        } else {
+            self.set_return_type(KnownClass::NoneType.to_instance(self.db()), ret.range());
         }
     }
 

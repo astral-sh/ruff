@@ -154,9 +154,9 @@ class C:
     _name: str | None = None
 
     # TODO: No diagnostic should be emitted here
-    # error: [invalid-return-type]
     @property
     def name(self) -> str:
+        # error: [invalid-return-type]
         return self._name or "Unset"
     # TODO: No diagnostic should be emitted here
     # error: [unresolved-attribute] "Type `Literal[name]` has no attribute `setter`"

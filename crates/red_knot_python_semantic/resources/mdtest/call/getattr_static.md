@@ -12,7 +12,7 @@ import inspect
 
 class Descriptor:
     def __get__(self, instance, owner) -> str:
-        return str(1)
+        return "a"
 
 class C:
     normal: int = 1
