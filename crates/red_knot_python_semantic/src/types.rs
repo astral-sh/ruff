@@ -1883,19 +1883,13 @@ impl<'db> Type<'db> {
             Type::Callable(CallableType::BoundMethod(bound_method)) => {
                 let instance = bound_method.self_instance(db);
                 let arguments = arguments.with_self(instance);
-
                 let binding = bind_call(
                     db,
                     &arguments,
                     bound_method.function(db).signature(db),
                     self,
                 );
-
-                if binding.has_binding_errors() {
-                    Err(CallError::BindingError { binding })
-                } else {
-                    Ok(CallOutcome::Single(binding))
-                }
+                binding.into_outcome()
             }
             Type::Callable(CallableType::MethodWrapperDunderGet(function)) => {
                 // Here, we dynamically model the overloaded function signature of `types.FunctionType.__get__`.
@@ -1965,13 +1959,7 @@ impl<'db> Type<'db> {
                     },
                 );
 
-                let binding = bind_call(db, arguments, &signature, self);
-
-                if binding.has_binding_errors() {
-                    Err(CallError::BindingError { binding })
-                } else {
-                    Ok(CallOutcome::Single(binding))
-                }
+                bind_call(db, arguments, &signature, self).into_outcome()
             }
             Type::Callable(CallableType::WrapperDescriptorDunderGet) => {
                 // Here, we also model `types.FunctionType.__get__`, but now we consider a call to
@@ -2050,13 +2038,7 @@ impl<'db> Type<'db> {
                     ),
                 );
 
-                let binding = bind_call(db, arguments, &signature, self);
-
-                if binding.has_binding_errors() {
-                    Err(CallError::BindingError { binding })
-                } else {
-                    Ok(CallOutcome::Single(binding))
-                }
+                bind_call(db, arguments, &signature, self).into_outcome()
             }
             Type::FunctionLiteral(function_type) => {
                 let mut binding = bind_call(db, arguments, function_type.signature(db), self);
@@ -2146,11 +2128,11 @@ impl<'db> Type<'db> {
                         let Some((instance_ty, attr_name, default)) =
                             binding.three_parameter_types()
                         else {
-                            return Ok(CallOutcome::Single(binding));
+                            return binding.into_outcome();
                         };
 
                         let Some(attr_name) = attr_name.into_string_literal() else {
-                            return Ok(CallOutcome::Single(binding));
+                            return binding.into_outcome();
                         };
 
                         let default = if default.is_unknown() {
@@ -2187,44 +2169,39 @@ impl<'db> Type<'db> {
                     _ => {}
                 };
 
-                if binding.has_binding_errors() {
-                    Err(CallError::BindingError { binding })
-                } else {
-                    Ok(CallOutcome::Single(binding))
-                }
+                binding.into_outcome()
             }
 
             // TODO annotated return type on `__new__` or metaclass `__call__`
             // TODO check call vs signatures of `__new__` and/or `__init__`
             Type::ClassLiteral(ClassLiteralType { class }) => {
-                Ok(CallOutcome::Single(CallBinding::from_return_type(
-                    match class.known(db) {
-                        // TODO: We should check the call signature and error if the bool call doesn't have the
-                        //   right signature and return a binding error.
+                let binding = CallBinding::from_return_type(match class.known(db) {
+                    // TODO: We should check the call signature and error if the bool call doesn't have the
+                    //   right signature and return a binding error.
 
-                        // If the class is the builtin-bool class (for example `bool(1)`), we try to
-                        // return the specific truthiness value of the input arg, `Literal[True]` for
-                        // the example above.
-                        Some(KnownClass::Bool) => arguments
-                            .first_argument()
-                            .map(|arg| arg.bool(db).into_type(db))
-                            .unwrap_or(Type::BooleanLiteral(false)),
+                    // If the class is the builtin-bool class (for example `bool(1)`), we try to
+                    // return the specific truthiness value of the input arg, `Literal[True]` for
+                    // the example above.
+                    Some(KnownClass::Bool) => arguments
+                        .first_argument()
+                        .map(|arg| arg.bool(db).into_type(db))
+                        .unwrap_or(Type::BooleanLiteral(false)),
 
-                        // TODO: Don't ignore the second and third arguments to `str`
-                        //   https://github.com/astral-sh/ruff/pull/16161#discussion_r1958425568
-                        Some(KnownClass::Str) => arguments
-                            .first_argument()
-                            .map(|arg| arg.str(db))
-                            .unwrap_or_else(|| Type::string_literal(db, "")),
+                    // TODO: Don't ignore the second and third arguments to `str`
+                    //   https://github.com/astral-sh/ruff/pull/16161#discussion_r1958425568
+                    Some(KnownClass::Str) => arguments
+                        .first_argument()
+                        .map(|arg| arg.str(db))
+                        .unwrap_or_else(|| Type::string_literal(db, "")),
 
-                        Some(KnownClass::Type) => arguments
-                            .exactly_one_argument()
-                            .map(|arg| arg.to_meta_type(db))
-                            .unwrap_or_else(|| KnownClass::Type.to_instance(db)),
+                    Some(KnownClass::Type) => arguments
+                        .exactly_one_argument()
+                        .map(|arg| arg.to_meta_type(db))
+                        .unwrap_or_else(|| KnownClass::Type.to_instance(db)),
 
-                        _ => Type::Instance(InstanceType { class }),
-                    },
-                )))
+                    _ => Type::Instance(InstanceType { class }),
+                });
+                binding.into_outcome()
             }
 
             instance_ty @ Type::Instance(_) => {
@@ -2267,17 +2244,16 @@ impl<'db> Type<'db> {
 
             // Dynamic types are callable, and the return type is the same dynamic type. Similarly,
             // `Never` is always callable and returns `Never`.
-            Type::Dynamic(_) | Type::Never => {
-                Ok(CallOutcome::Single(CallBinding::from_return_type(self)))
-            }
+            Type::Dynamic(_) | Type::Never => CallBinding::from_return_type(self).into_outcome(),
 
             Type::Union(union) => {
                 CallOutcome::try_call_union(db, union, |element| element.try_call(db, arguments))
             }
 
-            Type::Intersection(_) => Ok(CallOutcome::Single(CallBinding::from_return_type(
-                todo_type!("Type::Intersection.call()"),
-            ))),
+            Type::Intersection(_) => {
+                CallBinding::from_return_type(todo_type!("Type::Intersection.call()"))
+                    .into_outcome()
+            }
 
             _ => Err(CallError::NotCallable {
                 not_callable_type: self,

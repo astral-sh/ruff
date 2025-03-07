@@ -1,4 +1,4 @@
-use super::{Argument, CallArguments, InferContext, Signature, Type};
+use super::{Argument, CallArguments, CallError, CallOutcome, InferContext, Signature, Type};
 use crate::db::Db;
 use crate::types::diagnostic::{
     INVALID_ARGUMENT_TYPE, MISSING_ARGUMENT, PARAMETER_ALREADY_ASSIGNED,
@@ -168,6 +168,13 @@ impl<'db> CallBinding<'db> {
             parameter_tys: Box::default(),
             errors: vec![],
         }
+    }
+
+    pub(crate) fn into_outcome(self) -> Result<CallOutcome<'db>, CallError<'db>> {
+        if self.has_binding_errors() {
+            return Err(CallError::BindingError { binding: self });
+        }
+        Ok(CallOutcome::Single(self))
     }
 
     pub(crate) fn callable_type(&self) -> Type<'db> {
