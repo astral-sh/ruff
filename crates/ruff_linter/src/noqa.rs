@@ -341,8 +341,8 @@ pub(crate) fn lex_inline_noqa(
     Ok(None)
 }
 
-/// Lexess file-level exemption comment, e.g. `# ruff: noqa: F401`
-pub(crate) fn lex_file_exemption(
+/// Lexes file-level exemption comment, e.g. `# ruff: noqa: F401`
+fn lex_file_exemption(
     comment_range: TextRange,
     source: &str,
 ) -> Result<Option<NoqaLexerOutput<'_>>, LexicalError> {
