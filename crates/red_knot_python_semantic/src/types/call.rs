@@ -1,12 +1,11 @@
 use super::context::InferContext;
-use super::{Signature, Type};
-use crate::types::UnionType;
+use crate::types::{Type, UnionType};
 use crate::Db;
 
 mod arguments;
 mod bind;
 pub(super) use arguments::{Argument, CallArguments};
-pub(super) use bind::{bind_call, CallBinding};
+pub(super) use bind::{bind_call, match_call_parameters, CallBinding};
 
 /// A successfully bound call where all arguments are valid.
 ///

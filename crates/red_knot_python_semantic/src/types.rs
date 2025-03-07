@@ -20,7 +20,6 @@ pub(crate) use self::infer::{
     infer_scope_types,
 };
 pub use self::narrow::KnownConstraintFunction;
-pub(crate) use self::signatures::Signature;
 pub use self::subclass_of::SubclassOfType;
 use crate::module_name::ModuleName;
 use crate::module_resolver::{file_to_module, resolve_module, KnownModule};
@@ -30,13 +29,15 @@ use crate::semantic_index::symbol::ScopeId;
 use crate::semantic_index::{imported_modules, semantic_index};
 use crate::suppression::check_suppressions;
 use crate::symbol::{imported_symbol, Boundness, Symbol, SymbolAndQualifiers};
-use crate::types::call::{bind_call, CallArguments, CallBinding, CallOutcome, UnionCallError};
+use crate::types::call::{
+    bind_call, match_call_parameters, CallArguments, CallBinding, CallOutcome, UnionCallError,
+};
 use crate::types::class_base::ClassBase;
 use crate::types::diagnostic::{INVALID_TYPE_FORM, UNSUPPORTED_BOOL_CONVERSION};
 use crate::types::infer::infer_unpack_types;
 use crate::types::mro::{Mro, MroError, MroIterator};
 pub(crate) use crate::types::narrow::infer_narrowing_constraint;
-use crate::types::signatures::{Parameter, ParameterKind, Parameters};
+use crate::types::signatures::{FormalParameter, ParameterKind, SignatureShape, SignatureTypes};
 use crate::{Db, FxOrderSet, Module, Program};
 pub(crate) use class::{Class, ClassLiteralType, InstanceType, KnownClass, KnownInstanceType};
 
@@ -2250,6 +2251,42 @@ impl<'db> Type<'db> {
         non_negative_int_literal(db, return_ty)
     }
 
+    fn get_binding_shape(
+        self,
+        db: &'db dyn Db,
+        arguments: &CallArguments<'_, 'db>,
+    ) -> Result<&'db SignatureShape<'db>, CallError<'db>> {
+        match self {
+            Type::Callable(CallableType::BoundMethod(bound_method)) => {
+                let (shape, _) = bound_method.function(db).signature(db);
+                Ok(shape)
+            }
+            Type::Callable(CallableType::MethodWrapperDunderGet(_)) => Ok(SignatureShape::new([
+                FormalParameter::new_positional("instance", false),
+                FormalParameter::new_positional("owner", false),
+            ])),
+            Type::Callable(CallableType::WrapperDescriptorDunderGet) => Ok(SignatureShape::new([
+                FormalParameter::new_positional("self", false),
+                FormalParameter::new_positional("instance", false),
+                FormalParameter::new_positional("owner", false),
+            ])),
+            Type::FunctionLiteral(function_type) => {
+                let (shape, _) = function_type.signature(db);
+                Ok(shape)
+            }
+            // TODO check call vs signatures of `__new__` and/or `__init__`
+            Type::ClassLiteral(ClassLiteralType { class }) => Ok(SignatureShape::todo()),
+            // XXX: All of these todos
+            Type::Instance(_) => Ok(SignatureShape::todo()),
+            Type::Dynamic(_) => Ok(SignatureShape::any()),
+            Type::Union(_) => Ok(SignatureShape::todo()),
+            Type::Intersection(_) => Ok(SignatureShape::todo()),
+            _ => Err(CallError::NotCallable {
+                not_callable_type: self,
+            }),
+        }
+    }
+
     /// Calls `self`
     ///
     /// Returns `Ok` if the call with the given arguments is successful and `Err` otherwise.
@@ -3953,7 +3990,7 @@ impl<'db> FunctionType<'db> {
     /// Were this not a salsa query, then the calling query
     /// would depend on the function's AST and rerun for every change in that file.
     #[salsa::tracked(return_ref)]
-    pub fn signature(self, db: &'db dyn Db) -> Signature<'db> {
+    pub fn signature(self, db: &'db dyn Db) -> (SignatureShape<'db>, SignatureTypes<'db>) {
         let internal_signature = self.internal_signature(db);
 
         let decorators = self.decorators(db);
@@ -3983,11 +4020,14 @@ impl<'db> FunctionType<'db> {
     ///
     /// Don't call this when checking any other file; only when type-checking the function body
     /// scope.
-    fn internal_signature(self, db: &'db dyn Db) -> Signature<'db> {
+    fn internal_signature(self, db: &'db dyn Db) -> (SignatureShape<'db>, SignatureTypes<'db>) {
         let scope = self.body_scope(db);
         let function_stmt_node = scope.node(db).expect_function();
         let definition = semantic_index(db, scope.file(db)).definition(function_stmt_node);
-        Signature::from_function(db, definition, function_stmt_node)
+        (
+            SignatureShape::from_function(db, function_stmt_node),
+            SignatureTypes::from_function(db, definition, function_stmt_node),
+        )
     }
 
     pub fn is_known(self, db: &'db dyn Db, known_function: KnownFunction) -> bool {
