@@ -124,7 +124,7 @@ pub(crate) fn bit_count(checker: &Checker, call: &ExprCall) {
                 }
             } else {
                 // If it is not the unpacking of a list
-                checker.locator().slice(arg)
+                return;
             }
         }
         _ => checker.locator().slice(arg),
