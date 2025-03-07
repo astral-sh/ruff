@@ -154,7 +154,7 @@ enum InstanceFallbackShadowsNonDataDescriptor {
 /// on a class, dunder methods are only looked up on the meta class, not the class itself.
 ///
 /// All other attributes use the `WithInstanceFallback` policy.
-#[derive(Clone, Debug, Copy, PartialEq)]
+#[derive(Clone, Debug, Copy, PartialEq, Eq, Hash)]
 enum MemberLookupPolicy {
     /// Only look up the attribute on the meta type.
     NoInstanceFallback,
@@ -1860,15 +1860,15 @@ impl<'db> Type<'db> {
     /// TODO: We should return a `Result` here to handle errors that can appear during attribute
     /// lookup, like a failed `__get__` call on a descriptor.
     #[must_use]
-    #[salsa::tracked]
     pub(crate) fn member(self, db: &'db dyn Db, name: Name) -> SymbolAndQualifiers<'db> {
         self.member_lookup_with_policy(db, name, MemberLookupPolicy::WithInstanceFallback)
     }
 
     /// Similar to [`Type::member`], but allows the caller to specify what policy should be used
     /// when looking up attributes. See [`MemberLookupPolicy`] for more information.
+    #[salsa::tracked]
     fn member_lookup_with_policy(
-        &self,
+        self,
         db: &'db dyn Db,
         name: Name,
         policy: MemberLookupPolicy,
@@ -1891,7 +1891,7 @@ impl<'db> Type<'db> {
             Type::Dynamic(..) | Type::Never => Symbol::bound(self).into(),
 
             Type::FunctionLiteral(function) if name == "__get__" => Symbol::bound(Type::Callable(
-                CallableType::MethodWrapperDunderGet(*function),
+                CallableType::MethodWrapperDunderGet(function),
             ))
             .into(),
 
@@ -1951,7 +1951,7 @@ impl<'db> Type<'db> {
             }
 
             Type::BooleanLiteral(bool_value) if matches!(name_str, "real" | "numerator") => {
-                Symbol::bound(Type::IntLiteral(i64::from(*bool_value))).into()
+                Symbol::bound(Type::IntLiteral(i64::from(bool_value))).into()
             }
 
             Type::ModuleLiteral(module) => module.static_member(db, name_str).into(),
@@ -1999,7 +1999,7 @@ impl<'db> Type<'db> {
                     db,
                     class_attr_plain,
                     Type::none(db),
-                    *self,
+                    self,
                 )
                 .0;
 
