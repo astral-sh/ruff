@@ -328,7 +328,7 @@ pub(crate) fn lex_inline_noqa(
         }
 
         // Calculate positions
-        let comment_start = TextSize::try_from(before_noqa.len() - '#'.len_utf8()).unwrap();
+        let comment_start = before_noqa.text_len() - '#'.text_len();
         let noqa_literal_end = TextSize::try_from(noqa_literal_end).unwrap();
 
         let lexer = NoqaLexer::new(
@@ -387,7 +387,7 @@ pub(crate) fn lex_file_exemption(
         }
 
         // Calculate final positions
-        let comment_start = TextSize::try_from(before_tool.len() - '#'.len_utf8()).unwrap();
+        let comment_start = before_tool.text_len() - '#'.text_len();
         let noqa_literal_end = TextSize::try_from(noqa_literal_end).unwrap();
 
         let lexer = NoqaLexer::new(
