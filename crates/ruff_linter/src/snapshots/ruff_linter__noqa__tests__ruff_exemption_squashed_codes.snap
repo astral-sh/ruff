@@ -4,10 +4,10 @@ expression: exemption
 ---
 Ok(
     Some(
-        ParsedNoqa {
+        NoqaLexerOutput {
             warnings: [
                 MissingDelimiter(
-                    18..22,
+                    18..18,
                 ),
             ],
             directive: Codes(

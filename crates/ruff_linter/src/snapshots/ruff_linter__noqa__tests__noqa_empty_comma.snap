@@ -4,7 +4,7 @@ expression: directive
 ---
 Ok(
     Some(
-        ParsedNoqa {
+        NoqaLexerOutput {
             warnings: [
                 MissingItem(
                     13..13,

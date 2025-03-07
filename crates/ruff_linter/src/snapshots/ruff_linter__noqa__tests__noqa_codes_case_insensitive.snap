@@ -4,7 +4,7 @@ expression: directive
 ---
 Ok(
     Some(
-        ParsedNoqa {
+        NoqaLexerOutput {
             warnings: [],
             directive: Codes(
                 Codes {

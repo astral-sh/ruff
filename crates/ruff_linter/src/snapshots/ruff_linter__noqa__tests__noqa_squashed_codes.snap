@@ -4,10 +4,10 @@ expression: directive
 ---
 Ok(
     Some(
-        ParsedNoqa {
+        NoqaLexerOutput {
             warnings: [
                 MissingDelimiter(
-                    12..16,
+                    12..12,
                 ),
             ],
             directive: Codes(
