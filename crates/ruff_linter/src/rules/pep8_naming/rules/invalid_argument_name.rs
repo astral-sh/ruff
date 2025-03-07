@@ -37,6 +37,10 @@ use crate::checkers::ast::Checker;
 ///     pass
 /// ```
 ///
+/// ## Options
+/// - `lint.pep8-naming.ignore-names`
+/// - `lint.pep8-naming.extend-ignore-names`
+///
 /// [PEP 8]: https://peps.python.org/pep-0008/#function-and-method-arguments
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
