@@ -663,7 +663,7 @@ pub enum UnsupportedSyntaxErrorKind {
     /// def foo(x: *Ts): ...  # Syntax error
     /// ```
     ///
-    /// [PEP 646]: https://peps.python.org/pep-0646/#change-1-star-expressions-in-indexes
+    /// [PEP 646]: https://peps.python.org/pep-0646/#change-2-args-as-a-typevartuple
     StarAnnotation,
 }
 
