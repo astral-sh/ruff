@@ -45,7 +45,7 @@ def _(flag: bool):
 ```py
 class Manager: ...
 
-# error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it doesn't implement `__enter__` and `__exit__`"
+# error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it does not implement `__enter__` and `__exit__`"
 with Manager():
     ...
 ```
@@ -56,7 +56,7 @@ with Manager():
 class Manager:
     def __exit__(self, exc_tpe, exc_value, traceback): ...
 
-# error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it doesn't implement `__enter__`"
+# error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it does not implement `__enter__`"
 with Manager():
     ...
 ```
@@ -67,7 +67,7 @@ with Manager():
 class Manager:
     def __enter__(self): ...
 
-# error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it doesn't implement `__exit__`"
+# error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it does not implement `__exit__`"
 with Manager():
     ...
 ```

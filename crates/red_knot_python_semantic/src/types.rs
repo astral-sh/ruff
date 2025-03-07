@@ -3496,7 +3496,7 @@ impl<'db> ContextManagerErrorKind<'db> {
                 format!("the methods `{name_a}` and `{name_b}` are possibly unbound")
             }
             (CallDunderError::MethodNotAvailable, CallDunderError::MethodNotAvailable) => {
-                format!("it doesn't implement `{name_a}` and `{name_b}`")
+                format!("it does not implement `{name_a}` and `{name_b}`")
             }
             (CallDunderError::Call(_), CallDunderError::Call(_)) => {
                 format!("it does not correctly implement `{name_a}` or `{name_b}`")
