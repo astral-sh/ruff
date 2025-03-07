@@ -331,7 +331,10 @@ pub(crate) fn lex_inline_noqa(
         let comment_start = TextSize::try_from(before_noqa.len() - '#'.len_utf8()).unwrap();
         let noqa_literal_end = TextSize::try_from(noqa_literal_end).unwrap();
 
-        let lexer = NoqaLexer::starts_at(offset + noqa_literal_end, source);
+        let lexer = NoqaLexer::new(
+            source,
+            TextRange::new(offset + noqa_literal_end, comment_range.end()),
+        );
         return Ok(Some(lexer.lex(offset + comment_start)?));
     }
 
@@ -387,7 +390,10 @@ pub(crate) fn lex_file_exemption(
         let comment_start = TextSize::try_from(before_tool.len() - '#'.len_utf8()).unwrap();
         let noqa_literal_end = TextSize::try_from(noqa_literal_end).unwrap();
 
-        let lexer = NoqaLexer::starts_at(offset + noqa_literal_end, source);
+        let lexer = NoqaLexer::new(
+            source,
+            TextRange::new(offset + noqa_literal_end, comment_range.end()),
+        );
         return Ok(Some(lexer.lex(offset + comment_start)?));
     }
 
