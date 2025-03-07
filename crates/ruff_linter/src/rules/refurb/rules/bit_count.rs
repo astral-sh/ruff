@@ -111,7 +111,24 @@ pub(crate) fn bit_count(checker: &Checker, call: &ExprCall) {
     }
 
     // Extract, e.g., `x` in `bin(x)`.
-    let literal_text = checker.locator().slice(arg);
+    // If is a starred expression extract just the value, e.g., `123` in `bin(*[123])`.
+    let literal_text = match arg {
+        Expr::Starred(starred) => {
+            if let Expr::List(list) = &*starred.value {
+                if list.elts.len() == 1 {
+                    checker.locator().slice(&list.elts[0])
+                } else {
+                    // If the list is empty or has more than
+                    // one element, we cannot fix it as is a Python error.
+                    return;
+                }
+            } else {
+                // If it is not the unpacking of a list
+                checker.locator().slice(arg)
+            }
+        }
+        _ => checker.locator().slice(arg),
+    };
 
     // If we're calling a method on an integer, or an expression with lower precedence, parenthesize
     // it.
