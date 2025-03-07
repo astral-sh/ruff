@@ -2841,11 +2841,23 @@ impl<'db> Type<'db> {
         })
     }
 
+    /// Returns the type bound from a context manager with type `self`.
+    ///
+    /// This method should only be used outside of type checking because it omits any errors.
+    /// For type checking, use [`try_enter`](Self::try_enter) instead.
     fn enter(self, db: &'db dyn Db) -> Type<'db> {
         self.try_enter(db)
             .unwrap_or_else(|err| err.fallback_enter_type(db))
     }
 
+    /// Given the type of an object that is used as a context manager (i.e. in a `with` statement),
+    /// return the return type of its `__enter__` method, which is bound to any potential targets.
+    ///
+    /// E.g., for the following `with` statement, given the type of `x`, infer the type of `y`:
+    /// ```python
+    /// with x as y:
+    ///     pass
+    /// ```
     fn try_enter(self, db: &'db dyn Db) -> Result<Type<'db>, ContextManagerError<'db>> {
         let enter = self.try_call_dunder(db, "__enter__", &CallArguments::none());
         let exit = self.try_call_dunder(
