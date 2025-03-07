@@ -7,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/inline/ok/parenthesized_context_
 ```
 Module(
     ModModule {
-        range: 0..74,
+        range: 0..126,
         body: [
             With(
                 StmtWith {
@@ -60,6 +60,106 @@ Module(
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
                                         range: 70..73,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            With(
+                StmtWith {
+                    range: 74..99,
+                    is_async: false,
+                    items: [
+                        WithItem {
+                            range: 80..83,
+                            context_expr: Name(
+                                ExprName {
+                                    range: 80..83,
+                                    id: Name("foo"),
+                                    ctx: Load,
+                                },
+                            ),
+                            optional_vars: None,
+                        },
+                        WithItem {
+                            range: 85..93,
+                            context_expr: Name(
+                                ExprName {
+                                    range: 85..88,
+                                    id: Name("bar"),
+                                    ctx: Load,
+                                },
+                            ),
+                            optional_vars: Some(
+                                Name(
+                                    ExprName {
+                                        range: 92..93,
+                                        id: Name("y"),
+                                        ctx: Store,
+                                    },
+                                ),
+                            ),
+                        },
+                    ],
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 96..99,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 96..99,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            With(
+                StmtWith {
+                    range: 100..125,
+                    is_async: false,
+                    items: [
+                        WithItem {
+                            range: 106..114,
+                            context_expr: Name(
+                                ExprName {
+                                    range: 106..109,
+                                    id: Name("foo"),
+                                    ctx: Load,
+                                },
+                            ),
+                            optional_vars: Some(
+                                Name(
+                                    ExprName {
+                                        range: 113..114,
+                                        id: Name("x"),
+                                        ctx: Store,
+                                    },
+                                ),
+                            ),
+                        },
+                        WithItem {
+                            range: 116..119,
+                            context_expr: Name(
+                                ExprName {
+                                    range: 116..119,
+                                    id: Name("bar"),
+                                    ctx: Load,
+                                },
+                            ),
+                            optional_vars: None,
+                        },
+                    ],
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 122..125,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 122..125,
                                     },
                                 ),
                             },
