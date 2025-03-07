@@ -1,5 +1,9 @@
 # Unpacking
 
+If there are not enough or too many values ​​when unpacking, an error will occur and the types of
+all variables (if nested tuple unpacking fails, only the variables within the failed tuples) is
+inferred to be `Unknown`.
+
 ## Tuple
 
 ### Simple tuple
@@ -60,9 +64,6 @@ reveal_type(c)  # revealed: Literal[4]
 
 ### Uneven unpacking (1)
 
-If there are not enough or too many values ​​when unpacking, the type of all variables is inferred
-to be `Unknown`. This is a different behavior from pyright, but the same as mypy.
-
 ```py
 # error: [invalid-assignment] "Not enough values to unpack (expected 3, got 2)"
 (a, b, c) = (1, 2)
@@ -109,7 +110,7 @@ reveal_type(d)  # revealed: Literal[5]
 [a, *b, c, d] = (1, 2)
 reveal_type(a)  # revealed: Unknown
 # TODO: Should be list[Any] once support for assigning to starred expression is added
-reveal_type(b)  # revealed: @Todo(starred unpacking)
+reveal_type(b)  # revealed: Unknown
 reveal_type(c)  # revealed: Unknown
 reveal_type(d)  # revealed: Unknown
 ```
@@ -163,7 +164,7 @@ reveal_type(c)  # revealed: @Todo(starred unpacking)
 reveal_type(a)  # revealed: Unknown
 reveal_type(b)  # revealed: Unknown
 reveal_type(c)  # revealed: Unknown
-reveal_type(d)  # revealed: @Todo(starred unpacking)
+reveal_type(d)  # revealed: Unknown
 reveal_type(e)  # revealed: Unknown
 reveal_type(f)  # revealed: Unknown
 ```
@@ -247,7 +248,7 @@ reveal_type(b)  # revealed: Unknown
 (a, *b, c, d) = "ab"
 reveal_type(a)  # revealed: Unknown
 # TODO: Should be list[LiteralString] once support for assigning to starred expression is added
-reveal_type(b)  # revealed: @Todo(starred unpacking)
+reveal_type(b)  # revealed: Unknown
 reveal_type(c)  # revealed: Unknown
 reveal_type(d)  # revealed: Unknown
 ```
@@ -257,7 +258,7 @@ reveal_type(d)  # revealed: Unknown
 (a, b, *c, d) = "a"
 reveal_type(a)  # revealed: Unknown
 reveal_type(b)  # revealed: Unknown
-reveal_type(c)  # revealed: @Todo(starred unpacking)
+reveal_type(c)  # revealed: Unknown
 reveal_type(d)  # revealed: Unknown
 ```
 

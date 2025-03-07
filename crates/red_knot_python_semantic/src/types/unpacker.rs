@@ -121,7 +121,7 @@ impl<'db> Unpacker<'db> {
                     if let Some(tuple_ty) = ty.into_tuple() {
                         let tuple_ty_elements = self.tuple_ty_elements(target, elts, tuple_ty);
 
-                        let invalid_unpacking = match elts.len().cmp(&tuple_ty_elements.len()) {
+                        let length_mismatch = match elts.len().cmp(&tuple_ty_elements.len()) {
                             Ordering::Less => {
                                 self.context.report_lint(
                                     &INVALID_ASSIGNMENT,
@@ -151,7 +151,7 @@ impl<'db> Unpacker<'db> {
 
                         for (index, ty) in tuple_ty_elements.iter().enumerate() {
                             if let Some(element_types) = target_types.get_mut(index) {
-                                if invalid_unpacking {
+                                if length_mismatch {
                                     element_types.push(Type::unknown());
                                 } else {
                                     element_types.push(*ty);
@@ -249,18 +249,7 @@ impl<'db> Unpacker<'db> {
                 ),
             );
 
-            let mut element_types = tuple_ty.elements(self.db()).to_vec();
-
-            // Subtract 1 to insert the starred expression type at the correct
-            // index.
-            element_types.resize(targets.len() - 1, Type::unknown());
-            for element_type in &mut element_types {
-                *element_type = Type::unknown();
-            }
-            // TODO: This should be `list[Unknown]`
-            element_types.insert(starred_index, todo_type!("starred unpacking"));
-
-            Cow::Owned(element_types)
+            Cow::Owned(vec![Type::unknown(); targets.len()])
         }
     }
 
