@@ -622,8 +622,9 @@ pub enum UnsupportedSyntaxErrorKind {
     ///
     /// ## Examples
     ///
-    /// Like [`UnsupportedSyntaxError::StarTuple`] in `return` and `yield` statements, prior to
-    /// Python 3.9, tuple unpacking in the iterator clause of a `for` statement required parentheses:
+    /// Like [`UnsupportedSyntaxErrorKind::StarTuple`] in `return` and `yield` statements, prior to
+    /// Python 3.9, tuple unpacking in the iterator clause of a `for` statement required
+    /// parentheses:
     ///
     /// ```python
     /// # valid on Python 3.8 and earlier
