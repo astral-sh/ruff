@@ -115,12 +115,11 @@ impl System for OsSystem {
         path.as_std_path().exists()
     }
 
-    fn path_exists_case_sensitive(&self, path: &SystemPath, prefix: &SystemPath) -> Result<bool> {
+    fn path_exists_case_sensitive(&self, path: &SystemPath, prefix: &SystemPath) -> bool {
         if self.case_sensitivity().is_case_sensitive() {
-            Ok(self.path_exists(path))
+            self.path_exists(path)
         } else {
             self.path_exists_case_sensitive_fast(path)
-                .map(Ok)
                 .unwrap_or_else(|| self.path_exists_case_sensitive_slow(path, prefix))
         }
     }
@@ -276,23 +275,30 @@ impl OsSystem {
         Some(simplified_canonicalized == simplified)
     }
 
-    fn path_exists_case_sensitive_slow(
-        &self,
-        path: &SystemPath,
-        prefix: &SystemPath,
-    ) -> Result<bool> {
+    fn path_exists_case_sensitive_slow(&self, path: &SystemPath, prefix: &SystemPath) -> bool {
         // Iterate over the sub-paths up to prefix and check if they match the casing as on disk.
         for ancestor in path.ancestors() {
             if ancestor == prefix {
                 break;
             }
 
-            if !self.inner.real_case_cache.has_name_case(ancestor)? {
-                return Ok(false);
+            match self.inner.real_case_cache.has_name_case(ancestor) {
+                Ok(true) => {
+                    // Component has correct casing, continue with next component
+                }
+                Ok(false) => {
+                    // Component has incorrect casing
+                    return false;
+                }
+                Err(_) => {
+                    // Directory doesn't exist or can't be accessed. We can assume that the file with
+                    // the given casing doesn't exist.
+                    return false;
+                }
             }
         }
 
-        Ok(true)
+        true
     }
 }
 

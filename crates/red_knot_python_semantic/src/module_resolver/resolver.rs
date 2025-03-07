@@ -621,7 +621,6 @@ fn resolve_file_module(module: &ModulePath, resolver_state: &ResolverContext) ->
         if !system.case_sensitivity().is_case_sensitive()
             && !system
                 .path_exists_case_sensitive(path, module.search_path().as_system_path().unwrap())
-                .unwrap_or(true)
         {
             return None;
         }

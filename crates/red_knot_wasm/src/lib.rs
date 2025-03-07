@@ -260,12 +260,8 @@ impl System for WasmSystem {
         Err(ruff_notebook::NotebookError::Io(not_found()))
     }
 
-    fn path_exists_case_sensitive(
-        &self,
-        path: &SystemPath,
-        _prefix: &SystemPath,
-    ) -> ruff_db::system::Result<bool> {
-        Ok(self.path_exists(path))
+    fn path_exists_case_sensitive(&self, path: &SystemPath, _prefix: &SystemPath) -> bool {
+        self.path_exists(path)
     }
 
     fn case_sensitivity(&self) -> CaseSensitivity {

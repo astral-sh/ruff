@@ -136,7 +136,7 @@ impl System for LSPSystem {
         self.os_system.canonicalize_path(path)
     }
 
-    fn path_exists_case_sensitive(&self, path: &SystemPath, prefix: &SystemPath) -> Result<bool> {
+    fn path_exists_case_sensitive(&self, path: &SystemPath, prefix: &SystemPath) -> bool {
         self.os_system.path_exists_case_sensitive(path, prefix)
     }
 

@@ -98,7 +98,7 @@ pub trait System: Debug {
     /// Prefix is only intended as an optimization for systems that can't efficiently check
     /// if an entire path exists with the exact casing as specified in `path`. However,
     /// implementations are allowed to check the casing of the entire path if they can do so efficiently.
-    fn path_exists_case_sensitive(&self, path: &SystemPath, prefix: &SystemPath) -> Result<bool>;
+    fn path_exists_case_sensitive(&self, path: &SystemPath, prefix: &SystemPath) -> bool;
 
     /// Returns the [`CaseSensitivity`] of the system's file system.
     fn case_sensitivity(&self) -> CaseSensitivity;
