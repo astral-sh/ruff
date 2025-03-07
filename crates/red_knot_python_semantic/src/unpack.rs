@@ -70,21 +70,6 @@ pub(crate) enum UnpackValue<'db> {
 }
 
 impl<'db> UnpackValue<'db> {
-    /// Returns `true` if the value is an iterable expression.
-    pub(crate) const fn is_iterable(self) -> bool {
-        matches!(self, UnpackValue::Iterable(_))
-    }
-
-    /// Returns `true` if the value is a context manager expression.
-    pub(crate) const fn is_context_manager(self) -> bool {
-        matches!(self, UnpackValue::ContextManager(_))
-    }
-
-    /// Returns `true` if the value is being assigned to a target.
-    pub(crate) const fn is_assign(self) -> bool {
-        matches!(self, UnpackValue::Assign(_))
-    }
-
     /// Returns the underlying [`Expression`] that is being unpacked.
     pub(crate) const fn expression(self) -> Expression<'db> {
         match self {

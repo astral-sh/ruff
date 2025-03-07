@@ -42,31 +42,28 @@ impl<'db> Unpacker<'db> {
             "Unpacking target must be a list or tuple expression"
         );
 
-        let mut value_ty = infer_expression_types(self.db(), value.expression())
+        let value_ty = infer_expression_types(self.db(), value.expression())
             .expression_type(value.scoped_expression_id(self.db(), self.scope));
 
-        if value.is_assign()
-            && self.context.in_stub()
-            && value
-                .expression()
-                .node_ref(self.db())
-                .is_ellipsis_literal_expr()
-        {
-            value_ty = Type::unknown();
-        }
-        if value.is_iterable() {
-            // If the value is an iterable, then the type that needs to be unpacked is the iterator
-            // type.
-            value_ty = value_ty.try_iterate(self.db()).unwrap_or_else(|err| {
+        let value_ty = match value {
+            UnpackValue::Assign(expression) => {
+                if self.context.in_stub()
+                    && expression.node_ref(self.db()).is_ellipsis_literal_expr()
+                {
+                    Type::unknown()
+                } else {
+                    value_ty
+                }
+            }
+            UnpackValue::Iterable(_) => value_ty.try_iterate(self.db()).unwrap_or_else(|err| {
                 err.report_diagnostic(&self.context, value.as_any_node_ref(self.db()));
                 err.fallback_element_type(self.db())
-            });
-        }
-
-        if value.is_context_manager() {
-            // If value is a context manager, then the type that needs to be unpacked is the result of entering the context
-            value_ty = value_ty.enter(self.db());
-        }
+            }),
+            UnpackValue::ContextManager(_) => value_ty.try_enter(self.db()).unwrap_or_else(|err| {
+                err.report_diagnostic(&self.context, value.as_any_node_ref(self.db()));
+                err.fallback_enter_type(self.db())
+            }),
+        };
 
         self.unpack_inner(target, value.as_any_node_ref(self.db()), value_ty);
     }
