@@ -308,37 +308,14 @@ pub(crate) struct NoqaLexerOutput<'a> {
 }
 
 /// Lexes in-line `noqa` comment, e.g. `# noqa: F401`
-pub(crate) fn lex_inline_noqa(
+fn lex_inline_noqa(
     comment_range: TextRange,
     source: &str,
 ) -> Result<Option<NoqaLexerOutput<'_>>, LexicalError> {
-    let line = &source[comment_range];
+    let source = &source[..comment_range.end().to_usize()];
     let offset = comment_range.start();
-
-    for (char_index, _) in line
-        .char_indices()
-        .filter(|(pos, c)| matches!(c, 'n' | 'N') && is_noqa_at_position(line, *pos))
-    {
-        let noqa_literal_end = char_index + "noqa".len();
-
-        // Find comment start (position of '#')
-        let before_noqa = &line[..char_index].trim_end();
-        if !before_noqa.ends_with('#') {
-            continue;
-        }
-
-        // Calculate positions
-        let comment_start = before_noqa.text_len() - '#'.text_len();
-        let noqa_literal_end = TextSize::try_from(noqa_literal_end).unwrap();
-
-        let lexer = NoqaLexer::new(
-            source,
-            TextRange::new(offset + noqa_literal_end, comment_range.end()),
-        );
-        return Ok(Some(lexer.lex(offset + comment_start)?));
-    }
-
-    Ok(None)
+    let lexer = NoqaLexer::starts_at(offset, source);
+    lexer.lex_inline_noqa()
 }
 
 /// Lexes file-level exemption comment, e.g. `# ruff: noqa: F401`
@@ -346,67 +323,10 @@ fn lex_file_exemption(
     comment_range: TextRange,
     source: &str,
 ) -> Result<Option<NoqaLexerOutput<'_>>, LexicalError> {
-    let line = &source[comment_range];
+    let source = &source[..comment_range.end().to_usize()];
     let offset = comment_range.start();
-
-    for (char_index, _) in line
-        .char_indices()
-        .filter(|(pos, c)| matches!(c, 'n' | 'N') && is_noqa_at_position(line, *pos))
-    {
-        let noqa_literal_end = char_index + "noqa".len();
-        let mut pos = line[..char_index].trim_end().len();
-
-        // Check for ':' before 'noqa'
-        if pos == 0 || !line[..pos].ends_with(':') {
-            continue;
-        }
-        pos -= ':'.len_utf8();
-
-        // Check for 'ruff' or 'flake8'
-        let before_colon = line[..pos].trim_end();
-        let (is_ruff, is_flake8) = (
-            before_colon.ends_with("ruff"),
-            before_colon.ends_with("flake8"),
-        );
-        if !is_ruff && !is_flake8 {
-            continue;
-        }
-
-        // Move position past 'ruff' or 'flake8'
-        pos = before_colon.len()
-            - if is_ruff {
-                "ruff".len()
-            } else {
-                "flake8".len()
-            };
-
-        // Check for '#' character
-        let before_tool = line[..pos].trim_end();
-        if !before_tool.ends_with('#') {
-            continue;
-        }
-
-        // Calculate final positions
-        let comment_start = before_tool.text_len() - '#'.text_len();
-        let noqa_literal_end = TextSize::try_from(noqa_literal_end).unwrap();
-
-        let lexer = NoqaLexer::new(
-            source,
-            TextRange::new(offset + noqa_literal_end, comment_range.end()),
-        );
-        return Ok(Some(lexer.lex(offset + comment_start)?));
-    }
-
-    Ok(None)
-}
-
-/// Helper to check if "noqa" (case-insensitive) appears at the given position
-#[inline]
-fn is_noqa_at_position(text: &str, pos: usize) -> bool {
-    matches!(
-        text[pos..].as_bytes(),
-        [b'n' | b'N', b'o' | b'O', b'q' | b'Q', b'a' | b'A', ..]
-    )
+    let lexer = NoqaLexer::starts_at(offset, source);
+    lexer.lex_file_exemption()
 }
 
 pub(crate) fn lex_codes(text: &str) -> Result<Vec<Code<'_>>, LexicalError> {
@@ -417,16 +337,15 @@ pub(crate) fn lex_codes(text: &str) -> Result<Vec<Code<'_>>, LexicalError> {
 
 /// Lexer for `noqa` comment lines.
 ///
-/// Assumed to be initialized with range or offset that begins
-/// at or after `noqa` literal, e.g. the ":" in `# noqa: F401`.
+/// Assumed to be initialized with range or offset starting
+/// at the `#` at the beginning of a `noqa` comment.
 #[derive(Debug)]
 struct NoqaLexer<'a> {
-    /// A slice of source text starting at the end of the `noqa` literal
-    /// e.g. `: F401` in `# noqa: F401`
+    /// A slice of source text starting at the beginning of a `noqa` comment
     line: &'a str,
     /// Contains convenience methods for lexing
     cursor: Cursor<'a>,
-    /// Byte offset of end of `noqa` literal in source text
+    /// Byte offset of the start of the `noqa` comment
     offset: TextSize,
     /// Non-fatal warnings collected during lexing
     warnings: Vec<LexicalWarning>,
@@ -451,34 +370,144 @@ impl<'a> NoqaLexer<'a> {
 
     /// Initialize [`NoqaLexer`] at offset.
     ///
-    /// The offset should be at or after the `noqa` literal.
+    /// The offset should be the beginning of a `noqa` comment.
     fn starts_at(offset: TextSize, source: &'a str) -> Self {
         let range = TextRange::new(offset, source.text_len());
         Self::new(source, range)
     }
 
+    fn lex_inline_noqa(mut self) -> Result<Option<NoqaLexerOutput<'a>>, LexicalError> {
+        while !self.cursor.is_eof() {
+            // Skip over any leading content.
+            self.cursor.eat_while(|c| c != '#');
+
+            // This updates the offset and line in the case of
+            // multiple comments in a range, e.g.
+            // `# First # Second # noqa`
+            self.offset += self.cursor.token_len();
+            self.line = &self.line[self.cursor.token_len().to_usize()..];
+            self.cursor.start_token();
+
+            if !self.cursor.eat_char('#') {
+                continue;
+            }
+
+            self.cursor.eat_while(char::is_whitespace);
+
+            if !is_noqa_uncased(self.cursor.as_str()) {
+                continue;
+            }
+
+            self.cursor.skip_bytes("noqa".len());
+
+            return Ok(Some(self.lex_directive()?));
+        }
+
+        Ok(None)
+    }
+
+    fn lex_file_exemption(mut self) -> Result<Option<NoqaLexerOutput<'a>>, LexicalError> {
+        while !self.cursor.is_eof() {
+            // Skip over any leading content
+            self.cursor.eat_while(|c| c != '#');
+
+            // This updates the offset and line in the case of
+            // multiple comments in a range, e.g.
+            // # First # Second # noqa
+            self.offset += self.cursor.token_len();
+            self.line = &self.line[self.cursor.token_len().to_usize()..];
+            self.cursor.start_token();
+
+            // The remaining logic implements a simple regex
+
+            // `#\s*(?:ruff|flake8)\s*:\s*(?i)noqa`
+            //  ^
+            if !self.cursor.eat_char('#') {
+                continue;
+            }
+
+            // `#\s*(?:ruff|flake8)\s*:\s*(?i)noqa`
+            //   ^^^
+            self.cursor.eat_while(char::is_whitespace);
+
+            // `#\s*(?:ruff|flake8)\s*:\s*(?i)noqa`
+            //       ^^^^^^^^^^^^^
+            let (is_ruff, is_flake8) = (
+                self.cursor.as_str().starts_with("ruff"),
+                self.cursor.as_str().starts_with("flake8"),
+            );
+
+            if !is_ruff && !is_flake8 {
+                continue;
+            }
+
+            let tool_len = if is_ruff {
+                "ruff".len()
+            } else {
+                "flake8".len()
+            };
+
+            self.cursor.skip_bytes(tool_len);
+
+            // `#\s*(?:ruff|flake8)\s*:\s*(?i)noqa`
+            //                     ^^^
+            self.cursor.eat_while(char::is_whitespace);
+
+            // `#\s*(?:ruff|flake8)\s*:\s*(?i)noqa`
+            //                        ^
+            if !self.cursor.eat_char(':') {
+                continue;
+            }
+
+            // `#\s*(?:ruff|flake8)\s*:\s*(?i)noqa`
+            //                         ^^^
+            self.cursor.eat_while(char::is_whitespace);
+
+            // `#\s*(?:ruff|flake8)\s*:\s*(?i)noqa`
+            //                             ^^^^^^^
+            if !is_noqa_uncased(self.cursor.as_str()) {
+                continue;
+            }
+            self.cursor.skip_bytes("noqa".len());
+
+            return Ok(Some(self.lex_directive()?));
+        }
+        Ok(None)
+    }
+
     /// Collect codes in `noqa` comment.
-    ///
-    /// The `comment_start` is the offset in the source of the
-    /// beginning of the `noqa` comment, which is earlier
-    /// than the offset that marks the beginning of the codes.
-    fn lex(mut self, comment_start: TextSize) -> Result<NoqaLexerOutput<'a>, LexicalError> {
-        if self.cursor.first().is_whitespace() || self.cursor.first() == '#' || self.cursor.is_eof()
-        {
-            return Ok(NoqaLexerOutput {
-                warnings: self.warnings,
-                directive: Directive::All(All {
-                    range: TextRange::new(comment_start, self.offset),
-                }),
-            });
+    fn lex_directive(mut self) -> Result<NoqaLexerOutput<'a>, LexicalError> {
+        match self.cursor.bump() {
+            None => {
+                let range = TextRange::at(self.offset, self.current());
+                return Ok(NoqaLexerOutput {
+                    warnings: self.warnings,
+                    directive: Directive::All(All { range }),
+                });
+            }
+            // Ex) # noqa# A comment
+            //            ^
+            Some('#') => {
+                let range = TextRange::at(self.offset, self.current() - '#'.text_len());
+                return Ok(NoqaLexerOutput {
+                    warnings: self.warnings,
+                    directive: Directive::All(All { range }),
+                });
+            }
+            // Ex) # noqa A comment
+            Some(c) if c.is_whitespace() => {
+                let range = TextRange::at(self.offset, self.current() - c.text_len());
+                return Ok(NoqaLexerOutput {
+                    warnings: self.warnings,
+                    directive: Directive::All(All { range }),
+                });
+            }
+            // Ex) # noqa: F401,F842
+            Some(':') => self.lex_codes()?,
+            _ => {
+                return Err(LexicalError::InvalidSuffix);
+            }
         }
-
-        if self.cursor.first() != ':' {
-            return Err(LexicalError::InvalidSuffix);
-        }
-
-        self.cursor.bump();
-        self.lex_codes()?;
 
         let Some(last) = self.codes.last() else {
             return Err(LexicalError::MissingCodes);
@@ -487,7 +516,7 @@ impl<'a> NoqaLexer<'a> {
         Ok(NoqaLexerOutput {
             warnings: self.warnings,
             directive: Directive::Codes(Codes {
-                range: TextRange::new(comment_start, last.range.end()),
+                range: TextRange::new(self.offset, last.range.end()),
                 codes: self.codes,
             }),
         })
@@ -503,32 +532,26 @@ impl<'a> NoqaLexer<'a> {
 
     fn lex_code(&mut self) -> Result<(), LexicalError> {
         self.cursor.start_token();
-        match self.cursor.first() {
-            c if c.is_ascii_whitespace() => {
-                self.cursor.eat_while(|chr| chr.is_ascii_whitespace());
-                // Ex) # noqa:    ,F401
-                //            ^^^^^
-                if self.cursor.first() == ',' {
-                    self.warnings.push(LexicalWarning::MissingItem(
-                        self.token_range().add(self.offset),
-                    ));
-                    self.cursor.eat_char(',');
-                }
-            }
-            // Ex) # noqa: F401,,F841
-            //                  ^
-            ',' => {
-                self.warnings.push(LexicalWarning::MissingItem(
-                    self.token_range().add(self.offset),
-                ));
-                self.cursor.eat_char(',');
-            }
+        self.cursor.eat_while(|chr| chr.is_ascii_whitespace());
 
+        // Ex) # noqa: F401,    ,F841
+        //                  ^^^^
+        if self.cursor.first() == ',' {
+            self.warnings.push(LexicalWarning::MissingItem(
+                self.token_range().add(self.offset),
+            ));
+            self.cursor.eat_char(',');
+            return Ok(());
+        }
+
+        // Reset start of token so it does not include whitespace
+        self.cursor.start_token();
+        match self.cursor.bump() {
             // Ex) # noqa: F401
             //             ^
-            c if c.is_ascii_uppercase() => {
+            Some(c) if c.is_ascii_uppercase() => {
                 self.cursor.eat_while(|chr| chr.is_ascii_uppercase());
-                if !self.cursor.first().is_ascii_digit() {
+                if !self.cursor.eat_if(|c| c.is_ascii_digit()) {
                     // Fail hard if we're already attempting
                     // to lex squashed codes, e.g. `F401Fabc`
                     if self.missing_delimiter {
@@ -536,8 +559,8 @@ impl<'a> NoqaLexer<'a> {
                     }
                     // Otherwise we've reached the first invalid code,
                     // so it could be a comment and we just stop parsing.
-                    // Ex) `#noqa: F401 A comment`
-                    //        we're here^
+                    // Ex) #noqa: F401 A comment
+                    //       we're here^
                     self.cursor.skip_bytes(self.cursor.as_str().len());
                     return Ok(());
                 }
@@ -553,7 +576,16 @@ impl<'a> NoqaLexer<'a> {
                         self.cursor.eat_char(',');
                         false
                     }
-                    c if c.is_ascii_whitespace() => false,
+
+                    // Whitespace could be a delimiter or the end of the `noqa`.
+                    // If it's the end, then non-ascii whitespace is allowed
+                    c if c.is_whitespace() => false,
+
+                    // e.g. #noqa:F401F842
+                    //                ^
+                    // Push a warning and update the `missing_delimiter`
+                    // state but don't consume the character since it's
+                    // part of the next code.
                     c if c.is_ascii_uppercase() => {
                         self.warnings
                             .push(LexicalWarning::MissingDelimiter(TextRange::empty(
@@ -561,13 +593,23 @@ impl<'a> NoqaLexer<'a> {
                             )));
                         true
                     }
+                    // Start of a new comment
+                    // e.g. #noqa: F401#A comment
+                    //                 ^
                     '#' => false,
                     _ => return Err(LexicalError::InvalidCodeSuffix),
                 };
             }
-            _ => {
+            Some(_) => {
+                // The first time we hit an evidently invalid code,
+                // it's probably a trailing comment. So stop lexing,
+                // but don't push an error.
+                // Ex)
+                // # noqa: F401 we import this for a reason
+                //              ^----- stop lexing but no error
                 self.cursor.skip_bytes(self.cursor.as_str().len());
             }
+            None => {}
         }
         Ok(())
     }
@@ -594,6 +636,15 @@ impl<'a> NoqaLexer<'a> {
     fn current(&self) -> TextSize {
         self.line.text_len() - self.cursor.text_len()
     }
+}
+
+/// Helper to check if "noqa" (case-insensitive) appears at the given position
+#[inline]
+fn is_noqa_uncased(text: &str) -> bool {
+    matches!(
+        text.as_bytes(),
+        [b'n' | b'N', b'o' | b'O', b'q' | b'Q', b'a' | b'A', ..]
+    )
 }
 
 /// Indicates recoverable error encountered while lexing with [`NoqaLexer`]
