@@ -9,7 +9,7 @@ pub use os::OsSystem;
 
 use ruff_notebook::{Notebook, NotebookError};
 use std::error::Error;
-use std::fmt::Debug;
+use std::fmt::{Debug, Formatter};
 use std::path::{Path, PathBuf};
 use std::{fmt, io};
 pub use test::{DbWithTestSystem, DbWithWritableSystem, InMemorySystem, TestSystem};
@@ -100,9 +100,8 @@ pub trait System: Debug {
     /// implementations are allowed to check the casing of the entire path if they can do so efficiently.
     fn path_exists_case_sensitive(&self, path: &SystemPath, prefix: &SystemPath) -> Result<bool>;
 
-    /// Returns `Some(true)` if the system is case-sensitive, `Some(false)` if it is case-insensitive
-    /// and `None` if querying the information failed.
-    fn is_case_sensitive(&self) -> Option<bool>;
+    /// Returns the [`CaseSensitivity`] of the system's file system.
+    fn case_sensitivity(&self) -> CaseSensitivity;
 
     /// Returns `true` if `path` exists and is a directory.
     fn is_directory(&self, path: &SystemPath) -> bool {
@@ -174,6 +173,39 @@ pub trait System: Debug {
     fn as_any(&self) -> &dyn std::any::Any;
 
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any;
+}
+
+#[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
+pub enum CaseSensitivity {
+    /// The case sensitivity of the file system is unknown.
+    ///
+    /// The file system is either case-sensitive or case-insensitive. A caller
+    /// should not assume either case.
+    #[default]
+    Unknown,
+
+    /// The file system is case-sensitive.
+    CaseSensitive,
+
+    /// The file system is case-insensitive.
+    CaseInsensitive,
+}
+
+impl CaseSensitivity {
+    /// Returns `true` if the file system is known to be case-sensitive.
+    pub const fn is_case_sensitive(self) -> bool {
+        matches!(self, Self::CaseSensitive)
+    }
+}
+
+impl fmt::Display for CaseSensitivity {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            CaseSensitivity::Unknown => f.write_str("unknown"),
+            CaseSensitivity::CaseSensitive => f.write_str("case-sensitive"),
+            CaseSensitivity::CaseInsensitive => f.write_str("case-insensitive"),
+        }
+    }
 }
 
 /// System trait for non-readonly systems.

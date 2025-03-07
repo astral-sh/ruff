@@ -618,7 +618,7 @@ fn resolve_file_module(module: &ModulePath, resolver_state: &ResolverContext) ->
     // those file systems are case sensitive (we wouldn't get to this point).
     if let Some(path) = file.path(resolver_state.db).as_system_path() {
         let system = resolver_state.db.system();
-        if system.is_case_sensitive() != Some(true)
+        if !system.case_sensitivity().is_case_sensitive()
             && !system
                 .path_exists_case_sensitive(path, module.search_path().as_system_path().unwrap())
                 .unwrap_or(true)

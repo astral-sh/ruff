@@ -11,8 +11,8 @@ use ruff_db::diagnostic::{DisplayDiagnosticConfig, OldDiagnosticTrait};
 use ruff_db::files::{system_path_to_file, File};
 use ruff_db::system::walk_directory::WalkDirectoryBuilder;
 use ruff_db::system::{
-    DirectoryEntry, GlobError, MemoryFileSystem, Metadata, PatternError, System, SystemPath,
-    SystemPathBuf, SystemVirtualPath,
+    CaseSensitivity, DirectoryEntry, GlobError, MemoryFileSystem, Metadata, PatternError, System,
+    SystemPath, SystemPathBuf, SystemVirtualPath,
 };
 use ruff_notebook::Notebook;
 
@@ -268,8 +268,8 @@ impl System for WasmSystem {
         Ok(self.path_exists(path))
     }
 
-    fn is_case_sensitive(&self) -> Option<bool> {
-        Some(true)
+    fn case_sensitivity(&self) -> CaseSensitivity {
+        CaseSensitivity::CaseSensitive
     }
 
     fn current_directory(&self) -> &SystemPath {

@@ -7,8 +7,8 @@ use lsp_types::Url;
 use ruff_db::file_revision::FileRevision;
 use ruff_db::system::walk_directory::WalkDirectoryBuilder;
 use ruff_db::system::{
-    DirectoryEntry, FileType, GlobError, Metadata, OsSystem, PatternError, Result, System,
-    SystemPath, SystemPathBuf, SystemVirtualPath, SystemVirtualPathBuf,
+    CaseSensitivity, DirectoryEntry, FileType, GlobError, Metadata, OsSystem, PatternError, Result,
+    System, SystemPath, SystemPathBuf, SystemVirtualPath, SystemVirtualPathBuf,
 };
 use ruff_notebook::{Notebook, NotebookError};
 
@@ -224,8 +224,8 @@ impl System for LSPSystem {
         self
     }
 
-    fn is_case_sensitive(&self) -> Option<bool> {
-        self.os_system.is_case_sensitive()
+    fn case_sensitivity(&self) -> CaseSensitivity {
+        self.os_system.case_sensitivity()
     }
 }
 

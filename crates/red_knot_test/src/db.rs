@@ -3,8 +3,8 @@ use red_knot_python_semantic::lint::{LintRegistry, RuleSelection};
 use red_knot_python_semantic::{default_lint_registry, Db as SemanticDb};
 use ruff_db::files::{File, Files};
 use ruff_db::system::{
-    DbWithWritableSystem, InMemorySystem, OsSystem, System, SystemPath, SystemPathBuf,
-    WritableSystem,
+    CaseSensitivity, DbWithWritableSystem, InMemorySystem, OsSystem, System, SystemPath,
+    SystemPathBuf, WritableSystem,
 };
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_db::{Db as SourceDb, Upcast};
@@ -220,8 +220,8 @@ impl System for MdtestSystem {
             .path_exists_case_sensitive(&self.normalize_path(path), &self.normalize_path(prefix))
     }
 
-    fn is_case_sensitive(&self) -> Option<bool> {
-        self.as_system().is_case_sensitive()
+    fn case_sensitivity(&self) -> CaseSensitivity {
+        self.as_system().case_sensitivity()
     }
 
     fn current_directory(&self) -> &SystemPath {
