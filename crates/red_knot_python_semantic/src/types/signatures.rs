@@ -115,6 +115,22 @@ impl<'db> Parameters<'db> {
         Self(parameters.into_iter().collect())
     }
 
+    /// Return dynamic parameters: (*args: Any, **kwargs: Any)
+    pub(crate) fn any() -> Self {
+        Self(vec![
+            Parameter {
+                name: Some(Name::new_static("args")),
+                annotated_ty: Some(Type::any()),
+                kind: ParameterKind::Variadic,
+            },
+            Parameter {
+                name: Some(Name::new_static("kwargs")),
+                annotated_ty: Some(Type::any()),
+                kind: ParameterKind::KeywordVariadic,
+            },
+        ])
+    }
+
     /// Return todo parameters: (*args: Todo, **kwargs: Todo)
     fn todo() -> Self {
         Self(vec![

@@ -2341,10 +2341,9 @@ impl<'db> Type<'db> {
 
             // TODO annotated return type on `__new__` or metaclass `__call__`
             // TODO check call vs signatures of `__new__` and/or `__init__`
-            Type::ClassLiteral(ClassLiteralType { class }) => {
-                let overload =
-                    OverloadBinding::from_return_type(Type::Instance(InstanceType { class }));
-                let binding = overload.into_binding();
+            Type::ClassLiteral(ClassLiteralType { .. }) => {
+                let signature = Signature::new(Parameters::any(), Some(self.to_instance(db)));
+                let binding = bind_call(db, arguments, &signature.into(), self);
                 binding.into_outcome()
             }
 
