@@ -63,25 +63,19 @@ impl<'db> Unpack<'db> {
 pub(crate) enum UnpackValue<'db> {
     /// An iterable expression like the one in a `for` loop or a comprehension.
     Iterable(Expression<'db>),
+    /// An context manager expression like the one in a `with` statement.
+    ContextManager(Expression<'db>),
     /// An expression that is being assigned to a target.
     Assign(Expression<'db>),
 }
 
 impl<'db> UnpackValue<'db> {
-    /// Returns `true` if the value is an iterable expression.
-    pub(crate) const fn is_iterable(self) -> bool {
-        matches!(self, UnpackValue::Iterable(_))
-    }
-
-    /// Returns `true` if the value is being assigned to a target.
-    pub(crate) const fn is_assign(self) -> bool {
-        matches!(self, UnpackValue::Assign(_))
-    }
-
     /// Returns the underlying [`Expression`] that is being unpacked.
     pub(crate) const fn expression(self) -> Expression<'db> {
         match self {
-            UnpackValue::Assign(expr) | UnpackValue::Iterable(expr) => expr,
+            UnpackValue::Assign(expr)
+            | UnpackValue::Iterable(expr)
+            | UnpackValue::ContextManager(expr) => expr,
         }
     }
 

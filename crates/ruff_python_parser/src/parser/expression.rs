@@ -11,6 +11,7 @@ use ruff_python_ast::{
 };
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
+use crate::error::StarTupleKind;
 use crate::parser::progress::ParserProgress;
 use crate::parser::{helpers, FunctionKind, Parser};
 use crate::string::{parse_fstring_literal_element, parse_string_literal, StringType};
@@ -701,9 +702,31 @@ impl<'src> Parser<'src> {
                     }
                 }
 
+                let arg_range = parser.node_range(start);
                 if parser.eat(TokenKind::Equal) {
                     seen_keyword_argument = true;
-                    let arg = if let Expr::Name(ident_expr) = parsed_expr.expr {
+                    let arg = if let ParsedExpr {
+                        expr: Expr::Name(ident_expr),
+                        is_parenthesized,
+                    } = parsed_expr
+                    {
+                        // test_ok parenthesized_kwarg_py37
+                        // # parse_options: {"target-version": "3.7"}
+                        // f((a)=1)
+
+                        // test_err parenthesized_kwarg_py38
+                        // # parse_options: {"target-version": "3.8"}
+                        // f((a)=1)
+                        // f((a) = 1)
+                        // f( ( a ) = 1)
+
+                        if is_parenthesized {
+                            parser.add_unsupported_syntax_error(
+                                UnsupportedSyntaxErrorKind::ParenthesizedKeywordArgumentName,
+                                arg_range,
+                            );
+                        }
+
                         ast::Identifier {
                             id: ident_expr.id,
                             range: ident_expr.range,
@@ -2089,10 +2112,27 @@ impl<'src> Parser<'src> {
         }
 
         let value = self.at_expr().then(|| {
-            Box::new(
-                self.parse_expression_list(ExpressionContext::starred_bitwise_or())
-                    .expr,
-            )
+            let parsed_expr = self.parse_expression_list(ExpressionContext::starred_bitwise_or());
+
+            // test_ok iter_unpack_yield_py37
+            // # parse_options: {"target-version": "3.7"}
+            // rest = (4, 5, 6)
+            // def g(): yield (1, 2, 3, *rest)
+
+            // test_ok iter_unpack_yield_py38
+            // # parse_options: {"target-version": "3.8"}
+            // rest = (4, 5, 6)
+            // def g(): yield 1, 2, 3, *rest
+            // def h(): yield 1, (yield 2, *rest), 3
+
+            // test_err iter_unpack_yield_py37
+            // # parse_options: {"target-version": "3.7"}
+            // rest = (4, 5, 6)
+            // def g(): yield 1, 2, 3, *rest
+            // def h(): yield 1, (yield 2, *rest), 3
+            self.check_tuple_unpacking(&parsed_expr, StarTupleKind::Yield);
+
+            Box::new(parsed_expr.expr)
         });
 
         Expr::Yield(ast::ExprYield {

@@ -13,7 +13,8 @@ class Foo[T]: ...
 class Bar(Foo[Bar]): ...
 
 reveal_type(Bar)  # revealed: Literal[Bar]
-reveal_type(Bar.__mro__)  # revealed: tuple[Literal[Bar], Unknown, Literal[object]]
+# TODO: Instead of `Literal[Foo]`, we might eventually want to show a type that involves the type parameter.
+reveal_type(Bar.__mro__)  # revealed: tuple[Literal[Bar], Literal[Foo], Literal[object]]
 ```
 
 ## Access to attributes declarated in stubs

@@ -46,6 +46,17 @@ class DunderOnMetaClass(metaclass=Meta):
 reveal_type(DunderOnMetaClass[0])  # revealed: str
 ```
 
+If the dunder method is only present on the class itself, it will not be called:
+
+```py
+class ClassWithNormalDunder:
+    def __getitem__(self, key: int) -> str:
+        return str(key)
+
+# error: [non-subscriptable]
+ClassWithNormalDunder[0]
+```
+
 ## Operating on instances
 
 When invoking a dunder method on an instance of a class, it is looked up on the class:
@@ -79,11 +90,30 @@ reveal_type(this_fails[0])  # revealed: Unknown
 However, the attached dunder method *can* be called if accessed directly:
 
 ```py
-# TODO: `this_fails.__getitem__` is incorrectly treated as a bound method. This
-# should be fixed with https://github.com/astral-sh/ruff/issues/16367
-# error: [too-many-positional-arguments]
-# error: [invalid-argument-type]
 reveal_type(this_fails.__getitem__(this_fails, 0))  # revealed: Unknown | str
+```
+
+The instance-level method is also not called when the class-level method is present:
+
+```py
+def external_getitem1(instance, key) -> str:
+    return "a"
+
+def external_getitem2(key) -> int:
+    return 1
+
+def _(flag: bool):
+    class ThisFails:
+        if flag:
+            __getitem__ = external_getitem1
+
+        def __init__(self):
+            self.__getitem__ = external_getitem2
+
+    this_fails = ThisFails()
+
+    # error: [call-possibly-unbound-method]
+    reveal_type(this_fails[0])  # revealed: Unknown | str
 ```
 
 ## When the dunder is not a method
@@ -125,4 +155,65 @@ class ClassWithDescriptorDunder:
 class_with_descriptor_dunder = ClassWithDescriptorDunder()
 
 reveal_type(class_with_descriptor_dunder[0])  # revealed: str
+```
+
+## Dunders can not be overwritten on instances
+
+If we attempt to overwrite a dunder method on an instance, it does not affect the behavior of
+implicit dunder calls:
+
+```py
+class C:
+    def __getitem__(self, key: int) -> str:
+        return str(key)
+
+    def f(self):
+        # TODO: This should emit an `invalid-assignment` diagnostic once we understand the type of `self`
+        self.__getitem__ = None
+
+# This is still fine, and simply calls the `__getitem__` method on the class
+reveal_type(C()[0])  # revealed: str
+```
+
+## Calling a union of dunder methods
+
+```py
+def _(flag: bool):
+    class C:
+        if flag:
+            def __getitem__(self, key: int) -> str:
+                return str(key)
+        else:
+            def __getitem__(self, key: int) -> bytes:
+                return bytes()
+
+    c = C()
+    reveal_type(c[0])  # revealed: str | bytes
+
+    if flag:
+        class D:
+            def __getitem__(self, key: int) -> str:
+                return str(key)
+
+    else:
+        class D:
+            def __getitem__(self, key: int) -> bytes:
+                return bytes()
+
+    d = D()
+    reveal_type(d[0])  # revealed: str | bytes
+```
+
+## Calling a possibly-unbound dunder method
+
+```py
+def _(flag: bool):
+    class C:
+        if flag:
+            def __getitem__(self, key: int) -> str:
+                return str(key)
+
+    c = C()
+    # error: [call-possibly-unbound-method]
+    reveal_type(c[0])  # revealed: str
 ```

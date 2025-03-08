@@ -155,7 +155,9 @@ reveal_type(c_instance.declared_in_body_and_init)  # revealed: str | None
 
 reveal_type(c_instance.declared_in_body_defined_in_init)  # revealed: str | None
 
-reveal_type(c_instance.bound_in_body_declared_in_init)  # revealed: str | None
+# TODO: This should be `str | None`. Fixing this requires an overhaul of the `Symbol` API,
+# which is planned in https://github.com/astral-sh/ruff/issues/14297
+reveal_type(c_instance.bound_in_body_declared_in_init)  # revealed: Unknown | str | None
 
 reveal_type(c_instance.bound_in_body_and_init)  # revealed: Unknown | None | Literal["a"]
 ```
@@ -359,9 +361,28 @@ class C:
 
 c_instance = C()
 
-# TODO: Should be `Unknown | int | None`
-# error: [unresolved-attribute]
-reveal_type(c_instance.x)  # revealed: Unknown
+reveal_type(c_instance.x)  # revealed: Unknown | int | None
+```
+
+#### Attributes defined in `with` statements, but with unpacking
+
+```py
+class ContextManager:
+    def __enter__(self) -> tuple[int | None, int]:
+        return 1, 2
+
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
+        pass
+
+class C:
+    def __init__(self) -> None:
+        with ContextManager() as (self.x, self.y):
+            pass
+
+c_instance = C()
+
+reveal_type(c_instance.x)  # revealed: Unknown | int | None
+reveal_type(c_instance.y)  # revealed: Unknown | int
 ```
 
 #### Attributes defined in comprehensions
@@ -707,7 +728,90 @@ reveal_type(Derived().declared_in_body)  # revealed: int | None
 reveal_type(Derived().defined_in_init)  # revealed: str | None
 ```
 
+## Accessing attributes on class objects
+
+When accessing attributes on class objects, they are always looked up on the type of the class
+object first, i.e. on the metaclass:
+
+```py
+from typing import Literal
+
+class Meta1:
+    attr: Literal["meta class value"] = "meta class value"
+
+class C1(metaclass=Meta1): ...
+
+reveal_type(C1.attr)  # revealed: Literal["meta class value"]
+```
+
+However, the meta class attribute only takes precedence over a class-level attribute if it is a data
+descriptor. If it is a non-data descriptor or a normal attribute, the class-level attribute is used
+instead (see the [descriptor protocol tests] for data/non-data descriptor attributes):
+
+```py
+class Meta2:
+    attr: str = "meta class value"
+
+class C2(metaclass=Meta2):
+    attr: Literal["class value"] = "class value"
+
+reveal_type(C2.attr)  # revealed: Literal["class value"]
+```
+
+If the class-level attribute is only partially defined, we union the meta class attribute with the
+class-level attribute:
+
+```py
+def _(flag: bool):
+    class Meta3:
+        attr1 = "meta class value"
+        attr2: Literal["meta class value"] = "meta class value"
+
+    class C3(metaclass=Meta3):
+        if flag:
+            attr1 = "class value"
+            # TODO: Neither mypy nor pyright show an error here, but we could consider emitting a conflicting-declaration diagnostic here.
+            attr2: Literal["class value"] = "class value"
+
+    reveal_type(C3.attr1)  # revealed: Unknown | Literal["meta class value", "class value"]
+    reveal_type(C3.attr2)  # revealed: Literal["meta class value", "class value"]
+```
+
+If the *meta class* attribute is only partially defined, we emit a `possibly-unbound-attribute`
+diagnostic:
+
+```py
+def _(flag: bool):
+    class Meta4:
+        if flag:
+            attr1: str = "meta class value"
+
+    class C4(metaclass=Meta4): ...
+    # error: [possibly-unbound-attribute]
+    reveal_type(C4.attr1)  # revealed: str
+```
+
+Finally, if both the meta class attribute and the class-level attribute are only partially defined,
+we union them and emit a `possibly-unbound-attribute` diagnostic:
+
+```py
+def _(flag1: bool, flag2: bool):
+    class Meta5:
+        if flag1:
+            attr1 = "meta class value"
+
+    class C5(metaclass=Meta5):
+        if flag2:
+            attr1 = "class value"
+
+    # error: [possibly-unbound-attribute]
+    reveal_type(C5.attr1)  # revealed: Unknown | Literal["meta class value", "class value"]
+```
+
 ## Union of attributes
+
+If the (meta)class is a union type or if the attribute on the (meta) class has a union type, we
+infer those union types accordingly:
 
 ```py
 def _(flag: bool):
@@ -719,14 +823,35 @@ def _(flag: bool):
         class C1:
             x = 2
 
+    reveal_type(C1.x)  # revealed: Unknown | Literal[1, 2]
+
     class C2:
         if flag:
             x = 3
         else:
             x = 4
 
-    reveal_type(C1.x)  # revealed: Unknown | Literal[1, 2]
     reveal_type(C2.x)  # revealed: Unknown | Literal[3, 4]
+
+    if flag:
+        class Meta3(type):
+            x = 5
+
+    else:
+        class Meta3(type):
+            x = 6
+
+    class C3(metaclass=Meta3): ...
+    reveal_type(C3.x)  # revealed: Unknown | Literal[5, 6]
+
+    class Meta4(type):
+        if flag:
+            x = 7
+        else:
+            x = 8
+
+    class C4(metaclass=Meta4): ...
+    reveal_type(C4.x)  # revealed: Unknown | Literal[7, 8]
 ```
 
 ## Inherited class attributes
@@ -886,7 +1011,7 @@ def _(flag: bool):
                 self.x = 1
 
     # error: [possibly-unbound-attribute]
-    reveal_type(Foo().x)  # revealed: int
+    reveal_type(Foo().x)  # revealed: int | Unknown
 ```
 
 #### Possibly unbound
@@ -1108,8 +1233,8 @@ Most attribute accesses on bool-literal types are delegated to `builtins.bool`, 
 bools are instances of that class:
 
 ```py
-reveal_type(True.__and__)  # revealed: @Todo(overloaded method)
-reveal_type(False.__or__)  # revealed: @Todo(overloaded method)
+reveal_type(True.__and__)  # revealed: <bound method `__and__` of `Literal[True]`>
+reveal_type(False.__or__)  # revealed: <bound method `__or__` of `Literal[False]`>
 ```
 
 Some attributes are special-cased, however:
@@ -1212,6 +1337,20 @@ class C:
 reveal_type(C().x)  # revealed: Unknown
 ```
 
+### Accessing attributes on `Never`
+
+Arbitrary attributes can be accessed on `Never` without emitting any errors:
+
+```py
+from typing_extensions import Never
+
+def f(never: Never):
+    reveal_type(never.arbitrary_attribute)  # revealed: Never
+
+    # Assigning `Never` to an attribute on `Never` is also allowed:
+    never.another_attribute = never
+```
+
 ### Builtin types attributes
 
 This test can probably be removed eventually, but we currently include it because we do not yet
@@ -1251,6 +1390,7 @@ reveal_type(C.a_none)  # revealed: None
 Some of the tests in the *Class and instance variables* section draw inspiration from
 [pyright's documentation] on this topic.
 
+[descriptor protocol tests]: descriptor_protocol.md
 [pyright's documentation]: https://microsoft.github.io/pyright/#/type-concepts-advanced?id=class-and-instance-variables
 [typing spec on `classvar`]: https://typing.readthedocs.io/en/latest/spec/class-compat.html#classvar
 [`typing.classvar`]: https://docs.python.org/3/library/typing.html#typing.ClassVar

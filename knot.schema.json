@@ -442,7 +442,7 @@
           ]
         },
         "invalid-return-type": {
-          "title": "detects the return value that can't be assigned to the return type",
+          "title": "detects a returned value that can't be assigned to the function's annotated return type",
           "description": "TODO #14889",
           "default": "error",
           "oneOf": [

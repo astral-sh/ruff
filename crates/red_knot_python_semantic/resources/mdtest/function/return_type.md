@@ -39,8 +39,6 @@ class Foo(ABC):
     # error: [invalid-return-type]
     def g[T](self, x: T) -> T: ...
 
-# TODO: no error
-# error: [invalid-base]
 class Bar(Protocol):
     # TODO: no error
     # error: [invalid-return-type]

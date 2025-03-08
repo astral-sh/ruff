@@ -737,3 +737,13 @@ def _(flag: bool, flag2: bool):
     for y in Iterable2():
         reveal_type(y)  # revealed: bytes | str | int
 ```
+
+## Never is iterable
+
+```py
+from typing_extensions import Never
+
+def f(never: Never):
+    for x in never:
+        reveal_type(x)  # revealed: Never
+```

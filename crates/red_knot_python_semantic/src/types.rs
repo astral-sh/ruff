@@ -4,9 +4,10 @@ use std::str::FromStr;
 use bitflags::bitflags;
 use call::{CallDunderError, CallError};
 use context::InferContext;
-use diagnostic::NOT_ITERABLE;
+use diagnostic::{INVALID_CONTEXT_MANAGER, NOT_ITERABLE};
 use ruff_db::files::File;
 use ruff_python_ast as ast;
+use ruff_python_ast::name::Name;
 use ruff_text_size::{Ranged, TextRange};
 use type_ordering::union_elements_ordering;
 
@@ -120,6 +121,52 @@ fn definition_expression_type<'db>(
     } else {
         // expression is in a type-params sub-scope
         infer_scope_types(db, scope).expression_type(expr_id)
+    }
+}
+
+/// The descriptor protocol distiguishes two kinds of descriptors. Non-data descriptors
+/// define a `__get__` method, while data descriptors additionally define a `__set__`
+/// method or a `__delete__` method. This enum is used to categorize attributes into two
+/// groups: (1) data descriptors and (2) normal attributes or non-data descriptors.
+#[derive(Clone, Debug, Copy, PartialEq, Eq, Hash, salsa::Update)]
+enum AttributeKind {
+    DataDescriptor,
+    NormalOrNonDataDescriptor,
+}
+
+/// This enum is used to control the behavior of the descriptor protocol implementation.
+/// When invoked on a class object, the fallback type (a class attribute) can shadow a
+/// non-data descriptor of the meta type (the class's metaclass). However, this is not
+/// true for instances. When invoked on an instance, the fallback type (an attribute on
+/// the instance) can not completely shadow a non-data descriptor of the meta type (the
+/// class), because we do not currently attempt to statically infer if an instance
+/// attribute is definitely defined (i.e. to check whether a particular method has been
+/// called).
+#[derive(Clone, Debug, Copy, PartialEq)]
+enum InstanceFallbackShadowsNonDataDescriptor {
+    Yes,
+    No,
+}
+
+/// Dunder methods are looked up on the meta type of a type without potentially falling
+/// back on attributes on the type itself. For example, when implicitly invoked on an
+/// instance, dunder methods are not looked up as instance attributes. And when invoked
+/// on a class, dunder methods are only looked up on the meta class, not the class itself.
+///
+/// All other attributes use the `WithInstanceFallback` policy.
+#[derive(Clone, Debug, Copy, PartialEq, Eq, Hash)]
+enum MemberLookupPolicy {
+    /// Only look up the attribute on the meta type.
+    NoInstanceFallback,
+    /// Look up the attribute on the meta type, but fall back to attributes on the instance
+    /// if the meta-type attribute is not found or if the meta-type attribute is not a data
+    /// descriptor.
+    WithInstanceFallback,
+}
+
+impl AttributeKind {
+    const fn is_data(self) -> bool {
+        matches!(self, Self::DataDescriptor)
     }
 }
 
@@ -239,6 +286,7 @@ pub enum Type<'db> {
     // TODO protocols, callable types, overloads, generics, type vars
 }
 
+#[salsa::tracked]
 impl<'db> Type<'db> {
     pub const fn any() -> Self {
         Self::Dynamic(DynamicType::Any)
@@ -628,6 +676,11 @@ impl<'db> Type<'db> {
                 KnownClass::WrapperDescriptorType
                     .to_instance(db)
                     .is_subtype_of(db, target)
+            }
+
+            (Type::Callable(CallableType::General(_)), _) => {
+                // TODO: Implement subtyping for general callable types
+                false
             }
 
             // A fully static heterogenous tuple type `A` is a subtype of a fully static heterogeneous tuple type `B`
@@ -1200,6 +1253,12 @@ impl<'db> Type<'db> {
                 // TODO: add checks for the above cases once we support them
                 instance.is_disjoint_from(db, KnownClass::Tuple.to_instance(db))
             }
+
+            (Type::Callable(CallableType::General(_)), _)
+            | (_, Type::Callable(CallableType::General(_))) => {
+                // TODO: Implement disjointness for general callable types
+                false
+            }
         }
     }
 
@@ -1245,14 +1304,19 @@ impl<'db> Type<'db> {
             }
             Type::Union(union) => union.is_fully_static(db),
             Type::Intersection(intersection) => intersection.is_fully_static(db),
+            // TODO: Once we support them, make sure that we return `false` for other types
+            // containing gradual forms such as `tuple[Any, ...]`.
+            // Conversely, make sure to return `true` for homogeneous tuples such as
+            // `tuple[int, ...]`, once we add support for them.
             Type::Tuple(tuple) => tuple
                 .elements(db)
                 .iter()
                 .all(|elem| elem.is_fully_static(db)),
-            // TODO: Once we support them, make sure that we return `false` for other types
-            // containing gradual forms such as `tuple[Any, ...]` or `Callable[..., str]`.
-            // Conversely, make sure to return `true` for homogeneous tuples such as
-            // `tuple[int, ...]`, once we add support for them.
+            Type::Callable(CallableType::General(_)) => {
+                // TODO: `Callable` is not fully static when the parameter argument is `...` or
+                // when any parameter type or return type is not fully static.
+                false
+            }
         }
     }
 
@@ -1286,6 +1350,12 @@ impl<'db> Type<'db> {
             | Type::ClassLiteral(..)
             | Type::ModuleLiteral(..)
             | Type::KnownInstance(..) => true,
+            Type::Callable(CallableType::General(_)) => {
+                // A general callable type is never a singleton because for any given signature,
+                // there could be any number of distinct objects that are all callable with that
+                // signature.
+                false
+            }
             Type::Instance(InstanceType { class }) => {
                 class.known(db).is_some_and(KnownClass::is_singleton)
             }
@@ -1355,7 +1425,212 @@ impl<'db> Type<'db> {
             | Type::Intersection(..)
             | Type::LiteralString
             | Type::AlwaysTruthy
-            | Type::AlwaysFalsy => false,
+            | Type::AlwaysFalsy
+            | Type::Callable(CallableType::General(_)) => false,
+        }
+    }
+
+    /// This function is roughly equivalent to `find_name_in_mro` as defined in the [descriptor guide] or
+    /// [`_PyType_Lookup`] in CPython's `Objects/typeobject.c`. It should typically be called through
+    /// [Type::class_member], unless it is known that `self` is a class-like type. This function returns
+    /// `None` if called on an instance-like type.
+    ///
+    /// [descriptor guide]: https://docs.python.org/3/howto/descriptor.html#invocation-from-an-instance
+    /// [`_PyType_Lookup`]: https://github.com/python/cpython/blob/e285232c76606e3be7bf216efb1be1e742423e4b/Objects/typeobject.c#L5223
+    fn find_name_in_mro(&self, db: &'db dyn Db, name: &str) -> Option<SymbolAndQualifiers<'db>> {
+        match self {
+            Type::Union(union) => Some(union.map_with_boundness_and_qualifiers(db, |elem| {
+                elem.find_name_in_mro(db, name)
+                    // If some elements are classes, and some are not, we simply fall back to `Unbound` for the non-class
+                    // elements instead of short-circuiting the whole result to `None`. We would need a more detailed
+                    // return type otherwise, and since `find_name_in_mro` is usually called via `class_member`, this is
+                    // not a problem.
+                    .unwrap_or_default()
+            })),
+            Type::Intersection(inter) => {
+                Some(inter.map_with_boundness_and_qualifiers(db, |elem| {
+                    elem.find_name_in_mro(db, name)
+                        // Fall back to Unbound, similar to the union case (see above).
+                        .unwrap_or_default()
+                }))
+            }
+
+            Type::Dynamic(_) | Type::Never => Some(Symbol::bound(self).into()),
+
+            Type::ClassLiteral(ClassLiteralType { class })
+                if class.is_known(db, KnownClass::FunctionType) && name == "__get__" =>
+            {
+                Some(Symbol::bound(Type::Callable(CallableType::WrapperDescriptorDunderGet)).into())
+            }
+            Type::ClassLiteral(ClassLiteralType { class })
+                if class.is_known(db, KnownClass::FunctionType)
+                    && matches!(name, "__set__" | "__delete__") =>
+            {
+                // Hard code this knowledge, as we look up `__set__` and `__delete__` on `FunctionType` often.
+                Some(Symbol::Unbound.into())
+            }
+            // TODO:
+            // We currently hard-code the knowledge that the following known classes are not
+            // descriptors, i.e. that they have no `__get__` method. This is not wrong and
+            // potentially even beneficial for performance, but it's not very principled.
+            // This case can probably be removed eventually, but we include it at the moment
+            // because we make extensive use of these types in our test suite. Note that some
+            // builtin types are not included here, since they do not have generic bases and
+            // are correctly handled by the `find_name_in_mro` method.
+            Type::ClassLiteral(class)
+                if matches!(
+                    class.class.known(db),
+                    Some(
+                        KnownClass::Int
+                            | KnownClass::Str
+                            | KnownClass::Bytes
+                            | KnownClass::Tuple
+                            | KnownClass::Slice
+                            | KnownClass::Range,
+                    )
+                ) && matches!(name, "__get__" | "__set__" | "__delete__") =>
+            {
+                Some(Symbol::Unbound.into())
+            }
+            Type::ClassLiteral(class_literal) => Some(class_literal.class_member(db, name)),
+
+            Type::SubclassOf(subclass_of)
+                if name == "__get__"
+                    && matches!(
+                        subclass_of
+                            .subclass_of()
+                            .into_class()
+                            .and_then(|c| c.known(db)),
+                        Some(
+                            KnownClass::Int
+                                | KnownClass::Str
+                                | KnownClass::Bytes
+                                | KnownClass::Tuple
+                                | KnownClass::Slice
+                                | KnownClass::Range,
+                        )
+                    ) =>
+            {
+                Some(Symbol::Unbound.into())
+            }
+            Type::SubclassOf(subclass_of_ty) => subclass_of_ty.find_name_in_mro(db, name),
+
+            // We eagerly normalize type[object], i.e. Type::SubclassOf(object) to `type`, i.e. Type::Instance(type).
+            // So looking up a name in the MRO of `Type::Instance(type)` is equivalent to looking up the name in the
+            // MRO of the class `object`.
+            Type::Instance(InstanceType { class }) if class.is_known(db, KnownClass::Type) => {
+                KnownClass::Object
+                    .to_class_literal(db)
+                    .find_name_in_mro(db, name)
+            }
+            Type::FunctionLiteral(_)
+            | Type::Callable(_)
+            | Type::ModuleLiteral(_)
+            | Type::KnownInstance(_)
+            | Type::AlwaysTruthy
+            | Type::AlwaysFalsy
+            | Type::IntLiteral(_)
+            | Type::BooleanLiteral(_)
+            | Type::StringLiteral(_)
+            | Type::LiteralString
+            | Type::BytesLiteral(_)
+            | Type::SliceLiteral(_)
+            | Type::Tuple(_)
+            | Type::Instance(_) => None,
+        }
+    }
+
+    /// Look up an attribute in the MRO of the meta type of `self`. This returns class-level attributes
+    /// when called on an instance-like type, and metaclass attributes when called on a class-like type.
+    ///
+    /// Basically corresponds to `self.to_meta_type().find_name_in_mro(name)`, except for the handling
+    /// of union and intersection types.
+    #[salsa::tracked]
+    fn class_member(self, db: &'db dyn Db, name: Name) -> SymbolAndQualifiers<'db> {
+        match self {
+            Type::Union(union) => union
+                .map_with_boundness_and_qualifiers(db, |elem| elem.class_member(db, name.clone())),
+            Type::Intersection(inter) => inter
+                .map_with_boundness_and_qualifiers(db, |elem| elem.class_member(db, name.clone())),
+            _ => self
+                .to_meta_type(db)
+                .find_name_in_mro(db, name.as_str())
+                .expect("was called on meta type"),
+        }
+    }
+
+    /// This function roughly corresponds to looking up an attribute in the `__dict__` of an object.
+    /// For instance-like types, this goes through the classes MRO and discovers attribute assignments
+    /// in methods, as well as class-body declarations that we consider to be evidence for the presence
+    /// of an instance attribute.
+    ///
+    /// For example, an instance of the following class has instance members `a` and `b`, but `c` is
+    /// just a class attribute that would not be discovered by this method:
+    /// ```py
+    /// class C:
+    ///     a: int
+    ///
+    ///     c = 1
+    ///
+    ///     def __init__(self):
+    ///         self.b: str = "a"
+    /// ```
+    fn instance_member(&self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
+        match self {
+            Type::Union(union) => {
+                union.map_with_boundness_and_qualifiers(db, |elem| elem.instance_member(db, name))
+            }
+
+            Type::Intersection(intersection) => intersection
+                .map_with_boundness_and_qualifiers(db, |elem| elem.instance_member(db, name)),
+
+            Type::Dynamic(_) | Type::Never => Symbol::bound(self).into(),
+
+            Type::Instance(InstanceType { class }) => class.instance_member(db, name),
+
+            Type::FunctionLiteral(_) => KnownClass::FunctionType
+                .to_instance(db)
+                .instance_member(db, name),
+
+            Type::Callable(CallableType::BoundMethod(_)) => KnownClass::MethodType
+                .to_instance(db)
+                .instance_member(db, name),
+            Type::Callable(CallableType::MethodWrapperDunderGet(_)) => {
+                KnownClass::MethodWrapperType
+                    .to_instance(db)
+                    .instance_member(db, name)
+            }
+            Type::Callable(CallableType::WrapperDescriptorDunderGet) => {
+                KnownClass::WrapperDescriptorType
+                    .to_instance(db)
+                    .instance_member(db, name)
+            }
+            Type::Callable(CallableType::General(_)) => {
+                // TODO: Implement static member lookup for general callable types
+                Symbol::todo("static member lookup on general callable type").into()
+            }
+
+            Type::IntLiteral(_) => KnownClass::Int.to_instance(db).instance_member(db, name),
+            Type::BooleanLiteral(_) => KnownClass::Bool.to_instance(db).instance_member(db, name),
+            Type::StringLiteral(_) | Type::LiteralString => {
+                KnownClass::Str.to_instance(db).instance_member(db, name)
+            }
+            Type::BytesLiteral(_) => KnownClass::Bytes.to_instance(db).instance_member(db, name),
+            Type::SliceLiteral(_) => KnownClass::Slice.to_instance(db).instance_member(db, name),
+            Type::Tuple(_) => KnownClass::Tuple.to_instance(db).instance_member(db, name),
+
+            Type::AlwaysTruthy | Type::AlwaysFalsy => Type::object(db).instance_member(db, name),
+            Type::ModuleLiteral(_) => KnownClass::ModuleType
+                .to_instance(db)
+                .instance_member(db, name),
+
+            Type::KnownInstance(_) => Symbol::Unbound.into(),
+
+            // TODO: we currently don't model the fact that class literals and subclass-of types have
+            // a `__dict__` that is filled with class level attributes. Modeling this is currently not
+            // required, as `instance_member` is only called for instance-like types through `member`,
+            // but we might want to add this in the future.
+            Type::ClassLiteral(_) | Type::SubclassOf(_) => Symbol::Unbound.into(),
         }
     }
 
@@ -1363,191 +1638,244 @@ impl<'db> Type<'db> {
     /// method corresponds to `inspect.getattr_static(<object of type 'self'>, name)`.
     ///
     /// See also: [`Type::member`]
-    #[must_use]
     fn static_member(&self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
-        match self {
-            Type::Dynamic(_) => Symbol::bound(self),
-
-            Type::Never => Symbol::todo("attribute lookup on Never"),
-
-            Type::FunctionLiteral(_) => KnownClass::FunctionType
-                .to_instance(db)
-                .static_member(db, name),
-
-            Type::Callable(CallableType::BoundMethod(_)) => KnownClass::MethodType
-                .to_instance(db)
-                .static_member(db, name),
-            Type::Callable(CallableType::MethodWrapperDunderGet(_)) => {
-                KnownClass::MethodWrapperType
-                    .to_instance(db)
-                    .static_member(db, name)
-            }
-            Type::Callable(CallableType::WrapperDescriptorDunderGet) => {
-                KnownClass::WrapperDescriptorType
-                    .to_instance(db)
-                    .static_member(db, name)
-            }
-
-            Type::ModuleLiteral(module) => module.static_member(db, name),
-
-            Type::ClassLiteral(class_ty) => class_ty.static_member(db, name),
-
-            Type::SubclassOf(subclass_of_ty) => subclass_of_ty.static_member(db, name),
-
-            Type::KnownInstance(known_instance) => known_instance.static_member(db, name),
-
-            Type::Instance(InstanceType { class }) => match (class.known(db), name) {
-                (Some(KnownClass::VersionInfo), "major") => Symbol::bound(Type::IntLiteral(
-                    Program::get(db).python_version(db).major.into(),
-                )),
-                (Some(KnownClass::VersionInfo), "minor") => Symbol::bound(Type::IntLiteral(
-                    Program::get(db).python_version(db).minor.into(),
-                )),
-                (Some(KnownClass::FunctionType), "__get__") => {
-                    Symbol::bound(Type::Callable(CallableType::WrapperDescriptorDunderGet))
-                }
-
-                // TODO:
-                // We currently hard-code the knowledge that the following known classes are not
-                // descriptors, i.e. that they have no `__get__` method. This is not wrong and
-                // potentially even beneficial for performance, but it's not very principled.
-                // This case can probably be removed eventually, but we include it at the moment
-                // because we make extensive use of these types in our test suite. Note that some
-                // builtin types are not included here, since they do not have generic bases and
-                // are correctly handled by the `instance_member` method.
-                (
-                    Some(
-                        KnownClass::Str
-                        | KnownClass::Bytes
-                        | KnownClass::Tuple
-                        | KnownClass::Slice
-                        | KnownClass::Range,
-                    ),
-                    "__get__",
-                ) => Symbol::Unbound,
-
-                _ => {
-                    let SymbolAndQualifiers(symbol, _) = class.instance_member(db, name);
-                    symbol
-                }
-            },
-
-            Type::Union(union) => union.map_with_boundness(db, |elem| elem.static_member(db, name)),
-
-            Type::Intersection(intersection) => {
-                intersection.map_with_boundness(db, |elem| elem.static_member(db, name))
-            }
-
-            Type::IntLiteral(_) => match name {
-                "real" | "numerator" => Symbol::bound(self),
-                // TODO more attributes could probably be usefully special-cased
-                _ => KnownClass::Int.to_instance(db).static_member(db, name),
-            },
-
-            Type::BooleanLiteral(bool_value) => match name {
-                "real" | "numerator" => Symbol::bound(Type::IntLiteral(i64::from(*bool_value))),
-                _ => KnownClass::Bool.to_instance(db).static_member(db, name),
-            },
-
-            Type::StringLiteral(_) | Type::LiteralString => {
-                KnownClass::Str.to_instance(db).static_member(db, name)
-            }
-
-            Type::BytesLiteral(_) => KnownClass::Bytes.to_instance(db).static_member(db, name),
-
-            // We could plausibly special-case `start`, `step`, and `stop` here,
-            // but it doesn't seem worth the complexity given the very narrow range of places
-            // where we infer `SliceLiteral` types.
-            Type::SliceLiteral(_) => KnownClass::Slice.to_instance(db).static_member(db, name),
-
-            Type::Tuple(_) => {
-                // TODO: We might want to special case some attributes here, as the stubs
-                // for `builtins.tuple` assume that `self` is a homogeneous tuple, while
-                // we're explicitly modeling heterogeneous tuples using `Type::Tuple`.
-                KnownClass::Tuple.to_instance(db).static_member(db, name)
-            }
-
-            Type::AlwaysTruthy | Type::AlwaysFalsy => match name {
-                "__bool__" => {
-                    // TODO should be `Callable[[], Literal[True/False]]`
-                    Symbol::todo("`__bool__` for `AlwaysTruthy`/`AlwaysFalsy` Type variants")
-                }
-                _ => Type::object(db).static_member(db, name),
-            },
+        if let Type::ModuleLiteral(module) = self {
+            module.static_member(db, name)
+        } else if let symbol @ Symbol::Type(_, _) = self.class_member(db, name.into()).symbol {
+            symbol
+        } else if let Some(symbol @ Symbol::Type(_, _)) =
+            self.find_name_in_mro(db, name).map(|inner| inner.symbol)
+        {
+            symbol
+        } else {
+            self.instance_member(db, name).symbol
         }
     }
 
-    /// Call the `__get__(instance, owner)` method on a type, and get the return
-    /// type of the call.
+    /// Look up `__get__` on the meta type of self, and call it with the arguments `self`, `instance`,
+    /// and `owner`. `__get__` is different than other dunder methods in that it is not looked up using
+    /// the descriptor protocol itself.
     ///
-    /// If `__get__` is not defined on the type, this method returns `Ok(None)`.
-    /// If the call to `__get__` fails, this method returns an error.
+    /// In addition to the return type of `__get__`, this method also returns the *kind* of attribute
+    /// that `self` represents: (1) a data descriptor or (2) a non-data descriptor / normal attribute.
+    ///
+    /// If `__get__` is not defined on the meta type, this method returns `None`.
+    #[salsa::tracked]
     fn try_call_dunder_get(
         self,
         db: &'db dyn Db,
-        instance: Option<Type<'db>>,
+        instance: Type<'db>,
         owner: Type<'db>,
-    ) -> Option<Type<'db>> {
-        #[salsa::tracked]
-        fn try_call_dunder_get_query<'db>(
-            db: &'db dyn Db,
-            ty_self: Type<'db>,
-            instance: Option<Type<'db>>,
-            owner: Type<'db>,
-        ) -> Option<Type<'db>> {
-            // TODO: Handle possible-unboundness and errors from `__get__` calls.
+    ) -> Option<(Type<'db>, AttributeKind)> {
+        let descr_get = self.class_member(db, "__get__".into()).symbol;
 
-            match ty_self {
-                Type::Union(union) => {
-                    let mut builder = UnionBuilder::new(db);
-                    for elem in union.elements(db) {
-                        let ty = if let Some(result) = elem.try_call_dunder_get(db, instance, owner)
-                        {
-                            result
-                        } else {
-                            *elem
-                        };
-                        builder = builder.add(ty);
+        if let Symbol::Type(descr_get, descr_get_boundness) = descr_get {
+            let return_ty = descr_get
+                .try_call(db, &CallArguments::positional([self, instance, owner]))
+                .map(|outcome| {
+                    if descr_get_boundness == Boundness::Bound {
+                        outcome.return_type(db)
+                    } else {
+                        UnionType::from_elements(db, [outcome.return_type(db), self])
                     }
-                    Some(builder.build())
-                }
-                Type::Intersection(intersection) => {
-                    if !intersection.negative(db).is_empty() {
-                        return Some(todo_type!(
-                            "try_call_dunder_get: intersections with negative contributions"
-                        ));
-                    }
+                })
+                .ok()?;
 
-                    let mut builder = IntersectionBuilder::new(db);
-                    for elem in intersection.positive(db) {
-                        let ty = if let Some(result) = elem.try_call_dunder_get(db, instance, owner)
-                        {
-                            result
-                        } else {
-                            *elem
-                        };
-                        builder = builder.add_positive(ty);
-                    }
-                    Some(builder.build())
-                }
-                _ => {
-                    // TODO: Handle possible-unboundness of `__get__` method
-                    // There is an existing test case for this in `descriptor_protocol.md`.
+            let descriptor_kind = if self.class_member(db, "__set__".into()).symbol.is_unbound()
+                && self
+                    .class_member(db, "__delete__".into())
+                    .symbol
+                    .is_unbound()
+            {
+                AttributeKind::NormalOrNonDataDescriptor
+            } else {
+                AttributeKind::DataDescriptor
+            };
 
-                    ty_self
-                        .member(db, "__get__")
-                        .ignore_possibly_unbound()?
-                        .try_call(
-                            db,
-                            &CallArguments::positional([instance.unwrap_or(Type::none(db)), owner]),
+            Some((return_ty, descriptor_kind))
+        } else {
+            None
+        }
+    }
+
+    /// Look up `__get__` on the meta type of `attribute`, and call it with `attribute`, `instance`,
+    /// and `owner` as arguments. This method exists as a separate step as we need to handle unions
+    /// and intersections explicitly.
+    fn try_call_dunder_get_on_attribute(
+        db: &'db dyn Db,
+        attribute: SymbolAndQualifiers<'db>,
+        instance: Type<'db>,
+        owner: Type<'db>,
+    ) -> (SymbolAndQualifiers<'db>, AttributeKind) {
+        match attribute {
+            // This branch is not strictly needed, but it short-circuits the lookup of various dunder
+            // methods and calls that would otherwise be made.
+            //
+            // Note that attribute accesses on dynamic types always succeed. For this reason, they also
+            // have `__get__`, `__set__`, and `__delete__` methods and are therefore considered to be
+            // data descriptors.
+            //
+            // The same is true for `Never`.
+            SymbolAndQualifiers {
+                symbol: Symbol::Type(Type::Dynamic(_) | Type::Never, _),
+                qualifiers: _,
+            } => (attribute, AttributeKind::DataDescriptor),
+
+            SymbolAndQualifiers {
+                symbol: Symbol::Type(Type::Union(union), boundness),
+                qualifiers,
+            } => (
+                union
+                    .map_with_boundness(db, |elem| {
+                        Symbol::Type(
+                            elem.try_call_dunder_get(db, instance, owner)
+                                .map_or(*elem, |(ty, _)| ty),
+                            boundness,
                         )
-                        .map(|outcome| Some(outcome.return_type(db)))
-                        .unwrap_or(None)
+                    })
+                    .with_qualifiers(qualifiers),
+                // TODO: avoid the duplication here:
+                if union.elements(db).iter().all(|elem| {
+                    elem.try_call_dunder_get(db, instance, owner)
+                        .is_some_and(|(_, kind)| kind.is_data())
+                }) {
+                    AttributeKind::DataDescriptor
+                } else {
+                    AttributeKind::NormalOrNonDataDescriptor
+                },
+            ),
+
+            SymbolAndQualifiers {
+                symbol: Symbol::Type(Type::Intersection(intersection), boundness),
+                qualifiers,
+            } => (
+                intersection
+                    .map_with_boundness(db, |elem| {
+                        Symbol::Type(
+                            elem.try_call_dunder_get(db, instance, owner)
+                                .map_or(*elem, |(ty, _)| ty),
+                            boundness,
+                        )
+                    })
+                    .with_qualifiers(qualifiers),
+                // TODO: Discover data descriptors in intersections.
+                AttributeKind::NormalOrNonDataDescriptor,
+            ),
+
+            SymbolAndQualifiers {
+                symbol: Symbol::Type(attribute_ty, boundness),
+                qualifiers: _,
+            } => {
+                if let Some((return_ty, attribute_kind)) =
+                    attribute_ty.try_call_dunder_get(db, instance, owner)
+                {
+                    (Symbol::Type(return_ty, boundness).into(), attribute_kind)
+                } else {
+                    (attribute, AttributeKind::NormalOrNonDataDescriptor)
                 }
             }
-        }
 
-        try_call_dunder_get_query(db, self, instance, owner)
+            _ => (attribute, AttributeKind::NormalOrNonDataDescriptor),
+        }
+    }
+
+    /// Implementation of the descriptor protocol.
+    ///
+    /// This method roughly performs the following steps:
+    ///
+    /// - Look up the attribute `name` on the meta type of `self`. Call the result `meta_attr`.
+    /// - Call `__get__` on the meta-type of `meta_attr`, if it exists. If the call succeeds,
+    ///   replace `meta_attr` with the result of the call. Also check if `meta_attr` is a *data*
+    ///   descriptor by testing if `__set__` or `__delete__` exist.
+    /// - If `meta_attr` is a data descriptor, return it.
+    /// - Otherwise, if `fallback` is bound, return `fallback`.
+    /// - Otherwise, return `meta_attr`.
+    ///
+    /// In addition to that, we also handle various cases of possibly-unbound symbols and fall
+    /// back to lower-precedence stages of the descriptor protocol by building union types.
+    fn invoke_descriptor_protocol(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        fallback: SymbolAndQualifiers<'db>,
+        policy: InstanceFallbackShadowsNonDataDescriptor,
+    ) -> SymbolAndQualifiers<'db> {
+        let (
+            SymbolAndQualifiers {
+                symbol: meta_attr,
+                qualifiers: meta_attr_qualifiers,
+            },
+            meta_attr_kind,
+        ) = Self::try_call_dunder_get_on_attribute(
+            db,
+            self.class_member(db, name.into()),
+            self,
+            self.to_meta_type(db),
+        );
+
+        let SymbolAndQualifiers {
+            symbol: fallback,
+            qualifiers: fallback_qualifiers,
+        } = fallback;
+
+        match (meta_attr, meta_attr_kind, fallback) {
+            // The fallback type is unbound, so we can just return `meta_attr` unconditionally,
+            // no matter if it's data descriptor, a non-data descriptor, or a normal attribute.
+            (meta_attr @ Symbol::Type(_, _), _, Symbol::Unbound) => {
+                meta_attr.with_qualifiers(meta_attr_qualifiers)
+            }
+
+            // `meta_attr` is the return type of a data descriptor and definitely bound, so we
+            // return it.
+            (meta_attr @ Symbol::Type(_, Boundness::Bound), AttributeKind::DataDescriptor, _) => {
+                meta_attr.with_qualifiers(meta_attr_qualifiers)
+            }
+
+            // `meta_attr` is the return type of a data descriptor, but the attribute on the
+            // meta type is possibly-unbound. This means that we "fall through" to the next
+            // stage of the descriptor protocol and union with the fallback type.
+            (
+                Symbol::Type(meta_attr_ty, Boundness::PossiblyUnbound),
+                AttributeKind::DataDescriptor,
+                Symbol::Type(fallback_ty, fallback_boundness),
+            ) => Symbol::Type(
+                UnionType::from_elements(db, [meta_attr_ty, fallback_ty]),
+                fallback_boundness,
+            )
+            .with_qualifiers(meta_attr_qualifiers.union(fallback_qualifiers)),
+
+            // `meta_attr` is *not* a data descriptor. This means that the `fallback` type has
+            // now the highest priority. However, we only return the pure `fallback` type if the
+            // policy allows it. When invoked on class objects, the policy is set to `Yes`, which
+            // means that class-level attributes (the fallback) can shadow non-data descriptors
+            // on metaclasses. However, for instances, the policy is set to `No`, because we do
+            // allow instance-level attributes to shadow class-level non-data descriptors. This
+            // would require us to statically infer if an instance attribute is always set, which
+            // is something we currently don't attempt to do.
+            (
+                Symbol::Type(_, _),
+                AttributeKind::NormalOrNonDataDescriptor,
+                fallback @ Symbol::Type(_, Boundness::Bound),
+            ) if policy == InstanceFallbackShadowsNonDataDescriptor::Yes => {
+                fallback.with_qualifiers(fallback_qualifiers)
+            }
+
+            // `meta_attr` is *not* a data descriptor. The `fallback` symbol is either possibly
+            // unbound or the policy argument is `No`. In both cases, the `fallback` type does
+            // not completely shadow the non-data descriptor, so we build a union of the two.
+            (
+                Symbol::Type(meta_attr_ty, meta_attr_boundness),
+                AttributeKind::NormalOrNonDataDescriptor,
+                Symbol::Type(fallback_ty, fallback_boundness),
+            ) => Symbol::Type(
+                UnionType::from_elements(db, [meta_attr_ty, fallback_ty]),
+                meta_attr_boundness.max(fallback_boundness),
+            )
+            .with_qualifiers(meta_attr_qualifiers.union(fallback_qualifiers)),
+
+            // If the attribute is not found on the meta type, we simply return the fallback.
+            (Symbol::Unbound, _, fallback) => fallback.with_qualifiers(fallback_qualifiers),
+        }
     }
 
     /// Access an attribute of this type, potentially invoking the descriptor protocol.
@@ -1558,40 +1886,114 @@ impl<'db> Type<'db> {
     /// TODO: We should return a `Result` here to handle errors that can appear during attribute
     /// lookup, like a failed `__get__` call on a descriptor.
     #[must_use]
-    pub(crate) fn member(&self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
+    pub(crate) fn member(self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
+        self.member_lookup_with_policy(db, name.into(), MemberLookupPolicy::WithInstanceFallback)
+    }
+
+    /// Similar to [`Type::member`], but allows the caller to specify what policy should be used
+    /// when looking up attributes. See [`MemberLookupPolicy`] for more information.
+    #[salsa::tracked]
+    fn member_lookup_with_policy(
+        self,
+        db: &'db dyn Db,
+        name: Name,
+        policy: MemberLookupPolicy,
+    ) -> SymbolAndQualifiers<'db> {
         if name == "__class__" {
-            return Symbol::bound(self.to_meta_type(db));
+            return Symbol::bound(self.to_meta_type(db)).into();
         }
 
-        match self {
-            Type::FunctionLiteral(function) if name == "__get__" => Symbol::bound(Type::Callable(
-                CallableType::MethodWrapperDunderGet(*function),
-            )),
+        let name_str = name.as_str();
 
-            Type::Callable(CallableType::BoundMethod(bound_method)) => match name {
-                "__self__" => Symbol::bound(bound_method.self_instance(db)),
-                "__func__" => Symbol::bound(Type::FunctionLiteral(bound_method.function(db))),
+        match self {
+            Type::Union(union) => union
+                .map_with_boundness(db, |elem| elem.member(db, &name).symbol)
+                .into(),
+
+            Type::Intersection(intersection) => intersection
+                .map_with_boundness(db, |elem| elem.member(db, &name).symbol)
+                .into(),
+
+            Type::Dynamic(..) | Type::Never => Symbol::bound(self).into(),
+
+            Type::FunctionLiteral(function) if name == "__get__" => Symbol::bound(Type::Callable(
+                CallableType::MethodWrapperDunderGet(function),
+            ))
+            .into(),
+
+            Type::ClassLiteral(ClassLiteralType { class })
+                if class.is_known(db, KnownClass::FunctionType) && name == "__get__" =>
+            {
+                Symbol::bound(Type::Callable(CallableType::WrapperDescriptorDunderGet)).into()
+            }
+
+            Type::Callable(CallableType::BoundMethod(bound_method)) => match name_str {
+                "__self__" => Symbol::bound(bound_method.self_instance(db)).into(),
+                "__func__" => {
+                    Symbol::bound(Type::FunctionLiteral(bound_method.function(db))).into()
+                }
                 _ => {
                     KnownClass::MethodType
                         .to_instance(db)
-                        .member(db, name)
+                        .member(db, &name)
                         .or_fall_back_to(db, || {
                             // If an attribute is not available on the bound method object,
                             // it will be looked up on the underlying function object:
-                            Type::FunctionLiteral(bound_method.function(db)).member(db, name)
+                            Type::FunctionLiteral(bound_method.function(db)).member(db, &name)
                         })
                 }
             },
             Type::Callable(CallableType::MethodWrapperDunderGet(_)) => {
                 KnownClass::MethodWrapperType
                     .to_instance(db)
-                    .member(db, name)
+                    .member(db, &name)
             }
             Type::Callable(CallableType::WrapperDescriptorDunderGet) => {
                 KnownClass::WrapperDescriptorType
                     .to_instance(db)
-                    .member(db, name)
+                    .member(db, &name)
             }
+            Type::Callable(CallableType::General(_)) => {
+                // TODO
+                Symbol::todo("member lookup on general callable type").into()
+            }
+
+            Type::Instance(InstanceType { class })
+                if class.is_known(db, KnownClass::VersionInfo) && name == "major" =>
+            {
+                Symbol::bound(Type::IntLiteral(
+                    Program::get(db).python_version(db).major.into(),
+                ))
+                .into()
+            }
+            Type::Instance(InstanceType { class })
+                if class.is_known(db, KnownClass::VersionInfo) && name == "minor" =>
+            {
+                Symbol::bound(Type::IntLiteral(
+                    Program::get(db).python_version(db).minor.into(),
+                ))
+                .into()
+            }
+
+            Type::IntLiteral(_) if matches!(name_str, "real" | "numerator") => {
+                Symbol::bound(self).into()
+            }
+
+            Type::BooleanLiteral(bool_value) if matches!(name_str, "real" | "numerator") => {
+                Symbol::bound(Type::IntLiteral(i64::from(bool_value))).into()
+            }
+
+            Type::ModuleLiteral(module) => module.static_member(db, name_str).into(),
+
+            Type::AlwaysFalsy | Type::AlwaysTruthy => self.class_member(db, name),
+
+            _ if policy == MemberLookupPolicy::NoInstanceFallback => self
+                .invoke_descriptor_protocol(
+                    db,
+                    name_str,
+                    Symbol::Unbound.into(),
+                    InstanceFallbackShadowsNonDataDescriptor::No,
+                ),
 
             Type::Instance(..)
             | Type::BooleanLiteral(..)
@@ -1603,34 +2005,40 @@ impl<'db> Type<'db> {
             | Type::Tuple(..)
             | Type::KnownInstance(..)
             | Type::FunctionLiteral(..) => {
-                let member = self.static_member(db, name);
+                let fallback = self.instance_member(db, name_str);
 
-                let instance = Some(*self);
-                let owner = self.to_meta_type(db);
-
-                // TODO: Handle `__get__` call errors instead of using `.unwrap_or(None)`.
-                // There is an existing test case for this in `descriptor_protocol.md`.
-                member.map_type(|ty| ty.try_call_dunder_get(db, instance, owner).unwrap_or(ty))
+                self.invoke_descriptor_protocol(
+                    db,
+                    name_str,
+                    fallback,
+                    InstanceFallbackShadowsNonDataDescriptor::No,
+                )
             }
+
             Type::ClassLiteral(..) | Type::SubclassOf(..) => {
-                let member = self.static_member(db, name);
+                let class_attr_plain = self.find_name_in_mro(db, name_str).expect(
+                    "Calling `find_name_in_mro` on class literals and subclass-of types should always return `Some`",
+                );
 
-                let instance = None;
-                let owner = *self;
+                if name == "__mro__" {
+                    return class_attr_plain;
+                }
 
-                // TODO: Handle `__get__` call errors (see above).
-                member.map_type(|ty| ty.try_call_dunder_get(db, instance, owner).unwrap_or(ty))
+                let class_attr_fallback = Self::try_call_dunder_get_on_attribute(
+                    db,
+                    class_attr_plain,
+                    Type::none(db),
+                    self,
+                )
+                .0;
+
+                self.invoke_descriptor_protocol(
+                    db,
+                    name_str,
+                    class_attr_fallback,
+                    InstanceFallbackShadowsNonDataDescriptor::Yes,
+                )
             }
-            Type::Union(union) => union.map_with_boundness(db, |elem| elem.member(db, name)),
-            Type::Intersection(intersection) => {
-                intersection.map_with_boundness(db, |elem| elem.member(db, name))
-            }
-
-            Type::Dynamic(..)
-            | Type::Never
-            | Type::AlwaysFalsy
-            | Type::AlwaysTruthy
-            | Type::ModuleLiteral(..) => self.static_member(db, name),
         }
     }
 
@@ -2038,9 +2446,50 @@ impl<'db> Type<'db> {
                                     if instance.is_none(db) {
                                         function_ty
                                     } else {
-                                        Type::Callable(CallableType::BoundMethod(
-                                            BoundMethodType::new(db, function, instance),
-                                        ))
+                                        match instance {
+                                            Type::KnownInstance(
+                                                KnownInstanceType::TypeAliasType(type_alias),
+                                            ) if arguments
+                                                .third_argument()
+                                                .and_then(Type::into_class_literal)
+                                                .is_some_and(|class_literal| {
+                                                    class_literal
+                                                        .class
+                                                        .is_known(db, KnownClass::TypeAliasType)
+                                                })
+                                                && function.name(db) == "__name__" =>
+                                            {
+                                                Type::string_literal(db, type_alias.name(db))
+                                            }
+                                            Type::KnownInstance(KnownInstanceType::TypeVar(
+                                                typevar,
+                                            )) if arguments
+                                                .third_argument()
+                                                .and_then(Type::into_class_literal)
+                                                .is_some_and(|class_literal| {
+                                                    class_literal
+                                                        .class
+                                                        .is_known(db, KnownClass::TypeVar)
+                                                })
+                                                && function.name(db) == "__name__" =>
+                                            {
+                                                Type::string_literal(db, typevar.name(db))
+                                            }
+                                            _ => {
+                                                if function.has_known_class_decorator(
+                                                    db,
+                                                    KnownClass::Property,
+                                                ) {
+                                                    todo_type!("@property")
+                                                } else {
+                                                    Type::Callable(CallableType::BoundMethod(
+                                                        BoundMethodType::new(
+                                                            db, function, instance,
+                                                        ),
+                                                    ))
+                                                }
+                                            }
+                                        }
                                     }
                                 } else {
                                     Type::unknown()
@@ -2267,8 +2716,11 @@ impl<'db> Type<'db> {
                     })
             }
 
-            // Dynamic types are callable, and the return type is the same dynamic type
-            Type::Dynamic(_) => Ok(CallOutcome::Single(CallBinding::from_return_type(self))),
+            // Dynamic types are callable, and the return type is the same dynamic type. Similarly,
+            // `Never` is always callable and returns `Never`.
+            Type::Dynamic(_) | Type::Never => {
+                Ok(CallOutcome::Single(CallBinding::from_return_type(self)))
+            }
 
             Type::Union(union) => {
                 CallOutcome::try_call_union(db, union, |element| element.try_call(db, arguments))
@@ -2294,18 +2746,12 @@ impl<'db> Type<'db> {
         name: &str,
         arguments: &CallArguments<'_, 'db>,
     ) -> Result<CallOutcome<'db>, CallDunderError<'db>> {
-        let meta_type = self.to_meta_type(db);
-
-        match meta_type.static_member(db, name) {
-            Symbol::Type(callable_ty, boundness) => {
-                // Dunder methods are looked up on the meta type, but they invoke the descriptor
-                // protocol *as if they had been called on the instance itself*. This is why we
-                // pass `Some(self)` for the `instance` argument here.
-                let callable_ty = callable_ty
-                    .try_call_dunder_get(db, Some(self), meta_type)
-                    .unwrap_or(callable_ty);
-
-                let result = callable_ty.try_call(db, arguments)?;
+        match self
+            .member_lookup_with_policy(db, name.into(), MemberLookupPolicy::NoInstanceFallback)
+            .symbol
+        {
+            Symbol::Type(dunder_callbable, boundness) => {
+                let result = dunder_callbable.try_call(db, arguments)?;
 
                 if boundness == Boundness::Bound {
                     Ok(result)
@@ -2422,6 +2868,52 @@ impl<'db> Type<'db> {
 
         iteration_result.map_err(|error_kind| IterationError {
             iterable_type: self,
+            error_kind,
+        })
+    }
+
+    /// Returns the type bound from a context manager with type `self`.
+    ///
+    /// This method should only be used outside of type checking because it omits any errors.
+    /// For type checking, use [`try_enter`](Self::try_enter) instead.
+    fn enter(self, db: &'db dyn Db) -> Type<'db> {
+        self.try_enter(db)
+            .unwrap_or_else(|err| err.fallback_enter_type(db))
+    }
+
+    /// Given the type of an object that is used as a context manager (i.e. in a `with` statement),
+    /// return the return type of its `__enter__` method, which is bound to any potential targets.
+    ///
+    /// E.g., for the following `with` statement, given the type of `x`, infer the type of `y`:
+    /// ```python
+    /// with x as y:
+    ///     pass
+    /// ```
+    fn try_enter(self, db: &'db dyn Db) -> Result<Type<'db>, ContextManagerError<'db>> {
+        let enter = self.try_call_dunder(db, "__enter__", &CallArguments::none());
+        let exit = self.try_call_dunder(
+            db,
+            "__exit__",
+            &CallArguments::positional([Type::none(db), Type::none(db), Type::none(db)]),
+        );
+
+        // TODO: Make use of Protocols when we support it (the manager be assignable to `contextlib.AbstractContextManager`).
+        let result = match (enter, exit) {
+            (Ok(enter), Ok(_)) => Ok(enter.return_type(db)),
+            (Ok(enter), Err(exit_error)) => Err(ContextManagerErrorKind::Exit {
+                enter_return_type: enter.return_type(db),
+                exit_error,
+            }),
+            // TODO: Use the `exit_ty` to determine if any raised exception is suppressed.
+            (Err(enter_error), Ok(_)) => Err(ContextManagerErrorKind::Enter(enter_error)),
+            (Err(enter_error), Err(exit_error)) => Err(ContextManagerErrorKind::EnterAndExit {
+                enter_error,
+                exit_error,
+            }),
+        };
+
+        result.map_err(|error_kind| ContextManagerError {
+            context_manager_type: self,
             error_kind,
         })
     }
@@ -2592,6 +3084,12 @@ impl<'db> Type<'db> {
             Type::KnownInstance(KnownInstanceType::Unknown) => Ok(Type::unknown()),
             Type::KnownInstance(KnownInstanceType::AlwaysTruthy) => Ok(Type::AlwaysTruthy),
             Type::KnownInstance(KnownInstanceType::AlwaysFalsy) => Ok(Type::AlwaysFalsy),
+            Type::KnownInstance(KnownInstanceType::Callable) => {
+                // TODO: Use an opt-in rule for a bare `Callable`
+                Ok(Type::Callable(CallableType::General(
+                    GeneralCallableType::unknown(db),
+                )))
+            }
             Type::KnownInstance(_) => Ok(todo_type!(
                 "Invalid or unsupported `KnownInstanceType` in `Type::to_type_expression`"
             )),
@@ -2663,6 +3161,10 @@ impl<'db> Type<'db> {
             }
             Type::Callable(CallableType::WrapperDescriptorDunderGet) => {
                 KnownClass::WrapperDescriptorType.to_class_literal(db)
+            }
+            Type::Callable(CallableType::General(_)) => {
+                // TODO: Get the meta type
+                todo_type!(".to_meta_type() for general callable type")
             }
             Type::ModuleLiteral(_) => KnownClass::ModuleType.to_class_literal(db),
             Type::Tuple(_) => KnownClass::Tuple.to_class_literal(db),
@@ -2749,6 +3251,9 @@ pub enum DynamicType {
     ///
     /// This variant should be created with the `todo_type!` macro.
     Todo(TodoType),
+    /// Temporary type until we support protocols. We use a separate variant (instead of `Todo(…)`)
+    /// in order to be able to match on them explicitly.
+    TodoProtocol,
 }
 
 impl std::fmt::Display for DynamicType {
@@ -2759,6 +3264,11 @@ impl std::fmt::Display for DynamicType {
             // `DynamicType::Todo`'s display should be explicit that is not a valid display of
             // any other type
             DynamicType::Todo(todo) => write!(f, "@Todo{todo}"),
+            DynamicType::TodoProtocol => f.write_str(if cfg!(debug_assertions) {
+                "@Todo(protocol)"
+            } else {
+                "@Todo"
+            }),
         }
     }
 }
@@ -2949,6 +3459,135 @@ impl<'db> TypeVarInstance<'db> {
 pub enum TypeVarBoundOrConstraints<'db> {
     UpperBound(Type<'db>),
     Constraints(TupleType<'db>),
+}
+
+/// Error returned if a type is not (or may not be) a context manager.
+#[derive(Debug)]
+struct ContextManagerError<'db> {
+    /// The type of the object that the analysed code attempted to use as a context manager.
+    context_manager_type: Type<'db>,
+
+    /// The precise kind of error encountered when trying to use the type as a context manager.
+    error_kind: ContextManagerErrorKind<'db>,
+}
+
+impl<'db> ContextManagerError<'db> {
+    fn enter_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
+        self.error_kind.enter_type(db)
+    }
+
+    fn fallback_enter_type(&self, db: &'db dyn Db) -> Type<'db> {
+        self.enter_type(db).unwrap_or(Type::unknown())
+    }
+
+    /// Reports the diagnostic for this error
+    fn report_diagnostic(
+        &self,
+        context: &InferContext<'db>,
+        context_manager_node: ast::AnyNodeRef,
+    ) {
+        self.error_kind
+            .report_diagnostic(context, self.context_manager_type, context_manager_node);
+    }
+}
+
+#[derive(Debug)]
+enum ContextManagerErrorKind<'db> {
+    Exit {
+        enter_return_type: Type<'db>,
+        exit_error: CallDunderError<'db>,
+    },
+    Enter(CallDunderError<'db>),
+    EnterAndExit {
+        enter_error: CallDunderError<'db>,
+        exit_error: CallDunderError<'db>,
+    },
+}
+
+impl<'db> ContextManagerErrorKind<'db> {
+    fn enter_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
+        match self {
+            ContextManagerErrorKind::Exit {
+                enter_return_type,
+                exit_error: _,
+            } => Some(*enter_return_type),
+            ContextManagerErrorKind::Enter(enter_error)
+            | ContextManagerErrorKind::EnterAndExit {
+                enter_error,
+                exit_error: _,
+            } => match enter_error {
+                CallDunderError::PossiblyUnbound(call_outcome) => {
+                    Some(call_outcome.return_type(db))
+                }
+                CallDunderError::Call(call_error) => call_error.return_type(db),
+                CallDunderError::MethodNotAvailable => None,
+            },
+        }
+    }
+
+    fn report_diagnostic(
+        &self,
+        context: &InferContext<'db>,
+        context_expression_ty: Type<'db>,
+        context_expression_node: ast::AnyNodeRef,
+    ) {
+        let format_call_dunder_error = |call_dunder_error: &CallDunderError<'db>, name: &str| {
+            match call_dunder_error {
+                CallDunderError::MethodNotAvailable => format!("it does not implement `{name}`"),
+                CallDunderError::PossiblyUnbound(_) => {
+                    format!("the method `{name}` is possibly unbound")
+                }
+                // TODO: Use more specific error messages for the different error cases.
+                //  E.g. hint toward the union variant that doesn't correctly implement enter,
+                //  distinguish between a not callable `__enter__` attribute and a wrong signature.
+                CallDunderError::Call(_) => format!("it does not correctly implement `{name}`"),
+            }
+        };
+
+        let format_call_dunder_errors = |error_a: &CallDunderError<'db>,
+                                         name_a: &str,
+                                         error_b: &CallDunderError<'db>,
+                                         name_b: &str| {
+            match (error_a, error_b) {
+                (CallDunderError::PossiblyUnbound(_), CallDunderError::PossiblyUnbound(_)) => {
+                    format!("the methods `{name_a}` and `{name_b}` are possibly unbound")
+                }
+                (CallDunderError::MethodNotAvailable, CallDunderError::MethodNotAvailable) => {
+                    format!("it does not implement `{name_a}` and `{name_b}`")
+                }
+                (CallDunderError::Call(_), CallDunderError::Call(_)) => {
+                    format!("it does not correctly implement `{name_a}` or `{name_b}`")
+                }
+                (_, _) => format!(
+                    "{format_a}, and {format_b}",
+                    format_a = format_call_dunder_error(error_a, name_a),
+                    format_b = format_call_dunder_error(error_b, name_b)
+                ),
+            }
+        };
+
+        let db = context.db();
+
+        let formatted_errors = match self {
+            ContextManagerErrorKind::Exit {
+                enter_return_type: _,
+                exit_error,
+            } => format_call_dunder_error(exit_error, "__exit__"),
+            ContextManagerErrorKind::Enter(enter_error) => {
+                format_call_dunder_error(enter_error, "__enter__")
+            }
+            ContextManagerErrorKind::EnterAndExit {
+                enter_error,
+                exit_error,
+            } => format_call_dunder_errors(enter_error, "__enter__", exit_error, "__exit__"),
+        };
+
+        context.report_lint(&INVALID_CONTEXT_MANAGER, context_expression_node,
+            format_args!("Object of type `{context_expression}` cannot be used with `with` because {formatted_errors}",
+context_expression = context_expression_ty.display(db)
+        ),
+        );
+    }
 }
 
 /// Error returned if a type is not (or may not be) iterable.
@@ -3715,9 +4354,30 @@ pub struct BoundMethodType<'db> {
     self_instance: Type<'db>,
 }
 
+/// This type represents a general callable type that are used to represent `typing.Callable`
+/// and `lambda` expressions.
+#[salsa::interned]
+pub struct GeneralCallableType<'db> {
+    #[return_ref]
+    signature: Signature<'db>,
+}
+
+impl<'db> GeneralCallableType<'db> {
+    /// Create a general callable type which accepts any parameters and returns an `Unknown` type.
+    pub(crate) fn unknown(db: &'db dyn Db) -> Self {
+        GeneralCallableType::new(
+            db,
+            Signature::new(Parameters::unknown(), Some(Type::unknown())),
+        )
+    }
+}
+
 /// A type that represents callable objects.
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, salsa::Update)]
 pub enum CallableType<'db> {
+    /// Represents a general callable type.
+    General(GeneralCallableType<'db>),
+
     /// Represents a callable `instance.method` where `instance` is an instance of a class
     /// and `method` is a method (of that class).
     ///
@@ -3834,7 +4494,8 @@ impl<'db> ModuleLiteralType<'db> {
         if name == "__dict__" {
             return KnownClass::ModuleType
                 .to_instance(db)
-                .static_member(db, "__dict__");
+                .member(db, "__dict__")
+                .symbol;
         }
 
         // If the file that originally imported the module has also imported a submodule
@@ -3858,7 +4519,7 @@ impl<'db> ModuleLiteralType<'db> {
             }
         }
 
-        imported_symbol(db, &self.module(db), name)
+        imported_symbol(db, &self.module(db), name).symbol
     }
 }
 
@@ -3964,6 +4625,53 @@ impl<'db> UnionType<'db> {
                     Boundness::Bound
                 },
             )
+        }
+    }
+
+    pub(crate) fn map_with_boundness_and_qualifiers(
+        self,
+        db: &'db dyn Db,
+        mut transform_fn: impl FnMut(&Type<'db>) -> SymbolAndQualifiers<'db>,
+    ) -> SymbolAndQualifiers<'db> {
+        let mut builder = UnionBuilder::new(db);
+        let mut qualifiers = TypeQualifiers::empty();
+
+        let mut all_unbound = true;
+        let mut possibly_unbound = false;
+        for ty in self.elements(db) {
+            let SymbolAndQualifiers {
+                symbol: ty_member,
+                qualifiers: new_qualifiers,
+            } = transform_fn(ty);
+            qualifiers |= new_qualifiers;
+            match ty_member {
+                Symbol::Unbound => {
+                    possibly_unbound = true;
+                }
+                Symbol::Type(ty_member, member_boundness) => {
+                    if member_boundness == Boundness::PossiblyUnbound {
+                        possibly_unbound = true;
+                    }
+
+                    all_unbound = false;
+                    builder = builder.add(ty_member);
+                }
+            }
+        }
+        SymbolAndQualifiers {
+            symbol: if all_unbound {
+                Symbol::Unbound
+            } else {
+                Symbol::Type(
+                    builder.build(),
+                    if possibly_unbound {
+                        Boundness::PossiblyUnbound
+                    } else {
+                        Boundness::Bound
+                    },
+                )
+            },
+            qualifiers,
         }
     }
 
@@ -4232,6 +4940,58 @@ impl<'db> IntersectionType<'db> {
             )
         }
     }
+
+    pub(crate) fn map_with_boundness_and_qualifiers(
+        self,
+        db: &'db dyn Db,
+        mut transform_fn: impl FnMut(&Type<'db>) -> SymbolAndQualifiers<'db>,
+    ) -> SymbolAndQualifiers<'db> {
+        if !self.negative(db).is_empty() {
+            return Symbol::todo("map_with_boundness: intersections with negative contributions")
+                .into();
+        }
+
+        let mut builder = IntersectionBuilder::new(db);
+        let mut qualifiers = TypeQualifiers::empty();
+
+        let mut any_unbound = false;
+        let mut any_possibly_unbound = false;
+        for ty in self.positive(db) {
+            let SymbolAndQualifiers {
+                symbol: member,
+                qualifiers: new_qualifiers,
+            } = transform_fn(ty);
+            qualifiers |= new_qualifiers;
+            match member {
+                Symbol::Unbound => {
+                    any_unbound = true;
+                }
+                Symbol::Type(ty_member, member_boundness) => {
+                    if member_boundness == Boundness::PossiblyUnbound {
+                        any_possibly_unbound = true;
+                    }
+
+                    builder = builder.add_positive(ty_member);
+                }
+            }
+        }
+
+        SymbolAndQualifiers {
+            symbol: if any_unbound {
+                Symbol::Unbound
+            } else {
+                Symbol::Type(
+                    builder.build(),
+                    if any_possibly_unbound {
+                        Boundness::PossiblyUnbound
+                    } else {
+                        Boundness::Bound
+                    },
+                )
+            },
+            qualifiers,
+        }
+    }
 }
 
 #[salsa::interned]
@@ -4379,8 +5139,10 @@ pub(crate) mod tests {
             .build()
             .unwrap();
 
-        let typing_no_default = typing_symbol(&db, "NoDefault").expect_type();
-        let typing_extensions_no_default = typing_extensions_symbol(&db, "NoDefault").expect_type();
+        let typing_no_default = typing_symbol(&db, "NoDefault").symbol.expect_type();
+        let typing_extensions_no_default = typing_extensions_symbol(&db, "NoDefault")
+            .symbol
+            .expect_type();
 
         assert_eq!(typing_no_default.display(&db).to_string(), "NoDefault");
         assert_eq!(
@@ -4412,7 +5174,7 @@ pub(crate) mod tests {
         )?;
 
         let bar = system_path_to_file(&db, "src/bar.py")?;
-        let a = global_symbol(&db, bar, "a");
+        let a = global_symbol(&db, bar, "a").symbol;
 
         assert_eq!(
             a.expect_type(),
@@ -4431,7 +5193,7 @@ pub(crate) mod tests {
         )?;
         db.clear_salsa_events();
 
-        let a = global_symbol(&db, bar, "a");
+        let a = global_symbol(&db, bar, "a").symbol;
 
         assert_eq!(
             a.expect_type(),
@@ -4533,6 +5295,7 @@ pub(crate) mod tests {
             };
 
             let function_body_scope = known_module_symbol(&db, module, function_name)
+                .symbol
                 .expect_type()
                 .expect_function_literal()
                 .body_scope(&db);

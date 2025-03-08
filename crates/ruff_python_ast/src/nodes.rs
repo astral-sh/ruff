@@ -2179,6 +2179,13 @@ impl ExprName {
     pub fn id(&self) -> &Name {
         &self.id
     }
+
+    /// Returns `true` if this node represents an invalid name i.e., the `ctx` is [`Invalid`].
+    ///
+    /// [`Invalid`]: ExprContext::Invalid
+    pub const fn is_invalid(&self) -> bool {
+        matches!(self.ctx, ExprContext::Invalid)
+    }
 }
 
 impl ExprList {

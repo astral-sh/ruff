@@ -216,6 +216,17 @@ impl SourceOrderVisitor<'_> for PullTypesVisitor<'_> {
                 self.visit_body(&for_stmt.orelse);
                 return;
             }
+            Stmt::With(with_stmt) => {
+                for item in &with_stmt.items {
+                    if let Some(target) = &item.optional_vars {
+                        self.visit_target(target);
+                    }
+                    self.visit_expr(&item.context_expr);
+                }
+
+                self.visit_body(&with_stmt.body);
+                return;
+            }
             Stmt::AnnAssign(_)
             | Stmt::Return(_)
             | Stmt::Delete(_)
@@ -223,7 +234,6 @@ impl SourceOrderVisitor<'_> for PullTypesVisitor<'_> {
             | Stmt::TypeAlias(_)
             | Stmt::While(_)
             | Stmt::If(_)
-            | Stmt::With(_)
             | Stmt::Match(_)
             | Stmt::Raise(_)
             | Stmt::Try(_)
