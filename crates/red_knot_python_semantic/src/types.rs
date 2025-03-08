@@ -678,6 +678,11 @@ impl<'db> Type<'db> {
                     .is_subtype_of(db, target)
             }
 
+            (Type::Callable(CallableType::General(_)), _) => {
+                // TODO: Implement subtyping for general callable types
+                false
+            }
+
             // A fully static heterogenous tuple type `A` is a subtype of a fully static heterogeneous tuple type `B`
             // iff the two tuple types have the same number of elements and each element-type in `A` is a subtype
             // of the element-type at the same index in `B`. (Now say that 5 times fast.)
@@ -1248,6 +1253,12 @@ impl<'db> Type<'db> {
                 // TODO: add checks for the above cases once we support them
                 instance.is_disjoint_from(db, KnownClass::Tuple.to_instance(db))
             }
+
+            (Type::Callable(CallableType::General(_)), _)
+            | (_, Type::Callable(CallableType::General(_))) => {
+                // TODO: Implement disjointness for general callable types
+                false
+            }
         }
     }
 
@@ -1293,14 +1304,19 @@ impl<'db> Type<'db> {
             }
             Type::Union(union) => union.is_fully_static(db),
             Type::Intersection(intersection) => intersection.is_fully_static(db),
+            // TODO: Once we support them, make sure that we return `false` for other types
+            // containing gradual forms such as `tuple[Any, ...]`.
+            // Conversely, make sure to return `true` for homogeneous tuples such as
+            // `tuple[int, ...]`, once we add support for them.
             Type::Tuple(tuple) => tuple
                 .elements(db)
                 .iter()
                 .all(|elem| elem.is_fully_static(db)),
-            // TODO: Once we support them, make sure that we return `false` for other types
-            // containing gradual forms such as `tuple[Any, ...]` or `Callable[..., str]`.
-            // Conversely, make sure to return `true` for homogeneous tuples such as
-            // `tuple[int, ...]`, once we add support for them.
+            Type::Callable(CallableType::General(_)) => {
+                // TODO: `Callable` is not fully static when the parameter argument is `...` or
+                // when any parameter type or return type is not fully static.
+                false
+            }
         }
     }
 
@@ -1334,6 +1350,12 @@ impl<'db> Type<'db> {
             | Type::ClassLiteral(..)
             | Type::ModuleLiteral(..)
             | Type::KnownInstance(..) => true,
+            Type::Callable(CallableType::General(_)) => {
+                // A general callable type is never a singleton because for any given signature,
+                // there could be any number of distinct objects that are all callable with that
+                // signature.
+                false
+            }
             Type::Instance(InstanceType { class }) => {
                 class.known(db).is_some_and(KnownClass::is_singleton)
             }
@@ -1403,7 +1425,8 @@ impl<'db> Type<'db> {
             | Type::Intersection(..)
             | Type::LiteralString
             | Type::AlwaysTruthy
-            | Type::AlwaysFalsy => false,
+            | Type::AlwaysFalsy
+            | Type::Callable(CallableType::General(_)) => false,
         }
     }
 
@@ -1581,6 +1604,10 @@ impl<'db> Type<'db> {
                 KnownClass::WrapperDescriptorType
                     .to_instance(db)
                     .instance_member(db, name)
+            }
+            Type::Callable(CallableType::General(_)) => {
+                // TODO: Implement static member lookup for general callable types
+                Symbol::todo("static member lookup on general callable type").into()
             }
 
             Type::IntLiteral(_) => KnownClass::Int.to_instance(db).instance_member(db, name),
@@ -1925,6 +1952,10 @@ impl<'db> Type<'db> {
                 KnownClass::WrapperDescriptorType
                     .to_instance(db)
                     .member(db, &name)
+            }
+            Type::Callable(CallableType::General(_)) => {
+                // TODO
+                Symbol::todo("member lookup on general callable type").into()
             }
 
             Type::Instance(InstanceType { class })
@@ -3053,6 +3084,12 @@ impl<'db> Type<'db> {
             Type::KnownInstance(KnownInstanceType::Unknown) => Ok(Type::unknown()),
             Type::KnownInstance(KnownInstanceType::AlwaysTruthy) => Ok(Type::AlwaysTruthy),
             Type::KnownInstance(KnownInstanceType::AlwaysFalsy) => Ok(Type::AlwaysFalsy),
+            Type::KnownInstance(KnownInstanceType::Callable) => {
+                // TODO: Use an opt-in rule for a bare `Callable`
+                Ok(Type::Callable(CallableType::General(
+                    GeneralCallableType::unknown(db),
+                )))
+            }
             Type::KnownInstance(_) => Ok(todo_type!(
                 "Invalid or unsupported `KnownInstanceType` in `Type::to_type_expression`"
             )),
@@ -3124,6 +3161,10 @@ impl<'db> Type<'db> {
             }
             Type::Callable(CallableType::WrapperDescriptorDunderGet) => {
                 KnownClass::WrapperDescriptorType.to_class_literal(db)
+            }
+            Type::Callable(CallableType::General(_)) => {
+                // TODO: Get the meta type
+                todo_type!(".to_meta_type() for general callable type")
             }
             Type::ModuleLiteral(_) => KnownClass::ModuleType.to_class_literal(db),
             Type::Tuple(_) => KnownClass::Tuple.to_class_literal(db),
@@ -4313,9 +4354,30 @@ pub struct BoundMethodType<'db> {
     self_instance: Type<'db>,
 }
 
+/// This type represents a general callable type that are used to represent `typing.Callable`
+/// and `lambda` expressions.
+#[salsa::interned]
+pub struct GeneralCallableType<'db> {
+    #[return_ref]
+    signature: Signature<'db>,
+}
+
+impl<'db> GeneralCallableType<'db> {
+    /// Create a general callable type which accepts any parameters and returns an `Unknown` type.
+    pub(crate) fn unknown(db: &'db dyn Db) -> Self {
+        GeneralCallableType::new(
+            db,
+            Signature::new(Parameters::unknown(), Some(Type::unknown())),
+        )
+    }
+}
+
 /// A type that represents callable objects.
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, salsa::Update)]
 pub enum CallableType<'db> {
+    /// Represents a general callable type.
+    General(GeneralCallableType<'db>),
+
     /// Represents a callable `instance.method` where `instance` is an instance of a class
     /// and `method` is a method (of that class).
     ///

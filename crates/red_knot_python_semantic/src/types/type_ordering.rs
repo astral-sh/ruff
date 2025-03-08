@@ -77,6 +77,12 @@ pub(super) fn union_elements_ordering<'db>(left: &Type<'db>, right: &Type<'db>) 
         (Type::Callable(CallableType::WrapperDescriptorDunderGet), _) => Ordering::Less,
         (_, Type::Callable(CallableType::WrapperDescriptorDunderGet)) => Ordering::Greater,
 
+        (Type::Callable(CallableType::General(_)), Type::Callable(CallableType::General(_))) => {
+            Ordering::Equal
+        }
+        (Type::Callable(CallableType::General(_)), _) => Ordering::Less,
+        (_, Type::Callable(CallableType::General(_))) => Ordering::Greater,
+
         (Type::Tuple(left), Type::Tuple(right)) => left.cmp(right),
         (Type::Tuple(_), _) => Ordering::Less,
         (_, Type::Tuple(_)) => Ordering::Greater,

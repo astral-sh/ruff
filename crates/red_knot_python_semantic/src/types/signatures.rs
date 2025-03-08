@@ -1,11 +1,11 @@
-use super::{definition_expression_type, Type};
+use super::{definition_expression_type, DynamicType, Type};
 use crate::Db;
 use crate::{semantic_index::definition::Definition, types::todo_type};
 use ruff_python_ast::{self as ast, name::Name};
 
 /// A typed callable signature.
-#[derive(Clone, Debug, PartialEq, Eq, salsa::Update)]
-pub(crate) struct Signature<'db> {
+#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
+pub struct Signature<'db> {
     /// Parameters, in source order.
     ///
     /// The ordering of parameters in a valid signature must be: first positional-only parameters,
@@ -67,29 +67,105 @@ impl<'db> Signature<'db> {
     }
 }
 
-// TODO: use SmallVec here once invariance bug is fixed
-#[derive(Clone, Debug, PartialEq, Eq, salsa::Update)]
-pub(crate) struct Parameters<'db>(Vec<Parameter<'db>>);
+#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
+pub(crate) struct Parameters<'db> {
+    // TODO: use SmallVec here once invariance bug is fixed
+    value: Vec<Parameter<'db>>,
+
+    /// Whether this parameter list represents a gradual form using `...` as the only parameter.
+    ///
+    /// If this is `true`, the `value` will still contain the variadic and keyword-variadic
+    /// parameters. This flag is used to distinguish between an explicit `...` in the callable type
+    /// as in `Callable[..., int]` and the variadic arguments in `lambda` expression as in
+    /// `lambda *args, **kwargs: None`.
+    ///
+    /// The display implementation utilizes this flag to use `...` instead of displaying the
+    /// individual variadic and keyword-variadic parameters.
+    ///
+    /// Note: This flag is also used to indicate invalid forms of `Callable` annotations.
+    is_gradual: bool,
+}
 
 impl<'db> Parameters<'db> {
     pub(crate) fn new(parameters: impl IntoIterator<Item = Parameter<'db>>) -> Self {
-        Self(parameters.into_iter().collect())
+        Self {
+            value: parameters.into_iter().collect(),
+            is_gradual: false,
+        }
+    }
+
+    pub(crate) fn as_slice(&self) -> &[Parameter<'db>] {
+        self.value.as_slice()
+    }
+
+    pub(crate) const fn is_gradual(&self) -> bool {
+        self.is_gradual
     }
 
     /// Return todo parameters: (*args: Todo, **kwargs: Todo)
-    fn todo() -> Self {
-        Self(vec![
-            Parameter {
-                name: Some(Name::new_static("args")),
-                annotated_ty: Some(todo_type!("todo signature *args")),
-                kind: ParameterKind::Variadic,
-            },
-            Parameter {
-                name: Some(Name::new_static("kwargs")),
-                annotated_ty: Some(todo_type!("todo signature **kwargs")),
-                kind: ParameterKind::KeywordVariadic,
-            },
-        ])
+    pub(crate) fn todo() -> Self {
+        Self {
+            value: vec![
+                Parameter {
+                    name: Some(Name::new_static("args")),
+                    annotated_ty: Some(todo_type!("todo signature *args")),
+                    kind: ParameterKind::Variadic,
+                },
+                Parameter {
+                    name: Some(Name::new_static("kwargs")),
+                    annotated_ty: Some(todo_type!("todo signature **kwargs")),
+                    kind: ParameterKind::KeywordVariadic,
+                },
+            ],
+            is_gradual: false,
+        }
+    }
+
+    /// Return parameters that represents a gradual form using `...` as the only parameter.
+    ///
+    /// Internally, this is represented as `(*Any, **Any)` that accepts parameters of type [`Any`].
+    ///
+    /// [`Any`]: crate::types::DynamicType::Any
+    pub(crate) fn gradual_form() -> Self {
+        Self {
+            value: vec![
+                Parameter {
+                    name: None,
+                    annotated_ty: Some(Type::Dynamic(DynamicType::Any)),
+                    kind: ParameterKind::Variadic,
+                },
+                Parameter {
+                    name: None,
+                    annotated_ty: Some(Type::Dynamic(DynamicType::Any)),
+                    kind: ParameterKind::KeywordVariadic,
+                },
+            ],
+            is_gradual: true,
+        }
+    }
+
+    /// Return parameters that represents an unknown list of parameters.
+    ///
+    /// Internally, this is represented as `(*Unknown, **Unknown)` that accepts parameters of type
+    /// [`Unknown`].
+    ///
+    /// [`Unknown`]: crate::types::DynamicType::Unknown
+    pub(crate) fn unknown() -> Self {
+        Self {
+            value: vec![
+                Parameter {
+                    name: None,
+                    annotated_ty: Some(Type::Dynamic(DynamicType::Unknown)),
+                    kind: ParameterKind::Variadic,
+                },
+                Parameter {
+                    name: None,
+                    annotated_ty: Some(Type::Dynamic(DynamicType::Unknown)),
+                    kind: ParameterKind::KeywordVariadic,
+                },
+            ],
+            is_gradual: true,
+        }
     }
 
     fn from_parameters(
@@ -146,22 +222,21 @@ impl<'db> Parameters<'db> {
         let keywords = kwarg.as_ref().map(|arg| {
             Parameter::from_node_and_kind(db, definition, arg, ParameterKind::KeywordVariadic)
         });
-        Self(
+        Self::new(
             positional_only
                 .chain(positional_or_keyword)
                 .chain(variadic)
                 .chain(keyword_only)
-                .chain(keywords)
-                .collect(),
+                .chain(keywords),
         )
     }
 
     pub(crate) fn len(&self) -> usize {
-        self.0.len()
+        self.value.len()
     }
 
     pub(crate) fn iter(&self) -> std::slice::Iter<Parameter<'db>> {
-        self.0.iter()
+        self.value.iter()
     }
 
     /// Iterate initial positional parameters, not including variadic parameter, if any.
@@ -175,7 +250,7 @@ impl<'db> Parameters<'db> {
 
     /// Return parameter at given index, or `None` if index is out-of-range.
     pub(crate) fn get(&self, index: usize) -> Option<&Parameter<'db>> {
-        self.0.get(index)
+        self.value.get(index)
     }
 
     /// Return positional parameter at given index, or `None` if `index` is out of range.
@@ -218,7 +293,7 @@ impl<'db, 'a> IntoIterator for &'a Parameters<'db> {
     type IntoIter = std::slice::Iter<'a, Parameter<'db>>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.0.iter()
+        self.value.iter()
     }
 }
 
@@ -226,11 +301,11 @@ impl<'db> std::ops::Index<usize> for Parameters<'db> {
     type Output = Parameter<'db>;
 
     fn index(&self, index: usize) -> &Self::Output {
-        &self.0[index]
+        &self.value[index]
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, salsa::Update)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
 pub(crate) struct Parameter<'db> {
     /// Parameter name.
     ///
@@ -270,6 +345,14 @@ impl<'db> Parameter<'db> {
                 .map(|annotation| definition_expression_type(db, definition, annotation)),
             kind,
         }
+    }
+
+    pub(crate) fn is_keyword_only(&self) -> bool {
+        matches!(self.kind, ParameterKind::KeywordOnly { .. })
+    }
+
+    pub(crate) fn is_positional_only(&self) -> bool {
+        matches!(self.kind, ParameterKind::PositionalOnly { .. })
     }
 
     pub(crate) fn is_variadic(&self) -> bool {
@@ -328,7 +411,7 @@ impl<'db> Parameter<'db> {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, salsa::Update)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
 pub(crate) enum ParameterKind<'db> {
     /// Positional-only parameter, e.g. `def f(x, /): ...`
     PositionalOnly { default_ty: Option<Type<'db>> },
@@ -361,7 +444,7 @@ mod tests {
 
     #[track_caller]
     fn assert_params<'db>(signature: &Signature<'db>, expected: &[Parameter<'db>]) {
-        assert_eq!(signature.parameters.0.as_slice(), expected);
+        assert_eq!(signature.parameters.value.as_slice(), expected);
     }
 
     #[test]
@@ -490,7 +573,7 @@ mod tests {
             name: Some(name),
             annotated_ty,
             kind: ParameterKind::PositionalOrKeyword { .. },
-        }] = &sig.parameters.0[..]
+        }] = &sig.parameters.value[..]
         else {
             panic!("expected one positional-or-keyword parameter");
         };
@@ -524,7 +607,7 @@ mod tests {
             name: Some(name),
             annotated_ty,
             kind: ParameterKind::PositionalOrKeyword { .. },
-        }] = &sig.parameters.0[..]
+        }] = &sig.parameters.value[..]
         else {
             panic!("expected one positional-or-keyword parameter");
         };
@@ -562,7 +645,7 @@ mod tests {
             name: Some(b_name),
             annotated_ty: b_annotated_ty,
             kind: ParameterKind::PositionalOrKeyword { .. },
-        }] = &sig.parameters.0[..]
+        }] = &sig.parameters.value[..]
         else {
             panic!("expected two positional-or-keyword parameters");
         };
@@ -605,7 +688,7 @@ mod tests {
             name: Some(b_name),
             annotated_ty: b_annotated_ty,
             kind: ParameterKind::PositionalOrKeyword { .. },
-        }] = &sig.parameters.0[..]
+        }] = &sig.parameters.value[..]
         else {
             panic!("expected two positional-or-keyword parameters");
         };
