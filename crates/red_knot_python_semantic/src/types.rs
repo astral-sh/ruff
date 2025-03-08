@@ -19,7 +19,7 @@ pub(crate) use self::infer::{
     infer_scope_types,
 };
 pub use self::narrow::KnownConstraintFunction;
-pub(crate) use self::signatures::Signature;
+pub(crate) use self::signatures::{Overloads, Signature};
 pub use self::subclass_of::SubclassOfType;
 use crate::module_name::ModuleName;
 use crate::module_resolver::{file_to_module, resolve_module, KnownModule};
@@ -1959,7 +1959,7 @@ impl<'db> Type<'db> {
                     },
                 );
 
-                bind_call(db, arguments, &signature, self).into_outcome()
+                bind_call(db, arguments, &signature.into(), self).into_outcome()
             }
             Type::Callable(CallableType::WrapperDescriptorDunderGet) => {
                 // Here, we also model `types.FunctionType.__get__`, but now we consider a call to
@@ -2038,7 +2038,7 @@ impl<'db> Type<'db> {
                     ),
                 );
 
-                bind_call(db, arguments, &signature, self).into_outcome()
+                bind_call(db, arguments, &signature.into(), self).into_outcome()
             }
             Type::FunctionLiteral(function_type) => {
                 let mut binding = bind_call(db, arguments, function_type.signature(db), self);
@@ -3512,8 +3512,8 @@ impl<'db> FunctionType<'db> {
     /// Were this not a salsa query, then the calling query
     /// would depend on the function's AST and rerun for every change in that file.
     #[salsa::tracked(return_ref)]
-    pub fn signature(self, db: &'db dyn Db) -> Signature<'db> {
-        let internal_signature = self.internal_signature(db);
+    pub fn signature(self, db: &'db dyn Db) -> Overloads<'db> {
+        let internal_signature = self.internal_signature(db).into();
 
         let decorators = self.decorators(db);
         let mut decorators = decorators.iter();
@@ -3525,7 +3525,7 @@ impl<'db> FunctionType<'db> {
             {
                 internal_signature
             } else {
-                Signature::todo("return type of decorated function")
+                Signature::todo("return type of decorated function").into()
             }
         } else {
             internal_signature

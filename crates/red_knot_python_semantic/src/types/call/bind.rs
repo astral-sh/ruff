@@ -1,4 +1,6 @@
-use super::{Argument, CallArguments, CallError, CallOutcome, InferContext, Signature, Type};
+use super::{
+    Argument, CallArguments, CallError, CallOutcome, InferContext, Overloads, Signature, Type,
+};
 use crate::db::Db;
 use crate::types::diagnostic::{
     INVALID_ARGUMENT_TYPE, MISSING_ARGUMENT, PARAMETER_ALREADY_ASSIGNED,
@@ -17,9 +19,25 @@ use ruff_text_size::Ranged;
 pub(crate) fn bind_call<'db>(
     db: &'db dyn Db,
     arguments: &CallArguments<'_, 'db>,
-    signature: &Signature<'db>,
+    overloads: &Overloads<'db>,
     callable_ty: Type<'db>,
 ) -> CallBinding<'db> {
+    let overloads = overloads
+        .iter()
+        .map(|signature| bind_overload(db, arguments, signature))
+        .collect::<Vec<_>>()
+        .into_boxed_slice();
+    CallBinding {
+        callable_ty,
+        overloads,
+    }
+}
+
+fn bind_overload<'db>(
+    db: &'db dyn Db,
+    arguments: &CallArguments<'_, 'db>,
+    signature: &Signature<'db>,
+) -> OverloadBinding<'db> {
     let parameters = signature.parameters();
     // The type assigned to each parameter at this call site.
     let mut parameter_tys = vec![None; parameters.len()];
@@ -126,18 +144,13 @@ pub(crate) fn bind_call<'db>(
         });
     }
 
-    let overload = OverloadBinding {
+    OverloadBinding {
         return_ty: signature.return_ty.unwrap_or(Type::unknown()),
         parameter_tys: parameter_tys
             .into_iter()
             .map(|opt_ty| opt_ty.unwrap_or(Type::unknown()))
             .collect(),
         errors,
-    };
-
-    CallBinding {
-        callable_ty,
-        overloads: vec![overload].into_boxed_slice(),
     }
 }
 

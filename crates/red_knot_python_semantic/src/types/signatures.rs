@@ -3,7 +3,42 @@ use crate::Db;
 use crate::{semantic_index::definition::Definition, types::todo_type};
 use ruff_python_ast::{self as ast, name::Name};
 
-/// A typed callable signature.
+/// A collection of overloads for a callable.
+#[derive(Clone, Debug, PartialEq, Eq, salsa::Update)]
+pub(crate) enum Overloads<'db> {
+    Single(Signature<'db>),
+    Overloaded(Box<[Signature<'db>]>),
+}
+
+impl<'db> Overloads<'db> {
+    pub(crate) fn iter(&self) -> std::slice::Iter<Signature<'db>> {
+        match self {
+            Overloads::Single(signature) => std::slice::from_ref(signature).iter(),
+            Overloads::Overloaded(signatures) => signatures.iter(),
+        }
+    }
+}
+
+impl<'db> From<Signature<'db>> for Overloads<'db> {
+    fn from(signature: Signature<'db>) -> Self {
+        Overloads::Single(signature)
+    }
+}
+
+impl<'db, I> From<I> for Overloads<'db>
+where
+    I: IntoIterator,
+    I::IntoIter: Iterator<Item = Signature<'db>>,
+{
+    fn from(overloads: I) -> Self {
+        let overloads = overloads.into_iter().collect::<Vec<_>>().into_boxed_slice();
+        debug_assert!(!overloads.is_empty());
+        Overloads::Overloaded(overloads)
+    }
+}
+
+/// A typed callable signature. If a callable is overloaded, there will be one of these for each
+/// possible overload.
 #[derive(Clone, Debug, PartialEq, Eq, salsa::Update)]
 pub(crate) struct Signature<'db> {
     /// Parameters, in source order.
@@ -630,7 +665,7 @@ mod tests {
         .unwrap();
         let func = get_function_f(&db, "/src/a.py");
 
-        let expected_sig = func.internal_signature(&db);
+        let expected_sig = func.internal_signature(&db).into();
 
         // With no decorators, internal and external signature are the same
         assert_eq!(func.signature(&db), &expected_sig);
@@ -651,7 +686,7 @@ mod tests {
         .unwrap();
         let func = get_function_f(&db, "/src/a.py");
 
-        let expected_sig = Signature::todo("return type of decorated function");
+        let expected_sig = Signature::todo("return type of decorated function").into();
 
         // With no decorators, internal and external signature are the same
         assert_eq!(func.signature(&db), &expected_sig);
