@@ -1607,7 +1607,7 @@ impl<'db> Type<'db> {
             }
             Type::Callable(CallableType::General(_)) => {
                 // TODO: Implement static member lookup for general callable types
-                Symbol::todo("static member lookup on general callable type")
+                Symbol::todo("static member lookup on general callable type").into()
             }
 
             Type::IntLiteral(_) => KnownClass::Int.to_instance(db).instance_member(db, name),
@@ -1955,7 +1955,7 @@ impl<'db> Type<'db> {
             }
             Type::Callable(CallableType::General(_)) => {
                 // TODO
-                Symbol::todo("member lookup on general callable type")
+                Symbol::todo("member lookup on general callable type").into()
             }
 
             Type::Instance(InstanceType { class })
