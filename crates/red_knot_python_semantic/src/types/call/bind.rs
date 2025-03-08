@@ -22,6 +22,8 @@ pub(crate) fn bind_call<'db>(
     overloads: &Overloads<'db>,
     callable_ty: Type<'db>,
 ) -> CallBinding<'db> {
+    // TODO: This checks every overload. Consider short-circuiting this loop once we find the first
+    // overload that is a successful match against the argument list.
     let overloads = overloads
         .iter()
         .map(|signature| bind_overload(db, arguments, signature))
