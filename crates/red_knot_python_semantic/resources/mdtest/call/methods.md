@@ -235,30 +235,30 @@ method_wrapper(C(), None)
 method_wrapper(None, C)
 
 # Passing `None` without an `owner` argument is an
-# error: [missing-argument] "No argument provided for required parameter `owner` of method wrapper `__get__` of function `f`"
-# error: [invalid-argument-type] "Object of type `None` cannot be assigned to parameter 1 (`instance`) of method wrapper `__get__` of function `f`; expected type `~None`"
+# error: [missing-argument] "No argument provided for required parameter `owner` of overload 1 of method wrapper `__get__` of function `f`"
+# error: [invalid-argument-type] "Object of type `None` cannot be assigned to parameter 1 (`instance`) of overload 2 of method wrapper `__get__` of function `f`; expected type `~None`"
 method_wrapper(None)
 
 # Passing something that is not assignable to `type` as the `owner` argument is an
-# error: [invalid-argument-type] "Object of type `Literal[1]` cannot be assigned to parameter 2 (`owner`) of method wrapper `__get__` of function `f`; expected type `type`"
-# error: [invalid-argument-type] "Object of type `None` cannot be assigned to parameter 1 (`instance`) of method wrapper `__get__` of function `f`; expected type `~None`"
-# error: [invalid-argument-type] "Object of type `Literal[1]` cannot be assigned to parameter 2 (`owner`) of method wrapper `__get__` of function `f`; expected type `type | None`"
+# error: [invalid-argument-type] "Object of type `Literal[1]` cannot be assigned to parameter 2 (`owner`) of overload 1 of method wrapper `__get__` of function `f`; expected type `type`"
+# error: [invalid-argument-type] "Object of type `None` cannot be assigned to parameter 1 (`instance`) of overload 2 of method wrapper `__get__` of function `f`; expected type `~None`"
+# error: [invalid-argument-type] "Object of type `Literal[1]` cannot be assigned to parameter 2 (`owner`) of overload 2 of method wrapper `__get__` of function `f`; expected type `type | None`"
 method_wrapper(None, 1)
 
 # Passing `None` as the `owner` argument when `instance` is `None` is an
-# error: [invalid-argument-type] "Object of type `None` cannot be assigned to parameter 2 (`owner`) of method wrapper `__get__` of function `f`; expected type `type`"
-# error: [invalid-argument-type] "Object of type `None` cannot be assigned to parameter 1 (`instance`) of method wrapper `__get__` of function `f`; expected type `~None`"
+# error: [invalid-argument-type] "Object of type `None` cannot be assigned to parameter 2 (`owner`) of overload 1 of method wrapper `__get__` of function `f`; expected type `type`"
+# error: [invalid-argument-type] "Object of type `None` cannot be assigned to parameter 1 (`instance`) of overload 2 of method wrapper `__get__` of function `f`; expected type `~None`"
 method_wrapper(None, None)
 
 # Calling `__get__` without any arguments is an
-# error: [missing-argument] "No arguments provided for required parameters `instance`, `owner` of method wrapper `__get__` of function `f`"
-# error: [missing-argument] "No argument provided for required parameter `instance` of method wrapper `__get__` of function `f`"
+# error: [missing-argument] "No arguments provided for required parameters `instance`, `owner` of overload 1 of method wrapper `__get__` of function `f`"
+# error: [missing-argument] "No argument provided for required parameter `instance` of overload 2 of method wrapper `__get__` of function `f`"
 method_wrapper()
 
 # Calling `__get__` with too many positional arguments is an
-# error: [invalid-argument-type] "Object of type `C` cannot be assigned to parameter 1 (`instance`) of method wrapper `__get__` of function `f`; expected type `None`"
-# error: [too-many-positional-arguments] "Too many positional arguments to method wrapper `__get__` of function `f`: expected 2, got 3"
-# error: [too-many-positional-arguments] "Too many positional arguments to method wrapper `__get__` of function `f`: expected 2, got 3"
+# error: [invalid-argument-type] "Object of type `C` cannot be assigned to parameter 1 (`instance`) of overload 1 of method wrapper `__get__` of function `f`; expected type `None`"
+# error: [too-many-positional-arguments] "Too many positional arguments to overload 1 of method wrapper `__get__` of function `f`: expected 2, got 3"
+# error: [too-many-positional-arguments] "Too many positional arguments to overload 2 of method wrapper `__get__` of function `f`: expected 2, got 3"
 method_wrapper(C(), C, "one too many")
 ```
 
