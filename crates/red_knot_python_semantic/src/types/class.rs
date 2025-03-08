@@ -513,6 +513,16 @@ impl<'db> Class<'db> {
 
                     union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
                 }
+                AttributeAssignment::ContextManager { context_manager } => {
+                    // We found an attribute assignment like:
+                    //
+                    //     with <context_manager> as self.name:
+
+                    let context_ty = infer_expression_type(db, *context_manager);
+                    let inferred_ty = context_ty.enter(db);
+
+                    union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
+                }
                 AttributeAssignment::Unpack {
                     attribute_expression_id,
                     unpack,

@@ -43,7 +43,7 @@ use crate::module_resolver::{file_to_module, resolve_module};
 use crate::semantic_index::ast_ids::{HasScopedExpressionId, HasScopedUseId, ScopedExpressionId};
 use crate::semantic_index::definition::{
     AssignmentDefinitionKind, Definition, DefinitionKind, DefinitionNodeKey,
-    ExceptHandlerDefinitionKind, ForStmtDefinitionKind, TargetKind,
+    ExceptHandlerDefinitionKind, ForStmtDefinitionKind, TargetKind, WithItemDefinitionKind,
 };
 use crate::semantic_index::expression::{Expression, ExpressionKind};
 use crate::semantic_index::semantic_index;
@@ -60,10 +60,10 @@ use crate::types::diagnostic::{
     report_invalid_attribute_assignment, report_unresolved_module, TypeCheckDiagnostics,
     CALL_NON_CALLABLE, CALL_POSSIBLY_UNBOUND_METHOD, CONFLICTING_DECLARATIONS,
     CONFLICTING_METACLASS, CYCLIC_CLASS_DEFINITION, DIVISION_BY_ZERO, DUPLICATE_BASE,
-    INCONSISTENT_MRO, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE, INVALID_CONTEXT_MANAGER,
-    INVALID_DECLARATION, INVALID_PARAMETER_DEFAULT, INVALID_TYPE_FORM,
-    INVALID_TYPE_VARIABLE_CONSTRAINTS, POSSIBLY_UNBOUND_ATTRIBUTE, POSSIBLY_UNBOUND_IMPORT,
-    UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_IMPORT, UNSUPPORTED_OPERATOR,
+    INCONSISTENT_MRO, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE, INVALID_DECLARATION,
+    INVALID_PARAMETER_DEFAULT, INVALID_TYPE_FORM, INVALID_TYPE_VARIABLE_CONSTRAINTS,
+    POSSIBLY_UNBOUND_ATTRIBUTE, POSSIBLY_UNBOUND_IMPORT, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE,
+    UNRESOLVED_IMPORT, UNSUPPORTED_OPERATOR,
 };
 use crate::types::mro::MroErrorKind;
 use crate::types::unpacker::{UnpackResult, Unpacker};
@@ -839,13 +839,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             DefinitionKind::Parameter(parameter_with_default) => {
                 self.infer_parameter_definition(parameter_with_default, definition);
             }
-            DefinitionKind::WithItem(with_item) => {
-                self.infer_with_item_definition(
-                    with_item.target(),
-                    with_item.node(),
-                    with_item.is_async(),
-                    definition,
-                );
+            DefinitionKind::WithItem(with_item_definition) => {
+                self.infer_with_item_definition(with_item_definition, definition);
             }
             DefinitionKind::MatchPattern(match_pattern) => {
                 self.infer_match_pattern_definition(
@@ -1597,18 +1592,17 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = with_statement;
         for item in items {
             let target = item.optional_vars.as_deref();
-            if let Some(ast::Expr::Name(name)) = target {
-                self.infer_definition(name);
+            if let Some(target) = target {
+                self.infer_target(target, &item.context_expr, |db, ctx_manager_ty| {
+                    // TODO: `infer_with_statement_definition` reports a diagnostic if `ctx_manager_ty` isn't a context manager
+                    //  but only if the target is a name. We should report a diagnostic here if the target isn't a name:
+                    //  `with not_context_manager as a.x: ...
+                    ctx_manager_ty.enter(db)
+                });
             } else {
-                // TODO infer definitions in unpacking assignment
-
                 // Call into the context expression inference to validate that it evaluates
                 // to a valid context manager.
-                let context_expression_ty = if target.is_some() {
-                    self.infer_standalone_expression(&item.context_expr)
-                } else {
-                    self.infer_expression(&item.context_expr)
-                };
+                let context_expression_ty = self.infer_expression(&item.context_expr);
                 self.infer_context_expression(&item.context_expr, context_expression_ty, *is_async);
                 self.infer_optional_expression(target);
             }
@@ -1619,24 +1613,36 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     fn infer_with_item_definition(
         &mut self,
-        target: &ast::ExprName,
-        with_item: &ast::WithItem,
-        is_async: bool,
+        with_item: &WithItemDefinitionKind<'db>,
         definition: Definition<'db>,
     ) {
-        self.infer_standalone_expression(&with_item.context_expr);
+        let context_expr = with_item.context_expr();
+        let name = with_item.name();
 
-        let target_ty = self.infer_context_expression(
-            &with_item.context_expr,
-            self.expression_type(&with_item.context_expr),
-            is_async,
-        );
+        let context_expr_ty = self.infer_standalone_expression(context_expr);
 
-        self.types.expressions.insert(
-            target.scoped_expression_id(self.db(), self.scope()),
-            target_ty,
-        );
-        self.add_binding(target.into(), definition, target_ty);
+        let target_ty = if with_item.is_async() {
+            todo_type!("async `with` statement")
+        } else {
+            match with_item.target() {
+                TargetKind::Sequence(unpack) => {
+                    let unpacked = infer_unpack_types(self.db(), unpack);
+                    let name_ast_id = name.scoped_expression_id(self.db(), self.scope());
+                    if with_item.is_first() {
+                        self.context.extend(unpacked);
+                    }
+                    unpacked.expression_type(name_ast_id)
+                }
+                TargetKind::Name => self.infer_context_expression(
+                    context_expr,
+                    context_expr_ty,
+                    with_item.is_async(),
+                ),
+            }
+        };
+
+        self.store_expression_type(name, target_ty);
+        self.add_binding(name.into(), definition, target_ty);
     }
 
     /// Infers the type of a context expression (`with expr`) and returns the target's type
@@ -1656,120 +1662,12 @@ impl<'db> TypeInferenceBuilder<'db> {
             return todo_type!("async `with` statement");
         }
 
-        let context_manager_ty = context_expression_ty.to_meta_type(self.db());
-
-        let enter = context_manager_ty.member(self.db(), "__enter__").symbol;
-        let exit = context_manager_ty.member(self.db(), "__exit__").symbol;
-
-        // TODO: Make use of Protocols when we support it (the manager be assignable to `contextlib.AbstractContextManager`).
-        match (enter, exit) {
-            (Symbol::Unbound, Symbol::Unbound) => {
-                self.context.report_lint(
-                    &INVALID_CONTEXT_MANAGER,
-                    context_expression,
-                    format_args!(
-                        "Object of type `{}` cannot be used with `with` because it doesn't implement `__enter__` and `__exit__`",
-                        context_expression_ty.display(self.db())
-                    ),
-                );
-                Type::unknown()
-            }
-            (Symbol::Unbound, _) => {
-                self.context.report_lint(
-                    &INVALID_CONTEXT_MANAGER,
-                    context_expression,
-                    format_args!(
-                        "Object of type `{}` cannot be used with `with` because it doesn't implement `__enter__`",
-                        context_expression_ty.display(self.db())
-                    ),
-                );
-                Type::unknown()
-            }
-            (Symbol::Type(enter_ty, enter_boundness), exit) => {
-                if enter_boundness == Boundness::PossiblyUnbound {
-                    self.context.report_lint(
-                        &INVALID_CONTEXT_MANAGER,
-                        context_expression,
-                        format_args!(
-                            "Object of type `{context_expression}` cannot be used with `with` because the method `__enter__` is possibly unbound",
-                            context_expression = context_expression_ty.display(self.db()),
-                        ),
-                    );
-                }
-
-                let target_ty = enter_ty
-                    .try_call(self.db(), &CallArguments::positional([context_expression_ty]))
-                    .map(|outcome| outcome.return_type(self.db()))
-                    .unwrap_or_else(|err|  {
-                        // TODO: Use more specific error messages for the different error cases.
-                        //  E.g. hint toward the union variant that doesn't correctly implement enter,
-                        //  distinguish between a not callable `__enter__` attribute and a wrong signature.
-                        self.context.report_lint(
-                            &INVALID_CONTEXT_MANAGER,
-                            context_expression,
-                            format_args!("
-                                Object of type `{context_expression}` cannot be used with `with` because it does not correctly implement `__enter__`",
-                                context_expression = context_expression_ty.display(self.db()),
-                            ),
-                        );
-                        err.fallback_return_type(self.db())
-                    });
-
-                match exit {
-                    Symbol::Unbound => {
-                        self.context.report_lint(
-                            &INVALID_CONTEXT_MANAGER,
-                            context_expression,
-                            format_args!(
-                                "Object of type `{}` cannot be used with `with` because it doesn't implement `__exit__`",
-                                context_expression_ty.display(self.db())
-                            ),
-                        );
-                    }
-                    Symbol::Type(exit_ty, exit_boundness) => {
-                        // TODO: Use the `exit_ty` to determine if any raised exception is suppressed.
-
-                        if exit_boundness == Boundness::PossiblyUnbound {
-                            self.context.report_lint(
-                                &INVALID_CONTEXT_MANAGER,
-                                context_expression,
-                                format_args!(
-                                    "Object of type `{context_expression}` cannot be used with `with` because the method `__exit__` is possibly unbound",
-                                    context_expression = context_expression_ty.display(self.db()),
-                                ),
-                            );
-                        }
-
-                        if exit_ty
-                            .try_call(
-                                self.db(),
-                                &CallArguments::positional([
-                                    context_manager_ty,
-                                    Type::none(self.db()),
-                                    Type::none(self.db()),
-                                    Type::none(self.db()),
-                                ]),
-                            )
-                            .is_err()
-                        {
-                            // TODO: Use more specific error messages for the different error cases.
-                            //  E.g. hint toward the union variant that doesn't correctly implement enter,
-                            //  distinguish between a not callable `__exit__` attribute and a wrong signature.
-                            self.context.report_lint(
-                                &INVALID_CONTEXT_MANAGER,
-                                context_expression,
-                                format_args!(
-                                    "Object of type `{context_expression}` cannot be used with `with` because it does not correctly implement `__exit__`",
-                                    context_expression = context_expression_ty.display(self.db()),
-                                ),
-                            );
-                        }
-                    }
-                }
-
-                target_ty
-            }
-        }
+        context_expression_ty
+            .try_enter(self.db())
+            .unwrap_or_else(|err| {
+                err.report_diagnostic(&self.context, context_expression.into());
+                err.fallback_enter_type(self.db())
+            })
     }
 
     fn infer_except_handler_definition(

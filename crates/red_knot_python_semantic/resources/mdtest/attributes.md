@@ -358,9 +358,25 @@ class C:
 
 c_instance = C()
 
-# TODO: Should be `Unknown | int | None`
-# error: [unresolved-attribute]
-reveal_type(c_instance.x)  # revealed: Unknown
+reveal_type(c_instance.x)  # revealed: Unknown | int | None
+```
+
+#### Attributes defined in `with` statements, but with unpacking
+
+```py
+class ContextManager:
+    def __enter__(self) -> tuple[int | None, int]: ...
+    def __exit__(self, exc_type, exc_value, traceback) -> None: ...
+
+class C:
+    def __init__(self) -> None:
+        with ContextManager() as (self.x, self.y):
+            pass
+
+c_instance = C()
+
+reveal_type(c_instance.x)  # revealed: Unknown | int | None
+reveal_type(c_instance.y)  # revealed: Unknown | int
 ```
 
 #### Attributes defined in comprehensions

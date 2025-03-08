@@ -613,3 +613,98 @@ def _(arg: tuple[tuple[int, str], Iterable]):
         reveal_type(a)  # revealed: int | bytes
         reveal_type(b)  # revealed: str | bytes
 ```
+
+## With statement
+
+Unpacking in a `with` statement.
+
+### Same types
+
+```py
+class ContextManager:
+    def __enter__(self) -> tuple[int, int]:
+        return (1, 2)
+
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
+        pass
+
+with ContextManager() as (a, b):
+    reveal_type(a)  # revealed: int
+    reveal_type(b)  # revealed: int
+```
+
+### Mixed types
+
+```py
+class ContextManager:
+    def __enter__(self) -> tuple[int, str]:
+        return (1, "a")
+
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
+        pass
+
+with ContextManager() as (a, b):
+    reveal_type(a)  # revealed: int
+    reveal_type(b)  # revealed: str
+```
+
+### Nested
+
+```py
+class ContextManager:
+    def __enter__(self) -> tuple[int, tuple[str, bytes]]:
+        return (1, ("a", b"bytes"))
+
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
+        pass
+
+with ContextManager() as (a, (b, c)):
+    reveal_type(a)  # revealed: int
+    reveal_type(b)  # revealed: str
+    reveal_type(c)  # revealed: bytes
+```
+
+### Starred expression
+
+```py
+class ContextManager:
+    def __enter__(self) -> tuple[int, int, int]:
+        return (1, 2, 3)
+
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
+        pass
+
+with ContextManager() as (a, *b):
+    reveal_type(a)  # revealed: int
+    # TODO: Should be list[int] once support for assigning to starred expression is added
+    reveal_type(b)  # revealed: @Todo(starred unpacking)
+```
+
+### Unbound context manager expression
+
+```py
+# TODO: should only be one diagnostic
+# error: [unresolved-reference] "Name `nonexistant` used when not defined"
+# error: [unresolved-reference] "Name `nonexistant` used when not defined"
+# error: [unresolved-reference] "Name `nonexistant` used when not defined"
+with nonexistant as (x, y):
+    reveal_type(x)  # revealed: Unknown
+    reveal_type(y)  # revealed: Unknown
+```
+
+### Invalid unpacking
+
+```py
+class ContextManager:
+    def __enter__(self) -> tuple[int, str]:
+        return (1, "a")
+
+    def __exit__(self, *args) -> None:
+        pass
+
+# error: [invalid-assignment] "Not enough values to unpack (expected 3, got 2)"
+with ContextManager() as (a, b, c):
+    reveal_type(a)  # revealed: Unknown
+    reveal_type(b)  # revealed: Unknown
+    reveal_type(c)  # revealed: Unknown
+```
