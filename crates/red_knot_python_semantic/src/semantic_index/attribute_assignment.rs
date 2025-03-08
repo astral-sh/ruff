@@ -22,7 +22,7 @@ pub(crate) enum AttributeAssignment<'db> {
     /// `for self.x in <iterable>`.
     Iterable { iterable: Expression<'db> },
 
-    /// An attribute assignment where the right-hand side is a context manager, for example
+    /// An attribute assignment where the expression to be assigned is a context manager, for example
     /// `with <context_manager> as self.x`.
     ContextManager { context_manager: Expression<'db> },
 

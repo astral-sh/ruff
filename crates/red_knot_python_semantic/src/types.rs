@@ -2870,7 +2870,7 @@ impl<'db> Type<'db> {
         let result = match (enter, exit) {
             (Ok(enter), Ok(_)) => Ok(enter.return_type(db)),
             (Ok(enter), Err(exit_error)) => Err(ContextManagerErrorKind::Exit {
-                enter_ret_ty: enter.return_type(db),
+                enter_return_type: enter.return_type(db),
                 exit_error,
             }),
             // TODO: Use the `exit_ty` to determine if any raised exception is suppressed.
@@ -3453,7 +3453,7 @@ impl<'db> ContextManagerError<'db> {
 #[derive(Debug)]
 enum ContextManagerErrorKind<'db> {
     Exit {
-        enter_ret_ty: Type<'db>,
+        enter_return_type: Type<'db>,
         exit_error: CallDunderError<'db>,
     },
     Enter(CallDunderError<'db>),
@@ -3467,9 +3467,9 @@ impl<'db> ContextManagerErrorKind<'db> {
     fn enter_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
         match self {
             ContextManagerErrorKind::Exit {
-                enter_ret_ty,
+                enter_return_type,
                 exit_error: _,
-            } => Some(*enter_ret_ty),
+            } => Some(*enter_return_type),
             ContextManagerErrorKind::Enter(enter_error)
             | ContextManagerErrorKind::EnterAndExit {
                 enter_error,
@@ -3484,63 +3484,61 @@ impl<'db> ContextManagerErrorKind<'db> {
         }
     }
 
-    fn format_call_dunder_error(call_dunder_error: &CallDunderError<'db>, name: &str) -> String {
-        match call_dunder_error {
-            CallDunderError::MethodNotAvailable => format!("it does not implement `{name}`"),
-            CallDunderError::PossiblyUnbound(_) => {
-                format!("the method `{name}` is possibly unbound")
-            }
-            // TODO: Use more specific error messages for the different error cases.
-            //  E.g. hint toward the union variant that doesn't correctly implement enter,
-            //  distinguish between a not callable `__enter__` attribute and a wrong signature.
-            CallDunderError::Call(_) => format!("it does not correctly implement `{name}`"),
-        }
-    }
-
-    fn format_call_dunder_errors(
-        error_a: &CallDunderError<'db>,
-        name_a: &str,
-        error_b: &CallDunderError<'db>,
-        name_b: &str,
-    ) -> String {
-        match (error_a, error_b) {
-            (CallDunderError::PossiblyUnbound(_), CallDunderError::PossiblyUnbound(_)) => {
-                format!("the methods `{name_a}` and `{name_b}` are possibly unbound")
-            }
-            (CallDunderError::MethodNotAvailable, CallDunderError::MethodNotAvailable) => {
-                format!("it does not implement `{name_a}` and `{name_b}`")
-            }
-            (CallDunderError::Call(_), CallDunderError::Call(_)) => {
-                format!("it does not correctly implement `{name_a}` or `{name_b}`")
-            }
-            (_, _) => format!(
-                "{format_a}, and {format_b}",
-                format_a = Self::format_call_dunder_error(error_a, name_a),
-                format_b = Self::format_call_dunder_error(error_b, name_b)
-            ),
-        }
-    }
-
     fn report_diagnostic(
         &self,
         context: &InferContext<'db>,
         context_expression_ty: Type<'db>,
         context_expression_node: ast::AnyNodeRef,
     ) {
+        let format_call_dunder_error = |call_dunder_error: &CallDunderError<'db>, name: &str| {
+            match call_dunder_error {
+                CallDunderError::MethodNotAvailable => format!("it does not implement `{name}`"),
+                CallDunderError::PossiblyUnbound(_) => {
+                    format!("the method `{name}` is possibly unbound")
+                }
+                // TODO: Use more specific error messages for the different error cases.
+                //  E.g. hint toward the union variant that doesn't correctly implement enter,
+                //  distinguish between a not callable `__enter__` attribute and a wrong signature.
+                CallDunderError::Call(_) => format!("it does not correctly implement `{name}`"),
+            }
+        };
+
+        let format_call_dunder_errors = |error_a: &CallDunderError<'db>,
+                                         name_a: &str,
+                                         error_b: &CallDunderError<'db>,
+                                         name_b: &str| {
+            match (error_a, error_b) {
+                (CallDunderError::PossiblyUnbound(_), CallDunderError::PossiblyUnbound(_)) => {
+                    format!("the methods `{name_a}` and `{name_b}` are possibly unbound")
+                }
+                (CallDunderError::MethodNotAvailable, CallDunderError::MethodNotAvailable) => {
+                    format!("it does not implement `{name_a}` and `{name_b}`")
+                }
+                (CallDunderError::Call(_), CallDunderError::Call(_)) => {
+                    format!("it does not correctly implement `{name_a}` or `{name_b}`")
+                }
+                (_, _) => format!(
+                    "{format_a}, and {format_b}",
+                    format_a = format_call_dunder_error(error_a, name_a),
+                    format_b = format_call_dunder_error(error_b, name_b)
+                ),
+            }
+        };
+
         let db = context.db();
 
         let formatted_errors = match self {
             ContextManagerErrorKind::Exit {
-                enter_ret_ty: _,
+                enter_return_type: _,
                 exit_error,
-            } => Self::format_call_dunder_error(exit_error, "__exit__"),
+            } => format_call_dunder_error(exit_error, "__exit__"),
             ContextManagerErrorKind::Enter(enter_error) => {
-                Self::format_call_dunder_error(enter_error, "__enter__")
+                format_call_dunder_error(enter_error, "__enter__")
             }
             ContextManagerErrorKind::EnterAndExit {
                 enter_error,
                 exit_error,
-            } => Self::format_call_dunder_errors(enter_error, "__enter__", exit_error, "__exit__"),
+            } => format_call_dunder_errors(enter_error, "__enter__", exit_error, "__exit__"),
         };
 
         context.report_lint(&INVALID_CONTEXT_MANAGER, context_expression_node,

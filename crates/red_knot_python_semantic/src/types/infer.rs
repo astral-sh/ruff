@@ -1592,7 +1592,6 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = with_statement;
         for item in items {
             let target = item.optional_vars.as_deref();
-            // TODO infer definitions in unpacking assignment
             if let Some(target) = target {
                 self.infer_target(target, &item.context_expr, |db, ctx_manager_ty| {
                     // TODO: `infer_with_statement_definition` reports a diagnostic if `ctx_manager_ty` isn't a context manager
