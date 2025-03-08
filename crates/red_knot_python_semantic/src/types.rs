@@ -2397,7 +2397,7 @@ impl<'db> Type<'db> {
 
             Type::Intersection(_) => {
                 let overloads = Overloads::todo("Type::Intersection.call()");
-                let binding = bind_call(db, &arguments, &overloads, self);
+                let binding = bind_call(db, arguments, &overloads, self);
                 binding.into_outcome()
             }
 
