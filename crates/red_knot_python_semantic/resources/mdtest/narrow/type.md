@@ -88,7 +88,10 @@ def _(x: str | int):
 
 ```py
 def _(x: str | int):
-    # TODO: we could issue a diagnostic here
+    # error: [unknown-argument] "Argument `object` does not match any known parameter of overload 1 of class `type`"
+    # error: [missing-argument] "No argument provided for required parameter `o` of overload 1 of class `type`"
+    # error: [unknown-argument] "Argument `object` does not match any known parameter of overload 2 of class `type`"
+    # error: [missing-argument] "No arguments provided for required parameters `o`, `bases`, `dict` of overload 2 of class `type`"
     if type(object=x) is str:
         reveal_type(x)  # revealed: str | int
 ```

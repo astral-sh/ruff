@@ -2286,17 +2286,64 @@ impl<'db> Type<'db> {
                 binding.into_outcome()
             }
 
+            Type::ClassLiteral(ClassLiteralType { class })
+                if class.is_known(db, KnownClass::Type) =>
+            {
+                // ```py
+                // class type:
+                //     @overload
+                //     def __init__(self, o: object, /) -> None: ...
+                //     @overload
+                //     def __init__(self, name: str, bases: tuple[type, ...], dict: dict[str, Any], /, **kwds: Any) -> None: ...
+                // ```
+                let overloads = Overloads::from_overloads([
+                    Signature::new(
+                        Parameters::new([Parameter::new(
+                            Some("o".into()),
+                            Some(Type::any()),
+                            ParameterKind::PositionalOnly { default_ty: None },
+                        )]),
+                        Some(self.to_instance(db)),
+                    ),
+                    Signature::new(
+                        Parameters::new([
+                            Parameter::new(
+                                Some("o".into()),
+                                Some(Type::any()),
+                                ParameterKind::PositionalOnly { default_ty: None },
+                            ),
+                            Parameter::new(
+                                Some("bases".into()),
+                                Some(Type::any()),
+                                ParameterKind::PositionalOnly { default_ty: None },
+                            ),
+                            Parameter::new(
+                                Some("dict".into()),
+                                Some(Type::any()),
+                                ParameterKind::PositionalOnly { default_ty: None },
+                            ),
+                        ]),
+                        Some(self.to_instance(db)),
+                    ),
+                ]);
+
+                let mut binding = bind_call(db, arguments, &overloads, self);
+                let Some((index, overload)) = binding.matching_overload_mut() else {
+                    return Err(CallError::BindingError { binding });
+                };
+                if index == 0 {
+                    if let Some(arg) = arguments.first_argument() {
+                        overload.set_return_type(arg.to_meta_type(db));
+                    }
+                }
+                binding.into_outcome()
+            }
+
             // TODO annotated return type on `__new__` or metaclass `__call__`
             // TODO check call vs signatures of `__new__` and/or `__init__`
             Type::ClassLiteral(ClassLiteralType { class }) => {
-                let overload = OverloadBinding::from_return_type(match class.known(db) {
-                    Some(KnownClass::Type) => arguments
-                        .exactly_one_argument()
-                        .map(|arg| arg.to_meta_type(db))
-                        .unwrap_or_else(|| KnownClass::Type.to_instance(db)),
-
-                    _ => Type::Instance(InstanceType { class }),
-                });
+                let overload =
+                    OverloadBinding::from_return_type(Type::Instance(InstanceType { class }));
                 let binding = overload.into_binding();
                 binding.into_outcome()
             }

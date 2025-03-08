@@ -29,9 +29,15 @@ But a three-argument call to type creates a dynamic instance of the `type` class
 reveal_type(type("Foo", (), {}))  # revealed: type
 ```
 
-Other numbers of arguments are invalid (TODO -- these should emit a diagnostic)
+Other numbers of arguments are invalid
 
 ```py
+# error: [too-many-positional-arguments] "Too many positional arguments to overload 1 of class `type`: expected 1, got 2"
+# error: [missing-argument] "No argument provided for required parameter `dict` of overload 2 of class `type`"
 type("Foo", ())
+
+# error: [too-many-positional-arguments] "Too many positional arguments to overload 1 of class `type`: expected 1, got 3"
+# error: [unknown-argument] "Argument `weird_other_arg` does not match any known parameter of overload 1 of class `type`"
+# error: [unknown-argument] "Argument `weird_other_arg` does not match any known parameter of overload 2 of class `type`"
 type("Foo", (), {}, weird_other_arg=42)
 ```
