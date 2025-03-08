@@ -242,13 +242,11 @@ impl<'db> CallBinding<'db> {
     }
 
     /// Report diagnostics for all of the errors that occurred when trying to match actual
-    /// arguments to formal parameters. If the callable has multiple overloads, we only report
-    /// diagnostics for the first overload.
+    /// arguments to formal parameters. If the callable has multiple overloads, we report
+    /// diagnostics for all of them.
     pub(crate) fn report_diagnostics(&self, context: &InferContext<'db>, node: ast::AnyNodeRef) {
-        // TODO: We currently only report the errors from the first overload. Consider reporting
-        // errors from all of them.
-        if let Some(overload) = self.overloads.first() {
-            let callable_descriptor = self.callable_descriptor(context.db());
+        let callable_descriptor = self.callable_descriptor(context.db());
+        for overload in &self.overloads {
             overload.report_diagnostics(
                 context,
                 node,
