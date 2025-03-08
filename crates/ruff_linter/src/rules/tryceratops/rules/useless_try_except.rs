@@ -38,35 +38,48 @@ impl Violation for UselessTryExcept {
     }
 }
 
+/// Checks if the given exception handler immediately re-raises.
+fn is_immediate_reraise_handler(handler: &ExceptHandler) -> bool {
+    let ExceptHandler::ExceptHandler(ExceptHandlerExceptHandler { name, body, .. }) = handler;
+    let Some(Stmt::Raise(ast::StmtRaise {
+        exc, cause: None, ..
+    })) = &body.first()
+    else {
+        return false;
+    };
+
+    let Some(exc) = exc else {
+        return true;
+    };
+
+    let Expr::Name(ast::ExprName { id, .. }) = exc.as_ref() else {
+        return false;
+    };
+
+    name.as_ref().is_some_and(|name| name.as_str() == id)
+}
+
 /// TRY203 (previously TRY302)
 pub(crate) fn useless_try_except(checker: &Checker, handlers: &[ExceptHandler]) {
-    if let Some(diagnostics) = handlers
-        .iter()
-        .map(|handler| {
-            let ExceptHandler::ExceptHandler(ExceptHandlerExceptHandler { name, body, .. }) =
-                handler;
-            let Some(Stmt::Raise(ast::StmtRaise {
-                exc, cause: None, ..
-            })) = &body.first()
-            else {
-                return None;
-            };
-            if let Some(expr) = exc {
-                // E.g., `except ... as e: raise e`
-                if let Expr::Name(ast::ExprName { id, .. }) = expr.as_ref() {
-                    if name.as_ref().is_some_and(|name| name.as_str() == id) {
-                        return Some(Diagnostic::new(UselessTryExcept, handler.range()));
-                    }
-                }
-                None
-            } else {
-                // E.g., `except ...: raise`
-                Some(Diagnostic::new(UselessTryExcept, handler.range()))
-            }
-        })
-        .collect::<Option<Vec<_>>>()
-    {
-        // Require that all handlers are useless, but create one diagnostic per handler.
-        checker.report_diagnostics(diagnostics);
-    }
+    // Iterate over `handlers` in reverse order and stop at the first non-immediate re-raise handler.
+    //
+    // ```python
+    // try:
+    //     ...
+    // except ValueError:      # not useless
+    //     raise
+    // except Exceptions as e: # not useless (stop here)
+    //     print(e)
+    // except TypeError as e:  # useless
+    //     raise e
+    // except ImportError:     # useless
+    //     raise
+    // ```
+    checker.report_diagnostics(
+        handlers
+            .iter()
+            .rev()
+            .take_while(|handler| is_immediate_reraise_handler(handler))
+            .map(|handler| Diagnostic::new(UselessTryExcept, handler.range())),
+    );
 }
