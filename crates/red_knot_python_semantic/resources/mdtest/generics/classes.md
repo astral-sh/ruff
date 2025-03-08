@@ -68,7 +68,7 @@ class C[T]:
 # TODO: no error
 # TODO: revealed: C[int]
 # error: [non-subscriptable]
-reveal_type(C[int]())  # revealed: Unknown
+reveal_type(C[int]())  # revealed: C
 ```
 
 We can infer the type parameter from a type context:
@@ -129,18 +129,19 @@ propagate through:
 
 ```py
 class Base[T]:
-    x: T
+    x: T | None = None
 
 # TODO: no error
 # error: [non-subscriptable]
 class Sub[U](Base[U]): ...
 
 # TODO: no error
-# TODO: revealed: int
+# TODO: revealed: int | None
 # error: [non-subscriptable]
-reveal_type(Base[int].x)  # revealed: Unknown
-# TODO: revealed: int
-reveal_type(Sub[int].x)  # revealed: Unknown
+reveal_type(Base[int].x)  # revealed: T | None
+# TODO: revealed: int | None
+# error: [non-subscriptable]
+reveal_type(Sub[int].x)  # revealed: T | None
 ```
 
 ## Cyclic class definition

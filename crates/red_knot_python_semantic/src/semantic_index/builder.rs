@@ -1032,6 +1032,7 @@ where
                                     self.db,
                                     self.file,
                                     self.current_scope(),
+                                    // SAFETY: `target` belongs to the `self.module` tree
                                     #[allow(unsafe_code)]
                                     unsafe {
                                         AstNodeRef::new(self.module.clone(), target)
@@ -1262,16 +1263,64 @@ where
                 is_async,
                 ..
             }) => {
-                for item in items {
-                    self.visit_expr(&item.context_expr);
-                    if let Some(optional_vars) = item.optional_vars.as_deref() {
-                        self.add_standalone_expression(&item.context_expr);
-                        self.push_assignment(CurrentAssignment::WithItem {
-                            item,
-                            is_async: *is_async,
-                        });
+                for item @ ruff_python_ast::WithItem {
+                    range: _,
+                    context_expr,
+                    optional_vars,
+                } in items
+                {
+                    self.visit_expr(context_expr);
+                    if let Some(optional_vars) = optional_vars.as_deref() {
+                        let context_manager = self.add_standalone_expression(context_expr);
+                        let current_assignment = match optional_vars {
+                            ast::Expr::Tuple(_) | ast::Expr::List(_) => {
+                                Some(CurrentAssignment::WithItem {
+                                    item,
+                                    first: true,
+                                    is_async: *is_async,
+                                    unpack: Some(Unpack::new(
+                                        self.db,
+                                        self.file,
+                                        self.current_scope(),
+                                        // SAFETY: the node `optional_vars` belongs to the `self.module` tree
+                                        #[allow(unsafe_code)]
+                                        unsafe {
+                                            AstNodeRef::new(self.module.clone(), optional_vars)
+                                        },
+                                        UnpackValue::ContextManager(context_manager),
+                                        countme::Count::default(),
+                                    )),
+                                })
+                            }
+                            ast::Expr::Name(_) => Some(CurrentAssignment::WithItem {
+                                item,
+                                is_async: *is_async,
+                                unpack: None,
+                                // `false` is arbitrary here---we don't actually use it other than in the actual unpacks
+                                first: false,
+                            }),
+                            ast::Expr::Attribute(ast::ExprAttribute {
+                                value: object,
+                                attr,
+                                ..
+                            }) => {
+                                self.register_attribute_assignment(
+                                    object,
+                                    attr,
+                                    AttributeAssignment::ContextManager { context_manager },
+                                );
+                                None
+                            }
+                            _ => None,
+                        };
+
+                        if let Some(current_assignment) = current_assignment {
+                            self.push_assignment(current_assignment);
+                        }
                         self.visit_expr(optional_vars);
-                        self.pop_assignment();
+                        if current_assignment.is_some() {
+                            self.pop_assignment();
+                        }
                     }
                 }
                 self.visit_body(body);
@@ -1304,6 +1353,7 @@ where
                             self.db,
                             self.file,
                             self.current_scope(),
+                            // SAFETY: the node `target` belongs to the `self.module` tree
                             #[allow(unsafe_code)]
                             unsafe {
                                 AstNodeRef::new(self.module.clone(), target)
@@ -1631,12 +1681,19 @@ where
                                 },
                             );
                         }
-                        Some(CurrentAssignment::WithItem { item, is_async }) => {
+                        Some(CurrentAssignment::WithItem {
+                            item,
+                            first,
+                            is_async,
+                            unpack,
+                        }) => {
                             self.add_definition(
                                 symbol,
                                 WithItemDefinitionNodeRef {
-                                    node: item,
-                                    target: name_node,
+                                    unpack,
+                                    context_expr: &item.context_expr,
+                                    name: name_node,
+                                    first,
                                     is_async,
                                 },
                             );
@@ -1646,7 +1703,9 @@ where
                 }
 
                 if let Some(
-                    CurrentAssignment::Assign { first, .. } | CurrentAssignment::For { first, .. },
+                    CurrentAssignment::Assign { first, .. }
+                    | CurrentAssignment::For { first, .. }
+                    | CurrentAssignment::WithItem { first, .. },
                 ) = self.current_assignment_mut()
                 {
                     *first = false;
@@ -1826,6 +1885,10 @@ where
                     | CurrentAssignment::For {
                         unpack: Some(unpack),
                         ..
+                    }
+                    | CurrentAssignment::WithItem {
+                        unpack: Some(unpack),
+                        ..
                     },
                 ) = self.current_assignment()
                 {
@@ -1919,7 +1982,9 @@ enum CurrentAssignment<'a> {
     },
     WithItem {
         item: &'a ast::WithItem,
+        first: bool,
         is_async: bool,
+        unpack: Option<Unpack<'a>>,
     },
 }
 
