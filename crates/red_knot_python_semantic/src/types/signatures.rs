@@ -11,6 +11,21 @@ pub(crate) enum Overloads<'db> {
 }
 
 impl<'db> Overloads<'db> {
+    pub(crate) fn from_overloads<I>(overloads: I) -> Self
+    where
+        I: IntoIterator,
+        I::IntoIter: Iterator<Item = Signature<'db>>,
+    {
+        let mut iter = overloads.into_iter();
+        let first_overload = iter.next().expect("overloads should not be empty");
+        let Some(second_overload) = iter.next() else {
+            return Overloads::Single(first_overload);
+        };
+        let mut overloads = vec![first_overload, second_overload];
+        overloads.extend(iter);
+        Overloads::Overloaded(overloads.into())
+    }
+
     pub(crate) fn iter(&self) -> std::slice::Iter<Signature<'db>> {
         match self {
             Overloads::Single(signature) => std::slice::from_ref(signature).iter(),
@@ -22,18 +37,6 @@ impl<'db> Overloads<'db> {
 impl<'db> From<Signature<'db>> for Overloads<'db> {
     fn from(signature: Signature<'db>) -> Self {
         Overloads::Single(signature)
-    }
-}
-
-impl<'db, I> From<I> for Overloads<'db>
-where
-    I: IntoIterator,
-    I::IntoIter: Iterator<Item = Signature<'db>>,
-{
-    fn from(overloads: I) -> Self {
-        let overloads = overloads.into_iter().collect::<Vec<_>>().into_boxed_slice();
-        debug_assert!(!overloads.is_empty());
-        Overloads::Overloaded(overloads)
     }
 }
 

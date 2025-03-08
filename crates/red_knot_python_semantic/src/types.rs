@@ -1905,23 +1905,30 @@ impl<'db> Type<'db> {
                 //     def __get__(self, instance: object, owner: type | None = None, /) -> MethodType: ...
                 // ```
 
-                let first_argument_is_none =
-                    arguments.first_argument().is_some_and(|ty| ty.is_none(db));
-
-                let signature = Signature::new(
-                    Parameters::new([
-                        Parameter::new(
-                            Some("instance".into()),
-                            Some(Type::object(db)),
-                            ParameterKind::PositionalOnly { default_ty: None },
-                        ),
-                        if first_argument_is_none {
+                let not_none = Type::none(db).negate(db);
+                let overloads = Overloads::from_overloads([
+                    Signature::new(
+                        Parameters::new([
+                            Parameter::new(
+                                Some("instance".into()),
+                                Some(Type::none(db)),
+                                ParameterKind::PositionalOnly { default_ty: None },
+                            ),
                             Parameter::new(
                                 Some("owner".into()),
                                 Some(KnownClass::Type.to_instance(db)),
                                 ParameterKind::PositionalOnly { default_ty: None },
-                            )
-                        } else {
+                            ),
+                        ]),
+                        None,
+                    ),
+                    Signature::new(
+                        Parameters::new([
+                            Parameter::new(
+                                Some("instance".into()),
+                                Some(not_none),
+                                ParameterKind::PositionalOnly { default_ty: None },
+                            ),
                             Parameter::new(
                                 Some("owner".into()),
                                 Some(UnionType::from_elements(
@@ -1931,62 +1938,81 @@ impl<'db> Type<'db> {
                                 ParameterKind::PositionalOnly {
                                     default_ty: Some(Type::none(db)),
                                 },
-                            )
-                        },
-                    ]),
-                    if function.has_known_class_decorator(db, KnownClass::Classmethod)
-                        && function.decorators(db).len() == 1
-                    {
-                        if let Some(owner) = arguments.second_argument() {
-                            Some(Type::Callable(CallableType::BoundMethod(
-                                BoundMethodType::new(db, function, owner),
-                            )))
-                        } else if let Some(instance) = arguments.first_argument() {
-                            Some(Type::Callable(CallableType::BoundMethod(
-                                BoundMethodType::new(db, function, instance.to_meta_type(db)),
-                            )))
-                        } else {
-                            Some(Type::unknown())
-                        }
-                    } else {
-                        Some(match arguments.first_argument() {
-                            Some(ty) if ty.is_none(db) => Type::FunctionLiteral(function),
-                            Some(instance) => Type::Callable(CallableType::BoundMethod(
-                                BoundMethodType::new(db, function, instance),
-                            )),
-                            _ => Type::unknown(),
-                        })
-                    },
-                );
+                            ),
+                        ]),
+                        None,
+                    ),
+                ]);
 
-                bind_call(db, arguments, &signature.into(), self).into_outcome()
+                let mut binding = bind_call(db, arguments, &overloads, self);
+                let Some(overload) = binding.matching_overload_mut() else {
+                    return Err(CallError::BindingError { binding });
+                };
+
+                if function.has_known_class_decorator(db, KnownClass::Classmethod)
+                    && function.decorators(db).len() == 1
+                {
+                    if let Some(owner) = arguments.second_argument() {
+                        overload.set_return_type(Type::Callable(CallableType::BoundMethod(
+                            BoundMethodType::new(db, function, owner),
+                        )));
+                    } else if let Some(instance) = arguments.first_argument() {
+                        overload.set_return_type(Type::Callable(CallableType::BoundMethod(
+                            BoundMethodType::new(db, function, instance.to_meta_type(db)),
+                        )));
+                    }
+                } else {
+                    if let Some(first) = arguments.first_argument() {
+                        if first.is_none(db) {
+                            overload.set_return_type(Type::FunctionLiteral(function));
+                        } else {
+                            overload.set_return_type(Type::Callable(CallableType::BoundMethod(
+                                BoundMethodType::new(db, function, first),
+                            )));
+                        }
+                    }
+                }
+
+                binding.into_outcome()
             }
             Type::Callable(CallableType::WrapperDescriptorDunderGet) => {
                 // Here, we also model `types.FunctionType.__get__`, but now we consider a call to
                 // this as a function, i.e. we also expect the `self` argument to be passed in.
 
-                let second_argument_is_none =
-                    arguments.second_argument().is_some_and(|ty| ty.is_none(db));
-
-                let signature = Signature::new(
-                    Parameters::new([
-                        Parameter::new(
-                            Some("self".into()),
-                            Some(KnownClass::FunctionType.to_instance(db)),
-                            ParameterKind::PositionalOnly { default_ty: None },
-                        ),
-                        Parameter::new(
-                            Some("instance".into()),
-                            Some(Type::object(db)),
-                            ParameterKind::PositionalOnly { default_ty: None },
-                        ),
-                        if second_argument_is_none {
+                let not_none = Type::none(db).negate(db);
+                let overloads = Overloads::from_overloads([
+                    Signature::new(
+                        Parameters::new([
+                            Parameter::new(
+                                Some("self".into()),
+                                Some(KnownClass::FunctionType.to_instance(db)),
+                                ParameterKind::PositionalOnly { default_ty: None },
+                            ),
+                            Parameter::new(
+                                Some("instance".into()),
+                                Some(Type::none(db)),
+                                ParameterKind::PositionalOnly { default_ty: None },
+                            ),
                             Parameter::new(
                                 Some("owner".into()),
                                 Some(KnownClass::Type.to_instance(db)),
                                 ParameterKind::PositionalOnly { default_ty: None },
-                            )
-                        } else {
+                            ),
+                        ]),
+                        None,
+                    ),
+                    Signature::new(
+                        Parameters::new([
+                            Parameter::new(
+                                Some("self".into()),
+                                Some(KnownClass::FunctionType.to_instance(db)),
+                                ParameterKind::PositionalOnly { default_ty: None },
+                            ),
+                            Parameter::new(
+                                Some("instance".into()),
+                                Some(not_none),
+                                ParameterKind::PositionalOnly { default_ty: None },
+                            ),
                             Parameter::new(
                                 Some("owner".into()),
                                 Some(UnionType::from_elements(
@@ -1996,53 +2022,51 @@ impl<'db> Type<'db> {
                                 ParameterKind::PositionalOnly {
                                     default_ty: Some(Type::none(db)),
                                 },
-                            )
-                        },
-                    ]),
-                    Some(
-                        if let Some(function_ty @ Type::FunctionLiteral(function)) =
-                            arguments.first_argument()
-                        {
-                            if function.has_known_class_decorator(db, KnownClass::Classmethod)
-                                && function.decorators(db).len() == 1
-                            {
-                                if let Some(owner) = arguments.third_argument() {
-                                    Type::Callable(CallableType::BoundMethod(BoundMethodType::new(
-                                        db, function, owner,
-                                    )))
-                                } else if let Some(instance) = arguments.second_argument() {
-                                    Type::Callable(CallableType::BoundMethod(BoundMethodType::new(
-                                        db,
-                                        function,
-                                        instance.to_meta_type(db),
-                                    )))
-                                } else {
-                                    Type::unknown()
-                                }
-                            } else {
-                                if let Some(instance) = arguments.second_argument() {
-                                    if instance.is_none(db) {
-                                        function_ty
-                                    } else {
-                                        Type::Callable(CallableType::BoundMethod(
-                                            BoundMethodType::new(db, function, instance),
-                                        ))
-                                    }
-                                } else {
-                                    Type::unknown()
-                                }
-                            }
-                        } else {
-                            Type::unknown()
-                        },
+                            ),
+                        ]),
+                        None,
                     ),
-                );
+                ]);
 
-                bind_call(db, arguments, &signature.into(), self).into_outcome()
+                let mut binding = bind_call(db, arguments, &overloads, self);
+                let Some(overload) = binding.matching_overload_mut() else {
+                    return Err(CallError::BindingError { binding });
+                };
+
+                if let Some(function_ty @ Type::FunctionLiteral(function)) =
+                    arguments.first_argument()
+                {
+                    if function.has_known_class_decorator(db, KnownClass::Classmethod)
+                        && function.decorators(db).len() == 1
+                    {
+                        if let Some(owner) = arguments.third_argument() {
+                            overload.set_return_type(Type::Callable(CallableType::BoundMethod(
+                                BoundMethodType::new(db, function, owner),
+                            )));
+                        } else if let Some(instance) = arguments.second_argument() {
+                            overload.set_return_type(Type::Callable(CallableType::BoundMethod(
+                                BoundMethodType::new(db, function, instance.to_meta_type(db)),
+                            )));
+                        }
+                    } else {
+                        if let Some(instance) = arguments.second_argument() {
+                            if instance.is_none(db) {
+                                overload.set_return_type(function_ty);
+                            } else {
+                                overload.set_return_type(Type::Callable(
+                                    CallableType::BoundMethod(BoundMethodType::new(
+                                        db, function, instance,
+                                    )),
+                                ));
+                            }
+                        }
+                    }
+                }
+
+                binding.into_outcome()
             }
             Type::FunctionLiteral(function_type) => {
                 let mut binding = bind_call(db, arguments, function_type.signature(db), self);
-
                 let Some(overload) = binding.matching_overload_mut() else {
                     return Err(CallError::BindingError { binding });
                 };
