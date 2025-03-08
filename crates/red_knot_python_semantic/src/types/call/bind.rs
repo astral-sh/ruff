@@ -126,14 +126,18 @@ pub(crate) fn bind_call<'db>(
         });
     }
 
-    CallBinding {
-        callable_ty,
+    let overload = OverloadBinding {
         return_ty: signature.return_ty.unwrap_or(Type::unknown()),
         parameter_tys: parameter_tys
             .into_iter()
             .map(|opt_ty| opt_ty.unwrap_or(Type::unknown()))
             .collect(),
         errors,
+    };
+
+    CallBinding {
+        callable_ty,
+        overloads: vec![overload].into_boxed_slice(),
     }
 }
 
@@ -144,11 +148,120 @@ pub(crate) struct CallableDescriptor<'a> {
     kind: &'a str,
 }
 
+/// Binding information for a call site.
+///
+/// For a successful binding, each argument is mapped to one of the callable's formal parameters.
+/// If the callable has multiple overloads, the first one that matches is used as the overall
+/// binding match.
+///
+/// If the arguments cannot be matched to formal parameters, we store information about the
+/// specific errors that occurred when trying to match them up. If the callable has multiple
+/// overloads, we store this error information for each overload.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct CallBinding<'db> {
     /// Type of the callable object (function, class...)
     callable_ty: Type<'db>,
 
+    overloads: Box<[OverloadBinding<'db>]>,
+}
+
+impl<'db> CallBinding<'db> {
+    pub(crate) fn into_outcome(self) -> Result<CallOutcome<'db>, CallError<'db>> {
+        if self.has_binding_errors() {
+            return Err(CallError::BindingError { binding: self });
+        }
+        Ok(CallOutcome::Single(self))
+    }
+
+    pub(crate) fn callable_type(&self) -> Type<'db> {
+        self.callable_ty
+    }
+
+    /// Returns whether there were any errors binding this call site. If the callable has multiple
+    /// overloads, they must _all_ have errors.
+    pub(crate) fn has_binding_errors(&self) -> bool {
+        self.overloads
+            .iter()
+            .all(OverloadBinding::has_binding_errors)
+    }
+
+    /// Returns the overload that matched for this call binding. Returns `None` if none of the
+    /// overloads matched.
+    pub(crate) fn matching_overload(&self) -> Option<&OverloadBinding<'db>> {
+        self.overloads
+            .iter()
+            .find(|overload| !overload.has_binding_errors())
+    }
+
+    /// Returns the overload that matched for this call binding. Returns `None` if none of the
+    /// overloads matched.
+    pub(crate) fn matching_overload_mut(&mut self) -> Option<&mut OverloadBinding<'db>> {
+        self.overloads
+            .iter_mut()
+            .find(|overload| !overload.has_binding_errors())
+    }
+
+    /// Returns the return type of the matching overload for this binding. If none of the overloads
+    /// matched, returns a union of the return types of each overload.
+    pub(crate) fn return_type(&self, db: &'db dyn Db) -> Type<'db> {
+        if let Some(overload) = self.matching_overload() {
+            return overload.return_type();
+        }
+        if let [overload] = self.overloads.as_ref() {
+            return overload.return_type();
+        }
+        UnionType::from_elements(db, self.overloads.iter().map(OverloadBinding::return_type))
+    }
+
+    fn callable_descriptor(&self, db: &'db dyn Db) -> Option<CallableDescriptor> {
+        match self.callable_ty {
+            Type::FunctionLiteral(function) => Some(CallableDescriptor {
+                kind: "function",
+                name: function.name(db),
+            }),
+            Type::ClassLiteral(class_type) => Some(CallableDescriptor {
+                kind: "class",
+                name: class_type.class().name(db),
+            }),
+            Type::Callable(CallableType::BoundMethod(bound_method)) => Some(CallableDescriptor {
+                kind: "bound method",
+                name: bound_method.function(db).name(db),
+            }),
+            Type::Callable(CallableType::MethodWrapperDunderGet(function)) => {
+                Some(CallableDescriptor {
+                    kind: "method wrapper `__get__` of function",
+                    name: function.name(db),
+                })
+            }
+            Type::Callable(CallableType::WrapperDescriptorDunderGet) => Some(CallableDescriptor {
+                kind: "wrapper descriptor",
+                name: "FunctionType.__get__",
+            }),
+            _ => None,
+        }
+    }
+
+    /// Report diagnostics for all of the errors that occurred when trying to match actual
+    /// arguments to formal parameters. If the callable has multiple overloads, we only report
+    /// diagnostics for the first overload.
+    pub(crate) fn report_diagnostics(&self, context: &InferContext<'db>, node: ast::AnyNodeRef) {
+        // TODO: We currently only report the errors from the first overload. Consider reporting
+        // errors from all of them.
+        if let Some(overload) = self.overloads.first() {
+            let callable_descriptor = self.callable_descriptor(context.db());
+            overload.report_diagnostics(
+                context,
+                node,
+                self.callable_ty,
+                callable_descriptor.as_ref(),
+            );
+        }
+    }
+}
+
+/// Binding information for one of the overloads of a callable.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct OverloadBinding<'db> {
     /// Return type of the call.
     return_ty: Type<'db>,
 
@@ -159,26 +272,22 @@ pub(crate) struct CallBinding<'db> {
     errors: Vec<CallBindingError<'db>>,
 }
 
-impl<'db> CallBinding<'db> {
+impl<'db> OverloadBinding<'db> {
+    // TODO remove this constructor and construct always from `bind_call`
+    pub(crate) fn into_binding(self) -> CallBinding<'db> {
+        CallBinding {
+            callable_ty: todo_type!("CallBinding::from_return_type"),
+            overloads: vec![self].into_boxed_slice(),
+        }
+    }
+
     // TODO remove this constructor and construct always from `bind_call`
     pub(crate) fn from_return_type(return_ty: Type<'db>) -> Self {
         Self {
-            callable_ty: todo_type!("CallBinding::from_return_type"),
             return_ty,
             parameter_tys: Box::default(),
             errors: vec![],
         }
-    }
-
-    pub(crate) fn into_outcome(self) -> Result<CallOutcome<'db>, CallError<'db>> {
-        if self.has_binding_errors() {
-            return Err(CallError::BindingError { binding: self });
-        }
-        Ok(CallOutcome::Single(self))
-    }
-
-    pub(crate) fn callable_type(&self) -> Type<'db> {
-        self.callable_ty
     }
 
     pub(crate) fn set_return_type(&mut self, return_ty: Type<'db>) {
@@ -214,43 +323,15 @@ impl<'db> CallBinding<'db> {
         }
     }
 
-    fn callable_descriptor(&self, db: &'db dyn Db) -> Option<CallableDescriptor> {
-        match self.callable_ty {
-            Type::FunctionLiteral(function) => Some(CallableDescriptor {
-                kind: "function",
-                name: function.name(db),
-            }),
-            Type::ClassLiteral(class_type) => Some(CallableDescriptor {
-                kind: "class",
-                name: class_type.class().name(db),
-            }),
-            Type::Callable(CallableType::BoundMethod(bound_method)) => Some(CallableDescriptor {
-                kind: "bound method",
-                name: bound_method.function(db).name(db),
-            }),
-            Type::Callable(CallableType::MethodWrapperDunderGet(function)) => {
-                Some(CallableDescriptor {
-                    kind: "method wrapper `__get__` of function",
-                    name: function.name(db),
-                })
-            }
-            Type::Callable(CallableType::WrapperDescriptorDunderGet) => Some(CallableDescriptor {
-                kind: "wrapper descriptor",
-                name: "FunctionType.__get__",
-            }),
-            _ => None,
-        }
-    }
-
-    pub(crate) fn report_diagnostics(&self, context: &InferContext<'db>, node: ast::AnyNodeRef) {
-        let callable_descriptor = self.callable_descriptor(context.db());
+    fn report_diagnostics(
+        &self,
+        context: &InferContext<'db>,
+        node: ast::AnyNodeRef,
+        callable_ty: Type<'db>,
+        callable_descriptor: Option<&CallableDescriptor>,
+    ) {
         for error in &self.errors {
-            error.report_diagnostic(
-                context,
-                node,
-                self.callable_ty,
-                callable_descriptor.as_ref(),
-            );
+            error.report_diagnostic(context, node, callable_ty, callable_descriptor);
         }
     }
 

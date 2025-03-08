@@ -6,7 +6,7 @@ use crate::Db;
 mod arguments;
 mod bind;
 pub(super) use arguments::{Argument, CallArguments};
-pub(super) use bind::{bind_call, CallBinding};
+pub(super) use bind::{bind_call, CallBinding, OverloadBinding};
 
 /// A successfully bound call where all arguments are valid.
 ///
@@ -68,9 +68,9 @@ impl<'db> CallOutcome<'db> {
     /// The type returned by this call.
     pub(super) fn return_type(&self, db: &'db dyn Db) -> Type<'db> {
         match self {
-            Self::Single(binding) => binding.return_type(),
+            Self::Single(binding) => binding.return_type(db),
             Self::Union(bindings) => {
-                UnionType::from_elements(db, bindings.iter().map(bind::CallBinding::return_type))
+                UnionType::from_elements(db, bindings.iter().map(|binding| binding.return_type(db)))
             }
         }
     }
@@ -123,11 +123,11 @@ impl<'db> CallError<'db> {
                 db,
                 bindings
                     .iter()
-                    .map(CallBinding::return_type)
+                    .map(|binding| binding.return_type(db))
                     .chain(errors.iter().map(|err| err.fallback_return_type(db))),
             )),
             Self::PossiblyUnboundDunderCall { outcome, .. } => Some(outcome.return_type(db)),
-            Self::BindingError { binding } => Some(binding.return_type()),
+            Self::BindingError { binding } => Some(binding.return_type(db)),
         }
     }
 

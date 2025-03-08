@@ -29,7 +29,7 @@ use crate::semantic_index::symbol::ScopeId;
 use crate::semantic_index::{imported_modules, semantic_index};
 use crate::suppression::check_suppressions;
 use crate::symbol::{imported_symbol, Boundness, Symbol, SymbolAndQualifiers};
-use crate::types::call::{bind_call, CallArguments, CallBinding, CallOutcome, UnionCallError};
+use crate::types::call::{bind_call, CallArguments, CallOutcome, OverloadBinding, UnionCallError};
 use crate::types::class_base::ClassBase;
 use crate::types::diagnostic::{INVALID_TYPE_FORM, UNSUPPORTED_BOOL_CONVERSION};
 use crate::types::infer::infer_unpack_types;
@@ -1751,7 +1751,7 @@ impl<'db> Type<'db> {
                             match err {
                                 CallError::BindingError { binding } => {
                                     return Err(BoolError::IncorrectArguments {
-                                        truthiness: type_to_truthiness(binding.return_type()),
+                                        truthiness: type_to_truthiness(binding.return_type(db)),
                                         not_boolable_type: *instance_ty,
                                     });
                                 }
@@ -2043,70 +2043,71 @@ impl<'db> Type<'db> {
             Type::FunctionLiteral(function_type) => {
                 let mut binding = bind_call(db, arguments, function_type.signature(db), self);
 
-                if binding.has_binding_errors() {
+                let Some(overload) = binding.matching_overload_mut() else {
                     return Err(CallError::BindingError { binding });
-                }
+                };
 
                 match function_type.known(db) {
                     Some(KnownFunction::IsEquivalentTo) => {
-                        let (ty_a, ty_b) = binding
+                        let (ty_a, ty_b) = overload
                             .two_parameter_types()
                             .unwrap_or((Type::unknown(), Type::unknown()));
-                        binding
+                        overload
                             .set_return_type(Type::BooleanLiteral(ty_a.is_equivalent_to(db, ty_b)));
                     }
                     Some(KnownFunction::IsSubtypeOf) => {
-                        let (ty_a, ty_b) = binding
+                        let (ty_a, ty_b) = overload
                             .two_parameter_types()
                             .unwrap_or((Type::unknown(), Type::unknown()));
-                        binding.set_return_type(Type::BooleanLiteral(ty_a.is_subtype_of(db, ty_b)));
+                        overload
+                            .set_return_type(Type::BooleanLiteral(ty_a.is_subtype_of(db, ty_b)));
                     }
                     Some(KnownFunction::IsAssignableTo) => {
-                        let (ty_a, ty_b) = binding
+                        let (ty_a, ty_b) = overload
                             .two_parameter_types()
                             .unwrap_or((Type::unknown(), Type::unknown()));
-                        binding
+                        overload
                             .set_return_type(Type::BooleanLiteral(ty_a.is_assignable_to(db, ty_b)));
                     }
                     Some(KnownFunction::IsDisjointFrom) => {
-                        let (ty_a, ty_b) = binding
+                        let (ty_a, ty_b) = overload
                             .two_parameter_types()
                             .unwrap_or((Type::unknown(), Type::unknown()));
-                        binding
+                        overload
                             .set_return_type(Type::BooleanLiteral(ty_a.is_disjoint_from(db, ty_b)));
                     }
                     Some(KnownFunction::IsGradualEquivalentTo) => {
-                        let (ty_a, ty_b) = binding
+                        let (ty_a, ty_b) = overload
                             .two_parameter_types()
                             .unwrap_or((Type::unknown(), Type::unknown()));
-                        binding.set_return_type(Type::BooleanLiteral(
+                        overload.set_return_type(Type::BooleanLiteral(
                             ty_a.is_gradual_equivalent_to(db, ty_b),
                         ));
                     }
                     Some(KnownFunction::IsFullyStatic) => {
-                        let ty = binding.one_parameter_type().unwrap_or(Type::unknown());
-                        binding.set_return_type(Type::BooleanLiteral(ty.is_fully_static(db)));
+                        let ty = overload.one_parameter_type().unwrap_or(Type::unknown());
+                        overload.set_return_type(Type::BooleanLiteral(ty.is_fully_static(db)));
                     }
                     Some(KnownFunction::IsSingleton) => {
-                        let ty = binding.one_parameter_type().unwrap_or(Type::unknown());
-                        binding.set_return_type(Type::BooleanLiteral(ty.is_singleton(db)));
+                        let ty = overload.one_parameter_type().unwrap_or(Type::unknown());
+                        overload.set_return_type(Type::BooleanLiteral(ty.is_singleton(db)));
                     }
                     Some(KnownFunction::IsSingleValued) => {
-                        let ty = binding.one_parameter_type().unwrap_or(Type::unknown());
-                        binding.set_return_type(Type::BooleanLiteral(ty.is_single_valued(db)));
+                        let ty = overload.one_parameter_type().unwrap_or(Type::unknown());
+                        overload.set_return_type(Type::BooleanLiteral(ty.is_single_valued(db)));
                     }
 
                     Some(KnownFunction::Len) => {
-                        if let Some(first_arg) = binding.one_parameter_type() {
+                        if let Some(first_arg) = overload.one_parameter_type() {
                             if let Some(len_ty) = first_arg.len(db) {
-                                binding.set_return_type(len_ty);
+                                overload.set_return_type(len_ty);
                             }
                         };
                     }
 
                     Some(KnownFunction::Repr) => {
-                        if let Some(first_arg) = binding.one_parameter_type() {
-                            binding.set_return_type(first_arg.repr(db));
+                        if let Some(first_arg) = overload.one_parameter_type() {
+                            overload.set_return_type(first_arg.repr(db));
                         };
                     }
 
@@ -2114,19 +2115,19 @@ impl<'db> Type<'db> {
                         // TODO: Use `.two_parameter_tys()` exclusively
                         // when overloads are supported.
                         if let Some(casted_ty) = arguments.first_argument() {
-                            if binding.two_parameter_types().is_some() {
-                                binding.set_return_type(casted_ty);
+                            if overload.two_parameter_types().is_some() {
+                                overload.set_return_type(casted_ty);
                             }
                         };
                     }
 
                     Some(KnownFunction::Overload) => {
-                        binding.set_return_type(todo_type!("overload(..) return type"));
+                        overload.set_return_type(todo_type!("overload(..) return type"));
                     }
 
                     Some(KnownFunction::GetattrStatic) => {
                         let Some((instance_ty, attr_name, default)) =
-                            binding.three_parameter_types()
+                            overload.three_parameter_types()
                         else {
                             return binding.into_outcome();
                         };
@@ -2144,7 +2145,7 @@ impl<'db> Type<'db> {
                         let union_with_default = |ty| UnionType::from_elements(db, [ty, default]);
 
                         // TODO: we could emit a diagnostic here (if default is not set)
-                        binding.set_return_type(
+                        overload.set_return_type(
                             match instance_ty.static_member(db, attr_name.value(db)) {
                                 Symbol::Type(ty, Boundness::Bound) => {
                                     if instance_ty.is_fully_static(db) {
@@ -2175,7 +2176,7 @@ impl<'db> Type<'db> {
             // TODO annotated return type on `__new__` or metaclass `__call__`
             // TODO check call vs signatures of `__new__` and/or `__init__`
             Type::ClassLiteral(ClassLiteralType { class }) => {
-                let binding = CallBinding::from_return_type(match class.known(db) {
+                let overload = OverloadBinding::from_return_type(match class.known(db) {
                     // TODO: We should check the call signature and error if the bool call doesn't have the
                     //   right signature and return a binding error.
 
@@ -2201,6 +2202,7 @@ impl<'db> Type<'db> {
 
                     _ => Type::Instance(InstanceType { class }),
                 });
+                let binding = overload.into_binding();
                 binding.into_outcome()
             }
 
@@ -2244,14 +2246,17 @@ impl<'db> Type<'db> {
 
             // Dynamic types are callable, and the return type is the same dynamic type. Similarly,
             // `Never` is always callable and returns `Never`.
-            Type::Dynamic(_) | Type::Never => CallBinding::from_return_type(self).into_outcome(),
+            Type::Dynamic(_) | Type::Never => OverloadBinding::from_return_type(self)
+                .into_binding()
+                .into_outcome(),
 
             Type::Union(union) => {
                 CallOutcome::try_call_union(db, union, |element| element.try_call(db, arguments))
             }
 
             Type::Intersection(_) => {
-                CallBinding::from_return_type(todo_type!("Type::Intersection.call()"))
+                OverloadBinding::from_return_type(todo_type!("Type::Intersection.call()"))
+                    .into_binding()
                     .into_outcome()
             }
 

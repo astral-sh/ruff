@@ -3423,9 +3423,13 @@ impl<'db> TypeInferenceBuilder<'db> {
                         continue;
                     };
 
+                    let Some(overload) = binding.matching_overload() else {
+                        continue;
+                    };
+
                     match known_function {
                         KnownFunction::RevealType => {
-                            if let Some(revealed_type) = binding.one_parameter_type() {
+                            if let Some(revealed_type) = overload.one_parameter_type() {
                                 self.context.report_diagnostic(
                                     call_expression,
                                     DiagnosticId::RevealedType,
@@ -3439,7 +3443,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             }
                         }
                         KnownFunction::AssertType => {
-                            if let [actual_ty, asserted_ty] = binding.parameter_types() {
+                            if let [actual_ty, asserted_ty] = overload.parameter_types() {
                                 if !actual_ty.is_gradual_equivalent_to(self.db(), *asserted_ty) {
                                     self.context.report_lint(
                                             &TYPE_ASSERTION_FAILURE,
@@ -3454,7 +3458,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             }
                         }
                         KnownFunction::StaticAssert => {
-                            if let Some((parameter_ty, message)) = binding.two_parameter_types() {
+                            if let Some((parameter_ty, message)) = overload.two_parameter_types() {
                                 let truthiness = match parameter_ty.try_bool(self.db()) {
                                     Ok(truthiness) => truthiness,
                                     Err(err) => {
