@@ -1,0 +1,111 @@
+---
+source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+---
+E12.py:15:15: E124 Closing bracket does not match visual indentation
+   |
+13 | print("E124", ("visual",
+14 |                "indent_two"
+15 |               ))
+   |               ^ E124
+16 | #: E124
+17 | print("E124", ("visual",
+   |
+
+E12.py:19:1: E124 Closing bracket does not match visual indentation
+   |
+17 | print("E124", ("visual",
+18 |                "indent_five"
+19 | ))
+   | ^ E124
+20 | #: E124
+21 | a = (123,
+   |
+
+E12.py:22:1: E124 Closing bracket does not match visual indentation
+   |
+20 | #: E124
+21 | a = (123,
+22 | )
+   | ^ E124
+23 | #: E129 W503
+24 | if (row < 0 or self.moduleCount <= row
+   |
+
+E12.py:140:1: E124 Closing bracket does not match visual indentation
+    |
+138 | my_list = [1, 2, 3,
+139 |            4, 5, 6,
+140 | ]
+    | ^ E124
+141 | #: E124
+142 | my_list = [1, 2, 3,
+    |
+
+E12.py:144:20: E124 Closing bracket does not match visual indentation
+    |
+142 | my_list = [1, 2, 3,
+143 |            4, 5, 6,
+144 |                    ]
+    |                    ^ E124
+145 | #: E124
+146 | result = some_function_that_takes_arguments('a', 'b', 'c',
+    |
+
+E12.py:148:1: E124 Closing bracket does not match visual indentation
+    |
+146 | result = some_function_that_takes_arguments('a', 'b', 'c',
+147 |                                             'd', 'e', 'f',
+148 | )
+    | ^ E124
+149 | #: E124
+150 | fooff(aaaa,
+    |
+
+E12.py:155:1: E124 Closing bracket does not match visual indentation
+    |
+153 |           dadd
+154 |       ), fff,
+155 | )
+    | ^ E124
+156 | #: E124
+157 | fooff(aaaa,
+    |
+
+E12.py:163:1: E124 Closing bracket does not match visual indentation
+    |
+161 |       ),
+162 |       fff,
+163 | )
+    | ^ E124
+164 | #: E124
+165 | d = dict('foo',
+    |
+
+E12.py:168:15: E124 Closing bracket does not match visual indentation
+    |
+166 |          help="exclude files or directories which match these "
+167 |               "comma separated patterns (default: %s)" % DEFAULT_EXCLUDE
+168 |               )
+    |               ^ E124
+169 | #: E124 E128 E128
+170 | if line_removed:
+    |
+
+E12.py:174:9: E124 Closing bracket does not match visual indentation
+    |
+172 |         name="Removing the option for contract",
+173 |         description="contract line has been removed",
+174 |         )
+    |         ^ E124
+175 | #:
+    |
+
+E12.py:320:17: E124 Closing bracket does not match visual indentation
+    |
+318 |                 name="Removing the option for contract",
+319 |                 description="contract line has been removed",
+320 |                 )
+    |                 ^ E124
+321 | #: E127
+322 | rv.update(d=('a', 'b', 'c'),
+    |
