@@ -2279,9 +2279,9 @@ impl<'db> Type<'db> {
             }
 
             Type::Intersection(_) => {
-                OverloadBinding::from_return_type(todo_type!("Type::Intersection.call()"))
-                    .into_binding()
-                    .into_outcome()
+                let overloads = Overloads::todo("Type::Intersection.call()");
+                let binding = bind_call(db, &arguments, &overloads, self);
+                binding.into_outcome()
             }
 
             _ => Err(CallError::NotCallable {
@@ -3549,7 +3549,7 @@ impl<'db> FunctionType<'db> {
             {
                 internal_signature
             } else {
-                Signature::todo("return type of decorated function").into()
+                Overloads::todo("return type of decorated function")
             }
         } else {
             internal_signature

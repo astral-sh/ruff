@@ -32,6 +32,16 @@ impl<'db> Overloads<'db> {
             Overloads::Overloaded(signatures) => signatures.iter(),
         }
     }
+
+    /// Return a todo signature: (*args: Todo, **kwargs: Todo) -> Todo
+    #[allow(unused_variables)] // 'reason' only unused in debug builds
+    pub(crate) fn todo(reason: &'static str) -> Self {
+        let signature = Signature {
+            parameters: Parameters::todo(),
+            return_ty: Some(todo_type!(reason)),
+        };
+        signature.into()
+    }
 }
 
 impl<'db> From<Signature<'db>> for Overloads<'db> {
@@ -63,15 +73,6 @@ impl<'db> Signature<'db> {
         Self {
             parameters,
             return_ty,
-        }
-    }
-
-    /// Return a todo signature: (*args: Todo, **kwargs: Todo) -> Todo
-    #[allow(unused_variables)] // 'reason' only unused in debug builds
-    pub(crate) fn todo(reason: &'static str) -> Self {
-        Self {
-            parameters: Parameters::todo(),
-            return_ty: Some(todo_type!(reason)),
         }
     }
 
@@ -689,7 +690,7 @@ mod tests {
         .unwrap();
         let func = get_function_f(&db, "/src/a.py");
 
-        let expected_sig = Signature::todo("return type of decorated function").into();
+        let expected_sig = Overloads::todo("return type of decorated function");
 
         // With no decorators, internal and external signature are the same
         assert_eq!(func.signature(&db), &expected_sig);
