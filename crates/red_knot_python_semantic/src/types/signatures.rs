@@ -141,22 +141,6 @@ impl<'db> Parameters<'db> {
         self.is_gradual
     }
 
-    /// Return dynamic parameters: (*args: Any, **kwargs: Any)
-    pub(crate) fn any() -> Self {
-        Self(vec![
-            Parameter {
-                name: Some(Name::new_static("args")),
-                annotated_ty: Some(Type::any()),
-                kind: ParameterKind::Variadic,
-            },
-            Parameter {
-                name: Some(Name::new_static("kwargs")),
-                annotated_ty: Some(Type::any()),
-                kind: ParameterKind::KeywordVariadic,
-            },
-        ])
-    }
-
     /// Return todo parameters: (*args: Todo, **kwargs: Todo)
     pub(crate) fn todo() -> Self {
         Self {

@@ -2411,28 +2411,31 @@ impl<'db> Type<'db> {
                         ]),
                         None,
                     ),
-                    Signature::new(Parameters::new([
-                        Parameter::new(
-                            Some("self".into()),
-                            Some(KnownClass::FunctionType.to_instance(db)),
-                            ParameterKind::PositionalOnly { default_ty: None },
-                        ),
-                        Parameter::new(
-                            Some("instance".into()),
-                            Some(not_none),
-                            ParameterKind::PositionalOnly { default_ty: None },
-                        ),
-                        Parameter::new(
-                            Some("owner".into()),
-                            Some(UnionType::from_elements(
-                                db,
-                                [KnownClass::Type.to_instance(db), Type::none(db)],
-                            )),
-                            ParameterKind::PositionalOnly {
-                                default_ty: Some(Type::none(db)),
-                            },
-                        ),
-                    ])),
+                    Signature::new(
+                        Parameters::new([
+                            Parameter::new(
+                                Some("self".into()),
+                                Some(KnownClass::FunctionType.to_instance(db)),
+                                ParameterKind::PositionalOnly { default_ty: None },
+                            ),
+                            Parameter::new(
+                                Some("instance".into()),
+                                Some(not_none),
+                                ParameterKind::PositionalOnly { default_ty: None },
+                            ),
+                            Parameter::new(
+                                Some("owner".into()),
+                                Some(UnionType::from_elements(
+                                    db,
+                                    [KnownClass::Type.to_instance(db), Type::none(db)],
+                                )),
+                                ParameterKind::PositionalOnly {
+                                    default_ty: Some(Type::none(db)),
+                                },
+                            ),
+                        ]),
+                        None,
+                    ),
                 ]);
 
                 let mut binding = bind_call(db, arguments, &overloads, self);
@@ -2784,7 +2787,8 @@ impl<'db> Type<'db> {
             // TODO annotated return type on `__new__` or metaclass `__call__`
             // TODO check call vs signatures of `__new__` and/or `__init__`
             Type::ClassLiteral(ClassLiteralType { .. }) => {
-                let signature = Signature::new(Parameters::any(), Some(self.to_instance(db)));
+                let signature =
+                    Signature::new(Parameters::gradual_form(), Some(self.to_instance(db)));
                 let binding = bind_call(db, arguments, &signature.into(), self);
                 binding.into_outcome()
             }
