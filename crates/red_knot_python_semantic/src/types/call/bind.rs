@@ -7,7 +7,7 @@ use crate::types::diagnostic::{
     TOO_MANY_POSITIONAL_ARGUMENTS, UNKNOWN_ARGUMENT,
 };
 use crate::types::signatures::Parameter;
-use crate::types::{todo_type, CallableType, UnionType};
+use crate::types::{CallableType, UnionType};
 use ruff_db::diagnostic::{OldSecondaryDiagnosticMessage, Span};
 use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
@@ -290,23 +290,6 @@ pub(crate) struct OverloadBinding<'db> {
 }
 
 impl<'db> OverloadBinding<'db> {
-    // TODO remove this constructor and construct always from `bind_call`
-    pub(crate) fn into_binding(self) -> CallBinding<'db> {
-        CallBinding {
-            callable_ty: todo_type!("CallBinding::from_return_type"),
-            overloads: vec![self].into_boxed_slice(),
-        }
-    }
-
-    // TODO remove this constructor and construct always from `bind_call`
-    pub(crate) fn from_return_type(return_ty: Type<'db>) -> Self {
-        Self {
-            return_ty,
-            parameter_tys: Box::default(),
-            errors: vec![],
-        }
-    }
-
     pub(crate) fn set_return_type(&mut self, return_ty: Type<'db>) {
         self.return_ty = return_ty;
     }

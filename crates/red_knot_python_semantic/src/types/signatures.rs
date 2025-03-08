@@ -33,6 +33,15 @@ impl<'db> Overloads<'db> {
         }
     }
 
+    /// Return a signature for a dynamic callable
+    pub(crate) fn dynamic(ty: Type<'db>) -> Self {
+        let signature = Signature {
+            parameters: Parameters::gradual_form(),
+            return_ty: Some(ty),
+        };
+        signature.into()
+    }
+
     /// Return a todo signature: (*args: Todo, **kwargs: Todo) -> Todo
     #[allow(unused_variables)] // 'reason' only unused in debug builds
     pub(crate) fn todo(reason: &'static str) -> Self {

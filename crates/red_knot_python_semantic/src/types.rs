@@ -30,7 +30,7 @@ use crate::semantic_index::symbol::ScopeId;
 use crate::semantic_index::{imported_modules, semantic_index};
 use crate::suppression::check_suppressions;
 use crate::symbol::{imported_symbol, Boundness, Symbol, SymbolAndQualifiers};
-use crate::types::call::{bind_call, CallArguments, CallOutcome, OverloadBinding, UnionCallError};
+use crate::types::call::{bind_call, CallArguments, CallOutcome, UnionCallError};
 use crate::types::class_base::ClassBase;
 use crate::types::diagnostic::{INVALID_TYPE_FORM, UNSUPPORTED_BOOL_CONVERSION};
 use crate::types::infer::infer_unpack_types;
@@ -2833,9 +2833,11 @@ impl<'db> Type<'db> {
 
             // Dynamic types are callable, and the return type is the same dynamic type. Similarly,
             // `Never` is always callable and returns `Never`.
-            Type::Dynamic(_) | Type::Never => OverloadBinding::from_return_type(self)
-                .into_binding()
-                .into_outcome(),
+            Type::Dynamic(_) | Type::Never => {
+                let overloads = Overloads::dynamic(self);
+                let binding = bind_call(db, arguments, &overloads, self);
+                binding.into_outcome()
+            }
 
             Type::Union(union) => {
                 CallOutcome::try_call_union(db, union, |element| element.try_call(db, arguments))
