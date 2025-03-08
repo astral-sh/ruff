@@ -6416,8 +6416,14 @@ impl<'db> TypeInferenceBuilder<'db> {
                 // TODO: Support `Concatenate[...]`
                 Parameters::todo()
             }
+            ast::Expr::Name(name) if name.is_invalid() => {
+                // This is a special case to avoid raising the error suggesting what the first
+                // argument should be. This only happens when there's already a syntax error like
+                // `Callable[]`.
+                return Err(());
+            }
             _ => {
-                // TODO: Check whether `Expr::Name` is a parameter specification
+                // TODO: Check whether `Expr::Name` is a ParamSpec
                 self.context.report_lint(
                     &INVALID_TYPE_FORM,
                     parameters,

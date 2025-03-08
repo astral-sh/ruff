@@ -124,12 +124,6 @@ from typing import Callable
 
 def gradual_form(c: Callable[..., str]):
     reveal_type(c)  # revealed: (...) -> str
-
-# TODO: This doesn't work yet as it requires understanding `lambda` expressions but it doesn't raise
-# any errors because it's a `todo` type.
-gradual_form(lambda: "hello")
-gradual_form(lambda x: "hello")
-gradual_form(lambda x, y: "hello")
 ```
 
 ## Using `typing.Concatenate`

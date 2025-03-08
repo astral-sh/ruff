@@ -101,7 +101,6 @@ from typing import Callable
 
 # error: [invalid-syntax] "Expected index or slice expression"
 # error: [invalid-type-form] "Special form `typing.Callable` expected exactly two arguments (parameter types and return type)"
-# error: [invalid-type-form] "The first argument to `Callable` must be either a list of types, ParamSpec, Concatenate, or `...`"
 def _(c: Callable[]):
     reveal_type(c)  # revealed: (...) -> Unknown
 ```

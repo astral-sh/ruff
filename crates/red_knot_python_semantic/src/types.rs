@@ -1265,7 +1265,8 @@ impl<'db> Type<'db> {
                 .iter()
                 .all(|elem| elem.is_fully_static(db)),
             Type::Callable(CallableType::General(_)) => {
-                // TODO: `Callable[..., str]` is not fully static
+                // TODO: `Callable` is not fully static when the parameter argument is `...` or
+                // when any parameter type or return type is not fully static.
                 false
             }
         }
@@ -1410,7 +1411,7 @@ impl<'db> Type<'db> {
                     .static_member(db, name)
             }
             Type::Callable(CallableType::General(_)) => {
-                // TODO
+                // TODO: Implement static member lookup for general callable types
                 Symbol::todo("static member lookup on general callable type")
             }
 
@@ -2701,7 +2702,7 @@ impl<'db> Type<'db> {
                 KnownClass::WrapperDescriptorType.to_class_literal(db)
             }
             Type::Callable(CallableType::General(_)) => {
-                // TODO
+                // TODO: Get the meta type
                 todo_type!(".to_meta_type() for general callable type")
             }
             Type::ModuleLiteral(_) => KnownClass::ModuleType.to_class_literal(db),

@@ -123,7 +123,9 @@ impl<'db> Parameters<'db> {
 
     /// Return parameters that represents a gradual form using `...` as the only parameter.
     ///
-    /// Internally, this is represented as `(*Any, **Any)` that accepts parameters of any type.
+    /// Internally, this is represented as `(*Any, **Any)` that accepts parameters of type [`Any`].
+    ///
+    /// [`Any`]: crate::types::DynamicType::Any
     pub(crate) fn gradual_form() -> Self {
         Self {
             value: vec![
@@ -142,17 +144,22 @@ impl<'db> Parameters<'db> {
         }
     }
 
-    /// Return parameters that accepts any arguments i.e., `(*args: Unknown, **kwargs: Unknown)`
+    /// Return parameters that represents an unknown list of parameters.
+    ///
+    /// Internally, this is represented as `(*Unknown, **Unknown)` that accepts parameters of type
+    /// [`Unknown`].
+    ///
+    /// [`Unknown`]: crate::types::DynamicType::Unknown
     pub(crate) fn unknown() -> Self {
         Self {
             value: vec![
                 Parameter {
-                    name: Some(Name::new_static("args")),
+                    name: None,
                     annotated_ty: Some(Type::Dynamic(DynamicType::Unknown)),
                     kind: ParameterKind::Variadic,
                 },
                 Parameter {
-                    name: Some(Name::new_static("kwargs")),
+                    name: None,
                     annotated_ty: Some(Type::Dynamic(DynamicType::Unknown)),
                     kind: ParameterKind::KeywordVariadic,
                 },
