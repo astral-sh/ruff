@@ -1184,7 +1184,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
             }
             // TODO: Protocol / abstract methods can have empty bodies
-            if (self.in_stub() || is_overloaded) && is_suite_empty(&function.body) {
+            if (self.in_stub() || is_overloaded)
+                && self.types.return_types_and_ranges.is_empty()
+                && is_suite_empty(&function.body)
+            {
                 return;
             }
             for invalid in self
