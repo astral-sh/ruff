@@ -1945,7 +1945,7 @@ impl<'db> Type<'db> {
                 ]);
 
                 let mut binding = bind_call(db, arguments, &overloads, self);
-                let Some(overload) = binding.matching_overload_mut() else {
+                let Some((_, overload)) = binding.matching_overload_mut() else {
                     return Err(CallError::BindingError { binding });
                 };
 
@@ -2029,7 +2029,7 @@ impl<'db> Type<'db> {
                 ]);
 
                 let mut binding = bind_call(db, arguments, &overloads, self);
-                let Some(overload) = binding.matching_overload_mut() else {
+                let Some((_, overload)) = binding.matching_overload_mut() else {
                     return Err(CallError::BindingError { binding });
                 };
 
@@ -2067,7 +2067,7 @@ impl<'db> Type<'db> {
             }
             Type::FunctionLiteral(function_type) => {
                 let mut binding = bind_call(db, arguments, function_type.signature(db), self);
-                let Some(overload) = binding.matching_overload_mut() else {
+                let Some((_, overload)) = binding.matching_overload_mut() else {
                     return Err(CallError::BindingError { binding });
                 };
 
@@ -2216,7 +2216,7 @@ impl<'db> Type<'db> {
                 );
 
                 let mut binding = bind_call(db, arguments, &signature.into(), self);
-                let Some(overload) = binding.matching_overload_mut() else {
+                let Some((_, overload)) = binding.matching_overload_mut() else {
                     return Err(CallError::BindingError { binding });
                 };
                 overload.set_return_type(
@@ -2228,17 +2228,68 @@ impl<'db> Type<'db> {
                 binding.into_outcome()
             }
 
+            Type::ClassLiteral(ClassLiteralType { class })
+                if class.is_known(db, KnownClass::Str) =>
+            {
+                // ```py
+                // class str(Sequence[str]):
+                //     @overload
+                //     def __new__(cls, object: object = ...) -> Self: ...
+                //     @overload
+                //     def __new__(cls, object: ReadableBuffer, encoding: str = ..., errors: str = ...) -> Self: ...
+                // ```
+                let overloads = Overloads::from_overloads([
+                    Signature::new(
+                        Parameters::new([Parameter::new(
+                            Some("o".into()),
+                            Some(Type::any()),
+                            ParameterKind::PositionalOnly {
+                                default_ty: Some(Type::string_literal(db, "")),
+                            },
+                        )]),
+                        Some(self.to_instance(db)),
+                    ),
+                    Signature::new(
+                        Parameters::new([
+                            Parameter::new(
+                                Some("o".into()),
+                                Some(Type::any()), // TODO: ReadableBuffer
+                                ParameterKind::PositionalOnly { default_ty: None },
+                            ),
+                            Parameter::new(
+                                Some("encoding".into()),
+                                Some(KnownClass::Str.to_instance(db)),
+                                ParameterKind::PositionalOnly { default_ty: None },
+                            ),
+                            Parameter::new(
+                                Some("errors".into()),
+                                Some(KnownClass::Str.to_instance(db)),
+                                ParameterKind::PositionalOnly { default_ty: None },
+                            ),
+                        ]),
+                        Some(self.to_instance(db)),
+                    ),
+                ]);
+
+                let mut binding = bind_call(db, arguments, &overloads, self);
+                let Some((index, overload)) = binding.matching_overload_mut() else {
+                    return Err(CallError::BindingError { binding });
+                };
+                if index == 0 {
+                    overload.set_return_type(
+                        arguments
+                            .first_argument()
+                            .map(|arg| arg.str(db))
+                            .unwrap_or_else(|| Type::string_literal(db, "")),
+                    );
+                }
+                binding.into_outcome()
+            }
+
             // TODO annotated return type on `__new__` or metaclass `__call__`
             // TODO check call vs signatures of `__new__` and/or `__init__`
             Type::ClassLiteral(ClassLiteralType { class }) => {
                 let overload = OverloadBinding::from_return_type(match class.known(db) {
-                    // TODO: Don't ignore the second and third arguments to `str`
-                    //   https://github.com/astral-sh/ruff/pull/16161#discussion_r1958425568
-                    Some(KnownClass::Str) => arguments
-                        .first_argument()
-                        .map(|arg| arg.str(db))
-                        .unwrap_or_else(|| Type::string_literal(db, "")),
-
                     Some(KnownClass::Type) => arguments
                         .exactly_one_argument()
                         .map(|arg| arg.to_meta_type(db))

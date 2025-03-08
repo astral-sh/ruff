@@ -3423,7 +3423,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         continue;
                     };
 
-                    let Some(overload) = binding.matching_overload() else {
+                    let Some((_, overload)) = binding.matching_overload() else {
                         continue;
                     };
 

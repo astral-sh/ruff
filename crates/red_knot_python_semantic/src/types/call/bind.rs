@@ -200,24 +200,26 @@ impl<'db> CallBinding<'db> {
 
     /// Returns the overload that matched for this call binding. Returns `None` if none of the
     /// overloads matched.
-    pub(crate) fn matching_overload(&self) -> Option<&OverloadBinding<'db>> {
+    pub(crate) fn matching_overload(&self) -> Option<(usize, &OverloadBinding<'db>)> {
         self.overloads
             .iter()
-            .find(|overload| !overload.has_binding_errors())
+            .enumerate()
+            .find(|(_, overload)| !overload.has_binding_errors())
     }
 
     /// Returns the overload that matched for this call binding. Returns `None` if none of the
     /// overloads matched.
-    pub(crate) fn matching_overload_mut(&mut self) -> Option<&mut OverloadBinding<'db>> {
+    pub(crate) fn matching_overload_mut(&mut self) -> Option<(usize, &mut OverloadBinding<'db>)> {
         self.overloads
             .iter_mut()
-            .find(|overload| !overload.has_binding_errors())
+            .enumerate()
+            .find(|(_, overload)| !overload.has_binding_errors())
     }
 
     /// Returns the return type of the matching overload for this binding. If none of the overloads
     /// matched, returns a union of the return types of each overload.
     pub(crate) fn return_type(&self, db: &'db dyn Db) -> Type<'db> {
-        if let Some(overload) = self.matching_overload() {
+        if let Some((_, overload)) = self.matching_overload() {
             return overload.return_type();
         }
         if let [overload] = self.overloads.as_ref() {
