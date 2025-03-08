@@ -264,7 +264,7 @@ declare_lint! {
 declare_lint! {
     /// TODO #14889
     pub(crate) static INVALID_RETURN_TYPE = {
-        summary: "detects the return value that can't be assigned to the return type",
+        summary: "detects a returned value that can't be assigned to the function's annotated return type",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
@@ -1096,6 +1096,21 @@ pub(super) fn report_invalid_return_type(
                 expected_ty.display(context.db())
             ),
         )],
+    );
+}
+
+pub(super) fn report_implicit_return_type(
+    context: &InferContext,
+    range: impl Ranged,
+    expected_ty: Type,
+) {
+    context.report_lint(
+        &INVALID_RETURN_TYPE,
+        range,
+        format_args!(
+            "Function can implicitly return `None`, which is not assignable to return type `{}`",
+            expected_ty.display(context.db())
+        ),
     );
 }
 

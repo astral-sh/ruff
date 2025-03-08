@@ -346,8 +346,11 @@ reveal_type(C().y)  # revealed: Unknown | str
 
 ```py
 class ContextManager:
-    def __enter__(self) -> int | None: ...
-    def __exit__(self, exc_type, exc_value, traceback) -> None: ...
+    def __enter__(self) -> int | None:
+        return 1
+
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
+        pass
 
 class C:
     def __init__(self) -> None:

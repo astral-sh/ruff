@@ -56,7 +56,7 @@ use crate::symbol::{
 };
 use crate::types::call::{Argument, CallArguments, UnionCallError};
 use crate::types::diagnostic::{
-    report_invalid_arguments_to_annotated, report_invalid_assignment,
+    report_implicit_return_type, report_invalid_arguments_to_annotated, report_invalid_assignment,
     report_invalid_attribute_assignment, report_invalid_return_type, report_unresolved_module,
     TypeCheckDiagnostics, CALL_NON_CALLABLE, CALL_POSSIBLY_UNBOUND_METHOD,
     CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS, CYCLIC_CLASS_DEFINITION, DIVISION_BY_ZERO,
@@ -1056,7 +1056,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         );
     }
 
-    fn set_return_type(&mut self, ty: Type<'db>, range: TextRange) {
+    fn record_return_type(&mut self, ty: Type<'db>, range: TextRange) {
         self.types
             .return_types_and_ranges
             .push(TypeAndRange { ty, range });
@@ -1135,50 +1135,85 @@ impl<'db> TypeInferenceBuilder<'db> {
                         } else {
                             return false;
                         }
+                    } else {
+                        return false;
                     }
                 }
                 saw_ellipsis
             }
-            if is_suite_empty(&function.body) {
+            fn does_suite_always_return(suite: &[ast::Stmt]) -> bool {
+                match suite.last() {
+                    Some(ast::Stmt::Return(_) | ast::Stmt::Raise(_)) => true,
+                    Some(ast::Stmt::If(if_stmt)) => {
+                        !if_stmt.elif_else_clauses.is_empty()
+                            && does_suite_always_return(&if_stmt.body)
+                            && if_stmt
+                                .elif_else_clauses
+                                .iter()
+                                .all(|clause| does_suite_always_return(&clause.body))
+                    }
+                    Some(ast::Stmt::While(while_stmt)) => {
+                        does_suite_always_return(&while_stmt.body)
+                            && does_suite_always_return(&while_stmt.orelse)
+                    }
+                    Some(ast::Stmt::For(for_stmt)) => {
+                        does_suite_always_return(&for_stmt.body)
+                            && does_suite_always_return(&for_stmt.orelse)
+                    }
+                    Some(ast::Stmt::Try(try_stmt)) => {
+                        does_suite_always_return(&try_stmt.body)
+                            && does_suite_always_return(&try_stmt.orelse)
+                            && does_suite_always_return(&try_stmt.finalbody)
+                    }
+                    Some(ast::Stmt::With(with_stmt)) => does_suite_always_return(&with_stmt.body),
+                    Some(ast::Stmt::Match(match_stmt)) => match_stmt
+                        .cases
+                        .iter()
+                        .all(|case| does_suite_always_return(&case.body)),
+                    _ => false,
+                }
+            }
+            let mut is_overloaded = false;
+            for decorator in &function.decorator_list {
+                let deco = self.file_expression_type(&decorator.expression);
+                if deco
+                    .into_function_literal()
+                    .is_some_and(|f| f.is_known(self.db(), KnownFunction::Overload))
+                {
+                    is_overloaded = true;
+                }
+            }
+            // TODO: Protocol / abstract methods can have empty bodies
+            if (self.in_stub() || is_overloaded) && is_suite_empty(&function.body) {
                 return;
             }
-            let inferred_ty = if self.types.return_types_and_ranges.is_empty() {
-                KnownClass::NoneType.to_instance(self.db())
-            } else {
-                UnionType::from_elements(
-                    self.db(),
-                    self.types
-                        .return_types_and_ranges
-                        .iter()
-                        .map(|ty_range| ty_range.ty),
-                )
-            };
-            if !inferred_ty.is_assignable_to(self.db(), declared_ty) {
-                let mut reported = false;
-                for invalid in self
-                    .types
-                    .return_types_and_ranges
-                    .iter()
-                    .filter(|ty_range| !ty_range.ty.is_assignable_to(self.db(), declared_ty))
-                {
-                    report_invalid_return_type(
-                        &self.context,
-                        invalid.range,
-                        function.returns.as_ref().unwrap().range(),
-                        declared_ty,
-                        invalid.ty,
-                    );
-                    reported = true;
-                }
-                if !reported {
-                    report_invalid_return_type(
-                        &self.context,
-                        function.range(),
-                        function.returns.as_ref().unwrap().range(),
-                        declared_ty,
-                        inferred_ty,
-                    );
-                }
+            for invalid in self
+                .types
+                .return_types_and_ranges
+                .iter()
+                .filter(|ty_range| !ty_range.ty.is_assignable_to(self.db(), declared_ty))
+            {
+                report_invalid_return_type(
+                    &self.context,
+                    invalid.range,
+                    function.returns.as_ref().unwrap().range(),
+                    declared_ty,
+                    invalid.ty,
+                );
+            }
+            let scope_id = self.index.node_scope(NodeWithScopeRef::Function(function));
+            let use_def = self.index.use_def_map(scope_id);
+            if use_def.can_implicit_return(self.db())
+                && !does_suite_always_return(&function.body)
+                && !KnownClass::NoneType
+                    .to_instance(self.db())
+                    .is_assignable_to(self.db(), declared_ty)
+            {
+                report_implicit_return_type(
+                    &self.context,
+                    function.returns.as_ref().unwrap().range(),
+                    declared_ty,
+                );
             }
         }
     }
@@ -2732,7 +2767,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
 
         let range = cause.as_ref().map_or(raise.range(), |cause| cause.range());
-        self.set_return_type(Type::Never, range);
+        self.record_return_type(Type::Never, range);
     }
 
     /// Given a `from .foo import bar` relative import, resolve the relative module
@@ -2911,9 +2946,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                 .value
                 .as_ref()
                 .map_or(ret.range(), |value| value.range());
-            self.set_return_type(ty, range);
+            self.record_return_type(ty, range);
         } else {
-            self.set_return_type(KnownClass::NoneType.to_instance(self.db()), ret.range());
+            self.record_return_type(KnownClass::NoneType.to_instance(self.db()), ret.range());
         }
     }
 

@@ -166,7 +166,8 @@ When a class has an explicit `metaclass` that is not a class, but is a callable 
 `type.__new__` arguments, we should return the meta type of its return type.
 
 ```py
-def f(*args, **kwargs) -> int: ...
+def f(*args, **kwargs) -> int:
+    return 1
 
 class A(metaclass=f): ...
 
