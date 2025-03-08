@@ -704,7 +704,7 @@ class ContextManager:
 
 # error: [invalid-assignment] "Not enough values to unpack (expected 3, got 2)"
 with ContextManager() as (a, b, c):
-    reveal_type(a)  # revealed: int
-    reveal_type(b)  # revealed: str
+    reveal_type(a)  # revealed: Unknown
+    reveal_type(b)  # revealed: Unknown
     reveal_type(c)  # revealed: Unknown
 ```
