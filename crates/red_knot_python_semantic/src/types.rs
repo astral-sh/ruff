@@ -2459,51 +2459,48 @@ impl<'db> Type<'db> {
                             )));
                         }
                     } else {
-                        if let Some(instance) = arguments.second_argument() {
-                            if instance.is_none(db) {
+                        match (arguments.second_argument(), arguments.third_argument()) {
+                            (Some(instance), _) if instance.is_none(db) => {
                                 overload.set_return_type(function_ty);
-                            } else {
-                                overload.set_return_type(match instance {
-                                    Type::KnownInstance(KnownInstanceType::TypeAliasType(
-                                        type_alias,
-                                    )) if arguments
-                                        .third_argument()
-                                        .and_then(Type::into_class_literal)
-                                        .is_some_and(|class_literal| {
-                                            class_literal
-                                                .class
-                                                .is_known(db, KnownClass::TypeAliasType)
-                                        })
-                                        && function.name(db) == "__name__" =>
-                                    {
-                                        Type::string_literal(db, type_alias.name(db))
-                                    }
-                                    Type::KnownInstance(KnownInstanceType::TypeVar(typevar))
-                                        if arguments
-                                            .third_argument()
-                                            .and_then(Type::into_class_literal)
-                                            .is_some_and(|class_literal| {
-                                                class_literal
-                                                    .class
-                                                    .is_known(db, KnownClass::TypeVar)
-                                            })
-                                            && function.name(db) == "__name__" =>
-                                    {
-                                        Type::string_literal(db, typevar.name(db))
-                                    }
-                                    _ => {
-                                        if function
-                                            .has_known_class_decorator(db, KnownClass::Property)
-                                        {
-                                            todo_type!("@property")
-                                        } else {
-                                            Type::Callable(CallableType::BoundMethod(
-                                                BoundMethodType::new(db, function, instance),
-                                            ))
-                                        }
-                                    }
-                                });
                             }
+
+                            (
+                                Some(Type::KnownInstance(KnownInstanceType::TypeAliasType(
+                                    type_alias,
+                                ))),
+                                Some(Type::ClassLiteral(ClassLiteralType { class })),
+                            ) if class.is_known(db, KnownClass::TypeAliasType)
+                                && function.name(db) == "__name__" =>
+                            {
+                                overload
+                                    .set_return_type(Type::string_literal(db, type_alias.name(db)));
+                            }
+
+                            (
+                                Some(Type::KnownInstance(KnownInstanceType::TypeVar(typevar))),
+                                Some(Type::ClassLiteral(ClassLiteralType { class })),
+                            ) if class.is_known(db, KnownClass::TypeVar)
+                                && function.name(db) == "__name__" =>
+                            {
+                                overload
+                                    .set_return_type(Type::string_literal(db, typevar.name(db)));
+                            }
+
+                            (Some(_), _)
+                                if function.has_known_class_decorator(db, KnownClass::Property) =>
+                            {
+                                overload.set_return_type(todo_type!("@property"));
+                            }
+
+                            (Some(instance), _) => {
+                                overload.set_return_type(Type::Callable(
+                                    CallableType::BoundMethod(BoundMethodType::new(
+                                        db, function, instance,
+                                    )),
+                                ));
+                            }
+
+                            (None, _) => {}
                         }
                     }
                 }
