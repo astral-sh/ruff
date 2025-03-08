@@ -2197,21 +2197,41 @@ impl<'db> Type<'db> {
                 binding.into_outcome()
             }
 
+            Type::ClassLiteral(ClassLiteralType { class })
+                if class.is_known(db, KnownClass::Bool) =>
+            {
+                // ```py
+                // class bool(int):
+                //     def __new__(cls, o: object = ..., /) -> Self: ...
+                // ```
+                let signature = Signature::new(
+                    Parameters::new([Parameter::new(
+                        Some("o".into()),
+                        Some(Type::any()),
+                        ParameterKind::PositionalOnly {
+                            default_ty: Some(Type::BooleanLiteral(false)),
+                        },
+                    )]),
+                    Some(self.to_instance(db)),
+                );
+
+                let mut binding = bind_call(db, arguments, &signature.into(), self);
+                let Some(overload) = binding.matching_overload_mut() else {
+                    return Err(CallError::BindingError { binding });
+                };
+                overload.set_return_type(
+                    arguments
+                        .first_argument()
+                        .map(|arg| arg.bool(db).into_type(db))
+                        .unwrap_or(Type::BooleanLiteral(false)),
+                );
+                binding.into_outcome()
+            }
+
             // TODO annotated return type on `__new__` or metaclass `__call__`
             // TODO check call vs signatures of `__new__` and/or `__init__`
             Type::ClassLiteral(ClassLiteralType { class }) => {
                 let overload = OverloadBinding::from_return_type(match class.known(db) {
-                    // TODO: We should check the call signature and error if the bool call doesn't have the
-                    //   right signature and return a binding error.
-
-                    // If the class is the builtin-bool class (for example `bool(1)`), we try to
-                    // return the specific truthiness value of the input arg, `Literal[True]` for
-                    // the example above.
-                    Some(KnownClass::Bool) => arguments
-                        .first_argument()
-                        .map(|arg| arg.bool(db).into_type(db))
-                        .unwrap_or(Type::BooleanLiteral(false)),
-
                     // TODO: Don't ignore the second and third arguments to `str`
                     //   https://github.com/astral-sh/ruff/pull/16161#discussion_r1958425568
                     Some(KnownClass::Str) => arguments
