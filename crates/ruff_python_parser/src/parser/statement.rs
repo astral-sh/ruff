@@ -5,10 +5,12 @@ use rustc_hash::{FxBuildHasher, FxHashSet};
 
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{
-    self as ast, ExceptHandler, Expr, ExprContext, IpyEscapeKind, Operator, Stmt, WithItem,
+    self as ast, ExceptHandler, Expr, ExprContext, IpyEscapeKind, Operator, PythonVersion, Stmt,
+    WithItem,
 };
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
+use crate::error::StarTupleKind;
 use crate::parser::expression::{ParsedExpr, EXPR_SET};
 use crate::parser::progress::ParserProgress;
 use crate::parser::{
@@ -388,15 +390,57 @@ impl<'src> Parser<'src> {
         // return x := 1
         // return *x and y
         let value = self.at_expr().then(|| {
-            Box::new(
-                self.parse_expression_list(ExpressionContext::starred_bitwise_or())
-                    .expr,
-            )
+            let parsed_expr = self.parse_expression_list(ExpressionContext::starred_bitwise_or());
+
+            // test_ok iter_unpack_return_py37
+            // # parse_options: {"target-version": "3.7"}
+            // rest = (4, 5, 6)
+            // def f(): return (1, 2, 3, *rest)
+
+            // test_ok iter_unpack_return_py38
+            // # parse_options: {"target-version": "3.8"}
+            // rest = (4, 5, 6)
+            // def f(): return 1, 2, 3, *rest
+
+            // test_err iter_unpack_return_py37
+            // # parse_options: {"target-version": "3.7"}
+            // rest = (4, 5, 6)
+            // def f(): return 1, 2, 3, *rest
+            self.check_tuple_unpacking(&parsed_expr, StarTupleKind::Return);
+
+            Box::new(parsed_expr.expr)
         });
 
         ast::StmtReturn {
             range: self.node_range(start),
             value,
+        }
+    }
+
+    /// Report [`UnsupportedSyntaxError`]s for each starred element in `expr` if it is an
+    /// unparenthesized tuple.
+    ///
+    /// This method can be used to check for tuple unpacking in return and yield statements, which
+    /// are only allowed in Python 3.8 and later: <https://github.com/python/cpython/issues/76298>.
+    pub(crate) fn check_tuple_unpacking(&mut self, expr: &Expr, kind: StarTupleKind) {
+        let kind = UnsupportedSyntaxErrorKind::StarTuple(kind);
+        if kind.is_supported(self.options.target_version) {
+            return;
+        }
+
+        let Expr::Tuple(ast::ExprTuple {
+            elts,
+            parenthesized: false,
+            ..
+        }) = expr
+        else {
+            return;
+        };
+
+        for elt in elts {
+            if elt.is_starred_expr() {
+                self.add_unsupported_syntax_error(kind, elt.range());
+            }
         }
     }
 
@@ -1786,6 +1830,21 @@ impl<'src> Parser<'src> {
         // x = 10
         let type_params = self.try_parse_type_params();
 
+        // test_ok function_type_params_py312
+        // # parse_options: {"target-version": "3.12"}
+        // def foo[T](): ...
+
+        // test_err function_type_params_py311
+        // # parse_options: {"target-version": "3.11"}
+        // def foo[T](): ...
+        // def foo[](): ...
+        if let Some(ast::TypeParams { range, .. }) = &type_params {
+            self.add_unsupported_syntax_error(
+                UnsupportedSyntaxErrorKind::TypeParameterList,
+                *range,
+            );
+        }
+
         // test_ok function_def_parameter_range
         // def foo(
         //     first: int,
@@ -1899,6 +1958,21 @@ impl<'src> Parser<'src> {
         //     pass
         // x = 10
         let type_params = self.try_parse_type_params();
+
+        // test_ok class_type_params_py312
+        // # parse_options: {"target-version": "3.12"}
+        // class Foo[S: (str, bytes), T: float, *Ts, **P]: ...
+
+        // test_err class_type_params_py311
+        // # parse_options: {"target-version": "3.11"}
+        // class Foo[S: (str, bytes), T: float, *Ts, **P]: ...
+        // class Foo[]: ...
+        if let Some(ast::TypeParams { range, .. }) = &type_params {
+            self.add_unsupported_syntax_error(
+                UnsupportedSyntaxErrorKind::TypeParameterList,
+                *range,
+            );
+        }
 
         // test_ok class_def_arguments
         // class Foo: ...
@@ -2569,6 +2643,56 @@ impl<'src> Parser<'src> {
             let decorator_start = self.node_start();
             self.bump(TokenKind::At);
 
+            let parsed_expr = self.parse_named_expression_or_higher(ExpressionContext::default());
+
+            if self.options.target_version < PythonVersion::PY39 {
+                // test_ok decorator_expression_dotted_ident_py38
+                // # parse_options: { "target-version": "3.8" }
+                // @buttons.clicked.connect
+                // def spam(): ...
+
+                // test_ok decorator_expression_identity_hack_py38
+                // # parse_options: { "target-version": "3.8" }
+                // def _(x): return x
+                // @_(buttons[0].clicked.connect)
+                // def spam(): ...
+
+                // test_ok decorator_expression_eval_hack_py38
+                // # parse_options: { "target-version": "3.8" }
+                // @eval("buttons[0].clicked.connect")
+                // def spam(): ...
+
+                // test_ok decorator_expression_py39
+                // # parse_options: { "target-version": "3.9" }
+                // @buttons[0].clicked.connect
+                // def spam(): ...
+                // @(x := lambda x: x)(foo)
+                // def bar(): ...
+
+                // test_err decorator_expression_py38
+                // # parse_options: { "target-version": "3.8" }
+                // @buttons[0].clicked.connect
+                // def spam(): ...
+
+                // test_err decorator_named_expression_py37
+                // # parse_options: { "target-version": "3.7" }
+                // @(x := lambda x: x)(foo)
+                // def bar(): ...
+                let allowed_decorator = match &parsed_expr.expr {
+                    Expr::Call(expr_call) => {
+                        helpers::is_name_or_attribute_expression(&expr_call.func)
+                    }
+                    expr => helpers::is_name_or_attribute_expression(expr),
+                };
+
+                if !allowed_decorator {
+                    self.add_unsupported_syntax_error(
+                        UnsupportedSyntaxErrorKind::RelaxedDecorator,
+                        parsed_expr.range(),
+                    );
+                }
+            }
+
             // test_err decorator_invalid_expression
             // @*x
             // @(*x)
@@ -2576,7 +2700,6 @@ impl<'src> Parser<'src> {
             // @yield x
             // @yield from x
             // def foo(): ...
-            let parsed_expr = self.parse_named_expression_or_higher(ExpressionContext::default());
 
             decorators.push(ast::Decorator {
                 expression: parsed_expr.expr,
@@ -3020,6 +3143,21 @@ impl<'src> Parser<'src> {
                         // first time, otherwise it's a user error.
                         std::mem::swap(&mut parameters.args, &mut parameters.posonlyargs);
                         seen_positional_only_separator = true;
+
+                        // test_ok pos_only_py38
+                        // # parse_options: {"target-version": "3.8"}
+                        // def foo(a, /): ...
+
+                        // test_err pos_only_py37
+                        // # parse_options: {"target-version": "3.7"}
+                        // def foo(a, /): ...
+                        // def foo(a, /, b, /): ...
+                        // def foo(a, *args, /, b): ...
+                        // def foo(a, //): ...
+                        parser.add_unsupported_syntax_error(
+                            UnsupportedSyntaxErrorKind::PositionalOnlyParameter,
+                            slash_range,
+                        );
                     }
 
                     last_keyword_only_separator_range = None;

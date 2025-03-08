@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.9.10
+
+### Preview features
+
+- \[`ruff`\] Add new rule `RUF059`: Unused unpacked assignment ([#16449](https://github.com/astral-sh/ruff/pull/16449))
+- \[`syntax-errors`\] Detect assignment expressions before Python 3.8 ([#16383](https://github.com/astral-sh/ruff/pull/16383))
+- \[`syntax-errors`\] Named expressions in decorators before Python 3.9 ([#16386](https://github.com/astral-sh/ruff/pull/16386))
+- \[`syntax-errors`\] Parenthesized keyword argument names after Python 3.8 ([#16482](https://github.com/astral-sh/ruff/pull/16482))
+- \[`syntax-errors`\] Positional-only parameters before Python 3.8 ([#16481](https://github.com/astral-sh/ruff/pull/16481))
+- \[`syntax-errors`\] Tuple unpacking in `return` and `yield` before Python 3.8 ([#16485](https://github.com/astral-sh/ruff/pull/16485))
+- \[`syntax-errors`\] Type parameter defaults before Python 3.13 ([#16447](https://github.com/astral-sh/ruff/pull/16447))
+- \[`syntax-errors`\] Type parameter lists before Python 3.12 ([#16479](https://github.com/astral-sh/ruff/pull/16479))
+- \[`syntax-errors`\] `except*` before Python 3.11 ([#16446](https://github.com/astral-sh/ruff/pull/16446))
+- \[`syntax-errors`\] `type` statements before Python 3.12 ([#16478](https://github.com/astral-sh/ruff/pull/16478))
+
+### Bug fixes
+
+- Escape template filenames in glob patterns in configuration ([#16407](https://github.com/astral-sh/ruff/pull/16407))
+- \[`flake8-simplify`\] Exempt unittest context methods for `SIM115` rule ([#16439](https://github.com/astral-sh/ruff/pull/16439))
+- Formatter: Fix syntax error location in notebooks ([#16499](https://github.com/astral-sh/ruff/pull/16499))
+- \[`pyupgrade`\] Do not offer fix when at least one target is `global`/`nonlocal` (`UP028`) ([#16451](https://github.com/astral-sh/ruff/pull/16451))
+- \[`flake8-builtins`\] Ignore variables matching module attribute names (`A001`) ([#16454](https://github.com/astral-sh/ruff/pull/16454))
+- \[`pylint`\] Convert `code` keyword argument to a positional argument in fix for (`PLR1722`) ([#16424](https://github.com/astral-sh/ruff/pull/16424))
+
+### CLI
+
+- Move rule code from `description` to `check_name` in GitLab output serializer ([#16437](https://github.com/astral-sh/ruff/pull/16437))
+
+### Documentation
+
+- \[`pydocstyle`\] Clarify that `D417` only checks docstrings with an arguments section ([#16494](https://github.com/astral-sh/ruff/pull/16494))
+
 ## 0.9.9
 
 ### Preview features

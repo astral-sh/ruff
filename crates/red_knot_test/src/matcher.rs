@@ -1,10 +1,10 @@
-//! Match [`Diagnostic`]s against assertions and produce test failure messages for any
-//! mismatches.
+//! Match [`OldDiagnosticTrait`]s against assertions and produce test failure
+//! messages for any mismatches.
 use crate::assertion::{InlineFileAssertions, ParsedAssertion, UnparsedAssertion};
 use crate::db::Db;
 use crate::diagnostic::SortedDiagnostics;
 use colored::Colorize;
-use ruff_db::diagnostic::{Diagnostic, DiagnosticAsStrError, DiagnosticId};
+use ruff_db::diagnostic::{DiagnosticAsStrError, DiagnosticId, OldDiagnosticTrait};
 use ruff_db::files::File;
 use ruff_db::source::{line_index, source_text, SourceText};
 use ruff_source_file::{LineIndex, OneIndexed};
@@ -53,7 +53,7 @@ pub(super) fn match_file<T>(
     diagnostics: impl IntoIterator<Item = T>,
 ) -> Result<(), FailuresByLine>
 where
-    T: Diagnostic,
+    T: OldDiagnosticTrait,
 {
     // Parse assertions from comments in the file, and get diagnostics from the file; both
     // ordered by line number.
@@ -155,7 +155,7 @@ impl Unmatched for ParsedAssertion<'_> {
     }
 }
 
-fn maybe_add_undefined_reveal_clarification<T: Diagnostic>(
+fn maybe_add_undefined_reveal_clarification<T: OldDiagnosticTrait>(
     diagnostic: &T,
     original: std::fmt::Arguments,
 ) -> String {
@@ -171,7 +171,7 @@ fn maybe_add_undefined_reveal_clarification<T: Diagnostic>(
 
 impl<T> Unmatched for T
 where
-    T: Diagnostic,
+    T: OldDiagnosticTrait,
 {
     fn unmatched(&self) -> String {
         let id = self.id();
@@ -188,7 +188,7 @@ where
 
 impl<T> UnmatchedWithColumn for T
 where
-    T: Diagnostic,
+    T: OldDiagnosticTrait,
 {
     fn unmatched_with_column(&self, column: OneIndexed) -> String {
         let id = self.id();
@@ -226,10 +226,12 @@ impl Matcher {
         }
     }
 
-    /// Check a slice of [`Diagnostic`]s against a slice of [`UnparsedAssertion`]s.
+    /// Check a slice of [`OldDiagnosticTrait`]s against a slice of
+    /// [`UnparsedAssertion`]s.
     ///
-    /// Return vector of [`Unmatched`] for any unmatched diagnostics or assertions.
-    fn match_line<'a, 'b, T: Diagnostic + 'a>(
+    /// Return vector of [`Unmatched`] for any unmatched diagnostics or
+    /// assertions.
+    fn match_line<'a, 'b, T: OldDiagnosticTrait + 'a>(
         &self,
         diagnostics: &'a [T],
         assertions: &'a [UnparsedAssertion<'b>],
@@ -261,7 +263,7 @@ impl Matcher {
         }
     }
 
-    fn column<T: Diagnostic>(&self, diagnostic: &T) -> OneIndexed {
+    fn column<T: OldDiagnosticTrait>(&self, diagnostic: &T) -> OneIndexed {
         diagnostic
             .span()
             .and_then(|span| span.range())
@@ -273,7 +275,7 @@ impl Matcher {
             .unwrap_or(OneIndexed::from_zero_indexed(0))
     }
 
-    /// Check if `assertion` matches any [`Diagnostic`]s in `unmatched`.
+    /// Check if `assertion` matches any [`OldDiagnosticTrait`]s in `unmatched`.
     ///
     /// If so, return `true` and remove the matched diagnostics from `unmatched`. Otherwise, return
     /// `false`.
@@ -283,7 +285,11 @@ impl Matcher {
     ///
     /// A `Revealed` assertion must match a revealed-type diagnostic, and may also match an
     /// undefined-reveal diagnostic, if present.
-    fn matches<T: Diagnostic>(&self, assertion: &ParsedAssertion, unmatched: &mut Vec<&T>) -> bool {
+    fn matches<T: OldDiagnosticTrait>(
+        &self,
+        assertion: &ParsedAssertion,
+        unmatched: &mut Vec<&T>,
+    ) -> bool {
         match assertion {
             ParsedAssertion::Error(error) => {
                 let position = unmatched.iter().position(|diagnostic| {
@@ -341,9 +347,9 @@ impl Matcher {
 #[cfg(test)]
 mod tests {
     use super::FailuresByLine;
-    use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity, Span};
+    use ruff_db::diagnostic::{DiagnosticId, OldDiagnosticTrait, Severity, Span};
     use ruff_db::files::{system_path_to_file, File};
-    use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
+    use ruff_db::system::DbWithWritableSystem as _;
     use ruff_python_trivia::textwrap::dedent;
     use ruff_source_file::OneIndexed;
     use ruff_text_size::TextRange;
@@ -383,7 +389,7 @@ mod tests {
         file: File,
     }
 
-    impl Diagnostic for TestDiagnostic {
+    impl OldDiagnosticTrait for TestDiagnostic {
         fn id(&self) -> DiagnosticId {
             self.id
         }
@@ -407,7 +413,7 @@ mod tests {
     ) -> Result<(), FailuresByLine> {
         colored::control::set_override(false);
 
-        let mut db = crate::db::Db::setup(SystemPathBuf::from("/src"));
+        let mut db = crate::db::Db::setup();
         db.write_file("/src/test.py", source).unwrap();
         let file = system_path_to_file(&db, "/src/test.py").unwrap();
 

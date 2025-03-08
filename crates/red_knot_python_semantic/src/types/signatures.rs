@@ -431,12 +431,13 @@ mod tests {
     use crate::db::tests::{setup_db, TestDb};
     use crate::symbol::global_symbol;
     use crate::types::{FunctionType, KnownClass};
-    use ruff_db::system::DbWithTestSystem;
+    use ruff_db::system::DbWithWritableSystem as _;
 
     #[track_caller]
     fn get_function_f<'db>(db: &'db TestDb, file: &'static str) -> FunctionType<'db> {
         let module = ruff_db::files::system_path_to_file(db, file).unwrap();
         global_symbol(db, module, "f")
+            .symbol
             .expect_type()
             .expect_function_literal()
     }

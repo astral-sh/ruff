@@ -12,7 +12,7 @@ import inspect
 
 class Descriptor:
     def __get__(self, instance, owner) -> str:
-        return 1
+        return "a"
 
 class C:
     normal: int = 1
@@ -59,7 +59,7 @@ import sys
 reveal_type(inspect.getattr_static(sys, "platform"))  # revealed: LiteralString
 reveal_type(inspect.getattr_static(inspect, "getattr_static"))  # revealed: Literal[getattr_static]
 
-reveal_type(inspect.getattr_static(1, "real"))  # revealed: Literal[1]
+reveal_type(inspect.getattr_static(1, "real"))  # revealed: Literal[real]
 ```
 
 (Implicit) instance attributes can also be accessed through `inspect.getattr_static`:
@@ -70,6 +70,23 @@ class D:
         self.instance_attr: int = 1
 
 reveal_type(inspect.getattr_static(D(), "instance_attr"))  # revealed: int
+```
+
+And attributes on metaclasses can be accessed when probing the class:
+
+```py
+class Meta(type):
+    attr: int = 1
+
+class E(metaclass=Meta): ...
+
+reveal_type(inspect.getattr_static(E, "attr"))  # revealed: int
+```
+
+Metaclass attributes can not be added when probing an instance of the class:
+
+```py
+reveal_type(inspect.getattr_static(E(), "attr", "non_existent"))  # revealed: Literal["non_existent"]
 ```
 
 ## Error cases

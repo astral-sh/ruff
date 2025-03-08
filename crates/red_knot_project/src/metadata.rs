@@ -321,7 +321,7 @@ mod tests {
 
         system
             .memory_file_system()
-            .write_files([(root.join("foo.py"), ""), (root.join("bar.py"), "")])
+            .write_files_all([(root.join("foo.py"), ""), (root.join("bar.py"), "")])
             .context("Failed to write files")?;
 
         let project =
@@ -349,7 +349,7 @@ mod tests {
 
         system
             .memory_file_system()
-            .write_files([
+            .write_files_all([
                 (
                     root.join("pyproject.toml"),
                     r#"
@@ -393,7 +393,7 @@ mod tests {
 
         system
             .memory_file_system()
-            .write_files([
+            .write_files_all([
                 (
                     root.join("pyproject.toml"),
                     r#"
@@ -432,7 +432,7 @@ expected `.`, `]`
 
         system
             .memory_file_system()
-            .write_files([
+            .write_files_all([
                 (
                     root.join("pyproject.toml"),
                     r#"
@@ -482,7 +482,7 @@ expected `.`, `]`
 
         system
             .memory_file_system()
-            .write_files([
+            .write_files_all([
                 (
                     root.join("pyproject.toml"),
                     r#"
@@ -532,7 +532,7 @@ expected `.`, `]`
 
         system
             .memory_file_system()
-            .write_files([
+            .write_files_all([
                 (
                     root.join("pyproject.toml"),
                     r#"
@@ -572,7 +572,7 @@ expected `.`, `]`
 
         system
             .memory_file_system()
-            .write_files([
+            .write_files_all([
                 (
                     root.join("pyproject.toml"),
                     r#"
@@ -623,7 +623,7 @@ expected `.`, `]`
 
         system
             .memory_file_system()
-            .write_files([
+            .write_files_all([
                 (
                     root.join("pyproject.toml"),
                     r#"
@@ -673,7 +673,7 @@ expected `.`, `]`
 
         system
             .memory_file_system()
-            .write_file(
+            .write_file_all(
                 root.join("pyproject.toml"),
                 r#"
                 [project]
@@ -703,7 +703,7 @@ expected `.`, `]`
 
         system
             .memory_file_system()
-            .write_file(
+            .write_file_all(
                 root.join("pyproject.toml"),
                 r#"
                 [project]
@@ -735,7 +735,7 @@ expected `.`, `]`
 
         system
             .memory_file_system()
-            .write_file(
+            .write_file_all(
                 root.join("pyproject.toml"),
                 r#"
                 [project]
@@ -765,7 +765,7 @@ expected `.`, `]`
 
         system
             .memory_file_system()
-            .write_file(
+            .write_file_all(
                 root.join("pyproject.toml"),
                 r#"
                 [project]
@@ -795,7 +795,7 @@ expected `.`, `]`
 
         system
             .memory_file_system()
-            .write_file(
+            .write_file_all(
                 root.join("pyproject.toml"),
                 r#"
                 [project]
@@ -828,7 +828,7 @@ expected `.`, `]`
 
         system
             .memory_file_system()
-            .write_file(
+            .write_file_all(
                 root.join("pyproject.toml"),
                 r#"
                 [project]
@@ -861,7 +861,7 @@ expected `.`, `]`
 
         system
             .memory_file_system()
-            .write_file(
+            .write_file_all(
                 root.join("pyproject.toml"),
                 r#"
                 [project]
@@ -886,7 +886,7 @@ expected `.`, `]`
 
         system
             .memory_file_system()
-            .write_file(
+            .write_file_all(
                 root.join("pyproject.toml"),
                 r#"
                 [project]
@@ -911,7 +911,7 @@ expected `.`, `]`
 
         system
             .memory_file_system()
-            .write_file(
+            .write_file_all(
                 root.join("pyproject.toml"),
                 r#"
                 [project]

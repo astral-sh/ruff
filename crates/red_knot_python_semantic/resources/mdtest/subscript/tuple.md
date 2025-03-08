@@ -117,7 +117,6 @@ from typing import Tuple
 
 class C(Tuple): ...
 
-# Runtime value: `(C, tuple, typing.Generic, object)`
-# TODO: Add `Generic` to the MRO
-reveal_type(C.__mro__)  # revealed: tuple[Literal[C], Literal[tuple], Unknown, Literal[object]]
+# revealed: tuple[Literal[C], Literal[tuple], Literal[Sequence], Literal[Reversible], Literal[Collection], Literal[Iterable], Literal[Container], @Todo(protocol), Literal[object]]
+reveal_type(C.__mro__)
 ```

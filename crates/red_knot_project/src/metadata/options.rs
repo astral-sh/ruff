@@ -2,7 +2,7 @@ use crate::metadata::value::{RangedValue, RelativePathBuf, ValueSource, ValueSou
 use crate::Db;
 use red_knot_python_semantic::lint::{GetLintError, Level, LintSource, RuleSelection};
 use red_knot_python_semantic::{ProgramSettings, PythonPath, PythonPlatform, SearchPathSettings};
-use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity, Span};
+use ruff_db::diagnostic::{DiagnosticId, OldDiagnosticTrait, Severity, Span};
 use ruff_db::files::system_path_to_file;
 use ruff_db::system::{System, SystemPath};
 use ruff_macros::Combine;
@@ -376,7 +376,7 @@ impl OptionDiagnostic {
     }
 }
 
-impl Diagnostic for OptionDiagnostic {
+impl OldDiagnosticTrait for OptionDiagnostic {
     fn id(&self) -> DiagnosticId {
         self.id
     }

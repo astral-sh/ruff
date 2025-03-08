@@ -7,7 +7,7 @@ use red_knot_project::metadata::options::{EnvironmentOptions, Options};
 use red_knot_project::metadata::value::RangedValue;
 use red_knot_project::ProjectMetadata;
 use red_knot_project::{Db, ProjectDatabase};
-use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig};
+use ruff_db::diagnostic::{DisplayDiagnosticConfig, OldDiagnosticTrait};
 use ruff_db::files::{system_path_to_file, File};
 use ruff_db::system::walk_directory::WalkDirectoryBuilder;
 use ruff_db::system::{
@@ -64,7 +64,7 @@ impl Workspace {
     pub fn open_file(&mut self, path: &str, contents: &str) -> Result<FileHandle, Error> {
         self.system
             .fs
-            .write_file(path, contents)
+            .write_file_all(path, contents)
             .map_err(into_error)?;
 
         let file = system_path_to_file(&self.db, path).expect("File to exist");

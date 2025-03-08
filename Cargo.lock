@@ -2541,6 +2541,7 @@ dependencies = [
  "regex",
  "ruff_db",
  "ruff_index",
+ "ruff_notebook",
  "ruff_python_ast",
  "ruff_python_trivia",
  "ruff_source_file",
@@ -2549,6 +2550,7 @@ dependencies = [
  "salsa",
  "serde",
  "smallvec",
+ "tempfile",
  "thiserror 2.0.11",
  "toml",
 ]
@@ -2657,7 +2659,7 @@ dependencies = [
 
 [[package]]
 name = "ruff"
-version = "0.9.9"
+version = "0.9.10"
 dependencies = [
  "anyhow",
  "argfile",
@@ -2892,7 +2894,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_linter"
-version = "0.9.9"
+version = "0.9.10"
 dependencies = [
  "aho-corasick",
  "anyhow",
@@ -3214,7 +3216,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_wasm"
-version = "0.9.9"
+version = "0.9.10"
 dependencies = [
  "console_error_panic_hook",
  "console_log",
