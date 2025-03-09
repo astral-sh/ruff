@@ -557,7 +557,9 @@ pub enum UnsupportedSyntaxErrorKind {
     /// [PEP 614]: https://peps.python.org/pep-0614/
     /// [`dotted_name`]: https://docs.python.org/3.8/reference/compound_stmts.html#grammar-token-dotted-name
     /// [decorator grammar]: https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-decorator
-    RelaxedDecorator,
+    RelaxedDecorator {
+        invalid_node_name: &'static str,
+    },
 
     /// Represents the use of a [PEP 570] positional-only parameter before Python 3.8.
     ///
@@ -633,7 +635,14 @@ impl Display for UnsupportedSyntaxError {
             UnsupportedSyntaxErrorKind::StarTuple(StarTupleKind::Yield) => {
                 "Cannot use iterable unpacking in yield expressions"
             }
-            UnsupportedSyntaxErrorKind::RelaxedDecorator => "Unsupported expression in decorators",
+            UnsupportedSyntaxErrorKind::RelaxedDecorator { invalid_node_name } => {
+                return write!(
+                    f,
+                    "Cannot use {invalid_node_name} outside function-call arguments in a decorator \
+                    on Python {target_version} (syntax was added in Python 3.9)",
+                    target_version = self.target_version,
+                );
+            }
             UnsupportedSyntaxErrorKind::PositionalOnlyParameter => {
                 "Cannot use positional-only parameter separator"
             }
@@ -677,7 +686,9 @@ impl UnsupportedSyntaxErrorKind {
             UnsupportedSyntaxErrorKind::Walrus => Change::Added(PythonVersion::PY38),
             UnsupportedSyntaxErrorKind::ExceptStar => Change::Added(PythonVersion::PY311),
             UnsupportedSyntaxErrorKind::StarTuple(_) => Change::Added(PythonVersion::PY38),
-            UnsupportedSyntaxErrorKind::RelaxedDecorator => Change::Added(PythonVersion::PY39),
+            UnsupportedSyntaxErrorKind::RelaxedDecorator { .. } => {
+                Change::Added(PythonVersion::PY39)
+            }
             UnsupportedSyntaxErrorKind::PositionalOnlyParameter => {
                 Change::Added(PythonVersion::PY38)
             }

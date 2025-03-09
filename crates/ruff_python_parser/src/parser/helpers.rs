@@ -1,4 +1,5 @@
-use ruff_python_ast::{self as ast, CmpOp, Expr, ExprContext};
+use ruff_python_ast::{self as ast, CmpOp, Expr, ExprContext, Number};
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::TokenKind;
 
@@ -47,11 +48,52 @@ pub(super) const fn token_kind_to_cmp_op(tokens: [TokenKind; 2]) -> Option<CmpOp
 /// Helper for `parse_decorators` to determine if `expr` is a [`dotted_name`] from the decorator
 /// grammar before Python 3.9.
 ///
+/// Returns `None` if `expr` is a `dotted_name`. Returns `Some((description, range))` if it is not,
+/// where `description` is a string describing the invalid node and `range` is the node's range.
+///
 /// [`dotted_name`]: https://docs.python.org/3.8/reference/compound_stmts.html#grammar-token-dotted-name
-pub(super) fn is_name_or_attribute_expression(expr: &Expr) -> bool {
-    match expr {
-        Expr::Attribute(attr) => is_name_or_attribute_expression(&attr.value),
-        Expr::Name(_) => true,
-        _ => false,
-    }
+pub(super) fn invalid_pre_py39_decorator_node(expr: &Expr) -> Option<(&'static str, TextRange)> {
+    let description = match expr {
+        Expr::Attribute(attr) => return invalid_pre_py39_decorator_node(&attr.value),
+
+        Expr::Name(_) => None,
+
+        Expr::NumberLiteral(number) => match &number.value {
+            Number::Int(_) => Some("an int literal"),
+            Number::Float(_) => Some("a float literal"),
+            Number::Complex { .. } => Some("a complex literal"),
+        },
+
+        Expr::BoolOp(_) => Some("boolean expression"),
+        Expr::BinOp(_) => Some("binary-operation expression"),
+        Expr::UnaryOp(_) => Some("unary-operation expression"),
+        Expr::Await(_) => Some("`await` expression"),
+        Expr::Lambda(_) => Some("lambda expression"),
+        Expr::If(_) => Some("conditional expression"),
+        Expr::Dict(_) => Some("a dict literal"),
+        Expr::Set(_) => Some("a set literal"),
+        Expr::List(_) => Some("a list literal"),
+        Expr::Tuple(_) => Some("a tuple literal"),
+        Expr::Starred(_) => Some("starred expression"),
+        Expr::Slice(_) => Some("slice expression"),
+        Expr::BytesLiteral(_) => Some("bytes literal"),
+        Expr::StringLiteral(_) => Some("string literal"),
+        Expr::EllipsisLiteral(_) => Some("ellipsis literal"),
+        Expr::NoneLiteral(_) => Some("`None` literal"),
+        Expr::BooleanLiteral(_) => Some("boolean literal"),
+        Expr::ListComp(_) => Some("list comprehension"),
+        Expr::SetComp(_) => Some("set comprehension"),
+        Expr::DictComp(_) => Some("dict comprehension"),
+        Expr::Generator(_) => Some("generator expression"),
+        Expr::Yield(_) => Some("`yield` expression"),
+        Expr::YieldFrom(_) => Some("`yield from` expression"),
+        Expr::Compare(_) => Some("comparison expression"),
+        Expr::Call(_) => Some("function call"),
+        Expr::FString(_) => Some("f-string"),
+        Expr::Named(_) => Some("assignment expression"),
+        Expr::Subscript(_) => Some("subscript expression"),
+        Expr::IpyEscapeCommand(_) => Some("IPython escape command"),
+    };
+
+    description.map(|description| (description, expr.range()))
 }

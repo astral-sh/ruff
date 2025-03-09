@@ -128,6 +128,6 @@ Module(
   |
 1 | # parse_options: { "target-version": "3.7" }
 2 | @(x := lambda x: x)(foo)
-  |  ^^^^^^^^^^^^^^^^^^^^^^^ Syntax Error: Unsupported expression in decorators on Python 3.7 (syntax was added in Python 3.9)
+  |   ^^^^^^^^^^^^^^^^ Syntax Error: Cannot use assignment expression outside function-call arguments in a decorator on Python 3.7 (syntax was added in Python 3.9)
 3 | def bar(): ...
   |
