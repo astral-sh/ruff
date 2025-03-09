@@ -94,5 +94,7 @@ reveal_type(1.0 / 0)  # revealed: int | float
 class MyInt(int): ...
 
 # No error for a subclass of int
+# TODO should not emit an error (waits until we start understanding __new__)
+# error: [too-many-positional-arguments] "Too many positional arguments to bound method `__init__`: expected 0, got 1"
 reveal_type(MyInt(3) / 0)  # revealed: int | float
 ```

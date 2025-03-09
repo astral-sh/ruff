@@ -111,6 +111,8 @@ class E[T]:
     def __init__(self, x: T) -> None: ...
 
 # TODO: revealed: E[int] or E[Literal[1]]
+# TODO should not emit an error
+# error: [invalid-argument-type] "Object of type `Literal[1]` cannot be assigned to parameter 2 (`x`) of bound method `__init__`; expected type `T`"
 reveal_type(E(1))  # revealed: E
 ```
 
@@ -118,7 +120,8 @@ The types inferred from a type context and from a constructor parameter must be 
 other:
 
 ```py
-# TODO: error
+# TODO: the error should not leak the `T` typevar and should mention `E[int]`
+# error: [invalid-argument-type] "Object of type `Literal["five"]` cannot be assigned to parameter 2 (`x`) of bound method `__init__`; expected type `T`"
 wrong_innards: E[int] = E("five")
 ```
 
