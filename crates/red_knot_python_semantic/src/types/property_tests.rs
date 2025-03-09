@@ -150,10 +150,7 @@ impl Ty {
             Ty::BuiltinsFunction(name) => builtins_symbol(db, name).symbol.expect_type(),
             Ty::BuiltinsBoundMethod { class, method } => {
                 let builtins_class = builtins_symbol(db, class).symbol.expect_type();
-                let function = builtins_class
-                    .class_member(db, method.into())
-                    .symbol
-                    .expect_type();
+                let function = builtins_class.member(db, method).symbol.expect_type();
 
                 create_bound_method(db, function, builtins_class)
             }
