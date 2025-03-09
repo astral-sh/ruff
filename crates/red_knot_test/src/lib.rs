@@ -113,7 +113,9 @@ fn run_test(
                 .canonicalize()
                 .expect("Canonicalizing to succeed");
             let root_path = SystemPathBuf::from_path_buf(root_path)
-                .expect("Temp directory to be a valid UTF8 path");
+                .expect("Temp directory to be a valid UTF8 path")
+                .simplified()
+                .to_path_buf();
 
             db.use_os_system_with_temp_dir(root_path, dir);
         }

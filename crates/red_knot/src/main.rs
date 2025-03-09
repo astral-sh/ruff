@@ -80,6 +80,8 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     countme::enable(verbosity.is_trace());
     let _guard = setup_tracing(verbosity)?;
 
+    tracing::debug!("Version: {}", version::version());
+
     // The base path to which all CLI arguments are relative to.
     let cwd = {
         let cwd = std::env::current_dir().context("Failed to get the current working directory")?;

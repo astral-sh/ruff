@@ -140,3 +140,27 @@ import b.foo  # error: [unresolved-import] "Cannot resolve import `b.foo`"
 
 ```py
 ```
+
+## Long paths
+
+It's unlikely that a single module component is as long as in this example, but Windows treats paths
+that are longer than 200 and something specially. This test ensures that Red Knot can handle those
+paths gracefully.
+
+```toml
+system = "os"
+```
+
+`AveryLongPathAveryLongPathAveryLongPathAveryLongPathAveryLongPathAveryLongPathAveryLongPathAveryLongPathAveryLongPathAveryLongPathAveryLongPathAveryLongPathAveryLongPathAveryLongPathAveryLongPathAveryLongPathAveryLongPath/__init__.py`:
+
+```py
+class Foo: ...
+```
+
+```py
+from AveryLongPathAveryLongPathAveryLongPathAveryLongPathAveryLongPathAveryLongPathAveryLongPathAveryLongPathAveryLongPathAveryLongPathAveryLongPathAveryLongPathAveryLongPathAveryLongPathAveryLongPathAveryLongPathAveryLongPath import (
+    Foo,
+)
+
+reveal_type(Foo())  # revealed: Foo
+```
