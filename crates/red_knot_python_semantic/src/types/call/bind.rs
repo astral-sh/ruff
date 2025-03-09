@@ -1,11 +1,13 @@
-use super::{Argument, CallArguments, InferContext, Signature, Type};
+use super::{
+    Argument, CallArguments, CallError, CallOutcome, InferContext, Overloads, Signature, Type,
+};
 use crate::db::Db;
 use crate::types::diagnostic::{
     INVALID_ARGUMENT_TYPE, MISSING_ARGUMENT, PARAMETER_ALREADY_ASSIGNED,
     TOO_MANY_POSITIONAL_ARGUMENTS, UNKNOWN_ARGUMENT,
 };
 use crate::types::signatures::Parameter;
-use crate::types::{todo_type, CallableType, UnionType};
+use crate::types::{CallableType, UnionType};
 use ruff_db::diagnostic::{OldSecondaryDiagnosticMessage, Span};
 use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
@@ -17,9 +19,27 @@ use ruff_text_size::Ranged;
 pub(crate) fn bind_call<'db>(
     db: &'db dyn Db,
     arguments: &CallArguments<'_, 'db>,
-    signature: &Signature<'db>,
+    overloads: &Overloads<'db>,
     callable_ty: Type<'db>,
 ) -> CallBinding<'db> {
+    // TODO: This checks every overload. Consider short-circuiting this loop once we find the first
+    // overload that is a successful match against the argument list.
+    let overloads = overloads
+        .iter()
+        .map(|signature| bind_overload(db, arguments, signature))
+        .collect::<Vec<_>>()
+        .into_boxed_slice();
+    CallBinding {
+        callable_ty,
+        overloads,
+    }
+}
+
+fn bind_overload<'db>(
+    db: &'db dyn Db,
+    arguments: &CallArguments<'_, 'db>,
+    signature: &Signature<'db>,
+) -> OverloadBinding<'db> {
     let parameters = signature.parameters();
     // The type assigned to each parameter at this call site.
     let mut parameter_tys = vec![None; parameters.len()];
@@ -126,8 +146,7 @@ pub(crate) fn bind_call<'db>(
         });
     }
 
-    CallBinding {
-        callable_ty,
+    OverloadBinding {
         return_ty: signature.return_ty.unwrap_or(Type::unknown()),
         parameter_tys: parameter_tys
             .into_iter()
@@ -144,11 +163,122 @@ pub(crate) struct CallableDescriptor<'a> {
     kind: &'a str,
 }
 
+/// Binding information for a call site.
+///
+/// For a successful binding, each argument is mapped to one of the callable's formal parameters.
+/// If the callable has multiple overloads, the first one that matches is used as the overall
+/// binding match.
+///
+/// If the arguments cannot be matched to formal parameters, we store information about the
+/// specific errors that occurred when trying to match them up. If the callable has multiple
+/// overloads, we store this error information for each overload.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct CallBinding<'db> {
     /// Type of the callable object (function, class...)
     callable_ty: Type<'db>,
 
+    overloads: Box<[OverloadBinding<'db>]>,
+}
+
+impl<'db> CallBinding<'db> {
+    pub(crate) fn into_outcome(self) -> Result<CallOutcome<'db>, CallError<'db>> {
+        if self.has_binding_errors() {
+            return Err(CallError::BindingError { binding: self });
+        }
+        Ok(CallOutcome::Single(self))
+    }
+
+    pub(crate) fn callable_type(&self) -> Type<'db> {
+        self.callable_ty
+    }
+
+    /// Returns whether there were any errors binding this call site. If the callable has multiple
+    /// overloads, they must _all_ have errors.
+    pub(crate) fn has_binding_errors(&self) -> bool {
+        self.overloads
+            .iter()
+            .all(OverloadBinding::has_binding_errors)
+    }
+
+    /// Returns the overload that matched for this call binding. Returns `None` if none of the
+    /// overloads matched.
+    pub(crate) fn matching_overload(&self) -> Option<(usize, &OverloadBinding<'db>)> {
+        self.overloads
+            .iter()
+            .enumerate()
+            .find(|(_, overload)| !overload.has_binding_errors())
+    }
+
+    /// Returns the overload that matched for this call binding. Returns `None` if none of the
+    /// overloads matched.
+    pub(crate) fn matching_overload_mut(&mut self) -> Option<(usize, &mut OverloadBinding<'db>)> {
+        self.overloads
+            .iter_mut()
+            .enumerate()
+            .find(|(_, overload)| !overload.has_binding_errors())
+    }
+
+    /// Returns the return type of the matching overload for this binding. If none of the overloads
+    /// matched, returns a union of the return types of each overload.
+    pub(crate) fn return_type(&self, db: &'db dyn Db) -> Type<'db> {
+        if let Some((_, overload)) = self.matching_overload() {
+            return overload.return_type();
+        }
+        if let [overload] = self.overloads.as_ref() {
+            return overload.return_type();
+        }
+        UnionType::from_elements(db, self.overloads.iter().map(OverloadBinding::return_type))
+    }
+
+    fn callable_descriptor(&self, db: &'db dyn Db) -> Option<CallableDescriptor> {
+        match self.callable_ty {
+            Type::FunctionLiteral(function) => Some(CallableDescriptor {
+                kind: "function",
+                name: function.name(db),
+            }),
+            Type::ClassLiteral(class_type) => Some(CallableDescriptor {
+                kind: "class",
+                name: class_type.class().name(db),
+            }),
+            Type::Callable(CallableType::BoundMethod(bound_method)) => Some(CallableDescriptor {
+                kind: "bound method",
+                name: bound_method.function(db).name(db),
+            }),
+            Type::Callable(CallableType::MethodWrapperDunderGet(function)) => {
+                Some(CallableDescriptor {
+                    kind: "method wrapper `__get__` of function",
+                    name: function.name(db),
+                })
+            }
+            Type::Callable(CallableType::WrapperDescriptorDunderGet) => Some(CallableDescriptor {
+                kind: "wrapper descriptor",
+                name: "FunctionType.__get__",
+            }),
+            _ => None,
+        }
+    }
+
+    /// Report diagnostics for all of the errors that occurred when trying to match actual
+    /// arguments to formal parameters. If the callable has multiple overloads, we report
+    /// diagnostics for all of them.
+    pub(crate) fn report_diagnostics(&self, context: &InferContext<'db>, node: ast::AnyNodeRef) {
+        let callable_descriptor = self.callable_descriptor(context.db());
+        let multiple_overloads = self.overloads.len() > 1;
+        for (idx, overload) in self.overloads.iter().enumerate() {
+            overload.report_diagnostics(
+                context,
+                node,
+                self.callable_ty,
+                callable_descriptor.as_ref(),
+                multiple_overloads.then(|| idx + 1),
+            );
+        }
+    }
+}
+
+/// Binding information for one of the overloads of a callable.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct OverloadBinding<'db> {
     /// Return type of the call.
     return_ty: Type<'db>,
 
@@ -159,21 +289,7 @@ pub(crate) struct CallBinding<'db> {
     errors: Vec<CallBindingError<'db>>,
 }
 
-impl<'db> CallBinding<'db> {
-    // TODO remove this constructor and construct always from `bind_call`
-    pub(crate) fn from_return_type(return_ty: Type<'db>) -> Self {
-        Self {
-            callable_ty: todo_type!("CallBinding::from_return_type"),
-            return_ty,
-            parameter_tys: Box::default(),
-            errors: vec![],
-        }
-    }
-
-    pub(crate) fn callable_type(&self) -> Type<'db> {
-        self.callable_ty
-    }
-
+impl<'db> OverloadBinding<'db> {
     pub(crate) fn set_return_type(&mut self, return_ty: Type<'db>) {
         self.return_ty = return_ty;
     }
@@ -207,43 +323,16 @@ impl<'db> CallBinding<'db> {
         }
     }
 
-    fn callable_descriptor(&self, db: &'db dyn Db) -> Option<CallableDescriptor> {
-        match self.callable_ty {
-            Type::FunctionLiteral(function) => Some(CallableDescriptor {
-                kind: "function",
-                name: function.name(db),
-            }),
-            Type::ClassLiteral(class_type) => Some(CallableDescriptor {
-                kind: "class",
-                name: class_type.class().name(db),
-            }),
-            Type::Callable(CallableType::BoundMethod(bound_method)) => Some(CallableDescriptor {
-                kind: "bound method",
-                name: bound_method.function(db).name(db),
-            }),
-            Type::Callable(CallableType::MethodWrapperDunderGet(function)) => {
-                Some(CallableDescriptor {
-                    kind: "method wrapper `__get__` of function",
-                    name: function.name(db),
-                })
-            }
-            Type::Callable(CallableType::WrapperDescriptorDunderGet) => Some(CallableDescriptor {
-                kind: "wrapper descriptor",
-                name: "FunctionType.__get__",
-            }),
-            _ => None,
-        }
-    }
-
-    pub(crate) fn report_diagnostics(&self, context: &InferContext<'db>, node: ast::AnyNodeRef) {
-        let callable_descriptor = self.callable_descriptor(context.db());
+    fn report_diagnostics(
+        &self,
+        context: &InferContext<'db>,
+        node: ast::AnyNodeRef,
+        callable_ty: Type<'db>,
+        callable_descriptor: Option<&CallableDescriptor>,
+        overload: Option<usize>,
+    ) {
         for error in &self.errors {
-            error.report_diagnostic(
-                context,
-                node,
-                self.callable_ty,
-                callable_descriptor.as_ref(),
-            );
+            error.report_diagnostic(context, node, callable_ty, callable_descriptor, overload);
         }
     }
 
@@ -376,6 +465,7 @@ impl<'db> CallBindingError<'db> {
         node: ast::AnyNodeRef,
         callable_ty: Type<'db>,
         callable_descriptor: Option<&CallableDescriptor>,
+        overload: Option<usize>,
     ) {
         match self {
             Self::InvalidArgumentType {
@@ -401,7 +491,12 @@ impl<'db> CallBindingError<'db> {
                     Self::get_node(node, *argument_index),
                     format_args!(
                         "Object of type `{provided_ty_display}` cannot be assigned to \
-                        parameter {parameter}{}; expected type `{expected_ty_display}`",
+                        parameter {parameter}{}{}; expected type `{expected_ty_display}`",
+                        if let Some(overload) = overload {
+                            format!(" of overload {overload}")
+                        } else {
+                            String::new()
+                        },
                         if let Some(CallableDescriptor { kind, name }) = callable_descriptor {
                             format!(" of {kind} `{name}`")
                         } else {
@@ -421,10 +516,20 @@ impl<'db> CallBindingError<'db> {
                     &TOO_MANY_POSITIONAL_ARGUMENTS,
                     Self::get_node(node, *first_excess_argument_index),
                     format_args!(
-                        "Too many positional arguments{}: expected \
+                        "Too many positional arguments{}{}{}: expected \
                         {expected_positional_count}, got {provided_positional_count}",
+                        if overload.is_some() || callable_descriptor.is_some() {
+                            " to"
+                        } else {
+                            ""
+                        },
+                        if let Some(overload) = overload {
+                            format!(" overload {overload} of")
+                        } else {
+                            String::new()
+                        },
                         if let Some(CallableDescriptor { kind, name }) = callable_descriptor {
-                            format!(" to {kind} `{name}`")
+                            format!(" {kind} `{name}`")
                         } else {
                             String::new()
                         }
@@ -438,7 +543,12 @@ impl<'db> CallBindingError<'db> {
                     &MISSING_ARGUMENT,
                     node,
                     format_args!(
-                        "No argument{s} provided for required parameter{s} {parameters}{}",
+                        "No argument{s} provided for required parameter{s} {parameters}{}{}",
+                        if let Some(overload) = overload {
+                            format!(" of overload {overload}")
+                        } else {
+                            String::new()
+                        },
                         if let Some(CallableDescriptor { kind, name }) = callable_descriptor {
                             format!(" of {kind} `{name}`")
                         } else {
@@ -456,7 +566,12 @@ impl<'db> CallBindingError<'db> {
                     &UNKNOWN_ARGUMENT,
                     Self::get_node(node, *argument_index),
                     format_args!(
-                        "Argument `{argument_name}` does not match any known parameter{}",
+                        "Argument `{argument_name}` does not match any known parameter{}{}",
+                        if let Some(overload) = overload {
+                            format!(" of overload {overload}")
+                        } else {
+                            String::new()
+                        },
                         if let Some(CallableDescriptor { kind, name }) = callable_descriptor {
                             format!(" of {kind} `{name}`")
                         } else {
@@ -474,7 +589,12 @@ impl<'db> CallBindingError<'db> {
                     &PARAMETER_ALREADY_ASSIGNED,
                     Self::get_node(node, *argument_index),
                     format_args!(
-                        "Multiple values provided for parameter {parameter}{}",
+                        "Multiple values provided for parameter {parameter}{}{}",
+                        if let Some(overload) = overload {
+                            format!(" of overload {overload}")
+                        } else {
+                            String::new()
+                        },
                         if let Some(CallableDescriptor { kind, name }) = callable_descriptor {
                             format!(" of {kind} `{name}`")
                         } else {
