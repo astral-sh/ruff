@@ -267,6 +267,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "R5501") => (RuleGroup::Stable, rules::pylint::rules::CollapsibleElseIf),
         (Pylint, "R6104") => (RuleGroup::Preview, rules::pylint::rules::NonAugmentedAssignment),
         (Pylint, "R6201") => (RuleGroup::Preview, rules::pylint::rules::LiteralMembership),
+        (Pylint, "R6202") => (RuleGroup::Preview, rules::pylint::rules::InEmptyCollection),
         (Pylint, "R6301") => (RuleGroup::Preview, rules::pylint::rules::NoSelfUse),
         #[cfg(any(feature = "test-rules", test))]
         (Pylint, "W0101") => (RuleGroup::Preview, rules::pylint::rules::UnreachableCode),

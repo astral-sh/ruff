@@ -1,0 +1,80 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+in_empty_collection.py:2:1: PLR6202 Unnecessary membership test on empty collection
+  |
+1 | # Errors
+2 | 1 in []
+  | ^^^^^^^ PLR6202
+3 | 1 not in []
+4 | _ in ()
+  |
+
+in_empty_collection.py:3:1: PLR6202 Unnecessary membership test on empty collection
+  |
+1 | # Errors
+2 | 1 in []
+3 | 1 not in []
+  | ^^^^^^^^^^^ PLR6202
+4 | _ in ()
+5 | _ not in ()
+  |
+
+in_empty_collection.py:4:1: PLR6202 Unnecessary membership test on empty collection
+  |
+2 | 1 in []
+3 | 1 not in []
+4 | _ in ()
+  | ^^^^^^^ PLR6202
+5 | _ not in ()
+6 | 'a' in set()
+  |
+
+in_empty_collection.py:5:1: PLR6202 Unnecessary membership test on empty collection
+  |
+3 | 1 not in []
+4 | _ in ()
+5 | _ not in ()
+  | ^^^^^^^^^^^ PLR6202
+6 | 'a' in set()
+7 | 'a' not in set()
+  |
+
+in_empty_collection.py:6:1: PLR6202 Unnecessary membership test on empty collection
+  |
+4 | _ in ()
+5 | _ not in ()
+6 | 'a' in set()
+  | ^^^^^^^^^^^^ PLR6202
+7 | 'a' not in set()
+8 | 'b' in {}
+  |
+
+in_empty_collection.py:7:1: PLR6202 Unnecessary membership test on empty collection
+  |
+5 | _ not in ()
+6 | 'a' in set()
+7 | 'a' not in set()
+  | ^^^^^^^^^^^^^^^^ PLR6202
+8 | 'b' in {}
+9 | 'b' not in {}
+  |
+
+in_empty_collection.py:8:1: PLR6202 Unnecessary membership test on empty collection
+  |
+6 | 'a' in set()
+7 | 'a' not in set()
+8 | 'b' in {}
+  | ^^^^^^^^^ PLR6202
+9 | 'b' not in {}
+  |
+
+in_empty_collection.py:9:1: PLR6202 Unnecessary membership test on empty collection
+   |
+ 7 | 'a' not in set()
+ 8 | 'b' in {}
+ 9 | 'b' not in {}
+   | ^^^^^^^^^^^^^ PLR6202
+10 |
+11 | # OK
+   |
