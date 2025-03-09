@@ -163,7 +163,7 @@ reveal_type(B.__class__)  # revealed: Literal[M]
 ## Non-class
 
 When a class has an explicit `metaclass` that is not a class, but is a callable that accepts
-`type.__new__` arguments, we should return the meta type of its return type.
+`type.__new__` arguments, we should return the meta-type of its return type.
 
 ```py
 def f(*args, **kwargs) -> int: ...

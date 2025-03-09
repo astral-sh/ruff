@@ -40,10 +40,10 @@ class Meta(type):
     def __getitem__(cls, key: int) -> str:
         return str(key)
 
-class DunderOnMetaClass(metaclass=Meta):
+class DunderOnMetaclass(metaclass=Meta):
     pass
 
-reveal_type(DunderOnMetaClass[0])  # revealed: str
+reveal_type(DunderOnMetaclass[0])  # revealed: str
 ```
 
 If the dunder method is only present on the class itself, it will not be called:

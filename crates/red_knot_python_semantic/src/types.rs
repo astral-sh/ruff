@@ -136,9 +136,9 @@ enum AttributeKind {
 
 /// This enum is used to control the behavior of the descriptor protocol implementation.
 /// When invoked on a class object, the fallback type (a class attribute) can shadow a
-/// non-data descriptor of the meta type (the class's metaclass). However, this is not
+/// non-data descriptor of the meta-type (the class's metaclass). However, this is not
 /// true for instances. When invoked on an instance, the fallback type (an attribute on
-/// the instance) can not completely shadow a non-data descriptor of the meta type (the
+/// the instance) can not completely shadow a non-data descriptor of the meta-type (the
 /// class), because we do not currently attempt to statically infer if an instance
 /// attribute is definitely defined (i.e. to check whether a particular method has been
 /// called).
@@ -148,17 +148,17 @@ enum InstanceFallbackShadowsNonDataDescriptor {
     No,
 }
 
-/// Dunder methods are looked up on the meta type of a type without potentially falling
+/// Dunder methods are looked up on the meta-type of a type without potentially falling
 /// back on attributes on the type itself. For example, when implicitly invoked on an
 /// instance, dunder methods are not looked up as instance attributes. And when invoked
-/// on a class, dunder methods are only looked up on the meta class, not the class itself.
+/// on a class, dunder methods are only looked up on the metaclass, not the class itself.
 ///
 /// All other attributes use the `WithInstanceFallback` policy.
 #[derive(Clone, Debug, Copy, PartialEq, Eq, Hash)]
 enum MemberLookupPolicy {
-    /// Only look up the attribute on the meta type.
+    /// Only look up the attribute on the meta-type.
     NoInstanceFallback,
-    /// Look up the attribute on the meta type, but fall back to attributes on the instance
+    /// Look up the attribute on the meta-type, but fall back to attributes on the instance
     /// if the meta-type attribute is not found or if the meta-type attribute is not a data
     /// descriptor.
     WithInstanceFallback,
@@ -1540,7 +1540,7 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Look up an attribute in the MRO of the meta type of `self`. This returns class-level attributes
+    /// Look up an attribute in the MRO of the meta-type of `self`. This returns class-level attributes
     /// when called on an instance-like type, and metaclass attributes when called on a class-like type.
     ///
     /// Basically corresponds to `self.to_meta_type().find_name_in_mro(name)`, except for the handling
@@ -1555,7 +1555,9 @@ impl<'db> Type<'db> {
             _ => self
                 .to_meta_type(db)
                 .find_name_in_mro(db, name.as_str())
-                .expect("was called on meta type"),
+                .expect(
+                    "`Type::find_name_in_mro()` should return `Some()` when called on a meta-type",
+                ),
         }
     }
 
@@ -1652,14 +1654,14 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Look up `__get__` on the meta type of self, and call it with the arguments `self`, `instance`,
+    /// Look up `__get__` on the meta-type of self, and call it with the arguments `self`, `instance`,
     /// and `owner`. `__get__` is different than other dunder methods in that it is not looked up using
     /// the descriptor protocol itself.
     ///
     /// In addition to the return type of `__get__`, this method also returns the *kind* of attribute
     /// that `self` represents: (1) a data descriptor or (2) a non-data descriptor / normal attribute.
     ///
-    /// If `__get__` is not defined on the meta type, this method returns `None`.
+    /// If `__get__` is not defined on the meta-type, this method returns `None`.
     #[salsa::tracked]
     fn try_call_dunder_get(
         self,
@@ -1698,7 +1700,7 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Look up `__get__` on the meta type of `attribute`, and call it with `attribute`, `instance`,
+    /// Look up `__get__` on the meta-type of `attribute`, and call it with `attribute`, `instance`,
     /// and `owner` as arguments. This method exists as a separate step as we need to handle unions
     /// and intersections explicitly.
     fn try_call_dunder_get_on_attribute(
@@ -1783,7 +1785,7 @@ impl<'db> Type<'db> {
     ///
     /// This method roughly performs the following steps:
     ///
-    /// - Look up the attribute `name` on the meta type of `self`. Call the result `meta_attr`.
+    /// - Look up the attribute `name` on the meta-type of `self`. Call the result `meta_attr`.
     /// - Call `__get__` on the meta-type of `meta_attr`, if it exists. If the call succeeds,
     ///   replace `meta_attr` with the result of the call. Also check if `meta_attr` is a *data*
     ///   descriptor by testing if `__set__` or `__delete__` exist.
@@ -1832,7 +1834,7 @@ impl<'db> Type<'db> {
             }
 
             // `meta_attr` is the return type of a data descriptor, but the attribute on the
-            // meta type is possibly-unbound. This means that we "fall through" to the next
+            // meta-type is possibly-unbound. This means that we "fall through" to the next
             // stage of the descriptor protocol and union with the fallback type.
             (
                 Symbol::Type(meta_attr_ty, Boundness::PossiblyUnbound),
@@ -1873,7 +1875,7 @@ impl<'db> Type<'db> {
             )
             .with_qualifiers(meta_attr_qualifiers.union(fallback_qualifiers)),
 
-            // If the attribute is not found on the meta type, we simply return the fallback.
+            // If the attribute is not found on the meta-type, we simply return the fallback.
             (Symbol::Unbound, _, fallback) => fallback.with_qualifiers(fallback_qualifiers),
         }
     }
@@ -2736,7 +2738,7 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Look up a dunder method on the meta type of `self` and call it.
+    /// Look up a dunder method on the meta-type of `self` and call it.
     ///
     /// Returns an `Err` if the dunder method can't be called,
     /// or the given arguments are not valid.
@@ -3163,7 +3165,7 @@ impl<'db> Type<'db> {
                 KnownClass::WrapperDescriptorType.to_class_literal(db)
             }
             Type::Callable(CallableType::General(_)) => {
-                // TODO: Get the meta type
+                // TODO: Get the meta-type
                 todo_type!(".to_meta_type() for general callable type")
             }
             Type::ModuleLiteral(_) => KnownClass::ModuleType.to_class_literal(db),
