@@ -1457,42 +1457,39 @@ impl<'db> Type<'db> {
 
             Type::Dynamic(_) | Type::Never => Some(Symbol::bound(self).into()),
 
-            Type::ClassLiteral(ClassLiteralType { class })
-                if class.is_known(db, KnownClass::FunctionType) && name == "__get__" =>
-            {
-                Some(Symbol::bound(Type::Callable(CallableType::WrapperDescriptorDunderGet)).into())
-            }
-            Type::ClassLiteral(ClassLiteralType { class })
-                if class.is_known(db, KnownClass::FunctionType)
-                    && matches!(name, "__set__" | "__delete__") =>
-            {
-                // Hard code this knowledge, as we look up `__set__` and `__delete__` on `FunctionType` often.
-                Some(Symbol::Unbound.into())
-            }
-            // TODO:
-            // We currently hard-code the knowledge that the following known classes are not
-            // descriptors, i.e. that they have no `__get__` method. This is not wrong and
-            // potentially even beneficial for performance, but it's not very principled.
-            // This case can probably be removed eventually, but we include it at the moment
-            // because we make extensive use of these types in our test suite. Note that some
-            // builtin types are not included here, since they do not have generic bases and
-            // are correctly handled by the `find_name_in_mro` method.
-            Type::ClassLiteral(class)
-                if matches!(
-                    class.class.known(db),
-                    Some(
-                        KnownClass::Int
+            Type::ClassLiteral(class_literal @ ClassLiteralType { class }) => {
+                match (class.known(db), name) {
+                    (Some(KnownClass::FunctionType), "__get__") => Some(
+                        Symbol::bound(Type::Callable(CallableType::WrapperDescriptorDunderGet))
+                            .into(),
+                    ),
+                    (Some(KnownClass::FunctionType), "__set__" | "__delete__") => {
+                        // Hard code this knowledge, as we look up `__set__` and `__delete__` on `FunctionType` often.
+                        Some(Symbol::Unbound.into())
+                    }
+                    // TODO:
+                    // We currently hard-code the knowledge that the following known classes are not
+                    // descriptors, i.e. that they have no `__get__` method. This is not wrong and
+                    // potentially even beneficial for performance, but it's not very principled.
+                    // This case can probably be removed eventually, but we include it at the moment
+                    // because we make extensive use of these types in our test suite. Note that some
+                    // builtin types are not included here, since they do not have generic bases and
+                    // are correctly handled by the `find_name_in_mro` method.
+                    (
+                        Some(
+                            KnownClass::Int
                             | KnownClass::Str
                             | KnownClass::Bytes
                             | KnownClass::Tuple
                             | KnownClass::Slice
                             | KnownClass::Range,
-                    )
-                ) && matches!(name, "__get__" | "__set__" | "__delete__") =>
-            {
-                Some(Symbol::Unbound.into())
+                        ),
+                        "__get__" | "__set__" | "__delete__",
+                    ) => Some(Symbol::Unbound.into()),
+
+                    _ => Some(class_literal.class_member(db, name)),
+                }
             }
-            Type::ClassLiteral(class_literal) => Some(class_literal.class_member(db, name)),
 
             Type::SubclassOf(subclass_of)
                 if name == "__get__"
@@ -1523,6 +1520,7 @@ impl<'db> Type<'db> {
                     .to_class_literal(db)
                     .find_name_in_mro(db, name)
             }
+
             Type::FunctionLiteral(_)
             | Type::Callable(_)
             | Type::ModuleLiteral(_)
