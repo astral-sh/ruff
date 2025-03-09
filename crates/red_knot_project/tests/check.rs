@@ -87,6 +87,10 @@ fn run_corpus_tests(pattern: &str) -> anyhow::Result<()> {
 
     let mut db = setup_db(&root, system.clone())?;
 
+    // Set the target Python version to the latest one supported by red-knot.
+    // This enables us to parse syntax (and accurately infer types) for code that only works
+    // on newer Python versions.
+    // (Some of the corpus snippets use syntax that is only available on newer Python versions.)
     Program::get(&db)
         .set_python_version(&mut db)
         .to(PythonVersion::latest());
