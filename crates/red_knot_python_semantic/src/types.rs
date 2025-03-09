@@ -730,10 +730,9 @@ impl<'db> Type<'db> {
             // `Literal[str]` is a subtype of `type` because the `str` class object is an instance of its metaclass `type`.
             // `Literal[abc.ABC]` is a subtype of `abc.ABCMeta` because the `abc.ABC` class object
             // is an instance of its metaclass `abc.ABCMeta`.
-            (Type::ClassLiteral(ClassLiteralType { class }), _) => class
-                .metaclass(db)
-                .to_instance(db)
-                .is_some_and(|instance_type| instance_type.is_subtype_of(db, target)),
+            (Type::ClassLiteral(ClassLiteralType { class }), _) => {
+                class.metaclass_instance_type(db).is_subtype_of(db, target)
+            }
 
             // `type[str]` (== `SubclassOf("str")` in red-knot) describes all possible runtime subclasses
             // of the class object `str`. It is a subtype of `type` (== `Instance("type")`) because `str`
@@ -745,7 +744,7 @@ impl<'db> Type<'db> {
             (Type::SubclassOf(subclass_of_ty), _) => subclass_of_ty
                 .subclass_of()
                 .into_class()
-                .and_then(|class| class.metaclass(db).to_instance(db))
+                .map(|class| class.metaclass_instance_type(db))
                 .is_some_and(|metaclass_instance_type| {
                     metaclass_instance_type.is_subtype_of(db, target)
                 }),
@@ -1127,14 +1126,9 @@ impl<'db> Type<'db> {
                 ClassBase::Dynamic(_) => {
                     KnownClass::Type.to_instance(db).is_disjoint_from(db, other)
                 }
-                ClassBase::Class(class) => {
-                    class
-                        .metaclass(db)
-                        .to_instance(db)
-                        .is_some_and(|metaclass_instance_type| {
-                            metaclass_instance_type.is_disjoint_from(db, other)
-                        })
-                }
+                ClassBase::Class(class) => class
+                    .metaclass_instance_type(db)
+                    .is_disjoint_from(db, other),
             },
 
             (Type::KnownInstance(known_instance), Type::Instance(InstanceType { class }))
@@ -1204,11 +1198,8 @@ impl<'db> Type<'db> {
             (Type::ClassLiteral(ClassLiteralType { class }), instance @ Type::Instance(_))
             | (instance @ Type::Instance(_), Type::ClassLiteral(ClassLiteralType { class })) => {
                 !class
-                    .metaclass(db)
-                    .to_instance(db)
-                    .is_some_and(|metaclass_instance_type| {
-                        metaclass_instance_type.is_subtype_of(db, instance)
-                    })
+                    .metaclass_instance_type(db)
+                    .is_subtype_of(db, instance)
             }
 
             (Type::FunctionLiteral(..), Type::Instance(InstanceType { class }))
@@ -2112,13 +2103,9 @@ impl<'db> Type<'db> {
             Type::FunctionLiteral(_) => Truthiness::AlwaysTrue,
             Type::Callable(_) => Truthiness::AlwaysTrue,
             Type::ModuleLiteral(_) => Truthiness::AlwaysTrue,
-            Type::ClassLiteral(ClassLiteralType { class }) => {
-                if let Some(metaclass_instance_type) = class.metaclass(db).to_instance(db) {
-                    metaclass_instance_type.try_bool_impl(db, allow_short_circuit)?
-                } else {
-                    Truthiness::Ambiguous
-                }
-            }
+            Type::ClassLiteral(ClassLiteralType { class }) => class
+                .metaclass_instance_type(db)
+                .try_bool_impl(db, allow_short_circuit)?,
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
                 ClassBase::Dynamic(_) => Truthiness::Ambiguous,
                 ClassBase::Class(class) => {
@@ -2965,8 +2952,6 @@ impl<'db> Type<'db> {
                 Some(builder.build())
             }
             Type::Intersection(_) => Some(todo_type!("Type::Intersection.to_instance()")),
-            // TODO: calling `.to_instance()` on any of these should result in a diagnostic,
-            // since they already indicate that the object is an instance of some kind:
             Type::BooleanLiteral(_)
             | Type::BytesLiteral(_)
             | Type::FunctionLiteral(_)

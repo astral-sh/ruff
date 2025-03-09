@@ -188,6 +188,14 @@ impl<'db> Class<'db> {
             .unwrap_or_else(|_| SubclassOfType::subclass_of_unknown())
     }
 
+    /// Return a type representing "the set of all instances of the metaclass of this class".
+    pub(super) fn metaclass_instance_type(self, db: &'db dyn Db) -> Type<'db> {
+        self
+            .metaclass(db)
+            .to_instance(db)
+            .expect("`Type::to_instance()` should always return `Some()` when called on the type of a metaclass")
+    }
+
     /// Return the metaclass of this class, or an error if the metaclass cannot be inferred.
     #[salsa::tracked]
     pub(super) fn try_metaclass(self, db: &'db dyn Db) -> Result<Type<'db>, MetaclassError<'db>> {
@@ -972,16 +980,20 @@ impl<'db> KnownClass {
         self.try_to_class_literal(db)
             .map(Type::ClassLiteral)
             .unwrap_or_else(|lookup_error| {
-                if cfg!(test) {
-                    panic!("{}", lookup_error.display(db, self));
-                } else if MESSAGES.lock().unwrap().insert(self) {
+                assert!(
+                    !cfg!(any(test, debug_assertions)),
+                    "{}",
+                    lookup_error.display(db, self)
+                );
+
+                if MESSAGES.lock().unwrap().insert(self) {
                     if matches!(
                         lookup_error,
                         KnownClassLookupError::ClassPossiblyUnbound { .. }
                     ) {
-                        tracing::warn!("{}", lookup_error.display(db, self));
+                        tracing::debug!("{}", lookup_error.display(db, self));
                     } else {
-                        tracing::warn!(
+                        tracing::debug!(
                             "{}. Falling back to `Unknown` for the symbol instead.",
                             lookup_error.display(db, self)
                         );

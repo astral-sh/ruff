@@ -1,12 +1,15 @@
 use anyhow::{anyhow, Context};
 use red_knot_project::{ProjectDatabase, ProjectMetadata};
-use red_knot_python_semantic::{HasType, SemanticModel};
+use red_knot_python_semantic::{HasType, Program, SemanticModel};
 use ruff_db::files::{system_path_to_file, File};
 use ruff_db::parsed::parsed_module;
 use ruff_db::system::{SystemPath, SystemPathBuf, TestSystem};
 use ruff_python_ast::visitor::source_order;
 use ruff_python_ast::visitor::source_order::SourceOrderVisitor;
-use ruff_python_ast::{self as ast, Alias, Expr, Parameter, ParameterWithDefault, Stmt};
+use ruff_python_ast::{
+    self as ast, Alias, Expr, Parameter, ParameterWithDefault, PythonVersion, Stmt,
+};
+use salsa::Setter;
 
 fn setup_db(project_root: &SystemPath, system: TestSystem) -> anyhow::Result<ProjectDatabase> {
     let project = ProjectMetadata::discover(project_root, &system)?;
@@ -83,6 +86,10 @@ fn run_corpus_tests(pattern: &str) -> anyhow::Result<()> {
     memory_fs.create_directory_all(root.as_ref())?;
 
     let mut db = setup_db(&root, system.clone())?;
+
+    Program::get(&db)
+        .set_python_version(&mut db)
+        .to(PythonVersion::latest());
 
     let workspace_root = get_cargo_workspace_root()?;
     let workspace_root = workspace_root.to_string();
