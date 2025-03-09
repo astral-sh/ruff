@@ -69,7 +69,8 @@ without raising an error.
 from typing import Any
 
 def any() -> Any: ...
-def flag() -> bool: ...
+def flag() -> bool:
+    return True
 
 a: int
 b: str
@@ -126,7 +127,8 @@ inferred types:
 from typing import Any
 
 def any() -> Any: ...
-def flag() -> bool: ...
+def flag() -> bool:
+    return True
 
 a = 1
 b = 2
@@ -164,7 +166,8 @@ error for both `a` and `b`:
 ```py
 from typing import Any
 
-def flag() -> bool: ...
+def flag() -> bool:
+    return True
 
 if flag():
     a: Any = 1
@@ -194,7 +197,8 @@ seems inconsistent when compared to the case just above.
 `mod.py`:
 
 ```py
-def flag() -> bool: ...
+def flag() -> bool:
+    return True
 
 if flag():
     a: int
@@ -248,7 +252,8 @@ inconsistent when compared to the "possibly-undeclared-and-possibly-unbound" cas
 `mod.py`:
 
 ```py
-def flag() -> bool: ...
+def flag() -> bool:
+    return True
 
 if flag:
     a = 1

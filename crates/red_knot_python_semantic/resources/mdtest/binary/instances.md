@@ -406,10 +406,12 @@ A left-hand dunder method doesn't apply for the right-hand operand, or vice vers
 
 ```py
 class A:
-    def __add__(self, other) -> int: ...
+    def __add__(self, other) -> int:
+        return 1
 
 class B:
-    def __radd__(self, other) -> int: ...
+    def __radd__(self, other) -> int:
+        return 1
 
 class C: ...
 

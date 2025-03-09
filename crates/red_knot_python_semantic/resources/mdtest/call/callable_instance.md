@@ -25,7 +25,8 @@ reveal_type(b)  # revealed: Unknown
 def _(flag: bool):
     class PossiblyNotCallable:
         if flag:
-            def __call__(self) -> int: ...
+            def __call__(self) -> int:
+                return 1
 
     a = PossiblyNotCallable()
     result = a()  # error: "Object of type `PossiblyNotCallable` is not callable (possibly unbound `__call__` method)"
@@ -38,7 +39,8 @@ def _(flag: bool):
 def _(flag: bool):
     if flag:
         class PossiblyUnbound:
-            def __call__(self) -> int: ...
+            def __call__(self) -> int:
+                return 1
 
     # error: [possibly-unresolved-reference]
     a = PossiblyUnbound()
@@ -64,7 +66,8 @@ def _(flag: bool):
         if flag:
             __call__ = 1
         else:
-            def __call__(self) -> int: ...
+            def __call__(self) -> int:
+                return 1
 
     a = NonCallable()
     # error: [call-non-callable] "Object of type `Literal[1]` is not callable"

@@ -82,8 +82,12 @@ def _(flag: bool):
 Calling a union where the arguments don't match the signature of all variants.
 
 ```py
-def f1(a: int) -> int: ...
-def f2(a: str) -> str: ...
+def f1(a: int) -> int:
+    return a
+
+def f2(a: str) -> str:
+    return a
+
 def _(flag: bool):
     if flag:
         f = f1

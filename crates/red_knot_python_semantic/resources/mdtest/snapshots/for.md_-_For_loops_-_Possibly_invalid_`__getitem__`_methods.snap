@@ -28,7 +28,7 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/loops/for.md
 14 |                 return "foo"
 15 |         else:
 16 |             def __getitem__(self, item: str) -> int:
-17 |                 return "foo"
+17 |                 return 42
 18 | 
 19 |     # error: [not-iterable]
 20 |     for x in Iterable1():

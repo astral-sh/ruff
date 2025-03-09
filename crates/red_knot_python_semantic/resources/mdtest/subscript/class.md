@@ -13,7 +13,7 @@ a = NotSubscriptable[0]  # error: "Cannot subscript object of type `Literal[NotS
 ```py
 class Identity:
     def __class_getitem__(cls, item: int) -> str:
-        return item
+        return str(item)
 
 reveal_type(Identity[0])  # revealed: str
 ```
@@ -25,7 +25,7 @@ def _(flag: bool):
     class UnionClassGetItem:
         if flag:
             def __class_getitem__(cls, item: int) -> str:
-                return item
+                return str(item)
         else:
             def __class_getitem__(cls, item: int) -> int:
                 return item
@@ -39,7 +39,7 @@ def _(flag: bool):
 def _(flag: bool):
     class A:
         def __class_getitem__(cls, item: int) -> str:
-            return item
+            return str(item)
 
     class B:
         def __class_getitem__(cls, item: int) -> int:

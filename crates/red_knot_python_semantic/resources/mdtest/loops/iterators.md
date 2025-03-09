@@ -10,7 +10,8 @@ class Iterator:
         return 42
 
 class Iterable:
-    def __iter__(self) -> Iterator: ...
+    def __iter__(self) -> Iterator:
+        return Iterator()
 
 def generator_function():
     yield from Iterable()

@@ -99,22 +99,28 @@ The returned value of `__len__` is implicitly and recursively converted to `int`
 from typing import Literal
 
 class Zero:
-    def __len__(self) -> Literal[0]: ...
+    def __len__(self) -> Literal[0]:
+        return 0
 
 class ZeroOrOne:
-    def __len__(self) -> Literal[0, 1]: ...
+    def __len__(self) -> Literal[0, 1]:
+        return 0
 
 class ZeroOrTrue:
-    def __len__(self) -> Literal[0, True]: ...
+    def __len__(self) -> Literal[0, True]:
+        return 0
 
 class OneOrFalse:
-    def __len__(self) -> Literal[1] | Literal[False]: ...
+    def __len__(self) -> Literal[1] | Literal[False]:
+        return 1
 
 class OneOrFoo:
-    def __len__(self) -> Literal[1, "foo"]: ...
+    def __len__(self) -> Literal[1, "foo"]:
+        return 1
 
 class ZeroOrStr:
-    def __len__(self) -> Literal[0] | str: ...
+    def __len__(self) -> Literal[0] | str:
+        return 0
 
 reveal_type(len(Zero()))  # revealed: Literal[0]
 reveal_type(len(ZeroOrOne()))  # revealed: Literal[0, 1]
@@ -134,10 +140,12 @@ reveal_type(len(ZeroOrStr()))  # revealed: int
 from typing import Literal
 
 class LiteralTrue:
-    def __len__(self) -> Literal[True]: ...
+    def __len__(self) -> Literal[True]:
+        return True
 
 class LiteralFalse:
-    def __len__(self) -> Literal[False]: ...
+    def __len__(self) -> Literal[False]:
+        return False
 
 reveal_type(len(LiteralTrue()))  # revealed: Literal[1]
 reveal_type(len(LiteralFalse()))  # revealed: Literal[0]
@@ -157,19 +165,24 @@ class SomeEnum(Enum):
     INT_2 = 3_2
 
 class Auto:
-    def __len__(self) -> Literal[SomeEnum.AUTO]: ...
+    def __len__(self) -> Literal[SomeEnum.AUTO]:
+        return SomeEnum.AUTO
 
 class Int:
-    def __len__(self) -> Literal[SomeEnum.INT]: ...
+    def __len__(self) -> Literal[SomeEnum.INT]:
+        return SomeEnum.INT
 
 class Str:
-    def __len__(self) -> Literal[SomeEnum.STR]: ...
+    def __len__(self) -> Literal[SomeEnum.STR]:
+        return SomeEnum.STR
 
 class Tuple:
-    def __len__(self) -> Literal[SomeEnum.TUPLE]: ...
+    def __len__(self) -> Literal[SomeEnum.TUPLE]:
+        return SomeEnum.TUPLE
 
 class IntUnion:
-    def __len__(self) -> Literal[SomeEnum.INT, SomeEnum.INT_2]: ...
+    def __len__(self) -> Literal[SomeEnum.INT, SomeEnum.INT_2]:
+        return SomeEnum.INT
 
 reveal_type(len(Auto()))  # revealed: int
 reveal_type(len(Int()))  # revealed: int
@@ -184,7 +197,8 @@ reveal_type(len(IntUnion()))  # revealed: int
 from typing import Literal
 
 class Negative:
-    def __len__(self) -> Literal[-1]: ...
+    def __len__(self) -> Literal[-1]:
+        return -1
 
 # TODO: Emit a diagnostic
 reveal_type(len(Negative()))  # revealed: int
@@ -196,10 +210,12 @@ reveal_type(len(Negative()))  # revealed: int
 from typing import Literal
 
 class SecondOptionalArgument:
-    def __len__(self, v: int = 0) -> Literal[0]: ...
+    def __len__(self, v: int = 0) -> Literal[0]:
+        return 0
 
 class SecondRequiredArgument:
-    def __len__(self, v: int) -> Literal[1]: ...
+    def __len__(self, v: int) -> Literal[1]:
+        return 1
 
 # TODO: Emit a diagnostic
 reveal_type(len(SecondOptionalArgument()))  # revealed: Literal[0]

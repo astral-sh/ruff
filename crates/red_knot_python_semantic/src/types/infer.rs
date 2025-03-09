@@ -56,8 +56,9 @@ use crate::symbol::{
 };
 use crate::types::call::{Argument, CallArguments, UnionCallError};
 use crate::types::diagnostic::{
-    report_invalid_arguments_to_annotated, report_invalid_arguments_to_callable,
-    report_invalid_assignment, report_invalid_attribute_assignment, report_unresolved_module,
+    report_implicit_return_type, report_invalid_arguments_to_annotated,
+    report_invalid_arguments_to_callable, report_invalid_assignment,
+    report_invalid_attribute_assignment, report_invalid_return_type, report_unresolved_module,
     TypeCheckDiagnostics, CALL_NON_CALLABLE, CALL_POSSIBLY_UNBOUND_METHOD,
     CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS, CYCLIC_CLASS_DEFINITION, DIVISION_BY_ZERO,
     DUPLICATE_BASE, INCONSISTENT_MRO, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE, INVALID_DECLARATION,
@@ -262,6 +263,12 @@ impl<'db> InferenceRegion<'db> {
     }
 }
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq, salsa::Update)]
+struct TypeAndRange<'db> {
+    ty: Type<'db>,
+    range: TextRange,
+}
+
 /// The inferred types for a single region.
 #[derive(Debug, Eq, PartialEq, salsa::Update)]
 pub(crate) struct TypeInference<'db> {
@@ -276,6 +283,9 @@ pub(crate) struct TypeInference<'db> {
 
     /// The definitions that are deferred.
     deferred: FxHashSet<Definition<'db>>,
+
+    /// The returned types and their corresponding ranges of this region, if it is a function body.
+    return_types_and_ranges: Vec<TypeAndRange<'db>>,
 
     /// The diagnostics for this region.
     diagnostics: TypeCheckDiagnostics,
@@ -296,6 +306,7 @@ impl<'db> TypeInference<'db> {
             bindings: FxHashMap::default(),
             declarations: FxHashMap::default(),
             deferred: FxHashSet::default(),
+            return_types_and_ranges: vec![],
             diagnostics: TypeCheckDiagnostics::default(),
             scope,
             cycle_fallback_type: None,
@@ -308,6 +319,7 @@ impl<'db> TypeInference<'db> {
             bindings: FxHashMap::default(),
             declarations: FxHashMap::default(),
             deferred: FxHashSet::default(),
+            return_types_and_ranges: vec![],
             diagnostics: TypeCheckDiagnostics::default(),
             scope,
             cycle_fallback_type: Some(cycle_fallback_type),
@@ -1044,6 +1056,12 @@ impl<'db> TypeInferenceBuilder<'db> {
         );
     }
 
+    fn record_return_type(&mut self, ty: Type<'db>, range: TextRange) {
+        self.types
+            .return_types_and_ranges
+            .push(TypeAndRange { ty, range });
+    }
+
     fn infer_module(&mut self, module: &ast::ModModule) {
         self.infer_body(&module.body);
     }
@@ -1100,6 +1118,107 @@ impl<'db> TypeInferenceBuilder<'db> {
             self.infer_definition(parameter);
         }
         self.infer_body(&function.body);
+
+        if let Some(declared_ty) = function
+            .returns
+            .as_deref()
+            .map(|ret| self.file_expression_type(ret))
+        {
+            fn is_suite_empty(suite: &[ast::Stmt]) -> bool {
+                let mut saw_ellipsis = false;
+                for statement in suite {
+                    if let Some(expr) = statement.as_expr_stmt() {
+                        if expr.value.is_ellipsis_literal_expr() {
+                            saw_ellipsis = true;
+                        } else if expr.value.is_string_literal_expr() {
+                            // docstring
+                        } else {
+                            return false;
+                        }
+                    } else {
+                        return false;
+                    }
+                }
+                saw_ellipsis
+            }
+            fn does_suite_always_return(suite: &[ast::Stmt]) -> bool {
+                match suite.last() {
+                    Some(ast::Stmt::Return(_) | ast::Stmt::Raise(_)) => true,
+                    Some(ast::Stmt::If(if_stmt)) => {
+                        !if_stmt.elif_else_clauses.is_empty()
+                            && does_suite_always_return(&if_stmt.body)
+                            && if_stmt
+                                .elif_else_clauses
+                                .iter()
+                                .all(|clause| does_suite_always_return(&clause.body))
+                    }
+                    Some(ast::Stmt::While(while_stmt)) => {
+                        does_suite_always_return(&while_stmt.body)
+                            && does_suite_always_return(&while_stmt.orelse)
+                    }
+                    Some(ast::Stmt::For(for_stmt)) => {
+                        does_suite_always_return(&for_stmt.body)
+                            && does_suite_always_return(&for_stmt.orelse)
+                    }
+                    Some(ast::Stmt::Try(try_stmt)) => {
+                        does_suite_always_return(&try_stmt.body)
+                            && does_suite_always_return(&try_stmt.orelse)
+                            && does_suite_always_return(&try_stmt.finalbody)
+                    }
+                    Some(ast::Stmt::With(with_stmt)) => does_suite_always_return(&with_stmt.body),
+                    Some(ast::Stmt::Match(match_stmt)) => match_stmt
+                        .cases
+                        .iter()
+                        .all(|case| does_suite_always_return(&case.body)),
+                    _ => false,
+                }
+            }
+            let mut is_overloaded = false;
+            for decorator in &function.decorator_list {
+                let deco = self.file_expression_type(&decorator.expression);
+                if deco
+                    .into_function_literal()
+                    .is_some_and(|f| f.is_known(self.db(), KnownFunction::Overload))
+                {
+                    is_overloaded = true;
+                }
+            }
+            // TODO: Protocol / abstract methods can have empty bodies
+            if (self.in_stub() || is_overloaded)
+                && self.types.return_types_and_ranges.is_empty()
+                && is_suite_empty(&function.body)
+            {
+                return;
+            }
+            for invalid in self
+                .types
+                .return_types_and_ranges
+                .iter()
+                .filter(|ty_range| !ty_range.ty.is_assignable_to(self.db(), declared_ty))
+            {
+                report_invalid_return_type(
+                    &self.context,
+                    invalid.range,
+                    function.returns.as_ref().unwrap().range(),
+                    declared_ty,
+                    invalid.ty,
+                );
+            }
+            let scope_id = self.index.node_scope(NodeWithScopeRef::Function(function));
+            let use_def = self.index.use_def_map(scope_id);
+            if use_def.can_implicit_return(self.db())
+                && !does_suite_always_return(&function.body)
+                && !KnownClass::NoneType
+                    .to_instance(self.db())
+                    .is_assignable_to(self.db(), declared_ty)
+            {
+                report_implicit_return_type(
+                    &self.context,
+                    function.returns.as_ref().unwrap().range(),
+                    declared_ty,
+                );
+            }
+        }
     }
 
     fn infer_body(&mut self, suite: &[ast::Stmt]) {
@@ -2553,6 +2672,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                 report_invalid_exception_cause(&self.context, cause, cause_type);
             }
         }
+
+        let range = cause.as_ref().map_or(raise.range(), |cause| cause.range());
+        self.record_return_type(Type::Never, range);
     }
 
     /// Given a `from .foo import bar` relative import, resolve the relative module
@@ -2726,7 +2848,15 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn infer_return_statement(&mut self, ret: &ast::StmtReturn) {
-        self.infer_optional_expression(ret.value.as_deref());
+        if let Some(ty) = self.infer_optional_expression(ret.value.as_deref()) {
+            let range = ret
+                .value
+                .as_ref()
+                .map_or(ret.range(), |value| value.range());
+            self.record_return_type(ty, range);
+        } else {
+            self.record_return_type(KnownClass::NoneType.to_instance(self.db()), ret.range());
+        }
     }
 
     fn infer_delete_statement(&mut self, delete: &ast::StmtDelete) {

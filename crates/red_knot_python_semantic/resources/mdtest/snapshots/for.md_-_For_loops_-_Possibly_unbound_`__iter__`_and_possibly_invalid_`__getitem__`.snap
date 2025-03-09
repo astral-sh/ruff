@@ -36,7 +36,7 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/loops/for.md
 22 |                 return "foo"
 23 |         else:
 24 |             def __getitem__(self, item: str) -> int:
-25 |                 return "foo"
+25 |                 return 42
 26 |         if flag2:
 27 |             def __iter__(self) -> Iterator:
 28 |                 return Iterator()

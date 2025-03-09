@@ -37,6 +37,8 @@ def foo() -> int:
     return 42
 
 def decorator(func) -> Callable[[], int]:
+    # TODO: no error
+    # error: [invalid-return-type]
     return foo
 
 @decorator

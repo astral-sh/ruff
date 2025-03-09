@@ -86,7 +86,7 @@ fn cli_arguments_are_relative_to_the_current_directory() -> anyhow::Result<()> {
             "libs/utils.py",
             r#"
             def add(a: int, b: int) -> int:
-                a + b
+                return a + b
             "#,
         ),
         (
@@ -158,7 +158,7 @@ fn paths_in_configuration_files_are_relative_to_the_project_root() -> anyhow::Re
             "libs/utils.py",
             r#"
             def add(a: int, b: int) -> int:
-                a + b
+                return a + b
             "#,
         ),
         (

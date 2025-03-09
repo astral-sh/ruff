@@ -491,7 +491,7 @@ pub enum NodeWithScopeKind {
 }
 
 impl NodeWithScopeKind {
-    pub(super) const fn scope_kind(&self) -> ScopeKind {
+    pub(crate) const fn scope_kind(&self) -> ScopeKind {
         match self {
             Self::Module => ScopeKind::Module,
             Self::Class(_) => ScopeKind::Class,
