@@ -132,5 +132,38 @@ TRY203.py:68:5: TRY203 Remove exception handler; error is immediately re-raised
 69 | |         raise e
    | |_______________^ TRY203
 70 |
-71 |   def fine():
+71 |   def bad():
+   |
+
+TRY203.py:78:5: TRY203 Remove exception handler; error is immediately re-raised
+   |
+76 |       except Exception as e:
+77 |           print("foo")
+78 | /     except TypeError:
+79 | |         raise
+   | |_____________^ TRY203
+80 |
+81 |   def bad():
+   |
+
+TRY203.py:88:5: TRY203 Remove exception handler; error is immediately re-raised
+   |
+86 |       except Exception as e:
+87 |           print("foo")
+88 | /     except TypeError:
+89 | |         raise
+   | |_____________^ TRY203
+90 |       except ValueError:
+91 |           raise
+   |
+
+TRY203.py:90:5: TRY203 Remove exception handler; error is immediately re-raised
+   |
+88 |       except TypeError:
+89 |           raise
+90 | /     except ValueError:
+91 | |         raise
+   | |_____________^ TRY203
+92 |
+93 |   def fine():
    |
