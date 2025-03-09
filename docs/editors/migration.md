@@ -25,7 +25,7 @@ The following [`ruff-lsp`](https://github.com/astral-sh/ruff-lsp) settings are n
 - `lint.run`: This setting is no longer relevant for the native language server, which runs on every
     keystroke by default.
 - `lint.args`, `format.args`: These settings have been replaced by more granular settings in `ruff server` like [`lint.select`](settings.md#select), [`format.preview`](settings.md#format_preview),
-    etc. along with the ability to provide a default configuration file using [`configuration`](settings.md#configuration).
+    etc. along with the ability to override any configuration using the [`configuration`](settings.md#configuration) option.
 
 The following settings are not accepted by the language server but are still used by the VS Code
 extension. Refer to their respective documentation for more information on how it's being used by
@@ -61,38 +61,68 @@ value of `["<RULES>"]`.
 
 ## Examples
 
-Let's say you have these settings in VS Code:
+If you've been providing a configuration file as shown below:
 
 ```json
 {
-    "ruff.lint.args": "--select=E,F --line-length 80 --config ~/.config/custom_ruff_config.toml"
+    "ruff.lint.args": "--config ~/.config/custom_ruff_config.toml",
+    "ruff.format.args": "--config ~/.config/custom_ruff_config.toml"
 }
 ```
 
-After enabling the native server, you can migrate your settings like so:
+You can migrate to the new server by using the [`configuration`](settings.md#configuration) setting
+like below which will apply the configuration to both the linter and the formatter:
 
 ```json
 {
-    "ruff.configuration": "~/.config/custom_ruff_config.toml",
+    "ruff.configuration": "~/.config/custom_ruff_config.toml"
+}
+```
+
+Or, if you've been using specific flags like:
+
+```json
+{
+    "ruff.lint.args": "--select=E,F --unfixable=F401 --unsafe-fixes"
+}
+```
+
+You can migrate to the new server by using the [`lint.select`](settings.md#select) and
+[`configuration`](settings.md#configuration) setting like so:
+
+```json
+{
+    "ruff.lint.select": ["E", "F"],
+    "ruff.configuration": {
+        "unsafe-fixes": true,
+        "lint": {
+            "unfixable": ["F401"]
+        }
+    }
+}
+```
+
+And, if you're also using the `format.args` setting like:
+
+```json
+{
+    "ruff.format.args": "--line-length 80 --config='format.quote-style=double'"
+}
+```
+
+You can migrate to the new server by using the [`lineLength`](settings.md#linelength) and
+[`configuration`](settings.md#configuration) setting like so:
+
+```json
+{
     "ruff.lineLength": 80,
-    "ruff.lint.select": ["E", "F"]
+    "ruff.configuration": {
+        "format": {
+            "quote-style": "double"
+        }
+    }
 }
 ```
 
-Similarly, let's say you have these settings in Helix:
-
-```toml
-[language-server.ruff.config.lint]
-args = "--select=E,F --line-length 80 --config ~/.config/custom_ruff_config.toml"
-```
-
-These can be migrated like so:
-
-```toml
-[language-server.ruff.config]
-configuration = "~/.config/custom_ruff_config.toml"
-lineLength = 80
-
-[language-server.ruff.config.lint]
-select = ["E", "F"]
-```
+All of the above examples are valid for the VS Code extension only. For other editors, please refer
+to their respective documentation on the [settings](settings.md) page.
