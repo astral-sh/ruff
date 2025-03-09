@@ -114,6 +114,14 @@ def f(cond: bool) -> int:
     cond = True
     if cond:
         return 1
+
+def f(cond: bool) -> int:
+    if cond:
+        cond = True
+    else:
+        return 1
+    if cond:
+        return 2
 ```
 
 ## Invalid return type
@@ -193,4 +201,13 @@ def f(cond: bool) -> int:
 def f(cond: bool) -> int:
     if cond:
         raise ValueError()
+
+# error: [invalid-return-type]
+def f(cond: bool) -> int:
+    if cond:
+        cond = False
+    else:
+        return 1
+    if cond:
+        return 2
 ```

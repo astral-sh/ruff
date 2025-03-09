@@ -304,6 +304,12 @@ pub(crate) struct VisibilityConstraints {
     interiors: IndexVec<ScopedVisibilityConstraintId, InteriorNode>,
 }
 
+impl VisibilityConstraints {
+    pub(crate) fn get_interior(&self, id: ScopedVisibilityConstraintId) -> InteriorNode {
+        self.interiors[id]
+    }
+}
+
 #[derive(Debug, Default, PartialEq, Eq)]
 pub(crate) struct VisibilityConstraintsBuilder {
     interiors: IndexVec<ScopedVisibilityConstraintId, InteriorNode>,
@@ -543,10 +549,6 @@ impl VisibilityConstraintsBuilder {
         });
         self.and_cache.insert((a, b), result);
         result
-    }
-
-    pub(crate) fn get_interior(&self, id: ScopedVisibilityConstraintId) -> InteriorNode {
-        self.interiors[id]
     }
 }
 

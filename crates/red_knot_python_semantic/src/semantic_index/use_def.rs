@@ -276,24 +276,7 @@ use crate::semantic_index::visibility_constraints::{
     ScopedVisibilityConstraintId, VisibilityConstraints, VisibilityConstraintsBuilder,
 };
 
-use super::visibility_constraints::InteriorNode;
-
 mod symbol_state;
-
-/// Used to delay evaluation of `can_implicit_return`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, salsa::Update)]
-pub(crate) struct PredicateAndInterior<'db> {
-    predicate: Predicate<'db>,
-    interior: InteriorNode,
-}
-
-impl PredicateAndInterior<'_> {
-    pub(crate) fn can_implicit_return(&self, db: &dyn crate::Db) -> bool {
-        let truthiness = VisibilityConstraints::analyze_single(db, &self.predicate);
-        let visibility = self.interior.visibility_constraint(truthiness);
-        visibility != ScopedVisibilityConstraintId::ALWAYS_FALSE
-    }
-}
 
 /// Applicable definitions and constraints for every use of a name.
 #[derive(Debug, PartialEq, Eq, salsa::Update)]
@@ -338,7 +321,8 @@ pub(crate) struct UseDefMap<'db> {
     /// eager scope.
     eager_bindings: EagerBindings,
 
-    /// Whether the scope can implicitly return a value.
+    /// Whether or not the start of the scope is visible.
+    /// This is used to check if the scope can implicitly return a value.
     /// For example:
     ///
     /// ```python
@@ -349,10 +333,10 @@ pub(crate) struct UseDefMap<'db> {
     ///
     /// In this case, the scope may implicitly return `None`.
     ///
-    /// The check is basically done by seeing if `UseDefMapBuilder::scope_start_visibility != ALWAYS_FALSE`,
-    /// but if `scope_start_visibility` is not terminal, a delayed evaluation of the predicate must be performed.
-    /// This can be done by executing `PredicateAndInterior::can_implicit_return`.
-    can_implicit_return: Result<bool, PredicateAndInterior<'db>>,
+    /// The check is basically done by seeing if `scope_start_visibility != ALWAYS_FALSE`,
+    /// but if `scope_start_visibility` is not terminal, delayed evaluations of the predicates must be performed.
+    /// This can be done by executing `UseDefMap::can_implicit_return`.
+    scope_start_visibility: ScopedVisibilityConstraintId,
 }
 
 impl<'db> UseDefMap<'db> {
@@ -401,9 +385,16 @@ impl<'db> UseDefMap<'db> {
         self.declarations_iterator(declarations)
     }
 
+    /// This function is intended to be called only once inside `TypeInferenceBuilder::infer_function_body`.
     pub(crate) fn can_implicit_return(&self, db: &dyn crate::Db) -> bool {
-        self.can_implicit_return
-            .unwrap_or_else(|deferred| deferred.can_implicit_return(db))
+        let mut visibility = self.scope_start_visibility;
+        while !visibility.is_terminal() {
+            let interior = self.visibility_constraints.get_interior(visibility);
+            let predicate = self.predicates[interior.atom()];
+            let truthiness = VisibilityConstraints::analyze_single(db, &predicate);
+            visibility = interior.visibility_constraint(truthiness);
+        }
+        visibility != ScopedVisibilityConstraintId::ALWAYS_FALSE
     }
 
     fn bindings_iterator<'map>(
@@ -812,19 +803,6 @@ impl<'db> UseDefMapBuilder<'db> {
         self.bindings_by_declaration.shrink_to_fit();
         self.eager_bindings.shrink_to_fit();
 
-        let can_implicit_return = if self.scope_start_visibility.is_terminal() {
-            Ok(self.scope_start_visibility != ScopedVisibilityConstraintId::ALWAYS_FALSE)
-        } else {
-            let interior = self
-                .visibility_constraints
-                .get_interior(self.scope_start_visibility);
-            let predicate = self.predicates.get_predicate(interior.atom());
-            Err(PredicateAndInterior {
-                predicate,
-                interior,
-            })
-        };
-
         UseDefMap {
             all_definitions: self.all_definitions,
             predicates: self.predicates.build(),
@@ -835,7 +813,7 @@ impl<'db> UseDefMapBuilder<'db> {
             declarations_by_binding: self.declarations_by_binding,
             bindings_by_declaration: self.bindings_by_declaration,
             eager_bindings: self.eager_bindings,
-            can_implicit_return,
+            scope_start_visibility: self.scope_start_visibility,
         }
     }
 }

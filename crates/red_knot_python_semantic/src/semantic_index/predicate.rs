@@ -40,10 +40,6 @@ impl<'db> PredicatesBuilder<'db> {
         self.predicates.shrink_to_fit();
         self.predicates
     }
-
-    pub(crate) fn get_predicate(&self, id: ScopedPredicateId) -> Predicate<'db> {
-        self.predicates[id]
-    }
 }
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update)]
