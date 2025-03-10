@@ -3,7 +3,66 @@ use crate::Db;
 use crate::{semantic_index::definition::Definition, types::todo_type};
 use ruff_python_ast::{self as ast, name::Name};
 
-/// A typed callable signature.
+/// A collection of overloads for a callable.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
+pub enum Overloads<'db> {
+    Single(Signature<'db>),
+    Overloaded(Box<[Signature<'db>]>),
+}
+
+impl<'db> Overloads<'db> {
+    /// Creates a new `Overloads` from an non-empty iterator of [`Signature`]s. Panics if the
+    /// iterator is empty.
+    pub(crate) fn from_overloads<I>(overloads: I) -> Self
+    where
+        I: IntoIterator,
+        I::IntoIter: Iterator<Item = Signature<'db>>,
+    {
+        let mut iter = overloads.into_iter();
+        let first_overload = iter.next().expect("overloads should not be empty");
+        let Some(second_overload) = iter.next() else {
+            return Overloads::Single(first_overload);
+        };
+        let mut overloads = vec![first_overload, second_overload];
+        overloads.extend(iter);
+        Overloads::Overloaded(overloads.into())
+    }
+
+    pub(crate) fn iter(&self) -> std::slice::Iter<Signature<'db>> {
+        match self {
+            Overloads::Single(signature) => std::slice::from_ref(signature).iter(),
+            Overloads::Overloaded(signatures) => signatures.iter(),
+        }
+    }
+
+    /// Return a signature for a dynamic callable
+    pub(crate) fn dynamic(ty: Type<'db>) -> Self {
+        let signature = Signature {
+            parameters: Parameters::gradual_form(),
+            return_ty: Some(ty),
+        };
+        signature.into()
+    }
+
+    /// Return a todo signature: (*args: Todo, **kwargs: Todo) -> Todo
+    #[allow(unused_variables)] // 'reason' only unused in debug builds
+    pub(crate) fn todo(reason: &'static str) -> Self {
+        let signature = Signature {
+            parameters: Parameters::todo(),
+            return_ty: Some(todo_type!(reason)),
+        };
+        signature.into()
+    }
+}
+
+impl<'db> From<Signature<'db>> for Overloads<'db> {
+    fn from(signature: Signature<'db>) -> Self {
+        Overloads::Single(signature)
+    }
+}
+
+/// A typed callable signature. If a callable is overloaded, there will be one of these for each
+/// possible overload.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
 pub struct Signature<'db> {
     /// Parameters, in source order.
@@ -25,15 +84,6 @@ impl<'db> Signature<'db> {
         Self {
             parameters,
             return_ty,
-        }
-    }
-
-    /// Return a todo signature: (*args: Todo, **kwargs: Todo) -> Todo
-    #[allow(unused_variables)] // 'reason' only unused in debug builds
-    pub(crate) fn todo(reason: &'static str) -> Self {
-        Self {
-            parameters: Parameters::todo(),
-            return_ty: Some(todo_type!(reason)),
         }
     }
 
@@ -714,7 +764,7 @@ mod tests {
         .unwrap();
         let func = get_function_f(&db, "/src/a.py");
 
-        let expected_sig = func.internal_signature(&db);
+        let expected_sig = func.internal_signature(&db).into();
 
         // With no decorators, internal and external signature are the same
         assert_eq!(func.signature(&db), &expected_sig);
@@ -735,7 +785,7 @@ mod tests {
         .unwrap();
         let func = get_function_f(&db, "/src/a.py");
 
-        let expected_sig = Signature::todo("return type of decorated function");
+        let expected_sig = Overloads::todo("return type of decorated function");
 
         // With no decorators, internal and external signature are the same
         assert_eq!(func.signature(&db), &expected_sig);

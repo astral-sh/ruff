@@ -491,6 +491,16 @@
             }
           ]
         },
+        "no-matching-overload": {
+          "title": "detects calls that do not match any overload",
+          "description": "## What it does\nChecks for calls to an overloaded function that do not match any of the overloads.\n\n## Why is this bad?\nFailing to provide the correct arguments to one of the overloads will raise a `TypeError`\nat runtime.\n\n## Examples\n```python\n@overload\ndef func(x: int): ...\n@overload\ndef func(x: bool): ...\nfunc(\"string\")  # error: [no-matching-overload]\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "non-subscriptable": {
           "title": "detects subscripting objects that do not support subscripting",
           "description": "## What it does\nChecks for subscripting objects that do not support subscripting.\n\n## Why is this bad?\nSubscripting an object that does not support it will raise a `TypeError` at runtime.\n\n## Examples\n```python\n4[1]  # TypeError: 'int' object is not subscriptable\n```",

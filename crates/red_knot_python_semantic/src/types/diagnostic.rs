@@ -45,6 +45,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_TYPE_FORM);
     registry.register_lint(&INVALID_TYPE_VARIABLE_CONSTRAINTS);
     registry.register_lint(&MISSING_ARGUMENT);
+    registry.register_lint(&NO_MATCHING_OVERLOAD);
     registry.register_lint(&NON_SUBSCRIPTABLE);
     registry.register_lint(&NOT_ITERABLE);
     registry.register_lint(&UNSUPPORTED_BOOL_CONVERSION);
@@ -469,6 +470,29 @@ declare_lint! {
     /// ```
     pub(crate) static MISSING_ARGUMENT = {
         summary: "detects missing required arguments in a call",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for calls to an overloaded function that do not match any of the overloads.
+    ///
+    /// ## Why is this bad?
+    /// Failing to provide the correct arguments to one of the overloads will raise a `TypeError`
+    /// at runtime.
+    ///
+    /// ## Examples
+    /// ```python
+    /// @overload
+    /// def func(x: int): ...
+    /// @overload
+    /// def func(x: bool): ...
+    /// func("string")  # error: [no-matching-overload]
+    /// ```
+    pub(crate) static NO_MATCHING_OVERLOAD = {
+        summary: "detects calls that do not match any overload",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
