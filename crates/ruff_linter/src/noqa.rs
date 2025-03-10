@@ -462,26 +462,12 @@ impl<'a> NoqaLexer<'a> {
 
     /// Collect codes in `noqa` comment.
     fn lex_directive(mut self) -> Result<NoqaLexerOutput<'a>, LexicalError> {
+        let range = TextRange::at(self.offset, self.position());
+
         match self.cursor.bump() {
-            None => {
-                let range = TextRange::at(self.offset, self.current());
-                return Ok(NoqaLexerOutput {
-                    warnings: self.warnings,
-                    directive: Directive::All(All { range }),
-                });
-            }
+            // End of comment
             // Ex) # noqa# A comment
-            //            ^
-            Some('#') => {
-                let range = TextRange::at(self.offset, self.current() - '#'.text_len());
-                return Ok(NoqaLexerOutput {
-                    warnings: self.warnings,
-                    directive: Directive::All(All { range }),
-                });
-            }
-            // Ex) # noqa A comment
-            Some(c) if c.is_whitespace() => {
-                let range = TextRange::at(self.offset, self.current() - c.text_len());
+            None | Some('#') => {
                 return Ok(NoqaLexerOutput {
                     warnings: self.warnings,
                     directive: Directive::All(All { range }),
@@ -489,6 +475,22 @@ impl<'a> NoqaLexer<'a> {
             }
             // Ex) # noqa: F401,F842
             Some(':') => self.lex_codes()?,
+            // Ex) # noqa A comment
+            // Ex) # noqa   : F401
+            Some(c) if c.is_whitespace() => {
+                self.eat_whitespace();
+                match self.cursor.bump() {
+                    Some(':') => self.lex_codes()?,
+                    _ => {
+                        return Ok(NoqaLexerOutput {
+                            warnings: self.warnings,
+                            directive: Directive::All(All { range }),
+                        });
+                    }
+                }
+            }
+            // Ex) #noqaA comment
+            // Ex) #noqaF401
             _ => {
                 return Err(LexicalError::InvalidSuffix);
             }
