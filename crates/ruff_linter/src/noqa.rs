@@ -312,9 +312,7 @@ fn lex_inline_noqa(
     comment_range: TextRange,
     source: &str,
 ) -> Result<Option<NoqaLexerOutput<'_>>, LexicalError> {
-    let source = &source[..comment_range.end().to_usize()];
-    let offset = comment_range.start();
-    let lexer = NoqaLexer::starts_at(offset, source);
+    let lexer = NoqaLexer::in_range(comment_range, source);
     lexer.lex_inline_noqa()
 }
 
@@ -323,14 +321,12 @@ fn lex_file_exemption(
     comment_range: TextRange,
     source: &str,
 ) -> Result<Option<NoqaLexerOutput<'_>>, LexicalError> {
-    let source = &source[..comment_range.end().to_usize()];
-    let offset = comment_range.start();
-    let lexer = NoqaLexer::starts_at(offset, source);
+    let lexer = NoqaLexer::in_range(comment_range, source);
     lexer.lex_file_exemption()
 }
 
 pub(crate) fn lex_codes(text: &str) -> Result<Vec<Code<'_>>, LexicalError> {
-    let mut lexer = NoqaLexer::starts_at(TextSize::new(0), text);
+    let mut lexer = NoqaLexer::in_range(TextRange::new(TextSize::new(0), text.text_len()), text);
     lexer.lex_codes()?;
     Ok(lexer.codes)
 }
@@ -345,7 +341,12 @@ struct NoqaLexer<'a> {
     line: &'a str,
     /// Contains convenience methods for lexing
     cursor: Cursor<'a>,
-    /// Byte offset of the start of the `noqa` comment
+    /// Byte offset of the start of putative `noqa` comment
+    ///
+    /// Note: This is updated in the course of lexing in the case
+    /// where there are multiple comments in a comment range.
+    /// Ex) `# comment # noqa: F401`
+    /// start^         ^-- changed to here during lexing
     offset: TextSize,
     /// Non-fatal warnings collected during lexing
     warnings: Vec<LexicalWarning>,
@@ -357,7 +358,8 @@ struct NoqaLexer<'a> {
 }
 
 impl<'a> NoqaLexer<'a> {
-    fn new(source: &'a str, range: TextRange) -> Self {
+    /// Initialize [`NoqaLexer`] in the given range of source text.
+    fn in_range(range: TextRange, source: &'a str) -> Self {
         Self {
             line: &source[range],
             offset: range.start(),
@@ -366,14 +368,6 @@ impl<'a> NoqaLexer<'a> {
             missing_delimiter: false,
             codes: Vec::new(),
         }
-    }
-
-    /// Initialize [`NoqaLexer`] at offset.
-    ///
-    /// The offset should be the beginning of a `noqa` comment.
-    fn starts_at(offset: TextSize, source: &'a str) -> Self {
-        let range = TextRange::new(offset, source.text_len());
-        Self::new(source, range)
     }
 
     fn lex_inline_noqa(mut self) -> Result<Option<NoqaLexerOutput<'a>>, LexicalError> {
