@@ -416,7 +416,7 @@ checksum = "8c41dc435a7b98e4608224bbf65282309f5403719df9113621b30f8b6f74e2f4"
 dependencies = [
  "nix",
  "terminfo",
- "thiserror 2.0.11",
+ "thiserror 2.0.12",
  "which",
  "windows-sys 0.59.0",
 ]
@@ -2081,7 +2081,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8b7cafe60d6cf8e62e1b9b2ea516a089c008945bb5a275416789e7db0bc199dc"
 dependencies = [
  "memchr",
- "thiserror 2.0.11",
+ "thiserror 2.0.12",
  "ucd-trie",
 ]
 
@@ -2275,7 +2275,7 @@ dependencies = [
  "newtype-uuid",
  "quick-xml",
  "strip-ansi-escapes",
- "thiserror 2.0.11",
+ "thiserror 2.0.12",
  "uuid",
 ]
 
@@ -2453,7 +2453,7 @@ dependencies = [
  "salsa",
  "schemars",
  "serde",
- "thiserror 2.0.11",
+ "thiserror 2.0.12",
  "toml",
  "tracing",
 ]
@@ -2499,7 +2499,7 @@ dependencies = [
  "strum_macros",
  "tempfile",
  "test-case",
- "thiserror 2.0.11",
+ "thiserror 2.0.12",
  "tracing",
 ]
 
@@ -2551,7 +2551,7 @@ dependencies = [
  "serde",
  "smallvec",
  "tempfile",
- "thiserror 2.0.11",
+ "thiserror 2.0.12",
  "toml",
 ]
 
@@ -2707,7 +2707,7 @@ dependencies = [
  "strum",
  "tempfile",
  "test-case",
- "thiserror 2.0.11",
+ "thiserror 2.0.12",
  "tikv-jemallocator",
  "toml",
  "tracing",
@@ -2790,7 +2790,7 @@ dependencies = [
  "schemars",
  "serde",
  "tempfile",
- "thiserror 2.0.11",
+ "thiserror 2.0.12",
  "tracing",
  "tracing-subscriber",
  "tracing-tree",
@@ -2945,7 +2945,7 @@ dependencies = [
  "strum",
  "strum_macros",
  "test-case",
- "thiserror 2.0.11",
+ "thiserror 2.0.12",
  "toml",
  "typed-arena",
  "unicode-normalization",
@@ -2979,7 +2979,7 @@ dependencies = [
  "serde_json",
  "serde_with",
  "test-case",
- "thiserror 2.0.11",
+ "thiserror 2.0.12",
  "uuid",
 ]
 
@@ -3053,7 +3053,7 @@ dependencies = [
  "similar",
  "smallvec",
  "static_assertions",
- "thiserror 2.0.11",
+ "thiserror 2.0.12",
  "tracing",
 ]
 
@@ -3189,7 +3189,7 @@ dependencies = [
  "serde",
  "serde_json",
  "shellexpand",
- "thiserror 2.0.11",
+ "thiserror 2.0.12",
  "toml",
  "tracing",
  "tracing-subscriber",
@@ -3779,11 +3779,11 @@ dependencies = [
 
 [[package]]
 name = "thiserror"
-version = "2.0.11"
+version = "2.0.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d452f284b73e6d76dd36758a0c8684b1d5be31f92b89d07fd5822175732206fc"
+checksum = "567b8a2dae586314f7be2a752ec7474332959c6460e02bde30d702a66d488708"
 dependencies = [
- "thiserror-impl 2.0.11",
+ "thiserror-impl 2.0.12",
 ]
 
 [[package]]
@@ -3799,9 +3799,9 @@ dependencies = [
 
 [[package]]
 name = "thiserror-impl"
-version = "2.0.11"
+version = "2.0.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "26afc1baea8a989337eeb52b6e72a039780ce45c3edfcc9c5b9d112feeb173c2"
+checksum = "7f7cf42b4507d8ea322120659672cf1b9dbb93f8f2d4ecfd6e51350ff5b17a1d"
 dependencies = [
  "proc-macro2",
  "quote",
