@@ -1,7 +1,7 @@
 use ruff_python_ast::{self as ast, CmpOp, Expr, ExprContext, Number};
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::TokenKind;
+use crate::{error::RelaxedDecoratorError, TokenKind};
 
 /// Set the `ctx` for `Expr::Id`, `Expr::Attribute`, `Expr::Subscript`, `Expr::Starred`,
 /// `Expr::Tuple` and `Expr::List`. If `expr` is either `Expr::Tuple` or `Expr::List`,
@@ -48,56 +48,56 @@ pub(super) const fn token_kind_to_cmp_op(tokens: [TokenKind; 2]) -> Option<CmpOp
 /// Helper for `parse_decorators` to determine if `expr` is a [`dotted_name`] from the decorator
 /// grammar before Python 3.9.
 ///
-/// Returns `None` if `expr` is a `dotted_name`. Returns `Some((description, range))` if it is not,
-/// where `description` is a string describing the invalid node and `range` is the node's range.
+/// Returns `Some((error, range))` if `expr` is not a `dotted_name`, or `None` if it is a `dotted_name`.
 ///
 /// [`dotted_name`]: https://docs.python.org/3.8/reference/compound_stmts.html#grammar-token-dotted-name
-pub(super) fn invalid_pre_py39_decorator_description_and_range(
+pub(super) fn detect_invalid_pre_py39_decorator_node(
     expr: &Expr,
-) -> Option<(&'static str, TextRange)> {
+) -> Option<(RelaxedDecoratorError, TextRange)> {
     let description = match expr {
-        Expr::Attribute(attr) => {
-            return invalid_pre_py39_decorator_description_and_range(&attr.value)
-        }
-
         Expr::Name(_) => return None,
 
+        Expr::Attribute(attribute) => {
+            return detect_invalid_pre_py39_decorator_node(&attribute.value)
+        }
+
+        Expr::Call(_) => return Some((RelaxedDecoratorError::CallExpression, expr.range())),
+
         Expr::NumberLiteral(number) => match &number.value {
-            Number::Int(_) => "int literals",
-            Number::Float(_) => "float literals",
-            Number::Complex { .. } => "complex literals",
+            Number::Int(_) => "an int literal",
+            Number::Float(_) => "a float literal",
+            Number::Complex { .. } => "a complex literal",
         },
 
-        Expr::BoolOp(_) => "boolean expressions",
-        Expr::BinOp(_) => "binary-operation expressions",
-        Expr::UnaryOp(_) => "unary-operation expressions",
-        Expr::Await(_) => "`await` expressions",
-        Expr::Lambda(_) => "lambda expressions",
-        Expr::If(_) => "conditional expressions",
-        Expr::Dict(_) => "dict literals",
-        Expr::Set(_) => "set literals",
-        Expr::List(_) => "list literals",
-        Expr::Tuple(_) => "tuple literals",
-        Expr::Starred(_) => "starred expressions",
-        Expr::Slice(_) => "slice expressions",
-        Expr::BytesLiteral(_) => "bytes literals",
-        Expr::StringLiteral(_) => "string literals",
-        Expr::EllipsisLiteral(_) => "ellipsis literals",
-        Expr::NoneLiteral(_) => "`None` literals",
-        Expr::BooleanLiteral(_) => "boolean literals",
-        Expr::ListComp(_) => "list comprehensions",
-        Expr::SetComp(_) => "set comprehensions",
-        Expr::DictComp(_) => "dict comprehensions",
-        Expr::Generator(_) => "generator expressions",
-        Expr::Yield(_) => "`yield` expressions",
-        Expr::YieldFrom(_) => "`yield from` expressions",
-        Expr::Compare(_) => "comparison expressions",
-        Expr::Call(_) => "function calls",
-        Expr::FString(_) => "f-strings",
-        Expr::Named(_) => "assignment expressions",
-        Expr::Subscript(_) => "subscript expressions",
-        Expr::IpyEscapeCommand(_) => "IPython escape commands",
+        Expr::BoolOp(_) => "boolean expression",
+        Expr::BinOp(_) => "binary-operation expression",
+        Expr::UnaryOp(_) => "unary-operation expression",
+        Expr::Await(_) => "`await` expression",
+        Expr::Lambda(_) => "lambda expression",
+        Expr::If(_) => "conditional expression",
+        Expr::Dict(_) => "a dict literal",
+        Expr::Set(_) => "a set literal",
+        Expr::List(_) => "a list literal",
+        Expr::Tuple(_) => "a tuple literal",
+        Expr::Starred(_) => "starred expression",
+        Expr::Slice(_) => "slice expression",
+        Expr::BytesLiteral(_) => "a bytes literal",
+        Expr::StringLiteral(_) => "a string literal",
+        Expr::EllipsisLiteral(_) => "an ellipsis literal",
+        Expr::NoneLiteral(_) => "a `None` literal",
+        Expr::BooleanLiteral(_) => "a boolean literal",
+        Expr::ListComp(_) => "a list comprehension",
+        Expr::SetComp(_) => "a set comprehension",
+        Expr::DictComp(_) => "a dict comprehension",
+        Expr::Generator(_) => "generator expression",
+        Expr::Yield(_) => "`yield` expression",
+        Expr::YieldFrom(_) => "`yield from` expression",
+        Expr::Compare(_) => "comparison expression",
+        Expr::FString(_) => "f-string",
+        Expr::Named(_) => "assignment expression",
+        Expr::Subscript(_) => "subscript expression",
+        Expr::IpyEscapeCommand(_) => "IPython escape command",
     };
 
-    Some((description, expr.range()))
+    Some((RelaxedDecoratorError::Other(description), expr.range()))
 }

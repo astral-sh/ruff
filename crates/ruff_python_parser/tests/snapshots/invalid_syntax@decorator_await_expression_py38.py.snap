@@ -91,6 +91,6 @@ Module(
 1 | # parse_options: { "target-version": "3.8" }
 2 | async def foo():
 3 |     @await bar
-  |      ^^^^^^^^^ Syntax Error: Cannot use `await` expression outside function-call arguments in a decorator on Python 3.8 (syntax was added in Python 3.9)
+  |      ^^^^^^^^^ Syntax Error: Cannot use `await` expression outside function call arguments in a decorator on Python 3.8 (syntax was added in Python 3.9)
 4 |     def baz(): ...
   |

@@ -63,6 +63,6 @@ Module(
   |
 1 | # parse_options: { "target-version": "3.8" }
 2 | @3.14
-  |  ^^^^ Syntax Error: Cannot use a float literal outside function-call arguments in a decorator on Python 3.8 (syntax was added in Python 3.9)
+  |  ^^^^ Syntax Error: Cannot use a float literal outside function call arguments in a decorator on Python 3.8 (syntax was added in Python 3.9)
 3 | def bar(): ...
   |

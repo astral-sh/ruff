@@ -2701,18 +2701,21 @@ impl<'src> Parser<'src> {
                 //     @await bar
                 //     def baz(): ...
 
-                let disallowed_expression = match &parsed_expr.expr {
+                // test_err decorator_non_toplevel_call_expression_py38
+                // # parse_options: { "target-version": "3.8" }
+                // @foo().bar()
+                // def baz(): ...
+
+                let relaxed_decorator_error = match &parsed_expr.expr {
                     Expr::Call(expr_call) => {
-                        helpers::invalid_pre_py39_decorator_description_and_range(&expr_call.func)
+                        helpers::detect_invalid_pre_py39_decorator_node(&expr_call.func)
                     }
-                    expr => helpers::invalid_pre_py39_decorator_description_and_range(expr),
+                    expr => helpers::detect_invalid_pre_py39_decorator_node(expr),
                 };
 
-                if let Some((description, range)) = disallowed_expression {
+                if let Some((error, range)) = relaxed_decorator_error {
                     self.add_unsupported_syntax_error(
-                        UnsupportedSyntaxErrorKind::RelaxedDecorator {
-                            invalid_node_name: description,
-                        },
+                        UnsupportedSyntaxErrorKind::RelaxedDecorator(error),
                         range,
                     );
                 }
