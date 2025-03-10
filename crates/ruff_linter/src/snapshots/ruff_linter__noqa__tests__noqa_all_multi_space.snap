@@ -1,14 +1,16 @@
 ---
 source: crates/ruff_linter/src/noqa.rs
-expression: "Directive::try_extract(source, TextSize::default())"
-snapshot_kind: text
+expression: directive
 ---
 Ok(
     Some(
-        All(
-            All {
-                range: 0..7,
-            },
-        ),
+        NoqaLexerOutput {
+            warnings: [],
+            directive: All(
+                All {
+                    range: 0..7,
+                },
+            ),
+        },
     ),
 )

@@ -1,26 +1,22 @@
 ---
 source: crates/ruff_linter/src/noqa.rs
-expression: directive
+expression: exemption
 ---
 Ok(
     Some(
         NoqaLexerOutput {
-            warnings: [
-                MissingItem(
-                    13..14,
-                ),
-            ],
+            warnings: [],
             directive: Codes(
                 Codes {
-                    range: 0..19,
+                    range: 3..27,
                     codes: [
                         Code {
                             code: "F401",
-                            range: 8..12,
+                            range: 17..21,
                         },
                         Code {
                             code: "F841",
-                            range: 15..19,
+                            range: 23..27,
                         },
                     ],
                 },
