@@ -1217,17 +1217,26 @@ mod tests {
     use ruff_text_size::{TextLen, TextRange, TextSize};
 
     use crate::noqa::{
-        add_noqa_inner, lex_codes, lex_file_exemption, lex_inline_noqa, Directive, NoqaLexerOutput,
-        NoqaMapping,
+        add_noqa_inner, lex_codes, lex_file_exemption, lex_inline_noqa, Directive, LexicalError,
+        NoqaLexerOutput, NoqaMapping,
     };
     use crate::rules::pycodestyle::rules::{AmbiguousVariableName, UselessSemicolon};
     use crate::rules::pyflakes::rules::UnusedVariable;
     use crate::rules::pyupgrade::rules::PrintfStringFormatting;
     use crate::{generate_noqa_edits, Locator};
 
-    fn assert_codes_match_slices(codes: &crate::noqa::Codes, source: &str) {
-        for code in codes.iter() {
-            assert_eq!(&source[code.range], code.code);
+    fn assert_lexed_ranges_match_slices(
+        directive: Result<Option<NoqaLexerOutput>, LexicalError>,
+        source: &str,
+    ) {
+        if let Ok(Some(NoqaLexerOutput {
+            warnings: _,
+            directive: Directive::Codes(codes),
+        })) = directive
+        {
+            for code in codes.iter() {
+                assert_eq!(&source[code.range], code.code);
+            }
         }
     }
 
@@ -1242,13 +1251,7 @@ mod tests {
         let source = "# noqa";
         let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
         assert_debug_snapshot!(directive);
-        if let Ok(Some(NoqaLexerOutput {
-            warnings: _,
-            directive: Directive::Codes(codes),
-        })) = directive
-        {
-            assert_codes_match_slices(&codes, source);
-        }
+        assert_lexed_ranges_match_slices(directive, source);
     }
 
     #[test]
@@ -1256,13 +1259,7 @@ mod tests {
         let source = "# noqa: F401";
         let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
         assert_debug_snapshot!(directive);
-        if let Ok(Some(NoqaLexerOutput {
-            warnings: _,
-            directive: Directive::Codes(codes),
-        })) = directive
-        {
-            assert_codes_match_slices(&codes, source);
-        }
+        assert_lexed_ranges_match_slices(directive, source);
     }
 
     #[test]
@@ -1270,13 +1267,7 @@ mod tests {
         let source = "# noqa: F401, F841";
         let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
         assert_debug_snapshot!(directive);
-        if let Ok(Some(NoqaLexerOutput {
-            warnings: _,
-            directive: Directive::Codes(codes),
-        })) = directive
-        {
-            assert_codes_match_slices(&codes, source);
-        }
+        assert_lexed_ranges_match_slices(directive, source);
     }
 
     #[test]
@@ -1284,13 +1275,7 @@ mod tests {
         let source = "# NOQA";
         let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
         assert_debug_snapshot!(directive);
-        if let Ok(Some(NoqaLexerOutput {
-            warnings: _,
-            directive: Directive::Codes(codes),
-        })) = directive
-        {
-            assert_codes_match_slices(&codes, source);
-        }
+        assert_lexed_ranges_match_slices(directive, source);
     }
 
     #[test]
@@ -1298,13 +1283,7 @@ mod tests {
         let source = "# NOQA: F401";
         let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
         assert_debug_snapshot!(directive);
-        if let Ok(Some(NoqaLexerOutput {
-            warnings: _,
-            directive: Directive::Codes(codes),
-        })) = directive
-        {
-            assert_codes_match_slices(&codes, source);
-        }
+        assert_lexed_ranges_match_slices(directive, source);
     }
 
     #[test]
@@ -1312,13 +1291,7 @@ mod tests {
         let source = "# NOQA: F401, F841";
         let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
         assert_debug_snapshot!(directive);
-        if let Ok(Some(NoqaLexerOutput {
-            warnings: _,
-            directive: Directive::Codes(codes),
-        })) = directive
-        {
-            assert_codes_match_slices(&codes, source);
-        }
+        assert_lexed_ranges_match_slices(directive, source);
     }
 
     #[test]
@@ -1326,13 +1299,7 @@ mod tests {
         let source = "#   # noqa: F401";
         let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
         assert_debug_snapshot!(directive);
-        if let Ok(Some(NoqaLexerOutput {
-            warnings: _,
-            directive: Directive::Codes(codes),
-        })) = directive
-        {
-            assert_codes_match_slices(&codes, source);
-        }
+        assert_lexed_ranges_match_slices(directive, source);
     }
 
     #[test]
@@ -1340,13 +1307,7 @@ mod tests {
         let source = "# noqa: F401   #";
         let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
         assert_debug_snapshot!(directive);
-        if let Ok(Some(NoqaLexerOutput {
-            warnings: _,
-            directive: Directive::Codes(codes),
-        })) = directive
-        {
-            assert_codes_match_slices(&codes, source);
-        }
+        assert_lexed_ranges_match_slices(directive, source);
     }
 
     #[test]
@@ -1354,13 +1315,7 @@ mod tests {
         let source = "#noqa";
         let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
         assert_debug_snapshot!(directive);
-        if let Ok(Some(NoqaLexerOutput {
-            warnings: _,
-            directive: Directive::Codes(codes),
-        })) = directive
-        {
-            assert_codes_match_slices(&codes, source);
-        }
+        assert_lexed_ranges_match_slices(directive, source);
     }
 
     #[test]
@@ -1368,13 +1323,7 @@ mod tests {
         let source = "#noqa:F401";
         let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
         assert_debug_snapshot!(directive);
-        if let Ok(Some(NoqaLexerOutput {
-            warnings: _,
-            directive: Directive::Codes(codes),
-        })) = directive
-        {
-            assert_codes_match_slices(&codes, source);
-        }
+        assert_lexed_ranges_match_slices(directive, source);
     }
 
     #[test]
@@ -1382,13 +1331,7 @@ mod tests {
         let source = "#noqa:F401,F841";
         let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
         assert_debug_snapshot!(directive);
-        if let Ok(Some(NoqaLexerOutput {
-            warnings: _,
-            directive: Directive::Codes(codes),
-        })) = directive
-        {
-            assert_codes_match_slices(&codes, source);
-        }
+        assert_lexed_ranges_match_slices(directive, source);
     }
 
     #[test]
@@ -1396,13 +1339,7 @@ mod tests {
         let source = "#  noqa";
         let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
         assert_debug_snapshot!(directive);
-        if let Ok(Some(NoqaLexerOutput {
-            warnings: _,
-            directive: Directive::Codes(codes),
-        })) = directive
-        {
-            assert_codes_match_slices(&codes, source);
-        }
+        assert_lexed_ranges_match_slices(directive, source);
     }
 
     #[test]
@@ -1410,13 +1347,7 @@ mod tests {
         let source = "#  noqa: F401";
         let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
         assert_debug_snapshot!(directive);
-        if let Ok(Some(NoqaLexerOutput {
-            warnings: _,
-            directive: Directive::Codes(codes),
-        })) = directive
-        {
-            assert_codes_match_slices(&codes, source);
-        }
+        assert_lexed_ranges_match_slices(directive, source);
     }
 
     #[test]
@@ -1424,13 +1355,7 @@ mod tests {
         let source = "#  noqa: F401,  F841";
         let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
         assert_debug_snapshot!(directive);
-        if let Ok(Some(NoqaLexerOutput {
-            warnings: _,
-            directive: Directive::Codes(codes),
-        })) = directive
-        {
-            assert_codes_match_slices(&codes, source);
-        }
+        assert_lexed_ranges_match_slices(directive, source);
     }
 
     #[test]
@@ -1438,13 +1363,7 @@ mod tests {
         let source = "###noqa: F401";
         let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
         assert_debug_snapshot!(directive);
-        if let Ok(Some(NoqaLexerOutput {
-            warnings: _,
-            directive: Directive::Codes(codes),
-        })) = directive
-        {
-            assert_codes_match_slices(&codes, source);
-        }
+        assert_lexed_ranges_match_slices(directive, source);
     }
 
     #[test]
@@ -1452,13 +1371,7 @@ mod tests {
         let source = "# Some comment describing the noqa # noqa";
         let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
         assert_debug_snapshot!(directive);
-        if let Ok(Some(NoqaLexerOutput {
-            warnings: _,
-            directive: Directive::Codes(codes),
-        })) = directive
-        {
-            assert_codes_match_slices(&codes, source);
-        }
+        assert_lexed_ranges_match_slices(directive, source);
     }
 
     #[test]
@@ -1466,13 +1379,7 @@ mod tests {
         let source = "# Some comment describing the noqa # noqa: F401";
         let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
         assert_debug_snapshot!(directive);
-        if let Ok(Some(NoqaLexerOutput {
-            warnings: _,
-            directive: Directive::Codes(codes),
-        })) = directive
-        {
-            assert_codes_match_slices(&codes, source);
-        }
+        assert_lexed_ranges_match_slices(directive, source);
     }
 
     #[test]
@@ -1480,13 +1387,7 @@ mod tests {
         let source = "# Some comment describing the noqa # noqa: F401, F841";
         let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
         assert_debug_snapshot!(directive);
-        if let Ok(Some(NoqaLexerOutput {
-            warnings: _,
-            directive: Directive::Codes(codes),
-        })) = directive
-        {
-            assert_codes_match_slices(&codes, source);
-        }
+        assert_lexed_ranges_match_slices(directive, source);
     }
 
     #[test]
@@ -1494,13 +1395,7 @@ mod tests {
         let source = "# noqa # Some comment describing the noqa";
         let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
         assert_debug_snapshot!(directive);
-        if let Ok(Some(NoqaLexerOutput {
-            warnings: _,
-            directive: Directive::Codes(codes),
-        })) = directive
-        {
-            assert_codes_match_slices(&codes, source);
-        }
+        assert_lexed_ranges_match_slices(directive, source);
     }
 
     #[test]
@@ -1508,13 +1403,7 @@ mod tests {
         let source = "# noqa: F401 # Some comment describing the noqa";
         let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
         assert_debug_snapshot!(directive);
-        if let Ok(Some(NoqaLexerOutput {
-            warnings: _,
-            directive: Directive::Codes(codes),
-        })) = directive
-        {
-            assert_codes_match_slices(&codes, source);
-        }
+        assert_lexed_ranges_match_slices(directive, source);
     }
 
     #[test]
@@ -1522,13 +1411,7 @@ mod tests {
         let source = "# noqa: F401, F841 # Some comment describing the noqa";
         let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
         assert_debug_snapshot!(directive);
-        if let Ok(Some(NoqaLexerOutput {
-            warnings: _,
-            directive: Directive::Codes(codes),
-        })) = directive
-        {
-            assert_codes_match_slices(&codes, source);
-        }
+        assert_lexed_ranges_match_slices(directive, source);
     }
 
     #[test]
@@ -1536,13 +1419,7 @@ mod tests {
         let source = "# noqa: unused-import, F401, some other code";
         let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
         assert_debug_snapshot!(directive);
-        if let Ok(Some(NoqaLexerOutput {
-            warnings: _,
-            directive: Directive::Codes(codes),
-        })) = directive
-        {
-            assert_codes_match_slices(&codes, source);
-        }
+        assert_lexed_ranges_match_slices(directive, source);
     }
 
     #[test]
@@ -1550,13 +1427,7 @@ mod tests {
         let source = "# noqa: F401F841";
         let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
         assert_debug_snapshot!(directive);
-        if let Ok(Some(NoqaLexerOutput {
-            warnings: _,
-            directive: Directive::Codes(codes),
-        })) = directive
-        {
-            assert_codes_match_slices(&codes, source);
-        }
+        assert_lexed_ranges_match_slices(directive, source);
     }
 
     #[test]
@@ -1564,13 +1435,7 @@ mod tests {
         let source = "# noqa: F401,,F841";
         let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
         assert_debug_snapshot!(directive);
-        if let Ok(Some(NoqaLexerOutput {
-            warnings: _,
-            directive: Directive::Codes(codes),
-        })) = directive
-        {
-            assert_codes_match_slices(&codes, source);
-        }
+        assert_lexed_ranges_match_slices(directive, source);
     }
 
     #[test]
@@ -1578,13 +1443,7 @@ mod tests {
         let source = "# noqa: F401, ,F841";
         let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
         assert_debug_snapshot!(directive);
-        if let Ok(Some(NoqaLexerOutput {
-            warnings: _,
-            directive: Directive::Codes(codes),
-        })) = directive
-        {
-            assert_codes_match_slices(&codes, source);
-        }
+        assert_lexed_ranges_match_slices(directive, source);
     }
 
     #[test]
@@ -1592,13 +1451,7 @@ mod tests {
         let source = "# noqa: F401 We're ignoring an import";
         let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
         assert_debug_snapshot!(directive);
-        if let Ok(Some(NoqaLexerOutput {
-            warnings: _,
-            directive: Directive::Codes(codes),
-        })) = directive
-        {
-            assert_codes_match_slices(&codes, source);
-        }
+        assert_lexed_ranges_match_slices(directive, source);
     }
 
     #[test]
@@ -1606,13 +1459,7 @@ mod tests {
         let source = "# noqa: F401abc";
         let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
         assert_debug_snapshot!(directive);
-        if let Ok(Some(NoqaLexerOutput {
-            warnings: _,
-            directive: Directive::Codes(codes),
-        })) = directive
-        {
-            assert_codes_match_slices(&codes, source);
-        }
+        assert_lexed_ranges_match_slices(directive, source);
     }
 
     #[test]
@@ -1620,13 +1467,7 @@ mod tests {
         let source = "# noqa[F401]";
         let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
         assert_debug_snapshot!(directive);
-        if let Ok(Some(NoqaLexerOutput {
-            warnings: _,
-            directive: Directive::Codes(codes),
-        })) = directive
-        {
-            assert_codes_match_slices(&codes, source);
-        }
+        assert_lexed_ranges_match_slices(directive, source);
     }
 
     #[test]
@@ -1634,13 +1475,7 @@ mod tests {
         let source = "# flake8: noqa";
         let exemption = lex_file_exemption(TextRange::up_to(source.text_len()), source);
         assert_debug_snapshot!(exemption);
-        if let Ok(Some(NoqaLexerOutput {
-            warnings: _,
-            directive: Directive::Codes(codes),
-        })) = exemption
-        {
-            assert_codes_match_slices(&codes, source);
-        }
+        assert_lexed_ranges_match_slices(exemption, source);
     }
 
     #[test]
@@ -1648,13 +1483,7 @@ mod tests {
         let source = "# ruff: noqa";
         let exemption = lex_file_exemption(TextRange::up_to(source.text_len()), source);
         assert_debug_snapshot!(exemption);
-        if let Ok(Some(NoqaLexerOutput {
-            warnings: _,
-            directive: Directive::Codes(codes),
-        })) = exemption
-        {
-            assert_codes_match_slices(&codes, source);
-        }
+        assert_lexed_ranges_match_slices(exemption, source);
     }
 
     #[test]
@@ -1662,13 +1491,7 @@ mod tests {
         let source = "#flake8:noqa";
         let exemption = lex_file_exemption(TextRange::up_to(source.text_len()), source);
         assert_debug_snapshot!(exemption);
-        if let Ok(Some(NoqaLexerOutput {
-            warnings: _,
-            directive: Directive::Codes(codes),
-        })) = exemption
-        {
-            assert_codes_match_slices(&codes, source);
-        }
+        assert_lexed_ranges_match_slices(exemption, source);
     }
 
     #[test]
@@ -1676,13 +1499,7 @@ mod tests {
         let source = "#ruff:noqa";
         let exemption = lex_file_exemption(TextRange::up_to(source.text_len()), source);
         assert_debug_snapshot!(exemption);
-        if let Ok(Some(NoqaLexerOutput {
-            warnings: _,
-            directive: Directive::Codes(codes),
-        })) = exemption
-        {
-            assert_codes_match_slices(&codes, source);
-        }
+        assert_lexed_ranges_match_slices(exemption, source);
     }
 
     #[test]
@@ -1691,13 +1508,7 @@ mod tests {
         let source = "# flake8: noqa: F401, F841";
         let exemption = lex_file_exemption(TextRange::up_to(source.text_len()), source);
         assert_debug_snapshot!(exemption);
-        if let Ok(Some(NoqaLexerOutput {
-            warnings: _,
-            directive: Directive::Codes(codes),
-        })) = exemption
-        {
-            assert_codes_match_slices(&codes, source);
-        }
+        assert_lexed_ranges_match_slices(exemption, source);
     }
 
     #[test]
@@ -1705,26 +1516,14 @@ mod tests {
         let source = "# ruff: noqa: F401, F841";
         let exemption = lex_file_exemption(TextRange::up_to(source.text_len()), source);
         assert_debug_snapshot!(exemption);
-        if let Ok(Some(NoqaLexerOutput {
-            warnings: _,
-            directive: Directive::Codes(codes),
-        })) = exemption
-        {
-            assert_codes_match_slices(&codes, source);
-        }
+        assert_lexed_ranges_match_slices(exemption, source);
     }
     #[test]
     fn ruff_exemption_codes_leading_hashes() {
         let source = "#### ruff: noqa: F401, F841";
         let exemption = lex_file_exemption(TextRange::up_to(source.text_len()), source);
         assert_debug_snapshot!(exemption);
-        if let Ok(Some(NoqaLexerOutput {
-            warnings: _,
-            directive: Directive::Codes(codes),
-        })) = exemption
-        {
-            assert_codes_match_slices(&codes, source);
-        }
+        assert_lexed_ranges_match_slices(exemption, source);
     }
 
     #[test]
@@ -1732,13 +1531,7 @@ mod tests {
         let source = "# ruff: noqa: F401F841";
         let exemption = lex_file_exemption(TextRange::up_to(source.text_len()), source);
         assert_debug_snapshot!(exemption);
-        if let Ok(Some(NoqaLexerOutput {
-            warnings: _,
-            directive: Directive::Codes(codes),
-        })) = exemption
-        {
-            assert_codes_match_slices(&codes, source);
-        }
+        assert_lexed_ranges_match_slices(exemption, source);
     }
 
     #[test]
@@ -1746,13 +1539,7 @@ mod tests {
         let source = "# ruff: noqa: F401,,F841";
         let exemption = lex_file_exemption(TextRange::up_to(source.text_len()), source);
         assert_debug_snapshot!(exemption);
-        if let Ok(Some(NoqaLexerOutput {
-            warnings: _,
-            directive: Directive::Codes(codes),
-        })) = exemption
-        {
-            assert_codes_match_slices(&codes, source);
-        }
+        assert_lexed_ranges_match_slices(exemption, source);
     }
 
     #[test]
@@ -1760,13 +1547,7 @@ mod tests {
         let source = "# ruff: noqa: F401, ,F841";
         let exemption = lex_file_exemption(TextRange::up_to(source.text_len()), source);
         assert_debug_snapshot!(exemption);
-        if let Ok(Some(NoqaLexerOutput {
-            warnings: _,
-            directive: Directive::Codes(codes),
-        })) = exemption
-        {
-            assert_codes_match_slices(&codes, source);
-        }
+        assert_lexed_ranges_match_slices(exemption, source);
     }
 
     #[test]
@@ -1774,13 +1555,7 @@ mod tests {
         let source = "# ruff: noqa: F401abc";
         let exemption = lex_file_exemption(TextRange::up_to(source.text_len()), source);
         assert_debug_snapshot!(exemption);
-        if let Ok(Some(NoqaLexerOutput {
-            warnings: _,
-            directive: Directive::Codes(codes),
-        })) = exemption
-        {
-            assert_codes_match_slices(&codes, source);
-        }
+        assert_lexed_ranges_match_slices(exemption, source);
     }
 
     #[test]
@@ -1788,13 +1563,7 @@ mod tests {
         let source = "# Leading comment # ruff: noqa: F401";
         let exemption = lex_file_exemption(TextRange::up_to(source.text_len()), source);
         assert_debug_snapshot!(exemption);
-        if let Ok(Some(NoqaLexerOutput {
-            warnings: _,
-            directive: Directive::Codes(codes),
-        })) = exemption
-        {
-            assert_codes_match_slices(&codes, source);
-        }
+        assert_lexed_ranges_match_slices(exemption, source);
     }
 
     #[test]
@@ -1802,13 +1571,7 @@ mod tests {
         let source = "# ruff: noqa: F401 # Trailing comment";
         let exemption = lex_file_exemption(TextRange::up_to(source.text_len()), source);
         assert_debug_snapshot!(exemption);
-        if let Ok(Some(NoqaLexerOutput {
-            warnings: _,
-            directive: Directive::Codes(codes),
-        })) = exemption
-        {
-            assert_codes_match_slices(&codes, source);
-        }
+        assert_lexed_ranges_match_slices(exemption, source);
     }
 
     #[test]
@@ -1816,13 +1579,7 @@ mod tests {
         let source = "# Leading comment # ruff: noqa";
         let exemption = lex_file_exemption(TextRange::up_to(source.text_len()), source);
         assert_debug_snapshot!(exemption);
-        if let Ok(Some(NoqaLexerOutput {
-            warnings: _,
-            directive: Directive::Codes(codes),
-        })) = exemption
-        {
-            assert_codes_match_slices(&codes, source);
-        }
+        assert_lexed_ranges_match_slices(exemption, source);
     }
 
     #[test]
@@ -1830,13 +1587,7 @@ mod tests {
         let source = "# ruff: noqa # Trailing comment";
         let exemption = lex_file_exemption(TextRange::up_to(source.text_len()), source);
         assert_debug_snapshot!(exemption);
-        if let Ok(Some(NoqaLexerOutput {
-            warnings: _,
-            directive: Directive::Codes(codes),
-        })) = exemption
-        {
-            assert_codes_match_slices(&codes, source);
-        }
+        assert_lexed_ranges_match_slices(exemption, source);
     }
 
     #[test]
@@ -1844,13 +1595,7 @@ mod tests {
         let source = "# ruff: noqa: F401# And another comment";
         let exemption = lex_file_exemption(TextRange::up_to(source.text_len()), source);
         assert_debug_snapshot!(exemption);
-        if let Ok(Some(NoqaLexerOutput {
-            warnings: _,
-            directive: Directive::Codes(codes),
-        })) = exemption
-        {
-            assert_codes_match_slices(&codes, source);
-        }
+        assert_lexed_ranges_match_slices(exemption, source);
     }
 
     #[test]
@@ -1858,13 +1603,7 @@ mod tests {
         let source = "# ruff: noqa# Trailing comment";
         let exemption = lex_file_exemption(TextRange::up_to(source.text_len()), source);
         assert_debug_snapshot!(exemption);
-        if let Ok(Some(NoqaLexerOutput {
-            warnings: _,
-            directive: Directive::Codes(codes),
-        })) = exemption
-        {
-            assert_codes_match_slices(&codes, source);
-        }
+        assert_lexed_ranges_match_slices(exemption, source);
     }
 
     #[test]
@@ -1872,13 +1611,7 @@ mod tests {
         let source = "# ruff: noqa Trailing comment";
         let exemption = lex_file_exemption(TextRange::up_to(source.text_len()), source);
         assert_debug_snapshot!(exemption);
-        if let Ok(Some(NoqaLexerOutput {
-            warnings: _,
-            directive: Directive::Codes(codes),
-        })) = exemption
-        {
-            assert_codes_match_slices(&codes, source);
-        }
+        assert_lexed_ranges_match_slices(exemption, source);
     }
 
     #[test]
@@ -1886,13 +1619,7 @@ mod tests {
         let source = "# ruff: noqa: F401 Trailing comment";
         let exemption = lex_file_exemption(TextRange::up_to(source.text_len()), source);
         assert_debug_snapshot!(exemption);
-        if let Ok(Some(NoqaLexerOutput {
-            warnings: _,
-            directive: Directive::Codes(codes),
-        })) = exemption
-        {
-            assert_codes_match_slices(&codes, source);
-        }
+        assert_lexed_ranges_match_slices(exemption, source);
     }
 
     #[test]
@@ -1900,13 +1627,7 @@ mod tests {
         let source = "# flake8: NoQa";
         let exemption = lex_file_exemption(TextRange::up_to(source.text_len()), source);
         assert_debug_snapshot!(exemption);
-        if let Ok(Some(NoqaLexerOutput {
-            warnings: _,
-            directive: Directive::Codes(codes),
-        })) = exemption
-        {
-            assert_codes_match_slices(&codes, source);
-        }
+        assert_lexed_ranges_match_slices(exemption, source);
     }
 
     #[test]
@@ -1914,13 +1635,7 @@ mod tests {
         let source = "# ruff: NoQa";
         let exemption = lex_file_exemption(TextRange::up_to(source.text_len()), source);
         assert_debug_snapshot!(exemption);
-        if let Ok(Some(NoqaLexerOutput {
-            warnings: _,
-            directive: Directive::Codes(codes),
-        })) = exemption
-        {
-            assert_codes_match_slices(&codes, source);
-        }
+        assert_lexed_ranges_match_slices(exemption, source);
     }
 
     #[test]
