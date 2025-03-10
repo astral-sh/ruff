@@ -2703,9 +2703,9 @@ impl<'src> Parser<'src> {
 
                 let disallowed_expression = match &parsed_expr.expr {
                     Expr::Call(expr_call) => {
-                        helpers::invalid_pre_py39_decorator_node(&expr_call.func)
+                        helpers::invalid_pre_py39_decorator_description_and_range(&expr_call.func)
                     }
-                    expr => helpers::invalid_pre_py39_decorator_node(expr),
+                    expr => helpers::invalid_pre_py39_decorator_description_and_range(expr),
                 };
 
                 if let Some((description, range)) = disallowed_expression {

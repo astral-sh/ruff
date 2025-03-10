@@ -52,48 +52,52 @@ pub(super) const fn token_kind_to_cmp_op(tokens: [TokenKind; 2]) -> Option<CmpOp
 /// where `description` is a string describing the invalid node and `range` is the node's range.
 ///
 /// [`dotted_name`]: https://docs.python.org/3.8/reference/compound_stmts.html#grammar-token-dotted-name
-pub(super) fn invalid_pre_py39_decorator_node(expr: &Expr) -> Option<(&'static str, TextRange)> {
+pub(super) fn invalid_pre_py39_decorator_description_and_range(
+    expr: &Expr,
+) -> Option<(&'static str, TextRange)> {
     let description = match expr {
-        Expr::Attribute(attr) => return invalid_pre_py39_decorator_node(&attr.value),
+        Expr::Attribute(attr) => {
+            return invalid_pre_py39_decorator_description_and_range(&attr.value)
+        }
 
-        Expr::Name(_) => None,
+        Expr::Name(_) => return None,
 
         Expr::NumberLiteral(number) => match &number.value {
-            Number::Int(_) => Some("an int literal"),
-            Number::Float(_) => Some("a float literal"),
-            Number::Complex { .. } => Some("a complex literal"),
+            Number::Int(_) => "int literals",
+            Number::Float(_) => "float literals",
+            Number::Complex { .. } => "complex literals",
         },
 
-        Expr::BoolOp(_) => Some("boolean expression"),
-        Expr::BinOp(_) => Some("binary-operation expression"),
-        Expr::UnaryOp(_) => Some("unary-operation expression"),
-        Expr::Await(_) => Some("`await` expression"),
-        Expr::Lambda(_) => Some("lambda expression"),
-        Expr::If(_) => Some("conditional expression"),
-        Expr::Dict(_) => Some("a dict literal"),
-        Expr::Set(_) => Some("a set literal"),
-        Expr::List(_) => Some("a list literal"),
-        Expr::Tuple(_) => Some("a tuple literal"),
-        Expr::Starred(_) => Some("starred expression"),
-        Expr::Slice(_) => Some("slice expression"),
-        Expr::BytesLiteral(_) => Some("bytes literal"),
-        Expr::StringLiteral(_) => Some("string literal"),
-        Expr::EllipsisLiteral(_) => Some("ellipsis literal"),
-        Expr::NoneLiteral(_) => Some("`None` literal"),
-        Expr::BooleanLiteral(_) => Some("boolean literal"),
-        Expr::ListComp(_) => Some("list comprehension"),
-        Expr::SetComp(_) => Some("set comprehension"),
-        Expr::DictComp(_) => Some("dict comprehension"),
-        Expr::Generator(_) => Some("generator expression"),
-        Expr::Yield(_) => Some("`yield` expression"),
-        Expr::YieldFrom(_) => Some("`yield from` expression"),
-        Expr::Compare(_) => Some("comparison expression"),
-        Expr::Call(_) => Some("function call"),
-        Expr::FString(_) => Some("f-string"),
-        Expr::Named(_) => Some("assignment expression"),
-        Expr::Subscript(_) => Some("subscript expression"),
-        Expr::IpyEscapeCommand(_) => Some("IPython escape command"),
+        Expr::BoolOp(_) => "boolean expressions",
+        Expr::BinOp(_) => "binary-operation expressions",
+        Expr::UnaryOp(_) => "unary-operation expressions",
+        Expr::Await(_) => "`await` expressions",
+        Expr::Lambda(_) => "lambda expressions",
+        Expr::If(_) => "conditional expressions",
+        Expr::Dict(_) => "dict literals",
+        Expr::Set(_) => "set literals",
+        Expr::List(_) => "list literals",
+        Expr::Tuple(_) => "tuple literals",
+        Expr::Starred(_) => "starred expressions",
+        Expr::Slice(_) => "slice expressions",
+        Expr::BytesLiteral(_) => "bytes literals",
+        Expr::StringLiteral(_) => "string literals",
+        Expr::EllipsisLiteral(_) => "ellipsis literals",
+        Expr::NoneLiteral(_) => "`None` literals",
+        Expr::BooleanLiteral(_) => "boolean literals",
+        Expr::ListComp(_) => "list comprehensions",
+        Expr::SetComp(_) => "set comprehensions",
+        Expr::DictComp(_) => "dict comprehensions",
+        Expr::Generator(_) => "generator expressions",
+        Expr::Yield(_) => "`yield` expressions",
+        Expr::YieldFrom(_) => "`yield from` expressions",
+        Expr::Compare(_) => "comparison expressions",
+        Expr::Call(_) => "function calls",
+        Expr::FString(_) => "f-strings",
+        Expr::Named(_) => "assignment expressions",
+        Expr::Subscript(_) => "subscript expressions",
+        Expr::IpyEscapeCommand(_) => "IPython escape commands",
     };
 
-    description.map(|description| (description, expr.range()))
+    Some((description, expr.range()))
 }

@@ -638,9 +638,10 @@ impl Display for UnsupportedSyntaxError {
             UnsupportedSyntaxErrorKind::RelaxedDecorator { invalid_node_name } => {
                 return write!(
                     f,
-                    "Cannot use {invalid_node_name} outside function-call arguments in a decorator \
-                    on Python {target_version} (syntax was added in Python 3.9)",
+                    "Can only use {invalid_node_name} inside call expressions in a decorator \
+                    on Python {target_version} (relaxed decorator syntax was {changed})",
                     target_version = self.target_version,
+                    changed = self.kind.changed_version(),
                 );
             }
             UnsupportedSyntaxErrorKind::PositionalOnlyParameter => {
