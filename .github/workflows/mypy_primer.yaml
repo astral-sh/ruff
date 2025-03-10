@@ -59,7 +59,7 @@ jobs:
 
           echo "Running mypy_primer"
 
-          uvx --from "git+https://github.com/sharkdp/mypy_primer.git@add-red-knot-support" mypy_primer \
+          uvx --from "git+https://github.com/astral-sh/mypy_primer.git@add-red-knot-support" mypy_primer \
             --repo ruff \
             --type-checker knot \
             --old base_commit \
