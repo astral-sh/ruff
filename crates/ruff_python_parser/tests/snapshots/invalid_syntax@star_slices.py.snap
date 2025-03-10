@@ -1,0 +1,81 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/star_slices.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..19,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 0..18,
+                    value: Subscript(
+                        ExprSubscript {
+                            range: 0..18,
+                            value: Name(
+                                ExprName {
+                                    range: 0..5,
+                                    id: Name("array"),
+                                    ctx: Load,
+                                },
+                            ),
+                            slice: Slice(
+                                ExprSlice {
+                                    range: 6..17,
+                                    lower: Some(
+                                        Starred(
+                                            ExprStarred {
+                                                range: 6..12,
+                                                value: Name(
+                                                    ExprName {
+                                                        range: 7..12,
+                                                        id: Name("start"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ),
+                                    upper: Some(
+                                        Starred(
+                                            ExprStarred {
+                                                range: 13..17,
+                                                value: Name(
+                                                    ExprName {
+                                                        range: 14..17,
+                                                        id: Name("end"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ),
+                                    step: None,
+                                },
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | array[*start:*end]
+  |       ^^^^^^ Syntax Error: Starred expression cannot be used here
+  |
+
+
+  |
+1 | array[*start:*end]
+  |              ^^^^ Syntax Error: Starred expression cannot be used here
+  |

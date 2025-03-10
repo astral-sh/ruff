@@ -853,6 +853,35 @@ impl<'src> Parser<'src> {
 
         self.expect(TokenKind::Rsqb);
 
+        // test_ok star_index_py311
+        // # parse_options: {"target-version": "3.11"}
+        // lst[*index]  # simple index
+        // class Array(Generic[DType, *Shape]): ...  # motivating example from the PEP
+        // lst[a, *b, c]  # different positions
+        // lst[a, b, *c]  # different positions
+        // lst[*a, *b]  # multiple unpacks
+        // array[3:5, *idxs]  # mixed with slices
+
+        // test_err star_index_py310
+        // # parse_options: {"target-version": "3.10"}
+        // lst[*index]  # simple index
+        // class Array(Generic[DType, *Shape]): ...  # motivating example from the PEP
+        // lst[a, *b, c]  # different positions
+        // lst[a, b, *c]  # different positions
+        // lst[*a, *b]  # multiple unpacks
+        // array[3:5, *idxs]  # mixed with slices
+
+        // test_err star_slices
+        // array[*start:*end]
+        if let Expr::Tuple(ast::ExprTuple { elts, .. }) = &slice {
+            for elt in elts.iter().filter(|elt| elt.is_starred_expr()) {
+                self.add_unsupported_syntax_error(
+                    UnsupportedSyntaxErrorKind::StarExpressionInIndex,
+                    elt.range(),
+                );
+            }
+        };
+
         ast::ExprSubscript {
             value: Box::new(value),
             slice: Box::new(slice),
