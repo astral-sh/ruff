@@ -786,6 +786,11 @@ impl<'db> Type<'db> {
             (Type::Dynamic(_), _) => true,
             (_, Type::Dynamic(_)) => true,
 
+            // TODO: For now we are treating a TypeVar as Any, and allowing it to be assignable-to
+            // and assignable-from any other type.
+            (_, Type::KnownInstance(KnownInstanceType::TypeVar(_))) => true,
+            (Type::KnownInstance(KnownInstanceType::TypeVar(_)), _) => true,
+
             // All types are assignable to `object`.
             // TODO this special case might be removable once the below cases are comprehensive
             (_, Type::Instance(InstanceType { class })) if class.is_object(db) => true,
@@ -2672,6 +2677,33 @@ impl<'db> Type<'db> {
                             .exactly_one_argument()
                             .map(|arg| arg.to_meta_type(db))
                             .unwrap_or_else(|| KnownClass::Type.to_instance(db)),
+
+                        // TODO: We should check the call signature and error if the TypeVar call
+                        // doesn't have the right signature and return a binding error.
+                        Some(KnownClass::TypeVar) => {
+                            arguments
+                                .first_argument()
+                                .and_then(Type::into_string_literal)
+                                .map(|name| {
+                                    // TODO: TypeVar can only be called when the result is immediately
+                                    // assigned to a variable. Ideally we would use the `name` from the
+                                    // lvalue of this assignment instead of constructing a new one.
+                                    let name = ast::name::Name::new(name.value(db));
+                                    // TODO: Extract bounds and constraints
+                                    let bound_or_constraint = None;
+                                    // TODO: Extract default type
+                                    let default_ty = None;
+                                    Type::KnownInstance(KnownInstanceType::TypeVar(
+                                        TypeVarInstance::new(
+                                            db,
+                                            name,
+                                            bound_or_constraint,
+                                            default_ty,
+                                        ),
+                                    ))
+                                })
+                                .unwrap_or_else(|| KnownClass::Type.to_instance(db))
+                        }
 
                         _ => Type::Instance(InstanceType { class }),
                     },
