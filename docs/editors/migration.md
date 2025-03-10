@@ -19,7 +19,8 @@ The migration process involves any or all of the following:
 1. [Remove settings](#removed-settings) that are no longer supported
 1. Update the `ruff` version
 
-Use the [examples](#examples) below to help you migrate your settings.
+Read on to learn more about the unsupported or new settings, or jump to the [examples](#examples)
+that enumerate some of the common settings and how to migrate them.
 
 ## Unsupported Settings
 
