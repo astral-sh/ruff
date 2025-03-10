@@ -1,5 +1,3 @@
-#![allow(clippy::disallowed_names)]
-
 use std::collections::HashSet;
 use std::io::Write;
 use std::time::{Duration, Instant};
@@ -16,7 +14,7 @@ use ruff_db::source::source_text;
 use ruff_db::system::{
     OsSystem, System, SystemPath, SystemPathBuf, UserConfigDirectoryOverrideGuard,
 };
-use ruff_db::Upcast;
+use ruff_db::{Db as _, Upcast};
 use ruff_python_ast::PythonVersion;
 
 struct TestCase {
@@ -1786,6 +1784,85 @@ fn changes_to_user_configuration() -> anyhow::Result<()> {
     assert!(
         diagnostics.len() == 1,
         "Expected exactly one diagnostic but got: {diagnostics:#?}"
+    );
+
+    Ok(())
+}
+
+/// Tests that renaming a file from `lib.py` to `Lib.py` is correctly reflected.
+///
+/// This test currently fails on case-insensitive systems because `Files` is case-sensitive
+/// but the `System::metadata` call isn't. This means that
+/// Red Knot considers both `Lib.py` and `lib.py` to exist when only `lib.py` does
+///
+/// The incoming change events then are no-ops because they don't change either file's
+/// status nor does it update their last modified time (renaming a file doesn't bump it's
+/// last modified timestamp).
+///
+/// Fixing this requires to either make `Files` case-insensitive and store the
+/// real-case path (if it differs) on `File` or make `Files` use a
+/// case-sensitive `System::metadata` call. This does open the question if all
+/// `System` calls should be case sensitive. This would be the most consistent
+/// but might be hard to pull off.
+///
+/// What the right solution is also depends on if Red Knot itself should be case
+/// sensitive or not. E.g. should `include="src"` be case sensitive on all systems
+/// or only on case-sensitive systems?
+///
+/// Lastly, whatever solution we pick must also work well with VS Code which,
+/// unfortunately ,doesn't propagate casing-only renames.
+/// <https://github.com/rust-lang/rust-analyzer/issues/9581>
+#[ignore]
+#[test]
+fn rename_files_casing_only() -> anyhow::Result<()> {
+    let mut case = setup([("lib.py", "class Foo: ...")])?;
+
+    assert!(
+        resolve_module(case.db(), &ModuleName::new("lib").unwrap()).is_some(),
+        "Expected `lib` module to exist."
+    );
+    assert_eq!(
+        resolve_module(case.db(), &ModuleName::new("Lib").unwrap()),
+        None,
+        "Expected `Lib` module not to exist"
+    );
+
+    // Now rename `lib.py` to `Lib.py`
+    if case.db().system().case_sensitivity().is_case_sensitive() {
+        std::fs::rename(
+            case.project_path("lib.py").as_std_path(),
+            case.project_path("Lib.py").as_std_path(),
+        )
+        .context("Failed to rename `lib.py` to `Lib.py`")?;
+    } else {
+        // On case-insensitive file systems, renaming a file to a different casing is a no-op.
+        // Rename to a different name first
+        std::fs::rename(
+            case.project_path("lib.py").as_std_path(),
+            case.project_path("temp.py").as_std_path(),
+        )
+        .context("Failed to rename `lib.py` to `temp.py`")?;
+
+        std::fs::rename(
+            case.project_path("temp.py").as_std_path(),
+            case.project_path("Lib.py").as_std_path(),
+        )
+        .context("Failed to rename `temp.py` to `Lib.py`")?;
+    }
+
+    let changes = case.stop_watch(event_for_file("Lib.py"));
+    case.apply_changes(changes);
+
+    // Resolving `lib` should now fail but `Lib` should now succeed
+    assert_eq!(
+        resolve_module(case.db(), &ModuleName::new("lib").unwrap()),
+        None,
+        "Expected `lib` module to no longer exist."
+    );
+
+    assert!(
+        resolve_module(case.db(), &ModuleName::new("Lib").unwrap()).is_some(),
+        "Expected `Lib` module to exist"
     );
 
     Ok(())
