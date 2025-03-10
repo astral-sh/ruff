@@ -11,6 +11,8 @@ pub enum Overloads<'db> {
 }
 
 impl<'db> Overloads<'db> {
+    /// Creates a new `Overloads` from an non-empty iterator of [`Signature`]s. Panics if the
+    /// iterator is empty.
     pub(crate) fn from_overloads<I>(overloads: I) -> Self
     where
         I: IntoIterator,
