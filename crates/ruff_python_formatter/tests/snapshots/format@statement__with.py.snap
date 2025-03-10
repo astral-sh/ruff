@@ -771,110 +771,39 @@ if True:
 
 # Regression test for https://github.com/astral-sh/ruff/issues/14001
 with (
-    (
-        open(
-            "some/path.txt",
-            "rb",
-        )
-        if True
-        else open("other/path.txt")
+    open(
+        "some/path.txt",
+        "rb",
     )
+    if True
+    else open("other/path.txt")
     # Bar
 ):
     pass
 
 
 with (  # trailing comment
-    (
-        open(
-            "some/path.txt",
-            "rb",
-        )
-        if True
-        else open("other/path.txt")
+    open(
+        "some/path.txt",
+        "rb",
     )
+    if True
+    else open("other/path.txt")
     # Bar
 ):
     pass
 
 
 with (
-    (
-        open(
-            "some/path.txt",
-            "rb",
-        )
-        if True
-        else open("other/path.txt")
+    open(
+        "some/path.txt",
+        "rb",
     )
+    if True
+    else open("other/path.txt")
     # Bar
 ):
     pass
-```
-
-
-#### Preview changes
-```diff
---- Stable
-+++ Preview
-@@ -377,42 +377,36 @@
- 
- # Regression test for https://github.com/astral-sh/ruff/issues/14001
- with (
--    (
--        open(
--            "some/path.txt",
--            "rb",
--        )
--        if True
--        else open("other/path.txt")
-+    open(
-+        "some/path.txt",
-+        "rb",
-     )
-+    if True
-+    else open("other/path.txt")
-     # Bar
- ):
-     pass
- 
- 
- with (  # trailing comment
--    (
--        open(
--            "some/path.txt",
--            "rb",
--        )
--        if True
--        else open("other/path.txt")
-+    open(
-+        "some/path.txt",
-+        "rb",
-     )
-+    if True
-+    else open("other/path.txt")
-     # Bar
- ):
-     pass
- 
- 
- with (
--    (
--        open(
--            "some/path.txt",
--            "rb",
--        )
--        if True
--        else open("other/path.txt")
-+    open(
-+        "some/path.txt",
-+        "rb",
-     )
-+    if True
-+    else open("other/path.txt")
-     # Bar
- ):
-     pass
 ```
 
 
