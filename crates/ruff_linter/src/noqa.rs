@@ -426,22 +426,13 @@ impl<'a> NoqaLexer<'a> {
 
             // `#\s*(?:ruff|flake8)\s*:\s*(?i)noqa`
             //       ^^^^^^^^^^^^^
-            let (is_ruff, is_flake8) = (
-                self.cursor.as_str().starts_with("ruff"),
-                self.cursor.as_str().starts_with("flake8"),
-            );
-
-            if !is_ruff && !is_flake8 {
+            if self.cursor.as_str().starts_with("ruff") {
+                self.cursor.skip_bytes("ruff".len());
+            } else if self.cursor.as_str().starts_with("flake8") {
+                self.cursor.skip_bytes("flake8".len());
+            } else {
                 continue;
             }
-
-            let tool_len = if is_ruff {
-                "ruff".len()
-            } else {
-                "flake8".len()
-            };
-
-            self.cursor.skip_bytes(tool_len);
 
             // `#\s*(?:ruff|flake8)\s*:\s*(?i)noqa`
             //                     ^^^
