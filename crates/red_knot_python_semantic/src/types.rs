@@ -2678,6 +2678,13 @@ impl<'db> Type<'db> {
                 )))
             }
 
+            Type::SubclassOf(subclass_of_type) => match subclass_of_type.subclass_of() {
+                ClassBase::Dynamic(dynamic_type) => Ok(CallOutcome::Single(
+                    CallBinding::from_return_type(Type::Dynamic(dynamic_type)),
+                )),
+                ClassBase::Class(class) => Type::class_literal(class).try_call(db, arguments),
+            },
+
             instance_ty @ Type::Instance(_) => {
                 instance_ty
                     .try_call_dunder(db, "__call__", arguments)
