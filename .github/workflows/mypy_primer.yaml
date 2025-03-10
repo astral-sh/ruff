@@ -6,6 +6,7 @@ on:
   pull_request:
     paths:
       - "crates/red_knot*/**"
+      - "crates/ruff_db"
       - "crates/ruff_python_ast"
       - "crates/ruff_python_parser"
       - ".github/workflows/mypy_primer.yaml"
