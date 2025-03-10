@@ -1,0 +1,22 @@
+---
+source: crates/ruff_linter/src/noqa.rs
+expression: directive
+---
+Ok(
+    Some(
+        NoqaLexerOutput {
+            warnings: [],
+            directive: Codes(
+                Codes {
+                    range: 6..18,
+                    codes: [
+                        Code {
+                            code: "F401",
+                            range: 14..18,
+                        },
+                    ],
+                },
+            ),
+        },
+    ),
+)

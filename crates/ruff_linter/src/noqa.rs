@@ -1373,6 +1373,14 @@ mod tests {
     }
 
     #[test]
+    fn noqa_code_leading_hashes_with_spaces() {
+        let source = "#  #  # noqa: F401";
+        let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
+        assert_debug_snapshot!(directive);
+        assert_lexed_ranges_match_slices(directive, source);
+    }
+
+    #[test]
     fn noqa_all_leading_comment() {
         let source = "# Some comment describing the noqa # noqa";
         let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
