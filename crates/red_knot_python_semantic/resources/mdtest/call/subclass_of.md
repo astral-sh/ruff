@@ -34,7 +34,9 @@ from knot_extensions import Unknown
 
 def _(subclass_of_any: type[Any], subclass_of_unknown: type[Unknown]):
     reveal_type(subclass_of_any())  # revealed: Any
+    reveal_type(subclass_of_any("any", "args", 1, 2))  # revealed: Any
     reveal_type(subclass_of_unknown())  # revealed: Unknown
+    reveal_type(subclass_of_unknown("any", "args", 1, 2))  # revealed: Unknown
 ```
 
 ## Unions of classes
