@@ -1,3 +1,6 @@
+use std::collections::btree_map;
+use std::collections::btree_map::Entry;
+use std::collections::btree_set;
 use std::collections::{BTreeMap, BTreeSet};
 
 use anyhow::Result;
@@ -10,13 +13,12 @@ use crate::collector::Collector;
 pub use crate::db::ModuleDb;
 use crate::resolver::Resolver;
 pub use crate::settings::{AnalyzeSettings, Direction};
-
 mod collector;
 mod db;
 mod resolver;
 mod settings;
 
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ModuleImports(BTreeSet<SystemPathBuf>);
 
@@ -54,9 +56,19 @@ impl ModuleImports {
         Ok(resolved_imports)
     }
 
-    /// Insert a file path into the module imports.
     pub fn insert(&mut self, path: SystemPathBuf) {
         self.0.insert(path);
+    }
+
+    pub fn remove(&mut self, key: &SystemPathBuf) {
+        self.0.remove(key);
+    }
+
+    pub fn difference<'a>(&'a self, other: &'a ModuleImports) -> BTreeSet<&'a SystemPathBuf> {
+        // TODO: don't collect; return iterator
+        self.0
+            .difference(&other.0)
+            .collect::<BTreeSet<&SystemPathBuf>>()
     }
 
     /// Extend the module imports with additional file paths.
@@ -72,6 +84,10 @@ impl ModuleImports {
     /// Returns the number of module imports.
     pub fn len(&self) -> usize {
         self.0.len()
+    }
+
+    pub fn iter(&self) -> btree_set::Iter<'_, SystemPathBuf> {
+        self.0.iter()
     }
 
     /// Convert the file paths to be relative to a given path.
@@ -119,5 +135,29 @@ impl ImportMap {
             reverse.0.entry(path).or_default();
         }
         reverse
+    }
+
+    pub fn iter(&self) -> btree_map::Iter<'_, SystemPathBuf, ModuleImports> {
+        self.0.iter()
+    }
+
+    pub fn contains_key(&self, key: &SystemPathBuf) -> bool {
+        self.0.contains_key(key)
+    }
+
+    pub fn get(&self, key: &SystemPathBuf) -> Option<&ModuleImports> {
+        self.0.get(key)
+    }
+
+    pub fn insert(&mut self, key: SystemPathBuf, value: ModuleImports) -> Option<ModuleImports> {
+        self.0.insert(key, value)
+    }
+
+    pub fn remove(&mut self, key: &SystemPathBuf) -> Option<ModuleImports> {
+        self.0.remove(key)
+    }
+
+    pub fn entry(&mut self, key: SystemPathBuf) -> Entry<'_, SystemPathBuf, ModuleImports> {
+        self.0.entry(key)
     }
 }
