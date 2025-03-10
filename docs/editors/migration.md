@@ -1,10 +1,10 @@
 # Migrating from `ruff-lsp`
 
-To provide some context, [`ruff-lsp`][ruff-lsp] is the [Language Server Protocol] implementation for
-Ruff to power the editor integrations which is written in Python and is a separate package from Ruff
-itself. The **native server** is the [Language Server Protocol] implementation which is **written in
-Rust** and is available under the `ruff server` command. This guide is intended to help users
-migrate from [`ruff-lsp`][ruff-lsp] to the native server.
+[`ruff-lsp`][ruff-lsp] is the [Language Server Protocol] implementation for Ruff to power the editor
+integrations. It is written in Python and is a separate package from Ruff itself. The **native
+server**, however, is the [Language Server Protocol] implementation which is **written in Rust** and
+is available under the `ruff server` command. This guide is intended to help users migrate from
+[`ruff-lsp`][ruff-lsp] to the native server.
 
 !!! note
 
@@ -34,22 +34,21 @@ The following [`ruff-lsp`][ruff-lsp] settings are not supported by the native se
     configuration using the [`configuration`](settings.md#configuration) setting.
 
 The following settings are not accepted by the language server but are still used by the [VS Code extension].
-Refer to their respective documentation for more information on how it's being used by the extension:
+Refer to their respective documentation for more information on how each is used by the extension:
 
 - [`path`](settings.md#path)
 - [`interpreter`](settings.md#interpreter)
 
 ## Removed Settings
 
-Additionally, the following settings are not supported by the native server, they should be removed:
+Additionally, the following settings are not supported by the native server and should be removed:
 
 - [`ignoreStandardLibrary`](settings.md#ignorestandardlibrary)
 - [`showNotifications`](settings.md#shownotifications)
 
 ## New Settings
 
-The native server introduces several new settings that [`ruff-lsp`][ruff-lsp] does not have. These
-are, as follows:
+The native server introduces several new settings that [`ruff-lsp`][ruff-lsp] does not have:
 
 - [`configuration`](settings.md#configuration)
 - [`configurationPreference`](settings.md#configurationpreference)
@@ -64,7 +63,7 @@ are, as follows:
 ## Examples
 
 All of the examples mentioned below are only valid for the [VS Code extension]. For other editors,
-please refer to their respective documentation on the [settings](settings.md) page.
+please refer to their respective documentation sections in the [settings](settings.md) page.
 
 ### Configuration file
 
@@ -111,19 +110,18 @@ You can migrate to the new server by using the [`lint.select`](settings.md#selec
 }
 ```
 
-Following options can be set directly in the editor settings:
+The following options can be set directly in the editor settings:
 
 - [`lint.select`](settings.md#select)
 - [`lint.extendSelect`](settings.md#extendselect)
 - [`lint.ignore`](settings.md#ignore)
 - [`lint.preview`](settings.md#lint_preview)
 
-While the rest of the options can be set using the [`configuration`](settings.md#configuration)
-setting.
+The remaining options can be set using the [`configuration`](settings.md#configuration) setting.
 
 ### `format.args`
 
-If you're also providing the formatter flags by using `ruff.format.args` like so:
+If you're also providing formatter flags by using `ruff.format.args` like so:
 
 ```json
 {
@@ -145,13 +143,12 @@ You can migrate to the new server by using the [`lineLength`](settings.md#linele
 }
 ```
 
-Following options can be set directly in the editor settings:
+The following options can be set directly in the editor settings:
 
 - [`lineLength`](settings.md#linelength)
 - [`format.preview`](settings.md#format_preview)
 
-While the rest of the options can be set using the [`configuration`](settings.md#configuration)
-setting.
+The remaining options can be set using the [`configuration`](settings.md#configuration) setting.
 
 [language server protocol]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/
 [ruff-lsp]: https://github.com/astral-sh/ruff-lsp
