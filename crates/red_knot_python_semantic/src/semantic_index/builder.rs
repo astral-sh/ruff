@@ -36,7 +36,7 @@ use crate::semantic_index::visibility_constraints::{
     ScopedVisibilityConstraintId, VisibilityConstraintsBuilder,
 };
 use crate::semantic_index::SemanticIndex;
-use crate::unpack::{Unpack, UnpackValue};
+use crate::unpack::{Unpack, UnpackKind, UnpackValue};
 use crate::Db;
 
 mod except_handlers;
@@ -832,6 +832,170 @@ impl<'db> SemanticIndexBuilder<'db> {
             eager_bindings: self.eager_bindings,
         }
     }
+
+    /// Unpacks `expression` into `target`.
+    ///
+    /// ## Safety
+    /// `target` must belong to `self.module`.
+    #[allow(unsafe_code)]
+    unsafe fn unpack(
+        &self,
+        unpack_kind: UnpackKind,
+        expression: Expression<'db>,
+        target: &ast::Expr,
+    ) -> Unpack<'db> {
+        Unpack::new(
+            self.db,
+            self.file,
+            self.current_scope(),
+            #[allow(unsafe_code)]
+            unsafe {
+                AstNodeRef::new(self.module.clone(), target)
+            },
+            UnpackValue::new(unpack_kind, expression),
+            countme::Count::default(),
+        )
+    }
+
+    fn add_unpackable_assignments<U>(&mut self, unpackable: U)
+    where
+        U: Unpackable<'db> + Copy,
+    {
+        // We only handle assignments to names and unpackings here, other targets like
+        // attribute and subscript are handled separately as they don't create a new
+        // definition.
+
+        // optimize for empty iterators here
+        let value = std::cell::OnceCell::new();
+        for target in unpackable.targets() {
+            let value =
+                *value.get_or_init(|| self.add_standalone_expression(unpackable.expression()));
+            let current_assignment = match target {
+                ast::Expr::List(_) | ast::Expr::Tuple(_) => {
+                    let unpack = Some(
+                        // SAFETY: `target` belongs to the `self.module` tree
+                        #[allow(unsafe_code)]
+                        unsafe {
+                            self.unpack(U::UNPACK_KIND, value, target)
+                        },
+                    );
+                    Some(unpackable.assignment(unpack))
+                }
+                ast::Expr::Name(_) => Some(unpackable.assignment(None)),
+                ast::Expr::Attribute(ast::ExprAttribute {
+                    value: object,
+                    attr,
+                    ..
+                }) => {
+                    self.register_attribute_assignment(
+                        object,
+                        attr,
+                        U::attribute_assignment(value),
+                    );
+
+                    None
+                }
+                _ => None,
+            };
+
+            if let Some(current_assignment) = current_assignment {
+                self.push_assignment(current_assignment);
+            }
+
+            self.visit_expr(target);
+
+            if current_assignment.is_some() {
+                // Only need to pop in the case where we pushed something
+                self.pop_assignment();
+            }
+        }
+    }
+}
+
+trait Unpackable<'a> {
+    fn targets(self) -> impl Iterator<Item = &'a ast::Expr>;
+    fn expression(self) -> &'a ast::Expr;
+    fn assignment(self, unpack: Option<Unpack<'a>>) -> CurrentAssignment<'a>;
+    fn attribute_assignment(expression: Expression<'a>) -> AttributeAssignment<'a>;
+    const UNPACK_KIND: UnpackKind;
+}
+
+impl<'a> Unpackable<'a> for &'a ast::StmtAssign {
+    fn targets(self) -> impl Iterator<Item = &'a ast::Expr> {
+        self.targets.iter()
+    }
+
+    fn expression(self) -> &'a ast::Expr {
+        &self.value
+    }
+
+    const UNPACK_KIND: UnpackKind = UnpackKind::Assign;
+
+    fn assignment(self, unpack: Option<Unpack<'a>>) -> CurrentAssignment<'a> {
+        CurrentAssignment::Assign {
+            node: self,
+            first: true,
+            unpack,
+        }
+    }
+
+    fn attribute_assignment(expression: Expression<'a>) -> AttributeAssignment<'a> {
+        AttributeAssignment::Unannotated { value: expression }
+    }
+}
+
+impl<'a> Unpackable<'a> for &'a ast::StmtFor {
+    fn targets(self) -> impl Iterator<Item = &'a ast::Expr> {
+        std::iter::once(&*self.target)
+    }
+
+    fn expression(self) -> &'a ast::Expr {
+        &self.iter
+    }
+
+    const UNPACK_KIND: UnpackKind = UnpackKind::Iterable;
+
+    fn assignment(self, unpack: Option<Unpack<'a>>) -> CurrentAssignment<'a> {
+        CurrentAssignment::For {
+            node: self,
+            first: true,
+            unpack,
+        }
+    }
+
+    fn attribute_assignment(expression: Expression<'a>) -> AttributeAssignment<'a> {
+        AttributeAssignment::Iterable {
+            iterable: expression,
+        }
+    }
+}
+
+impl<'a> Unpackable<'a> for (&'a ast::WithItem, bool) {
+    fn targets(self) -> impl Iterator<Item = &'a ast::Expr> {
+        self.0.optional_vars.as_deref().into_iter()
+    }
+
+    fn expression(self) -> &'a ast::Expr {
+        &self.0.context_expr
+    }
+
+    const UNPACK_KIND: UnpackKind = UnpackKind::ContextManager;
+
+    fn assignment(self, unpack: Option<Unpack<'a>>) -> CurrentAssignment<'a> {
+        // TODO: async
+        CurrentAssignment::WithItem {
+            item: self.0,
+            first: true,
+            is_async: self.1,
+            unpack,
+        }
+    }
+
+    fn attribute_assignment(expression: Expression<'a>) -> AttributeAssignment<'a> {
+        AttributeAssignment::ContextManager {
+            context_manager: expression,
+        }
+    }
 }
 
 impl<'db, 'ast> Visitor<'ast> for SemanticIndexBuilder<'db>
@@ -1017,63 +1181,8 @@ where
                 debug_assert_eq!(&self.current_assignments, &[]);
 
                 self.visit_expr(&node.value);
-                let value = self.add_standalone_expression(&node.value);
 
-                for target in &node.targets {
-                    // We only handle assignments to names and unpackings here, other targets like
-                    // attribute and subscript are handled separately as they don't create a new
-                    // definition.
-                    let current_assignment = match target {
-                        ast::Expr::List(_) | ast::Expr::Tuple(_) => {
-                            Some(CurrentAssignment::Assign {
-                                node,
-                                first: true,
-                                unpack: Some(Unpack::new(
-                                    self.db,
-                                    self.file,
-                                    self.current_scope(),
-                                    // SAFETY: `target` belongs to the `self.module` tree
-                                    #[allow(unsafe_code)]
-                                    unsafe {
-                                        AstNodeRef::new(self.module.clone(), target)
-                                    },
-                                    UnpackValue::Assign(value),
-                                    countme::Count::default(),
-                                )),
-                            })
-                        }
-                        ast::Expr::Name(_) => Some(CurrentAssignment::Assign {
-                            node,
-                            unpack: None,
-                            first: false,
-                        }),
-                        ast::Expr::Attribute(ast::ExprAttribute {
-                            value: object,
-                            attr,
-                            ..
-                        }) => {
-                            self.register_attribute_assignment(
-                                object,
-                                attr,
-                                AttributeAssignment::Unannotated { value },
-                            );
-
-                            None
-                        }
-                        _ => None,
-                    };
-
-                    if let Some(current_assignment) = current_assignment {
-                        self.push_assignment(current_assignment);
-                    }
-
-                    self.visit_expr(target);
-
-                    if current_assignment.is_some() {
-                        // Only need to pop in the case where we pushed something
-                        self.pop_assignment();
-                    }
-                }
+                self.add_unpackable_assignments(node);
             }
             ast::Stmt::AnnAssign(node) => {
                 debug_assert_eq!(&self.current_assignments, &[]);
@@ -1263,65 +1372,15 @@ where
                 is_async,
                 ..
             }) => {
-                for item @ ruff_python_ast::WithItem {
+                for item @ ast::WithItem {
                     range: _,
                     context_expr,
-                    optional_vars,
+                    optional_vars: _,
                 } in items
                 {
                     self.visit_expr(context_expr);
-                    if let Some(optional_vars) = optional_vars.as_deref() {
-                        let context_manager = self.add_standalone_expression(context_expr);
-                        let current_assignment = match optional_vars {
-                            ast::Expr::Tuple(_) | ast::Expr::List(_) => {
-                                Some(CurrentAssignment::WithItem {
-                                    item,
-                                    first: true,
-                                    is_async: *is_async,
-                                    unpack: Some(Unpack::new(
-                                        self.db,
-                                        self.file,
-                                        self.current_scope(),
-                                        // SAFETY: the node `optional_vars` belongs to the `self.module` tree
-                                        #[allow(unsafe_code)]
-                                        unsafe {
-                                            AstNodeRef::new(self.module.clone(), optional_vars)
-                                        },
-                                        UnpackValue::ContextManager(context_manager),
-                                        countme::Count::default(),
-                                    )),
-                                })
-                            }
-                            ast::Expr::Name(_) => Some(CurrentAssignment::WithItem {
-                                item,
-                                is_async: *is_async,
-                                unpack: None,
-                                // `false` is arbitrary here---we don't actually use it other than in the actual unpacks
-                                first: false,
-                            }),
-                            ast::Expr::Attribute(ast::ExprAttribute {
-                                value: object,
-                                attr,
-                                ..
-                            }) => {
-                                self.register_attribute_assignment(
-                                    object,
-                                    attr,
-                                    AttributeAssignment::ContextManager { context_manager },
-                                );
-                                None
-                            }
-                            _ => None,
-                        };
 
-                        if let Some(current_assignment) = current_assignment {
-                            self.push_assignment(current_assignment);
-                        }
-                        self.visit_expr(optional_vars);
-                        if current_assignment.is_some() {
-                            self.pop_assignment();
-                        }
-                    }
+                    self.add_unpackable_assignments((item, *is_async));
                 }
                 self.visit_body(body);
             }
@@ -1330,7 +1389,7 @@ where
                 for_stmt @ ast::StmtFor {
                     range: _,
                     is_async: _,
-                    target,
+                    target: _,
                     iter,
                     body,
                     orelse,
@@ -1338,59 +1397,13 @@ where
             ) => {
                 debug_assert_eq!(&self.current_assignments, &[]);
 
-                let iter_expr = self.add_standalone_expression(iter);
                 self.visit_expr(iter);
 
                 self.record_ambiguous_visibility();
 
                 let pre_loop = self.flow_snapshot();
 
-                let current_assignment = match &**target {
-                    ast::Expr::List(_) | ast::Expr::Tuple(_) => Some(CurrentAssignment::For {
-                        node: for_stmt,
-                        first: true,
-                        unpack: Some(Unpack::new(
-                            self.db,
-                            self.file,
-                            self.current_scope(),
-                            // SAFETY: the node `target` belongs to the `self.module` tree
-                            #[allow(unsafe_code)]
-                            unsafe {
-                                AstNodeRef::new(self.module.clone(), target)
-                            },
-                            UnpackValue::Iterable(iter_expr),
-                            countme::Count::default(),
-                        )),
-                    }),
-                    ast::Expr::Name(_) => Some(CurrentAssignment::For {
-                        node: for_stmt,
-                        unpack: None,
-                        first: false,
-                    }),
-                    ast::Expr::Attribute(ast::ExprAttribute {
-                        value: object,
-                        attr,
-                        ..
-                    }) => {
-                        self.register_attribute_assignment(
-                            object,
-                            attr,
-                            AttributeAssignment::Iterable {
-                                iterable: iter_expr,
-                            },
-                        );
-                        None
-                    }
-                    _ => None,
-                };
-
-                if let Some(current_assignment) = current_assignment {
-                    self.push_assignment(current_assignment);
-                }
-                self.visit_expr(target);
-                if current_assignment.is_some() {
-                    self.pop_assignment();
-                }
+                self.add_unpackable_assignments(for_stmt);
 
                 let outer_loop = self.push_loop();
                 self.visit_body(body);
