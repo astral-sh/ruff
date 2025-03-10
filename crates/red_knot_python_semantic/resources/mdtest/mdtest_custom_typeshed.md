@@ -22,19 +22,9 @@ We can then place custom stub files in `/typeshed/stdlib`, for example:
 `/typeshed/stdlib/builtins.pyi`:
 
 ```pyi
-class object: ...
-class type: ...
-class ellipsis: ...
-
 class BuiltinClass: ...
 
 builtin_symbol: BuiltinClass
-```
-
-`/typeshed/stdlib/types.pyi`:
-
-```pyi
-class ModuleType: ...
 ```
 
 `/typeshed/stdlib/sys/__init__.pyi`:
@@ -80,18 +70,11 @@ class OldClass: ...
 class NewClass: ...
 ```
 
-`/typeshed/stdlib/types.pyi`:
-
-```pyi
-class ModuleType: ...
-```
-
 `/typeshed/stdlib/VERSIONS`:
 
 ```text
 old_module: 3.0-
 new_module: 3.11-
-types: 3.9-
 ```
 
 ```py
@@ -117,12 +100,6 @@ typeshed = "/typeshed"
 
 ```pyi
 def reveal_type(obj, /): ...
-```
-
-`/typeshed/stdlib/types.pyi`:
-
-```pyi
-class ModuleType: ...
 ```
 
 ```py

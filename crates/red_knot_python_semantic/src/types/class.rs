@@ -951,11 +951,7 @@ impl<'db> KnownClass {
     /// Lookup a [`KnownClass`] in typeshed and return a [`Type`]
     /// representing all possible instances of the class.
     ///
-    /// ## Panics
-    ///
-    /// This method will panic if the class cannot be found in typeshed
-    /// and *either* the `test` feature *or* the `debug_assertions` feature is enabled.
-    /// See [`KnownClass::to_class_literal`] for more details.
+    /// If the class cannot be found in typeshed, a debug-level log message will be emitted stating this.
     pub(crate) fn to_instance(self, db: &'db dyn Db) -> Type<'db> {
         self.to_class_literal(db)
             .into_class_literal()
@@ -986,42 +982,7 @@ impl<'db> KnownClass {
 
     /// Lookup a [`KnownClass`] in typeshed and return a [`Type`] representing that class-literal.
     ///
-    /// ## Invariants upheld by this method
-    ///
-    /// When executed outside of tests, this method should never panic: if the symbol cannot
-    /// be found in typeshed, the method simply returns [`Type::unknown()`].
-    /// When executed in the context of tests, however, this method panics rather than falling
-    /// back to `Unknown` if a symbol cannot be found.
-    ///
-    /// This means that two desirable properties are upheld:
-    /// 1. red-knot works on (nearly) arbitrary custom typesheds without panicking when run
-    ///    outside of our tests. This is a potentially useful feature for a variety of reasons.
-    /// 2. Implicit behaviour is kept to a minimum in the context of our tests.
-    ///    If [`KnownClass`] symbols silently fell back to `Unknown` in the context of a test
-    ///    that used a custom typeshed directory, it might lead to hard-to-debug test failures
-    ///    and confusing behaviour.
-    ///
-    /// ## When this method panics
-    ///
-    /// This method panics if both the following conditions are met:
-    /// 1. Either no symbol can be found for the class in typeshed,
-    ///    OR the found symbol is not a class definition,
-    ///    OR the found symbol is possibly unbound.
-    /// 2. Either the `test` feature is enabled,
-    ///    OR the `debug_assertions` feature is enabled.
-    ///
-    /// If condition (1) is met but condition (2) is not, we simply log a debug warning
-    /// and fall back to `Unknown`.
-    ///
-    /// ## Why do we panic if *either* `test` *or* `debug_assertions` is enabled?
-    ///
-    /// Some of our tests are not run in a context where the `test` feature is enabled
-    /// (for example, mdtests). Meanwhile, other tests are never run in our CI with
-    /// `debug_assertions` enabled, because running them with a debug build would take too
-    /// long (our property tests). For both of these tests, however, we want to avoid
-    /// special-cases symbols silently falling back to `Unknown`. Panicking if *either*
-    /// `test` is enabled *or* `debug_assertions` is enabled covers both cases, while still
-    /// avoiding panicking when red-knot is run on production code.
+    /// If the class cannot be found in typeshed, a debug-level log message will be emitted stating this.
     pub(crate) fn to_class_literal(self, db: &'db dyn Db) -> Type<'db> {
         // a cache of the `KnownClass`es that we have already failed to lookup in typeshed
         // (and therefore that we've already logged a warning for)
@@ -1030,12 +991,6 @@ impl<'db> KnownClass {
         self.try_to_class_literal(db)
             .map(Type::ClassLiteral)
             .unwrap_or_else(|lookup_error| {
-                assert!(
-                    !cfg!(any(test, debug_assertions)),
-                    "{}",
-                    lookup_error.display(db, self)
-                );
-
                 if MESSAGES.lock().unwrap().insert(self) {
                     if matches!(
                         lookup_error,
@@ -1063,11 +1018,7 @@ impl<'db> KnownClass {
     /// Lookup a [`KnownClass`] in typeshed and return a [`Type`]
     /// representing that class and all possible subclasses of the class.
     ///
-    /// ## Panics
-    ///
-    /// This method will panic if the class cannot be found in typeshed
-    /// and *either* the `test` feature *or* the `debug_assertions` feature is enabled.
-    /// See [`KnownClass::to_class_literal`] for more details.
+    /// If the class cannot be found in typeshed, a debug-level log message will be emitted stating this.
     pub(crate) fn to_subclass_of(self, db: &'db dyn Db) -> Type<'db> {
         self.to_class_literal(db)
             .into_class_literal()

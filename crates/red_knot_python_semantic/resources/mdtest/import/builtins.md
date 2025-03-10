@@ -32,16 +32,9 @@ typeshed = "/typeshed"
 `/typeshed/stdlib/builtins.pyi`:
 
 ```pyi
-class object: ...
 class Custom: ...
 
 custom_builtin: Custom
-```
-
-`/typeshed/stdlib/types.pyi`:
-
-```pyi
-class ModuleType: ...
 ```
 
 `/typeshed/stdlib/typing_extensions.pyi`:
@@ -72,12 +65,6 @@ typeshed = "/typeshed"
 ```pyi
 foo = bar
 bar = 1
-```
-
-`/typeshed/stdlib/types.pyi`:
-
-```pyi
-class ModuleType: ...
 ```
 
 `/typeshed/stdlib/typing_extensions.pyi`:

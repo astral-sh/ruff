@@ -1,15 +1,12 @@
 use anyhow::{anyhow, Context};
 use red_knot_project::{ProjectDatabase, ProjectMetadata};
-use red_knot_python_semantic::{HasType, Program, SemanticModel};
+use red_knot_python_semantic::{HasType, SemanticModel};
 use ruff_db::files::{system_path_to_file, File};
 use ruff_db::parsed::parsed_module;
 use ruff_db::system::{SystemPath, SystemPathBuf, TestSystem};
 use ruff_python_ast::visitor::source_order;
 use ruff_python_ast::visitor::source_order::SourceOrderVisitor;
-use ruff_python_ast::{
-    self as ast, Alias, Expr, Parameter, ParameterWithDefault, PythonVersion, Stmt,
-};
-use salsa::Setter;
+use ruff_python_ast::{self as ast, Alias, Expr, Parameter, ParameterWithDefault, Stmt};
 
 fn setup_db(project_root: &SystemPath, system: TestSystem) -> anyhow::Result<ProjectDatabase> {
     let project = ProjectMetadata::discover(project_root, &system)?;
@@ -86,14 +83,6 @@ fn run_corpus_tests(pattern: &str) -> anyhow::Result<()> {
     memory_fs.create_directory_all(root.as_ref())?;
 
     let mut db = setup_db(&root, system.clone())?;
-
-    // Set the target Python version to the latest one supported by red-knot.
-    // This enables us to parse syntax (and accurately infer types) for code that only works
-    // on newer Python versions.
-    // (Some of the corpus snippets use syntax that is only available on newer Python versions.)
-    Program::get(&db)
-        .set_python_version(&mut db)
-        .to(PythonVersion::latest());
 
     let workspace_root = get_cargo_workspace_root()?;
     let workspace_root = workspace_root.to_string();
