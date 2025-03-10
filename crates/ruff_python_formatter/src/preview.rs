@@ -13,10 +13,3 @@ pub(crate) const fn is_hug_parens_with_braces_and_square_brackets_enabled(
 ) -> bool {
     context.is_preview()
 }
-
-/// Returns `true` if the bugfix for single-with items with a trailing comment targeting Python 3.9 or newer is enabled.
-///
-/// See [#14001](https://github.com/astral-sh/ruff/issues/14001)
-pub(crate) fn is_with_single_target_parentheses_enabled(context: &PyFormatContext) -> bool {
-    context.is_preview()
-}
