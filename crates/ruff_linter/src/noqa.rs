@@ -337,8 +337,8 @@ pub(crate) fn lex_codes(text: &str) -> Result<Vec<Code<'_>>, LexicalError> {
 /// at the `#` at the beginning of a `noqa` comment.
 #[derive(Debug)]
 struct NoqaLexer<'a> {
-    /// A slice of source text starting at the beginning of a `noqa` comment
-    line: &'a str,
+    /// Length between offset and end of comment range
+    line_length: TextSize,
     /// Contains convenience methods for lexing
     cursor: Cursor<'a>,
     /// Byte offset of the start of putative `noqa` comment
@@ -361,7 +361,7 @@ impl<'a> NoqaLexer<'a> {
     /// Initialize [`NoqaLexer`] in the given range of source text.
     fn in_range(range: TextRange, source: &'a str) -> Self {
         Self {
-            line: &source[range],
+            line_length: range.len(),
             offset: range.start(),
             cursor: Cursor::new(&source[range]),
             warnings: Vec::new(),
@@ -375,11 +375,11 @@ impl<'a> NoqaLexer<'a> {
             // Skip over any leading content.
             self.cursor.eat_while(|c| c != '#');
 
-            // This updates the offset and line in the case of
+            // This updates the offset and line length in the case of
             // multiple comments in a range, e.g.
             // `# First # Second # noqa`
             self.offset += self.cursor.token_len();
-            self.line = &self.line[self.cursor.token_len().to_usize()..];
+            self.line_length -= self.cursor.token_len();
             self.cursor.start_token();
 
             if !self.cursor.eat_char('#') {
@@ -405,11 +405,11 @@ impl<'a> NoqaLexer<'a> {
             // Skip over any leading content
             self.cursor.eat_while(|c| c != '#');
 
-            // This updates the offset and line in the case of
+            // This updates the offset and line length in the case of
             // multiple comments in a range, e.g.
             // # First # Second # noqa
             self.offset += self.cursor.token_len();
-            self.line = &self.line[self.cursor.token_len().to_usize()..];
+            self.line_length -= self.cursor.token_len();
             self.cursor.start_token();
 
             // The remaining logic implements a simple regex
@@ -531,6 +531,7 @@ impl<'a> NoqaLexer<'a> {
             return Ok(());
         }
 
+        let before_code = self.cursor.as_str();
         // Reset start of token so it does not include whitespace
         self.cursor.start_token();
         match self.cursor.bump() {
@@ -552,7 +553,10 @@ impl<'a> NoqaLexer<'a> {
                     return Ok(());
                 }
                 self.cursor.eat_while(|chr| chr.is_ascii_digit());
-                self.push_code();
+
+                let code = &before_code[..self.cursor.token_len().to_usize()];
+
+                self.push_code(code);
 
                 if self.cursor.is_eof() {
                     return Ok(());
@@ -602,9 +606,9 @@ impl<'a> NoqaLexer<'a> {
     }
 
     /// Push current token to stack of [`Code`] objects
-    fn push_code(&mut self) {
+    fn push_code(&mut self, code: &'a str) {
         self.codes.push(Code {
-            code: &self.line[self.token_range()],
+            code,
             range: self.token_range().add(self.offset),
         });
     }
@@ -633,7 +637,7 @@ impl<'a> NoqaLexer<'a> {
     /// Retrieves the current position of the cursor within the line.
     #[inline]
     fn position(&self) -> TextSize {
-        self.line.text_len() - self.cursor.text_len()
+        self.line_length - self.cursor.text_len()
     }
 }
 
