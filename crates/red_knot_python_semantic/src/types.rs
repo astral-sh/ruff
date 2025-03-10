@@ -2320,12 +2320,12 @@ impl<'db> Type<'db> {
                     Signature::new(
                         Parameters::new([
                             Parameter::new(
-                                Some("instance".into()),
+                                Some(Name::new_static("instance")),
                                 Some(Type::none(db)),
                                 ParameterKind::PositionalOnly { default_ty: None },
                             ),
                             Parameter::new(
-                                Some("owner".into()),
+                                Some(Name::new_static("owner")),
                                 Some(KnownClass::Type.to_instance(db)),
                                 ParameterKind::PositionalOnly { default_ty: None },
                             ),
@@ -2335,12 +2335,12 @@ impl<'db> Type<'db> {
                     Signature::new(
                         Parameters::new([
                             Parameter::new(
-                                Some("instance".into()),
+                                Some(Name::new_static("instance")),
                                 Some(not_none),
                                 ParameterKind::PositionalOnly { default_ty: None },
                             ),
                             Parameter::new(
-                                Some("owner".into()),
+                                Some(Name::new_static("owner")),
                                 Some(UnionType::from_elements(
                                     db,
                                     [KnownClass::Type.to_instance(db), Type::none(db)],
@@ -2394,17 +2394,17 @@ impl<'db> Type<'db> {
                     Signature::new(
                         Parameters::new([
                             Parameter::new(
-                                Some("self".into()),
+                                Some(Name::new_static("self")),
                                 Some(KnownClass::FunctionType.to_instance(db)),
                                 ParameterKind::PositionalOnly { default_ty: None },
                             ),
                             Parameter::new(
-                                Some("instance".into()),
+                                Some(Name::new_static("instance")),
                                 Some(Type::none(db)),
                                 ParameterKind::PositionalOnly { default_ty: None },
                             ),
                             Parameter::new(
-                                Some("owner".into()),
+                                Some(Name::new_static("owner")),
                                 Some(KnownClass::Type.to_instance(db)),
                                 ParameterKind::PositionalOnly { default_ty: None },
                             ),
@@ -2414,17 +2414,17 @@ impl<'db> Type<'db> {
                     Signature::new(
                         Parameters::new([
                             Parameter::new(
-                                Some("self".into()),
+                                Some(Name::new_static("self")),
                                 Some(KnownClass::FunctionType.to_instance(db)),
                                 ParameterKind::PositionalOnly { default_ty: None },
                             ),
                             Parameter::new(
-                                Some("instance".into()),
+                                Some(Name::new_static("instance")),
                                 Some(not_none),
                                 ParameterKind::PositionalOnly { default_ty: None },
                             ),
                             Parameter::new(
-                                Some("owner".into()),
+                                Some(Name::new_static("owner")),
                                 Some(UnionType::from_elements(
                                     db,
                                     [KnownClass::Type.to_instance(db), Type::none(db)],
@@ -2648,7 +2648,7 @@ impl<'db> Type<'db> {
                 // ```
                 let signature = Signature::new(
                     Parameters::new([Parameter::new(
-                        Some("o".into()),
+                        Some(Name::new_static("o")),
                         Some(Type::any()),
                         ParameterKind::PositionalOnly {
                             default_ty: Some(Type::BooleanLiteral(false)),
@@ -2683,7 +2683,7 @@ impl<'db> Type<'db> {
                 let overloads = Overloads::from_overloads([
                     Signature::new(
                         Parameters::new([Parameter::new(
-                            Some("o".into()),
+                            Some(Name::new_static("o")),
                             Some(Type::any()),
                             ParameterKind::PositionalOnly {
                                 default_ty: Some(Type::string_literal(db, "")),
@@ -2694,17 +2694,17 @@ impl<'db> Type<'db> {
                     Signature::new(
                         Parameters::new([
                             Parameter::new(
-                                Some("o".into()),
+                                Some(Name::new_static("o")),
                                 Some(Type::any()), // TODO: ReadableBuffer
                                 ParameterKind::PositionalOnly { default_ty: None },
                             ),
                             Parameter::new(
-                                Some("encoding".into()),
+                                Some(Name::new_static("encoding")),
                                 Some(KnownClass::Str.to_instance(db)),
                                 ParameterKind::PositionalOnly { default_ty: None },
                             ),
                             Parameter::new(
-                                Some("errors".into()),
+                                Some(Name::new_static("errors")),
                                 Some(KnownClass::Str.to_instance(db)),
                                 ParameterKind::PositionalOnly { default_ty: None },
                             ),
@@ -2741,7 +2741,7 @@ impl<'db> Type<'db> {
                 let overloads = Overloads::from_overloads([
                     Signature::new(
                         Parameters::new([Parameter::new(
-                            Some("o".into()),
+                            Some(Name::new_static("o")),
                             Some(Type::any()),
                             ParameterKind::PositionalOnly { default_ty: None },
                         )]),
@@ -2750,17 +2750,17 @@ impl<'db> Type<'db> {
                     Signature::new(
                         Parameters::new([
                             Parameter::new(
-                                Some("o".into()),
+                                Some(Name::new_static("o")),
                                 Some(Type::any()),
                                 ParameterKind::PositionalOnly { default_ty: None },
                             ),
                             Parameter::new(
-                                Some("bases".into()),
+                                Some(Name::new_static("bases")),
                                 Some(Type::any()),
                                 ParameterKind::PositionalOnly { default_ty: None },
                             ),
                             Parameter::new(
-                                Some("dict".into()),
+                                Some(Name::new_static("dict")),
                                 Some(Type::any()),
                                 ParameterKind::PositionalOnly { default_ty: None },
                             ),
