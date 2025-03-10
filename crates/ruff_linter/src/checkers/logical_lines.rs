@@ -13,6 +13,7 @@ use crate::rules::pycodestyle::rules::logical_lines::{
     space_around_operator, whitespace_around_keywords, whitespace_around_named_parameter_equals,
     whitespace_before_comment, whitespace_before_parameters, LogicalLines, TokenFlags,
 };
+use crate::rules::ruff::rules::indented_form_feed;
 use crate::settings::LinterSettings;
 use crate::Locator;
 
@@ -97,6 +98,7 @@ pub(crate) fn check_logical_lines(
         Rule::UnexpectedIndentationComment,
         Rule::OverIndented,
     ]);
+    let enforce_indented_form_feed = settings.rules.any_enabled(&[Rule::IndentedFormFeed]);
 
     for line in &LogicalLines::from_tokens(tokens, locator) {
         if line.flags().contains(TokenFlags::OPERATOR) {
@@ -150,6 +152,12 @@ pub(crate) fn check_logical_lines(
 
             if enforce_redundant_backslash {
                 redundant_backslash(&line, locator, indexer, &mut context);
+            }
+        }
+
+        if enforce_indented_form_feed {
+            if let Some(diagnostic) = indented_form_feed(&line) {
+                context.push_diagnostic(diagnostic);
             }
         }
 
