@@ -995,11 +995,10 @@ impl<'db> KnownClass {
             | Self::MethodWrapperType
             | Self::WrapperDescriptorType => KnownModule::Types,
             Self::NoneType => KnownModule::Typeshed,
-            Self::SpecialForm
-            | Self::TypeVar
-            | Self::TypeAliasType
-            | Self::StdlibAlias
-            | Self::SupportsIndex => KnownModule::Typing,
+            Self::SpecialForm | Self::TypeVar | Self::StdlibAlias | Self::SupportsIndex => {
+                KnownModule::Typing
+            }
+            Self::TypeAliasType => KnownModule::TypingExtensions,
             Self::NoDefaultType => {
                 let python_version = Program::get(db).python_version(db);
 
@@ -1603,6 +1602,7 @@ mod tests {
     use super::*;
     use crate::db::tests::setup_db;
     use crate::module_resolver::resolve_module;
+    use salsa::Setter;
     use strum::IntoEnumIterator;
 
     #[test]
@@ -1616,6 +1616,54 @@ mod tests {
                 KnownClass::try_from_file_and_name(&db, class_module.file(), class_name),
                 Some(class),
                 "`KnownClass::candidate_from_str` appears to be missing a case for `{class_name}`"
+            );
+        }
+    }
+
+    #[test]
+    fn known_class_doesnt_fallback_to_unknown_unexpectedly_on_latest_version() {
+        let mut db = setup_db();
+
+        Program::get(&db)
+            .set_python_version(&mut db)
+            .to(PythonVersion::latest());
+
+        for class in KnownClass::iter() {
+            assert_ne!(
+                class.to_instance(&db),
+                Type::unknown(),
+                "Unexpectedly fell back to `Unknown` for `{class:?}`"
+            );
+        }
+    }
+
+    #[test]
+    fn known_class_doesnt_fallback_to_unknown_unexpectedly_on_low_python_version() {
+        let mut db = setup_db();
+
+        Program::get(&db)
+            .set_python_version(&mut db)
+            .to(PythonVersion::PY37);
+
+        for class in KnownClass::iter() {
+            let current_version = Program::get(&db).python_version(&db);
+
+            let version_added = match class {
+                KnownClass::BaseExceptionGroup => PythonVersion::PY311,
+                KnownClass::GenericAlias => PythonVersion::PY39,
+                _ => PythonVersion::PY37,
+            };
+
+            if current_version != version_added {
+                Program::get(&db)
+                    .set_python_version(&mut db)
+                    .to(version_added);
+            }
+
+            assert_ne!(
+                class.to_instance(&db),
+                Type::unknown(),
+                "Unexpectedly fell back to `Unknown` for `{class:?}` on Python {version_added}"
             );
         }
     }
