@@ -25,6 +25,7 @@ ruff_python_index = { workspace = true }
 ruff_python_literal = { workspace = true }
 ruff_python_semantic = { workspace = true }
 ruff_python_stdlib = { workspace = true }
+ruff_python_syntax_errors = { workspace = true }
 ruff_python_trivia = { workspace = true }
 ruff_python_parser = { workspace = true }
 ruff_source_file = { workspace = true, features = ["serde"] }
