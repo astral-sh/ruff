@@ -618,7 +618,7 @@ impl<'a> NoqaLexer<'a> {
     /// Consume whitespace
     #[inline]
     fn eat_whitespace(&mut self) {
-        self.cursor.eat_while(|c| c.is_whitespace());
+        self.cursor.eat_while(char::is_whitespace);
     }
 
     /// Consume ASCII whitespace
