@@ -2039,8 +2039,43 @@ impl<'src> Parser<'src> {
             return vec![];
         }
 
+        let open_paren_range = self.current_token_range();
+
         if self.at(TokenKind::Lpar) {
             if let Some(items) = self.try_parse_parenthesized_with_items() {
+                if items.iter().any(|item| item.optional_vars.is_some()) {
+                    // test_ok parenthesized_context_manager_py38
+                    // # parse_options: {"target-version": "3.8"}
+                    // with (foo, bar): ...
+                    // with (
+                    //   open('foo.txt')) as foo: ...
+                    // with (
+                    //   foo,
+                    //   bar,
+                    //   baz,
+                    // ): ...
+                    // with (
+                    //   foo,
+                    //   bar,
+                    //   baz,
+                    // ) as tup: ...
+
+                    // test_ok parenthesized_context_manager_py39
+                    // # parse_options: {"target-version": "3.9"}
+                    // with (foo as x, bar as y): ...
+                    // with (foo, bar as y): ...
+                    // with (foo as x, bar): ...
+
+                    // test_err parenthesized_context_manager_py38
+                    // # parse_options: {"target-version": "3.8"}
+                    // with (foo as x, bar as y): ...
+                    // with (foo, bar as y): ...
+                    // with (foo as x, bar): ...
+                    self.add_unsupported_syntax_error(
+                        UnsupportedSyntaxErrorKind::ParenthesizedContextManager,
+                        open_paren_range,
+                    );
+                }
                 self.expect(TokenKind::Rpar);
                 items
             } else {
