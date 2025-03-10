@@ -4048,6 +4048,23 @@ impl<'db> TypeInferenceBuilder<'db> {
         op: ast::Operator,
     ) -> Option<Type<'db>> {
         match (left_ty, right_ty, op) {
+            (Type::Union(lhs_union), rhs, _) => {
+                let mut union = UnionBuilder::new(self.db());
+                for lhs in lhs_union.elements(self.db()) {
+                    let result = self.infer_binary_expression_type(*lhs, rhs, op)?;
+                    union = union.add(result);
+                }
+                Some(union.build())
+            }
+            (lhs, Type::Union(rhs_union), _) => {
+                let mut union = UnionBuilder::new(self.db());
+                for rhs in rhs_union.elements(self.db()) {
+                    let result = self.infer_binary_expression_type(lhs, *rhs, op)?;
+                    union = union.add(result);
+                }
+                Some(union.build())
+            }
+
             // Non-todo Anys take precedence over Todos (as if we fix this `Todo` in the future,
             // the result would then become Any or Unknown, respectively).
             (any @ Type::Dynamic(DynamicType::Any), _, _)
@@ -4179,7 +4196,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                 | Type::SubclassOf(_)
                 | Type::Instance(_)
                 | Type::KnownInstance(_)
-                | Type::Union(_)
                 | Type::Intersection(_)
                 | Type::AlwaysTruthy
                 | Type::AlwaysFalsy
@@ -4196,7 +4212,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                 | Type::SubclassOf(_)
                 | Type::Instance(_)
                 | Type::KnownInstance(_)
-                | Type::Union(_)
                 | Type::Intersection(_)
                 | Type::AlwaysTruthy
                 | Type::AlwaysFalsy
