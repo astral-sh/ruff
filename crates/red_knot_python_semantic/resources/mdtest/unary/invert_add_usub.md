@@ -18,7 +18,7 @@ class Number:
     def __invert__(self) -> Literal[True]:
         return True
 
-a = Number()
+a = Number(0)
 
 reveal_type(+a)  # revealed: int
 reveal_type(-a)  # revealed: int
