@@ -576,7 +576,7 @@ impl<'a> NoqaLexer<'a> {
                     c if c.is_ascii_uppercase() => {
                         self.warnings
                             .push(LexicalWarning::MissingDelimiter(TextRange::empty(
-                                self.offset + self.current(),
+                                self.offset + self.position(),
                             )));
                         true
                     }
@@ -624,7 +624,7 @@ impl<'a> NoqaLexer<'a> {
     /// Current token range relative to offset
     #[inline]
     fn token_range(&self) -> TextRange {
-        let end = self.current();
+        let end = self.position();
         let len = self.cursor.token_len();
 
         TextRange::at(end - len, len)
@@ -632,7 +632,7 @@ impl<'a> NoqaLexer<'a> {
 
     /// Retrieves the current position of the cursor within the line.
     #[inline]
-    fn current(&self) -> TextSize {
+    fn position(&self) -> TextSize {
         self.line.text_len() - self.cursor.text_len()
     }
 }
