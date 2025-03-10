@@ -570,6 +570,8 @@ impl<'a> NoqaLexer<'a> {
 
                     // Whitespace could be a delimiter or the end of the `noqa`.
                     // If it's the end, then non-ascii whitespace is allowed
+                    // Ex) `# noqa: RUF100\tRUF200` has a valid delimiter
+                    // Ex) `# noqa: RUF100\u{00A0}RUF200` will not read `RUF200`
                     c if c.is_whitespace() => false,
 
                     // e.g. #noqa:F401F842
