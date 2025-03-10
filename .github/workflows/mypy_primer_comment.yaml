@@ -62,9 +62,13 @@ jobs:
           echo '<!-- generated-comment mypy_primer -->' >> comment.txt
 
           echo '## `mypy_primer` results' >> comment.txt
-          echo '```diff' >> comment.txt
-          cat pr/mypy_primer_diff/mypy_primer.diff >> comment.txt
-          echo '```' >> comment.txt
+          if [ -s "pr/mypy_primer_diff/mypy_primer.diff" ]; then
+            echo '```diff' >> comment.txt
+            cat pr/mypy_primer_diff/mypy_primer.diff >> comment.txt
+            echo '```' >> comment.txt
+          else
+            echo 'No ecosystem changes detected ✅' >> comment.txt
+          fi
 
           echo 'comment<<EOF' >> "$GITHUB_OUTPUT"
           cat comment.txt >> "$GITHUB_OUTPUT"

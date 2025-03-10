@@ -10,6 +10,7 @@ on:
       - "crates/ruff_python_ast"
       - "crates/ruff_python_parser"
       - ".github/workflows/mypy_primer.yaml"
+      - ".github/workflows/mypy_primer_comment.yaml"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref_name }}-${{ github.event.pull_request.number || github.sha }}
@@ -67,7 +68,7 @@ jobs:
               --new "$GITHUB_SHA" \
               --project-selector '/(mypy_primer|black|pyp|git-revise|zipp|arrow)$' \
               --output concise \
-              --debug | tee mypy_primer.diff
+              --debug | tee /dev/stdout | sed -e 's/\x1b\[[0-9;]*m//g' > mypy_primer.diff
           ) || [ $? -eq 1 ]
 
           echo ${{ github.event.number }} > pr-number
