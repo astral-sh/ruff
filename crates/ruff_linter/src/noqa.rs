@@ -519,7 +519,7 @@ impl<'a> NoqaLexer<'a> {
 
     fn lex_code(&mut self) -> Result<(), LexicalError> {
         self.cursor.start_token();
-        self.eat_ascii_whitespace();
+        self.eat_whitespace();
 
         // Ex) # noqa: F401,    ,F841
         //                  ^^^^
@@ -568,10 +568,7 @@ impl<'a> NoqaLexer<'a> {
                         false
                     }
 
-                    // Whitespace could be a delimiter or the end of the `noqa`.
-                    // If it's the end, then non-ascii whitespace is allowed
-                    // Ex) `# noqa: RUF100\tRUF200` has a valid delimiter
-                    // Ex) `# noqa: RUF100\u{00A0}RUF200` will not read `RUF200`
+                    // Whitespace is an allowed delimiter or the end of the `noqa`.
                     c if c.is_whitespace() => false,
 
                     // e.g. #noqa:F401F842
@@ -619,12 +616,6 @@ impl<'a> NoqaLexer<'a> {
     #[inline]
     fn eat_whitespace(&mut self) {
         self.cursor.eat_while(char::is_whitespace);
-    }
-
-    /// Consume ASCII whitespace
-    #[inline]
-    fn eat_ascii_whitespace(&mut self) {
-        self.cursor.eat_while(|c| c.is_ascii_whitespace());
     }
 
     /// Current token range relative to offset
