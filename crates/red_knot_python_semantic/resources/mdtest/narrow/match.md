@@ -20,7 +20,8 @@ def _(flag: bool):
 ## Class patterns
 
 ```py
-def get_object() -> object: ...
+def get_object() -> object:
+    return object()
 
 class A: ...
 class B: ...
@@ -42,10 +43,12 @@ reveal_type(x)  # revealed: object
 ## Class pattern with guard
 
 ```py
-def get_object() -> object: ...
+def get_object() -> object:
+    return object()
 
 class A:
-    def y() -> int: ...
+    def y() -> int:
+        return 1
 
 class B: ...
 

@@ -367,6 +367,8 @@ class C:
 
     @property
     def name(self) -> str:
+        # TODO: No diagnostic should be emitted here
+        # error: [invalid-return-type]
         return self._name or "Unset"
     # TODO: No diagnostic should be emitted here
     # error: [unresolved-attribute] "Type `Literal[name]` has no attribute `setter`"

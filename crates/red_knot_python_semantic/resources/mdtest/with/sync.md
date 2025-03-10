@@ -91,8 +91,8 @@ with Manager():
 from typing_extensions import Self
 
 class Manager:
-    def __enter__(self) -> Self: ...
-
+    def __enter__(self) -> Self:
+        return self
     __exit__: int = 32
 
 # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it does not correctly implement `__exit__`"

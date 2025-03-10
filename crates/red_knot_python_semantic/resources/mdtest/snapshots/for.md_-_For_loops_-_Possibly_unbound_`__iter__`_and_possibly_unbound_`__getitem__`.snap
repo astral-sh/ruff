@@ -25,7 +25,7 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/loops/for.md
 11 |                 return Iterator()
 12 |         if flag2:
 13 |             def __getitem__(self, key: int) -> bytes:
-14 |                 return 42
+14 |                 return bytes()
 15 | 
 16 |     # error: [not-iterable]
 17 |     for x in Iterable():

@@ -185,7 +185,7 @@ def _(flag: bool):
                 return str(key)
         else:
             def __getitem__(self, key: int) -> bytes:
-                return key
+                return bytes()
 
     c = C()
     reveal_type(c[0])  # revealed: str | bytes
@@ -198,7 +198,7 @@ def _(flag: bool):
     else:
         class D:
             def __getitem__(self, key: int) -> bytes:
-                return key
+                return bytes()
 
     d = D()
     reveal_type(d[0])  # revealed: str | bytes

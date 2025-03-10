@@ -197,7 +197,7 @@ class LtReturnTypeOnB: ...
 
 class B:
     def __lt__(self, o: B) -> LtReturnTypeOnB:
-        return set()
+        return LtReturnTypeOnB()
 
 reveal_type((A(), B()) < (A(), B()))  # revealed: LtReturnType | LtReturnTypeOnB | Literal[False]
 ```

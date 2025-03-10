@@ -35,7 +35,7 @@ Each typevar must also appear _somewhere_ in the parameter list:
 ```py
 def absurd[T]() -> T:
     # There's no way to construct a T!
-    ...
+    raise ValueError("absurd")
 ```
 
 ## Inferring generic function parameter types
@@ -48,7 +48,8 @@ whether we want to infer a more specific `Literal` type where possible, or use h
 the inferred type to e.g. `int`.
 
 ```py
-def f[T](x: T) -> T: ...
+def f[T](x: T) -> T:
+    return x
 
 # TODO: no error
 # TODO: revealed: int or Literal[1]
@@ -77,7 +78,8 @@ The matching up of call arguments and discovery of constraints on typevars can b
 process for arbitrarily-nested generic types in parameters.
 
 ```py
-def f[T](x: list[T]) -> T: ...
+def f[T](x: list[T]) -> T:
+    return x[0]
 
 # TODO: revealed: float
 reveal_type(f([1.0, 2.0]))  # revealed: T
@@ -119,7 +121,7 @@ def different_types[T, S](cond: bool, t: T, s: S) -> T:
     if cond:
         return t
     else:
-        # TODO: error: S is not assignable to T
+        # error: [invalid-return-type] "Object of type `S` is not assignable to return type `T`"
         return s
 
 def same_types[T](cond: bool, t1: T, t2: T) -> T:

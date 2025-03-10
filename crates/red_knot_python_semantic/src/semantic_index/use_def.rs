@@ -320,6 +320,23 @@ pub(crate) struct UseDefMap<'db> {
     /// Snapshot of bindings in this scope that can be used to resolve a reference in a nested
     /// eager scope.
     eager_bindings: EagerBindings,
+
+    /// Whether or not the start of the scope is visible.
+    /// This is used to check if the scope can implicitly return a value.
+    /// For example:
+    ///
+    /// ```python
+    /// def f(cond: bool) -> int:
+    ///     if cond:
+    ///        return 1
+    /// ```
+    ///
+    /// In this case, the scope may implicitly return `None`.
+    ///
+    /// The check is basically done by seeing if `scope_start_visibility != ALWAYS_FALSE`,
+    /// but if `scope_start_visibility` is not terminal, delayed evaluations of the predicates must be performed.
+    /// This can be done by executing `UseDefMap::can_implicit_return`.
+    scope_start_visibility: ScopedVisibilityConstraintId,
 }
 
 impl<'db> UseDefMap<'db> {
@@ -366,6 +383,18 @@ impl<'db> UseDefMap<'db> {
     ) -> DeclarationsIterator<'map, 'db> {
         let declarations = self.public_symbols[symbol].declarations();
         self.declarations_iterator(declarations)
+    }
+
+    /// This function is intended to be called only once inside `TypeInferenceBuilder::infer_function_body`.
+    pub(crate) fn can_implicit_return(&self, db: &dyn crate::Db) -> bool {
+        let mut visibility = self.scope_start_visibility;
+        while !visibility.is_terminal() {
+            let interior = self.visibility_constraints.get_interior(visibility);
+            let predicate = self.predicates[interior.atom()];
+            let truthiness = VisibilityConstraints::analyze_single(db, &predicate);
+            visibility = interior.visibility_constraint(truthiness);
+        }
+        visibility != ScopedVisibilityConstraintId::ALWAYS_FALSE
     }
 
     fn bindings_iterator<'map>(
@@ -784,6 +813,7 @@ impl<'db> UseDefMapBuilder<'db> {
             declarations_by_binding: self.declarations_by_binding,
             bindings_by_declaration: self.bindings_by_declaration,
             eager_bindings: self.eager_bindings,
+            scope_start_visibility: self.scope_start_visibility,
         }
     }
 }
