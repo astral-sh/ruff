@@ -386,7 +386,7 @@ impl<'a> NoqaLexer<'a> {
                 continue;
             }
 
-            self.cursor.eat_while(char::is_whitespace);
+            self.eat_whitespace();
 
             if !is_noqa_uncased(self.cursor.as_str()) {
                 continue;
@@ -422,7 +422,7 @@ impl<'a> NoqaLexer<'a> {
 
             // `#\s*(?:ruff|flake8)\s*:\s*(?i)noqa`
             //   ^^^
-            self.cursor.eat_while(char::is_whitespace);
+            self.eat_whitespace();
 
             // `#\s*(?:ruff|flake8)\s*:\s*(?i)noqa`
             //       ^^^^^^^^^^^^^
@@ -445,7 +445,7 @@ impl<'a> NoqaLexer<'a> {
 
             // `#\s*(?:ruff|flake8)\s*:\s*(?i)noqa`
             //                     ^^^
-            self.cursor.eat_while(char::is_whitespace);
+            self.eat_whitespace();
 
             // `#\s*(?:ruff|flake8)\s*:\s*(?i)noqa`
             //                        ^
@@ -455,7 +455,7 @@ impl<'a> NoqaLexer<'a> {
 
             // `#\s*(?:ruff|flake8)\s*:\s*(?i)noqa`
             //                         ^^^
-            self.cursor.eat_while(char::is_whitespace);
+            self.eat_whitespace();
 
             // `#\s*(?:ruff|flake8)\s*:\s*(?i)noqa`
             //                             ^^^^^^^
@@ -526,7 +526,7 @@ impl<'a> NoqaLexer<'a> {
 
     fn lex_code(&mut self) -> Result<(), LexicalError> {
         self.cursor.start_token();
-        self.cursor.eat_while(|chr| chr.is_ascii_whitespace());
+        self.eat_ascii_whitespace();
 
         // Ex) # noqa: F401,    ,F841
         //                  ^^^^
@@ -614,6 +614,18 @@ impl<'a> NoqaLexer<'a> {
             code: &self.line[self.token_range()],
             range: self.token_range().add(self.offset),
         });
+    }
+
+    /// Consume whitespace
+    #[inline]
+    fn eat_whitespace(&mut self) {
+        self.cursor.eat_while(|c| c.is_whitespace());
+    }
+
+    /// Consume ASCII whitespace
+    #[inline]
+    fn eat_ascii_whitespace(&mut self) {
+        self.cursor.eat_while(|c| c.is_ascii_whitespace());
     }
 
     /// Current token range relative to offset
