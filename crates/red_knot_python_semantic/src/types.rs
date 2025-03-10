@@ -2791,9 +2791,9 @@ impl<'db> Type<'db> {
             }
 
             Type::SubclassOf(subclass_of_type) => match subclass_of_type.subclass_of() {
-                ClassBase::Dynamic(dynamic_type) => Ok(CallOutcome::Single(
-                    CallBinding::from_return_type(Type::Dynamic(dynamic_type)),
-                )),
+                ClassBase::Dynamic(dynamic_type) => {
+                    Type::Dynamic(dynamic_type).try_call(db, arguments)
+                }
                 ClassBase::Class(class) => Type::class_literal(class).try_call(db, arguments),
             },
 
