@@ -3,7 +3,7 @@ use super::{
 };
 use crate::db::Db;
 use crate::types::diagnostic::{
-    INVALID_ARGUMENT_TYPE, MISSING_ARGUMENT, PARAMETER_ALREADY_ASSIGNED,
+    INVALID_ARGUMENT_TYPE, MISSING_ARGUMENT, NO_MATCHING_OVERLOAD, PARAMETER_ALREADY_ASSIGNED,
     TOO_MANY_POSITIONAL_ARGUMENTS, UNKNOWN_ARGUMENT,
 };
 use crate::types::signatures::Parameter;
@@ -259,18 +259,33 @@ impl<'db> CallBinding<'db> {
     }
 
     /// Report diagnostics for all of the errors that occurred when trying to match actual
-    /// arguments to formal parameters. If the callable has multiple overloads, we report
-    /// diagnostics for all of them.
+    /// arguments to formal parameters. If the callable has multiple overloads, we report a single
+    /// diagnostic that we couldn't match any overload.
+    /// TODO: Update this to add subdiagnostics about how we failed to match each overload.
     pub(crate) fn report_diagnostics(&self, context: &InferContext<'db>, node: ast::AnyNodeRef) {
         let callable_descriptor = self.callable_descriptor(context.db());
-        let multiple_overloads = self.overloads.len() > 1;
-        for (idx, overload) in self.overloads.iter().enumerate() {
+        if self.overloads.len() > 1 {
+            context.report_lint(
+                &NO_MATCHING_OVERLOAD,
+                node,
+                format_args!(
+                    "No overload{} matches arguments",
+                    if let Some(CallableDescriptor { kind, name }) = callable_descriptor {
+                        format!(" of {kind} `{name}`")
+                    } else {
+                        String::new()
+                    }
+                ),
+            );
+            return;
+        }
+
+        for overload in &self.overloads {
             overload.report_diagnostics(
                 context,
                 node,
                 self.callable_ty,
                 callable_descriptor.as_ref(),
-                multiple_overloads.then(|| idx + 1),
             );
         }
     }
@@ -329,10 +344,9 @@ impl<'db> OverloadBinding<'db> {
         node: ast::AnyNodeRef,
         callable_ty: Type<'db>,
         callable_descriptor: Option<&CallableDescriptor>,
-        overload: Option<usize>,
     ) {
         for error in &self.errors {
-            error.report_diagnostic(context, node, callable_ty, callable_descriptor, overload);
+            error.report_diagnostic(context, node, callable_ty, callable_descriptor);
         }
     }
 
@@ -465,7 +479,6 @@ impl<'db> CallBindingError<'db> {
         node: ast::AnyNodeRef,
         callable_ty: Type<'db>,
         callable_descriptor: Option<&CallableDescriptor>,
-        overload: Option<usize>,
     ) {
         match self {
             Self::InvalidArgumentType {
@@ -491,12 +504,7 @@ impl<'db> CallBindingError<'db> {
                     Self::get_node(node, *argument_index),
                     format_args!(
                         "Object of type `{provided_ty_display}` cannot be assigned to \
-                        parameter {parameter}{}{}; expected type `{expected_ty_display}`",
-                        if let Some(overload) = overload {
-                            format!(" of overload {overload}")
-                        } else {
-                            String::new()
-                        },
+                        parameter {parameter}{}; expected type `{expected_ty_display}`",
                         if let Some(CallableDescriptor { kind, name }) = callable_descriptor {
                             format!(" of {kind} `{name}`")
                         } else {
@@ -516,20 +524,10 @@ impl<'db> CallBindingError<'db> {
                     &TOO_MANY_POSITIONAL_ARGUMENTS,
                     Self::get_node(node, *first_excess_argument_index),
                     format_args!(
-                        "Too many positional arguments{}{}{}: expected \
+                        "Too many positional arguments{}: expected \
                         {expected_positional_count}, got {provided_positional_count}",
-                        if overload.is_some() || callable_descriptor.is_some() {
-                            " to"
-                        } else {
-                            ""
-                        },
-                        if let Some(overload) = overload {
-                            format!(" overload {overload} of")
-                        } else {
-                            String::new()
-                        },
                         if let Some(CallableDescriptor { kind, name }) = callable_descriptor {
-                            format!(" {kind} `{name}`")
+                            format!(" to {kind} `{name}`")
                         } else {
                             String::new()
                         }
@@ -543,12 +541,7 @@ impl<'db> CallBindingError<'db> {
                     &MISSING_ARGUMENT,
                     node,
                     format_args!(
-                        "No argument{s} provided for required parameter{s} {parameters}{}{}",
-                        if let Some(overload) = overload {
-                            format!(" of overload {overload}")
-                        } else {
-                            String::new()
-                        },
+                        "No argument{s} provided for required parameter{s} {parameters}{}",
                         if let Some(CallableDescriptor { kind, name }) = callable_descriptor {
                             format!(" of {kind} `{name}`")
                         } else {
@@ -566,12 +559,7 @@ impl<'db> CallBindingError<'db> {
                     &UNKNOWN_ARGUMENT,
                     Self::get_node(node, *argument_index),
                     format_args!(
-                        "Argument `{argument_name}` does not match any known parameter{}{}",
-                        if let Some(overload) = overload {
-                            format!(" of overload {overload}")
-                        } else {
-                            String::new()
-                        },
+                        "Argument `{argument_name}` does not match any known parameter{}",
                         if let Some(CallableDescriptor { kind, name }) = callable_descriptor {
                             format!(" of {kind} `{name}`")
                         } else {
@@ -589,12 +577,7 @@ impl<'db> CallBindingError<'db> {
                     &PARAMETER_ALREADY_ASSIGNED,
                     Self::get_node(node, *argument_index),
                     format_args!(
-                        "Multiple values provided for parameter {parameter}{}{}",
-                        if let Some(overload) = overload {
-                            format!(" of overload {overload}")
-                        } else {
-                            String::new()
-                        },
+                        "Multiple values provided for parameter {parameter}{}",
                         if let Some(CallableDescriptor { kind, name }) = callable_descriptor {
                             format!(" of {kind} `{name}`")
                         } else {

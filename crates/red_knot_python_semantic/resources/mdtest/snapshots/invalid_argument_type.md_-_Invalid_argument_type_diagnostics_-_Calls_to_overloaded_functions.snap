@@ -12,27 +12,17 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/diagnostics/invali
 ## mdtest_snippet.py
 
 ```
-1 | type("Foo", ())
+1 | type("Foo", ())  # error: [no-matching-overload]
 ```
 
 # Diagnostics
 
 ```
-error: lint:too-many-positional-arguments
- --> /src/mdtest_snippet.py:1:13
-  |
-1 | type("Foo", ())
-  |             ^^ Too many positional arguments to overload 1 of class `type`: expected 1, got 2
-  |
-
-```
-
-```
-error: lint:missing-argument
+error: lint:no-matching-overload
  --> /src/mdtest_snippet.py:1:1
   |
-1 | type("Foo", ())
-  | ^^^^^^^^^^^^^^^ No argument provided for required parameter `dict` of overload 2 of class `type`
+1 | type("Foo", ())  # error: [no-matching-overload]
+  | ^^^^^^^^^^^^^^^ No overload of class `type` matches arguments
   |
 
 ```

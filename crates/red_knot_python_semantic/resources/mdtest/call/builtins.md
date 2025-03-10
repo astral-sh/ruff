@@ -32,12 +32,9 @@ reveal_type(type("Foo", (), {}))  # revealed: type
 Other numbers of arguments are invalid
 
 ```py
-# error: [too-many-positional-arguments] "Too many positional arguments to overload 1 of class `type`: expected 1, got 2"
-# error: [missing-argument] "No argument provided for required parameter `dict` of overload 2 of class `type`"
+# error: [no-matching-overload] "No overload of class `type` matches arguments"
 type("Foo", ())
 
-# error: [too-many-positional-arguments] "Too many positional arguments to overload 1 of class `type`: expected 1, got 3"
-# error: [unknown-argument] "Argument `weird_other_arg` does not match any known parameter of overload 1 of class `type`"
-# error: [unknown-argument] "Argument `weird_other_arg` does not match any known parameter of overload 2 of class `type`"
+# error: [no-matching-overload] "No overload of class `type` matches arguments"
 type("Foo", (), {}, weird_other_arg=42)
 ```

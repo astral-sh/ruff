@@ -204,5 +204,5 @@ signature internally. Update that this to an `@overload` function in the Python 
 we can.
 
 ```py
-type("Foo", ())
+type("Foo", ())  # error: [no-matching-overload]
 ```
