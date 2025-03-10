@@ -9,6 +9,24 @@ if 1 in [1]:
 if 1 in {1}:
     print("Single-element set")
 
+if 1 in set([1]):
+    print("Single-element set")
+
+if 1 in set((1,)):
+    print("Single-element set")
+
+if 1 in set({1}):
+    print("Single-element set")
+
+if 1 in frozenset([1]):
+    print("Single-element set")
+
+if 1 in frozenset((1,)):
+    print("Single-element set")
+
+if 1 in frozenset({1}):
+    print("Single-element set")
+
 if "a" in "a":
     print("Single-element string")
 
@@ -27,6 +45,24 @@ if 1 in [1, 2]:
     pass
 
 if 1 in {1, 2}:
+    pass
+
+if 1 in set((1, 2)):
+    pass
+
+if 1 in set([1, 2]):
+    pass
+
+if 1 in set({1, 2}):
+    pass
+
+if 1 in frozenset((1, 2)):
+    pass
+
+if 1 in frozenset([1, 2]):
+    pass
+
+if 1 in frozenset({1, 2}):
     pass
 
 if "a" in "ab":
