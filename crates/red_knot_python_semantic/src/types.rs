@@ -2315,46 +2315,49 @@ impl<'db> Type<'db> {
                 //     def __get__(self, instance: object, owner: type | None = None, /) -> MethodType: ...
                 // ```
 
-                let not_none = Type::none(db).negate(db);
-                let overloads = Overloads::from_overloads([
-                    Signature::new(
-                        Parameters::new([
-                            Parameter::new(
-                                Some(Name::new_static("instance")),
-                                Some(Type::none(db)),
-                                ParameterKind::PositionalOnly { default_ty: None },
-                            ),
-                            Parameter::new(
-                                Some(Name::new_static("owner")),
-                                Some(KnownClass::Type.to_instance(db)),
-                                ParameterKind::PositionalOnly { default_ty: None },
-                            ),
-                        ]),
-                        None,
-                    ),
-                    Signature::new(
-                        Parameters::new([
-                            Parameter::new(
-                                Some(Name::new_static("instance")),
-                                Some(not_none),
-                                ParameterKind::PositionalOnly { default_ty: None },
-                            ),
-                            Parameter::new(
-                                Some(Name::new_static("owner")),
-                                Some(UnionType::from_elements(
-                                    db,
-                                    [KnownClass::Type.to_instance(db), Type::none(db)],
-                                )),
-                                ParameterKind::PositionalOnly {
-                                    default_ty: Some(Type::none(db)),
-                                },
-                            ),
-                        ]),
-                        None,
-                    ),
-                ]);
+                #[salsa::tracked(return_ref)]
+                fn overloads<'db>(db: &'db dyn Db) -> Overloads<'db> {
+                    let not_none = Type::none(db).negate(db);
+                    Overloads::from_overloads([
+                        Signature::new(
+                            Parameters::new([
+                                Parameter::new(
+                                    Some(Name::new_static("instance")),
+                                    Some(Type::none(db)),
+                                    ParameterKind::PositionalOnly { default_ty: None },
+                                ),
+                                Parameter::new(
+                                    Some(Name::new_static("owner")),
+                                    Some(KnownClass::Type.to_instance(db)),
+                                    ParameterKind::PositionalOnly { default_ty: None },
+                                ),
+                            ]),
+                            None,
+                        ),
+                        Signature::new(
+                            Parameters::new([
+                                Parameter::new(
+                                    Some(Name::new_static("instance")),
+                                    Some(not_none),
+                                    ParameterKind::PositionalOnly { default_ty: None },
+                                ),
+                                Parameter::new(
+                                    Some(Name::new_static("owner")),
+                                    Some(UnionType::from_elements(
+                                        db,
+                                        [KnownClass::Type.to_instance(db), Type::none(db)],
+                                    )),
+                                    ParameterKind::PositionalOnly {
+                                        default_ty: Some(Type::none(db)),
+                                    },
+                                ),
+                            ]),
+                            None,
+                        ),
+                    ])
+                }
 
-                let mut binding = bind_call(db, arguments, &overloads, self);
+                let mut binding = bind_call(db, arguments, overloads(db), self);
                 let Some((_, overload)) = binding.matching_overload_mut() else {
                     return Err(CallError::BindingError { binding });
                 };
@@ -2389,56 +2392,59 @@ impl<'db> Type<'db> {
                 // Here, we also model `types.FunctionType.__get__`, but now we consider a call to
                 // this as a function, i.e. we also expect the `self` argument to be passed in.
 
-                let not_none = Type::none(db).negate(db);
-                let overloads = Overloads::from_overloads([
-                    Signature::new(
-                        Parameters::new([
-                            Parameter::new(
-                                Some(Name::new_static("self")),
-                                Some(KnownClass::FunctionType.to_instance(db)),
-                                ParameterKind::PositionalOnly { default_ty: None },
-                            ),
-                            Parameter::new(
-                                Some(Name::new_static("instance")),
-                                Some(Type::none(db)),
-                                ParameterKind::PositionalOnly { default_ty: None },
-                            ),
-                            Parameter::new(
-                                Some(Name::new_static("owner")),
-                                Some(KnownClass::Type.to_instance(db)),
-                                ParameterKind::PositionalOnly { default_ty: None },
-                            ),
-                        ]),
-                        None,
-                    ),
-                    Signature::new(
-                        Parameters::new([
-                            Parameter::new(
-                                Some(Name::new_static("self")),
-                                Some(KnownClass::FunctionType.to_instance(db)),
-                                ParameterKind::PositionalOnly { default_ty: None },
-                            ),
-                            Parameter::new(
-                                Some(Name::new_static("instance")),
-                                Some(not_none),
-                                ParameterKind::PositionalOnly { default_ty: None },
-                            ),
-                            Parameter::new(
-                                Some(Name::new_static("owner")),
-                                Some(UnionType::from_elements(
-                                    db,
-                                    [KnownClass::Type.to_instance(db), Type::none(db)],
-                                )),
-                                ParameterKind::PositionalOnly {
-                                    default_ty: Some(Type::none(db)),
-                                },
-                            ),
-                        ]),
-                        None,
-                    ),
-                ]);
+                #[salsa::tracked(return_ref)]
+                fn overloads<'db>(db: &'db dyn Db) -> Overloads<'db> {
+                    let not_none = Type::none(db).negate(db);
+                    Overloads::from_overloads([
+                        Signature::new(
+                            Parameters::new([
+                                Parameter::new(
+                                    Some(Name::new_static("self")),
+                                    Some(KnownClass::FunctionType.to_instance(db)),
+                                    ParameterKind::PositionalOnly { default_ty: None },
+                                ),
+                                Parameter::new(
+                                    Some(Name::new_static("instance")),
+                                    Some(Type::none(db)),
+                                    ParameterKind::PositionalOnly { default_ty: None },
+                                ),
+                                Parameter::new(
+                                    Some(Name::new_static("owner")),
+                                    Some(KnownClass::Type.to_instance(db)),
+                                    ParameterKind::PositionalOnly { default_ty: None },
+                                ),
+                            ]),
+                            None,
+                        ),
+                        Signature::new(
+                            Parameters::new([
+                                Parameter::new(
+                                    Some(Name::new_static("self")),
+                                    Some(KnownClass::FunctionType.to_instance(db)),
+                                    ParameterKind::PositionalOnly { default_ty: None },
+                                ),
+                                Parameter::new(
+                                    Some(Name::new_static("instance")),
+                                    Some(not_none),
+                                    ParameterKind::PositionalOnly { default_ty: None },
+                                ),
+                                Parameter::new(
+                                    Some(Name::new_static("owner")),
+                                    Some(UnionType::from_elements(
+                                        db,
+                                        [KnownClass::Type.to_instance(db), Type::none(db)],
+                                    )),
+                                    ParameterKind::PositionalOnly {
+                                        default_ty: Some(Type::none(db)),
+                                    },
+                                ),
+                            ]),
+                            None,
+                        ),
+                    ])
+                }
 
-                let mut binding = bind_call(db, arguments, &overloads, self);
+                let mut binding = bind_call(db, arguments, overloads(db), self);
                 let Some((_, overload)) = binding.matching_overload_mut() else {
                     return Err(CallError::BindingError { binding });
                 };
@@ -2645,18 +2651,22 @@ impl<'db> Type<'db> {
                 // class bool(int):
                 //     def __new__(cls, o: object = ..., /) -> Self: ...
                 // ```
-                let signature = Signature::new(
-                    Parameters::new([Parameter::new(
-                        Some(Name::new_static("o")),
-                        Some(Type::any()),
-                        ParameterKind::PositionalOnly {
-                            default_ty: Some(Type::BooleanLiteral(false)),
-                        },
-                    )]),
-                    Some(self.to_instance(db)),
-                );
+                #[salsa::tracked(return_ref)]
+                fn overloads<'db>(db: &'db dyn Db) -> Overloads<'db> {
+                    Signature::new(
+                        Parameters::new([Parameter::new(
+                            Some(Name::new_static("o")),
+                            Some(Type::any()),
+                            ParameterKind::PositionalOnly {
+                                default_ty: Some(Type::BooleanLiteral(false)),
+                            },
+                        )]),
+                        Some(KnownClass::Bool.to_instance(db)),
+                    )
+                    .into()
+                }
 
-                let mut binding = bind_call(db, arguments, &signature.into(), self);
+                let mut binding = bind_call(db, arguments, overloads(db), self);
                 let Some((_, overload)) = binding.matching_overload_mut() else {
                     return Err(CallError::BindingError { binding });
                 };
@@ -2679,40 +2689,43 @@ impl<'db> Type<'db> {
                 //     @overload
                 //     def __new__(cls, object: ReadableBuffer, encoding: str = ..., errors: str = ...) -> Self: ...
                 // ```
-                let overloads = Overloads::from_overloads([
-                    Signature::new(
-                        Parameters::new([Parameter::new(
-                            Some(Name::new_static("o")),
-                            Some(Type::any()),
-                            ParameterKind::PositionalOnly {
-                                default_ty: Some(Type::string_literal(db, "")),
-                            },
-                        )]),
-                        Some(self.to_instance(db)),
-                    ),
-                    Signature::new(
-                        Parameters::new([
-                            Parameter::new(
+                #[salsa::tracked(return_ref)]
+                fn overloads<'db>(db: &'db dyn Db) -> Overloads<'db> {
+                    Overloads::from_overloads([
+                        Signature::new(
+                            Parameters::new([Parameter::new(
                                 Some(Name::new_static("o")),
-                                Some(Type::any()), // TODO: ReadableBuffer
-                                ParameterKind::PositionalOnly { default_ty: None },
-                            ),
-                            Parameter::new(
-                                Some(Name::new_static("encoding")),
-                                Some(KnownClass::Str.to_instance(db)),
-                                ParameterKind::PositionalOnly { default_ty: None },
-                            ),
-                            Parameter::new(
-                                Some(Name::new_static("errors")),
-                                Some(KnownClass::Str.to_instance(db)),
-                                ParameterKind::PositionalOnly { default_ty: None },
-                            ),
-                        ]),
-                        Some(self.to_instance(db)),
-                    ),
-                ]);
+                                Some(Type::any()),
+                                ParameterKind::PositionalOnly {
+                                    default_ty: Some(Type::string_literal(db, "")),
+                                },
+                            )]),
+                            Some(KnownClass::Str.to_instance(db)),
+                        ),
+                        Signature::new(
+                            Parameters::new([
+                                Parameter::new(
+                                    Some(Name::new_static("o")),
+                                    Some(Type::any()), // TODO: ReadableBuffer
+                                    ParameterKind::PositionalOnly { default_ty: None },
+                                ),
+                                Parameter::new(
+                                    Some(Name::new_static("encoding")),
+                                    Some(KnownClass::Str.to_instance(db)),
+                                    ParameterKind::PositionalOnly { default_ty: None },
+                                ),
+                                Parameter::new(
+                                    Some(Name::new_static("errors")),
+                                    Some(KnownClass::Str.to_instance(db)),
+                                    ParameterKind::PositionalOnly { default_ty: None },
+                                ),
+                            ]),
+                            Some(KnownClass::Str.to_instance(db)),
+                        ),
+                    ])
+                }
 
-                let mut binding = bind_call(db, arguments, &overloads, self);
+                let mut binding = bind_call(db, arguments, overloads(db), self);
                 let Some((index, overload)) = binding.matching_overload_mut() else {
                     return Err(CallError::BindingError { binding });
                 };
@@ -2737,38 +2750,41 @@ impl<'db> Type<'db> {
                 //     @overload
                 //     def __init__(self, name: str, bases: tuple[type, ...], dict: dict[str, Any], /, **kwds: Any) -> None: ...
                 // ```
-                let overloads = Overloads::from_overloads([
-                    Signature::new(
-                        Parameters::new([Parameter::new(
-                            Some(Name::new_static("o")),
-                            Some(Type::any()),
-                            ParameterKind::PositionalOnly { default_ty: None },
-                        )]),
-                        Some(self.to_instance(db)),
-                    ),
-                    Signature::new(
-                        Parameters::new([
-                            Parameter::new(
+                #[salsa::tracked(return_ref)]
+                fn overloads<'db>(db: &'db dyn Db) -> Overloads<'db> {
+                    Overloads::from_overloads([
+                        Signature::new(
+                            Parameters::new([Parameter::new(
                                 Some(Name::new_static("o")),
                                 Some(Type::any()),
                                 ParameterKind::PositionalOnly { default_ty: None },
-                            ),
-                            Parameter::new(
-                                Some(Name::new_static("bases")),
-                                Some(Type::any()),
-                                ParameterKind::PositionalOnly { default_ty: None },
-                            ),
-                            Parameter::new(
-                                Some(Name::new_static("dict")),
-                                Some(Type::any()),
-                                ParameterKind::PositionalOnly { default_ty: None },
-                            ),
-                        ]),
-                        Some(self.to_instance(db)),
-                    ),
-                ]);
+                            )]),
+                            Some(KnownClass::Type.to_instance(db)),
+                        ),
+                        Signature::new(
+                            Parameters::new([
+                                Parameter::new(
+                                    Some(Name::new_static("o")),
+                                    Some(Type::any()),
+                                    ParameterKind::PositionalOnly { default_ty: None },
+                                ),
+                                Parameter::new(
+                                    Some(Name::new_static("bases")),
+                                    Some(Type::any()),
+                                    ParameterKind::PositionalOnly { default_ty: None },
+                                ),
+                                Parameter::new(
+                                    Some(Name::new_static("dict")),
+                                    Some(Type::any()),
+                                    ParameterKind::PositionalOnly { default_ty: None },
+                                ),
+                            ]),
+                            Some(KnownClass::Type.to_instance(db)),
+                        ),
+                    ])
+                }
 
-                let mut binding = bind_call(db, arguments, &overloads, self);
+                let mut binding = bind_call(db, arguments, overloads(db), self);
                 let Some((index, overload)) = binding.matching_overload_mut() else {
                     return Err(CallError::BindingError { binding });
                 };
