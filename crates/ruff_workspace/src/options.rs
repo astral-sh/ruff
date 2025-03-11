@@ -3343,7 +3343,7 @@ pub struct RuffOptions {
         example = "extend-markup-names = [\"webhelpers.html.literal\", \"my_package.Markup\"]"
     )]
     #[deprecated(
-        since = "0.9.10",
+        since = "0.10.0",
         note = "The `extend-markup-names` option has been moved to the `flake8-bandit` section of the configuration."
     )]
     pub extend_markup_names: Option<Vec<String>>,
@@ -3379,7 +3379,7 @@ pub struct RuffOptions {
         example = "allowed-markup-calls = [\"bleach.clean\", \"my_package.sanitize\"]"
     )]
     #[deprecated(
-        since = "0.9.10",
+        since = "0.10.0",
         note = "The `allowed-markup-names` option has been moved to the `flake8-bandit` section of the configuration."
     )]
     pub allowed_markup_calls: Option<Vec<String>>,
