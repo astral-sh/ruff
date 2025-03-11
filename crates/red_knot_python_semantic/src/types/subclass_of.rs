@@ -92,4 +92,11 @@ impl<'db> SubclassOfType<'db> {
             }
         }
     }
+
+    pub(crate) fn to_instance(self) -> Type<'db> {
+        match self.subclass_of {
+            ClassBase::Class(class) => Type::instance(class),
+            ClassBase::Dynamic(dynamic_type) => Type::Dynamic(dynamic_type),
+        }
+    }
 }

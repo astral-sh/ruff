@@ -1702,7 +1702,10 @@ impl<'db> TypeInferenceBuilder<'db> {
             for element in tuple.elements(self.db()).iter().copied() {
                 builder = builder.add(
                     if element.is_assignable_to(self.db(), type_base_exception) {
-                        element.to_instance(self.db())
+                        element.to_instance(self.db()).expect(
+                            "`Type::to_instance()` should always return `Some()` \
+                                if called on a type assignable to `type[BaseException]`",
+                        )
                     } else {
                         if let Some(node) = node {
                             report_invalid_exception_caught(&self.context, node, element);
@@ -1717,7 +1720,10 @@ impl<'db> TypeInferenceBuilder<'db> {
         } else {
             let type_base_exception = KnownClass::BaseException.to_subclass_of(self.db());
             if node_ty.is_assignable_to(self.db(), type_base_exception) {
-                node_ty.to_instance(self.db())
+                node_ty.to_instance(self.db()).expect(
+                    "`Type::to_instance()` should always return `Some()` \
+                        if called on a type assignable to `type[BaseException]`",
+                )
             } else {
                 if let Some(node) = node {
                     report_invalid_exception_caught(&self.context, node, node_ty);
@@ -2542,7 +2548,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = raise;
 
         let base_exception_type = KnownClass::BaseException.to_subclass_of(self.db());
-        let base_exception_instance = base_exception_type.to_instance(self.db());
+        let base_exception_instance = KnownClass::BaseException.to_instance(self.db());
 
         let can_be_raised =
             UnionType::from_elements(self.db(), [base_exception_type, base_exception_instance]);
