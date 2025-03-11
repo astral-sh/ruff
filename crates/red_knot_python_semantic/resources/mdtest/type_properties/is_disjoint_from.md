@@ -96,7 +96,7 @@ static_assert(not is_disjoint_from(Literal[1, 2], Literal[2, 3]))
 
 ```py
 from typing_extensions import Literal, final
-from knot_extensions import Intersection, is_disjoint_from, static_assert
+from knot_extensions import Intersection, is_disjoint_from, static_assert, Not
 
 @final
 class P: ...
@@ -130,6 +130,18 @@ static_assert(not is_disjoint_from(Y, Z))
 static_assert(not is_disjoint_from(Intersection[X, Y], Z))
 static_assert(not is_disjoint_from(Intersection[X, Z], Y))
 static_assert(not is_disjoint_from(Intersection[Y, Z], X))
+
+# If one side has a positive element and the other side has a negative of that element, they are disjoint
+static_assert(is_disjoint_from(int, Not[int]))
+static_assert(is_disjoint_from(Intersection[X, Y, Not[Z]], Intersection[X, Z]))
+
+class Parent: ...
+class Child(Parent): ...
+
+static_assert(not is_disjoint_from(Parent, Child))
+static_assert(not is_disjoint_from(Parent, Not[Child]))
+static_assert(not is_disjoint_from(Not[Parent], Not[Child]))
+static_assert(is_disjoint_from(Not[Parent], Child))
 ```
 
 ## Special types

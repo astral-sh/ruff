@@ -266,6 +266,10 @@ static_assert(is_assignable_to(Intersection[int, Parent], Intersection[int, Not[
 static_assert(not is_assignable_to(int, Not[int]))
 static_assert(not is_assignable_to(int, Not[Literal[1]]))
 
+static_assert(is_assignable_to(Not[Parent], Not[Child1]))
+static_assert(not is_assignable_to(Not[Parent], Parent))
+static_assert(not is_assignable_to(Intersection[Unrelated, Not[Parent]], Parent))
+
 # Intersection with `Any` dominates the left hand side of intersections
 static_assert(is_assignable_to(Intersection[Any, Parent], Parent))
 static_assert(is_assignable_to(Intersection[Any, Child1], Parent))
@@ -277,6 +281,7 @@ static_assert(is_assignable_to(Intersection[Any, Parent, Unrelated], Intersectio
 
 # Even Any & Not[Parent] is assignable to Parent, since it could be Never
 static_assert(is_assignable_to(Intersection[Any, Not[Parent]], Parent))
+static_assert(is_assignable_to(Intersection[Any, Not[Parent]], Not[Parent]))
 
 # Intersection with `Any` is effectively ignored on the right hand side for the sake of assignment
 static_assert(is_assignable_to(Parent, Intersection[Any, Parent]))

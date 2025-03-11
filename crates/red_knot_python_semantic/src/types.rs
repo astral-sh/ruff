@@ -1000,17 +1000,15 @@ impl<'db> Type<'db> {
 
             (Type::Intersection(intersection), other)
             | (other, Type::Intersection(intersection)) => {
-                if intersection
+                intersection
                     .positive(db)
                     .iter()
                     .any(|p| p.is_disjoint_from(db, other))
-                {
-                    true
-                } else {
-                    // TODO we can do better here. For example:
-                    // X & ~Literal[1] is disjoint from Literal[1]
-                    false
-                }
+                    // A & B & Not[C] is disjoint from C
+                    || intersection
+                        .negative(db)
+                        .iter()
+                        .any(|&neg_ty| other.is_assignable_to(db, neg_ty))
             }
 
             // any single-valued type is disjoint from another single-valued type
