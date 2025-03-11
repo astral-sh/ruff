@@ -55,13 +55,9 @@ to a different type each time.
 ```py
 def f[T](x: T) -> T: ...
 
-# TODO: no error
 # TODO: revealed: int or Literal[1]
-# error: [invalid-argument-type]
 reveal_type(f(1))  # revealed: T
-# TODO: no error
 # TODO: revealed: str or Literal["a"]
-# error: [invalid-argument-type]
 reveal_type(f("a"))  # revealed: T
 ```
 
@@ -76,14 +72,9 @@ class C[T]:
     def m2(self, x: T) -> T: ...
 
 c: C[int] = C()
-# TODO: no error
-# error: [invalid-argument-type]
 c.m1(1)
-# TODO: no error
-# error: [invalid-argument-type]
 c.m2(1)
-# TODO: expected type `int`
-# error: [invalid-argument-type] "Object of type `Literal["string"]` cannot be assigned to parameter 2 (`x`) of bound method `m2`; expected type `T`"
+# TODO: error: [invalid-argument-type] "Object of type `Literal["string"]` cannot be assigned to parameter 2 (`x`) of bound method `m2`; expected type `T`"
 c.m2("string")
 ```
 
@@ -104,8 +95,9 @@ class Legacy(Generic[T]):
     def m(self, x: T, y: S) -> S: ...
 
 legacy: Legacy[int] = Legacy()
+# TODO: no errors
 # TODO: revealed: str
-reveal_type(legacy.m(1, "string"))  # revealed: @Todo(Invalid or unsupported `Instance` in `Type::to_type_expression`)
+reveal_type(legacy.m(1, "string"))  # revealed: S
 ```
 
 With PEP 695 syntax, it is clearer that the method uses a separate typevar:
@@ -115,10 +107,7 @@ class C[T]:
     def m[S](self, x: T, y: S) -> S: ...
 
 c: C[int] = C()
-# TODO: no errors
 # TODO: revealed: str
-# error: [invalid-argument-type]
-# error: [invalid-argument-type]
 reveal_type(c.m(1, "string"))  # revealed: S
 ```
 
