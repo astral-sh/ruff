@@ -21,15 +21,14 @@ use crate::settings::LinterSettings;
 /// standard-library module and vice versa.
 ///
 /// Standard-library modules can be marked as exceptions to this rule via the
-/// [`lint.flake8-builtins.builtins-allowed-modules`] configuration option.
+/// [`lint.flake8-builtins.allowed-modules`] configuration option.
 ///
 /// By default, only the last component of the module name is considered, so `logging.py`,
 /// `utils/logging.py`, and `utils/logging/__init__.py` would all clash with the builtin `logging`
-/// module. With the [`lint.flake8-builtins.builtins-strict-checking`] option set to `false`, the
-/// module path is considered, so only a top-level `logging.py` or `logging/__init__.py` will
-/// trigger the rule and `utils/logging.py`, for example, would not. In preview mode, the default
-/// value of [`lint.flake8-builtins.builtins-strict-checking`] is `false` rather than `true` in
-/// stable mode.
+/// module. With the [`lint.flake8-builtins.strict-checking`] option set to `false`, the module
+/// path is considered, so only a top-level `logging.py` or `logging/__init__.py` will trigger the
+/// rule and `utils/logging.py`, for example, would not. In preview mode, the default value of
+/// [`lint.flake8-builtins.strict-checking`] is `false` rather than `true` in stable mode.
 ///
 /// This rule is not applied to stub files, as the name of a stub module is out
 /// of the control of the author of the stub file. Instead, a stub should aim to
@@ -50,8 +49,8 @@ use crate::settings::LinterSettings;
 /// ```
 ///
 /// ## Options
-/// - `lint.flake8-builtins.builtins-allowed-modules`
-/// - `lint.flake8-builtins.builtins-strict-checking`
+/// - `lint.flake8-builtins.allowed-modules`
+/// - `lint.flake8-builtins.strict-checking`
 #[derive(ViolationMetadata)]
 pub(crate) struct StdlibModuleShadowing {
     name: String,
@@ -104,7 +103,7 @@ pub(crate) fn stdlib_module_shadowing(
     }
 
     // not allowed generally, but check for a parent in non-strict mode
-    if !settings.flake8_builtins.builtins_strict_checking && components.next().is_some() {
+    if !settings.flake8_builtins.strict_checking && components.next().is_some() {
         return None;
     }
 
@@ -136,7 +135,7 @@ fn is_allowed_module(settings: &LinterSettings, version: PythonVersion, module: 
 
     if settings
         .flake8_builtins
-        .builtins_allowed_modules
+        .allowed_modules
         .iter()
         .any(|allowed_module| allowed_module == module)
     {
