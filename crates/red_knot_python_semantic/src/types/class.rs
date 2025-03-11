@@ -1,3 +1,5 @@
+use std::sync::{LazyLock, Mutex};
+
 use crate::{
     module_resolver::file_to_module,
     semantic_index::{
@@ -18,6 +20,7 @@ use indexmap::IndexSet;
 use itertools::Itertools as _;
 use ruff_db::files::File;
 use ruff_python_ast::{self as ast, PythonVersion};
+use rustc_hash::FxHashSet;
 
 use super::{
     class_base::ClassBase, infer_expression_type, infer_unpack_types, IntersectionBuilder,
@@ -183,6 +186,14 @@ impl<'db> Class<'db> {
     pub(super) fn metaclass(self, db: &'db dyn Db) -> Type<'db> {
         self.try_metaclass(db)
             .unwrap_or_else(|_| SubclassOfType::subclass_of_unknown())
+    }
+
+    /// Return a type representing "the set of all instances of the metaclass of this class".
+    pub(super) fn metaclass_instance_type(self, db: &'db dyn Db) -> Type<'db> {
+        self
+            .metaclass(db)
+            .to_instance(db)
+            .expect("`Type::to_instance()` should always return `Some()` when called on the type of a metaclass")
     }
 
     /// Return the metaclass of this class, or an error if the metaclass cannot be inferred.
@@ -879,7 +890,7 @@ impl<'db> KnownClass {
         }
     }
 
-    pub(crate) fn as_str(self, db: &'db dyn Db) -> &'static str {
+    pub(crate) fn name(self, db: &'db dyn Db) -> &'static str {
         match self {
             Self::Bool => "bool",
             Self::Object => "object",
@@ -937,17 +948,101 @@ impl<'db> KnownClass {
         }
     }
 
+    fn display(self, db: &'db dyn Db) -> impl std::fmt::Display + 'db {
+        struct KnownClassDisplay<'db> {
+            db: &'db dyn Db,
+            class: KnownClass,
+        }
+
+        impl std::fmt::Display for KnownClassDisplay<'_> {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                let KnownClassDisplay {
+                    class: known_class,
+                    db,
+                } = *self;
+                write!(
+                    f,
+                    "{module}.{class}",
+                    module = known_class.canonical_module(db),
+                    class = known_class.name(db)
+                )
+            }
+        }
+
+        KnownClassDisplay { db, class: self }
+    }
+
+    /// Lookup a [`KnownClass`] in typeshed and return a [`Type`]
+    /// representing all possible instances of the class.
+    ///
+    /// If the class cannot be found in typeshed, a debug-level log message will be emitted stating this.
     pub(crate) fn to_instance(self, db: &'db dyn Db) -> Type<'db> {
-        self.to_class_literal(db).to_instance(db)
+        self.to_class_literal(db)
+            .into_class_literal()
+            .map(|ClassLiteralType { class }| Type::instance(class))
+            .unwrap_or_else(Type::unknown)
     }
 
+    /// Attempt to lookup a [`KnownClass`] in typeshed and return a [`Type`] representing that class-literal.
+    ///
+    /// Return an error if the symbol cannot be found in the expected typeshed module,
+    /// or if the symbol is not a class definition, or if the symbol is possibly unbound.
+    pub(crate) fn try_to_class_literal(
+        self,
+        db: &'db dyn Db,
+    ) -> Result<ClassLiteralType<'db>, KnownClassLookupError<'db>> {
+        let symbol = known_module_symbol(db, self.canonical_module(db), self.name(db)).symbol;
+        match symbol {
+            Symbol::Type(Type::ClassLiteral(class_type), Boundness::Bound) => Ok(class_type),
+            Symbol::Type(Type::ClassLiteral(class_type), Boundness::PossiblyUnbound) => {
+                Err(KnownClassLookupError::ClassPossiblyUnbound { class_type })
+            }
+            Symbol::Type(found_type, _) => {
+                Err(KnownClassLookupError::SymbolNotAClass { found_type })
+            }
+            Symbol::Unbound => Err(KnownClassLookupError::ClassNotFound),
+        }
+    }
+
+    /// Lookup a [`KnownClass`] in typeshed and return a [`Type`] representing that class-literal.
+    ///
+    /// If the class cannot be found in typeshed, a debug-level log message will be emitted stating this.
     pub(crate) fn to_class_literal(self, db: &'db dyn Db) -> Type<'db> {
-        known_module_symbol(db, self.canonical_module(db), self.as_str(db))
-            .symbol
-            .ignore_possibly_unbound()
-            .unwrap_or(Type::unknown())
+        // a cache of the `KnownClass`es that we have already failed to lookup in typeshed
+        // (and therefore that we've already logged a warning for)
+        static MESSAGES: LazyLock<Mutex<FxHashSet<KnownClass>>> = LazyLock::new(Mutex::default);
+
+        self.try_to_class_literal(db)
+            .map(Type::ClassLiteral)
+            .unwrap_or_else(|lookup_error| {
+                if MESSAGES.lock().unwrap().insert(self) {
+                    if matches!(
+                        lookup_error,
+                        KnownClassLookupError::ClassPossiblyUnbound { .. }
+                    ) {
+                        tracing::info!("{}", lookup_error.display(db, self));
+                    } else {
+                        tracing::info!(
+                            "{}. Falling back to `Unknown` for the symbol instead.",
+                            lookup_error.display(db, self)
+                        );
+                    }
+                }
+
+                match lookup_error {
+                    KnownClassLookupError::ClassPossiblyUnbound { class_type, .. } => {
+                        Type::class_literal(class_type.class)
+                    }
+                    KnownClassLookupError::ClassNotFound { .. }
+                    | KnownClassLookupError::SymbolNotAClass { .. } => Type::unknown(),
+                }
+            })
     }
 
+    /// Lookup a [`KnownClass`] in typeshed and return a [`Type`]
+    /// representing that class and all possible subclasses of the class.
+    ///
+    /// If the class cannot be found in typeshed, a debug-level log message will be emitted stating this.
     pub(crate) fn to_subclass_of(self, db: &'db dyn Db) -> Type<'db> {
         self.to_class_literal(db)
             .into_class_literal()
@@ -958,11 +1053,8 @@ impl<'db> KnownClass {
     /// Return `true` if this symbol can be resolved to a class definition `class` in typeshed,
     /// *and* `class` is a subclass of `other`.
     pub(super) fn is_subclass_of(self, db: &'db dyn Db, other: Class<'db>) -> bool {
-        known_module_symbol(db, self.canonical_module(db), self.as_str(db))
-            .symbol
-            .ignore_possibly_unbound()
-            .and_then(Type::into_class_literal)
-            .is_some_and(|ClassLiteralType { class }| class.is_subclass_of(db, other))
+        self.try_to_class_literal(db)
+            .is_ok_and(|ClassLiteralType { class }| class.is_subclass_of(db, other))
     }
 
     /// Return the module in which we should look up the definition for this class
@@ -995,11 +1087,10 @@ impl<'db> KnownClass {
             | Self::MethodWrapperType
             | Self::WrapperDescriptorType => KnownModule::Types,
             Self::NoneType => KnownModule::Typeshed,
-            Self::SpecialForm
-            | Self::TypeVar
-            | Self::TypeAliasType
-            | Self::StdlibAlias
-            | Self::SupportsIndex => KnownModule::Typing,
+            Self::SpecialForm | Self::TypeVar | Self::StdlibAlias | Self::SupportsIndex => {
+                KnownModule::Typing
+            }
+            Self::TypeAliasType => KnownModule::TypingExtensions,
             Self::NoDefaultType => {
                 let python_version = Program::get(db).python_version(db);
 
@@ -1224,6 +1315,62 @@ impl<'db> KnownClass {
             Self::SpecialForm | Self::TypeVar | Self::TypeAliasType | Self::NoDefaultType | Self::SupportsIndex => {
                 matches!(module, KnownModule::Typing | KnownModule::TypingExtensions)
             }
+        }
+    }
+}
+
+/// Enumeration of ways in which looking up a [`KnownClass`] in typeshed could fail.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum KnownClassLookupError<'db> {
+    /// There is no symbol by that name in the expected typeshed module.
+    ClassNotFound,
+    /// There is a symbol by that name in the expected typeshed module,
+    /// but it's not a class.
+    SymbolNotAClass { found_type: Type<'db> },
+    /// There is a symbol by that name in the expected typeshed module,
+    /// and it's a class definition, but it's possibly unbound.
+    ClassPossiblyUnbound { class_type: ClassLiteralType<'db> },
+}
+
+impl<'db> KnownClassLookupError<'db> {
+    fn display(&self, db: &'db dyn Db, class: KnownClass) -> impl std::fmt::Display + 'db {
+        struct ErrorDisplay<'db> {
+            db: &'db dyn Db,
+            class: KnownClass,
+            error: KnownClassLookupError<'db>,
+        }
+
+        impl std::fmt::Display for ErrorDisplay<'_> {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                let ErrorDisplay { db, class, error } = *self;
+
+                let class = class.display(db);
+                let python_version = Program::get(db).python_version(db);
+
+                match error {
+                    KnownClassLookupError::ClassNotFound => write!(
+                        f,
+                        "Could not find class `{class}` in typeshed on Python {python_version}",
+                    ),
+                    KnownClassLookupError::SymbolNotAClass { found_type } => write!(
+                        f,
+                        "Error looking up `{class}` in typeshed: expected to find a class definition \
+                        on Python {python_version}, but found a symbol of type `{found_type}` instead",
+                        found_type = found_type.display(db),
+                    ),
+                    KnownClassLookupError::ClassPossiblyUnbound { .. } => write!(
+                        f,
+                        "Error looking up `{class}` in typeshed on Python {python_version}: \
+                        expected to find a fully bound symbol, but found one that is possibly unbound",
+                    )
+                }
+            }
+        }
+
+        ErrorDisplay {
+            db,
+            class,
+            error: *self,
         }
     }
 }
@@ -1603,19 +1750,60 @@ mod tests {
     use super::*;
     use crate::db::tests::setup_db;
     use crate::module_resolver::resolve_module;
+    use salsa::Setter;
     use strum::IntoEnumIterator;
 
     #[test]
     fn known_class_roundtrip_from_str() {
         let db = setup_db();
         for class in KnownClass::iter() {
-            let class_name = class.as_str(&db);
+            let class_name = class.name(&db);
             let class_module = resolve_module(&db, &class.canonical_module(&db).name()).unwrap();
 
             assert_eq!(
                 KnownClass::try_from_file_and_name(&db, class_module.file(), class_name),
                 Some(class),
                 "`KnownClass::candidate_from_str` appears to be missing a case for `{class_name}`"
+            );
+        }
+    }
+
+    #[test]
+    fn known_class_doesnt_fallback_to_unknown_unexpectedly_on_latest_version() {
+        let mut db = setup_db();
+
+        Program::get(&db)
+            .set_python_version(&mut db)
+            .to(PythonVersion::latest());
+
+        for class in KnownClass::iter() {
+            assert_ne!(
+                class.to_instance(&db),
+                Type::unknown(),
+                "Unexpectedly fell back to `Unknown` for `{class:?}`"
+            );
+        }
+    }
+
+    #[test]
+    fn known_class_doesnt_fallback_to_unknown_unexpectedly_on_low_python_version() {
+        let mut db = setup_db();
+
+        for class in KnownClass::iter() {
+            let version_added = match class {
+                KnownClass::BaseExceptionGroup => PythonVersion::PY311,
+                KnownClass::GenericAlias => PythonVersion::PY39,
+                _ => PythonVersion::PY37,
+            };
+
+            Program::get(&db)
+                .set_python_version(&mut db)
+                .to(version_added);
+
+            assert_ne!(
+                class.to_instance(&db),
+                Type::unknown(),
+                "Unexpectedly fell back to `Unknown` for `{class:?}` on Python {version_added}"
             );
         }
     }

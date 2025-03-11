@@ -119,7 +119,14 @@ fn infer_definition_types_cycle_recovery<'db>(
     _cycle: &salsa::Cycle,
     input: Definition<'db>,
 ) -> TypeInference<'db> {
-    tracing::trace!("infer_definition_types_cycle_recovery");
+    let file = input.file(db);
+    let _span = tracing::trace_span!(
+        "infer_definition_types_cycle_recovery",
+        range = ?input.kind(db).target_range(),
+        file = %file.path(db)
+    )
+    .entered();
+
     TypeInference::cycle_fallback(input.scope(db), todo_type!("cycle recovery"))
 }
 
@@ -317,7 +324,7 @@ impl<'db> TypeInference<'db> {
     #[track_caller]
     pub(crate) fn expression_type(&self, expression: ScopedExpressionId) -> Type<'db> {
         self.try_expression_type(expression).expect(
-            "expression should belong to this TypeInference region and
+            "expression should belong to this TypeInference region and \
             TypeInferenceBuilder should have inferred a type for it",
         )
     }
@@ -1361,7 +1368,9 @@ impl<'db> TypeInferenceBuilder<'db> {
     ///
     /// The annotated type is implicitly wrapped in a homogeneous tuple.
     ///
-    /// See `infer_parameter_definition` doc comment for some relevant observations about scopes.
+    /// See [`infer_parameter_definition`] doc comment for some relevant observations about scopes.
+    ///
+    /// [`infer_parameter_definition`]: Self::infer_parameter_definition
     fn infer_variadic_positional_parameter_definition(
         &mut self,
         parameter: &ast::Parameter,
@@ -1390,7 +1399,9 @@ impl<'db> TypeInferenceBuilder<'db> {
     ///
     /// The annotated type is implicitly wrapped in a string-keyed dictionary.
     ///
-    /// See `infer_parameter_definition` doc comment for some relevant observations about scopes.
+    /// See [`infer_parameter_definition`] doc comment for some relevant observations about scopes.
+    ///
+    /// [`infer_parameter_definition`]: Self::infer_parameter_definition
     fn infer_variadic_keyword_parameter_definition(
         &mut self,
         parameter: &ast::Parameter,
@@ -1691,7 +1702,10 @@ impl<'db> TypeInferenceBuilder<'db> {
             for element in tuple.elements(self.db()).iter().copied() {
                 builder = builder.add(
                     if element.is_assignable_to(self.db(), type_base_exception) {
-                        element.to_instance(self.db())
+                        element.to_instance(self.db()).expect(
+                            "`Type::to_instance()` should always return `Some()` \
+                                if called on a type assignable to `type[BaseException]`",
+                        )
                     } else {
                         if let Some(node) = node {
                             report_invalid_exception_caught(&self.context, node, element);
@@ -1706,7 +1720,10 @@ impl<'db> TypeInferenceBuilder<'db> {
         } else {
             let type_base_exception = KnownClass::BaseException.to_subclass_of(self.db());
             if node_ty.is_assignable_to(self.db(), type_base_exception) {
-                node_ty.to_instance(self.db())
+                node_ty.to_instance(self.db()).expect(
+                    "`Type::to_instance()` should always return `Some()` \
+                        if called on a type assignable to `type[BaseException]`",
+                )
             } else {
                 if let Some(node) = node {
                     report_invalid_exception_caught(&self.context, node, node_ty);
@@ -2531,7 +2548,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = raise;
 
         let base_exception_type = KnownClass::BaseException.to_subclass_of(self.db());
-        let base_exception_instance = base_exception_type.to_instance(self.db());
+        let base_exception_instance = KnownClass::BaseException.to_instance(self.db());
 
         let can_be_raised =
             UnionType::from_elements(self.db(), [base_exception_type, base_exception_instance]);
@@ -3283,18 +3300,83 @@ impl<'db> TypeInferenceBuilder<'db> {
             body: _,
         } = lambda_expression;
 
-        if let Some(parameters) = parameters {
-            for default in parameters
-                .iter_non_variadic_params()
-                .filter_map(|param| param.default.as_deref())
-            {
-                self.infer_expression(default);
-            }
+        let parameters = if let Some(parameters) = parameters {
+            let positional_only = parameters
+                .posonlyargs
+                .iter()
+                .map(|parameter| {
+                    Parameter::new(
+                        Some(parameter.name().id.clone()),
+                        None,
+                        ParameterKind::PositionalOnly {
+                            default_ty: parameter
+                                .default()
+                                .map(|default| self.infer_expression(default)),
+                        },
+                    )
+                })
+                .collect::<Vec<_>>();
+            let positional_or_keyword = parameters
+                .args
+                .iter()
+                .map(|parameter| {
+                    Parameter::new(
+                        Some(parameter.name().id.clone()),
+                        None,
+                        ParameterKind::PositionalOrKeyword {
+                            default_ty: parameter
+                                .default()
+                                .map(|default| self.infer_expression(default)),
+                        },
+                    )
+                })
+                .collect::<Vec<_>>();
+            let variadic = parameters.vararg.as_ref().map(|parameter| {
+                Parameter::new(
+                    Some(parameter.name.id.clone()),
+                    None,
+                    ParameterKind::Variadic,
+                )
+            });
+            let keyword_only = parameters
+                .kwonlyargs
+                .iter()
+                .map(|parameter| {
+                    Parameter::new(
+                        Some(parameter.name().id.clone()),
+                        None,
+                        ParameterKind::KeywordOnly {
+                            default_ty: parameter
+                                .default()
+                                .map(|default| self.infer_expression(default)),
+                        },
+                    )
+                })
+                .collect::<Vec<_>>();
+            let keyword_variadic = parameters.kwarg.as_ref().map(|parameter| {
+                Parameter::new(
+                    Some(parameter.name.id.clone()),
+                    None,
+                    ParameterKind::KeywordVariadic,
+                )
+            });
 
-            self.infer_parameters(parameters);
-        }
+            Parameters::new(
+                positional_only
+                    .into_iter()
+                    .chain(positional_or_keyword)
+                    .chain(variadic)
+                    .chain(keyword_only)
+                    .chain(keyword_variadic),
+            )
+        } else {
+            Parameters::empty()
+        };
 
-        todo_type!("typing.Callable type")
+        Type::Callable(CallableType::General(GeneralCallableType::new(
+            self.db(),
+            Signature::new(parameters, Some(todo_type!("lambda return type"))),
+        )))
     }
 
     fn infer_call_expression(&mut self, call_expression: &ast::ExprCall) -> Type<'db> {

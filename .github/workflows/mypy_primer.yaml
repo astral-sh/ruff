@@ -10,6 +10,7 @@ on:
       - "crates/ruff_python_ast"
       - "crates/ruff_python_parser"
       - ".github/workflows/mypy_primer.yaml"
+      - ".github/workflows/mypy_primer_comment.yaml"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref_name }}-${{ github.event.pull_request.number || github.sha }}
@@ -42,6 +43,10 @@ jobs:
       - name: Install Rust toolchain
         run: rustup show
 
+      - name: Install mypy_primer
+        run: |
+          uv tool install "git+https://github.com/astral-sh/mypy_primer.git@add-red-knot-support"
+
       - name: Run mypy_primer
         shell: bash
         run: |
@@ -57,13 +62,32 @@ jobs:
 
           cd ..
 
-          echo "Running mypy_primer"
-
-          uvx --from "git+https://github.com/astral-sh/mypy_primer.git@add-red-knot-support" mypy_primer \
+          # Allow the exit code to be 0 or 1, only fail for actual mypy_primer crashes/bugs
+          uvx mypy_primer \
             --repo ruff \
             --type-checker knot \
             --old base_commit \
             --new "$GITHUB_SHA" \
             --project-selector '/(mypy_primer|black|pyp|git-revise|zipp|arrow)$' \
             --output concise \
-            --debug
+            --debug > mypy_primer.diff || [ $? -eq 1 ]
+
+          # Output diff with ANSI color codes
+          cat mypy_primer.diff
+
+          # Remove ANSI color codes before uploading
+          sed -ie 's/\x1b\[[0-9;]*m//g' mypy_primer.diff
+
+          echo ${{ github.event.number }} > pr-number
+
+      - name: Upload diff
+        uses: actions/upload-artifact@v4
+        with:
+          name: mypy_primer_diff
+          path: mypy_primer.diff
+
+      - name: Upload pr-number
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr-number
+          path: pr-number
