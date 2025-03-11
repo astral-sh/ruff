@@ -949,7 +949,6 @@ impl<'db> KnownClass {
     }
 
     fn display(self, db: &'db dyn Db) -> impl std::fmt::Display + 'db {
-        #[derive(Clone, Copy)]
         struct KnownClassDisplay<'db> {
             db: &'db dyn Db,
             class: KnownClass,
