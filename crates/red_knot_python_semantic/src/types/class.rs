@@ -1020,9 +1020,9 @@ impl<'db> KnownClass {
                         lookup_error,
                         KnownClassLookupError::ClassPossiblyUnbound { .. }
                     ) {
-                        tracing::debug!("{}", lookup_error.display(db, self));
+                        tracing::info!("{}", lookup_error.display(db, self));
                     } else {
-                        tracing::debug!(
+                        tracing::info!(
                             "{}. Falling back to `Unknown` for the symbol instead.",
                             lookup_error.display(db, self)
                         );
