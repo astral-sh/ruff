@@ -4,7 +4,8 @@
 //! union of types, each of which might contain multiple overloads.
 
 use super::{
-    Argument, Bindings, CallArguments, CallError, CallableSignature, InferContext, Signature, Type,
+    Argument, CallArguments, CallError, CallableSignature, InferContext, Signature, Type,
+    UnionCallError,
 };
 use crate::db::Db;
 use crate::types::diagnostic::{
@@ -165,11 +166,80 @@ fn bind_overload<'db>(
     }
 }
 
-/// Describes a callable for the purposes of diagnostics.
-#[derive(Debug)]
-pub(crate) struct CallableDescriptor<'a> {
-    name: &'a str,
-    kind: &'a str,
+/// Binding information for a possible union of callables. At a call site, the arguments must be
+/// compatible with _all_ of the types in the union for the call to be valid.
+///
+/// It's guaranteed that the wrapped bindings have no errors.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum Bindings<'db> {
+    /// The call resolves to exactly one binding.
+    Single(CallableBinding<'db>),
+
+    /// The call resolves to multiple bindings.
+    Union(Box<[CallableBinding<'db>]>),
+}
+
+impl<'db> Bindings<'db> {
+    /// Calls each union element using the provided `call` function.
+    ///
+    /// Returns `Ok` if all variants can be called without error according to the callback and `Err` otherwise.
+    pub(crate) fn try_call_union<F>(
+        db: &'db dyn Db,
+        union: UnionType<'db>,
+        call: F,
+    ) -> Result<Self, CallError<'db>>
+    where
+        F: Fn(Type<'db>) -> Result<Self, CallError<'db>>,
+    {
+        let elements = union.elements(db);
+        let mut bindings = Vec::with_capacity(elements.len());
+        let mut errors = Vec::new();
+        let mut all_errors_not_callable = true;
+
+        for element in elements {
+            match call(*element) {
+                Ok(Bindings::Single(binding)) => bindings.push(binding),
+                Ok(Bindings::Union(inner_bindings)) => {
+                    bindings.extend(inner_bindings);
+                }
+                Err(error) => {
+                    all_errors_not_callable &= error.is_not_callable();
+                    errors.push(error);
+                }
+            }
+        }
+
+        if errors.is_empty() {
+            Ok(Bindings::Union(bindings.into()))
+        } else if bindings.is_empty() && all_errors_not_callable {
+            Err(CallError::NotCallable {
+                not_callable_type: Type::Union(union),
+            })
+        } else {
+            Err(CallError::Union(UnionCallError {
+                errors: errors.into(),
+                bindings: bindings.into(),
+                called_type: Type::Union(union),
+            }))
+        }
+    }
+
+    /// The type returned by this call.
+    pub(crate) fn return_type(&self, db: &'db dyn Db) -> Type<'db> {
+        match self {
+            Self::Single(binding) => binding.return_type(),
+            Self::Union(bindings) => {
+                UnionType::from_elements(db, bindings.iter().map(CallableBinding::return_type))
+            }
+        }
+    }
+
+    pub(crate) fn bindings(&self) -> &[CallableBinding<'db>] {
+        match self {
+            Self::Single(binding) => std::slice::from_ref(binding),
+            Self::Union(bindings) => bindings,
+        }
+    }
 }
 
 /// Binding information for a single callable. If the callable is overloaded, there is a separate
@@ -348,6 +418,13 @@ impl<'db> Binding<'db> {
     pub(crate) fn has_binding_errors(&self) -> bool {
         !self.errors.is_empty()
     }
+}
+
+/// Describes a callable for the purposes of diagnostics.
+#[derive(Debug)]
+pub(crate) struct CallableDescriptor<'a> {
+    name: &'a str,
+    kind: &'a str,
 }
 
 /// Information needed to emit a diagnostic regarding a parameter.
