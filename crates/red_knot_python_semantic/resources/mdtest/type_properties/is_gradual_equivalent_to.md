@@ -62,4 +62,38 @@ static_assert(not is_gradual_equivalent_to(tuple[str, int], tuple[str, int, byte
 static_assert(not is_gradual_equivalent_to(tuple[str, int], tuple[int, str]))
 ```
 
+## Callable
+
+```py
+from knot_extensions import Unknown, CallableTypeFromFunction, is_gradual_equivalent_to, static_assert
+from typing import Any, Callable
+
+static_assert(is_gradual_equivalent_to(Callable[..., int], Callable[..., int]))
+static_assert(is_gradual_equivalent_to(Callable[..., Any], Callable[..., Unknown]))
+static_assert(is_gradual_equivalent_to(Callable[[int, Any], None], Callable[[int, Unknown], None]))
+
+static_assert(not is_gradual_equivalent_to(Callable[[int, Any], None], Callable[[Any, int], None]))
+static_assert(not is_gradual_equivalent_to(Callable[[int, str], None], Callable[[int, str, bytes], None]))
+static_assert(not is_gradual_equivalent_to(Callable[..., None], Callable[[], None]))
+```
+
+A function with no explicit return type should be gradual equivalent to a callable with a return
+type of `Any`.
+
+```py
+def f1():
+    return
+
+static_assert(is_gradual_equivalent_to(CallableTypeFromFunction[f1], Callable[[], Any]))
+```
+
+And, similarly for parameters with no annotations.
+
+```py
+def f2(a, b) -> None:
+    return
+
+static_assert(is_gradual_equivalent_to(CallableTypeFromFunction[f2], Callable[[Any, Any], None]))
+```
+
 [materializations]: https://typing.readthedocs.io/en/latest/spec/glossary.html#term-materialize
