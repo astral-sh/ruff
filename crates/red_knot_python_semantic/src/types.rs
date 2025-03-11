@@ -2392,6 +2392,9 @@ impl<'db> Type<'db> {
                 // Here, we also model `types.FunctionType.__get__`, but now we consider a call to
                 // this as a function, i.e. we also expect the `self` argument to be passed in.
 
+                // TODO: Consider merging this signature with the one in the previous match clause,
+                // since the previous one is just this signature with the `self` parameters
+                // removed.
                 #[salsa::tracked(return_ref)]
                 fn overloads<'db>(db: &'db dyn Db) -> Overloads<'db> {
                     let not_none = Type::none(db).negate(db);
