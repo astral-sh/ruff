@@ -1,6 +1,6 @@
 //! Settings for the `flake8-builtins` plugin.
 
-use crate::{display_settings, settings::types::PreviewMode};
+use crate::display_settings;
 use ruff_macros::CacheKey;
 use std::fmt::{Display, Formatter};
 
@@ -9,16 +9,6 @@ pub struct Settings {
     pub ignorelist: Vec<String>,
     pub allowed_modules: Vec<String>,
     pub strict_checking: bool,
-}
-
-impl Settings {
-    pub fn new(preview: PreviewMode) -> Self {
-        Self {
-            ignorelist: Vec::new(),
-            allowed_modules: Vec::new(),
-            strict_checking: preview.is_disabled(),
-        }
-    }
 }
 
 impl Display for Settings {
