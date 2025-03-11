@@ -3,8 +3,8 @@ source: crates/red_knot_test/src/lib.rs
 expression: snapshot
 ---
 ---
-mdtest name: invalid_argument_type.md - Invalid argument type diagnostics - Calls to overloaded functions
-mdtest path: crates/red_knot_python_semantic/resources/mdtest/diagnostics/invalid_argument_type.md
+mdtest name: no_matching_overload.md - No matching overload diagnostics - Calls to overloaded functions
+mdtest path: crates/red_knot_python_semantic/resources/mdtest/diagnostics/no_matching_overload.md
 ---
 
 # Python source files
