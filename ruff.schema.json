@@ -1035,7 +1035,7 @@
       "description": "Options for the `flake8-builtins` plugin.",
       "type": "object",
       "properties": {
-        "builtins-allowed-modules": {
+        "allowed-modules": {
           "description": "List of builtin module names to allow.",
           "type": [
             "array",
@@ -1045,8 +1045,20 @@
             "type": "string"
           }
         },
+        "builtins-allowed-modules": {
+          "description": "DEPRECATED: This option has been renamed to `allowed-modules`. Use `allowed-modules` instead.\n\nList of builtin module names to allow.\n\nThis option is ignored if both `allowed-modules` and `builtins-allowed-modules` are set.",
+          "deprecated": true,
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
         "builtins-ignorelist": {
-          "description": "Ignore list of builtins.",
+          "description": "DEPRECATED: This option has been renamed to `ignorelist`. Use `ignorelist` instead.\n\nIgnore list of builtins.\n\nThis option is ignored if both `ignorelist` and `builtins-ignorelist` are set.",
+          "deprecated": true,
           "type": [
             "array",
             "null"
@@ -1056,6 +1068,24 @@
           }
         },
         "builtins-strict-checking": {
+          "description": "DEPRECATED: This option has been renamed to `strict-checking`. Use `strict-checking` instead.\n\nCompare module names instead of full module paths.\n\nThis option is ignored if both `strict-checking` and `builtins-strict-checking` are set.",
+          "deprecated": true,
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "ignorelist": {
+          "description": "Ignore list of builtins.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "strict-checking": {
           "description": "Compare module names instead of full module paths.\n\nUsed by [`A005` - `stdlib-module-shadowing`](https://docs.astral.sh/ruff/rules/stdlib-module-shadowing/).\n\nIn preview mode the default value is `false` rather than `true`.",
           "type": [
             "boolean",
