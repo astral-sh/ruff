@@ -8,15 +8,11 @@ Ok(
             warnings: [],
             directive: Codes(
                 Codes {
-                    range: 0..24,
+                    range: 18..36,
                     codes: [
                         Code {
                             code: "F401",
-                            range: 14..18,
-                        },
-                        Code {
-                            code: "F841",
-                            range: 20..24,
+                            range: 32..36,
                         },
                     ],
                 },
