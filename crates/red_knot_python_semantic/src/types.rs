@@ -817,13 +817,12 @@ impl<'db> Type<'db> {
             }
 
             // An intersection type S is assignable to a type T if
-            // Any non-dynamic element of S is assignable to T (e.g. `int & Any` is assignable to `int` (but not to `str`))
+            // Any element of S is assignable to T (e.g. `A & B` is assignable to `A`)
             // Negative elements do not have an effect on assignability - if S is assignable to T then S & ~P is also assignable to T.
-            (Type::Intersection(intersection), ty) => {
-                intersection.positive(db).iter().any(|&elem_ty| {
-                    !matches!(elem_ty, Type::Dynamic(_)) && elem_ty.is_assignable_to(db, ty)
-                })
-            }
+            (Type::Intersection(intersection), ty) => intersection
+                .positive(db)
+                .iter()
+                .any(|&elem_ty| elem_ty.is_assignable_to(db, ty)),
 
             // A tuple type S is assignable to a tuple type T if their lengths are the same, and
             // each element of S is assignable to the corresponding element of T.
