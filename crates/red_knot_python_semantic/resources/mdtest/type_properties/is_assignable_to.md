@@ -248,6 +248,7 @@ static_assert(is_assignable_to(Intersection[Child1, Parent], Parent))
 
 static_assert(is_assignable_to(Intersection[Parent, Unrelated], Parent))
 static_assert(is_assignable_to(Intersection[Child1, Unrelated], Child1))
+static_assert(is_assignable_to(Intersection[Child1, Unrelated, Child2], Intersection[Child1, Unrelated]))
 
 static_assert(is_assignable_to(Intersection[Child1, Not[Child2]], Child1))
 static_assert(is_assignable_to(Intersection[Child1, Not[Child2]], Parent))
@@ -256,21 +257,40 @@ static_assert(is_assignable_to(Intersection[Child1, Not[Grandchild]], Parent))
 static_assert(is_assignable_to(Intersection[Child1, Child2], Intersection[Child1, Child2]))
 static_assert(is_assignable_to(Intersection[Child1, Child2], Intersection[Child2, Child1]))
 static_assert(is_assignable_to(Grandchild, Intersection[Child1, Child2]))
+static_assert(not is_assignable_to(Intersection[Child1, Child2], Intersection[Parent, Unrelated]))
 
 static_assert(not is_assignable_to(Parent, Intersection[Parent, Unrelated]))
 static_assert(not is_assignable_to(int, Intersection[int, Not[Literal[1]]]))
+# The literal `1` is not assignable to `Parent`, so the intersection of int and Parent is definitely an int that is not `1`
+static_assert(is_assignable_to(Intersection[int, Parent], Intersection[int, Not[Literal[1]]]))
 static_assert(not is_assignable_to(int, Not[int]))
 static_assert(not is_assignable_to(int, Not[Literal[1]]))
 
-static_assert(not is_assignable_to(Intersection[Any, Parent], Unrelated))
-static_assert(is_assignable_to(Intersection[Unrelated, Any], Intersection[Unrelated, Any]))
-static_assert(is_assignable_to(Intersection[Unrelated, Any], Intersection[Unrelated, Not[Any]]))
+# Intersection with `Any` dominates the left hand side of intersections
+static_assert(is_assignable_to(Intersection[Any, Parent], Parent))
+static_assert(is_assignable_to(Intersection[Any, Child1], Parent))
+static_assert(is_assignable_to(Intersection[Any, Child2, Not[Child1]], Parent))
+static_assert(is_assignable_to(Intersection[Any, Parent], Unrelated))
+static_assert(is_assignable_to(Intersection[Any, Parent], Intersection[Parent, Unrelated]))
+static_assert(is_assignable_to(Intersection[Any, Parent, Unrelated], Parent))
+static_assert(is_assignable_to(Intersection[Any, Parent, Unrelated], Intersection[Parent, Unrelated]))
 
-# TODO: The following assertions should not fail (see https://github.com/astral-sh/ruff/issues/14899)
-# error: [static-assert-error]
-static_assert(is_assignable_to(Intersection[Any, int], int))
-# error: [static-assert-error]
-static_assert(is_assignable_to(Intersection[Unrelated, Any], Not[tuple[Unrelated, Any]]))
+# Even Any & Not[Parent] is assignable to Parent, since it could be Never
+static_assert(is_assignable_to(Intersection[Any, Not[Parent]], Parent))
+
+# Intersection with `Any` is effectively ignored on the right hand side for the sake of assignment
+static_assert(is_assignable_to(Parent, Intersection[Any, Parent]))
+static_assert(is_assignable_to(Parent, Parent | Intersection[Any, Unrelated]))
+static_assert(is_assignable_to(Child1, Intersection[Any, Parent]))
+static_assert(not is_assignable_to(Literal[1], Intersection[Any, Parent]))
+static_assert(not is_assignable_to(Unrelated, Intersection[Any, Parent]))
+
+# Intersections with Any on both sides combine the above logic - the LHS dominates and Any is ignored on the right hand side
+static_assert(is_assignable_to(Intersection[Any, Parent], Intersection[Any, Parent]))
+static_assert(is_assignable_to(Intersection[Any, Unrelated], Intersection[Any, Parent]))
+static_assert(is_assignable_to(Intersection[Any, Parent, Unrelated], Intersection[Any, Parent, Unrelated]))
+static_assert(is_assignable_to(Intersection[Unrelated, Any], Intersection[Unrelated, Not[Any]]))
+static_assert(is_assignable_to(Intersection[Literal[1], Any], Intersection[Unrelated, Not[Any]]))
 ```
 
 ## General properties
