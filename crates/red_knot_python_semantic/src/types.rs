@@ -1625,8 +1625,7 @@ impl<'db> Type<'db> {
                     .instance_member(db, name)
             }
             Type::Callable(CallableType::General(_)) => {
-                // TODO: Implement static member lookup for general callable types
-                Symbol::todo("static member lookup on general callable type").into()
+                KnownClass::Object.to_instance(db).member(db, name)
             }
 
             Type::IntLiteral(_) => KnownClass::Int.to_instance(db).instance_member(db, name),
@@ -1973,8 +1972,7 @@ impl<'db> Type<'db> {
                     .member(db, &name)
             }
             Type::Callable(CallableType::General(_)) => {
-                // TODO
-                Symbol::todo("member lookup on general callable type").into()
+                KnownClass::Object.to_instance(db).member(db, &name)
             }
 
             Type::Instance(InstanceType { class })
@@ -3315,10 +3313,7 @@ impl<'db> Type<'db> {
             Type::Callable(CallableType::WrapperDescriptorDunderGet) => {
                 KnownClass::WrapperDescriptorType.to_class_literal(db)
             }
-            Type::Callable(CallableType::General(_)) => {
-                // TODO: Get the meta-type
-                todo_type!(".to_meta_type() for general callable type")
-            }
+            Type::Callable(CallableType::General(_)) => KnownClass::Type.to_class_literal(db),
             Type::ModuleLiteral(_) => KnownClass::ModuleType.to_class_literal(db),
             Type::Tuple(_) => KnownClass::Tuple.to_class_literal(db),
             Type::ClassLiteral(ClassLiteralType { class }) => class.metaclass(db),
