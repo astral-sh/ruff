@@ -11,16 +11,28 @@
 //! arguments must match _at least one_ overload.
 
 use super::{definition_expression_type, DynamicType, Type};
+use crate::semantic_index::definition::Definition;
+use crate::symbol::Boundness;
+use crate::types::todo_type;
 use crate::Db;
-use crate::{semantic_index::definition::Definition, types::todo_type};
 use ruff_python_ast::{self as ast, name::Name};
 
 /// The signature of a single callable. If the callable is overloaded, there is a separate
 /// [`Signature`] for each overload.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
 pub enum CallableSignature<'db> {
-    Single(Signature<'db>),
-    Overloaded(Box<[Signature<'db>]>),
+    Single {
+        signature: Signature<'db>,
+        /// If this is a callable object (i.e. called via a `__call__` method), the boundness of
+        /// that call method.
+        dunder_call: Option<Boundness>,
+    },
+    Overloaded {
+        overloads: Box<[Signature<'db>]>,
+        /// If this is a callable object (i.e. called via a `__call__` method), the boundness of
+        /// that call method.
+        dunder_call: Option<Boundness>,
+    },
 }
 
 impl<'db> CallableSignature<'db> {
@@ -34,17 +46,23 @@ impl<'db> CallableSignature<'db> {
         let mut iter = overloads.into_iter();
         let first_overload = iter.next().expect("overloads should not be empty");
         let Some(second_overload) = iter.next() else {
-            return CallableSignature::Single(first_overload);
+            return CallableSignature::Single {
+                signature: first_overload,
+                dunder_call: None,
+            };
         };
         let mut overloads = vec![first_overload, second_overload];
         overloads.extend(iter);
-        CallableSignature::Overloaded(overloads.into())
+        CallableSignature::Overloaded {
+            overloads: overloads.into(),
+            dunder_call: None,
+        }
     }
 
     pub(crate) fn iter(&self) -> std::slice::Iter<Signature<'db>> {
         match self {
-            CallableSignature::Single(signature) => std::slice::from_ref(signature).iter(),
-            CallableSignature::Overloaded(signatures) => signatures.iter(),
+            CallableSignature::Single { signature, .. } => std::slice::from_ref(signature).iter(),
+            CallableSignature::Overloaded { overloads, .. } => overloads.iter(),
         }
     }
 
@@ -70,7 +88,10 @@ impl<'db> CallableSignature<'db> {
 
 impl<'db> From<Signature<'db>> for CallableSignature<'db> {
     fn from(signature: Signature<'db>) -> Self {
-        CallableSignature::Single(signature)
+        CallableSignature::Single {
+            signature,
+            dunder_call: None,
+        }
     }
 }
 
