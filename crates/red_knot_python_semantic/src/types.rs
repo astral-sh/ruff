@@ -30,7 +30,7 @@ use crate::semantic_index::symbol::ScopeId;
 use crate::semantic_index::{imported_modules, semantic_index};
 use crate::suppression::check_suppressions;
 use crate::symbol::{imported_symbol, Boundness, Symbol, SymbolAndQualifiers};
-use crate::types::call::{bind_call, CallArguments, CallOutcome, UnionCallError};
+use crate::types::call::{bind_call, Bindings, CallArguments, UnionCallError};
 use crate::types::class_base::ClassBase;
 use crate::types::diagnostic::{INVALID_TYPE_FORM, UNSUPPORTED_BOOL_CONVERSION};
 use crate::types::infer::infer_unpack_types;
@@ -2321,7 +2321,7 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         arguments: &CallArguments<'_, 'db>,
-    ) -> Result<CallOutcome<'db>, CallError<'db>> {
+    ) -> Result<Bindings<'db>, CallError<'db>> {
         match self {
             Type::Callable(CallableType::BoundMethod(bound_method)) => {
                 let instance = bound_method.self_instance(db);
@@ -2894,7 +2894,7 @@ impl<'db> Type<'db> {
             }
 
             Type::Union(union) => {
-                CallOutcome::try_call_union(db, union, |element| element.try_call(db, arguments))
+                Bindings::try_call_union(db, union, |element| element.try_call(db, arguments))
             }
 
             Type::Intersection(_) => {
@@ -2918,7 +2918,7 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         name: &str,
         arguments: &CallArguments<'_, 'db>,
-    ) -> Result<CallOutcome<'db>, CallDunderError<'db>> {
+    ) -> Result<Bindings<'db>, CallDunderError<'db>> {
         match self
             .member_lookup_with_policy(db, name.into(), MemberLookupPolicy::NoInstanceFallback)
             .symbol

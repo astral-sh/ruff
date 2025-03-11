@@ -1,6 +1,10 @@
+//! When analyzing a call site, we create _bindings_, which match and type-check the actual
+//! arguments against the parameters of the callable. Like with
+//! [signatures][crate::types::signatures], we have to handle the fact that the callable might be a
+//! union of types, each of which might contain multiple overloads.
+
 use super::{
-    Argument, CallArguments, CallError, CallOutcome, CallableSignature, InferContext, Signature,
-    Type,
+    Argument, Bindings, CallArguments, CallError, CallableSignature, InferContext, Signature, Type,
 };
 use crate::db::Db;
 use crate::types::diagnostic::{
@@ -15,14 +19,14 @@ use ruff_text_size::Ranged;
 
 /// Bind a [`CallArguments`] against a [`CallableSignature`].
 ///
-/// The returned [`CallBinding`] provides the return type of the call, the bound types for all
+/// The returned [`CallableBinding`] provides the return type of the call, the bound types for all
 /// parameters, and any errors resulting from binding the call.
 pub(crate) fn bind_call<'db>(
     db: &'db dyn Db,
     arguments: &CallArguments<'_, 'db>,
     overloads: &CallableSignature<'db>,
     callable_ty: Type<'db>,
-) -> CallBinding<'db> {
+) -> CallableBinding<'db> {
     // TODO: This checks every overload. In the proposed more detailed call checking spec [1],
     // arguments are checked for arity first, and are only checked for type assignability against
     // the matching overloads. Make sure to implement that as part of separating call binding into
@@ -34,7 +38,7 @@ pub(crate) fn bind_call<'db>(
         .map(|signature| bind_overload(db, arguments, signature))
         .collect::<Vec<_>>()
         .into_boxed_slice();
-    CallBinding {
+    CallableBinding {
         callable_ty,
         overloads,
     }
@@ -44,7 +48,7 @@ fn bind_overload<'db>(
     db: &'db dyn Db,
     arguments: &CallArguments<'_, 'db>,
     signature: &Signature<'db>,
-) -> OverloadBinding<'db> {
+) -> Binding<'db> {
     let parameters = signature.parameters();
     // The type assigned to each parameter at this call site.
     let mut parameter_tys = vec![None; parameters.len()];
@@ -86,7 +90,7 @@ fn bind_overload<'db>(
                     .keyword_by_name(name)
                     .or_else(|| parameters.keyword_variadic())
                 else {
-                    errors.push(CallBindingError::UnknownArgument {
+                    errors.push(CallableBindingError::UnknownArgument {
                         argument_name: ast::name::Name::new(name),
                         argument_index: get_argument_index(argument_index, num_synthetic_args),
                     });
@@ -102,7 +106,7 @@ fn bind_overload<'db>(
         };
         if let Some(expected_ty) = parameter.annotated_type() {
             if !argument_ty.is_assignable_to(db, expected_ty) {
-                errors.push(CallBindingError::InvalidArgumentType {
+                errors.push(CallableBindingError::InvalidArgumentType {
                     parameter: ParameterContext::new(parameter, index, positional),
                     argument_index: get_argument_index(argument_index, num_synthetic_args),
                     expected_ty,
@@ -115,7 +119,7 @@ fn bind_overload<'db>(
                 let union = UnionType::from_elements(db, [existing, *argument_ty]);
                 parameter_tys[index].replace(union);
             } else {
-                errors.push(CallBindingError::ParameterAlreadyAssigned {
+                errors.push(CallableBindingError::ParameterAlreadyAssigned {
                     argument_index: get_argument_index(argument_index, num_synthetic_args),
                     parameter: ParameterContext::new(parameter, index, positional),
                 });
@@ -123,7 +127,7 @@ fn bind_overload<'db>(
         }
     }
     if let Some(first_excess_argument_index) = first_excess_positional {
-        errors.push(CallBindingError::TooManyPositionalArguments {
+        errors.push(CallableBindingError::TooManyPositionalArguments {
             first_excess_argument_index: get_argument_index(
                 first_excess_argument_index,
                 num_synthetic_args,
@@ -146,12 +150,12 @@ fn bind_overload<'db>(
     }
 
     if !missing.is_empty() {
-        errors.push(CallBindingError::MissingArguments {
+        errors.push(CallableBindingError::MissingArguments {
             parameters: ParameterContexts(missing),
         });
     }
 
-    OverloadBinding {
+    Binding {
         return_ty: signature.return_ty.unwrap_or(Type::unknown()),
         parameter_tys: parameter_tys
             .into_iter()
@@ -168,7 +172,8 @@ pub(crate) struct CallableDescriptor<'a> {
     kind: &'a str,
 }
 
-/// Binding information for a call site.
+/// Binding information for a single callable. If the callable is overloaded, there is a separate
+/// [`Binding`] for each overload.
 ///
 /// For a successful binding, each argument is mapped to one of the callable's formal parameters.
 /// If the callable has multiple overloads, the first one that matches is used as the overall
@@ -183,19 +188,19 @@ pub(crate) struct CallableDescriptor<'a> {
 ///
 /// [overloads]: https://github.com/python/typing/pull/1839
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct CallBinding<'db> {
+pub(crate) struct CallableBinding<'db> {
     /// Type of the callable object (function, class...)
     callable_ty: Type<'db>,
 
-    overloads: Box<[OverloadBinding<'db>]>,
+    overloads: Box<[Binding<'db>]>,
 }
 
-impl<'db> CallBinding<'db> {
-    pub(crate) fn into_outcome(self) -> Result<CallOutcome<'db>, CallError<'db>> {
+impl<'db> CallableBinding<'db> {
+    pub(crate) fn into_outcome(self) -> Result<Bindings<'db>, CallError<'db>> {
         if self.has_binding_errors() {
             return Err(CallError::BindingError { binding: self });
         }
-        Ok(CallOutcome::Single(self))
+        Ok(Bindings::Single(self))
     }
 
     pub(crate) fn callable_type(&self) -> Type<'db> {
@@ -210,7 +215,7 @@ impl<'db> CallBinding<'db> {
 
     /// Returns the overload that matched for this call binding. Returns `None` if none of the
     /// overloads matched.
-    pub(crate) fn matching_overload(&self) -> Option<(usize, &OverloadBinding<'db>)> {
+    pub(crate) fn matching_overload(&self) -> Option<(usize, &Binding<'db>)> {
         self.overloads
             .iter()
             .enumerate()
@@ -219,7 +224,7 @@ impl<'db> CallBinding<'db> {
 
     /// Returns the overload that matched for this call binding. Returns `None` if none of the
     /// overloads matched.
-    pub(crate) fn matching_overload_mut(&mut self) -> Option<(usize, &mut OverloadBinding<'db>)> {
+    pub(crate) fn matching_overload_mut(&mut self) -> Option<(usize, &mut Binding<'db>)> {
         self.overloads
             .iter_mut()
             .enumerate()
@@ -304,7 +309,7 @@ impl<'db> CallBinding<'db> {
 
 /// Binding information for one of the overloads of a callable.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct OverloadBinding<'db> {
+pub(crate) struct Binding<'db> {
     /// Return type of the call.
     return_ty: Type<'db>,
 
@@ -312,10 +317,10 @@ pub(crate) struct OverloadBinding<'db> {
     parameter_tys: Box<[Type<'db>]>,
 
     /// Call binding errors, if any.
-    errors: Vec<CallBindingError<'db>>,
+    errors: Vec<CallableBindingError<'db>>,
 }
 
-impl<'db> OverloadBinding<'db> {
+impl<'db> Binding<'db> {
     pub(crate) fn set_return_type(&mut self, return_ty: Type<'db>) {
         self.return_ty = return_ty;
     }
@@ -399,7 +404,7 @@ impl std::fmt::Display for ParameterContexts {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) enum CallBindingError<'db> {
+pub(crate) enum CallableBindingError<'db> {
     /// The type of an argument is not assignable to the annotated type of its corresponding
     /// parameter.
     InvalidArgumentType {
@@ -428,7 +433,7 @@ pub(crate) enum CallBindingError<'db> {
     },
 }
 
-impl<'db> CallBindingError<'db> {
+impl<'db> CallableBindingError<'db> {
     fn parameter_span_from_index(
         db: &'db dyn Db,
         callable_ty: Type<'db>,

@@ -4404,7 +4404,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     let reflected_dunder = op.reflected_dunder();
                     let rhs_reflected = right_class.member(self.db(), reflected_dunder).symbol;
                     // TODO: if `rhs_reflected` is possibly unbound, we should union the two possible
-                    // CallOutcomes together
+                    // Bindings together
                     if !rhs_reflected.is_unbound()
                         && rhs_reflected != left_class.member(self.db(), reflected_dunder).symbol
                     {

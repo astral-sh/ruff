@@ -6,21 +6,21 @@ use crate::Db;
 mod arguments;
 mod bind;
 pub(super) use arguments::{Argument, CallArguments};
-pub(super) use bind::{bind_call, CallBinding};
+pub(super) use bind::{bind_call, CallableBinding};
 
 /// A successfully bound call where all arguments are valid.
 ///
 /// It's guaranteed that the wrapped bindings have no errors.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) enum CallOutcome<'db> {
+pub(super) enum Bindings<'db> {
     /// The call resolves to exactly one binding.
-    Single(CallBinding<'db>),
+    Single(CallableBinding<'db>),
 
     /// The call resolves to multiple bindings.
-    Union(Box<[CallBinding<'db>]>),
+    Union(Box<[CallableBinding<'db>]>),
 }
 
-impl<'db> CallOutcome<'db> {
+impl<'db> Bindings<'db> {
     /// Calls each union element using the provided `call` function.
     ///
     /// Returns `Ok` if all variants can be called without error according to the callback and `Err` otherwise.
@@ -39,8 +39,8 @@ impl<'db> CallOutcome<'db> {
 
         for element in elements {
             match call(*element) {
-                Ok(CallOutcome::Single(binding)) => bindings.push(binding),
-                Ok(CallOutcome::Union(inner_bindings)) => {
+                Ok(Bindings::Single(binding)) => bindings.push(binding),
+                Ok(Bindings::Union(inner_bindings)) => {
                     bindings.extend(inner_bindings);
                 }
                 Err(error) => {
@@ -51,7 +51,7 @@ impl<'db> CallOutcome<'db> {
         }
 
         if errors.is_empty() {
-            Ok(CallOutcome::Union(bindings.into()))
+            Ok(Bindings::Union(bindings.into()))
         } else if bindings.is_empty() && all_errors_not_callable {
             Err(CallError::NotCallable {
                 not_callable_type: Type::Union(union),
@@ -70,12 +70,12 @@ impl<'db> CallOutcome<'db> {
         match self {
             Self::Single(binding) => binding.return_type(),
             Self::Union(bindings) => {
-                UnionType::from_elements(db, bindings.iter().map(CallBinding::return_type))
+                UnionType::from_elements(db, bindings.iter().map(CallableBinding::return_type))
             }
         }
     }
 
-    pub(super) fn bindings(&self) -> &[CallBinding<'db>] {
+    pub(super) fn bindings(&self) -> &[CallableBinding<'db>] {
         match self {
             Self::Single(binding) => std::slice::from_ref(binding),
             Self::Union(bindings) => bindings,
@@ -101,11 +101,11 @@ pub(super) enum CallError<'db> {
     /// The type has a `__call__` method but it isn't always bound.
     PossiblyUnboundDunderCall {
         called_type: Type<'db>,
-        outcome: Box<CallOutcome<'db>>,
+        outcome: Box<Bindings<'db>>,
     },
 
     /// The type is callable but not with the given arguments.
-    BindingError { binding: CallBinding<'db> },
+    BindingError { binding: CallableBinding<'db> },
 }
 
 impl<'db> CallError<'db> {
@@ -123,7 +123,7 @@ impl<'db> CallError<'db> {
                 db,
                 bindings
                     .iter()
-                    .map(CallBinding::return_type)
+                    .map(CallableBinding::return_type)
                     .chain(errors.iter().map(|err| err.fallback_return_type(db))),
             )),
             Self::PossiblyUnboundDunderCall { outcome, .. } => Some(outcome.return_type(db)),
@@ -166,7 +166,7 @@ pub(super) struct UnionCallError<'db> {
     pub(super) errors: Box<[CallError<'db>]>,
 
     /// The bindings for the callable variants (that have no binding errors).
-    pub(super) bindings: Box<[CallBinding<'db>]>,
+    pub(super) bindings: Box<[CallableBinding<'db>]>,
 
     /// The union type that we tried calling.
     pub(super) called_type: Type<'db>,
@@ -204,7 +204,7 @@ pub(super) enum CallDunderError<'db> {
     /// The type has the specified dunder method and it is callable
     /// with the specified arguments without any binding errors
     /// but it is possibly unbound.
-    PossiblyUnbound(CallOutcome<'db>),
+    PossiblyUnbound(Bindings<'db>),
 
     /// The dunder method with the specified name is missing.
     MethodNotAvailable,
