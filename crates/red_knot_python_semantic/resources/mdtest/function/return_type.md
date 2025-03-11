@@ -126,6 +126,8 @@ def f(cond: bool) -> int:
 
 ## Invalid return type
 
+<!-- snapshot-diagnostics -->
+
 ```py
 # error: [invalid-return-type]
 def f() -> int:
@@ -149,6 +151,8 @@ def m(x: T) -> T: ...
 
 ## Invalid return type in stub file
 
+<!-- snapshot-diagnostics -->
+
 ```pyi
 def f() -> int:
     # error: [invalid-return-type]
@@ -166,6 +170,8 @@ def foo() -> int:
 ```
 
 ## Invalid conditional return type
+
+<!-- snapshot-diagnostics -->
 
 ```py
 def f(cond: bool) -> str:
@@ -185,6 +191,8 @@ def f(cond: bool) -> str:
 ```
 
 ## Invalid implicit return type
+
+<!-- snapshot-diagnostics -->
 
 ```py
 def f() -> None:
