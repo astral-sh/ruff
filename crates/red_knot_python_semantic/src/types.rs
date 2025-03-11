@@ -2515,56 +2515,58 @@ impl<'db> Type<'db> {
 
                 match function_type.known(db) {
                     Some(KnownFunction::IsEquivalentTo) => {
-                        let (ty_a, ty_b) = overload
-                            .two_parameter_types()
-                            .unwrap_or((Type::unknown(), Type::unknown()));
-                        overload
-                            .set_return_type(Type::BooleanLiteral(ty_a.is_equivalent_to(db, ty_b)));
+                        if let [ty_a, ty_b] = overload.parameter_types() {
+                            overload.set_return_type(Type::BooleanLiteral(
+                                ty_a.is_equivalent_to(db, *ty_b),
+                            ));
+                        }
                     }
                     Some(KnownFunction::IsSubtypeOf) => {
-                        let (ty_a, ty_b) = overload
-                            .two_parameter_types()
-                            .unwrap_or((Type::unknown(), Type::unknown()));
-                        overload
-                            .set_return_type(Type::BooleanLiteral(ty_a.is_subtype_of(db, ty_b)));
+                        if let [ty_a, ty_b] = overload.parameter_types() {
+                            overload.set_return_type(Type::BooleanLiteral(
+                                ty_a.is_subtype_of(db, *ty_b),
+                            ));
+                        }
                     }
                     Some(KnownFunction::IsAssignableTo) => {
-                        let (ty_a, ty_b) = overload
-                            .two_parameter_types()
-                            .unwrap_or((Type::unknown(), Type::unknown()));
-                        overload
-                            .set_return_type(Type::BooleanLiteral(ty_a.is_assignable_to(db, ty_b)));
+                        if let [ty_a, ty_b] = overload.parameter_types() {
+                            overload.set_return_type(Type::BooleanLiteral(
+                                ty_a.is_assignable_to(db, *ty_b),
+                            ));
+                        }
                     }
                     Some(KnownFunction::IsDisjointFrom) => {
-                        let (ty_a, ty_b) = overload
-                            .two_parameter_types()
-                            .unwrap_or((Type::unknown(), Type::unknown()));
-                        overload
-                            .set_return_type(Type::BooleanLiteral(ty_a.is_disjoint_from(db, ty_b)));
+                        if let [ty_a, ty_b] = overload.parameter_types() {
+                            overload.set_return_type(Type::BooleanLiteral(
+                                ty_a.is_disjoint_from(db, *ty_b),
+                            ));
+                        }
                     }
                     Some(KnownFunction::IsGradualEquivalentTo) => {
-                        let (ty_a, ty_b) = overload
-                            .two_parameter_types()
-                            .unwrap_or((Type::unknown(), Type::unknown()));
-                        overload.set_return_type(Type::BooleanLiteral(
-                            ty_a.is_gradual_equivalent_to(db, ty_b),
-                        ));
+                        if let [ty_a, ty_b] = overload.parameter_types() {
+                            overload.set_return_type(Type::BooleanLiteral(
+                                ty_a.is_gradual_equivalent_to(db, *ty_b),
+                            ));
+                        }
                     }
                     Some(KnownFunction::IsFullyStatic) => {
-                        let ty = overload.one_parameter_type().unwrap_or(Type::unknown());
-                        overload.set_return_type(Type::BooleanLiteral(ty.is_fully_static(db)));
+                        if let [ty] = overload.parameter_types() {
+                            overload.set_return_type(Type::BooleanLiteral(ty.is_fully_static(db)));
+                        }
                     }
                     Some(KnownFunction::IsSingleton) => {
-                        let ty = overload.one_parameter_type().unwrap_or(Type::unknown());
-                        overload.set_return_type(Type::BooleanLiteral(ty.is_singleton(db)));
+                        if let [ty] = overload.parameter_types() {
+                            overload.set_return_type(Type::BooleanLiteral(ty.is_singleton(db)));
+                        }
                     }
                     Some(KnownFunction::IsSingleValued) => {
-                        let ty = overload.one_parameter_type().unwrap_or(Type::unknown());
-                        overload.set_return_type(Type::BooleanLiteral(ty.is_single_valued(db)));
+                        if let [ty] = overload.parameter_types() {
+                            overload.set_return_type(Type::BooleanLiteral(ty.is_single_valued(db)));
+                        }
                     }
 
                     Some(KnownFunction::Len) => {
-                        if let Some(first_arg) = overload.one_parameter_type() {
+                        if let [first_arg] = overload.parameter_types() {
                             if let Some(len_ty) = first_arg.len(db) {
                                 overload.set_return_type(len_ty);
                             }
@@ -2572,16 +2574,15 @@ impl<'db> Type<'db> {
                     }
 
                     Some(KnownFunction::Repr) => {
-                        if let Some(first_arg) = overload.one_parameter_type() {
+                        if let [first_arg] = overload.parameter_types() {
                             overload.set_return_type(first_arg.repr(db));
                         };
                     }
 
                     Some(KnownFunction::Cast) => {
-                        // TODO: Use `.two_parameter_tys()` exclusively
-                        // when overloads are supported.
+                        // TODO: Use `.parameter_types()` exclusively when overloads are supported.
                         if let Some(casted_ty) = arguments.first_argument() {
-                            if overload.two_parameter_types().is_some() {
+                            if let [_, _] = overload.parameter_types() {
                                 overload.set_return_type(casted_ty);
                             }
                         };
@@ -2592,9 +2593,7 @@ impl<'db> Type<'db> {
                     }
 
                     Some(KnownFunction::GetattrStatic) => {
-                        let Some((instance_ty, attr_name, default)) =
-                            overload.three_parameter_types()
-                        else {
+                        let [instance_ty, attr_name, default] = overload.parameter_types() else {
                             return binding.into_outcome();
                         };
 
@@ -2605,7 +2604,7 @@ impl<'db> Type<'db> {
                         let default = if default.is_unknown() {
                             Type::Never
                         } else {
-                            default
+                            *default
                         };
 
                         let union_with_default = |ty| UnionType::from_elements(db, [ty, default]);

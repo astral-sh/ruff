@@ -3332,7 +3332,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                     match known_function {
                         KnownFunction::RevealType => {
-                            if let Some(revealed_type) = overload.one_parameter_type() {
+                            if let [revealed_type] = overload.parameter_types() {
                                 self.context.report_diagnostic(
                                     call_expression,
                                     DiagnosticId::RevealedType,
@@ -3361,7 +3361,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             }
                         }
                         KnownFunction::StaticAssert => {
-                            if let Some((parameter_ty, message)) = overload.two_parameter_types() {
+                            if let [parameter_ty, message] = overload.parameter_types() {
                                 let truthiness = match parameter_ty.try_bool(self.db()) {
                                     Ok(truthiness) => truthiness,
                                     Err(err) => {
@@ -3392,7 +3392,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                             call_expression,
                                             format_args!("Static assertion error: {message}"),
                                         );
-                                    } else if parameter_ty == Type::BooleanLiteral(false) {
+                                    } else if *parameter_ty == Type::BooleanLiteral(false) {
                                         self.context.report_lint(
                                             &STATIC_ASSERT_ERROR,
                                             call_expression,

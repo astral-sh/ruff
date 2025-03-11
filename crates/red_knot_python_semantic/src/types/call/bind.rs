@@ -327,27 +327,6 @@ impl<'db> OverloadBinding<'db> {
         &self.parameter_tys
     }
 
-    pub(crate) fn one_parameter_type(&self) -> Option<Type<'db>> {
-        match self.parameter_types() {
-            [ty] => Some(*ty),
-            _ => None,
-        }
-    }
-
-    pub(crate) fn two_parameter_types(&self) -> Option<(Type<'db>, Type<'db>)> {
-        match self.parameter_types() {
-            [first, second] => Some((*first, *second)),
-            _ => None,
-        }
-    }
-
-    pub(crate) fn three_parameter_types(&self) -> Option<(Type<'db>, Type<'db>, Type<'db>)> {
-        match self.parameter_types() {
-            [first, second, third] => Some((*first, *second, *third)),
-            _ => None,
-        }
-    }
-
     fn report_diagnostics(
         &self,
         context: &InferContext<'db>,
