@@ -134,9 +134,8 @@ impl KnownModule {
     }
 
     pub fn name(self) -> ModuleName {
-        let self_as_str = self.as_str();
-        ModuleName::new_static(self_as_str)
-            .unwrap_or_else(|| panic!("{self_as_str} should be a valid module name!"))
+        ModuleName::new_static(self.as_str())
+            .unwrap_or_else(|| panic!("{self} should be a valid module name!"))
     }
 
     pub(crate) fn try_from_search_path_and_name(
@@ -164,6 +163,12 @@ impl KnownModule {
 
     pub const fn is_inspect(self) -> bool {
         matches!(self, Self::Inspect)
+    }
+}
+
+impl std::fmt::Display for KnownModule {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
     }
 }
 

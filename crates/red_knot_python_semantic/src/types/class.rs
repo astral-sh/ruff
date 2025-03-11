@@ -948,6 +948,31 @@ impl<'db> KnownClass {
         }
     }
 
+    fn display(self, db: &'db dyn Db) -> impl std::fmt::Display + 'db {
+        #[derive(Clone, Copy)]
+        struct KnownClassDisplay<'db> {
+            db: &'db dyn Db,
+            class: KnownClass,
+        }
+
+        impl std::fmt::Display for KnownClassDisplay<'_> {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                let KnownClassDisplay {
+                    class: known_class,
+                    db,
+                } = *self;
+                write!(
+                    f,
+                    "{module}.{class}",
+                    module = known_class.canonical_module(db),
+                    class = known_class.as_str(db)
+                )
+            }
+        }
+
+        KnownClassDisplay { db, class: self }
+    }
+
     /// Lookup a [`KnownClass`] in typeshed and return a [`Type`]
     /// representing all possible instances of the class.
     ///
@@ -1320,24 +1345,23 @@ impl<'db> KnownClassLookupError<'db> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 let ErrorDisplay { db, class, error } = *self;
 
-                let module = class.canonical_module(db).as_str();
-                let class = class.as_str(db);
+                let class = class.display(db);
                 let python_version = Program::get(db).python_version(db);
 
                 match error {
                     KnownClassLookupError::ClassNotFound => write!(
                         f,
-                        "Could not find class `{module}.{class}` in typeshed on Python {python_version}",
+                        "Could not find class `{class}` in typeshed on Python {python_version}",
                     ),
                     KnownClassLookupError::SymbolNotAClass { found_type } => write!(
                         f,
-                        "Error looking up `{module}.{class}` in typeshed: expected to find a class definition \
+                        "Error looking up `{class}` in typeshed: expected to find a class definition \
                         on Python {python_version}, but found a symbol of type `{found_type}` instead",
                         found_type = found_type.display(db),
                     ),
                     KnownClassLookupError::ClassPossiblyUnbound { .. } => write!(
                         f,
-                        "Error looking up `{module}.{class}` in typeshed on Python {python_version}: \
+                        "Error looking up `{class}` in typeshed on Python {python_version}: \
                         expected to find a fully bound symbol, but found one that is possibly unbound",
                     )
                 }
