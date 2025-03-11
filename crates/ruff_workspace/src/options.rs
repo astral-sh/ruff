@@ -1213,31 +1213,81 @@ impl Flake8BugbearOptions {
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Flake8BuiltinsOptions {
+    /// DEPRECATED: This option has been renamed to `ignorelist`. Use `ignorelist` instead.
+    ///
+    /// Ignore list of builtins.
+    ///
+    /// This option is ignored if both `ignorelist` and `builtins-ignorelist` are set.
     #[option(
         default = r#"[]"#,
         value_type = "list[str]",
         example = "builtins-ignorelist = [\"id\"]"
     )]
-    /// Ignore list of builtins.
+    #[deprecated(
+        since = "0.10.0",
+        note = "`builtins-ignorelist` has been renamed to `ignorelist`. Use that instead."
+    )]
     pub builtins_ignorelist: Option<Vec<String>>,
+
+    /// Ignore list of builtins.
+    #[option(
+        default = r#"[]"#,
+        value_type = "list[str]",
+        example = "ignorelist = [\"id\"]"
+    )]
+    pub ignorelist: Option<Vec<String>>,
+
+    /// DEPRECATED: This option has been renamed to `allowed-modules`. Use `allowed-modules` instead.
+    ///
+    /// List of builtin module names to allow.
+    ///
+    /// This option is ignored if both `allowed-modules` and `builtins-allowed-modules` are set.
     #[option(
         default = r#"[]"#,
         value_type = "list[str]",
         example = "builtins-allowed-modules = [\"secrets\"]"
     )]
-    /// List of builtin module names to allow.
+    #[deprecated(
+        since = "0.10.0",
+        note = "`builtins-allowed-modules` has been renamed to `allowed-modules`. Use that instead."
+    )]
     pub builtins_allowed_modules: Option<Vec<String>>,
+
+    /// List of builtin module names to allow.
+    #[option(
+        default = r#"[]"#,
+        value_type = "list[str]",
+        example = "allowed-modules = [\"secrets\"]"
+    )]
+    pub allowed_modules: Option<Vec<String>>,
+
+    /// DEPRECATED: This option has been renamed to `strict-checking`. Use `strict-checking` instead.
+    ///
+    /// Compare module names instead of full module paths.
+    ///
+    /// This option is ignored if both `strict-checking` and `builtins-strict-checking` are set.
     #[option(
         default = r#"true"#,
         value_type = "bool",
         example = "builtins-strict-checking = false"
     )]
+    #[deprecated(
+        since = "0.10.0",
+        note = "`builtins-strict-checking` has been renamed to `strict-checking`. Use that instead."
+    )]
+    pub builtins_strict_checking: Option<bool>,
+
     /// Compare module names instead of full module paths.
     ///
     /// Used by [`A005` - `stdlib-module-shadowing`](https://docs.astral.sh/ruff/rules/stdlib-module-shadowing/).
     ///
     /// In preview mode the default value is `false` rather than `true`.
-    pub builtins_strict_checking: Option<bool>,
+    #[option(
+        default = r#"true"#,
+        value_type = "bool",
+        example = "strict-checking = false"
+    )]
+    pub strict_checking: Option<bool>,
 }
 
 impl Flake8BuiltinsOptions {
@@ -1245,11 +1295,19 @@ impl Flake8BuiltinsOptions {
         self,
         preview: PreviewMode,
     ) -> ruff_linter::rules::flake8_builtins::settings::Settings {
+        #[allow(deprecated)]
         ruff_linter::rules::flake8_builtins::settings::Settings {
-            builtins_ignorelist: self.builtins_ignorelist.unwrap_or_default(),
-            builtins_allowed_modules: self.builtins_allowed_modules.unwrap_or_default(),
-            builtins_strict_checking: self
-                .builtins_strict_checking
+            ignorelist: self
+                .ignorelist
+                .or(self.builtins_ignorelist)
+                .unwrap_or_default(),
+            allowed_modules: self
+                .allowed_modules
+                .or(self.builtins_allowed_modules)
+                .unwrap_or_default(),
+            strict_checking: self
+                .strict_checking
+                .or(self.builtins_strict_checking)
                 // use the old default of true on non-preview
                 .unwrap_or(preview.is_disabled()),
         }

@@ -210,9 +210,9 @@ mod tests {
 
     use ruff_linter::codes;
     use ruff_linter::line_width::LineLength;
-    use ruff_linter::settings::types::PatternPrefixPair;
+    use ruff_linter::settings::types::{PatternPrefixPair, PreviewMode};
 
-    use crate::options::{LintCommonOptions, LintOptions, Options};
+    use crate::options::{Flake8BuiltinsOptions, LintCommonOptions, LintOptions, Options};
     use crate::pyproject::{find_settings_toml, parse_pyproject_toml, Pyproject, Tools};
 
     #[test]
@@ -322,6 +322,55 @@ ignore = ["E501"]
                 })
             })
         );
+
+        let pyproject: Pyproject = toml::from_str(
+            r#"
+[tool.ruff.lint.flake8-builtins]
+builtins-allowed-modules = ["asyncio"]
+builtins-ignorelist = ["argparse", 'typing']
+builtins-strict-checking = true
+allowed-modules = ['sys']
+ignorelist = ["os", 'io']
+strict-checking = false
+"#,
+        )?;
+
+        #[allow(deprecated)]
+        let expected = Flake8BuiltinsOptions {
+            builtins_allowed_modules: Some(vec!["asyncio".to_string()]),
+            allowed_modules: Some(vec!["sys".to_string()]),
+
+            builtins_ignorelist: Some(vec!["argparse".to_string(), "typing".to_string()]),
+            ignorelist: Some(vec!["os".to_string(), "io".to_string()]),
+
+            builtins_strict_checking: Some(true),
+            strict_checking: Some(false),
+        };
+
+        assert_eq!(
+            pyproject.tool,
+            Some(Tools {
+                ruff: Some(Options {
+                    lint: Some(LintOptions {
+                        common: LintCommonOptions {
+                            flake8_builtins: Some(expected.clone()),
+                            ..LintCommonOptions::default()
+                        },
+                        ..LintOptions::default()
+                    }),
+                    ..Options::default()
+                })
+            })
+        );
+
+        let settings = expected.into_settings(PreviewMode::Enabled);
+
+        assert_eq!(settings.allowed_modules, vec!["sys".to_string()]);
+        assert_eq!(
+            settings.ignorelist,
+            vec!["os".to_string(), "io".to_string()]
+        );
+        assert!(!settings.strict_checking);
 
         assert!(toml::from_str::<Pyproject>(
             r"
