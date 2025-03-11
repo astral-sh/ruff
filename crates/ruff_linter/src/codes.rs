@@ -950,7 +950,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         // fastapi
         (FastApi, "001") => (RuleGroup::Stable, rules::fastapi::rules::FastApiRedundantResponseModel),
         (FastApi, "002") => (RuleGroup::Stable, rules::fastapi::rules::FastApiNonAnnotatedDependency),
-        (FastApi, "003") => (RuleGroup::Preview, rules::fastapi::rules::FastApiUnusedPathParameter),
+        (FastApi, "003") => (RuleGroup::Stable, rules::fastapi::rules::FastApiUnusedPathParameter),
 
         // pydoclint
         (Pydoclint, "201") => (RuleGroup::Preview, rules::pydoclint::rules::DocstringMissingReturns),
