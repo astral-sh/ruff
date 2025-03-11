@@ -18,154 +18,6 @@ use ruff_db::diagnostic::{OldSecondaryDiagnosticMessage, Span};
 use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
-/// Bind a [`CallArguments`] against a [`CallableSignature`].
-///
-/// The returned [`CallableBinding`] provides the return type of the call, the bound types for all
-/// parameters, and any errors resulting from binding the call.
-pub(crate) fn bind_call<'db>(
-    db: &'db dyn Db,
-    arguments: &CallArguments<'_, 'db>,
-    overloads: &CallableSignature<'db>,
-    callable_ty: Type<'db>,
-) -> CallableBinding<'db> {
-    // TODO: This checks every overload. In the proposed more detailed call checking spec [1],
-    // arguments are checked for arity first, and are only checked for type assignability against
-    // the matching overloads. Make sure to implement that as part of separating call binding into
-    // two phases.
-    //
-    // [1] https://github.com/python/typing/pull/1839
-    let overloads = overloads
-        .iter()
-        .map(|signature| bind_overload(db, arguments, signature))
-        .collect::<Vec<_>>()
-        .into_boxed_slice();
-    CallableBinding {
-        callable_ty,
-        overloads,
-    }
-}
-
-fn bind_overload<'db>(
-    db: &'db dyn Db,
-    arguments: &CallArguments<'_, 'db>,
-    signature: &Signature<'db>,
-) -> Binding<'db> {
-    let parameters = signature.parameters();
-    // The type assigned to each parameter at this call site.
-    let mut parameter_tys = vec![None; parameters.len()];
-    let mut errors = vec![];
-    let mut next_positional = 0;
-    let mut first_excess_positional = None;
-    let mut num_synthetic_args = 0;
-    let get_argument_index = |argument_index: usize, num_synthetic_args: usize| {
-        if argument_index >= num_synthetic_args {
-            // Adjust the argument index to skip synthetic args, which don't appear at the call
-            // site and thus won't be in the Call node arguments list.
-            Some(argument_index - num_synthetic_args)
-        } else {
-            // we are erroring on a synthetic argument, we'll just emit the diagnostic on the
-            // entire Call node, since there's no argument node for this argument at the call site
-            None
-        }
-    };
-    for (argument_index, argument) in arguments.iter().enumerate() {
-        let (index, parameter, argument_ty, positional) = match argument {
-            Argument::Positional(ty) | Argument::Synthetic(ty) => {
-                if matches!(argument, Argument::Synthetic(_)) {
-                    num_synthetic_args += 1;
-                }
-                let Some((index, parameter)) = parameters
-                    .get_positional(next_positional)
-                    .map(|param| (next_positional, param))
-                    .or_else(|| parameters.variadic())
-                else {
-                    first_excess_positional.get_or_insert(argument_index);
-                    next_positional += 1;
-                    continue;
-                };
-                next_positional += 1;
-                (index, parameter, ty, !parameter.is_variadic())
-            }
-            Argument::Keyword { name, ty } => {
-                let Some((index, parameter)) = parameters
-                    .keyword_by_name(name)
-                    .or_else(|| parameters.keyword_variadic())
-                else {
-                    errors.push(CallableBindingError::UnknownArgument {
-                        argument_name: ast::name::Name::new(name),
-                        argument_index: get_argument_index(argument_index, num_synthetic_args),
-                    });
-                    continue;
-                };
-                (index, parameter, ty, false)
-            }
-
-            Argument::Variadic(_) | Argument::Keywords(_) => {
-                // TODO
-                continue;
-            }
-        };
-        if let Some(expected_ty) = parameter.annotated_type() {
-            if !argument_ty.is_assignable_to(db, expected_ty) {
-                errors.push(CallableBindingError::InvalidArgumentType {
-                    parameter: ParameterContext::new(parameter, index, positional),
-                    argument_index: get_argument_index(argument_index, num_synthetic_args),
-                    expected_ty,
-                    provided_ty: *argument_ty,
-                });
-            }
-        }
-        if let Some(existing) = parameter_tys[index].replace(*argument_ty) {
-            if parameter.is_variadic() || parameter.is_keyword_variadic() {
-                let union = UnionType::from_elements(db, [existing, *argument_ty]);
-                parameter_tys[index].replace(union);
-            } else {
-                errors.push(CallableBindingError::ParameterAlreadyAssigned {
-                    argument_index: get_argument_index(argument_index, num_synthetic_args),
-                    parameter: ParameterContext::new(parameter, index, positional),
-                });
-            }
-        }
-    }
-    if let Some(first_excess_argument_index) = first_excess_positional {
-        errors.push(CallableBindingError::TooManyPositionalArguments {
-            first_excess_argument_index: get_argument_index(
-                first_excess_argument_index,
-                num_synthetic_args,
-            ),
-            expected_positional_count: parameters.positional().count(),
-            provided_positional_count: next_positional,
-        });
-    }
-    let mut missing = vec![];
-    for (index, bound_ty) in parameter_tys.iter().enumerate() {
-        if bound_ty.is_none() {
-            let param = &parameters[index];
-            if param.is_variadic() || param.is_keyword_variadic() || param.default_type().is_some()
-            {
-                // variadic/keywords and defaulted arguments are not required
-                continue;
-            }
-            missing.push(ParameterContext::new(param, index, false));
-        }
-    }
-
-    if !missing.is_empty() {
-        errors.push(CallableBindingError::MissingArguments {
-            parameters: ParameterContexts(missing),
-        });
-    }
-
-    Binding {
-        return_ty: signature.return_ty.unwrap_or(Type::unknown()),
-        parameter_tys: parameter_tys
-            .into_iter()
-            .map(|opt_ty| opt_ty.unwrap_or(Type::unknown()))
-            .collect(),
-        errors,
-    }
-}
-
 /// Binding information for a possible union of callables. At a call site, the arguments must be
 /// compatible with _all_ of the types in the union for the call to be valid.
 ///
@@ -266,6 +118,33 @@ pub(crate) struct CallableBinding<'db> {
 }
 
 impl<'db> CallableBinding<'db> {
+    /// Bind a [`CallArguments`] against a [`CallableSignature`].
+    ///
+    /// The returned [`CallableBinding`] provides the return type of the call, the bound types for all
+    /// parameters, and any errors resulting from binding the call.
+    pub(crate) fn bind(
+        db: &'db dyn Db,
+        arguments: &CallArguments<'_, 'db>,
+        overloads: &CallableSignature<'db>,
+        callable_ty: Type<'db>,
+    ) -> Self {
+        // TODO: This checks every overload. In the proposed more detailed call checking spec [1],
+        // arguments are checked for arity first, and are only checked for type assignability against
+        // the matching overloads. Make sure to implement that as part of separating call binding into
+        // two phases.
+        //
+        // [1] https://github.com/python/typing/pull/1839
+        let overloads = overloads
+            .iter()
+            .map(|signature| Binding::bind(db, arguments, signature))
+            .collect::<Vec<_>>()
+            .into_boxed_slice();
+        CallableBinding {
+            callable_ty,
+            overloads,
+        }
+    }
+
     pub(crate) fn into_outcome(self) -> Result<Bindings<'db>, CallError<'db>> {
         if self.has_binding_errors() {
             return Err(CallError::BindingError { binding: self });
@@ -391,6 +270,129 @@ pub(crate) struct Binding<'db> {
 }
 
 impl<'db> Binding<'db> {
+    fn bind(
+        db: &'db dyn Db,
+        arguments: &CallArguments<'_, 'db>,
+        signature: &Signature<'db>,
+    ) -> Self {
+        let parameters = signature.parameters();
+        // The type assigned to each parameter at this call site.
+        let mut parameter_tys = vec![None; parameters.len()];
+        let mut errors = vec![];
+        let mut next_positional = 0;
+        let mut first_excess_positional = None;
+        let mut num_synthetic_args = 0;
+        let get_argument_index = |argument_index: usize, num_synthetic_args: usize| {
+            if argument_index >= num_synthetic_args {
+                // Adjust the argument index to skip synthetic args, which don't appear at the call
+                // site and thus won't be in the Call node arguments list.
+                Some(argument_index - num_synthetic_args)
+            } else {
+                // we are erroring on a synthetic argument, we'll just emit the diagnostic on the
+                // entire Call node, since there's no argument node for this argument at the call site
+                None
+            }
+        };
+        for (argument_index, argument) in arguments.iter().enumerate() {
+            let (index, parameter, argument_ty, positional) = match argument {
+                Argument::Positional(ty) | Argument::Synthetic(ty) => {
+                    if matches!(argument, Argument::Synthetic(_)) {
+                        num_synthetic_args += 1;
+                    }
+                    let Some((index, parameter)) = parameters
+                        .get_positional(next_positional)
+                        .map(|param| (next_positional, param))
+                        .or_else(|| parameters.variadic())
+                    else {
+                        first_excess_positional.get_or_insert(argument_index);
+                        next_positional += 1;
+                        continue;
+                    };
+                    next_positional += 1;
+                    (index, parameter, ty, !parameter.is_variadic())
+                }
+                Argument::Keyword { name, ty } => {
+                    let Some((index, parameter)) = parameters
+                        .keyword_by_name(name)
+                        .or_else(|| parameters.keyword_variadic())
+                    else {
+                        errors.push(CallableBindingError::UnknownArgument {
+                            argument_name: ast::name::Name::new(name),
+                            argument_index: get_argument_index(argument_index, num_synthetic_args),
+                        });
+                        continue;
+                    };
+                    (index, parameter, ty, false)
+                }
+
+                Argument::Variadic(_) | Argument::Keywords(_) => {
+                    // TODO
+                    continue;
+                }
+            };
+            if let Some(expected_ty) = parameter.annotated_type() {
+                if !argument_ty.is_assignable_to(db, expected_ty) {
+                    errors.push(CallableBindingError::InvalidArgumentType {
+                        parameter: ParameterContext::new(parameter, index, positional),
+                        argument_index: get_argument_index(argument_index, num_synthetic_args),
+                        expected_ty,
+                        provided_ty: *argument_ty,
+                    });
+                }
+            }
+            if let Some(existing) = parameter_tys[index].replace(*argument_ty) {
+                if parameter.is_variadic() || parameter.is_keyword_variadic() {
+                    let union = UnionType::from_elements(db, [existing, *argument_ty]);
+                    parameter_tys[index].replace(union);
+                } else {
+                    errors.push(CallableBindingError::ParameterAlreadyAssigned {
+                        argument_index: get_argument_index(argument_index, num_synthetic_args),
+                        parameter: ParameterContext::new(parameter, index, positional),
+                    });
+                }
+            }
+        }
+        if let Some(first_excess_argument_index) = first_excess_positional {
+            errors.push(CallableBindingError::TooManyPositionalArguments {
+                first_excess_argument_index: get_argument_index(
+                    first_excess_argument_index,
+                    num_synthetic_args,
+                ),
+                expected_positional_count: parameters.positional().count(),
+                provided_positional_count: next_positional,
+            });
+        }
+        let mut missing = vec![];
+        for (index, bound_ty) in parameter_tys.iter().enumerate() {
+            if bound_ty.is_none() {
+                let param = &parameters[index];
+                if param.is_variadic()
+                    || param.is_keyword_variadic()
+                    || param.default_type().is_some()
+                {
+                    // variadic/keywords and defaulted arguments are not required
+                    continue;
+                }
+                missing.push(ParameterContext::new(param, index, false));
+            }
+        }
+
+        if !missing.is_empty() {
+            errors.push(CallableBindingError::MissingArguments {
+                parameters: ParameterContexts(missing),
+            });
+        }
+
+        Self {
+            return_ty: signature.return_ty.unwrap_or(Type::unknown()),
+            parameter_tys: parameter_tys
+                .into_iter()
+                .map(|opt_ty| opt_ty.unwrap_or(Type::unknown()))
+                .collect(),
+            errors,
+        }
+    }
+
     pub(crate) fn set_return_type(&mut self, return_ty: Type<'db>) {
         self.return_ty = return_ty;
     }

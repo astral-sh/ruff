@@ -6,7 +6,7 @@ use crate::Db;
 mod arguments;
 mod bind;
 pub(super) use arguments::{Argument, CallArguments};
-pub(super) use bind::{bind_call, Bindings, CallableBinding};
+pub(super) use bind::{Bindings, CallableBinding};
 
 /// The reason why calling a type failed.
 #[derive(Debug, Clone, PartialEq, Eq)]

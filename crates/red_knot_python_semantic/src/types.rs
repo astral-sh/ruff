@@ -30,7 +30,7 @@ use crate::semantic_index::symbol::ScopeId;
 use crate::semantic_index::{imported_modules, semantic_index};
 use crate::suppression::check_suppressions;
 use crate::symbol::{imported_symbol, Boundness, Symbol, SymbolAndQualifiers};
-use crate::types::call::{bind_call, Bindings, CallArguments, UnionCallError};
+use crate::types::call::{Bindings, CallArguments, CallableBinding, UnionCallError};
 use crate::types::class_base::ClassBase;
 use crate::types::diagnostic::{INVALID_TYPE_FORM, UNSUPPORTED_BOOL_CONVERSION};
 use crate::types::infer::infer_unpack_types;
@@ -2326,7 +2326,7 @@ impl<'db> Type<'db> {
             Type::Callable(CallableType::BoundMethod(bound_method)) => {
                 let instance = bound_method.self_instance(db);
                 let arguments = arguments.with_self(instance);
-                let binding = bind_call(
+                let binding = CallableBinding::bind(
                     db,
                     &arguments,
                     bound_method.function(db).signature(db),
@@ -2390,7 +2390,7 @@ impl<'db> Type<'db> {
                     ])
                 }
 
-                let mut binding = bind_call(db, arguments, overloads(db), self);
+                let mut binding = CallableBinding::bind(db, arguments, overloads(db), self);
                 let Some((_, overload)) = binding.matching_overload_mut() else {
                     return Err(CallError::BindingError { binding });
                 };
@@ -2480,7 +2480,7 @@ impl<'db> Type<'db> {
                     ])
                 }
 
-                let mut binding = bind_call(db, arguments, overloads(db), self);
+                let mut binding = CallableBinding::bind(db, arguments, overloads(db), self);
                 let Some((_, overload)) = binding.matching_overload_mut() else {
                     return Err(CallError::BindingError { binding });
                 };
@@ -2550,7 +2550,8 @@ impl<'db> Type<'db> {
                 binding.into_outcome()
             }
             Type::FunctionLiteral(function_type) => {
-                let mut binding = bind_call(db, arguments, function_type.signature(db), self);
+                let mut binding =
+                    CallableBinding::bind(db, arguments, function_type.signature(db), self);
                 let Some((_, overload)) = binding.matching_overload_mut() else {
                     return Err(CallError::BindingError { binding });
                 };
@@ -2702,7 +2703,7 @@ impl<'db> Type<'db> {
                     .into()
                 }
 
-                let mut binding = bind_call(db, arguments, overloads(db), self);
+                let mut binding = CallableBinding::bind(db, arguments, overloads(db), self);
                 let Some((_, overload)) = binding.matching_overload_mut() else {
                     return Err(CallError::BindingError { binding });
                 };
@@ -2761,7 +2762,7 @@ impl<'db> Type<'db> {
                     ])
                 }
 
-                let mut binding = bind_call(db, arguments, overloads(db), self);
+                let mut binding = CallableBinding::bind(db, arguments, overloads(db), self);
                 let Some((index, overload)) = binding.matching_overload_mut() else {
                     return Err(CallError::BindingError { binding });
                 };
@@ -2820,7 +2821,7 @@ impl<'db> Type<'db> {
                     ])
                 }
 
-                let mut binding = bind_call(db, arguments, overloads(db), self);
+                let mut binding = CallableBinding::bind(db, arguments, overloads(db), self);
                 let Some((index, overload)) = binding.matching_overload_mut() else {
                     return Err(CallError::BindingError { binding });
                 };
@@ -2836,7 +2837,7 @@ impl<'db> Type<'db> {
             // TODO check call vs signatures of `__new__` and/or `__init__`
             Type::ClassLiteral(ClassLiteralType { .. }) => {
                 let signature = Signature::new(Parameters::gradual_form(), self.to_instance(db));
-                let binding = bind_call(db, arguments, &signature.into(), self);
+                let binding = CallableBinding::bind(db, arguments, &signature.into(), self);
                 binding.into_outcome()
             }
 
@@ -2889,7 +2890,7 @@ impl<'db> Type<'db> {
             // `Never` is always callable and returns `Never`.
             Type::Dynamic(_) | Type::Never => {
                 let overloads = CallableSignature::dynamic(self);
-                let binding = bind_call(db, arguments, &overloads, self);
+                let binding = CallableBinding::bind(db, arguments, &overloads, self);
                 binding.into_outcome()
             }
 
@@ -2899,7 +2900,7 @@ impl<'db> Type<'db> {
 
             Type::Intersection(_) => {
                 let overloads = CallableSignature::todo("Type::Intersection.call()");
-                let binding = bind_call(db, arguments, &overloads, self);
+                let binding = CallableBinding::bind(db, arguments, &overloads, self);
                 binding.into_outcome()
             }
 
