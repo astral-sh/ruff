@@ -39,6 +39,8 @@ use crate::checkers::ast::Checker;
 /// ).split(",")
 /// ```
 ///
+/// as this is converted to `["a", "b"]` without any of the comments.
+///
 /// ## References
 /// - [Python documentation: `str.split`](https://docs.python.org/3/library/stdtypes.html#str.split)
 #[derive(ViolationMetadata)]
