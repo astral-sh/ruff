@@ -20,7 +20,7 @@ pub(crate) use self::infer::{
     infer_scope_types,
 };
 pub use self::narrow::KnownConstraintFunction;
-pub(crate) use self::signatures::Signature;
+pub(crate) use self::signatures::{CallableSignature, Signature};
 pub use self::subclass_of::SubclassOfType;
 use crate::module_name::ModuleName;
 use crate::module_resolver::{file_to_module, resolve_module, KnownModule};
@@ -30,7 +30,7 @@ use crate::semantic_index::symbol::ScopeId;
 use crate::semantic_index::{imported_modules, semantic_index};
 use crate::suppression::check_suppressions;
 use crate::symbol::{imported_symbol, Boundness, Symbol, SymbolAndQualifiers};
-use crate::types::call::{bind_call, CallArguments, CallBinding, CallOutcome, UnionCallError};
+use crate::types::call::{bind_call, CallArguments, CallOutcome, UnionCallError};
 use crate::types::class_base::ClassBase;
 use crate::types::diagnostic::{INVALID_TYPE_FORM, UNSUPPORTED_BOOL_CONVERSION};
 use crate::types::infer::infer_unpack_types;
@@ -2306,19 +2306,13 @@ impl<'db> Type<'db> {
             Type::Callable(CallableType::BoundMethod(bound_method)) => {
                 let instance = bound_method.self_instance(db);
                 let arguments = arguments.with_self(instance);
-
                 let binding = bind_call(
                     db,
                     &arguments,
                     bound_method.function(db).signature(db),
                     self,
                 );
-
-                if binding.has_binding_errors() {
-                    Err(CallError::BindingError { binding })
-                } else {
-                    Ok(CallOutcome::Single(binding))
-                }
+                binding.into_outcome()
             }
             Type::Callable(CallableType::MethodWrapperDunderGet(function)) => {
                 // Here, we dynamically model the overloaded function signature of `types.FunctionType.__get__`.
@@ -2334,299 +2328,311 @@ impl<'db> Type<'db> {
                 //     def __get__(self, instance: object, owner: type | None = None, /) -> MethodType: ...
                 // ```
 
-                let first_argument_is_none =
-                    arguments.first_argument().is_some_and(|ty| ty.is_none(db));
-
-                let signature = Signature::new(
-                    Parameters::new([
-                        Parameter::new(
-                            Some("instance".into()),
-                            Some(Type::object(db)),
-                            ParameterKind::PositionalOnly { default_ty: None },
+                #[salsa::tracked(return_ref)]
+                fn overloads<'db>(db: &'db dyn Db) -> CallableSignature<'db> {
+                    let not_none = Type::none(db).negate(db);
+                    CallableSignature::from_overloads([
+                        Signature::new(
+                            Parameters::new([
+                                Parameter::new(
+                                    Some(Name::new_static("instance")),
+                                    Some(Type::none(db)),
+                                    ParameterKind::PositionalOnly { default_ty: None },
+                                ),
+                                Parameter::new(
+                                    Some(Name::new_static("owner")),
+                                    Some(KnownClass::Type.to_instance(db)),
+                                    ParameterKind::PositionalOnly { default_ty: None },
+                                ),
+                            ]),
+                            None,
                         ),
-                        if first_argument_is_none {
-                            Parameter::new(
-                                Some("owner".into()),
-                                Some(KnownClass::Type.to_instance(db)),
-                                ParameterKind::PositionalOnly { default_ty: None },
-                            )
-                        } else {
-                            Parameter::new(
-                                Some("owner".into()),
-                                Some(UnionType::from_elements(
-                                    db,
-                                    [KnownClass::Type.to_instance(db), Type::none(db)],
-                                )),
-                                ParameterKind::PositionalOnly {
-                                    default_ty: Some(Type::none(db)),
-                                },
-                            )
-                        },
-                    ]),
-                    if function.has_known_class_decorator(db, KnownClass::Classmethod)
-                        && function.decorators(db).len() == 1
-                    {
-                        if let Some(owner) = arguments.second_argument() {
-                            Some(Type::Callable(CallableType::BoundMethod(
-                                BoundMethodType::new(db, function, owner),
-                            )))
-                        } else if let Some(instance) = arguments.first_argument() {
-                            Some(Type::Callable(CallableType::BoundMethod(
-                                BoundMethodType::new(db, function, instance.to_meta_type(db)),
-                            )))
-                        } else {
-                            Some(Type::unknown())
-                        }
-                    } else {
-                        Some(match arguments.first_argument() {
-                            Some(ty) if ty.is_none(db) => Type::FunctionLiteral(function),
-                            Some(instance) => Type::Callable(CallableType::BoundMethod(
-                                BoundMethodType::new(db, function, instance),
-                            )),
-                            _ => Type::unknown(),
-                        })
-                    },
-                );
-
-                let binding = bind_call(db, arguments, &signature, self);
-
-                if binding.has_binding_errors() {
-                    Err(CallError::BindingError { binding })
-                } else {
-                    Ok(CallOutcome::Single(binding))
+                        Signature::new(
+                            Parameters::new([
+                                Parameter::new(
+                                    Some(Name::new_static("instance")),
+                                    Some(not_none),
+                                    ParameterKind::PositionalOnly { default_ty: None },
+                                ),
+                                Parameter::new(
+                                    Some(Name::new_static("owner")),
+                                    Some(UnionType::from_elements(
+                                        db,
+                                        [KnownClass::Type.to_instance(db), Type::none(db)],
+                                    )),
+                                    ParameterKind::PositionalOnly {
+                                        default_ty: Some(Type::none(db)),
+                                    },
+                                ),
+                            ]),
+                            None,
+                        ),
+                    ])
                 }
+
+                let mut binding = bind_call(db, arguments, overloads(db), self);
+                let Some((_, overload)) = binding.matching_overload_mut() else {
+                    return Err(CallError::BindingError { binding });
+                };
+
+                if function.has_known_class_decorator(db, KnownClass::Classmethod)
+                    && function.decorators(db).len() == 1
+                {
+                    if let Some(owner) = arguments.second_argument() {
+                        overload.set_return_type(Type::Callable(CallableType::BoundMethod(
+                            BoundMethodType::new(db, function, owner),
+                        )));
+                    } else if let Some(instance) = arguments.first_argument() {
+                        overload.set_return_type(Type::Callable(CallableType::BoundMethod(
+                            BoundMethodType::new(db, function, instance.to_meta_type(db)),
+                        )));
+                    }
+                } else {
+                    if let Some(first) = arguments.first_argument() {
+                        if first.is_none(db) {
+                            overload.set_return_type(Type::FunctionLiteral(function));
+                        } else {
+                            overload.set_return_type(Type::Callable(CallableType::BoundMethod(
+                                BoundMethodType::new(db, function, first),
+                            )));
+                        }
+                    }
+                }
+
+                binding.into_outcome()
             }
             Type::Callable(CallableType::WrapperDescriptorDunderGet) => {
                 // Here, we also model `types.FunctionType.__get__`, but now we consider a call to
                 // this as a function, i.e. we also expect the `self` argument to be passed in.
 
-                let second_argument_is_none =
-                    arguments.second_argument().is_some_and(|ty| ty.is_none(db));
-
-                let signature = Signature::new(
-                    Parameters::new([
-                        Parameter::new(
-                            Some("self".into()),
-                            Some(KnownClass::FunctionType.to_instance(db)),
-                            ParameterKind::PositionalOnly { default_ty: None },
+                // TODO: Consider merging this signature with the one in the previous match clause,
+                // since the previous one is just this signature with the `self` parameters
+                // removed.
+                #[salsa::tracked(return_ref)]
+                fn overloads<'db>(db: &'db dyn Db) -> CallableSignature<'db> {
+                    let not_none = Type::none(db).negate(db);
+                    CallableSignature::from_overloads([
+                        Signature::new(
+                            Parameters::new([
+                                Parameter::new(
+                                    Some(Name::new_static("self")),
+                                    Some(KnownClass::FunctionType.to_instance(db)),
+                                    ParameterKind::PositionalOnly { default_ty: None },
+                                ),
+                                Parameter::new(
+                                    Some(Name::new_static("instance")),
+                                    Some(Type::none(db)),
+                                    ParameterKind::PositionalOnly { default_ty: None },
+                                ),
+                                Parameter::new(
+                                    Some(Name::new_static("owner")),
+                                    Some(KnownClass::Type.to_instance(db)),
+                                    ParameterKind::PositionalOnly { default_ty: None },
+                                ),
+                            ]),
+                            None,
                         ),
-                        Parameter::new(
-                            Some("instance".into()),
-                            Some(Type::object(db)),
-                            ParameterKind::PositionalOnly { default_ty: None },
-                        ),
-                        if second_argument_is_none {
-                            Parameter::new(
-                                Some("owner".into()),
-                                Some(KnownClass::Type.to_instance(db)),
-                                ParameterKind::PositionalOnly { default_ty: None },
-                            )
-                        } else {
-                            Parameter::new(
-                                Some("owner".into()),
-                                Some(UnionType::from_elements(
-                                    db,
-                                    [KnownClass::Type.to_instance(db), Type::none(db)],
-                                )),
-                                ParameterKind::PositionalOnly {
-                                    default_ty: Some(Type::none(db)),
-                                },
-                            )
-                        },
-                    ]),
-                    Some(
-                        if let Some(function_ty @ Type::FunctionLiteral(function)) =
-                            arguments.first_argument()
-                        {
-                            if function.has_known_class_decorator(db, KnownClass::Classmethod)
-                                && function.decorators(db).len() == 1
-                            {
-                                if let Some(owner) = arguments.third_argument() {
-                                    Type::Callable(CallableType::BoundMethod(BoundMethodType::new(
-                                        db, function, owner,
-                                    )))
-                                } else if let Some(instance) = arguments.second_argument() {
-                                    Type::Callable(CallableType::BoundMethod(BoundMethodType::new(
+                        Signature::new(
+                            Parameters::new([
+                                Parameter::new(
+                                    Some(Name::new_static("self")),
+                                    Some(KnownClass::FunctionType.to_instance(db)),
+                                    ParameterKind::PositionalOnly { default_ty: None },
+                                ),
+                                Parameter::new(
+                                    Some(Name::new_static("instance")),
+                                    Some(not_none),
+                                    ParameterKind::PositionalOnly { default_ty: None },
+                                ),
+                                Parameter::new(
+                                    Some(Name::new_static("owner")),
+                                    Some(UnionType::from_elements(
                                         db,
-                                        function,
-                                        instance.to_meta_type(db),
-                                    )))
-                                } else {
-                                    Type::unknown()
-                                }
-                            } else {
-                                if let Some(instance) = arguments.second_argument() {
-                                    if instance.is_none(db) {
-                                        function_ty
-                                    } else {
-                                        match instance {
-                                            Type::KnownInstance(
-                                                KnownInstanceType::TypeAliasType(type_alias),
-                                            ) if arguments
-                                                .third_argument()
-                                                .and_then(Type::into_class_literal)
-                                                .is_some_and(|class_literal| {
-                                                    class_literal
-                                                        .class
-                                                        .is_known(db, KnownClass::TypeAliasType)
-                                                })
-                                                && function.name(db) == "__name__" =>
-                                            {
-                                                Type::string_literal(db, type_alias.name(db))
-                                            }
-                                            Type::KnownInstance(KnownInstanceType::TypeVar(
-                                                typevar,
-                                            )) if arguments
-                                                .third_argument()
-                                                .and_then(Type::into_class_literal)
-                                                .is_some_and(|class_literal| {
-                                                    class_literal
-                                                        .class
-                                                        .is_known(db, KnownClass::TypeVar)
-                                                })
-                                                && function.name(db) == "__name__" =>
-                                            {
-                                                Type::string_literal(db, typevar.name(db))
-                                            }
-                                            _ => {
-                                                if function.has_known_class_decorator(
-                                                    db,
-                                                    KnownClass::Property,
-                                                ) {
-                                                    todo_type!("@property")
-                                                } else {
-                                                    Type::Callable(CallableType::BoundMethod(
-                                                        BoundMethodType::new(
-                                                            db, function, instance,
-                                                        ),
-                                                    ))
-                                                }
-                                            }
-                                        }
-                                    }
-                                } else {
-                                    Type::unknown()
-                                }
-                            }
-                        } else {
-                            Type::unknown()
-                        },
-                    ),
-                );
-
-                let binding = bind_call(db, arguments, &signature, self);
-
-                if binding.has_binding_errors() {
-                    Err(CallError::BindingError { binding })
-                } else {
-                    Ok(CallOutcome::Single(binding))
+                                        [KnownClass::Type.to_instance(db), Type::none(db)],
+                                    )),
+                                    ParameterKind::PositionalOnly {
+                                        default_ty: Some(Type::none(db)),
+                                    },
+                                ),
+                            ]),
+                            None,
+                        ),
+                    ])
                 }
+
+                let mut binding = bind_call(db, arguments, overloads(db), self);
+                let Some((_, overload)) = binding.matching_overload_mut() else {
+                    return Err(CallError::BindingError { binding });
+                };
+
+                if let Some(function_ty @ Type::FunctionLiteral(function)) =
+                    arguments.first_argument()
+                {
+                    if function.has_known_class_decorator(db, KnownClass::Classmethod)
+                        && function.decorators(db).len() == 1
+                    {
+                        if let Some(owner) = arguments.third_argument() {
+                            overload.set_return_type(Type::Callable(CallableType::BoundMethod(
+                                BoundMethodType::new(db, function, owner),
+                            )));
+                        } else if let Some(instance) = arguments.second_argument() {
+                            overload.set_return_type(Type::Callable(CallableType::BoundMethod(
+                                BoundMethodType::new(db, function, instance.to_meta_type(db)),
+                            )));
+                        }
+                    } else {
+                        match (arguments.second_argument(), arguments.third_argument()) {
+                            (Some(instance), _) if instance.is_none(db) => {
+                                overload.set_return_type(function_ty);
+                            }
+
+                            (
+                                Some(Type::KnownInstance(KnownInstanceType::TypeAliasType(
+                                    type_alias,
+                                ))),
+                                Some(Type::ClassLiteral(ClassLiteralType { class })),
+                            ) if class.is_known(db, KnownClass::TypeAliasType)
+                                && function.name(db) == "__name__" =>
+                            {
+                                overload
+                                    .set_return_type(Type::string_literal(db, type_alias.name(db)));
+                            }
+
+                            (
+                                Some(Type::KnownInstance(KnownInstanceType::TypeVar(typevar))),
+                                Some(Type::ClassLiteral(ClassLiteralType { class })),
+                            ) if class.is_known(db, KnownClass::TypeVar)
+                                && function.name(db) == "__name__" =>
+                            {
+                                overload
+                                    .set_return_type(Type::string_literal(db, typevar.name(db)));
+                            }
+
+                            (Some(_), _)
+                                if function.has_known_class_decorator(db, KnownClass::Property) =>
+                            {
+                                overload.set_return_type(todo_type!("@property"));
+                            }
+
+                            (Some(instance), _) => {
+                                overload.set_return_type(Type::Callable(
+                                    CallableType::BoundMethod(BoundMethodType::new(
+                                        db, function, instance,
+                                    )),
+                                ));
+                            }
+
+                            (None, _) => {}
+                        }
+                    }
+                }
+
+                binding.into_outcome()
             }
             Type::FunctionLiteral(function_type) => {
                 let mut binding = bind_call(db, arguments, function_type.signature(db), self);
-
-                if binding.has_binding_errors() {
+                let Some((_, overload)) = binding.matching_overload_mut() else {
                     return Err(CallError::BindingError { binding });
-                }
+                };
 
                 match function_type.known(db) {
                     Some(KnownFunction::IsEquivalentTo) => {
-                        let (ty_a, ty_b) = binding
-                            .two_parameter_types()
-                            .unwrap_or((Type::unknown(), Type::unknown()));
-                        binding
-                            .set_return_type(Type::BooleanLiteral(ty_a.is_equivalent_to(db, ty_b)));
+                        if let [ty_a, ty_b] = overload.parameter_types() {
+                            overload.set_return_type(Type::BooleanLiteral(
+                                ty_a.is_equivalent_to(db, *ty_b),
+                            ));
+                        }
                     }
                     Some(KnownFunction::IsSubtypeOf) => {
-                        let (ty_a, ty_b) = binding
-                            .two_parameter_types()
-                            .unwrap_or((Type::unknown(), Type::unknown()));
-                        binding.set_return_type(Type::BooleanLiteral(ty_a.is_subtype_of(db, ty_b)));
+                        if let [ty_a, ty_b] = overload.parameter_types() {
+                            overload.set_return_type(Type::BooleanLiteral(
+                                ty_a.is_subtype_of(db, *ty_b),
+                            ));
+                        }
                     }
                     Some(KnownFunction::IsAssignableTo) => {
-                        let (ty_a, ty_b) = binding
-                            .two_parameter_types()
-                            .unwrap_or((Type::unknown(), Type::unknown()));
-                        binding
-                            .set_return_type(Type::BooleanLiteral(ty_a.is_assignable_to(db, ty_b)));
+                        if let [ty_a, ty_b] = overload.parameter_types() {
+                            overload.set_return_type(Type::BooleanLiteral(
+                                ty_a.is_assignable_to(db, *ty_b),
+                            ));
+                        }
                     }
                     Some(KnownFunction::IsDisjointFrom) => {
-                        let (ty_a, ty_b) = binding
-                            .two_parameter_types()
-                            .unwrap_or((Type::unknown(), Type::unknown()));
-                        binding
-                            .set_return_type(Type::BooleanLiteral(ty_a.is_disjoint_from(db, ty_b)));
+                        if let [ty_a, ty_b] = overload.parameter_types() {
+                            overload.set_return_type(Type::BooleanLiteral(
+                                ty_a.is_disjoint_from(db, *ty_b),
+                            ));
+                        }
                     }
                     Some(KnownFunction::IsGradualEquivalentTo) => {
-                        let (ty_a, ty_b) = binding
-                            .two_parameter_types()
-                            .unwrap_or((Type::unknown(), Type::unknown()));
-                        binding.set_return_type(Type::BooleanLiteral(
-                            ty_a.is_gradual_equivalent_to(db, ty_b),
-                        ));
+                        if let [ty_a, ty_b] = overload.parameter_types() {
+                            overload.set_return_type(Type::BooleanLiteral(
+                                ty_a.is_gradual_equivalent_to(db, *ty_b),
+                            ));
+                        }
                     }
                     Some(KnownFunction::IsFullyStatic) => {
-                        let ty = binding.one_parameter_type().unwrap_or(Type::unknown());
-                        binding.set_return_type(Type::BooleanLiteral(ty.is_fully_static(db)));
+                        if let [ty] = overload.parameter_types() {
+                            overload.set_return_type(Type::BooleanLiteral(ty.is_fully_static(db)));
+                        }
                     }
                     Some(KnownFunction::IsSingleton) => {
-                        let ty = binding.one_parameter_type().unwrap_or(Type::unknown());
-                        binding.set_return_type(Type::BooleanLiteral(ty.is_singleton(db)));
+                        if let [ty] = overload.parameter_types() {
+                            overload.set_return_type(Type::BooleanLiteral(ty.is_singleton(db)));
+                        }
                     }
                     Some(KnownFunction::IsSingleValued) => {
-                        let ty = binding.one_parameter_type().unwrap_or(Type::unknown());
-                        binding.set_return_type(Type::BooleanLiteral(ty.is_single_valued(db)));
+                        if let [ty] = overload.parameter_types() {
+                            overload.set_return_type(Type::BooleanLiteral(ty.is_single_valued(db)));
+                        }
                     }
 
                     Some(KnownFunction::Len) => {
-                        if let Some(first_arg) = binding.one_parameter_type() {
+                        if let [first_arg] = overload.parameter_types() {
                             if let Some(len_ty) = first_arg.len(db) {
-                                binding.set_return_type(len_ty);
+                                overload.set_return_type(len_ty);
                             }
                         };
                     }
 
                     Some(KnownFunction::Repr) => {
-                        if let Some(first_arg) = binding.one_parameter_type() {
-                            binding.set_return_type(first_arg.repr(db));
+                        if let [first_arg] = overload.parameter_types() {
+                            overload.set_return_type(first_arg.repr(db));
                         };
                     }
 
                     Some(KnownFunction::Cast) => {
-                        // TODO: Use `.two_parameter_tys()` exclusively
-                        // when overloads are supported.
+                        // TODO: Use `.parameter_types()` exclusively when overloads are supported.
                         if let Some(casted_ty) = arguments.first_argument() {
-                            if binding.two_parameter_types().is_some() {
-                                binding.set_return_type(casted_ty);
+                            if let [_, _] = overload.parameter_types() {
+                                overload.set_return_type(casted_ty);
                             }
                         };
                     }
 
                     Some(KnownFunction::Overload) => {
-                        binding.set_return_type(todo_type!("overload(..) return type"));
+                        overload.set_return_type(todo_type!("overload(..) return type"));
                     }
 
                     Some(KnownFunction::GetattrStatic) => {
-                        let Some((instance_ty, attr_name, default)) =
-                            binding.three_parameter_types()
-                        else {
-                            return Ok(CallOutcome::Single(binding));
+                        let [instance_ty, attr_name, default] = overload.parameter_types() else {
+                            return binding.into_outcome();
                         };
 
                         let Some(attr_name) = attr_name.into_string_literal() else {
-                            return Ok(CallOutcome::Single(binding));
+                            return binding.into_outcome();
                         };
 
                         let default = if default.is_unknown() {
                             Type::Never
                         } else {
-                            default
+                            *default
                         };
 
                         let union_with_default = |ty| UnionType::from_elements(db, [ty, default]);
 
                         // TODO: we could emit a diagnostic here (if default is not set)
-                        binding.set_return_type(
+                        overload.set_return_type(
                             match instance_ty.static_member(db, attr_name.value(db)) {
                                 Symbol::Type(ty, Boundness::Bound) => {
                                     if instance_ty.is_fully_static(db) {
@@ -2651,50 +2657,173 @@ impl<'db> Type<'db> {
                     _ => {}
                 };
 
-                if binding.has_binding_errors() {
-                    Err(CallError::BindingError { binding })
-                } else {
-                    Ok(CallOutcome::Single(binding))
+                binding.into_outcome()
+            }
+
+            Type::ClassLiteral(ClassLiteralType { class })
+                if class.is_known(db, KnownClass::Bool) =>
+            {
+                // ```py
+                // class bool(int):
+                //     def __new__(cls, o: object = ..., /) -> Self: ...
+                // ```
+                #[salsa::tracked(return_ref)]
+                fn overloads<'db>(db: &'db dyn Db) -> CallableSignature<'db> {
+                    Signature::new(
+                        Parameters::new([Parameter::new(
+                            Some(Name::new_static("o")),
+                            Some(Type::any()),
+                            ParameterKind::PositionalOnly {
+                                default_ty: Some(Type::BooleanLiteral(false)),
+                            },
+                        )]),
+                        Some(KnownClass::Bool.to_instance(db)),
+                    )
+                    .into()
                 }
+
+                let mut binding = bind_call(db, arguments, overloads(db), self);
+                let Some((_, overload)) = binding.matching_overload_mut() else {
+                    return Err(CallError::BindingError { binding });
+                };
+                overload.set_return_type(
+                    arguments
+                        .first_argument()
+                        .map(|arg| arg.bool(db).into_type(db))
+                        .unwrap_or(Type::BooleanLiteral(false)),
+                );
+                binding.into_outcome()
+            }
+
+            Type::ClassLiteral(ClassLiteralType { class })
+                if class.is_known(db, KnownClass::Str) =>
+            {
+                // ```py
+                // class str(Sequence[str]):
+                //     @overload
+                //     def __new__(cls, object: object = ...) -> Self: ...
+                //     @overload
+                //     def __new__(cls, object: ReadableBuffer, encoding: str = ..., errors: str = ...) -> Self: ...
+                // ```
+                #[salsa::tracked(return_ref)]
+                fn overloads<'db>(db: &'db dyn Db) -> CallableSignature<'db> {
+                    CallableSignature::from_overloads([
+                        Signature::new(
+                            Parameters::new([Parameter::new(
+                                Some(Name::new_static("o")),
+                                Some(Type::any()),
+                                ParameterKind::PositionalOnly {
+                                    default_ty: Some(Type::string_literal(db, "")),
+                                },
+                            )]),
+                            Some(KnownClass::Str.to_instance(db)),
+                        ),
+                        Signature::new(
+                            Parameters::new([
+                                Parameter::new(
+                                    Some(Name::new_static("o")),
+                                    Some(Type::any()), // TODO: ReadableBuffer
+                                    ParameterKind::PositionalOnly { default_ty: None },
+                                ),
+                                Parameter::new(
+                                    Some(Name::new_static("encoding")),
+                                    Some(KnownClass::Str.to_instance(db)),
+                                    ParameterKind::PositionalOnly { default_ty: None },
+                                ),
+                                Parameter::new(
+                                    Some(Name::new_static("errors")),
+                                    Some(KnownClass::Str.to_instance(db)),
+                                    ParameterKind::PositionalOnly { default_ty: None },
+                                ),
+                            ]),
+                            Some(KnownClass::Str.to_instance(db)),
+                        ),
+                    ])
+                }
+
+                let mut binding = bind_call(db, arguments, overloads(db), self);
+                let Some((index, overload)) = binding.matching_overload_mut() else {
+                    return Err(CallError::BindingError { binding });
+                };
+                if index == 0 {
+                    overload.set_return_type(
+                        arguments
+                            .first_argument()
+                            .map(|arg| arg.str(db))
+                            .unwrap_or_else(|| Type::string_literal(db, "")),
+                    );
+                }
+                binding.into_outcome()
+            }
+
+            Type::ClassLiteral(ClassLiteralType { class })
+                if class.is_known(db, KnownClass::Type) =>
+            {
+                // ```py
+                // class type:
+                //     @overload
+                //     def __init__(self, o: object, /) -> None: ...
+                //     @overload
+                //     def __init__(self, name: str, bases: tuple[type, ...], dict: dict[str, Any], /, **kwds: Any) -> None: ...
+                // ```
+                #[salsa::tracked(return_ref)]
+                fn overloads<'db>(db: &'db dyn Db) -> CallableSignature<'db> {
+                    CallableSignature::from_overloads([
+                        Signature::new(
+                            Parameters::new([Parameter::new(
+                                Some(Name::new_static("o")),
+                                Some(Type::any()),
+                                ParameterKind::PositionalOnly { default_ty: None },
+                            )]),
+                            Some(KnownClass::Type.to_instance(db)),
+                        ),
+                        Signature::new(
+                            Parameters::new([
+                                Parameter::new(
+                                    Some(Name::new_static("o")),
+                                    Some(Type::any()),
+                                    ParameterKind::PositionalOnly { default_ty: None },
+                                ),
+                                Parameter::new(
+                                    Some(Name::new_static("bases")),
+                                    Some(Type::any()),
+                                    ParameterKind::PositionalOnly { default_ty: None },
+                                ),
+                                Parameter::new(
+                                    Some(Name::new_static("dict")),
+                                    Some(Type::any()),
+                                    ParameterKind::PositionalOnly { default_ty: None },
+                                ),
+                            ]),
+                            Some(KnownClass::Type.to_instance(db)),
+                        ),
+                    ])
+                }
+
+                let mut binding = bind_call(db, arguments, overloads(db), self);
+                let Some((index, overload)) = binding.matching_overload_mut() else {
+                    return Err(CallError::BindingError { binding });
+                };
+                if index == 0 {
+                    if let Some(arg) = arguments.first_argument() {
+                        overload.set_return_type(arg.to_meta_type(db));
+                    }
+                }
+                binding.into_outcome()
             }
 
             // TODO annotated return type on `__new__` or metaclass `__call__`
             // TODO check call vs signatures of `__new__` and/or `__init__`
-            Type::ClassLiteral(ClassLiteralType { class }) => {
-                Ok(CallOutcome::Single(CallBinding::from_return_type(
-                    match class.known(db) {
-                        // TODO: We should check the call signature and error if the bool call doesn't have the
-                        //   right signature and return a binding error.
-
-                        // If the class is the builtin-bool class (for example `bool(1)`), we try to
-                        // return the specific truthiness value of the input arg, `Literal[True]` for
-                        // the example above.
-                        Some(KnownClass::Bool) => arguments
-                            .first_argument()
-                            .map(|arg| arg.bool(db).into_type(db))
-                            .unwrap_or(Type::BooleanLiteral(false)),
-
-                        // TODO: Don't ignore the second and third arguments to `str`
-                        //   https://github.com/astral-sh/ruff/pull/16161#discussion_r1958425568
-                        Some(KnownClass::Str) => arguments
-                            .first_argument()
-                            .map(|arg| arg.str(db))
-                            .unwrap_or_else(|| Type::string_literal(db, "")),
-
-                        Some(KnownClass::Type) => arguments
-                            .exactly_one_argument()
-                            .map(|arg| arg.to_meta_type(db))
-                            .unwrap_or_else(|| KnownClass::Type.to_instance(db)),
-
-                        _ => Type::Instance(InstanceType { class }),
-                    },
-                )))
+            Type::ClassLiteral(ClassLiteralType { .. }) => {
+                let signature = Signature::new(Parameters::gradual_form(), self.to_instance(db));
+                let binding = bind_call(db, arguments, &signature.into(), self);
+                binding.into_outcome()
             }
 
             Type::SubclassOf(subclass_of_type) => match subclass_of_type.subclass_of() {
-                ClassBase::Dynamic(dynamic_type) => Ok(CallOutcome::Single(
-                    CallBinding::from_return_type(Type::Dynamic(dynamic_type)),
-                )),
+                ClassBase::Dynamic(dynamic_type) => {
+                    Type::Dynamic(dynamic_type).try_call(db, arguments)
+                }
                 ClassBase::Class(class) => Type::class_literal(class).try_call(db, arguments),
             },
 
@@ -2739,16 +2868,20 @@ impl<'db> Type<'db> {
             // Dynamic types are callable, and the return type is the same dynamic type. Similarly,
             // `Never` is always callable and returns `Never`.
             Type::Dynamic(_) | Type::Never => {
-                Ok(CallOutcome::Single(CallBinding::from_return_type(self)))
+                let overloads = CallableSignature::dynamic(self);
+                let binding = bind_call(db, arguments, &overloads, self);
+                binding.into_outcome()
             }
 
             Type::Union(union) => {
                 CallOutcome::try_call_union(db, union, |element| element.try_call(db, arguments))
             }
 
-            Type::Intersection(_) => Ok(CallOutcome::Single(CallBinding::from_return_type(
-                todo_type!("Type::Intersection.call()"),
-            ))),
+            Type::Intersection(_) => {
+                let overloads = CallableSignature::todo("Type::Intersection.call()");
+                let binding = bind_call(db, arguments, &overloads, self);
+                binding.into_outcome()
+            }
 
             _ => Err(CallError::NotCallable {
                 not_callable_type: self,
@@ -4189,8 +4322,8 @@ impl<'db> FunctionType<'db> {
     /// Were this not a salsa query, then the calling query
     /// would depend on the function's AST and rerun for every change in that file.
     #[salsa::tracked(return_ref)]
-    pub fn signature(self, db: &'db dyn Db) -> Signature<'db> {
-        let internal_signature = self.internal_signature(db);
+    pub fn signature(self, db: &'db dyn Db) -> CallableSignature<'db> {
+        let internal_signature = self.internal_signature(db).into();
 
         let decorators = self.decorators(db);
         let mut decorators = decorators.iter();
@@ -4202,7 +4335,7 @@ impl<'db> FunctionType<'db> {
             {
                 internal_signature
             } else {
-                Signature::todo("return type of decorated function")
+                CallableSignature::todo("return type of decorated function")
             }
         } else {
             internal_signature

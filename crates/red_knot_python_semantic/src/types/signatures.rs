@@ -1,9 +1,80 @@
+//! _Signatures_ describe the expected parameters and return type of a function or other callable.
+//! Overloads and unions add complexity to this simple description.
+//!
+//! In a call expression, the type of the callable might be a union of several types. The call must
+//! be compatible with _all_ of these types, since at runtime the callable might be an instance of
+//! any of them.
+//!
+//! Each of the atomic types in the union must be callable. Each callable might be _overloaded_,
+//! containing multiple _overload signatures_, each of which describes a different combination of
+//! argument types and return types. For each callable type in the union, the call expression's
+//! arguments must match _at least one_ overload.
+
 use super::{definition_expression_type, DynamicType, Type};
 use crate::Db;
 use crate::{semantic_index::definition::Definition, types::todo_type};
 use ruff_python_ast::{self as ast, name::Name};
 
-/// A typed callable signature.
+/// The signature of a single callable. If the callable is overloaded, there is a separate
+/// [`Signature`] for each overload.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
+pub enum CallableSignature<'db> {
+    Single(Signature<'db>),
+    Overloaded(Box<[Signature<'db>]>),
+}
+
+impl<'db> CallableSignature<'db> {
+    /// Creates a new `CallableSignature` from an non-empty iterator of [`Signature`]s.
+    /// Panics if the iterator is empty.
+    pub(crate) fn from_overloads<I>(overloads: I) -> Self
+    where
+        I: IntoIterator,
+        I::IntoIter: Iterator<Item = Signature<'db>>,
+    {
+        let mut iter = overloads.into_iter();
+        let first_overload = iter.next().expect("overloads should not be empty");
+        let Some(second_overload) = iter.next() else {
+            return CallableSignature::Single(first_overload);
+        };
+        let mut overloads = vec![first_overload, second_overload];
+        overloads.extend(iter);
+        CallableSignature::Overloaded(overloads.into())
+    }
+
+    pub(crate) fn iter(&self) -> std::slice::Iter<Signature<'db>> {
+        match self {
+            CallableSignature::Single(signature) => std::slice::from_ref(signature).iter(),
+            CallableSignature::Overloaded(signatures) => signatures.iter(),
+        }
+    }
+
+    /// Return a signature for a dynamic callable
+    pub(crate) fn dynamic(ty: Type<'db>) -> Self {
+        let signature = Signature {
+            parameters: Parameters::gradual_form(),
+            return_ty: Some(ty),
+        };
+        signature.into()
+    }
+
+    /// Return a todo signature: (*args: Todo, **kwargs: Todo) -> Todo
+    #[allow(unused_variables)] // 'reason' only unused in debug builds
+    pub(crate) fn todo(reason: &'static str) -> Self {
+        let signature = Signature {
+            parameters: Parameters::todo(),
+            return_ty: Some(todo_type!(reason)),
+        };
+        signature.into()
+    }
+}
+
+impl<'db> From<Signature<'db>> for CallableSignature<'db> {
+    fn from(signature: Signature<'db>) -> Self {
+        CallableSignature::Single(signature)
+    }
+}
+
+/// The signature of one of the overloads of a callable.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
 pub struct Signature<'db> {
     /// Parameters, in source order.
@@ -25,15 +96,6 @@ impl<'db> Signature<'db> {
         Self {
             parameters,
             return_ty,
-        }
-    }
-
-    /// Return a todo signature: (*args: Todo, **kwargs: Todo) -> Todo
-    #[allow(unused_variables)] // 'reason' only unused in debug builds
-    pub(crate) fn todo(reason: &'static str) -> Self {
-        Self {
-            parameters: Parameters::todo(),
-            return_ty: Some(todo_type!(reason)),
         }
     }
 
@@ -722,7 +784,7 @@ mod tests {
         .unwrap();
         let func = get_function_f(&db, "/src/a.py");
 
-        let expected_sig = func.internal_signature(&db);
+        let expected_sig = func.internal_signature(&db).into();
 
         // With no decorators, internal and external signature are the same
         assert_eq!(func.signature(&db), &expected_sig);
@@ -743,7 +805,7 @@ mod tests {
         .unwrap();
         let func = get_function_f(&db, "/src/a.py");
 
-        let expected_sig = Signature::todo("return type of decorated function");
+        let expected_sig = CallableSignature::todo("return type of decorated function");
 
         // With no decorators, internal and external signature are the same
         assert_eq!(func.signature(&db), &expected_sig);

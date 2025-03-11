@@ -3408,9 +3408,13 @@ impl<'db> TypeInferenceBuilder<'db> {
                         continue;
                     };
 
+                    let Some((_, overload)) = binding.matching_overload() else {
+                        continue;
+                    };
+
                     match known_function {
                         KnownFunction::RevealType => {
-                            if let Some(revealed_type) = binding.one_parameter_type() {
+                            if let [revealed_type] = overload.parameter_types() {
                                 self.context.report_diagnostic(
                                     call_expression,
                                     DiagnosticId::RevealedType,
@@ -3424,7 +3428,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             }
                         }
                         KnownFunction::AssertType => {
-                            if let [actual_ty, asserted_ty] = binding.parameter_types() {
+                            if let [actual_ty, asserted_ty] = overload.parameter_types() {
                                 if !actual_ty.is_gradual_equivalent_to(self.db(), *asserted_ty) {
                                     self.context.report_lint(
                                             &TYPE_ASSERTION_FAILURE,
@@ -3439,7 +3443,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             }
                         }
                         KnownFunction::StaticAssert => {
-                            if let Some((parameter_ty, message)) = binding.two_parameter_types() {
+                            if let [parameter_ty, message] = overload.parameter_types() {
                                 let truthiness = match parameter_ty.try_bool(self.db()) {
                                     Ok(truthiness) => truthiness,
                                     Err(err) => {
@@ -3470,7 +3474,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                             call_expression,
                                             format_args!("Static assertion error: {message}"),
                                         );
-                                    } else if parameter_ty == Type::BooleanLiteral(false) {
+                                    } else if *parameter_ty == Type::BooleanLiteral(false) {
                                         self.context.report_lint(
                                             &STATIC_ASSERT_ERROR,
                                             call_expression,
@@ -6135,8 +6139,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                         Signature::new(parameters, Some(return_type)),
                     )));
 
-                // `Signature` / `Parameters` are not a `Type` variant, so we're storing the outer
-                // callable type on the these expressions instead.
+                // `Signature` / `Parameters` are not a `Type` variant, so we're storing
+                // the outer callable type on the these expressions instead.
                 self.store_expression_type(arguments_slice, callable_type);
                 self.store_expression_type(first_argument, callable_type);
 

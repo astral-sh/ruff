@@ -710,30 +710,30 @@ Finally, we test some error cases for the call to the wrapper descriptor:
 
 ```py
 # Calling the wrapper descriptor without any arguments is an
-# error: [missing-argument] "No arguments provided for required parameters `self`, `instance`"
+# error: [no-matching-overload] "No overload of wrapper descriptor `FunctionType.__get__` matches arguments"
 wrapper_descriptor()
 
 # Calling it without the `instance` argument is an also an
-# error: [missing-argument] "No argument provided for required parameter `instance`"
+# error: [no-matching-overload] "No overload of wrapper descriptor `FunctionType.__get__` matches arguments"
 wrapper_descriptor(f)
 
 # Calling it without the `owner` argument if `instance` is not `None` is an
-# error: [missing-argument] "No argument provided for required parameter `owner`"
+# error: [no-matching-overload] "No overload of wrapper descriptor `FunctionType.__get__` matches arguments"
 wrapper_descriptor(f, None)
 
 # But calling it with an instance is fine (in this case, the `owner` argument is optional):
 wrapper_descriptor(f, C())
 
 # Calling it with something that is not a `FunctionType` as the first argument is an
-# error: [invalid-argument-type] "Object of type `Literal[1]` cannot be assigned to parameter 1 (`self`) of wrapper descriptor `FunctionType.__get__`; expected type `FunctionType`"
+# error: [no-matching-overload] "No overload of wrapper descriptor `FunctionType.__get__` matches arguments"
 wrapper_descriptor(1, None, type(f))
 
 # Calling it with something that is not a `type` as the `owner` argument is an
-# error: [invalid-argument-type] "Object of type `Literal[f]` cannot be assigned to parameter 3 (`owner`) of wrapper descriptor `FunctionType.__get__`; expected type `type`"
+# error: [no-matching-overload] "No overload of wrapper descriptor `FunctionType.__get__` matches arguments"
 wrapper_descriptor(f, None, f)
 
 # Calling it with too many positional arguments is an
-# error: [too-many-positional-arguments] "Too many positional arguments to wrapper descriptor `FunctionType.__get__`: expected 3, got 4"
+# error: [no-matching-overload] "No overload of wrapper descriptor `FunctionType.__get__` matches arguments"
 wrapper_descriptor(f, None, type(f), "one too many")
 ```
 
