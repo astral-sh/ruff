@@ -94,6 +94,14 @@ impl<'db> Parameters<'db> {
         }
     }
 
+    /// Create an empty parameter list.
+    pub(crate) fn empty() -> Self {
+        Self {
+            value: Vec::new(),
+            is_gradual: false,
+        }
+    }
+
     pub(crate) fn as_slice(&self) -> &[Parameter<'db>] {
         self.value.as_slice()
     }
