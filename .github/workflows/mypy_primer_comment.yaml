@@ -63,9 +63,13 @@ jobs:
 
           echo '## `mypy_primer` results' >> comment.txt
           if [ -s "pr/mypy_primer_diff/mypy_primer.diff" ]; then
+            echo '<details>' >> comment.txt
+            echo '<summary>Changes were detected when running on open source projects</summary>' >> comment.txt
+            echo '' >> comment.txt
             echo '```diff' >> comment.txt
             cat pr/mypy_primer_diff/mypy_primer.diff >> comment.txt
             echo '```' >> comment.txt
+            echo '</details>' >> comment.txt
           else
             echo 'No ecosystem changes detected ✅' >> comment.txt
           fi

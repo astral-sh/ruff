@@ -61,15 +61,21 @@ jobs:
           echo "Running mypy_primer"
 
           (
-            uvx --from "git+https://github.com/astral-sh/mypy_primer.git@add-red-knot-support" mypy_primer \
+            uvx --verbose --from "git+https://github.com/astral-sh/mypy_primer.git@add-red-knot-support" mypy_primer \
               --repo ruff \
               --type-checker knot \
               --old base_commit \
               --new "$GITHUB_SHA" \
               --project-selector '/(mypy_primer|black|pyp|git-revise|zipp|arrow)$' \
               --output concise \
-              --debug | tee /dev/stdout | sed -e 's/\x1b\[[0-9;]*m//g' > mypy_primer.diff
+              --debug > mypy_primer.diff
           ) || [ $? -eq 1 ]
+
+          # Output diff with ANSI color codes
+          cat mypy_primer.diff
+
+          # Remove ANSI color codes before uploading
+          sed -ie 's/\x1b\[[0-9;]*m//g' mypy_primer.diff
 
           echo ${{ github.event.number }} > pr-number
 
