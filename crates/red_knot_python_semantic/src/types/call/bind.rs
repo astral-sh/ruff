@@ -22,8 +22,12 @@ pub(crate) fn bind_call<'db>(
     overloads: &Overloads<'db>,
     callable_ty: Type<'db>,
 ) -> CallBinding<'db> {
-    // TODO: This checks every overload. Consider short-circuiting this loop once we find the first
-    // overload that is a successful match against the argument list.
+    // TODO: This checks every overload. In the proposed more detailed call checking spec [1],
+    // arguments are checked for arity first, and are only checked for type assignability against
+    // the matching overloads. Make sure to implement that as part of separating call binding into
+    // two phases.
+    //
+    // [1] https://github.com/python/typing/pull/1839
     let overloads = overloads
         .iter()
         .map(|signature| bind_overload(db, arguments, signature))
@@ -169,9 +173,14 @@ pub(crate) struct CallableDescriptor<'a> {
 /// If the callable has multiple overloads, the first one that matches is used as the overall
 /// binding match.
 ///
+/// TODO: Implement the call site evaluation algorithm in the [proposed updated typing
+/// spec][overloads], which is much more subtle than “first match wins”.
+///
 /// If the arguments cannot be matched to formal parameters, we store information about the
 /// specific errors that occurred when trying to match them up. If the callable has multiple
 /// overloads, we store this error information for each overload.
+///
+/// [overloads]: https://github.com/python/typing/pull/1839
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct CallBinding<'db> {
     /// Type of the callable object (function, class...)
