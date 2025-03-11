@@ -68,9 +68,9 @@ impl<'db> CallOutcome<'db> {
     /// The type returned by this call.
     pub(super) fn return_type(&self, db: &'db dyn Db) -> Type<'db> {
         match self {
-            Self::Single(binding) => binding.return_type(db),
+            Self::Single(binding) => binding.return_type(),
             Self::Union(bindings) => {
-                UnionType::from_elements(db, bindings.iter().map(|binding| binding.return_type(db)))
+                UnionType::from_elements(db, bindings.iter().map(CallBinding::return_type))
             }
         }
     }
@@ -123,11 +123,11 @@ impl<'db> CallError<'db> {
                 db,
                 bindings
                     .iter()
-                    .map(|binding| binding.return_type(db))
+                    .map(CallBinding::return_type)
                     .chain(errors.iter().map(|err| err.fallback_return_type(db))),
             )),
             Self::PossiblyUnboundDunderCall { outcome, .. } => Some(outcome.return_type(db)),
-            Self::BindingError { binding } => Some(binding.return_type(db)),
+            Self::BindingError { binding } => Some(binding.return_type()),
         }
     }
 

@@ -225,16 +225,19 @@ impl<'db> CallBinding<'db> {
             .find(|(_, overload)| !overload.has_binding_errors())
     }
 
-    /// Returns the return type of the matching overload for this binding. If none of the overloads
-    /// matched, returns a union of the return types of each overload.
-    pub(crate) fn return_type(&self, db: &'db dyn Db) -> Type<'db> {
+    /// Returns the return type of this call. For a valid call, this is the return type of the
+    /// overload that the arguments matched against. For an invalid call to a non-overloaded
+    /// function, this is the return type of the function. For an invalid call to an overloaded
+    /// function, we return `Type::unknown`, since we cannot make any useful conclusions about
+    /// which overload was intended to be called.
+    pub(crate) fn return_type(&self) -> Type<'db> {
         if let Some((_, overload)) = self.matching_overload() {
             return overload.return_type();
         }
         if let [overload] = self.overloads.as_ref() {
             return overload.return_type();
         }
-        UnionType::from_elements(db, self.overloads.iter().map(OverloadBinding::return_type))
+        Type::unknown()
     }
 
     fn callable_descriptor(&self, db: &'db dyn Db) -> Option<CallableDescriptor> {

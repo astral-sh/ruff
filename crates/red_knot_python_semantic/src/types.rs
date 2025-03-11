@@ -2161,7 +2161,7 @@ impl<'db> Type<'db> {
                             match err {
                                 CallError::BindingError { binding } => {
                                     return Err(BoolError::IncorrectArguments {
-                                        truthiness: type_to_truthiness(binding.return_type(db)),
+                                        truthiness: type_to_truthiness(binding.return_type()),
                                         not_boolable_type: *instance_ty,
                                     });
                                 }

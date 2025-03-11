@@ -251,7 +251,7 @@ impl<'db> Class<'db> {
                         })
                         .map(|mut builder| {
                             for binding in bindings {
-                                builder = builder.add(binding.return_type(db));
+                                builder = builder.add(binding.return_type());
                             }
 
                             builder.build()
@@ -272,7 +272,7 @@ impl<'db> Class<'db> {
 
                 // TODO we should also check for binding errors that would indicate the metaclass
                 // does not accept the right arguments
-                Err(CallError::BindingError { binding }) => Ok(binding.return_type(db)),
+                Err(CallError::BindingError { binding }) => Ok(binding.return_type()),
             };
 
             return return_ty_result.map(|ty| ty.to_meta_type(db));
