@@ -204,9 +204,7 @@ impl<'db> CallBinding<'db> {
     /// Returns whether there were any errors binding this call site. If the callable has multiple
     /// overloads, they must _all_ have errors.
     pub(crate) fn has_binding_errors(&self) -> bool {
-        self.overloads
-            .iter()
-            .all(OverloadBinding::has_binding_errors)
+        self.matching_overload().is_none()
     }
 
     /// Returns the overload that matched for this call binding. Returns `None` if none of the
