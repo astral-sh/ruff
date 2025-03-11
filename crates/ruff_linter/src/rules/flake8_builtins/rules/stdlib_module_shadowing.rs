@@ -23,12 +23,12 @@ use crate::settings::LinterSettings;
 /// Standard-library modules can be marked as exceptions to this rule via the
 /// [`lint.flake8-builtins.allowed-modules`] configuration option.
 ///
-/// By default, only the last component of the module name is considered, so `logging.py`,
-/// `utils/logging.py`, and `utils/logging/__init__.py` would all clash with the builtin `logging`
-/// module. With the [`lint.flake8-builtins.strict-checking`] option set to `false`, the module
-/// path is considered, so only a top-level `logging.py` or `logging/__init__.py` will trigger the
-/// rule and `utils/logging.py`, for example, would not. In preview mode, the default value of
-/// [`lint.flake8-builtins.strict-checking`] is `false` rather than `true` in stable mode.
+/// By default, the module path relative to the project root or [`src`] directories is considered,
+/// so a top-level `logging.py` or `logging/__init__.py` will clash with the builtin `logging`
+/// module, but `utils/logging.py`, for example, will not. With the
+/// [`lint.flake8-builtins.builtins-strict-checking`] option set to `true`, only the last component
+/// of the module name is considered, so `logging.py`, `utils/logging.py`, and
+/// `utils/logging/__init__.py` will all trigger the rule.
 ///
 /// This rule is not applied to stub files, as the name of a stub module is out
 /// of the control of the author of the stub file. Instead, a stub should aim to

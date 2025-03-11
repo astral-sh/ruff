@@ -210,7 +210,7 @@ mod tests {
 
     use ruff_linter::codes;
     use ruff_linter::line_width::LineLength;
-    use ruff_linter::settings::types::{PatternPrefixPair, PreviewMode};
+    use ruff_linter::settings::types::PatternPrefixPair;
 
     use crate::options::{Flake8BuiltinsOptions, LintCommonOptions, LintOptions, Options};
     use crate::pyproject::{find_settings_toml, parse_pyproject_toml, Pyproject, Tools};
@@ -363,7 +363,7 @@ strict-checking = false
             })
         );
 
-        let settings = expected.into_settings(PreviewMode::Enabled);
+        let settings = expected.into_settings();
 
         assert_eq!(settings.allowed_modules, vec!["sys".to_string()]);
         assert_eq!(
