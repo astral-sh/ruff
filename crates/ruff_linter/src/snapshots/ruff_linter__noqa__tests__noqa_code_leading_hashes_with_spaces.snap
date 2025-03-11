@@ -5,22 +5,14 @@ expression: directive
 Ok(
     Some(
         NoqaLexerOutput {
-            warnings: [
-                MissingItem(
-                    13..14,
-                ),
-            ],
+            warnings: [],
             directive: Codes(
                 Codes {
-                    range: 0..19,
+                    range: 6..18,
                     codes: [
                         Code {
                             code: "F401",
-                            range: 8..12,
-                        },
-                        Code {
-                            code: "F841",
-                            range: 15..19,
+                            range: 14..18,
                         },
                     ],
                 },
