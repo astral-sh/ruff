@@ -6448,6 +6448,280 @@ impl AnyNodeRef<'_> {
     }
 }
 
+/// See also [FunctionDef](https://docs.python.org/3/library/ast.html#ast.FunctionDef)
+/// and [AsyncFunctionDef](https://docs.python.org/3/library/ast.html#ast.AsyncFunctionDef).
+///
+/// This type differs from the original Python AST, as it collapses the synchronous and asynchronous variants into a single type.
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtFunctionDef {
+    pub range: ruff_text_size::TextRange,
+    pub is_async: bool,
+    pub decorator_list: Vec<crate::Decorator>,
+    pub name: crate::Identifier,
+    pub type_params: Option<Box<crate::TypeParams>>,
+    pub parameters: Box<crate::Parameters>,
+    pub returns: Option<Box<Expr>>,
+    pub body: Vec<Stmt>,
+}
+
+/// See also [ClassDef](https://docs.python.org/3/library/ast.html#ast.ClassDef)
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtClassDef {
+    pub range: ruff_text_size::TextRange,
+    pub decorator_list: Vec<crate::Decorator>,
+    pub name: crate::Identifier,
+    pub type_params: Option<Box<crate::TypeParams>>,
+    pub arguments: Option<Box<crate::Arguments>>,
+    pub body: Vec<Stmt>,
+}
+
+/// See also [Return](https://docs.python.org/3/library/ast.html#ast.Return)
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtReturn {
+    pub range: ruff_text_size::TextRange,
+    pub value: Option<Box<Expr>>,
+}
+
+/// See also [Delete](https://docs.python.org/3/library/ast.html#ast.Delete)
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtDelete {
+    pub range: ruff_text_size::TextRange,
+    pub targets: Vec<Expr>,
+}
+
+/// See also [TypeAlias](https://docs.python.org/3/library/ast.html#ast.TypeAlias)
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtTypeAlias {
+    pub range: ruff_text_size::TextRange,
+    pub name: Box<Expr>,
+    pub type_params: Option<crate::TypeParams>,
+    pub value: Box<Expr>,
+}
+
+/// See also [Assign](https://docs.python.org/3/library/ast.html#ast.Assign)
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtAssign {
+    pub range: ruff_text_size::TextRange,
+    pub targets: Vec<Expr>,
+    pub value: Box<Expr>,
+}
+
+/// See also [AugAssign](https://docs.python.org/3/library/ast.html#ast.AugAssign)
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtAugAssign {
+    pub range: ruff_text_size::TextRange,
+    pub target: Box<Expr>,
+    pub op: crate::Operator,
+    pub value: Box<Expr>,
+}
+
+/// See also [AnnAssign](https://docs.python.org/3/library/ast.html#ast.AnnAssign)
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtAnnAssign {
+    pub range: ruff_text_size::TextRange,
+    pub target: Box<Expr>,
+    pub annotation: Box<Expr>,
+    pub value: Option<Box<Expr>>,
+    pub simple: bool,
+}
+
+/// See also [For](https://docs.python.org/3/library/ast.html#ast.For)
+/// and [AsyncFor](https://docs.python.org/3/library/ast.html#ast.AsyncFor).
+///
+/// This type differs from the original Python AST, as it collapses the synchronous and asynchronous variants into a single type.
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtFor {
+    pub range: ruff_text_size::TextRange,
+    pub is_async: bool,
+    pub target: Box<Expr>,
+    pub iter: Box<Expr>,
+    pub body: Vec<Stmt>,
+    pub orelse: Vec<Stmt>,
+}
+
+/// See also [While](https://docs.python.org/3/library/ast.html#ast.While)
+/// and [AsyncWhile](https://docs.python.org/3/library/ast.html#ast.AsyncWhile).
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtWhile {
+    pub range: ruff_text_size::TextRange,
+    pub test: Box<Expr>,
+    pub body: Vec<Stmt>,
+    pub orelse: Vec<Stmt>,
+}
+
+/// See also [If](https://docs.python.org/3/library/ast.html#ast.If)
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtIf {
+    pub range: ruff_text_size::TextRange,
+    pub test: Box<Expr>,
+    pub body: Vec<Stmt>,
+    pub elif_else_clauses: Vec<crate::ElifElseClause>,
+}
+
+/// See also [With](https://docs.python.org/3/library/ast.html#ast.With)
+/// and [AsyncWith](https://docs.python.org/3/library/ast.html#ast.AsyncWith).
+///
+/// This type differs from the original Python AST, as it collapses the synchronous and asynchronous variants into a single type.
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtWith {
+    pub range: ruff_text_size::TextRange,
+    pub is_async: bool,
+    pub items: Vec<crate::WithItem>,
+    pub body: Vec<Stmt>,
+}
+
+/// See also [Match](https://docs.python.org/3/library/ast.html#ast.Match)
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtMatch {
+    pub range: ruff_text_size::TextRange,
+    pub subject: Box<Expr>,
+    pub cases: Vec<crate::MatchCase>,
+}
+
+/// See also [Raise](https://docs.python.org/3/library/ast.html#ast.Raise)
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtRaise {
+    pub range: ruff_text_size::TextRange,
+    pub exc: Option<Box<Expr>>,
+    pub cause: Option<Box<Expr>>,
+}
+
+/// See also [Try](https://docs.python.org/3/library/ast.html#ast.Try)
+/// and [TryStar](https://docs.python.org/3/library/ast.html#ast.TryStar)
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtTry {
+    pub range: ruff_text_size::TextRange,
+    pub body: Vec<Stmt>,
+    pub handlers: Vec<ExceptHandler>,
+    pub orelse: Vec<Stmt>,
+    pub finalbody: Vec<Stmt>,
+    pub is_star: bool,
+}
+
+/// See also [Assert](https://docs.python.org/3/library/ast.html#ast.Assert)
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtAssert {
+    pub range: ruff_text_size::TextRange,
+    pub test: Box<Expr>,
+    pub msg: Option<Box<Expr>>,
+}
+
+/// See also [Import](https://docs.python.org/3/library/ast.html#ast.Import)
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtImport {
+    pub range: ruff_text_size::TextRange,
+    pub names: Vec<crate::Alias>,
+}
+
+/// See also [ImportFrom](https://docs.python.org/3/library/ast.html#ast.ImportFrom)
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtImportFrom {
+    pub range: ruff_text_size::TextRange,
+    pub module: Option<crate::Identifier>,
+    pub names: Vec<crate::Alias>,
+    pub level: u32,
+}
+
+/// See also [Global](https://docs.python.org/3/library/ast.html#ast.Global)
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtGlobal {
+    pub range: ruff_text_size::TextRange,
+    pub names: Vec<crate::Identifier>,
+}
+
+/// See also [Nonlocal](https://docs.python.org/3/library/ast.html#ast.Nonlocal)
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtNonlocal {
+    pub range: ruff_text_size::TextRange,
+    pub names: Vec<crate::Identifier>,
+}
+
+/// See also [Expr](https://docs.python.org/3/library/ast.html#ast.Expr)
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtExpr {
+    pub range: ruff_text_size::TextRange,
+    pub value: Box<Expr>,
+}
+
+/// See also [Pass](https://docs.python.org/3/library/ast.html#ast.Pass)
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtPass {
+    pub range: ruff_text_size::TextRange,
+}
+
+/// See also [Break](https://docs.python.org/3/library/ast.html#ast.Break)
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtBreak {
+    pub range: ruff_text_size::TextRange,
+}
+
+/// See also [Continue](https://docs.python.org/3/library/ast.html#ast.Continue)
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtContinue {
+    pub range: ruff_text_size::TextRange,
+}
+
+/// An AST node used to represent a IPython escape command at the statement level.
+///
+/// For example,
+/// ```python
+/// %matplotlib inline
+/// ```
+///
+/// ## Terminology
+///
+/// Escape commands are special IPython syntax which starts with a token to identify
+/// the escape kind followed by the command value itself. [Escape kind] are the kind
+/// of escape commands that are recognized by the token: `%`, `%%`, `!`, `!!`,
+/// `?`, `??`, `/`, `;`, and `,`.
+///
+/// Help command (or Dynamic Object Introspection as it's called) are the escape commands
+/// of the kind `?` and `??`. For example, `?str.replace`. Help end command are a subset
+/// of Help command where the token can be at the end of the line i.e., after the value.
+/// For example, `str.replace?`.
+///
+/// Here's where things get tricky. I'll divide the help end command into two types for
+/// better understanding:
+/// 1. Strict version: The token is _only_ at the end of the line. For example,
+///    `str.replace?` or `str.replace??`.
+/// 2. Combined version: Along with the `?` or `??` token, which are at the end of the
+///    line, there are other escape kind tokens that are present at the start as well.
+///    For example, `%matplotlib?` or `%%timeit?`.
+///
+/// Priority comes into picture for the "Combined version" mentioned above. How do
+/// we determine the escape kind if there are tokens on both side of the value, i.e., which
+/// token to choose? The Help end command always takes priority over any other token which
+/// means that if there is `?`/`??` at the end then that is used to determine the kind.
+/// For example, in `%matplotlib?` the escape kind is determined using the `?` token
+/// instead of `%` token.
+///
+/// ## Syntax
+///
+/// `<IpyEscapeKind><Command value>`
+///
+/// The simplest form is an escape kind token followed by the command value. For example,
+/// `%matplotlib inline`, `/foo`, `!pwd`, etc.
+///
+/// `<Command value><IpyEscapeKind ("?" or "??")>`
+///
+/// The help end escape command would be the reverse of the above syntax. Here, the
+/// escape kind token can only be either `?` or `??` and it is at the end of the line.
+/// For example, `str.replace?`, `math.pi??`, etc.
+///
+/// `<IpyEscapeKind><Command value><EscapeKind ("?" or "??")>`
+///
+/// The final syntax is the combined version of the above two. For example, `%matplotlib?`,
+/// `%%timeit??`, etc.
+///
+/// [Escape kind]: crate::IpyEscapeKind
+///
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtIpyEscapeCommand {
+    pub range: ruff_text_size::TextRange,
+    pub kind: crate::IpyEscapeKind,
+    pub value: Box<str>,
+}
+
 /// See also [BoolOp](https://docs.python.org/3/library/ast.html#ast.BoolOp)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprBoolOp {
@@ -6706,10 +6980,64 @@ pub struct ExprSlice {
 /// Here, the escape kind can only be `!` or `%` otherwise it is a syntax error.
 ///
 /// For more information related to terminology and syntax of escape commands,
-/// see [`crate::StmtIpyEscapeCommand`].
+/// see [`StmtIpyEscapeCommand`].
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprIpyEscapeCommand {
     pub range: ruff_text_size::TextRange,
     pub kind: crate::IpyEscapeKind,
     pub value: Box<str>,
+}
+
+#[cfg(test)]
+mod tests {
+    #[allow(clippy::wildcard_imports)]
+    use super::*;
+    use crate::Mod;
+
+    #[test]
+    #[cfg(target_pointer_width = "64")]
+    fn size() {
+        assert!(std::mem::size_of::<Stmt>() <= 120);
+        assert!(std::mem::size_of::<StmtFunctionDef>() <= 120);
+        assert!(std::mem::size_of::<StmtClassDef>() <= 104);
+        assert!(std::mem::size_of::<StmtTry>() <= 112);
+        assert!(std::mem::size_of::<Mod>() <= 32);
+        // 96 for Rustc < 1.76
+        assert!(matches!(std::mem::size_of::<Pattern>(), 88 | 96));
+
+        assert_eq!(std::mem::size_of::<Expr>(), 64);
+        assert_eq!(std::mem::size_of::<ExprAttribute>(), 56);
+        assert_eq!(std::mem::size_of::<ExprAwait>(), 16);
+        assert_eq!(std::mem::size_of::<ExprBinOp>(), 32);
+        assert_eq!(std::mem::size_of::<ExprBoolOp>(), 40);
+        assert_eq!(std::mem::size_of::<ExprBooleanLiteral>(), 12);
+        assert_eq!(std::mem::size_of::<ExprBytesLiteral>(), 40);
+        assert_eq!(std::mem::size_of::<ExprCall>(), 56);
+        assert_eq!(std::mem::size_of::<ExprCompare>(), 48);
+        assert_eq!(std::mem::size_of::<ExprDict>(), 32);
+        assert_eq!(std::mem::size_of::<ExprDictComp>(), 48);
+        assert_eq!(std::mem::size_of::<ExprEllipsisLiteral>(), 8);
+        // 56 for Rustc < 1.76
+        assert!(matches!(std::mem::size_of::<ExprFString>(), 48 | 56));
+        assert_eq!(std::mem::size_of::<ExprGenerator>(), 48);
+        assert_eq!(std::mem::size_of::<ExprIf>(), 32);
+        assert_eq!(std::mem::size_of::<ExprIpyEscapeCommand>(), 32);
+        assert_eq!(std::mem::size_of::<ExprLambda>(), 24);
+        assert_eq!(std::mem::size_of::<ExprList>(), 40);
+        assert_eq!(std::mem::size_of::<ExprListComp>(), 40);
+        assert_eq!(std::mem::size_of::<ExprName>(), 40);
+        assert_eq!(std::mem::size_of::<ExprNamed>(), 24);
+        assert_eq!(std::mem::size_of::<ExprNoneLiteral>(), 8);
+        assert_eq!(std::mem::size_of::<ExprNumberLiteral>(), 32);
+        assert_eq!(std::mem::size_of::<ExprSet>(), 32);
+        assert_eq!(std::mem::size_of::<ExprSetComp>(), 40);
+        assert_eq!(std::mem::size_of::<ExprSlice>(), 32);
+        assert_eq!(std::mem::size_of::<ExprStarred>(), 24);
+        assert_eq!(std::mem::size_of::<ExprStringLiteral>(), 56);
+        assert_eq!(std::mem::size_of::<ExprSubscript>(), 32);
+        assert_eq!(std::mem::size_of::<ExprTuple>(), 40);
+        assert_eq!(std::mem::size_of::<ExprUnaryOp>(), 24);
+        assert_eq!(std::mem::size_of::<ExprYield>(), 16);
+        assert_eq!(std::mem::size_of::<ExprYieldFrom>(), 16);
+    }
 }

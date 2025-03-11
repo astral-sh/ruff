@@ -30,6 +30,14 @@ types_requiring_create_prefix = [
     "UnaryOp",
     "BoolOp",
     "Operator",
+    "Decorator",
+    "TypeParams",
+    "Parameters",
+    "Arguments",
+    "ElifElseClause",
+    "WithItem",
+    "MatchCase",
+    "Alias",
 ]
 
 
@@ -679,6 +687,68 @@ def write_node(out: list[str], ast: Ast) -> None:
 
 
 # ------------------------------------------------------------------------------
+# Node structs
+
+
+def write_size_test(out: list[str]) -> None:
+    out.append("""
+#[cfg(test)]
+mod tests {
+    #[allow(clippy::wildcard_imports)]
+    use super::*;
+    use crate::Mod;
+
+    #[test]
+    #[cfg(target_pointer_width = "64")]
+    fn size() {
+        assert!(std::mem::size_of::<Stmt>() <= 120);
+        assert!(std::mem::size_of::<StmtFunctionDef>() <= 120);
+        assert!(std::mem::size_of::<StmtClassDef>() <= 104);
+        assert!(std::mem::size_of::<StmtTry>() <= 112);
+        assert!(std::mem::size_of::<Mod>() <= 32);
+        // 96 for Rustc < 1.76
+        assert!(matches!(std::mem::size_of::<Pattern>(), 88 | 96));
+
+        assert_eq!(std::mem::size_of::<Expr>(), 64);
+        assert_eq!(std::mem::size_of::<ExprAttribute>(), 56);
+        assert_eq!(std::mem::size_of::<ExprAwait>(), 16);
+        assert_eq!(std::mem::size_of::<ExprBinOp>(), 32);
+        assert_eq!(std::mem::size_of::<ExprBoolOp>(), 40);
+        assert_eq!(std::mem::size_of::<ExprBooleanLiteral>(), 12);
+        assert_eq!(std::mem::size_of::<ExprBytesLiteral>(), 40);
+        assert_eq!(std::mem::size_of::<ExprCall>(), 56);
+        assert_eq!(std::mem::size_of::<ExprCompare>(), 48);
+        assert_eq!(std::mem::size_of::<ExprDict>(), 32);
+        assert_eq!(std::mem::size_of::<ExprDictComp>(), 48);
+        assert_eq!(std::mem::size_of::<ExprEllipsisLiteral>(), 8);
+        // 56 for Rustc < 1.76
+        assert!(matches!(std::mem::size_of::<ExprFString>(), 48 | 56));
+        assert_eq!(std::mem::size_of::<ExprGenerator>(), 48);
+        assert_eq!(std::mem::size_of::<ExprIf>(), 32);
+        assert_eq!(std::mem::size_of::<ExprIpyEscapeCommand>(), 32);
+        assert_eq!(std::mem::size_of::<ExprLambda>(), 24);
+        assert_eq!(std::mem::size_of::<ExprList>(), 40);
+        assert_eq!(std::mem::size_of::<ExprListComp>(), 40);
+        assert_eq!(std::mem::size_of::<ExprName>(), 40);
+        assert_eq!(std::mem::size_of::<ExprNamed>(), 24);
+        assert_eq!(std::mem::size_of::<ExprNoneLiteral>(), 8);
+        assert_eq!(std::mem::size_of::<ExprNumberLiteral>(), 32);
+        assert_eq!(std::mem::size_of::<ExprSet>(), 32);
+        assert_eq!(std::mem::size_of::<ExprSetComp>(), 40);
+        assert_eq!(std::mem::size_of::<ExprSlice>(), 32);
+        assert_eq!(std::mem::size_of::<ExprStarred>(), 24);
+        assert_eq!(std::mem::size_of::<ExprStringLiteral>(), 56);
+        assert_eq!(std::mem::size_of::<ExprSubscript>(), 32);
+        assert_eq!(std::mem::size_of::<ExprTuple>(), 40);
+        assert_eq!(std::mem::size_of::<ExprUnaryOp>(), 24);
+        assert_eq!(std::mem::size_of::<ExprYield>(), 16);
+        assert_eq!(std::mem::size_of::<ExprYieldFrom>(), 16);
+    }
+}
+""")
+
+
+# ------------------------------------------------------------------------------
 # Format and write output
 
 
@@ -690,6 +760,7 @@ def generate(ast: Ast) -> list[str]:
     write_anynoderef(out, ast)
     write_nodekind(out, ast)
     write_node(out, ast)
+    write_size_test(out)
     return out
 
 
