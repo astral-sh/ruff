@@ -1070,10 +1070,57 @@ pub struct Flake8BanditOptions {
         example = "check-typed-exception = true"
     )]
     pub check_typed_exception: Option<bool>,
+
+    /// A list of additional callable names that behave like
+    /// [`markupsafe.Markup`](https://markupsafe.palletsprojects.com/en/stable/escaping/#markupsafe.Markup).
+    ///
+    /// Expects to receive a list of fully-qualified names (e.g., `webhelpers.html.literal`, rather than
+    /// `literal`).
+    #[option(
+        default = "[]",
+        value_type = "list[str]",
+        example = "extend-markup-names = [\"webhelpers.html.literal\", \"my_package.Markup\"]"
+    )]
+    pub extend_markup_names: Option<Vec<String>>,
+
+    /// A list of callable names, whose result may be safely passed into
+    /// [`markupsafe.Markup`](https://markupsafe.palletsprojects.com/en/stable/escaping/#markupsafe.Markup).
+    ///
+    /// Expects to receive a list of fully-qualified names (e.g., `bleach.clean`, rather than `clean`).
+    ///
+    /// This setting helps you avoid false positives in code like:
+    ///
+    /// ```python
+    /// from bleach import clean
+    /// from markupsafe import Markup
+    ///
+    /// cleaned_markup = Markup(clean(some_user_input))
+    /// ```
+    ///
+    /// Where the use of [`bleach.clean`](https://bleach.readthedocs.io/en/latest/clean.html)
+    /// usually ensures that there's no XSS vulnerability.
+    ///
+    /// Although it is not recommended, you may also use this setting to whitelist other
+    /// kinds of calls, e.g. calls to i18n translation functions, where how safe that is
+    /// will depend on the implementation and how well the translations are audited.
+    ///
+    /// Another common use-case is to wrap the output of functions that generate markup
+    /// like [`xml.etree.ElementTree.tostring`](https://docs.python.org/3/library/xml.etree.elementtree.html#xml.etree.ElementTree.tostring)
+    /// or template rendering engines where sanitization of potential user input is either
+    /// already baked in or has to happen before rendering.
+    #[option(
+        default = "[]",
+        value_type = "list[str]",
+        example = "allowed-markup-calls = [\"bleach.clean\", \"my_package.sanitize\"]"
+    )]
+    pub allowed_markup_calls: Option<Vec<String>>,
 }
 
 impl Flake8BanditOptions {
-    pub fn into_settings(self) -> ruff_linter::rules::flake8_bandit::settings::Settings {
+    pub fn into_settings(
+        self,
+        ruff_options: Option<&RuffOptions>,
+    ) -> ruff_linter::rules::flake8_bandit::settings::Settings {
         ruff_linter::rules::flake8_bandit::settings::Settings {
             hardcoded_tmp_directory: self
                 .hardcoded_tmp_directory
@@ -1082,6 +1129,20 @@ impl Flake8BanditOptions {
                 .chain(self.hardcoded_tmp_directory_extend.unwrap_or_default())
                 .collect(),
             check_typed_exception: self.check_typed_exception.unwrap_or(false),
+            extend_markup_names: self
+                .extend_markup_names
+                .or_else(|| {
+                    #[allow(deprecated)]
+                    ruff_options.and_then(|options| options.extend_markup_names.clone())
+                })
+                .unwrap_or_default(),
+            allowed_markup_calls: self
+                .allowed_markup_calls
+                .or_else(|| {
+                    #[allow(deprecated)]
+                    ruff_options.and_then(|options| options.allowed_markup_calls.clone())
+                })
+                .unwrap_or_default(),
         }
     }
 }
@@ -3279,6 +3340,10 @@ pub struct RuffOptions {
         value_type = "list[str]",
         example = "extend-markup-names = [\"webhelpers.html.literal\", \"my_package.Markup\"]"
     )]
+    #[deprecated(
+        since = "0.10.0",
+        note = "The `extend-markup-names` option has been moved to the `flake8-bandit` section of the configuration."
+    )]
     pub extend_markup_names: Option<Vec<String>>,
 
     /// A list of callable names, whose result may be safely passed into
@@ -3311,6 +3376,10 @@ pub struct RuffOptions {
         value_type = "list[str]",
         example = "allowed-markup-calls = [\"bleach.clean\", \"my_package.sanitize\"]"
     )]
+    #[deprecated(
+        since = "0.10.0",
+        note = "The `allowed-markup-names` option has been moved to the `flake8-bandit` section of the configuration."
+    )]
     pub allowed_markup_calls: Option<Vec<String>>,
 }
 
@@ -3320,8 +3389,6 @@ impl RuffOptions {
             parenthesize_tuple_in_subscript: self
                 .parenthesize_tuple_in_subscript
                 .unwrap_or_default(),
-            extend_markup_names: self.extend_markup_names.unwrap_or_default(),
-            allowed_markup_calls: self.allowed_markup_calls.unwrap_or_default(),
         }
     }
 }
