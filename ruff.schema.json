@@ -1026,7 +1026,7 @@
           }
         },
         "builtins-allowed-modules": {
-          "description": "List of builtin module names to allow.",
+          "description": "DEPRECATED: This option has been renamed to `allowed-modules`. Use `allowed-modules` instead.\n\nList of builtin module names to allow.\n\nThis option is ignored if both `allowed-modules` and `builtins-allowed-modules` are set.",
           "deprecated": true,
           "type": [
             "array",
@@ -1037,7 +1037,7 @@
           }
         },
         "builtins-ignorelist": {
-          "description": "Ignore list of builtins.",
+          "description": "DEPRECATED: This option has been renamed to `ignorelist`. Use `ignorelist` instead.\n\nIgnore list of builtins.\n\nThis option is ignored if both `ignorelist` and `builtins-ignorelist` are set.",
           "deprecated": true,
           "type": [
             "array",
@@ -1048,7 +1048,7 @@
           }
         },
         "builtins-strict-checking": {
-          "description": "Compare module names instead of full module paths.",
+          "description": "DEPRECATED: This option has been renamed to `strict-checking`. Use `strict-checking` instead.\n\nCompare module names instead of full module paths.\n\nThis option is ignored if both `strict-checking` and `builtins-strict-checking` are set.",
           "deprecated": true,
           "type": [
             "boolean",

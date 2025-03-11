@@ -1152,14 +1152,18 @@ impl Flake8BugbearOptions {
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Flake8BuiltinsOptions {
+    /// DEPRECATED: This option has been renamed to `ignorelist`. Use `ignorelist` instead.
+    ///
     /// Ignore list of builtins.
+    ///
+    /// This option is ignored if both `ignorelist` and `builtins-ignorelist` are set.
     #[option(
         default = r#"[]"#,
         value_type = "list[str]",
         example = "builtins-ignorelist = [\"id\"]"
     )]
     #[deprecated(
-        since = "0.9.7",
+        since = "0.10.0",
         note = "`builtins-ignorelist` has been renamed to `ignorelist`. Use that instead."
     )]
     pub builtins_ignorelist: Option<Vec<String>>,
@@ -1172,14 +1176,18 @@ pub struct Flake8BuiltinsOptions {
     )]
     pub ignorelist: Option<Vec<String>>,
 
+    /// DEPRECATED: This option has been renamed to `allowed-modules`. Use `allowed-modules` instead.
+    ///
     /// List of builtin module names to allow.
+    ///
+    /// This option is ignored if both `allowed-modules` and `builtins-allowed-modules` are set.
     #[option(
         default = r#"[]"#,
         value_type = "list[str]",
         example = "builtins-allowed-modules = [\"secrets\"]"
     )]
     #[deprecated(
-        since = "0.9.7",
+        since = "0.10.0",
         note = "`builtins-allowed-modules` has been renamed to `allowed-modules`. Use that instead."
     )]
     pub builtins_allowed_modules: Option<Vec<String>>,
@@ -1192,14 +1200,18 @@ pub struct Flake8BuiltinsOptions {
     )]
     pub allowed_modules: Option<Vec<String>>,
 
+    /// DEPRECATED: This option has been renamed to `strict-checking`. Use `strict-checking` instead.
+    ///
     /// Compare module names instead of full module paths.
+    ///
+    /// This option is ignored if both `strict-checking` and `builtins-strict-checking` are set.
     #[option(
         default = r#"true"#,
         value_type = "bool",
         example = "builtins-strict-checking = false"
     )]
     #[deprecated(
-        since = "0.9.7",
+        since = "0.10.0",
         note = "`builtins-strict-checking` has been renamed to `strict-checking`. Use that instead."
     )]
     pub builtins_strict_checking: Option<bool>,
