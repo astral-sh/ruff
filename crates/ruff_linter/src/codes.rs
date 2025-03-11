@@ -489,7 +489,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Simplify, "223") => (RuleGroup::Stable, rules::flake8_simplify::rules::ExprAndFalse),
         (Flake8Simplify, "300") => (RuleGroup::Stable, rules::flake8_simplify::rules::YodaConditions),
         (Flake8Simplify, "401") => (RuleGroup::Stable, rules::flake8_simplify::rules::IfElseBlockInsteadOfDictGet),
-        (Flake8Simplify, "905") => (RuleGroup::Preview, rules::flake8_simplify::rules::SplitStaticString),
+        (Flake8Simplify, "905") => (RuleGroup::Stable, rules::flake8_simplify::rules::SplitStaticString),
         (Flake8Simplify, "910") => (RuleGroup::Stable, rules::flake8_simplify::rules::DictGetWithNoneDefault),
         (Flake8Simplify, "911") => (RuleGroup::Stable, rules::flake8_simplify::rules::ZipDictKeysAndValues),
 
