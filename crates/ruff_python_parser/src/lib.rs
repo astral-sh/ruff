@@ -67,7 +67,11 @@
 use std::iter::FusedIterator;
 use std::ops::Deref;
 
-pub use crate::error::{FStringErrorType, LexicalErrorType, ParseError, ParseErrorType};
+pub use crate::error::{
+    FStringErrorType, LexicalErrorType, ParseError, ParseErrorType, UnsupportedSyntaxError,
+    UnsupportedSyntaxErrorKind,
+};
+pub use crate::parser::ParseOptions;
 pub use crate::token::{Token, TokenKind};
 
 use crate::parser::Parser;
@@ -110,7 +114,7 @@ pub mod typing;
 /// assert!(module.is_ok());
 /// ```
 pub fn parse_module(source: &str) -> Result<Parsed<ModModule>, ParseError> {
-    Parser::new(source, Mode::Module)
+    Parser::new(source, ParseOptions::from(Mode::Module))
         .parse()
         .try_into_module()
         .unwrap()
@@ -133,7 +137,7 @@ pub fn parse_module(source: &str) -> Result<Parsed<ModModule>, ParseError> {
 /// assert!(expr.is_ok());
 /// ```
 pub fn parse_expression(source: &str) -> Result<Parsed<ModExpression>, ParseError> {
-    Parser::new(source, Mode::Expression)
+    Parser::new(source, ParseOptions::from(Mode::Expression))
         .parse()
         .try_into_expression()
         .unwrap()
@@ -161,7 +165,7 @@ pub fn parse_expression_range(
     range: TextRange,
 ) -> Result<Parsed<ModExpression>, ParseError> {
     let source = &source[..range.end().to_usize()];
-    Parser::new_starts_at(source, Mode::Expression, range.start())
+    Parser::new_starts_at(source, range.start(), ParseOptions::from(Mode::Expression))
         .parse()
         .try_into_expression()
         .unwrap()
@@ -187,8 +191,12 @@ pub fn parse_parenthesized_expression_range(
     range: TextRange,
 ) -> Result<Parsed<ModExpression>, ParseError> {
     let source = &source[..range.end().to_usize()];
-    let parsed =
-        Parser::new_starts_at(source, Mode::ParenthesizedExpression, range.start()).parse();
+    let parsed = Parser::new_starts_at(
+        source,
+        range.start(),
+        ParseOptions::from(Mode::ParenthesizedExpression),
+    )
+    .parse();
     parsed.try_into_expression().unwrap().into_result()
 }
 
@@ -227,11 +235,11 @@ pub fn parse_string_annotation(
     }
 }
 
-/// Parse the given Python source code using the specified [`Mode`].
+/// Parse the given Python source code using the specified [`ParseOptions`].
 ///
-/// This function is the most general function to parse Python code. Based on the [`Mode`] supplied,
-/// it can be used to parse a single expression, a full Python program, an interactive expression
-/// or a Python program containing IPython escape commands.
+/// This function is the most general function to parse Python code. Based on the [`Mode`] supplied
+/// via the [`ParseOptions`], it can be used to parse a single expression, a full Python program,
+/// an interactive expression or a Python program containing IPython escape commands.
 ///
 /// # Example
 ///
@@ -239,16 +247,16 @@ pub fn parse_string_annotation(
 /// parsing:
 ///
 /// ```
-/// use ruff_python_parser::{Mode, parse};
+/// use ruff_python_parser::{parse, Mode, ParseOptions};
 ///
-/// let parsed = parse("1 + 2", Mode::Expression);
+/// let parsed = parse("1 + 2", ParseOptions::from(Mode::Expression));
 /// assert!(parsed.is_ok());
 /// ```
 ///
 /// Alternatively, we can parse a full Python program consisting of multiple lines:
 ///
 /// ```
-/// use ruff_python_parser::{Mode, parse};
+/// use ruff_python_parser::{parse, Mode, ParseOptions};
 ///
 /// let source = r#"
 /// class Greeter:
@@ -256,39 +264,39 @@ pub fn parse_string_annotation(
 ///   def greet(self):
 ///    print("Hello, world!")
 /// "#;
-/// let parsed = parse(source, Mode::Module);
+/// let parsed = parse(source, ParseOptions::from(Mode::Module));
 /// assert!(parsed.is_ok());
 /// ```
 ///
 /// Additionally, we can parse a Python program containing IPython escapes:
 ///
 /// ```
-/// use ruff_python_parser::{Mode, parse};
+/// use ruff_python_parser::{parse, Mode, ParseOptions};
 ///
 /// let source = r#"
 /// %timeit 1 + 2
 /// ?str.replace
 /// !ls
 /// "#;
-/// let parsed = parse(source, Mode::Ipython);
+/// let parsed = parse(source, ParseOptions::from(Mode::Ipython));
 /// assert!(parsed.is_ok());
 /// ```
-pub fn parse(source: &str, mode: Mode) -> Result<Parsed<Mod>, ParseError> {
-    parse_unchecked(source, mode).into_result()
+pub fn parse(source: &str, options: ParseOptions) -> Result<Parsed<Mod>, ParseError> {
+    parse_unchecked(source, options).into_result()
 }
 
-/// Parse the given Python source code using the specified [`Mode`].
+/// Parse the given Python source code using the specified [`ParseOptions`].
 ///
 /// This is same as the [`parse`] function except that it doesn't check for any [`ParseError`]
 /// and returns the [`Parsed`] as is.
-pub fn parse_unchecked(source: &str, mode: Mode) -> Parsed<Mod> {
-    Parser::new(source, mode).parse()
+pub fn parse_unchecked(source: &str, options: ParseOptions) -> Parsed<Mod> {
+    Parser::new(source, options).parse()
 }
 
 /// Parse the given Python source code using the specified [`PySourceType`].
 pub fn parse_unchecked_source(source: &str, source_type: PySourceType) -> Parsed<ModModule> {
     // SAFETY: Safe because `PySourceType` always parses to a `ModModule`
-    Parser::new(source, source_type.as_mode())
+    Parser::new(source, ParseOptions::from(source_type))
         .parse()
         .try_into_module()
         .unwrap()
@@ -300,6 +308,7 @@ pub struct Parsed<T> {
     syntax: T,
     tokens: Tokens,
     errors: Vec<ParseError>,
+    unsupported_syntax_errors: Vec<UnsupportedSyntaxError>,
 }
 
 impl<T> Parsed<T> {
@@ -318,6 +327,11 @@ impl<T> Parsed<T> {
         &self.errors
     }
 
+    /// Returns a list of version-related syntax errors found during parsing.
+    pub fn unsupported_syntax_errors(&self) -> &[UnsupportedSyntaxError] {
+        &self.unsupported_syntax_errors
+    }
+
     /// Consumes the [`Parsed`] output and returns the contained syntax node.
     pub fn into_syntax(self) -> T {
         self.syntax
@@ -328,15 +342,47 @@ impl<T> Parsed<T> {
         self.errors
     }
 
-    /// Returns `true` if the parsed source code is valid i.e., it has no syntax errors.
-    pub fn is_valid(&self) -> bool {
+    /// Returns `true` if the parsed source code is valid i.e., it has no [`ParseError`]s.
+    ///
+    /// Note that this does not include version-related [`UnsupportedSyntaxError`]s.
+    ///
+    /// See [`Parsed::has_no_syntax_errors`] for a version that takes these into account.
+    pub fn has_valid_syntax(&self) -> bool {
         self.errors.is_empty()
+    }
+
+    /// Returns `true` if the parsed source code is invalid i.e., it has [`ParseError`]s.
+    ///
+    /// Note that this does not include version-related [`UnsupportedSyntaxError`]s.
+    ///
+    /// See [`Parsed::has_no_syntax_errors`] for a version that takes these into account.
+    pub fn has_invalid_syntax(&self) -> bool {
+        !self.has_valid_syntax()
+    }
+
+    /// Returns `true` if the parsed source code does not contain any [`ParseError`]s *or*
+    /// [`UnsupportedSyntaxError`]s.
+    ///
+    /// See [`Parsed::has_valid_syntax`] for a version specific to [`ParseError`]s.
+    pub fn has_no_syntax_errors(&self) -> bool {
+        self.has_valid_syntax() && self.unsupported_syntax_errors.is_empty()
+    }
+
+    /// Returns `true` if the parsed source code contains any [`ParseError`]s *or*
+    /// [`UnsupportedSyntaxError`]s.
+    ///
+    /// See [`Parsed::has_invalid_syntax`] for a version specific to [`ParseError`]s.
+    pub fn has_syntax_errors(&self) -> bool {
+        !self.has_no_syntax_errors()
     }
 
     /// Returns the [`Parsed`] output as a [`Result`], returning [`Ok`] if it has no syntax errors,
     /// or [`Err`] containing the first [`ParseError`] encountered.
+    ///
+    /// Note that any [`unsupported_syntax_errors`](Parsed::unsupported_syntax_errors) will not
+    /// cause [`Err`] to be returned.
     pub fn as_result(&self) -> Result<&Parsed<T>, &[ParseError]> {
-        if self.is_valid() {
+        if self.has_valid_syntax() {
             Ok(self)
         } else {
             Err(&self.errors)
@@ -345,8 +391,11 @@ impl<T> Parsed<T> {
 
     /// Consumes the [`Parsed`] output and returns a [`Result`] which is [`Ok`] if it has no syntax
     /// errors, or [`Err`] containing the first [`ParseError`] encountered.
+    ///
+    /// Note that any [`unsupported_syntax_errors`](Parsed::unsupported_syntax_errors) will not
+    /// cause [`Err`] to be returned.
     pub(crate) fn into_result(self) -> Result<Parsed<T>, ParseError> {
-        if self.is_valid() {
+        if self.has_valid_syntax() {
             Ok(self)
         } else {
             Err(self.into_errors().into_iter().next().unwrap())
@@ -368,6 +417,7 @@ impl Parsed<Mod> {
                 syntax: module,
                 tokens: self.tokens,
                 errors: self.errors,
+                unsupported_syntax_errors: self.unsupported_syntax_errors,
             }),
             Mod::Expression(_) => None,
         }
@@ -387,6 +437,7 @@ impl Parsed<Mod> {
                 syntax: expression,
                 tokens: self.tokens,
                 errors: self.errors,
+                unsupported_syntax_errors: self.unsupported_syntax_errors,
             }),
         }
     }

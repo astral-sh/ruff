@@ -10,7 +10,7 @@ use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::settings::types::PythonVersion;
+use ruff_python_ast::PythonVersion;
 
 /// ## What it does
 /// Checks duplicate characters in `str.strip` calls.
@@ -211,7 +211,7 @@ pub(crate) fn bad_str_strip_call(checker: &Checker, call: &ast::ExprCall) {
         return;
     }
 
-    let removal = if checker.settings.target_version >= PythonVersion::Py39 {
+    let removal = if checker.target_version() >= PythonVersion::PY39 {
         RemovalKind::for_strip(strip)
     } else {
         None

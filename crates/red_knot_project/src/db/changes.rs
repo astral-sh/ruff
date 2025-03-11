@@ -2,10 +2,11 @@ use crate::db::{Db, ProjectDatabase};
 use crate::metadata::options::Options;
 use crate::watch::{ChangeEvent, CreatedKind, DeletedKind};
 use crate::{Project, ProjectMetadata};
+use std::collections::BTreeSet;
 
+use crate::walk::ProjectFilesWalker;
 use red_knot_python_semantic::Program;
-use ruff_db::files::{system_path_to_file, File, Files};
-use ruff_db::system::walk_directory::WalkState;
+use ruff_db::files::{File, Files};
 use ruff_db::system::SystemPath;
 use ruff_db::Db as _;
 use rustc_hash::FxHashSet;
@@ -14,7 +15,7 @@ impl ProjectDatabase {
     #[tracing::instrument(level = "debug", skip(self, changes, cli_options))]
     pub fn apply_changes(&mut self, changes: Vec<ChangeEvent>, cli_options: Option<&Options>) {
         let mut project = self.project();
-        let project_path = project.root(self).to_path_buf();
+        let project_root = project.root(self).to_path_buf();
         let program = Program::get(self);
         let custom_stdlib_versions_path = program
             .custom_stdlib_search_path(self)
@@ -29,7 +30,7 @@ impl ProjectDatabase {
 
         // Deduplicate the `sync` calls. Many file watchers emit multiple events for the same path.
         let mut synced_files = FxHashSet::default();
-        let mut synced_recursively = FxHashSet::default();
+        let mut sync_recursively = BTreeSet::default();
 
         let mut sync_path = |db: &mut ProjectDatabase, path: &SystemPath| {
             if synced_files.insert(path.to_path_buf()) {
@@ -37,17 +38,13 @@ impl ProjectDatabase {
             }
         };
 
-        let mut sync_recursively = |db: &mut ProjectDatabase, path: &SystemPath| {
-            if synced_recursively.insert(path.to_path_buf()) {
-                Files::sync_recursively(db, path);
-            }
-        };
-
         for change in changes {
+            tracing::trace!("Handle change: {:?}", change);
+
             if let Some(path) = change.system_path() {
                 if matches!(
                     path.file_name(),
-                    Some(".gitignore" | ".ignore" | "ruff.toml" | ".ruff.toml" | "pyproject.toml")
+                    Some(".gitignore" | ".ignore" | "knot.toml" | "pyproject.toml")
                 ) {
                     // Changes to ignore files or settings can change the project structure or add/remove files.
                     project_changed = true;
@@ -69,16 +66,27 @@ impl ProjectDatabase {
                     match kind {
                         CreatedKind::File => sync_path(self, &path),
                         CreatedKind::Directory | CreatedKind::Any => {
-                            sync_recursively(self, &path);
+                            sync_recursively.insert(path.clone());
                         }
                     }
 
-                    if self.system().is_file(&path) {
-                        // Add the parent directory because `walkdir` always visits explicitly passed files
-                        // even if they match an exclude filter.
-                        added_paths.insert(path.parent().unwrap().to_path_buf());
-                    } else {
-                        added_paths.insert(path);
+                    // Unlike other files, it's not only important to update the status of existing
+                    // and known `File`s (`sync_recursively`), it's also important to discover new files
+                    // that were added in the project's root (or any of the paths included for checking).
+                    //
+                    // This is important because `Project::check` iterates over all included files.
+                    // The code below walks the `added_paths` and adds all files that
+                    // should be included in the project. We can skip this check for
+                    // paths that aren't part of the project or shouldn't be included
+                    // when checking the project.
+                    if project.is_path_included(self, &path) {
+                        if self.system().is_file(&path) {
+                            // Add the parent directory because `walkdir` always visits explicitly passed files
+                            // even if they match an exclude filter.
+                            added_paths.insert(path.parent().unwrap().to_path_buf());
+                        } else {
+                            added_paths.insert(path);
+                        }
                     }
                 }
 
@@ -102,7 +110,7 @@ impl ProjectDatabase {
                             project.remove_file(self, file);
                         }
                     } else {
-                        sync_recursively(self, &path);
+                        sync_recursively.insert(path.clone());
 
                         if custom_stdlib_versions_path
                             .as_ref()
@@ -111,11 +119,19 @@ impl ProjectDatabase {
                             custom_stdlib_change = true;
                         }
 
-                        // Perform a full-reload in case the deleted directory contained the pyproject.toml.
-                        // We may want to make this more clever in the future, to e.g. iterate over the
-                        // indexed files and remove the once that start with the same path, unless
-                        // the deleted path is the project configuration.
-                        project_changed = true;
+                        if project.is_path_included(self, &path) || path == project_root {
+                            // TODO: Shouldn't it be enough to simply traverse the project files and remove all
+                            // that start with the given path?
+                            tracing::debug!(
+                                "Reload project because of a path that could have been a directory."
+                            );
+
+                            // Perform a full-reload in case the deleted directory contained the pyproject.toml.
+                            // We may want to make this more clever in the future, to e.g. iterate over the
+                            // indexed files and remove the once that start with the same path, unless
+                            // the deleted path is the project configuration.
+                            project_changed = true;
+                        }
                     }
                 }
 
@@ -132,16 +148,38 @@ impl ProjectDatabase {
                 ChangeEvent::Rescan => {
                     project_changed = true;
                     Files::sync_all(self);
+                    sync_recursively.clear();
                     break;
                 }
             }
         }
 
+        let sync_recursively = sync_recursively.into_iter();
+        let mut last = None;
+
+        for path in sync_recursively {
+            // Avoid re-syncing paths that are sub-paths of each other.
+            if let Some(last) = &last {
+                if path.starts_with(last) {
+                    continue;
+                }
+            }
+
+            Files::sync_recursively(self, &path);
+            last = Some(path);
+        }
+
         if project_changed {
-            match ProjectMetadata::discover(&project_path, self.system()) {
+            match ProjectMetadata::discover(&project_root, self.system()) {
                 Ok(mut metadata) => {
                     if let Some(cli_options) = cli_options {
                         metadata.apply_cli_options(cli_options.clone());
+                    }
+
+                    if let Err(error) = metadata.apply_configuration_files(self.system()) {
+                        tracing::error!(
+                            "Failed to apply configuration files, continuing without applying them: {error}"
+                        );
                     }
 
                     let program_settings = metadata.to_program_settings(self.system());
@@ -179,43 +217,24 @@ impl ProjectDatabase {
             }
         }
 
-        let mut added_paths = added_paths.into_iter();
+        let diagnostics = if let Some(walker) = ProjectFilesWalker::incremental(self, added_paths) {
+            // Use directory walking to discover newly added files.
+            let (files, diagnostics) = walker.collect_vec(self);
 
-        // Use directory walking to discover newly added files.
-        if let Some(path) = added_paths.next() {
-            let mut walker = self.system().walk_directory(&path);
-
-            for extra_path in added_paths {
-                walker = walker.add(&extra_path);
+            for file in files {
+                project.add_file(self, file);
             }
 
-            let added_paths = std::sync::Mutex::new(Vec::default());
+            diagnostics
+        } else {
+            Vec::new()
+        };
 
-            walker.run(|| {
-                Box::new(|entry| {
-                    let Ok(entry) = entry else {
-                        return WalkState::Continue;
-                    };
-
-                    if !entry.file_type().is_file() {
-                        return WalkState::Continue;
-                    }
-
-                    let mut paths = added_paths.lock().unwrap();
-
-                    paths.push(entry.into_path());
-
-                    WalkState::Continue
-                })
-            });
-
-            for path in added_paths.into_inner().unwrap() {
-                let file = system_path_to_file(self, &path);
-
-                if let Ok(file) = file {
-                    project.add_file(self, file);
-                }
-            }
-        }
+        // Note: We simply replace all IO related diagnostics here. This isn't ideal, because
+        // it removes IO errors that may still be relevant. However, tracking IO errors correctly
+        // across revisions doesn't feel essential, considering that they're rare. However, we could
+        // implement a `BTreeMap` or similar and only prune the diagnostics from paths that we've
+        // re-scanned (or that were removed etc).
+        project.replace_index_diagnostics(self, diagnostics);
     }
 }

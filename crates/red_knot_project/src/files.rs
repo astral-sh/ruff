@@ -8,10 +8,7 @@ use salsa::Setter;
 use ruff_db::files::File;
 
 use crate::db::Db;
-use crate::Project;
-
-/// Cheap cloneable hash set of files.
-type FileSet = Arc<FxHashSet<File>>;
+use crate::{IOErrorDiagnostic, Project};
 
 /// The indexed files of a project.
 ///
@@ -35,9 +32,9 @@ impl IndexedFiles {
         }
     }
 
-    fn indexed(files: FileSet) -> Self {
+    fn indexed(inner: Arc<IndexedInner>) -> Self {
         Self {
-            state: std::sync::Mutex::new(State::Indexed(files)),
+            state: std::sync::Mutex::new(State::Indexed(inner)),
         }
     }
 
@@ -46,8 +43,8 @@ impl IndexedFiles {
 
         match &*state {
             State::Lazy => Index::Lazy(LazyFiles { files: state }),
-            State::Indexed(files) => Index::Indexed(Indexed {
-                files: Arc::clone(files),
+            State::Indexed(inner) => Index::Indexed(Indexed {
+                inner: Arc::clone(inner),
                 _lifetime: PhantomData,
             }),
         }
@@ -94,7 +91,7 @@ impl IndexedFiles {
         Some(IndexedMut {
             db: Some(db),
             project,
-            files: indexed,
+            indexed,
             did_change: false,
         })
     }
@@ -112,7 +109,7 @@ enum State {
     Lazy,
 
     /// The files are indexed. Stores the known files of a package.
-    Indexed(FileSet),
+    Indexed(Arc<IndexedInner>),
 }
 
 pub(super) enum Index<'db> {
@@ -129,32 +126,48 @@ pub(super) struct LazyFiles<'db> {
 
 impl<'db> LazyFiles<'db> {
     /// Sets the indexed files of a package to `files`.
-    pub(super) fn set(mut self, files: FxHashSet<File>) -> Indexed<'db> {
+    pub(super) fn set(
+        mut self,
+        files: FxHashSet<File>,
+        diagnostics: Vec<IOErrorDiagnostic>,
+    ) -> Indexed<'db> {
         let files = Indexed {
-            files: Arc::new(files),
+            inner: Arc::new(IndexedInner { files, diagnostics }),
             _lifetime: PhantomData,
         };
-        *self.files = State::Indexed(Arc::clone(&files.files));
+        *self.files = State::Indexed(Arc::clone(&files.inner));
         files
     }
 }
 
-/// The indexed files of a package.
+/// The indexed files of the project.
 ///
 /// Note: This type is intentionally non-cloneable. Making it cloneable requires
 /// revisiting the locking behavior in [`IndexedFiles::indexed_mut`].
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug)]
 pub struct Indexed<'db> {
-    files: FileSet,
+    inner: Arc<IndexedInner>,
     // Preserve the lifetime of `PackageFiles`.
     _lifetime: PhantomData<&'db ()>,
+}
+
+#[derive(Debug)]
+struct IndexedInner {
+    files: FxHashSet<File>,
+    diagnostics: Vec<IOErrorDiagnostic>,
+}
+
+impl Indexed<'_> {
+    pub(super) fn diagnostics(&self) -> &[IOErrorDiagnostic] {
+        &self.inner.diagnostics
+    }
 }
 
 impl Deref for Indexed<'_> {
     type Target = FxHashSet<File>;
 
     fn deref(&self) -> &Self::Target {
-        &self.files
+        &self.inner.files
     }
 }
 
@@ -165,7 +178,7 @@ impl<'a> IntoIterator for &'a Indexed<'_> {
     type IntoIter = IndexedIter<'a>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.files.iter().copied()
+        self.inner.files.iter().copied()
     }
 }
 
@@ -176,13 +189,13 @@ impl<'a> IntoIterator for &'a Indexed<'_> {
 pub(super) struct IndexedMut<'db> {
     db: Option<&'db mut dyn Db>,
     project: Project,
-    files: FileSet,
+    indexed: Arc<IndexedInner>,
     did_change: bool,
 }
 
 impl IndexedMut<'_> {
     pub(super) fn insert(&mut self, file: File) -> bool {
-        if self.files_mut().insert(file) {
+        if self.inner_mut().files.insert(file) {
             self.did_change = true;
             true
         } else {
@@ -191,7 +204,7 @@ impl IndexedMut<'_> {
     }
 
     pub(super) fn remove(&mut self, file: File) -> bool {
-        if self.files_mut().remove(&file) {
+        if self.inner_mut().files.remove(&file) {
             self.did_change = true;
             true
         } else {
@@ -199,8 +212,13 @@ impl IndexedMut<'_> {
         }
     }
 
-    fn files_mut(&mut self) -> &mut FxHashSet<File> {
-        Arc::get_mut(&mut self.files).expect("All references to `FilesSet` to have been dropped")
+    pub(super) fn set_diagnostics(&mut self, diagnostics: Vec<IOErrorDiagnostic>) {
+        self.inner_mut().diagnostics = diagnostics;
+    }
+
+    fn inner_mut(&mut self) -> &mut IndexedInner {
+        Arc::get_mut(&mut self.indexed)
+            .expect("All references to `FilesSet` should have been dropped")
     }
 
     fn set_impl(&mut self) {
@@ -208,16 +226,16 @@ impl IndexedMut<'_> {
             return;
         };
 
-        let files = Arc::clone(&self.files);
+        let indexed = Arc::clone(&self.indexed);
 
         if self.did_change {
             // If there are changes, set the new file_set to trigger a salsa revision change.
             self.project
                 .set_file_set(db)
-                .to(IndexedFiles::indexed(files));
+                .to(IndexedFiles::indexed(indexed));
         } else {
             // The `indexed_mut` replaced the `state` with Lazy. Restore it back to the indexed state.
-            *self.project.file_set(db).state.lock().unwrap() = State::Indexed(files);
+            *self.project.file_set(db).state.lock().unwrap() = State::Indexed(indexed);
         }
     }
 }
@@ -237,7 +255,7 @@ mod tests {
     use crate::files::Index;
     use crate::ProjectMetadata;
     use ruff_db::files::system_path_to_file;
-    use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
+    use ruff_db::system::{DbWithWritableSystem as _, SystemPathBuf};
     use ruff_python_ast::name::Name;
 
     #[test]
@@ -252,7 +270,7 @@ mod tests {
         let file = system_path_to_file(&db, "test.py").unwrap();
 
         let files = match project.file_set(&db).get() {
-            Index::Lazy(lazy) => lazy.set(FxHashSet::from_iter([file])),
+            Index::Lazy(lazy) => lazy.set(FxHashSet::from_iter([file]), Vec::new()),
             Index::Indexed(files) => files,
         };
 

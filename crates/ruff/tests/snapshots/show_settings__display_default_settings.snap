@@ -189,7 +189,8 @@ linter.rules.should_fix = [
 linter.per_file_ignores = {}
 linter.safety_table.forced_safe = []
 linter.safety_table.forced_unsafe = []
-linter.target_version = Py37
+linter.unresolved_target_version = 3.7
+linter.per_file_target_version = {}
 linter.preview = disabled
 linter.explicit_preview_rules = false
 linter.extension = ExtensionMapping({})
@@ -373,7 +374,8 @@ linter.ruff.parenthesize_tuple_in_subscript = false
 
 # Formatter Settings
 formatter.exclude = []
-formatter.target_version = Py37
+formatter.unresolved_target_version = 3.7
+formatter.per_file_target_version = {}
 formatter.preview = disabled
 formatter.line_width = 100
 formatter.line_ending = auto
@@ -387,7 +389,7 @@ formatter.docstring_code_line_width = dynamic
 # Analyze Settings
 analyze.exclude = []
 analyze.preview = disabled
-analyze.target_version = Py37
+analyze.target_version = 3.7
 analyze.detect_string_imports = false
 analyze.extension = ExtensionMapping({})
 analyze.include_dependencies = {}

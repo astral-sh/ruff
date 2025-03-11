@@ -2,15 +2,16 @@
 //! command-line options. Structure is optimized for internal usage, as opposed
 //! to external visibility or parsing.
 
-use path_absolutize::path_dedot;
 use regex::Regex;
 use rustc_hash::FxHashSet;
 use std::fmt::{Display, Formatter};
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
+use types::CompiledPerFileTargetVersionList;
 
 use crate::codes::RuleCodePrefix;
 use ruff_macros::CacheKey;
+use ruff_python_ast::PythonVersion;
 
 use crate::line_width::LineLength;
 use crate::registry::{Linter, Rule};
@@ -21,10 +22,8 @@ use crate::rules::{
     flake8_self, flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe,
     pep8_naming, pycodestyle, pydoclint, pydocstyle, pyflakes, pylint, pyupgrade, ruff,
 };
-use crate::settings::types::{
-    CompiledPerFileIgnoreList, ExtensionMapping, FilePatternSet, PythonVersion,
-};
-use crate::{codes, RuleSelector};
+use crate::settings::types::{CompiledPerFileIgnoreList, ExtensionMapping, FilePatternSet};
+use crate::{codes, fs, RuleSelector};
 
 use super::line_width::IndentWidth;
 
@@ -220,7 +219,21 @@ pub struct LinterSettings {
     pub per_file_ignores: CompiledPerFileIgnoreList,
     pub fix_safety: FixSafetyTable,
 
-    pub target_version: PythonVersion,
+    /// The non-path-resolved Python version specified by the `target-version` input option.
+    ///
+    /// If you have a `Checker` available, see its `target_version` method instead.
+    ///
+    /// Otherwise, see [`LinterSettings::resolve_target_version`] for a way to obtain the Python
+    /// version for a given file, while respecting the overrides in `per_file_target_version`.
+    pub unresolved_target_version: PythonVersion,
+    /// Path-specific overrides to `unresolved_target_version`.
+    ///
+    /// If you have a `Checker` available, see its `target_version` method instead.
+    ///
+    /// Otherwise, see [`LinterSettings::resolve_target_version`] for a way to check a given
+    /// [`Path`] against these patterns, while falling back to `unresolved_target_version` if none
+    /// of them match.
+    pub per_file_target_version: CompiledPerFileTargetVersionList,
     pub preview: PreviewMode,
     pub explicit_preview_rules: bool,
 
@@ -282,7 +295,8 @@ impl Display for LinterSettings {
                 self.per_file_ignores,
                 self.fix_safety | nested,
 
-                self.target_version | debug,
+                self.unresolved_target_version,
+                self.per_file_target_version,
                 self.preview,
                 self.explicit_preview_rules,
                 self.extension | debug,
@@ -362,7 +376,7 @@ impl LinterSettings {
     pub fn for_rule(rule_code: Rule) -> Self {
         Self {
             rules: RuleTable::from_iter([rule_code]),
-            target_version: PythonVersion::latest(),
+            unresolved_target_version: PythonVersion::latest(),
             ..Self::default()
         }
     }
@@ -370,7 +384,7 @@ impl LinterSettings {
     pub fn for_rules(rules: impl IntoIterator<Item = Rule>) -> Self {
         Self {
             rules: RuleTable::from_iter(rules),
-            target_version: PythonVersion::latest(),
+            unresolved_target_version: PythonVersion::latest(),
             ..Self::default()
         }
     }
@@ -378,7 +392,8 @@ impl LinterSettings {
     pub fn new(project_root: &Path) -> Self {
         Self {
             exclude: FilePatternSet::default(),
-            target_version: PythonVersion::default(),
+            unresolved_target_version: PythonVersion::default(),
+            per_file_target_version: CompiledPerFileTargetVersionList::default(),
             project_root: project_root.to_path_buf(),
             rules: DEFAULT_SELECTORS
                 .iter()
@@ -398,7 +413,7 @@ impl LinterSettings {
             per_file_ignores: CompiledPerFileIgnoreList::default(),
             fix_safety: FixSafetyTable::default(),
 
-            src: vec![path_dedot::CWD.clone(), path_dedot::CWD.join("src")],
+            src: vec![fs::get_cwd().to_path_buf(), fs::get_cwd().join("src")],
             // Needs duplicating
             tab_size: IndentWidth::default(),
             line_length: LineLength::default(),
@@ -440,13 +455,24 @@ impl LinterSettings {
 
     #[must_use]
     pub fn with_target_version(mut self, target_version: PythonVersion) -> Self {
-        self.target_version = target_version;
+        self.unresolved_target_version = target_version;
         self
+    }
+
+    /// Resolve the [`PythonVersion`] to use for linting.
+    ///
+    /// This method respects the per-file version overrides in
+    /// [`LinterSettings::per_file_target_version`] and falls back on
+    /// [`LinterSettings::unresolved_target_version`] if none of the override patterns match.
+    pub fn resolve_target_version(&self, path: &Path) -> PythonVersion {
+        self.per_file_target_version
+            .is_match(path)
+            .unwrap_or(self.unresolved_target_version)
     }
 }
 
 impl Default for LinterSettings {
     fn default() -> Self {
-        Self::new(path_dedot::CWD.as_path())
+        Self::new(fs::get_cwd())
     }
 }

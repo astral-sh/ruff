@@ -1,12 +1,12 @@
 import sys
-from _hashlib import HASH as _HashlibHash
+from _hashlib import _HashObject
 from _typeshed import ReadableBuffer, SizedBuffer
 from collections.abc import Callable
 from types import ModuleType
 from typing import AnyStr, overload
 from typing_extensions import TypeAlias
 
-_DigestMod: TypeAlias = str | Callable[[], _HashlibHash] | ModuleType
+_DigestMod: TypeAlias = str | Callable[[], _HashObject] | ModuleType
 
 trans_5C: bytes
 trans_36: bytes

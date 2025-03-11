@@ -24,7 +24,7 @@ use ruff_linter::{
 use ruff_notebook::Notebook;
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
-use ruff_python_parser::ParseError;
+use ruff_python_parser::{ParseError, ParseOptions, UnsupportedSyntaxError};
 use ruff_source_file::LineIndex;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -94,8 +94,18 @@ pub(crate) fn check(
 
     let source_type = query.source_type();
 
+    let target_version = if let Some(path) = &document_path {
+        settings.linter.resolve_target_version(path)
+    } else {
+        settings.linter.unresolved_target_version
+    };
+
+    let parse_options = ParseOptions::from(source_type).with_target_version(target_version);
+
     // Parse once.
-    let parsed = ruff_python_parser::parse_unchecked_source(source_kind.source_code(), source_type);
+    let parsed = ruff_python_parser::parse_unchecked(source_kind.source_code(), parse_options)
+        .try_into_module()
+        .expect("PySourceType always parses to a ModModule");
 
     // Map row and column locations to byte slices (lazily).
     let locator = Locator::new(source_kind.source_code());
@@ -122,6 +132,7 @@ pub(crate) fn check(
         &source_kind,
         source_type,
         &parsed,
+        target_version,
     );
 
     let noqa_edits = generate_noqa_edits(
@@ -161,17 +172,34 @@ pub(crate) fn check(
             )
         });
 
+    let unsupported_syntax_errors = if settings.linter.preview.is_enabled() {
+        parsed.unsupported_syntax_errors()
+    } else {
+        &[]
+    };
+
     let lsp_diagnostics = lsp_diagnostics.chain(
         show_syntax_errors
             .then(|| {
-                parsed.errors().iter().map(|parse_error| {
-                    parse_error_to_lsp_diagnostic(
-                        parse_error,
-                        &source_kind,
-                        locator.to_index(),
-                        encoding,
-                    )
-                })
+                parsed
+                    .errors()
+                    .iter()
+                    .map(|parse_error| {
+                        parse_error_to_lsp_diagnostic(
+                            parse_error,
+                            &source_kind,
+                            locator.to_index(),
+                            encoding,
+                        )
+                    })
+                    .chain(unsupported_syntax_errors.iter().map(|error| {
+                        unsupported_syntax_error_to_lsp_diagnostic(
+                            error,
+                            &source_kind,
+                            locator.to_index(),
+                            encoding,
+                        )
+                    }))
             })
             .into_iter()
             .flatten(),
@@ -350,6 +378,45 @@ fn parse_error_to_lsp_diagnostic(
     )
 }
 
+fn unsupported_syntax_error_to_lsp_diagnostic(
+    unsupported_syntax_error: &UnsupportedSyntaxError,
+    source_kind: &SourceKind,
+    index: &LineIndex,
+    encoding: PositionEncoding,
+) -> (usize, lsp_types::Diagnostic) {
+    let range: lsp_types::Range;
+    let cell: usize;
+
+    if let Some(notebook_index) = source_kind.as_ipy_notebook().map(Notebook::index) {
+        NotebookRange { cell, range } = unsupported_syntax_error.range.to_notebook_range(
+            source_kind.source_code(),
+            index,
+            notebook_index,
+            encoding,
+        );
+    } else {
+        cell = usize::default();
+        range = unsupported_syntax_error
+            .range
+            .to_range(source_kind.source_code(), index, encoding);
+    }
+
+    (
+        cell,
+        lsp_types::Diagnostic {
+            range,
+            severity: Some(lsp_types::DiagnosticSeverity::ERROR),
+            tags: None,
+            code: None,
+            code_description: None,
+            source: Some(DIAGNOSTIC_NAME.into()),
+            message: format!("SyntaxError: {unsupported_syntax_error}"),
+            related_information: None,
+            data: None,
+        },
+    )
+}
+
 fn diagnostic_edit_range(
     range: TextRange,
     source_kind: &SourceKind,
@@ -378,7 +445,8 @@ fn tags(code: &str) -> Option<Vec<lsp_types::DiagnosticTag>> {
     match code {
         // F401: <module> imported but unused
         // F841: local variable <name> is assigned to but never used
-        "F401" | "F841" => Some(vec![lsp_types::DiagnosticTag::UNNECESSARY]),
+        // RUF059: Unused unpacked variable
+        "F401" | "F841" | "RUF059" => Some(vec![lsp_types::DiagnosticTag::UNNECESSARY]),
         _ => None,
     }
 }

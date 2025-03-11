@@ -1,4 +1,5 @@
 use std::fmt::Formatter;
+use std::str::FromStr;
 use std::sync::Arc;
 
 use ruff_db::files::File;
@@ -98,10 +99,13 @@ impl ModuleKind {
 }
 
 /// Enumeration of various core stdlib modules in which important types are located
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, strum_macros::EnumString)]
+#[cfg_attr(test, derive(strum_macros::EnumIter))]
+#[strum(serialize_all = "snake_case")]
 pub enum KnownModule {
     Builtins,
     Types,
+    #[strum(serialize = "_typeshed")]
     Typeshed,
     TypingExtensions,
     Typing,
@@ -109,6 +113,7 @@ pub enum KnownModule {
     #[allow(dead_code)]
     Abc, // currently only used in tests
     Collections,
+    Inspect,
     KnotExtensions,
 }
 
@@ -123,6 +128,7 @@ impl KnownModule {
             Self::Sys => "sys",
             Self::Abc => "abc",
             Self::Collections => "collections",
+            Self::Inspect => "inspect",
             Self::KnotExtensions => "knot_extensions",
         }
     }
@@ -137,20 +143,10 @@ impl KnownModule {
         search_path: &SearchPath,
         name: &ModuleName,
     ) -> Option<Self> {
-        if !search_path.is_standard_library() {
-            return None;
-        }
-        match name.as_str() {
-            "builtins" => Some(Self::Builtins),
-            "types" => Some(Self::Types),
-            "typing" => Some(Self::Typing),
-            "_typeshed" => Some(Self::Typeshed),
-            "typing_extensions" => Some(Self::TypingExtensions),
-            "sys" => Some(Self::Sys),
-            "abc" => Some(Self::Abc),
-            "collections" => Some(Self::Collections),
-            "knot_extensions" => Some(Self::KnotExtensions),
-            _ => None,
+        if search_path.is_standard_library() {
+            Self::from_str(name.as_str()).ok()
+        } else {
+            None
         }
     }
 
@@ -164,5 +160,30 @@ impl KnownModule {
 
     pub const fn is_knot_extensions(self) -> bool {
         matches!(self, Self::KnotExtensions)
+    }
+
+    pub const fn is_inspect(self) -> bool {
+        matches!(self, Self::Inspect)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use strum::IntoEnumIterator;
+
+    #[test]
+    fn known_module_roundtrip_from_str() {
+        let stdlib_search_path = SearchPath::vendored_stdlib();
+
+        for module in KnownModule::iter() {
+            let module_name = module.name();
+
+            assert_eq!(
+                KnownModule::try_from_search_path_and_name(&stdlib_search_path, &module_name),
+                Some(module),
+                "The strum `EnumString` implementation appears to be incorrect for `{module_name}`"
+            );
+        }
     }
 }

@@ -7,7 +7,7 @@ use ruff_notebook::{Notebook, NotebookError};
 
 use crate::system::{
     DirectoryEntry, FileType, GlobError, GlobErrorKind, Metadata, Result, System, SystemPath,
-    SystemPathBuf, SystemVirtualPath,
+    SystemPathBuf, SystemVirtualPath, WritableSystem,
 };
 
 use super::walk_directory::{
@@ -24,6 +24,11 @@ pub struct OsSystem {
 #[derive(Default, Debug)]
 struct OsSystemInner {
     cwd: SystemPathBuf,
+
+    /// Overrides the user's configuration directory for testing.
+    /// This is an `Option<Option<..>>` to allow setting an override of `None`.
+    #[cfg(feature = "testing")]
+    user_config_directory_override: std::sync::Mutex<Option<Option<SystemPathBuf>>>,
 }
 
 impl OsSystem {
@@ -32,8 +37,11 @@ impl OsSystem {
         assert!(cwd.as_utf8_path().is_absolute());
 
         Self {
+            // Spreading `..Default` because it isn't possible to feature gate the initializer of a single field.
+            #[allow(clippy::needless_update)]
             inner: Arc::new(OsSystemInner {
                 cwd: cwd.to_path_buf(),
+                ..Default::default()
             }),
         }
     }
@@ -100,6 +108,15 @@ impl System for OsSystem {
 
     #[cfg(not(target_arch = "wasm32"))]
     fn user_config_directory(&self) -> Option<SystemPathBuf> {
+        // In testing, we allow overriding the user configuration directory by using a
+        // thread local because overriding the environment variables breaks test isolation
+        // (tests run concurrently) and mutating environment variable in a multithreaded
+        // application is inherently unsafe.
+        #[cfg(feature = "testing")]
+        if let Ok(directory_override) = self.try_get_user_config_directory_override() {
+            return directory_override;
+        }
+
         use etcetera::BaseStrategy as _;
 
         let strategy = etcetera::base_strategy::choose_base_strategy().ok()?;
@@ -110,6 +127,11 @@ impl System for OsSystem {
     //   `os` feature enabled (via `ruff_workspace` -> `ruff_graph` -> `ruff_db`).
     #[cfg(target_arch = "wasm32")]
     fn user_config_directory(&self) -> Option<SystemPathBuf> {
+        #[cfg(feature = "testing")]
+        if let Ok(directory_override) = self.try_get_user_config_directory_override() {
+            return directory_override;
+        }
+
         None
     }
 
@@ -166,6 +188,16 @@ impl System for OsSystem {
                 file_type: file_type.into(),
             })
         })))
+    }
+}
+
+impl WritableSystem for OsSystem {
+    fn write_file(&self, path: &SystemPath, content: &str) -> Result<()> {
+        std::fs::write(path.as_std_path(), content)
+    }
+
+    fn create_directory_all(&self, path: &SystemPath) -> Result<()> {
+        std::fs::create_dir_all(path.as_std_path())
     }
 }
 
@@ -334,6 +366,64 @@ impl From<WalkState> for ignore::WalkState {
 
 fn not_found() -> std::io::Error {
     std::io::Error::new(std::io::ErrorKind::NotFound, "No such file or directory")
+}
+
+#[cfg(feature = "testing")]
+pub(super) mod testing {
+
+    use crate::system::{OsSystem, SystemPathBuf};
+
+    impl OsSystem {
+        /// Overrides the user configuration directory for the current scope
+        /// (for as long as the returned override is not dropped).
+        pub fn with_user_config_directory(
+            &self,
+            directory: Option<SystemPathBuf>,
+        ) -> UserConfigDirectoryOverrideGuard {
+            let mut directory_override = self.inner.user_config_directory_override.lock().unwrap();
+            let previous = directory_override.replace(directory);
+
+            UserConfigDirectoryOverrideGuard {
+                previous,
+                system: self.clone(),
+            }
+        }
+
+        /// Returns [`Ok`] if any override is set and [`Err`] otherwise.
+        pub(super) fn try_get_user_config_directory_override(
+            &self,
+        ) -> Result<Option<SystemPathBuf>, ()> {
+            let directory_override = self.inner.user_config_directory_override.lock().unwrap();
+            match directory_override.as_ref() {
+                Some(directory_override) => Ok(directory_override.clone()),
+                None => Err(()),
+            }
+        }
+    }
+
+    /// A scoped override of the [user's configuration directory](crate::System::user_config_directory) for the [`OsSystem`].
+    ///
+    /// Prefer overriding the user's configuration directory for tests that require
+    /// spawning a new process (e.g. CLI tests) by setting the `APPDATA` (windows)
+    /// or `XDG_CONFIG_HOME` (unix and other platforms) environment variables.
+    /// For example, by setting the environment variables when invoking the CLI with insta.
+    ///
+    /// Requires the `testing` feature.
+    #[must_use]
+    pub struct UserConfigDirectoryOverrideGuard {
+        previous: Option<Option<SystemPathBuf>>,
+        system: OsSystem,
+    }
+
+    impl Drop for UserConfigDirectoryOverrideGuard {
+        fn drop(&mut self) {
+            if let Ok(mut directory_override) =
+                self.system.inner.user_config_directory_override.try_lock()
+            {
+                *directory_override = self.previous.take();
+            }
+        }
+    }
 }
 
 #[cfg(test)]

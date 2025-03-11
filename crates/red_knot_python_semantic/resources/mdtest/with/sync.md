@@ -45,7 +45,7 @@ def _(flag: bool):
 ```py
 class Manager: ...
 
-# error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it doesn't implement `__enter__` and `__exit__`"
+# error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it does not implement `__enter__` and `__exit__`"
 with Manager():
     ...
 ```
@@ -56,7 +56,7 @@ with Manager():
 class Manager:
     def __exit__(self, exc_tpe, exc_value, traceback): ...
 
-# error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it doesn't implement `__enter__`"
+# error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it does not implement `__enter__`"
 with Manager():
     ...
 ```
@@ -67,7 +67,7 @@ with Manager():
 class Manager:
     def __enter__(self): ...
 
-# error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it doesn't implement `__exit__`"
+# error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it does not implement `__exit__`"
 with Manager():
     ...
 ```
@@ -80,7 +80,7 @@ class Manager:
 
     def __exit__(self, exc_tpe, exc_value, traceback): ...
 
-# error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because the method `__enter__` of type `int` is not callable"
+# error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it does not correctly implement `__enter__`"
 with Manager():
     ...
 ```
@@ -95,7 +95,7 @@ class Manager:
 
     __exit__: int = 32
 
-# error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because the method `__exit__` of type `int` is not callable"
+# error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it does not correctly implement `__exit__`"
 with Manager():
     ...
 ```
@@ -113,8 +113,7 @@ def _(flag: bool):
     class NotAContextManager: ...
     context_expr = Manager1() if flag else NotAContextManager()
 
-    # error: [invalid-context-manager] "Object of type `Manager1 | NotAContextManager` cannot be used with `with` because the method `__enter__` is possibly unbound"
-    # error: [invalid-context-manager] "Object of type `Manager1 | NotAContextManager` cannot be used with `with` because the method `__exit__` is possibly unbound"
+    # error: [invalid-context-manager] "Object of type `Manager1 | NotAContextManager` cannot be used with `with` because the methods `__enter__` and `__exit__` are possibly unbound"
     with context_expr as f:
         reveal_type(f)  # revealed: str
 ```
@@ -133,4 +132,20 @@ def _(flag: bool):
     # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because the method `__enter__` is possibly unbound"
     with Manager() as f:
         reveal_type(f)  # revealed: str
+```
+
+## Invalid `__enter__` signature
+
+```py
+class Manager:
+    def __enter__() -> str:
+        return "foo"
+
+    def __exit__(self, exc_type, exc_value, traceback): ...
+
+context_expr = Manager()
+
+# error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it does not correctly implement `__enter__`"
+with context_expr as f:
+    reveal_type(f)  # revealed: str
 ```

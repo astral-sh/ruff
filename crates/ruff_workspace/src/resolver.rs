@@ -7,8 +7,8 @@ use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::sync::RwLock;
 
-use anyhow::Result;
 use anyhow::{anyhow, bail};
+use anyhow::{Context, Result};
 use globset::{Candidate, GlobSet};
 use ignore::{DirEntry, Error, ParallelVisitor, WalkBuilder, WalkState};
 use itertools::Itertools;
@@ -304,16 +304,39 @@ pub fn resolve_configuration(
     relativity: Relativity,
     transformer: &dyn ConfigurationTransformer,
 ) -> Result<Configuration> {
-    let mut seen = FxHashSet::default();
-    let mut stack = vec![];
+    let mut configurations = indexmap::IndexMap::new();
     let mut next = Some(fs::normalize_path(pyproject));
     while let Some(path) = next {
-        if seen.contains(&path) {
-            bail!("Circular dependency detected in pyproject.toml");
+        if configurations.contains_key(&path) {
+            bail!(format!(
+                "Circular configuration detected: {chain}",
+                chain = configurations
+                    .keys()
+                    .chain([&path])
+                    .map(|p| format!("`{}`", p.display()))
+                    .join(" extends "),
+            ));
         }
 
         // Resolve the current path.
-        let options = pyproject::load_options(&path)?;
+        let options = pyproject::load_options(&path).with_context(|| {
+            if configurations.is_empty() {
+                format!(
+                    "Failed to load configuration `{path}`",
+                    path = path.display()
+                )
+            } else {
+                let chain = configurations
+                    .keys()
+                    .chain([&path])
+                    .map(|p| format!("`{}`", p.display()))
+                    .join(" extends ");
+                format!(
+                    "Failed to load extended configuration `{path}` ({chain})",
+                    path = path.display()
+                )
+            }
+        })?;
 
         let project_root = relativity.resolve(&path);
         let configuration = Configuration::from_options(options, Some(&path), project_root)?;
@@ -329,14 +352,13 @@ pub fn resolve_configuration(
 
         // Keep track of (1) the paths we've already resolved (to avoid cycles), and (2)
         // the base configuration for every path.
-        seen.insert(path);
-        stack.push(configuration);
+        configurations.insert(path, configuration);
     }
 
     // Merge the configurations, in order.
-    stack.reverse();
-    let mut configuration = stack.pop().unwrap();
-    while let Some(extend) = stack.pop() {
+    let mut configurations = configurations.into_values();
+    let mut configuration = configurations.next().unwrap();
+    for extend in configurations {
         configuration = configuration.combine(extend);
     }
     Ok(transformer.transform(configuration))
@@ -566,7 +588,7 @@ impl ParallelVisitor for PythonFilesVisitor<'_, '_> {
         match result {
             Ok(entry) => {
                 // Ignore directories
-                let resolved = if entry.file_type().map_or(true, |ft| ft.is_dir()) {
+                let resolved = if entry.file_type().is_none_or(|ft| ft.is_dir()) {
                     None
                 } else if entry.depth() == 0 {
                     // Accept all files that are passed-in directly.
@@ -855,7 +877,7 @@ mod tests {
     use path_absolutize::Absolutize;
     use tempfile::TempDir;
 
-    use ruff_linter::settings::types::FilePattern;
+    use ruff_linter::settings::types::{FilePattern, GlobPath};
 
     use crate::configuration::Configuration;
     use crate::pyproject::find_settings_toml;
@@ -950,13 +972,8 @@ mod tests {
         let project_root = Path::new("/tmp/");
 
         let path = Path::new("foo").absolutize_from(project_root).unwrap();
-        let exclude = FilePattern::User(
-            "foo".to_string(),
-            Path::new("foo")
-                .absolutize_from(project_root)
-                .unwrap()
-                .to_path_buf(),
-        );
+        let exclude =
+            FilePattern::User("foo".to_string(), GlobPath::normalize("foo", project_root));
         let file_path = &path;
         let file_basename = path.file_name().unwrap();
         assert!(match_exclusion(
@@ -966,13 +983,8 @@ mod tests {
         ));
 
         let path = Path::new("foo/bar").absolutize_from(project_root).unwrap();
-        let exclude = FilePattern::User(
-            "bar".to_string(),
-            Path::new("bar")
-                .absolutize_from(project_root)
-                .unwrap()
-                .to_path_buf(),
-        );
+        let exclude =
+            FilePattern::User("bar".to_string(), GlobPath::normalize("bar", project_root));
         let file_path = &path;
         let file_basename = path.file_name().unwrap();
         assert!(match_exclusion(
@@ -986,10 +998,7 @@ mod tests {
             .unwrap();
         let exclude = FilePattern::User(
             "baz.py".to_string(),
-            Path::new("baz.py")
-                .absolutize_from(project_root)
-                .unwrap()
-                .to_path_buf(),
+            GlobPath::normalize("baz.py", project_root),
         );
         let file_path = &path;
         let file_basename = path.file_name().unwrap();
@@ -1002,10 +1011,7 @@ mod tests {
         let path = Path::new("foo/bar").absolutize_from(project_root).unwrap();
         let exclude = FilePattern::User(
             "foo/bar".to_string(),
-            Path::new("foo/bar")
-                .absolutize_from(project_root)
-                .unwrap()
-                .to_path_buf(),
+            GlobPath::normalize("foo/bar", project_root),
         );
         let file_path = &path;
         let file_basename = path.file_name().unwrap();
@@ -1020,10 +1026,7 @@ mod tests {
             .unwrap();
         let exclude = FilePattern::User(
             "foo/bar/baz.py".to_string(),
-            Path::new("foo/bar/baz.py")
-                .absolutize_from(project_root)
-                .unwrap()
-                .to_path_buf(),
+            GlobPath::normalize("foo/bar/baz.py", project_root),
         );
         let file_path = &path;
         let file_basename = path.file_name().unwrap();
@@ -1038,10 +1041,7 @@ mod tests {
             .unwrap();
         let exclude = FilePattern::User(
             "foo/bar/*.py".to_string(),
-            Path::new("foo/bar/*.py")
-                .absolutize_from(project_root)
-                .unwrap()
-                .to_path_buf(),
+            GlobPath::normalize("foo/bar/*.py", project_root),
         );
         let file_path = &path;
         let file_basename = path.file_name().unwrap();
@@ -1054,13 +1054,8 @@ mod tests {
         let path = Path::new("foo/bar/baz.py")
             .absolutize_from(project_root)
             .unwrap();
-        let exclude = FilePattern::User(
-            "baz".to_string(),
-            Path::new("baz")
-                .absolutize_from(project_root)
-                .unwrap()
-                .to_path_buf(),
-        );
+        let exclude =
+            FilePattern::User("baz".to_string(), GlobPath::normalize("baz", project_root));
         let file_path = &path;
         let file_basename = path.file_name().unwrap();
         assert!(!match_exclusion(

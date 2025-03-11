@@ -72,7 +72,7 @@ fn build_fstring(joiner: &str, joinees: &[Expr], flags: FStringFlags) -> Option<
                     if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = expr {
                         if flags.is_none() {
                             // take the flags from the first Expr
-                            flags = Some(value.flags());
+                            flags = Some(value.first_literal_flags());
                         }
                         Some(value.to_str())
                     } else {

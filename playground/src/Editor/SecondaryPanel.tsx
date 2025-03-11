@@ -34,7 +34,7 @@ export default function SecondaryPanel({
 }: SecondaryPanelProps) {
   return (
     <div className="flex flex-col h-full">
-      <div className="flex-grow">
+      <div className="grow">
         <Content
           tool={tool}
           result={result}

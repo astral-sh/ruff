@@ -5,8 +5,10 @@ use crate::types::diagnostic::{
     TOO_MANY_POSITIONAL_ARGUMENTS, UNKNOWN_ARGUMENT,
 };
 use crate::types::signatures::Parameter;
-use crate::types::UnionType;
+use crate::types::{todo_type, CallableType, UnionType};
+use ruff_db::diagnostic::{OldSecondaryDiagnosticMessage, Span};
 use ruff_python_ast as ast;
+use ruff_text_size::Ranged;
 
 /// Bind a [`CallArguments`] against a callable [`Signature`].
 ///
@@ -16,7 +18,7 @@ pub(crate) fn bind_call<'db>(
     db: &'db dyn Db,
     arguments: &CallArguments<'_, 'db>,
     signature: &Signature<'db>,
-    callable_ty: Option<Type<'db>>,
+    callable_ty: Type<'db>,
 ) -> CallBinding<'db> {
     let parameters = signature.parameters();
     // The type assigned to each parameter at this call site.
@@ -135,10 +137,17 @@ pub(crate) fn bind_call<'db>(
     }
 }
 
+/// Describes a callable for the purposes of diagnostics.
+#[derive(Debug)]
+pub(crate) struct CallableDescriptor<'a> {
+    name: &'a str,
+    kind: &'a str,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct CallBinding<'db> {
     /// Type of the callable object (function, class...)
-    callable_ty: Option<Type<'db>>,
+    callable_ty: Type<'db>,
 
     /// Return type of the call.
     return_ty: Type<'db>,
@@ -154,11 +163,15 @@ impl<'db> CallBinding<'db> {
     // TODO remove this constructor and construct always from `bind_call`
     pub(crate) fn from_return_type(return_ty: Type<'db>) -> Self {
         Self {
-            callable_ty: None,
+            callable_ty: todo_type!("CallBinding::from_return_type"),
             return_ty,
             parameter_tys: Box::default(),
             errors: vec![],
         }
+    }
+
+    pub(crate) fn callable_type(&self) -> Type<'db> {
+        self.callable_ty
     }
 
     pub(crate) fn set_return_type(&mut self, return_ty: Type<'db>) {
@@ -187,19 +200,55 @@ impl<'db> CallBinding<'db> {
         }
     }
 
-    fn callable_name(&self, db: &'db dyn Db) -> Option<&str> {
-        match self.callable_ty {
-            Some(Type::FunctionLiteral(function)) => Some(function.name(db)),
-            Some(Type::ClassLiteral(class_type)) => Some(class_type.class.name(db)),
+    pub(crate) fn three_parameter_types(&self) -> Option<(Type<'db>, Type<'db>, Type<'db>)> {
+        match self.parameter_types() {
+            [first, second, third] => Some((*first, *second, *third)),
             _ => None,
         }
     }
 
-    pub(super) fn report_diagnostics(&self, context: &InferContext<'db>, node: ast::AnyNodeRef) {
-        let callable_name = self.callable_name(context.db());
-        for error in &self.errors {
-            error.report_diagnostic(context, node, callable_name);
+    fn callable_descriptor(&self, db: &'db dyn Db) -> Option<CallableDescriptor> {
+        match self.callable_ty {
+            Type::FunctionLiteral(function) => Some(CallableDescriptor {
+                kind: "function",
+                name: function.name(db),
+            }),
+            Type::ClassLiteral(class_type) => Some(CallableDescriptor {
+                kind: "class",
+                name: class_type.class().name(db),
+            }),
+            Type::Callable(CallableType::BoundMethod(bound_method)) => Some(CallableDescriptor {
+                kind: "bound method",
+                name: bound_method.function(db).name(db),
+            }),
+            Type::Callable(CallableType::MethodWrapperDunderGet(function)) => {
+                Some(CallableDescriptor {
+                    kind: "method wrapper `__get__` of function",
+                    name: function.name(db),
+                })
+            }
+            Type::Callable(CallableType::WrapperDescriptorDunderGet) => Some(CallableDescriptor {
+                kind: "wrapper descriptor",
+                name: "FunctionType.__get__",
+            }),
+            _ => None,
         }
+    }
+
+    pub(crate) fn report_diagnostics(&self, context: &InferContext<'db>, node: ast::AnyNodeRef) {
+        let callable_descriptor = self.callable_descriptor(context.db());
+        for error in &self.errors {
+            error.report_diagnostic(
+                context,
+                node,
+                self.callable_ty,
+                callable_descriptor.as_ref(),
+            );
+        }
+    }
+
+    pub(crate) fn has_binding_errors(&self) -> bool {
+        !self.errors.is_empty()
     }
 }
 
@@ -287,11 +336,46 @@ pub(crate) enum CallBindingError<'db> {
 }
 
 impl<'db> CallBindingError<'db> {
+    fn parameter_span_from_index(
+        db: &'db dyn Db,
+        callable_ty: Type<'db>,
+        parameter_index: usize,
+    ) -> Option<Span> {
+        match callable_ty {
+            Type::FunctionLiteral(function) => {
+                let function_scope = function.body_scope(db);
+                let mut span = Span::from(function_scope.file(db));
+                let node = function_scope.node(db);
+                if let Some(func_def) = node.as_function() {
+                    let range = func_def
+                        .parameters
+                        .iter()
+                        .nth(parameter_index)
+                        .map(|param| param.range())
+                        .unwrap_or(func_def.parameters.range);
+                    span = span.with_range(range);
+                    Some(span)
+                } else {
+                    None
+                }
+            }
+            Type::Callable(CallableType::BoundMethod(bound_method)) => {
+                Self::parameter_span_from_index(
+                    db,
+                    Type::FunctionLiteral(bound_method.function(db)),
+                    parameter_index,
+                )
+            }
+            _ => None,
+        }
+    }
+
     pub(super) fn report_diagnostic(
         &self,
         context: &InferContext<'db>,
         node: ast::AnyNodeRef,
-        callable_name: Option<&str>,
+        callable_ty: Type<'db>,
+        callable_descriptor: Option<&CallableDescriptor>,
     ) {
         match self {
             Self::InvalidArgumentType {
@@ -300,20 +384,31 @@ impl<'db> CallBindingError<'db> {
                 expected_ty,
                 provided_ty,
             } => {
+                let mut messages = vec![];
+                if let Some(span) =
+                    Self::parameter_span_from_index(context.db(), callable_ty, parameter.index)
+                {
+                    messages.push(OldSecondaryDiagnosticMessage::new(
+                        span,
+                        "parameter declared in function definition here",
+                    ));
+                }
+
                 let provided_ty_display = provided_ty.display(context.db());
                 let expected_ty_display = expected_ty.display(context.db());
-                context.report_lint(
+                context.report_lint_with_secondary_messages(
                     &INVALID_ARGUMENT_TYPE,
                     Self::get_node(node, *argument_index),
                     format_args!(
                         "Object of type `{provided_ty_display}` cannot be assigned to \
                         parameter {parameter}{}; expected type `{expected_ty_display}`",
-                        if let Some(callable_name) = callable_name {
-                            format!(" of function `{callable_name}`")
+                        if let Some(CallableDescriptor { kind, name }) = callable_descriptor {
+                            format!(" of {kind} `{name}`")
                         } else {
                             String::new()
                         }
                     ),
+                    messages,
                 );
             }
 
@@ -328,8 +423,8 @@ impl<'db> CallBindingError<'db> {
                     format_args!(
                         "Too many positional arguments{}: expected \
                         {expected_positional_count}, got {provided_positional_count}",
-                        if let Some(callable_name) = callable_name {
-                            format!(" to function `{callable_name}`")
+                        if let Some(CallableDescriptor { kind, name }) = callable_descriptor {
+                            format!(" to {kind} `{name}`")
                         } else {
                             String::new()
                         }
@@ -344,8 +439,8 @@ impl<'db> CallBindingError<'db> {
                     node,
                     format_args!(
                         "No argument{s} provided for required parameter{s} {parameters}{}",
-                        if let Some(callable_name) = callable_name {
-                            format!(" of function `{callable_name}`")
+                        if let Some(CallableDescriptor { kind, name }) = callable_descriptor {
+                            format!(" of {kind} `{name}`")
                         } else {
                             String::new()
                         }
@@ -362,8 +457,8 @@ impl<'db> CallBindingError<'db> {
                     Self::get_node(node, *argument_index),
                     format_args!(
                         "Argument `{argument_name}` does not match any known parameter{}",
-                        if let Some(callable_name) = callable_name {
-                            format!(" of function `{callable_name}`")
+                        if let Some(CallableDescriptor { kind, name }) = callable_descriptor {
+                            format!(" of {kind} `{name}`")
                         } else {
                             String::new()
                         }
@@ -380,8 +475,8 @@ impl<'db> CallBindingError<'db> {
                     Self::get_node(node, *argument_index),
                     format_args!(
                         "Multiple values provided for parameter {parameter}{}",
-                        if let Some(callable_name) = callable_name {
-                            format!(" of function `{callable_name}`")
+                        if let Some(CallableDescriptor { kind, name }) = callable_descriptor {
+                            format!(" of {kind} `{name}`")
                         } else {
                             String::new()
                         }

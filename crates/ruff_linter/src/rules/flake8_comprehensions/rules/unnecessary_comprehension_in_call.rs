@@ -41,7 +41,7 @@ use crate::rules::flake8_comprehensions::fixes;
 /// short-circuiting it may not improve performance. (It may even slightly regress performance,
 /// though the difference will usually be small.)
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// any([x.id for x in bar])
 /// all([x.id for x in bar])

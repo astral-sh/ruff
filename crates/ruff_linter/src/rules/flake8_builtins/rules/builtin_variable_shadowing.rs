@@ -59,11 +59,20 @@ impl Violation for BuiltinVariableShadowing {
 
 /// A001
 pub(crate) fn builtin_variable_shadowing(checker: &Checker, name: &str, range: TextRange) {
+    // These should not report violations as discussed in
+    // https://github.com/astral-sh/ruff/issues/16373
+    if matches!(
+        name,
+        "__doc__" | "__name__" | "__loader__" | "__package__" | "__spec__"
+    ) {
+        return;
+    }
+
     if shadows_builtin(
         name,
         checker.source_type,
         &checker.settings.flake8_builtins.builtins_ignorelist,
-        checker.settings.target_version,
+        checker.target_version(),
     ) {
         checker.report_diagnostic(Diagnostic::new(
             BuiltinVariableShadowing {

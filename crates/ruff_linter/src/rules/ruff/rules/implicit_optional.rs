@@ -12,7 +12,7 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
 
-use crate::settings::types::PythonVersion;
+use ruff_python_ast::PythonVersion;
 
 use super::super::typing::type_hint_explicitly_allows_none;
 
@@ -112,7 +112,7 @@ impl fmt::Display for ConversionType {
 
 impl From<PythonVersion> for ConversionType {
     fn from(target_version: PythonVersion) -> Self {
-        if target_version >= PythonVersion::Py310 {
+        if target_version >= PythonVersion::PY310 {
             Self::BinOpOr
         } else {
             Self::Optional
@@ -177,11 +177,11 @@ pub(crate) fn implicit_optional(checker: &Checker, parameters: &Parameters) {
                 let Some(expr) = type_hint_explicitly_allows_none(
                     parsed_annotation.expression(),
                     checker,
-                    checker.settings.target_version.minor(),
+                    checker.target_version(),
                 ) else {
                     continue;
                 };
-                let conversion_type = checker.settings.target_version.into();
+                let conversion_type = checker.target_version().into();
 
                 let mut diagnostic =
                     Diagnostic::new(ImplicitOptional { conversion_type }, expr.range());
@@ -192,14 +192,12 @@ pub(crate) fn implicit_optional(checker: &Checker, parameters: &Parameters) {
             }
         } else {
             // Unquoted annotation.
-            let Some(expr) = type_hint_explicitly_allows_none(
-                annotation,
-                checker,
-                checker.settings.target_version.minor(),
-            ) else {
+            let Some(expr) =
+                type_hint_explicitly_allows_none(annotation, checker, checker.target_version())
+            else {
                 continue;
             };
-            let conversion_type = checker.settings.target_version.into();
+            let conversion_type = checker.target_version().into();
 
             let mut diagnostic =
                 Diagnostic::new(ImplicitOptional { conversion_type }, expr.range());

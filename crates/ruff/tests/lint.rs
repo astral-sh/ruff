@@ -15,8 +15,8 @@ use tempfile::TempDir;
 const BIN_NAME: &str = "ruff";
 const STDIN_BASE_OPTIONS: &[&str] = &["check", "--no-cache", "--output-format", "concise"];
 
-fn tempdir_filter(tempdir: &TempDir) -> String {
-    format!(r"{}\\?/?", escape(tempdir.path().to_str().unwrap()))
+fn tempdir_filter(path: impl AsRef<Path>) -> String {
+    format!(r"{}\\?/?", escape(path.as_ref().to_str().unwrap()))
 }
 
 #[test]
@@ -610,6 +610,139 @@ fn extend_passed_via_config_argument() {
 }
 
 #[test]
+fn nonexistent_extend_file() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let project_dir = tempdir.path().canonicalize()?;
+    fs::write(
+        project_dir.join("ruff.toml"),
+        r#"
+extend = "ruff2.toml"
+"#,
+    )?;
+
+    fs::write(
+        project_dir.join("ruff2.toml"),
+        r#"
+extend = "ruff3.toml"
+"#,
+    )?;
+
+    insta::with_settings!({
+        filters => vec![
+            (tempdir_filter(&project_dir).as_str(), "[TMP]/"),
+            ("The system cannot find the file specified.", "No such file or directory")
+        ]
+    }, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["check"]).current_dir(project_dir), @r"
+        success: false
+        exit_code: 2
+        ----- stdout -----
+
+        ----- stderr -----
+        ruff failed
+          Cause: Failed to load extended configuration `[TMP]/ruff3.toml` (`[TMP]/ruff.toml` extends `[TMP]/ruff2.toml` extends `[TMP]/ruff3.toml`)
+          Cause: Failed to read [TMP]/ruff3.toml
+          Cause: No such file or directory (os error 2)
+        ");
+    });
+
+    Ok(())
+}
+
+#[test]
+fn circular_extend() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let project_path = tempdir.path().canonicalize()?;
+
+    fs::write(
+        project_path.join("ruff.toml"),
+        r#"
+extend = "ruff2.toml"
+"#,
+    )?;
+    fs::write(
+        project_path.join("ruff2.toml"),
+        r#"
+extend = "ruff3.toml"
+"#,
+    )?;
+    fs::write(
+        project_path.join("ruff3.toml"),
+        r#"
+extend = "ruff.toml"
+"#,
+    )?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&project_path).as_str(), "[TMP]/")]
+    }, {
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args(["check"])
+            .current_dir(project_path),
+        @r"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: Circular configuration detected: `[TMP]/ruff.toml` extends `[TMP]/ruff2.toml` extends `[TMP]/ruff3.toml` extends `[TMP]/ruff.toml`
+    ");
+    });
+
+    Ok(())
+}
+
+#[test]
+fn parse_error_extends() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let project_path = tempdir.path().canonicalize()?;
+
+    fs::write(
+        project_path.join("ruff.toml"),
+        r#"
+extend = "ruff2.toml"
+"#,
+    )?;
+    fs::write(
+        project_path.join("ruff2.toml"),
+        r#"
+[lint]
+select = [E501]
+"#,
+    )?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&project_path).as_str(), "[TMP]/")]
+    }, {
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args(["check"])
+            .current_dir(project_path),
+        @r"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: Failed to load extended configuration `[TMP]/ruff2.toml` (`[TMP]/ruff.toml` extends `[TMP]/ruff2.toml`)
+      Cause: Failed to parse [TMP]/ruff2.toml
+      Cause: TOML parse error at line 3, column 11
+      |
+    3 | select = [E501]
+      |           ^
+    invalid array
+    expected `]`
+    ");
+    });
+
+    Ok(())
+}
+
+#[test]
 fn config_file_and_isolated() -> Result<()> {
     let tempdir = TempDir::new()?;
     let ruff_dot_toml = tempdir.path().join("ruff.toml");
@@ -1019,6 +1152,22 @@ include = ["*.ipy"]
     });
 
     Ok(())
+}
+
+#[test]
+fn warn_invalid_noqa_with_no_diagnostics() {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--isolated"])
+        .arg("--select")
+        .arg("F401")
+        .arg("-")
+        .pass_stdin(
+            r#"
+# ruff: noqa: AAA101
+print("Hello world!")
+"#
+        ));
 }
 
 #[test]
@@ -2079,6 +2228,7 @@ fn flake8_import_convention_invalid_aliases_config_alias_name() -> Result<()> {
 
         ----- stderr -----
         ruff failed
+          Cause: Failed to load configuration `[TMP]/ruff.toml`
           Cause: Failed to parse [TMP]/ruff.toml
           Cause: TOML parse error at line 3, column 17
           |
@@ -2115,6 +2265,7 @@ fn flake8_import_convention_invalid_aliases_config_extend_alias_name() -> Result
 
         ----- stderr -----
         ruff failed
+          Cause: Failed to load configuration `[TMP]/ruff.toml`
           Cause: Failed to parse [TMP]/ruff.toml
           Cause: TOML parse error at line 3, column 17
           |
@@ -2151,6 +2302,7 @@ fn flake8_import_convention_invalid_aliases_config_module_name() -> Result<()> {
 
         ----- stderr -----
         ruff failed
+          Cause: Failed to load configuration `[TMP]/ruff.toml`
           Cause: Failed to parse [TMP]/ruff.toml
           Cause: TOML parse error at line 3, column 1
           |
@@ -2412,6 +2564,302 @@ fn a005_module_shadowing_strict_default() -> Result<()> {
 
         ----- stderr -----
         ");
+    });
+    Ok(())
+}
+
+/// Test that the linter respects per-file-target-version.
+#[test]
+fn per_file_target_version_linter() {
+    // without per-file-target-version, there should be one UP046 error
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--target-version", "py312"])
+        .args(["--select", "UP046"]) // only triggers on 3.12+
+        .args(["--stdin-filename", "test.py"])
+        .arg("--preview")
+        .arg("-")
+        .pass_stdin(r#"
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class A(Generic[T]):
+    var: T
+"#),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:6:9: UP046 Generic class `A` uses `Generic` subclass instead of type parameters
+    Found 1 error.
+    No fixes available (1 hidden fix can be enabled with the `--unsafe-fixes` option).
+
+    ----- stderr -----
+    "
+    );
+
+    // with per-file-target-version, there should be no errors because the new generic syntax is
+    // unavailable
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--target-version", "py312"])
+        .args(["--config", r#"per-file-target-version = {"test.py" = "py311"}"#])
+        .args(["--select", "UP046"]) // only triggers on 3.12+
+        .args(["--stdin-filename", "test.py"])
+        .arg("--preview")
+        .arg("-")
+        .pass_stdin(r#"
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class A(Generic[T]):
+    var: T
+"#),
+        @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    "
+    );
+}
+
+#[test]
+fn walrus_before_py38() {
+    // ok
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--stdin-filename", "test.py"])
+        .arg("--target-version=py38")
+        .arg("-")
+        .pass_stdin(r#"(x := 1)"#),
+        @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    "
+    );
+
+    // not ok on 3.7 with preview
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--stdin-filename", "test.py"])
+        .arg("--target-version=py37")
+        .arg("--preview")
+        .arg("-")
+        .pass_stdin(r#"(x := 1)"#),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:1:2: SyntaxError: Cannot use named assignment expression (`:=`) on Python 3.7 (syntax was added in Python 3.8)
+    Found 1 error.
+
+    ----- stderr -----
+    "
+    );
+}
+
+#[test]
+fn match_before_py310() {
+    // ok on 3.10
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--stdin-filename", "test.py"])
+        .arg("--target-version=py310")
+        .arg("-")
+        .pass_stdin(
+            r#"
+match 2:
+    case 1:
+        print("it's one")
+"#
+        ),
+        @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    "
+    );
+
+    // ok on 3.9 without preview
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--stdin-filename", "test.py"])
+        .arg("--target-version=py39")
+        .arg("-")
+        .pass_stdin(
+            r#"
+match 2:
+    case 1:
+        print("it's one")
+"#
+        ),
+        @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    "
+    );
+
+    // syntax error on 3.9 with preview
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--stdin-filename", "test.py"])
+        .arg("--target-version=py39")
+        .arg("--preview")
+        .arg("-")
+        .pass_stdin(
+            r#"
+match 2:
+    case 1:
+        print("it's one")
+"#
+        ),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:2:1: SyntaxError: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
+    Found 1 error.
+
+    ----- stderr -----
+    "
+    );
+}
+
+/// Regression test for <https://github.com/astral-sh/ruff/issues/16417>
+#[test]
+fn cache_syntax_errors() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    fs::write(tempdir.path().join("main.py"), "match 2:\n    case 1: ...")?;
+
+    let mut cmd = Command::new(get_cargo_bin(BIN_NAME));
+    // inline STDIN_BASE_OPTIONS to remove --no-cache
+    cmd.args(["check", "--output-format", "concise"])
+        .arg("--target-version=py39")
+        .arg("--preview")
+        .arg("--quiet") // suppress `debug build without --no-cache` warnings
+        .current_dir(&tempdir);
+
+    assert_cmd_snapshot!(
+        cmd,
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    main.py:1:1: SyntaxError: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
+
+    ----- stderr -----
+    "
+    );
+
+    // this should *not* be cached, like normal parse errors
+    assert_cmd_snapshot!(
+        cmd,
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    main.py:1:1: SyntaxError: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
+
+    ----- stderr -----
+    "
+    );
+
+    Ok(())
+}
+
+/// Regression test for <https://github.com/astral-sh/ruff/issues/9381> with very helpful
+/// reproduction repo here: <https://github.com/lucasfijen/example_ruff_glob_bug>
+#[test]
+fn cookiecutter_globbing() -> Result<()> {
+    // This is a simplified directory structure from the repo linked above. The essence of the
+    // problem is this `{{cookiecutter.repo_name}}` directory containing a config file with a glob.
+    // The absolute path of the glob contains the glob metacharacters `{{` and `}}` even though the
+    // user's glob does not.
+    let tempdir = TempDir::new()?;
+    let cookiecutter = tempdir.path().join("{{cookiecutter.repo_name}}");
+    let cookiecutter_toml = cookiecutter.join("pyproject.toml");
+    let tests = cookiecutter.join("tests");
+    fs::create_dir_all(&tests)?;
+    fs::write(
+        &cookiecutter_toml,
+        r#"tool.ruff.lint.per-file-ignores = { "tests/*" = ["F811"] }"#,
+    )?;
+    // F811 example from the docs to ensure the glob still works
+    let maintest = tests.join("maintest.py");
+    fs::write(maintest, "import foo\nimport bar\nimport foo")?;
+
+    insta::with_settings!({filters => vec![(r"\\", "/")]}, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+                .args(STDIN_BASE_OPTIONS)
+                .arg("--select=F811")
+                .current_dir(tempdir.path()), @r"
+			success: true
+			exit_code: 0
+			----- stdout -----
+			All checks passed!
+
+			----- stderr -----
+			");
+    });
+
+    // after removing the config file with the ignore, F811 applies, so the glob worked above
+    fs::remove_file(cookiecutter_toml)?;
+
+    insta::with_settings!({filters => vec![(r"\\", "/")]}, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+                .args(STDIN_BASE_OPTIONS)
+                .arg("--select=F811")
+                .current_dir(tempdir.path()), @r"
+			success: false
+			exit_code: 1
+			----- stdout -----
+			{{cookiecutter.repo_name}}/tests/maintest.py:3:8: F811 [*] Redefinition of unused `foo` from line 1
+			Found 1 error.
+			[*] 1 fixable with the `--fix` option.
+
+			----- stderr -----
+		");
+    });
+
+    Ok(())
+}
+
+/// Like the test above but exercises the non-absolute path case in `PerFile::new`
+#[test]
+fn cookiecutter_globbing_no_project_root() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let tempdir = tempdir.path().join("{{cookiecutter.repo_name}}");
+    fs::create_dir(&tempdir)?;
+
+    insta::with_settings!({filters => vec![(r"\\", "/")]}, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .current_dir(&tempdir)
+            .args(STDIN_BASE_OPTIONS)
+            .args(["--extend-per-file-ignores", "generated.py:Q"]), @r"
+		success: true
+		exit_code: 0
+		----- stdout -----
+		All checks passed!
+
+		----- stderr -----
+		warning: No Python files found under the given path(s)
+		");
     });
 
     Ok(())

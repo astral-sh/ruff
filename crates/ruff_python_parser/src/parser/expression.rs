@@ -11,12 +11,13 @@ use ruff_python_ast::{
 };
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
+use crate::error::StarTupleKind;
 use crate::parser::progress::ParserProgress;
 use crate::parser::{helpers, FunctionKind, Parser};
 use crate::string::{parse_fstring_literal_element, parse_string_literal, StringType};
 use crate::token::{TokenKind, TokenValue};
 use crate::token_set::TokenSet;
-use crate::{FStringErrorType, Mode, ParseErrorType};
+use crate::{FStringErrorType, Mode, ParseErrorType, UnsupportedSyntaxErrorKind};
 
 use super::{FStringElementsKind, Parenthesized, RecoveryContextKind};
 
@@ -632,7 +633,7 @@ impl<'src> Parser<'src> {
     /// If the parser isn't position at a `(` token.
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#calls>
-    fn parse_call_expression(&mut self, func: Expr, start: TextSize) -> ast::ExprCall {
+    pub(super) fn parse_call_expression(&mut self, func: Expr, start: TextSize) -> ast::ExprCall {
         let arguments = self.parse_arguments();
 
         ast::ExprCall {
@@ -701,9 +702,31 @@ impl<'src> Parser<'src> {
                     }
                 }
 
+                let arg_range = parser.node_range(start);
                 if parser.eat(TokenKind::Equal) {
                     seen_keyword_argument = true;
-                    let arg = if let Expr::Name(ident_expr) = parsed_expr.expr {
+                    let arg = if let ParsedExpr {
+                        expr: Expr::Name(ident_expr),
+                        is_parenthesized,
+                    } = parsed_expr
+                    {
+                        // test_ok parenthesized_kwarg_py37
+                        // # parse_options: {"target-version": "3.7"}
+                        // f((a)=1)
+
+                        // test_err parenthesized_kwarg_py38
+                        // # parse_options: {"target-version": "3.8"}
+                        // f((a)=1)
+                        // f((a) = 1)
+                        // f( ( a ) = 1)
+
+                        if is_parenthesized {
+                            parser.add_unsupported_syntax_error(
+                                UnsupportedSyntaxErrorKind::ParenthesizedKeywordArgumentName,
+                                arg_range,
+                            );
+                        }
+
                         ast::Identifier {
                             id: ident_expr.id,
                             range: ident_expr.range,
@@ -2089,10 +2112,27 @@ impl<'src> Parser<'src> {
         }
 
         let value = self.at_expr().then(|| {
-            Box::new(
-                self.parse_expression_list(ExpressionContext::starred_bitwise_or())
-                    .expr,
-            )
+            let parsed_expr = self.parse_expression_list(ExpressionContext::starred_bitwise_or());
+
+            // test_ok iter_unpack_yield_py37
+            // # parse_options: {"target-version": "3.7"}
+            // rest = (4, 5, 6)
+            // def g(): yield (1, 2, 3, *rest)
+
+            // test_ok iter_unpack_yield_py38
+            // # parse_options: {"target-version": "3.8"}
+            // rest = (4, 5, 6)
+            // def g(): yield 1, 2, 3, *rest
+            // def h(): yield 1, (yield 2, *rest), 3
+
+            // test_err iter_unpack_yield_py37
+            // # parse_options: {"target-version": "3.7"}
+            // rest = (4, 5, 6)
+            // def g(): yield 1, 2, 3, *rest
+            // def h(): yield 1, (yield 2, *rest), 3
+            self.check_tuple_unpacking(&parsed_expr, StarTupleKind::Yield);
+
+            Box::new(parsed_expr.expr)
         });
 
         Expr::Yield(ast::ExprYield {
@@ -2161,10 +2201,22 @@ impl<'src> Parser<'src> {
 
         let value = self.parse_conditional_expression_or_higher();
 
+        let range = self.node_range(start);
+
+        // test_err walrus_py37
+        // # parse_options: { "target-version": "3.7" }
+        // (x := 1)
+
+        // test_ok walrus_py38
+        // # parse_options: { "target-version": "3.8" }
+        // (x := 1)
+
+        self.add_unsupported_syntax_error(UnsupportedSyntaxErrorKind::Walrus, range);
+
         ast::ExprNamed {
             target: Box::new(target),
             value: Box::new(value.expr),
-            range: self.node_range(start),
+            range,
         }
     }
 
@@ -2265,7 +2317,7 @@ impl<'src> Parser<'src> {
             value,
         };
 
-        if self.mode != Mode::Ipython {
+        if self.options.mode != Mode::Ipython {
             self.add_error(ParseErrorType::UnexpectedIpythonEscapeCommand, &command);
         }
 

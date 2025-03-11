@@ -1167,6 +1167,7 @@ impl AlwaysFixableViolation for MissingSectionNameColon {
 /// a blank line, followed by a series of sections, each with a section header
 /// and a section body. Function docstrings often include a section for
 /// function arguments; this rule is concerned with that section only.
+/// Note that this rule only checks docstrings with an arguments (e.g. `Args`) section.
 ///
 /// This rule is enabled when using the `google` convention, and disabled when
 /// using the `pep257` and `numpy` conventions.
@@ -1399,7 +1400,8 @@ fn blanks_and_section_underline(
 
             if checker.enabled(Rule::OverindentedSectionUnderline) {
                 let leading_space = leading_space(&non_blank_line);
-                if leading_space.len() > docstring.indentation.len() {
+                let docstring_indentation = docstring.compute_indentation();
+                if leading_space.len() > docstring_indentation.len() {
                     let mut diagnostic = Diagnostic::new(
                         OverindentedSectionUnderline {
                             name: context.section_name().to_string(),
@@ -1412,7 +1414,7 @@ fn blanks_and_section_underline(
                         blank_lines_end,
                         leading_space.text_len() + TextSize::from(1),
                     );
-                    let contents = clean_space(docstring.indentation);
+                    let contents = clean_space(docstring_indentation);
                     diagnostic.set_fix(Fix::safe_edit(if contents.is_empty() {
                         Edit::range_deletion(range)
                     } else {
@@ -1540,7 +1542,7 @@ fn blanks_and_section_underline(
                     let content = format!(
                         "{}{}{}",
                         checker.stylist().line_ending().as_str(),
-                        clean_space(docstring.indentation),
+                        clean_space(docstring.compute_indentation()),
                         "-".repeat(context.section_name().len()),
                     );
                     diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
@@ -1621,7 +1623,7 @@ fn blanks_and_section_underline(
             let content = format!(
                 "{}{}{}",
                 checker.stylist().line_ending().as_str(),
-                clean_space(docstring.indentation),
+                clean_space(docstring.compute_indentation()),
                 "-".repeat(context.section_name().len()),
             );
             diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
@@ -1671,7 +1673,8 @@ fn common_section(
 
     if checker.enabled(Rule::OverindentedSection) {
         let leading_space = leading_space(context.summary_line());
-        if leading_space.len() > docstring.indentation.len() {
+        let docstring_indentation = docstring.compute_indentation();
+        if leading_space.len() > docstring_indentation.len() {
             let section_range = context.section_name_range();
             let mut diagnostic = Diagnostic::new(
                 OverindentedSection {
@@ -1681,7 +1684,7 @@ fn common_section(
             );
 
             // Replace the existing indentation with whitespace of the appropriate length.
-            let content = clean_space(docstring.indentation);
+            let content = clean_space(docstring_indentation);
             let fix_range = TextRange::at(context.start(), leading_space.text_len());
             diagnostic.set_fix(Fix::safe_edit(if content.is_empty() {
                 Edit::range_deletion(fix_range)
@@ -1738,7 +1741,7 @@ fn common_section(
                     format!(
                         "{}{}",
                         line_end.repeat(2 - num_blank_lines),
-                        docstring.indentation
+                        docstring.compute_indentation()
                     ),
                     context.end() - del_len,
                     context.end(),
@@ -1869,7 +1872,7 @@ fn args_section(context: &SectionContext) -> FxHashSet<String> {
     // Reformat each section.
     let mut args_sections: Vec<String> = vec![];
     for line in args_content.trim().lines() {
-        if line.chars().next().map_or(true, char::is_whitespace) {
+        if line.chars().next().is_none_or(char::is_whitespace) {
             // This is a continuation of the documentation for the previous parameter,
             // because it starts with whitespace.
             if let Some(last) = args_sections.last_mut() {

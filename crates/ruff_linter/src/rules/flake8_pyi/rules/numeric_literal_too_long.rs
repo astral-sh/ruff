@@ -12,7 +12,7 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Why is this bad?
 /// If a function has a default value where the literal representation is
-/// greater than 50 characters, the value is likely to be an implementation
+/// greater than 10 characters, the value is likely to be an implementation
 /// detail or a constant that varies depending on the system you're running on.
 ///
 /// Default values like these should generally be omitted from stubs. Use

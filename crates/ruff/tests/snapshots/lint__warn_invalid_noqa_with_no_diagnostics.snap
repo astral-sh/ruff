@@ -1,0 +1,22 @@
+---
+source: crates/ruff/tests/lint.rs
+info:
+  program: ruff
+  args:
+    - check
+    - "--no-cache"
+    - "--output-format"
+    - concise
+    - "--isolated"
+    - "--select"
+    - F401
+    - "-"
+  stdin: "\n# ruff: noqa: AAA101\nprint(\"Hello world!\")\n"
+---
+success: true
+exit_code: 0
+----- stdout -----
+All checks passed!
+
+----- stderr -----
+warning: Invalid rule code provided to `# ruff: noqa` at -:2: AAA101

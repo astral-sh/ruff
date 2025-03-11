@@ -1,11 +1,11 @@
-use crate::{parse, parse_expression, parse_module, Mode};
+use crate::{parse, parse_expression, parse_module, Mode, ParseOptions};
 
 #[test]
 fn test_modes() {
     let source = "a[0][1][2][3][4]";
 
-    assert!(parse(source, Mode::Expression).is_ok());
-    assert!(parse(source, Mode::Module).is_ok());
+    assert!(parse(source, ParseOptions::from(Mode::Expression)).is_ok());
+    assert!(parse(source, ParseOptions::from(Mode::Module)).is_ok());
 }
 
 #[test]
@@ -129,7 +129,7 @@ foo.bar[0].baz[1]??
 foo.bar[0].baz[2].egg??
 "
         .trim(),
-        Mode::Ipython,
+        ParseOptions::from(Mode::Ipython),
     )
     .unwrap();
     insta::assert_debug_snapshot!(parsed.syntax());

@@ -5,16 +5,20 @@ use bitflags::bitflags;
 use ruff_python_ast::{Mod, ModExpression, ModModule};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
+use crate::error::UnsupportedSyntaxError;
 use crate::parser::expression::ExpressionContext;
 use crate::parser::progress::{ParserProgress, TokenId};
 use crate::token::TokenValue;
 use crate::token_set::TokenSet;
 use crate::token_source::{TokenSource, TokenSourceCheckpoint};
-use crate::{Mode, ParseError, ParseErrorType, TokenKind};
+use crate::{Mode, ParseError, ParseErrorType, TokenKind, UnsupportedSyntaxErrorKind};
 use crate::{Parsed, Tokens};
+
+pub use crate::parser::options::ParseOptions;
 
 mod expression;
 mod helpers;
+mod options;
 mod pattern;
 mod progress;
 mod recovery;
@@ -32,8 +36,11 @@ pub(crate) struct Parser<'src> {
     /// Stores all the syntax errors found during the parsing.
     errors: Vec<ParseError>,
 
-    /// Specify the mode in which the code will be parsed.
-    mode: Mode,
+    /// Stores non-fatal syntax errors found during parsing, such as version-related errors.
+    unsupported_syntax_errors: Vec<UnsupportedSyntaxError>,
+
+    /// Options for how the code will be parsed.
+    options: ParseOptions,
 
     /// The ID of the current token. This is used to track the progress of the parser
     /// to avoid infinite loops when the parser is stuck.
@@ -51,18 +58,23 @@ pub(crate) struct Parser<'src> {
 
 impl<'src> Parser<'src> {
     /// Create a new parser for the given source code.
-    pub(crate) fn new(source: &'src str, mode: Mode) -> Self {
-        Parser::new_starts_at(source, mode, TextSize::new(0))
+    pub(crate) fn new(source: &'src str, options: ParseOptions) -> Self {
+        Parser::new_starts_at(source, TextSize::new(0), options)
     }
 
     /// Create a new parser for the given source code which starts parsing at the given offset.
-    pub(crate) fn new_starts_at(source: &'src str, mode: Mode, start_offset: TextSize) -> Self {
-        let tokens = TokenSource::from_source(source, mode, start_offset);
+    pub(crate) fn new_starts_at(
+        source: &'src str,
+        start_offset: TextSize,
+        options: ParseOptions,
+    ) -> Self {
+        let tokens = TokenSource::from_source(source, options.mode, start_offset);
 
         Parser {
-            mode,
+            options,
             source,
             errors: Vec::new(),
+            unsupported_syntax_errors: Vec::new(),
             tokens,
             recovery_context: RecoveryContext::empty(),
             prev_token_end: TextSize::new(0),
@@ -73,7 +85,7 @@ impl<'src> Parser<'src> {
 
     /// Consumes the [`Parser`] and returns the parsed [`Parsed`].
     pub(crate) fn parse(mut self) -> Parsed<Mod> {
-        let syntax = match self.mode {
+        let syntax = match self.options.mode {
             Mode::Expression | Mode::ParenthesizedExpression => {
                 Mod::Expression(self.parse_single_expression())
             }
@@ -159,6 +171,7 @@ impl<'src> Parser<'src> {
                 syntax,
                 tokens: Tokens::new(tokens),
                 errors: parse_errors,
+                unsupported_syntax_errors: self.unsupported_syntax_errors,
             };
         }
 
@@ -190,6 +203,7 @@ impl<'src> Parser<'src> {
             syntax,
             tokens: Tokens::new(tokens),
             errors: merged,
+            unsupported_syntax_errors: self.unsupported_syntax_errors,
         }
     }
 
@@ -424,6 +438,18 @@ impl<'src> Parser<'src> {
         inner(&mut self.errors, error, ranged.range());
     }
 
+    /// Add an [`UnsupportedSyntaxError`] with the given [`UnsupportedSyntaxErrorKind`] and
+    /// [`TextRange`] if its minimum version is less than [`Parser::target_version`].
+    fn add_unsupported_syntax_error(&mut self, kind: UnsupportedSyntaxErrorKind, range: TextRange) {
+        if kind.is_unsupported(self.options.target_version) {
+            self.unsupported_syntax_errors.push(UnsupportedSyntaxError {
+                kind,
+                range,
+                target_version: self.options.target_version,
+            });
+        }
+    }
+
     /// Returns `true` if the current token is of the given kind.
     fn at(&self, kind: TokenKind) -> bool {
         self.current_token_kind() == kind
@@ -651,6 +677,7 @@ impl<'src> Parser<'src> {
         ParserCheckpoint {
             tokens: self.tokens.checkpoint(),
             errors_position: self.errors.len(),
+            unsupported_syntax_errors_position: self.unsupported_syntax_errors.len(),
             current_token_id: self.current_token_id,
             prev_token_end: self.prev_token_end,
             recovery_context: self.recovery_context,
@@ -662,6 +689,7 @@ impl<'src> Parser<'src> {
         let ParserCheckpoint {
             tokens,
             errors_position,
+            unsupported_syntax_errors_position,
             current_token_id,
             prev_token_end,
             recovery_context,
@@ -669,6 +697,8 @@ impl<'src> Parser<'src> {
 
         self.tokens.rewind(tokens);
         self.errors.truncate(errors_position);
+        self.unsupported_syntax_errors
+            .truncate(unsupported_syntax_errors_position);
         self.current_token_id = current_token_id;
         self.prev_token_end = prev_token_end;
         self.recovery_context = recovery_context;
@@ -678,6 +708,7 @@ impl<'src> Parser<'src> {
 struct ParserCheckpoint {
     tokens: TokenSourceCheckpoint,
     errors_position: usize,
+    unsupported_syntax_errors_position: usize,
     current_token_id: TokenId,
     prev_token_end: TextSize,
     recovery_context: RecoveryContext,

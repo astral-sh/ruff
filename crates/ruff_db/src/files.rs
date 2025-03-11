@@ -496,7 +496,7 @@ impl std::error::Error for FileError {}
 mod tests {
     use crate::file_revision::FileRevision;
     use crate::files::{system_path_to_file, vendored_path_to_file, FileError};
-    use crate::system::DbWithTestSystem;
+    use crate::system::DbWithWritableSystem as _;
     use crate::tests::TestDb;
     use crate::vendored::VendoredFileSystemBuilder;
     use zip::CompressionMethod;

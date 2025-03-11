@@ -399,7 +399,7 @@ impl ShadowedKind {
 
         if is_python_builtin(
             new_name,
-            checker.settings.target_version.minor(),
+            checker.target_version().minor,
             checker.source_type.is_ipynb(),
         ) {
             return ShadowedKind::BuiltIn;

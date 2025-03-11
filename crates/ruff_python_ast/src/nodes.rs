@@ -1,5 +1,9 @@
 #![allow(clippy::derive_partial_eq_without_eq)]
 
+use crate::generated::{
+    ExprBytesLiteral, ExprDict, ExprFString, ExprList, ExprName, ExprSet, ExprStringLiteral,
+    ExprTuple,
+};
 use std::borrow::Cow;
 use std::fmt;
 use std::fmt::Debug;
@@ -18,7 +22,8 @@ use crate::{
     name::Name,
     str::{Quote, TripleQuotes},
     str_prefix::{AnyStringPrefix, ByteStringPrefix, FStringPrefix, StringLiteralPrefix},
-    ExceptHandler, Expr, FStringElement, LiteralExpressionRef, Pattern, Stmt, TypeParam,
+    ExceptHandler, Expr, ExprRef, FStringElement, LiteralExpressionRef, OperatorPrecedence,
+    Pattern, Stmt, TypeParam,
 };
 
 /// See also [Module](https://docs.python.org/3/library/ast.html#ast.Module)
@@ -119,6 +124,7 @@ pub struct StmtClassDef {
     pub decorator_list: Vec<Decorator>,
     pub name: Identifier,
     pub type_params: Option<Box<TypeParams>>,
+    // TODO: can remove?
     pub arguments: Option<Box<Arguments>>,
     pub body: Vec<Stmt>,
 }
@@ -365,74 +371,17 @@ impl Expr {
             _ => None,
         }
     }
+
+    /// Return the [`OperatorPrecedence`] of this expression
+    pub fn precedence(&self) -> OperatorPrecedence {
+        OperatorPrecedence::from(self)
+    }
 }
 
-/// An AST node used to represent a IPython escape command at the expression level.
-///
-/// For example,
-/// ```python
-/// dir = !pwd
-/// ```
-///
-/// Here, the escape kind can only be `!` or `%` otherwise it is a syntax error.
-///
-/// For more information related to terminology and syntax of escape commands,
-/// see [`StmtIpyEscapeCommand`].
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprIpyEscapeCommand {
-    pub range: TextRange,
-    pub kind: IpyEscapeKind,
-    pub value: Box<str>,
-}
-
-/// See also [BoolOp](https://docs.python.org/3/library/ast.html#ast.BoolOp)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprBoolOp {
-    pub range: TextRange,
-    pub op: BoolOp,
-    pub values: Vec<Expr>,
-}
-
-/// See also [NamedExpr](https://docs.python.org/3/library/ast.html#ast.NamedExpr)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprNamed {
-    pub range: TextRange,
-    pub target: Box<Expr>,
-    pub value: Box<Expr>,
-}
-
-/// See also [BinOp](https://docs.python.org/3/library/ast.html#ast.BinOp)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprBinOp {
-    pub range: TextRange,
-    pub left: Box<Expr>,
-    pub op: Operator,
-    pub right: Box<Expr>,
-}
-
-/// See also [UnaryOp](https://docs.python.org/3/library/ast.html#ast.UnaryOp)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprUnaryOp {
-    pub range: TextRange,
-    pub op: UnaryOp,
-    pub operand: Box<Expr>,
-}
-
-/// See also [Lambda](https://docs.python.org/3/library/ast.html#ast.Lambda)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprLambda {
-    pub range: TextRange,
-    pub parameters: Option<Box<Parameters>>,
-    pub body: Box<Expr>,
-}
-
-/// See also [IfExp](https://docs.python.org/3/library/ast.html#ast.IfExp)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprIf {
-    pub range: TextRange,
-    pub test: Box<Expr>,
-    pub body: Box<Expr>,
-    pub orelse: Box<Expr>,
+impl ExprRef<'_> {
+    pub fn precedence(&self) -> OperatorPrecedence {
+        OperatorPrecedence::from(self)
+    }
 }
 
 /// Represents an item in a [dictionary literal display][1].
@@ -481,13 +430,6 @@ impl Ranged for DictItem {
             self.value.end(),
         )
     }
-}
-
-/// See also [Dict](https://docs.python.org/3/library/ast.html#ast.Dict)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprDict {
-    pub range: TextRange,
-    pub items: Vec<DictItem>,
 }
 
 impl ExprDict {
@@ -625,13 +567,6 @@ impl DoubleEndedIterator for DictValueIterator<'_> {
 impl FusedIterator for DictValueIterator<'_> {}
 impl ExactSizeIterator for DictValueIterator<'_> {}
 
-/// See also [Set](https://docs.python.org/3/library/ast.html#ast.Set)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprSet {
-    pub range: TextRange,
-    pub elts: Vec<Expr>,
-}
-
 impl ExprSet {
     pub fn iter(&self) -> std::slice::Iter<'_, Expr> {
         self.elts.iter()
@@ -653,78 +588,6 @@ impl<'a> IntoIterator for &'a ExprSet {
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
     }
-}
-
-/// See also [ListComp](https://docs.python.org/3/library/ast.html#ast.ListComp)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprListComp {
-    pub range: TextRange,
-    pub elt: Box<Expr>,
-    pub generators: Vec<Comprehension>,
-}
-
-/// See also [SetComp](https://docs.python.org/3/library/ast.html#ast.SetComp)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprSetComp {
-    pub range: TextRange,
-    pub elt: Box<Expr>,
-    pub generators: Vec<Comprehension>,
-}
-
-/// See also [DictComp](https://docs.python.org/3/library/ast.html#ast.DictComp)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprDictComp {
-    pub range: TextRange,
-    pub key: Box<Expr>,
-    pub value: Box<Expr>,
-    pub generators: Vec<Comprehension>,
-}
-
-/// See also [GeneratorExp](https://docs.python.org/3/library/ast.html#ast.GeneratorExp)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprGenerator {
-    pub range: TextRange,
-    pub elt: Box<Expr>,
-    pub generators: Vec<Comprehension>,
-    pub parenthesized: bool,
-}
-
-/// See also [Await](https://docs.python.org/3/library/ast.html#ast.Await)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprAwait {
-    pub range: TextRange,
-    pub value: Box<Expr>,
-}
-
-/// See also [Yield](https://docs.python.org/3/library/ast.html#ast.Yield)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprYield {
-    pub range: TextRange,
-    pub value: Option<Box<Expr>>,
-}
-
-/// See also [YieldFrom](https://docs.python.org/3/library/ast.html#ast.YieldFrom)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprYieldFrom {
-    pub range: TextRange,
-    pub value: Box<Expr>,
-}
-
-/// See also [Compare](https://docs.python.org/3/library/ast.html#ast.Compare)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprCompare {
-    pub range: TextRange,
-    pub left: Box<Expr>,
-    pub ops: Box<[CmpOp]>,
-    pub comparators: Box<[Expr]>,
-}
-
-/// See also [Call](https://docs.python.org/3/library/ast.html#ast.Call)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprCall {
-    pub range: TextRange,
-    pub func: Box<Expr>,
-    pub arguments: Arguments,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -799,17 +662,15 @@ pub struct DebugText {
     pub trailing: String,
 }
 
-/// An AST node used to represent an f-string.
-///
-/// This type differs from the original Python AST ([JoinedStr]) in that it
-/// doesn't join the implicitly concatenated parts into a single string. Instead,
-/// it keeps them separate and provide various methods to access the parts.
-///
-/// [JoinedStr]: https://docs.python.org/3/library/ast.html#ast.JoinedStr
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprFString {
-    pub range: TextRange,
-    pub value: FStringValue,
+impl ExprFString {
+    /// Returns the single [`FString`] if the f-string isn't implicitly concatenated, [`None`]
+    /// otherwise.
+    pub const fn as_single_part_fstring(&self) -> Option<&FString> {
+        match &self.value.inner {
+            FStringValueInner::Single(FStringPart::FString(fstring)) => Some(fstring),
+            _ => None,
+        }
+    }
 }
 
 /// The value representing an [`ExprFString`].
@@ -819,7 +680,7 @@ pub struct FStringValue {
 }
 
 impl FStringValue {
-    /// Creates a new f-string with the given value.
+    /// Creates a new f-string literal with a single [`FString`] part.
     pub fn single(value: FString) -> Self {
         Self {
             inner: FStringValueInner::Single(FStringPart::FString(value)),
@@ -831,9 +692,13 @@ impl FStringValue {
     ///
     /// # Panics
     ///
-    /// Panics if `values` is less than 2. Use [`FStringValue::single`] instead.
+    /// Panics if `values` has less than 2 elements.
+    /// Use [`FStringValue::single`] instead.
     pub fn concatenated(values: Vec<FStringPart>) -> Self {
-        assert!(values.len() > 1);
+        assert!(
+            values.len() > 1,
+            "Use `FStringValue::single` to create single-part f-strings"
+        );
         Self {
             inner: FStringValueInner::Concatenated(values),
         }
@@ -842,15 +707,6 @@ impl FStringValue {
     /// Returns `true` if the f-string is implicitly concatenated, `false` otherwise.
     pub fn is_implicit_concatenated(&self) -> bool {
         matches!(self.inner, FStringValueInner::Concatenated(_))
-    }
-
-    /// Returns the single [`FString`] if the f-string isn't implicitly concatenated, [`None`]
-    /// otherwise.
-    pub fn as_single(&self) -> Option<&FString> {
-        match &self.inner {
-            FStringValueInner::Single(FStringPart::FString(fstring)) => Some(fstring),
-            _ => None,
-        }
     }
 
     /// Returns a slice of all the [`FStringPart`]s contained in this value.
@@ -882,7 +738,7 @@ impl FStringValue {
 
     /// Returns an iterator over the [`StringLiteral`] parts contained in this value.
     ///
-    /// Note that this doesn't nest into the f-string parts. For example,
+    /// Note that this doesn't recurse into the f-string parts. For example,
     ///
     /// ```python
     /// "foo" f"bar {x}" "baz" f"qux"
@@ -895,7 +751,7 @@ impl FStringValue {
 
     /// Returns an iterator over the [`FString`] parts contained in this value.
     ///
-    /// Note that this doesn't nest into the f-string parts. For example,
+    /// Note that this doesn't recurse into the f-string parts. For example,
     ///
     /// ```python
     /// "foo" f"bar {x}" "baz" f"qux"
@@ -1017,7 +873,7 @@ pub trait StringFlags: Copy {
     /// i.e., the length of the prefixes plus the length
     /// of the quotes used to open the string.
     fn opener_len(self) -> TextSize {
-        self.prefix().as_str().text_len() + self.quote_len()
+        self.prefix().text_len() + self.quote_len()
     }
 
     /// The total length of the string's closer.
@@ -1267,12 +1123,15 @@ impl fmt::Debug for FStringElements {
     }
 }
 
-/// An AST node that represents either a single string literal or an implicitly
-/// concatenated string literals.
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprStringLiteral {
-    pub range: TextRange,
-    pub value: StringLiteralValue,
+impl ExprStringLiteral {
+    /// Return `Some(literal)` if the string only consists of a single `StringLiteral` part
+    /// (indicating that it is not implicitly concatenated). Otherwise, return `None`.
+    pub fn as_single_part_string(&self) -> Option<&StringLiteral> {
+        match &self.value.inner {
+            StringLiteralValueInner::Single(value) => Some(value),
+            StringLiteralValueInner::Concatenated(_) => None,
+        }
+    }
 }
 
 /// The value representing a [`ExprStringLiteral`].
@@ -1282,7 +1141,7 @@ pub struct StringLiteralValue {
 }
 
 impl StringLiteralValue {
-    /// Creates a new single string literal with the given value.
+    /// Creates a new string literal with a single [`StringLiteral`] part.
     pub fn single(string: StringLiteral) -> Self {
         Self {
             inner: StringLiteralValueInner::Single(string),
@@ -1292,7 +1151,7 @@ impl StringLiteralValue {
     /// Returns the [`StringLiteralFlags`] associated with this string literal.
     ///
     /// For an implicitly concatenated string, it returns the flags for the first literal.
-    pub fn flags(&self) -> StringLiteralFlags {
+    pub fn first_literal_flags(&self) -> StringLiteralFlags {
         self.iter()
             .next()
             .expect(
@@ -1306,10 +1165,13 @@ impl StringLiteralValue {
     ///
     /// # Panics
     ///
-    /// Panics if `strings` is less than 2. Use [`StringLiteralValue::single`]
-    /// instead.
+    /// Panics if `strings` has less than 2 elements.
+    /// Use [`StringLiteralValue::single`] instead.
     pub fn concatenated(strings: Vec<StringLiteral>) -> Self {
-        assert!(strings.len() > 1);
+        assert!(
+            strings.len() > 1,
+            "Use `StringLiteralValue::single` to create single-part strings"
+        );
         Self {
             inner: StringLiteralValueInner::Concatenated(ConcatenatedStringLiteral {
                 strings,
@@ -1323,10 +1185,14 @@ impl StringLiteralValue {
         matches!(self.inner, StringLiteralValueInner::Concatenated(_))
     }
 
-    /// Returns `true` if the string literal is a unicode string.
+    /// Returns `true` if the string literal has a `u` prefix, e.g. `u"foo"`.
+    ///
+    /// Although all strings in Python 3 are valid unicode (and the `u` prefix
+    /// is only retained for backwards compatibility), these strings are known as
+    /// "unicode strings".
     ///
     /// For an implicitly concatenated string, it returns `true` only if the first
-    /// string literal is a unicode string.
+    /// [`StringLiteral`] has the `u` prefix.
     pub fn is_unicode(&self) -> bool {
         self.iter()
             .next()
@@ -1360,7 +1226,11 @@ impl StringLiteralValue {
         self.as_mut_slice().iter_mut()
     }
 
-    /// Returns `true` if the string literal value is empty.
+    /// Returns `true` if the node represents an empty string.
+    ///
+    /// Note that a [`StringLiteralValue`] node will always have >=1 [`StringLiteral`] parts
+    /// inside it. This method checks whether the value of the concatenated parts is equal
+    /// to the empty string, not whether the string has 0 parts inside it.
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
@@ -1473,8 +1343,8 @@ bitflags! {
 ///
 /// If you're using a `Generator` from the `ruff_python_codegen` crate to generate a lint-rule fix
 /// from an existing string literal, consider passing along the [`StringLiteral::flags`] field or
-/// the result of the [`StringLiteralValue::flags`] method. If you don't have an existing string but
-/// have a `Checker` from the `ruff_linter` crate available, consider using
+/// the result of the [`StringLiteralValue::first_literal_flags`] method. If you don't have an
+/// existing string but have a `Checker` from the `ruff_linter` crate available, consider using
 /// `Checker::default_string_flags` to create instances of this struct; this method will properly
 /// handle surrounding f-strings. For usage that doesn't fit into one of these categories, the
 /// public constructor [`StringLiteralFlags::empty`] can be used.
@@ -1633,6 +1503,16 @@ impl StringLiteral {
             flags: StringLiteralFlags::empty().with_invalid(),
         }
     }
+
+    /// The range of the string literal's contents.
+    ///
+    /// This excludes any prefixes, opening quotes or closing quotes.
+    pub fn content_range(&self) -> TextRange {
+        TextRange::new(
+            self.start() + self.flags.opener_len(),
+            self.end() - self.flags.closer_len(),
+        )
+    }
 }
 
 impl From<StringLiteral> for Expr {
@@ -1649,7 +1529,7 @@ impl From<StringLiteral> for Expr {
 /// implicitly concatenated string.
 #[derive(Clone)]
 struct ConcatenatedStringLiteral {
-    /// Each string literal that makes up the concatenated string.
+    /// The individual [`StringLiteral`] parts that make up the concatenated string.
     strings: Vec<StringLiteral>,
     /// The concatenated string value.
     value: OnceLock<Box<str>>,
@@ -1687,12 +1567,15 @@ impl Debug for ConcatenatedStringLiteral {
     }
 }
 
-/// An AST node that represents either a single bytes literal or an implicitly
-/// concatenated bytes literals.
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprBytesLiteral {
-    pub range: TextRange,
-    pub value: BytesLiteralValue,
+impl ExprBytesLiteral {
+    /// Return `Some(literal)` if the bytestring only consists of a single `BytesLiteral` part
+    /// (indicating that it is not implicitly concatenated). Otherwise, return `None`.
+    pub const fn as_single_part_bytestring(&self) -> Option<&BytesLiteral> {
+        match &self.value.inner {
+            BytesLiteralValueInner::Single(value) => Some(value),
+            BytesLiteralValueInner::Concatenated(_) => None,
+        }
+    }
 }
 
 /// The value representing a [`ExprBytesLiteral`].
@@ -1702,28 +1585,31 @@ pub struct BytesLiteralValue {
 }
 
 impl BytesLiteralValue {
-    /// Creates a new single bytes literal with the given value.
+    /// Create a new bytestring literal with a single [`BytesLiteral`] part.
     pub fn single(value: BytesLiteral) -> Self {
         Self {
             inner: BytesLiteralValueInner::Single(value),
         }
     }
 
-    /// Creates a new bytes literal with the given values that represents an
-    /// implicitly concatenated bytes.
+    /// Creates a new bytestring literal with the given values that represents an
+    /// implicitly concatenated bytestring.
     ///
     /// # Panics
     ///
-    /// Panics if `values` is less than 2. Use [`BytesLiteralValue::single`]
-    /// instead.
+    /// Panics if `values` has less than 2 elements.
+    /// Use [`BytesLiteralValue::single`] instead.
     pub fn concatenated(values: Vec<BytesLiteral>) -> Self {
-        assert!(values.len() > 1);
+        assert!(
+            values.len() > 1,
+            "Use `BytesLiteralValue::single` to create single-part bytestrings"
+        );
         Self {
             inner: BytesLiteralValueInner::Concatenated(values),
         }
     }
 
-    /// Returns `true` if the bytes literal is implicitly concatenated.
+    /// Returns `true` if the bytestring is implicitly concatenated.
     pub const fn is_implicit_concatenated(&self) -> bool {
         matches!(self.inner, BytesLiteralValueInner::Concatenated(_))
     }
@@ -1755,29 +1641,23 @@ impl BytesLiteralValue {
         self.as_mut_slice().iter_mut()
     }
 
-    /// Returns `true` if the concatenated bytes has a length of zero.
+    /// Return `true` if the node represents an empty bytestring.
+    ///
+    /// Note that a [`BytesLiteralValue`] node will always have >=1 [`BytesLiteral`] parts
+    /// inside it. This method checks whether the value of the concatenated parts is equal
+    /// to the empty bytestring, not whether the bytestring has 0 parts inside it.
     pub fn is_empty(&self) -> bool {
         self.iter().all(|part| part.is_empty())
     }
 
-    /// Returns the length of the concatenated bytes.
+    /// Returns the length of the concatenated bytestring.
     pub fn len(&self) -> usize {
         self.iter().map(|part| part.len()).sum()
     }
 
-    /// Returns an iterator over the bytes of the concatenated bytes.
+    /// Returns an iterator over the bytes of the concatenated bytestring.
     pub fn bytes(&self) -> impl Iterator<Item = u8> + '_ {
         self.iter().flat_map(|part| part.as_slice().iter().copied())
-    }
-
-    /// Returns the [`BytesLiteralFlags`] associated with this literal.
-    ///
-    /// For an implicitly concatenated literal, it returns the flags for the first literal.
-    pub fn flags(&self) -> BytesLiteralFlags {
-        self.iter()
-            .next()
-            .expect("There should always be at least one literal in an `ExprBytesLiteral` node")
-            .flags
     }
 }
 
@@ -1829,10 +1709,10 @@ impl<'a> From<&'a BytesLiteralValue> for Cow<'a, [u8]> {
 /// An internal representation of [`BytesLiteralValue`].
 #[derive(Clone, Debug, PartialEq)]
 enum BytesLiteralValueInner {
-    /// A single bytes literal i.e., `b"foo"`.
+    /// A single-part bytestring literal i.e., `b"foo"`.
     Single(BytesLiteral),
 
-    /// An implicitly concatenated bytes literals i.e., `b"foo" b"bar"`.
+    /// An implicitly concatenated bytestring literal i.e., `b"foo" b"bar"`.
     Concatenated(Vec<BytesLiteral>),
 }
 
@@ -1868,12 +1748,11 @@ bitflags! {
 /// ## Notes on usage
 ///
 /// If you're using a `Generator` from the `ruff_python_codegen` crate to generate a lint-rule fix
-/// from an existing bytes literal, consider passing along the [`BytesLiteral::flags`] field or the
-/// result of the [`BytesLiteralValue::flags`] method. If you don't have an existing literal but
-/// have a `Checker` from the `ruff_linter` crate available, consider using
-/// `Checker::default_bytes_flags` to create instances of this struct; this method will properly
-/// handle surrounding f-strings. For usage that doesn't fit into one of these categories, the
-/// public constructor [`BytesLiteralFlags::empty`] can be used.
+/// from an existing bytes literal, consider passing along the [`BytesLiteral::flags`] field. If
+/// you don't have an existing literal but have a `Checker` from the `ruff_linter` crate available,
+/// consider using `Checker::default_bytes_flags` to create instances of this struct; this method
+/// will properly handle surrounding f-strings. For usage that doesn't fit into one of these
+/// categories, the public constructor [`BytesLiteralFlags::empty`] can be used.
 #[derive(Copy, Clone, Eq, PartialEq, Hash)]
 pub struct BytesLiteralFlags(BytesLiteralFlagsInner);
 
@@ -2289,12 +2168,6 @@ impl From<FStringFlags> for AnyStringFlags {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprNumberLiteral {
-    pub range: TextRange,
-    pub value: Number,
-}
-
 #[derive(Clone, Debug, PartialEq, is_macro::Is)]
 pub enum Number {
     Int(int::Int),
@@ -2302,68 +2175,17 @@ pub enum Number {
     Complex { real: f64, imag: f64 },
 }
 
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct ExprBooleanLiteral {
-    pub range: TextRange,
-    pub value: bool,
-}
-
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct ExprNoneLiteral {
-    pub range: TextRange,
-}
-
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct ExprEllipsisLiteral {
-    pub range: TextRange,
-}
-
-/// See also [Attribute](https://docs.python.org/3/library/ast.html#ast.Attribute)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprAttribute {
-    pub range: TextRange,
-    pub value: Box<Expr>,
-    pub attr: Identifier,
-    pub ctx: ExprContext,
-}
-
-/// See also [Subscript](https://docs.python.org/3/library/ast.html#ast.Subscript)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprSubscript {
-    pub range: TextRange,
-    pub value: Box<Expr>,
-    pub slice: Box<Expr>,
-    pub ctx: ExprContext,
-}
-
-/// See also [Starred](https://docs.python.org/3/library/ast.html#ast.Starred)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprStarred {
-    pub range: TextRange,
-    pub value: Box<Expr>,
-    pub ctx: ExprContext,
-}
-
-/// See also [Name](https://docs.python.org/3/library/ast.html#ast.Name)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprName {
-    pub range: TextRange,
-    pub id: Name,
-    pub ctx: ExprContext,
-}
-
 impl ExprName {
     pub fn id(&self) -> &Name {
         &self.id
     }
-}
 
-/// See also [List](https://docs.python.org/3/library/ast.html#ast.List)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprList {
-    pub range: TextRange,
-    pub elts: Vec<Expr>,
-    pub ctx: ExprContext,
+    /// Returns `true` if this node represents an invalid name i.e., the `ctx` is [`Invalid`].
+    ///
+    /// [`Invalid`]: ExprContext::Invalid
+    pub const fn is_invalid(&self) -> bool {
+        matches!(self.ctx, ExprContext::Invalid)
+    }
 }
 
 impl ExprList {
@@ -2389,17 +2211,6 @@ impl<'a> IntoIterator for &'a ExprList {
     }
 }
 
-/// See also [Tuple](https://docs.python.org/3/library/ast.html#ast.Tuple)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprTuple {
-    pub range: TextRange,
-    pub elts: Vec<Expr>,
-    pub ctx: ExprContext,
-
-    /// Whether the tuple is parenthesized in the source code.
-    pub parenthesized: bool,
-}
-
 impl ExprTuple {
     pub fn iter(&self) -> std::slice::Iter<'_, Expr> {
         self.elts.iter()
@@ -2421,15 +2232,6 @@ impl<'a> IntoIterator for &'a ExprTuple {
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
     }
-}
-
-/// See also [Slice](https://docs.python.org/3/library/ast.html#ast.Slice)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprSlice {
-    pub range: TextRange,
-    pub lower: Option<Box<Expr>>,
-    pub upper: Option<Box<Expr>>,
-    pub step: Option<Box<Expr>>,
 }
 
 /// See also [expr_context](https://docs.python.org/3/library/ast.html#ast.expr_context)
@@ -2742,7 +2544,7 @@ impl Pattern {
     pub fn is_wildcard(&self) -> bool {
         match self {
             Pattern::MatchAs(PatternMatchAs { pattern, .. }) => {
-                pattern.as_deref().map_or(true, Pattern::is_wildcard)
+                pattern.as_deref().is_none_or(Pattern::is_wildcard)
             }
             Pattern::MatchOr(PatternMatchOr { patterns, .. }) => {
                 patterns.iter().all(Pattern::is_wildcard)
@@ -3567,6 +3369,7 @@ mod tests {
     #[allow(clippy::wildcard_imports)]
     use super::*;
 
+    use crate::generated::*;
     use crate::Mod;
 
     #[test]

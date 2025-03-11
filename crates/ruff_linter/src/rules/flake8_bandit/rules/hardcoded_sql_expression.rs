@@ -62,10 +62,10 @@ pub(crate) fn hardcoded_sql_expression(checker: &Checker, expr: &Expr) {
             op: Operator::Add, ..
         }) => {
             // Only evaluate the full BinOp, not the nested components.
-            if !checker
+            if checker
                 .semantic()
                 .current_expression_parent()
-                .map_or(true, |parent| !parent.is_bin_op_expr())
+                .is_some_and(ruff_python_ast::Expr::is_bin_op_expr)
             {
                 return;
             }

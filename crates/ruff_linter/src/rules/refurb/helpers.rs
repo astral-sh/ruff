@@ -6,7 +6,7 @@ use ruff_python_semantic::{BindingId, ResolvedReference, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
-use crate::settings::types::PythonVersion;
+use ruff_python_ast::PythonVersion;
 
 /// Format a code snippet to call `name.method()`.
 pub(super) fn generate_method_call(name: Name, method: &str, generator: Generator) -> String {
@@ -260,7 +260,7 @@ fn match_open_keywords(
                 if read_mode {
                     // newline is only valid for write_text
                     return None;
-                } else if target_version < PythonVersion::Py310 {
+                } else if target_version < PythonVersion::PY310 {
                     // `pathlib` doesn't support `newline` until Python 3.10.
                     return None;
                 }
@@ -290,11 +290,9 @@ fn match_open_keywords(
 
 /// Match open mode to see if it is supported.
 fn match_open_mode(mode: &Expr) -> Option<OpenMode> {
-    let ast::ExprStringLiteral { value, .. } = mode.as_string_literal_expr()?;
-    if value.is_implicit_concatenated() {
-        return None;
-    }
-    match value.to_str() {
+    let mode = mode.as_string_literal_expr()?.as_single_part_string()?;
+
+    match &*mode.value {
         "r" => Some(OpenMode::ReadText),
         "rb" => Some(OpenMode::ReadBytes),
         "w" => Some(OpenMode::WriteText),

@@ -53,10 +53,9 @@ pub(crate) fn normalize_imports<'a>(
             } => {
                 // Whether to track each member of the import as a separate entry.
                 let isolate_aliases = settings.force_single_line
-                    && module.map_or(true, |module| {
-                        !settings.single_line_exclusions.contains(module)
-                    })
-                    && !names.first().is_some_and(|alias| alias.name == "*");
+                    && module
+                        .is_none_or(|module| !settings.single_line_exclusions.contains(module))
+                    && names.first().is_none_or(|alias| alias.name != "*");
 
                 // Insert comments on the statement itself.
                 if isolate_aliases {

@@ -32,6 +32,13 @@ pub(crate) enum Command {
 
 #[derive(Debug, Parser)]
 pub(crate) struct CheckCommand {
+    /// List of files or directories to check.
+    #[clap(
+        help = "List of files or directories to check [default: the project root]",
+        value_name = "PATH"
+    )]
+    pub paths: Vec<SystemPathBuf>,
+
     /// Run the command within the given project directory.
     ///
     /// All `pyproject.toml` files will be discovered by walking up the directory tree from the given project directory,
@@ -41,12 +48,14 @@ pub(crate) struct CheckCommand {
     #[arg(long, value_name = "PROJECT")]
     pub(crate) project: Option<SystemPathBuf>,
 
-    /// Path to the virtual environment the project uses.
+    /// Path to the Python installation from which Red Knot resolves type information and third-party dependencies.
     ///
-    /// If provided, red-knot will use the `site-packages` directory of this virtual environment
-    /// to resolve type information for the project's third-party dependencies.
+    /// Red Knot will search in the path's `site-packages` directories for type information and
+    /// third-party imports.
+    ///
+    /// This option is commonly used to specify the path to a virtual environment.
     #[arg(long, value_name = "PATH")]
-    pub(crate) venv_path: Option<SystemPathBuf>,
+    pub(crate) python: Option<SystemPathBuf>,
 
     /// Custom directory to use for stdlib typeshed stubs.
     #[arg(long, value_name = "PATH", alias = "custom-typeshed-dir")]
@@ -74,7 +83,7 @@ pub(crate) struct CheckCommand {
     #[arg(long)]
     pub(crate) exit_zero: bool,
 
-    /// Run in watch mode by re-running whenever files change.
+    /// Watch files for changes and recheck files related to the changed files.
     #[arg(long, short = 'W')]
     pub(crate) watch: bool,
 }
@@ -97,7 +106,7 @@ impl CheckCommand {
                 python_version: self
                     .python_version
                     .map(|version| RangedValue::cli(version.into())),
-                venv_path: self.venv_path.map(RelativePathBuf::cli),
+                python: self.python.map(RelativePathBuf::cli),
                 typeshed: self.typeshed.map(RelativePathBuf::cli),
                 extra_paths: self.extra_search_path.map(|extra_search_paths| {
                     extra_search_paths

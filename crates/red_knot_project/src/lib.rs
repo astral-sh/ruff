@@ -1,6 +1,7 @@
 #![allow(clippy::ref_option)]
 
 use crate::metadata::options::OptionDiagnostic;
+use crate::walk::{ProjectFilesFilter, ProjectFilesWalker};
 pub use db::{Db, ProjectDatabase};
 use files::{Index, Indexed, IndexedFiles};
 use metadata::settings::Settings;
@@ -8,25 +9,24 @@ pub use metadata::{ProjectDiscoveryError, ProjectMetadata};
 use red_knot_python_semantic::lint::{LintRegistry, LintRegistryBuilder, RuleSelection};
 use red_knot_python_semantic::register_lints;
 use red_knot_python_semantic::types::check_types;
-use ruff_db::diagnostic::{Diagnostic, DiagnosticId, ParseDiagnostic, Severity};
-use ruff_db::files::{system_path_to_file, File};
+use ruff_db::diagnostic::{DiagnosticId, OldDiagnosticTrait, OldParseDiagnostic, Severity, Span};
+use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::{source_text, SourceTextError};
-use ruff_db::system::walk_directory::WalkState;
-use ruff_db::system::{FileType, SystemPath};
-use ruff_python_ast::PySourceType;
-use ruff_text_size::TextRange;
-use rustc_hash::{FxBuildHasher, FxHashSet};
+use ruff_db::system::{SystemPath, SystemPathBuf};
+use rustc_hash::FxHashSet;
 use salsa::Durability;
 use salsa::Setter;
 use std::borrow::Cow;
 use std::sync::Arc;
+use thiserror::Error;
 
 pub mod combine;
 
 mod db;
 mod files;
 pub mod metadata;
+mod walk;
 pub mod watch;
 
 pub static DEFAULT_LINT_REGISTRY: std::sync::LazyLock<LintRegistry> =
@@ -72,6 +72,30 @@ pub struct Project {
     #[return_ref]
     pub settings: Settings,
 
+    /// The paths that should be included when checking this project.
+    ///
+    /// The default (when this list is empty) is to include all files in the project root
+    /// (that satisfy the configured include and exclude patterns).
+    /// However, it's sometimes desired to only check a subset of the project, e.g. to see
+    /// the diagnostics for a single file or a folder.
+    ///
+    /// This list gets initialized by the paths passed to `knot check <paths>`
+    ///
+    /// ## How is this different from `open_files`?
+    ///
+    /// The `included_paths` is closely related to `open_files`. The only difference is that
+    /// `open_files` is already a resolved set of files whereas `included_paths` is only a list of paths
+    /// that are resolved to files by indexing them. The other difference is that
+    /// new files added to any directory in `included_paths` will be indexed and added to the project
+    /// whereas `open_files` needs to be updated manually (e.g. by the IDE).
+    ///
+    /// In short, `open_files` is cheaper in contexts where the set of files is known, like
+    /// in an IDE when the user only wants to check the open tabs. This could be modeled
+    /// with `included_paths` too but it would require an explicit walk dir step that's simply unnecessary.
+    #[default]
+    #[return_ref]
+    included_paths_list: Vec<SystemPathBuf>,
+
     /// Diagnostics that were generated when resolving the project settings.
     #[return_ref]
     settings_diagnostics: Vec<OptionDiagnostic>,
@@ -107,6 +131,16 @@ impl Project {
         self.settings(db).to_rules()
     }
 
+    /// Returns `true` if `path` is both part of the project and included (see `included_paths_list`).
+    ///
+    /// Unlike [Self::files], this method does not respect `.gitignore` files. It only checks
+    /// the project's include and exclude settings as well as the paths that were passed to `knot check <paths>`.
+    /// This means, that this method is an over-approximation of `Self::files` and may return `true` for paths
+    /// that won't be included when checking the project because they're ignored in a `.gitignore` file.
+    pub fn is_path_included(self, db: &dyn Db, path: &SystemPath) -> bool {
+        ProjectFilesFilter::from_project(db, self).is_included(path)
+    }
+
     pub fn reload(self, db: &mut dyn Db, metadata: ProjectMetadata) {
         tracing::debug!("Reloading project");
         assert_eq!(self.root(db), metadata.root());
@@ -129,15 +163,22 @@ impl Project {
     }
 
     /// Checks all open files in the project and its dependencies.
-    pub(crate) fn check(self, db: &ProjectDatabase) -> Vec<Box<dyn Diagnostic>> {
+    pub(crate) fn check(self, db: &ProjectDatabase) -> Vec<Box<dyn OldDiagnosticTrait>> {
         let project_span = tracing::debug_span!("Project::check");
         let _span = project_span.enter();
 
         tracing::debug!("Checking project '{name}'", name = self.name(db));
 
-        let mut diagnostics: Vec<Box<dyn Diagnostic>> = Vec::new();
+        let mut diagnostics: Vec<Box<dyn OldDiagnosticTrait>> = Vec::new();
         diagnostics.extend(self.settings_diagnostics(db).iter().map(|diagnostic| {
-            let diagnostic: Box<dyn Diagnostic> = Box::new(diagnostic.clone());
+            let diagnostic: Box<dyn OldDiagnosticTrait> = Box::new(diagnostic.clone());
+            diagnostic
+        }));
+
+        let files = ProjectFiles::new(db, self);
+
+        diagnostics.extend(files.diagnostics().iter().cloned().map(|diagnostic| {
+            let diagnostic: Box<dyn OldDiagnosticTrait> = Box::new(diagnostic);
             diagnostic
         }));
 
@@ -148,7 +189,6 @@ impl Project {
         let project_span = project_span.clone();
 
         rayon::scope(move |scope| {
-            let files = ProjectFiles::new(&db, self);
             for file in &files {
                 let result = inner_result.clone();
                 let db = db.clone();
@@ -167,12 +207,12 @@ impl Project {
         Arc::into_inner(result).unwrap().into_inner().unwrap()
     }
 
-    pub(crate) fn check_file(self, db: &dyn Db, file: File) -> Vec<Box<dyn Diagnostic>> {
+    pub(crate) fn check_file(self, db: &dyn Db, file: File) -> Vec<Box<dyn OldDiagnosticTrait>> {
         let mut file_diagnostics: Vec<_> = self
             .settings_diagnostics(db)
             .iter()
             .map(|diagnostic| {
-                let diagnostic: Box<dyn Diagnostic> = Box::new(diagnostic.clone());
+                let diagnostic: Box<dyn OldDiagnosticTrait> = Box::new(diagnostic.clone());
                 diagnostic
             })
             .collect();
@@ -206,6 +246,30 @@ impl Project {
         }
 
         removed
+    }
+
+    pub fn set_included_paths(self, db: &mut dyn Db, paths: Vec<SystemPathBuf>) {
+        tracing::debug!("Setting included paths: {paths}", paths = paths.len());
+
+        self.set_included_paths_list(db).to(paths);
+        self.reload_files(db);
+    }
+
+    /// Returns the paths that should be checked.
+    ///
+    /// The default is to check the entire project in which case this method returns
+    /// the project root. However, users can specify to only check specific sub-folders or
+    /// even files of a project by using `knot check <paths>`. In that case, this method
+    /// returns the provided absolute paths.
+    ///
+    /// Note: The CLI doesn't prohibit users from specifying paths outside the project root.
+    /// This can be useful to check arbitrary files, but it isn't something we recommend.
+    /// We should try to support this use case but it's okay if there are some limitations around it.
+    fn included_paths_or_root(self, db: &dyn Db) -> &[SystemPathBuf] {
+        match &**self.included_paths_list(db) {
+            [] => std::slice::from_ref(&self.metadata(db).root),
+            paths => paths,
+        }
     }
 
     /// Returns the open files in the project or `None` if the entire project should be checked.
@@ -290,6 +354,17 @@ impl Project {
         index.insert(file);
     }
 
+    /// Replaces the diagnostics from indexing the project files with `diagnostics`.
+    ///
+    /// This is a no-op if the project files haven't been indexed yet.
+    pub fn replace_index_diagnostics(self, db: &mut dyn Db, diagnostics: Vec<IOErrorDiagnostic>) {
+        let Some(mut index) = IndexedFiles::indexed_mut(db, self) else {
+            return;
+        };
+
+        index.set_diagnostics(diagnostics);
+    }
+
     /// Returns the files belonging to this project.
     pub fn files(self, db: &dyn Db) -> Indexed<'_> {
         let files = self.file_set(db);
@@ -297,12 +372,14 @@ impl Project {
         let indexed = match files.get() {
             Index::Lazy(vacant) => {
                 let _entered =
-                    tracing::debug_span!("Project::index_files", package = %self.name(db))
+                    tracing::debug_span!("Project::index_files", project = %self.name(db))
                         .entered();
 
-                let files = discover_project_files(db, self);
-                tracing::info!("Found {} files in project `{}`", files.len(), self.name(db));
-                vacant.set(files)
+                let walker = ProjectFilesWalker::new(db);
+                let (files, diagnostics) = walker.collect_set(db);
+
+                tracing::info!("Indexed {} file(s)", files.len());
+                vacant.set(files, diagnostics)
             }
             Index::Indexed(indexed) => indexed,
         };
@@ -320,81 +397,41 @@ impl Project {
     }
 }
 
-fn check_file_impl(db: &dyn Db, file: File) -> Vec<Box<dyn Diagnostic>> {
-    let mut diagnostics: Vec<Box<dyn Diagnostic>> = Vec::new();
+fn check_file_impl(db: &dyn Db, file: File) -> Vec<Box<dyn OldDiagnosticTrait>> {
+    let mut diagnostics: Vec<Box<dyn OldDiagnosticTrait>> = Vec::new();
 
     // Abort checking if there are IO errors.
     let source = source_text(db.upcast(), file);
 
     if let Some(read_error) = source.read_error() {
         diagnostics.push(Box::new(IOErrorDiagnostic {
-            file,
-            error: read_error.clone(),
+            file: Some(file),
+            error: read_error.clone().into(),
         }));
         return diagnostics;
     }
 
     let parsed = parsed_module(db.upcast(), file);
     diagnostics.extend(parsed.errors().iter().map(|error| {
-        let diagnostic: Box<dyn Diagnostic> = Box::new(ParseDiagnostic::new(file, error.clone()));
+        let diagnostic: Box<dyn OldDiagnosticTrait> =
+            Box::new(OldParseDiagnostic::new(file, error.clone()));
         diagnostic
     }));
 
     diagnostics.extend(check_types(db.upcast(), file).iter().map(|diagnostic| {
-        let boxed: Box<dyn Diagnostic> = Box::new(diagnostic.clone());
+        let boxed: Box<dyn OldDiagnosticTrait> = Box::new(diagnostic.clone());
         boxed
     }));
 
-    diagnostics.sort_unstable_by_key(|diagnostic| diagnostic.range().unwrap_or_default().start());
-
-    diagnostics
-}
-
-fn discover_project_files(db: &dyn Db, project: Project) -> FxHashSet<File> {
-    let paths = std::sync::Mutex::new(Vec::new());
-
-    db.system().walk_directory(project.root(db)).run(|| {
-        Box::new(|entry| {
-            match entry {
-                Ok(entry) => {
-                    // Skip over any non python files to avoid creating too many entries in `Files`.
-                    match entry.file_type() {
-                        FileType::File => {
-                            if entry
-                                .path()
-                                .extension()
-                                .and_then(PySourceType::try_from_extension)
-                                .is_some()
-                            {
-                                let mut paths = paths.lock().unwrap();
-                                paths.push(entry.into_path());
-                            }
-                        }
-                        FileType::Directory | FileType::Symlink => {}
-                    }
-                }
-                Err(error) => {
-                    // TODO Handle error
-                    tracing::error!("Failed to walk path: {error}");
-                }
-            }
-
-            WalkState::Continue
-        })
+    diagnostics.sort_unstable_by_key(|diagnostic| {
+        diagnostic
+            .span()
+            .and_then(|span| span.range())
+            .unwrap_or_default()
+            .start()
     });
 
-    let paths = paths.into_inner().unwrap();
-    let mut files = FxHashSet::with_capacity_and_hasher(paths.len(), FxBuildHasher);
-
-    for path in paths {
-        // If this returns `None`, then the file was deleted between the `walk_directory` call and now.
-        // We can ignore this.
-        if let Ok(file) = system_path_to_file(db.upcast(), &path) {
-            files.insert(file);
-        }
-    }
-
-    files
+    diagnostics
 }
 
 #[derive(Debug)]
@@ -409,6 +446,13 @@ impl<'a> ProjectFiles<'a> {
             ProjectFiles::OpenFiles(open_files)
         } else {
             ProjectFiles::Indexed(project.files(db))
+        }
+    }
+
+    fn diagnostics(&self) -> &[IOErrorDiagnostic] {
+        match self {
+            ProjectFiles::OpenFiles(_) => &[],
+            ProjectFiles::Indexed(indexed) => indexed.diagnostics(),
         }
     }
 }
@@ -443,13 +487,13 @@ impl Iterator for ProjectFilesIter<'_> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct IOErrorDiagnostic {
-    file: File,
-    error: SourceTextError,
+    file: Option<File>,
+    error: IOErrorKind,
 }
 
-impl Diagnostic for IOErrorDiagnostic {
+impl OldDiagnosticTrait for IOErrorDiagnostic {
     fn id(&self) -> DiagnosticId {
         DiagnosticId::Io
     }
@@ -458,12 +502,8 @@ impl Diagnostic for IOErrorDiagnostic {
         self.error.to_string().into()
     }
 
-    fn file(&self) -> Option<File> {
-        Some(self.file)
-    }
-
-    fn range(&self) -> Option<TextRange> {
-        None
+    fn span(&self) -> Option<Span> {
+        self.file.map(Span::from)
     }
 
     fn severity(&self) -> Severity {
@@ -471,15 +511,24 @@ impl Diagnostic for IOErrorDiagnostic {
     }
 }
 
+#[derive(Error, Debug, Clone)]
+enum IOErrorKind {
+    #[error(transparent)]
+    Walk(#[from] walk::WalkError),
+
+    #[error(transparent)]
+    SourceText(#[from] SourceTextError),
+}
+
 #[cfg(test)]
 mod tests {
     use crate::db::tests::TestDb;
     use crate::{check_file_impl, ProjectMetadata};
     use red_knot_python_semantic::types::check_types;
-    use ruff_db::diagnostic::Diagnostic;
+    use ruff_db::diagnostic::OldDiagnosticTrait;
     use ruff_db::files::system_path_to_file;
     use ruff_db::source::source_text;
-    use ruff_db::system::{DbWithTestSystem, SystemPath, SystemPathBuf};
+    use ruff_db::system::{DbWithTestSystem, DbWithWritableSystem as _, SystemPath, SystemPathBuf};
     use ruff_db::testing::assert_function_query_was_not_run;
     use ruff_python_ast::name::Name;
 

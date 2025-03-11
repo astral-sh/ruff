@@ -470,13 +470,13 @@ impl Printed {
         for marker in self.sourcemap {
             // Take the closest start marker, but skip over start_markers that have the same start.
             if marker.source <= source_range.start()
-                && !start_marker.is_some_and(|existing| existing.source >= marker.source)
+                && start_marker.is_none_or(|existing| existing.source < marker.source)
             {
                 start_marker = Some(marker);
             }
 
             if marker.source >= source_range.end()
-                && !end_marker.is_some_and(|existing| existing.source <= marker.source)
+                && end_marker.is_none_or(|existing| existing.source > marker.source)
             {
                 end_marker = Some(marker);
             }

@@ -16,8 +16,10 @@ red_knot_python_semantic = { workspace = true }
 red_knot_project = { workspace = true, features = ["zstd"] }
 red_knot_server = { workspace = true }
 ruff_db = { workspace = true, features = ["os", "cache"] }
+ruff_python_ast = { workspace = true }
 
 anyhow = { workspace = true }
+argfile = { workspace = true }
 chrono = { workspace = true }
 clap = { workspace = true, features = ["wrap_help"] }
 colored = { workspace = true }
@@ -30,6 +32,7 @@ tracing = { workspace = true, features = ["release_max_level_debug"] }
 tracing-subscriber = { workspace = true, features = ["env-filter", "fmt"] }
 tracing-flame = { workspace = true }
 tracing-tree = { workspace = true }
+wild = { workspace = true }
 
 [dev-dependencies]
 ruff_db = { workspace = true, features = ["testing"] }

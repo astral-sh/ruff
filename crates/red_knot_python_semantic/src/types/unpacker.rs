@@ -42,25 +42,28 @@ impl<'db> Unpacker<'db> {
             "Unpacking target must be a list or tuple expression"
         );
 
-        let mut value_ty = infer_expression_types(self.db(), value.expression())
+        let value_ty = infer_expression_types(self.db(), value.expression())
             .expression_type(value.scoped_expression_id(self.db(), self.scope));
 
-        if value.is_assign()
-            && self.context.in_stub()
-            && value
-                .expression()
-                .node_ref(self.db())
-                .is_ellipsis_literal_expr()
-        {
-            value_ty = Type::unknown();
-        }
-        if value.is_iterable() {
-            // If the value is an iterable, then the type that needs to be unpacked is the iterator
-            // type.
-            value_ty = value_ty
-                .iterate(self.db())
-                .unwrap_with_diagnostic(&self.context, value.as_any_node_ref(self.db()));
-        }
+        let value_ty = match value {
+            UnpackValue::Assign(expression) => {
+                if self.context.in_stub()
+                    && expression.node_ref(self.db()).is_ellipsis_literal_expr()
+                {
+                    Type::unknown()
+                } else {
+                    value_ty
+                }
+            }
+            UnpackValue::Iterable(_) => value_ty.try_iterate(self.db()).unwrap_or_else(|err| {
+                err.report_diagnostic(&self.context, value.as_any_node_ref(self.db()));
+                err.fallback_element_type(self.db())
+            }),
+            UnpackValue::ContextManager(_) => value_ty.try_enter(self.db()).unwrap_or_else(|err| {
+                err.report_diagnostic(&self.context, value.as_any_node_ref(self.db()));
+                err.fallback_enter_type(self.db())
+            }),
+        };
 
         self.unpack_inner(target, value.as_any_node_ref(self.db()), value_ty);
     }
@@ -120,43 +123,51 @@ impl<'db> Unpacker<'db> {
                     if let Some(tuple_ty) = ty.into_tuple() {
                         let tuple_ty_elements = self.tuple_ty_elements(target, elts, tuple_ty);
 
-                        match elts.len().cmp(&tuple_ty_elements.len()) {
+                        let length_mismatch = match elts.len().cmp(&tuple_ty_elements.len()) {
                             Ordering::Less => {
                                 self.context.report_lint(
                                     &INVALID_ASSIGNMENT,
-                                    target.into(),
+                                    target,
                                     format_args!(
                                         "Too many values to unpack (expected {}, got {})",
                                         elts.len(),
                                         tuple_ty_elements.len()
                                     ),
                                 );
+                                true
                             }
                             Ordering::Greater => {
                                 self.context.report_lint(
                                     &INVALID_ASSIGNMENT,
-                                    target.into(),
+                                    target,
                                     format_args!(
                                         "Not enough values to unpack (expected {}, got {})",
                                         elts.len(),
                                         tuple_ty_elements.len()
                                     ),
                                 );
+                                true
                             }
-                            Ordering::Equal => {}
-                        }
+                            Ordering::Equal => false,
+                        };
 
                         for (index, ty) in tuple_ty_elements.iter().enumerate() {
                             if let Some(element_types) = target_types.get_mut(index) {
-                                element_types.push(*ty);
+                                if length_mismatch {
+                                    element_types.push(Type::unknown());
+                                } else {
+                                    element_types.push(*ty);
+                                }
                             }
                         }
                     } else {
                         let ty = if ty.is_literal_string() {
                             Type::LiteralString
                         } else {
-                            ty.iterate(self.db())
-                                .unwrap_with_diagnostic(&self.context, value_expr)
+                            ty.try_iterate(self.db()).unwrap_or_else(|err| {
+                                err.report_diagnostic(&self.context, value_expr);
+                                err.fallback_element_type(self.db())
+                            })
                         };
                         for target_type in &mut target_types {
                             target_type.push(ty);
@@ -232,7 +243,7 @@ impl<'db> Unpacker<'db> {
         } else {
             self.context.report_lint(
                 &INVALID_ASSIGNMENT,
-                expr.into(),
+                expr,
                 format_args!(
                     "Not enough values to unpack (expected {} or more, got {})",
                     targets.len() - 1,
@@ -240,15 +251,7 @@ impl<'db> Unpacker<'db> {
                 ),
             );
 
-            let mut element_types = tuple_ty.elements(self.db()).to_vec();
-
-            // Subtract 1 to insert the starred expression type at the correct
-            // index.
-            element_types.resize(targets.len() - 1, Type::unknown());
-            // TODO: This should be `list[Unknown]`
-            element_types.insert(starred_index, todo_type!("starred unpacking"));
-
-            Cow::Owned(element_types)
+            Cow::Owned(vec![Type::unknown(); targets.len()])
         }
     }
 
@@ -261,7 +264,7 @@ impl<'db> Unpacker<'db> {
     }
 }
 
-#[derive(Debug, Default, PartialEq, Eq)]
+#[derive(Debug, Default, PartialEq, Eq, salsa::Update)]
 pub(crate) struct UnpackResult<'db> {
     targets: FxHashMap<ScopedExpressionId, Type<'db>>,
     diagnostics: TypeCheckDiagnostics,

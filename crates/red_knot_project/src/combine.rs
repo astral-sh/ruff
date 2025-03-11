@@ -1,7 +1,8 @@
 use std::{collections::HashMap, hash::BuildHasher};
 
-use red_knot_python_semantic::{PythonPlatform, PythonVersion, SitePackages};
+use red_knot_python_semantic::{PythonPath, PythonPlatform};
 use ruff_db::system::SystemPathBuf;
+use ruff_python_ast::PythonVersion;
 
 /// Combine two values, preferring the values in `self`.
 ///
@@ -127,7 +128,7 @@ macro_rules! impl_noop_combine {
 
 impl_noop_combine!(SystemPathBuf);
 impl_noop_combine!(PythonPlatform);
-impl_noop_combine!(SitePackages);
+impl_noop_combine!(PythonPath);
 impl_noop_combine!(PythonVersion);
 
 // std types

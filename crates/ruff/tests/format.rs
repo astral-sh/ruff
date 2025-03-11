@@ -816,6 +816,7 @@ if True:
 
         ----- stderr -----
         ruff failed
+          Cause: Failed to load configuration `[RUFF-TOML-PATH]`
           Cause: Failed to parse [RUFF-TOML-PATH]
           Cause: TOML parse error at line 1, column 1
           |
@@ -855,6 +856,7 @@ format = "json"
 
         ----- stderr -----
         ruff failed
+          Cause: Failed to load configuration `[RUFF-TOML-PATH]`
           Cause: Failed to parse [RUFF-TOML-PATH]
           Cause: TOML parse error at line 2, column 10
           |
@@ -1698,6 +1700,87 @@ fn test_notebook_trailing_semicolon() {
 }
 
 #[test]
+fn syntax_error_in_notebooks() -> Result<()> {
+    let tempdir = TempDir::new()?;
+
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+include = ["*.ipy"]
+"#,
+    )?;
+
+    fs::write(
+        tempdir.path().join("main.ipy"),
+        r#"
+{
+    "cells": [
+     {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+       "id": "S6nTuMqGGqp2"
+      },
+      "outputs": [],
+      "source": [
+       "np.random.seed(RANDOM_STATE)\n",
+       "X = pd.DataFrame(data=X, columns=np.arange(0, X.shape[1]))\n",
+       "X[10] = X[6] + X[7] + np.random.random() * 0.01"
+      ]
+     },
+     {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+       "id": "fTZWxz1zpb9R"
+      },
+      "outputs": [],
+      "source": [
+       "for i in range(iterations):\n",
+       "    # выберите случайный индекс в диапазон от 0 до len(X)-1 включительно при помощи функции random.randint\n",
+       "    j = # ваш код здесь\n"
+      ]
+     }
+    ],
+    "metadata": {
+     "colab": {
+      "provenance": []
+     },
+     "kernelspec": {
+      "display_name": "ml",
+      "language": "python",
+      "name": "python3"
+     },
+     "language_info": {
+      "name": "python",
+      "version": "3.12.9"
+     }
+    },
+    "nbformat": 4,
+    "nbformat_minor": 0
+   }
+"#,
+    )?;
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .current_dir(tempdir.path())
+        .arg("format")
+        .arg("--no-cache")
+        .args(["--config", &ruff_toml.file_name().unwrap().to_string_lossy()])
+        .args(["--extension", "ipy:ipynb"])
+        .arg("."), @r"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    error: Failed to parse main.ipy:2:3:24: Expected an expression
+    ");
+    Ok(())
+}
+
+#[test]
 fn extension() -> Result<()> {
     let tempdir = TempDir::new()?;
 
@@ -2083,4 +2166,85 @@ fn range_formatting_notebook() {
     ----- stderr -----
     error: Failed to format main.ipynb: Range formatting isn't supported for notebooks.
     ");
+}
+
+/// Test that the formatter respects `per-file-target-version`. Context managers can't be
+/// parenthesized like this before Python 3.10.
+///
+/// Adapted from <https://github.com/python/cpython/issues/56991#issuecomment-1093555135>
+#[test]
+fn per_file_target_version_formatter() {
+    // without `per-file-target-version` this should not be reformatted in the same way
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["format", "--isolated", "--stdin-filename", "test.py", "--target-version=py38"])
+        .arg("-")
+        .pass_stdin(r#"
+with open("a_really_long_foo") as foo, open("a_really_long_bar") as bar, open("a_really_long_baz") as baz:
+    pass
+"#), @r#"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    with open("a_really_long_foo") as foo, open("a_really_long_bar") as bar, open(
+        "a_really_long_baz"
+    ) as baz:
+        pass
+
+    ----- stderr -----
+    "#);
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["format", "--isolated", "--stdin-filename", "test.py", "--target-version=py38"])
+        .args(["--config", r#"per-file-target-version = {"test.py" = "py311"}"#])
+        .arg("-")
+        .pass_stdin(r#"
+with open("a_really_long_foo") as foo, open("a_really_long_bar") as bar, open("a_really_long_baz") as baz:
+    pass
+"#), @r#"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    with (
+        open("a_really_long_foo") as foo,
+        open("a_really_long_bar") as bar,
+        open("a_really_long_baz") as baz,
+    ):
+        pass
+
+    ----- stderr -----
+    "#);
+}
+
+/// Regression test for <https://github.com/astral-sh/ruff/issues/9381> with very helpful
+/// reproduction repo here: <https://github.com/lucasfijen/example_ruff_glob_bug>
+#[test]
+fn cookiecutter_globbing() -> Result<()> {
+    // This is a simplified directory structure from the repo linked above. The essence of the
+    // problem is this `{{cookiecutter.repo_name}}` directory containing a config file with a glob.
+    // The absolute path of the glob contains the glob metacharacters `{{` and `}}` even though the
+    // user's glob does not.
+    let tempdir = TempDir::new()?;
+    let cookiecutter = tempdir.path().join("{{cookiecutter.repo_name}}");
+    let cookiecutter_toml = cookiecutter.join("pyproject.toml");
+    let tests = cookiecutter.join("tests");
+    fs::create_dir_all(&tests)?;
+    fs::write(
+        cookiecutter_toml,
+        r#"tool.ruff.lint.per-file-ignores = { "tests/*" = ["F811"] }"#,
+    )?;
+    let maintest = tests.join("maintest.py");
+    fs::write(maintest, "import foo\nimport bar\nimport foo\n")?;
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .args(["format", "--no-cache", "--diff"])
+            .current_dir(tempdir.path()), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    1 file already formatted
+    ");
+
+    Ok(())
 }

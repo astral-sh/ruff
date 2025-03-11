@@ -578,6 +578,16 @@
         }
       }
     },
+    "per-file-target-version": {
+      "description": "A list of mappings from glob-style file pattern to Python version to use when checking the corresponding file(s).\n\nThis may be useful for overriding the global Python version settings in `target-version` or `requires-python` for a subset of files. For example, if you have a project with a minimum supported Python version of 3.9 but a subdirectory of developer scripts that want to use a newer feature like the `match` statement from Python 3.10, you can use `per-file-target-version` to specify `\"developer_scripts/*.py\" = \"py310\"`.\n\nThis setting is used by the linter to enforce any enabled version-specific lint rules, as well as by the formatter for any version-specific formatting options, such as parenthesizing context managers on Python 3.10+.",
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": {
+        "$ref": "#/definitions/PythonVersion"
+      }
+    },
     "preview": {
       "description": "Whether to enable preview mode. When preview mode is enabled, Ruff will use unstable rules, fixes, and formatting.",
       "type": [
@@ -1046,7 +1056,7 @@
           }
         },
         "builtins-strict-checking": {
-          "description": "Compare module names instead of full module paths.",
+          "description": "Compare module names instead of full module paths.\n\nUsed by [`A005` - `stdlib-module-shadowing`](https://docs.astral.sh/ruff/rules/stdlib-module-shadowing/).\n\nIn preview mode the default value is `false` rather than `true`.",
           "type": [
             "boolean",
             "null"
@@ -3367,6 +3377,7 @@
         "FURB157",
         "FURB16",
         "FURB161",
+        "FURB162",
         "FURB163",
         "FURB164",
         "FURB166",
@@ -3968,6 +3979,7 @@
         "RUF040",
         "RUF041",
         "RUF043",
+        "RUF045",
         "RUF046",
         "RUF047",
         "RUF048",
@@ -3981,6 +3993,7 @@
         "RUF056",
         "RUF057",
         "RUF058",
+        "RUF059",
         "RUF1",
         "RUF10",
         "RUF100",

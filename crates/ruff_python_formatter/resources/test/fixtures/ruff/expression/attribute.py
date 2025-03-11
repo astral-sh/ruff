@@ -152,3 +152,20 @@ result = (
     f(111111111111111111111111111111111111111111111111111111111111111111111111111111111)
     + 1
 ).bit_length()
+
+
+# Regression test for https://github.com/astral-sh/ruff/issues/16151
+result = (
+   (await query_the_thing(mypy_doesnt_understand))  # type: ignore[x]
+   .foo()
+   .bar()
+)
+
+(
+    (
+        a # trailing end-of-line
+        # trailing own-line
+    ) # trailing closing parentheses
+    # dangling before dot
+    .b # trailing end-of-line
+)

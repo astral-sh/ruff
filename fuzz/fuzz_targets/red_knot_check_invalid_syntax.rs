@@ -11,13 +11,16 @@ use red_knot_python_semantic::lint::LintRegistry;
 use red_knot_python_semantic::types::check_types;
 use red_knot_python_semantic::{
     default_lint_registry, lint::RuleSelection, Db as SemanticDb, Program, ProgramSettings,
-    PythonPlatform, PythonVersion, SearchPathSettings,
+    PythonPlatform, SearchPathSettings,
 };
 use ruff_db::files::{system_path_to_file, File, Files};
-use ruff_db::system::{DbWithTestSystem, System, SystemPathBuf, TestSystem};
+use ruff_db::system::{
+    DbWithTestSystem, DbWithWritableSystem as _, System, SystemPathBuf, TestSystem,
+};
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_db::{Db as SourceDb, Upcast};
-use ruff_python_parser::{parse_unchecked, Mode};
+use ruff_python_ast::PythonVersion;
+use ruff_python_parser::{parse_unchecked, Mode, ParseOptions};
 
 /// Database that can be used for testing.
 ///
@@ -133,8 +136,8 @@ fn do_fuzz(case: &[u8]) -> Corpus {
         return Corpus::Reject;
     };
 
-    let parsed = parse_unchecked(code, Mode::Module);
-    if parsed.is_valid() {
+    let parsed = parse_unchecked(code, ParseOptions::from(Mode::Module));
+    if parsed.has_valid_syntax() {
         return Corpus::Reject;
     }
 

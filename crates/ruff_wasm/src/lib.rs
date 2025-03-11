@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use js_sys::Error;
+use ruff_linter::settings::types::PythonVersion;
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
@@ -10,7 +11,6 @@ use ruff_linter::directives;
 use ruff_linter::line_width::{IndentWidth, LineLength};
 use ruff_linter::linter::check_path;
 use ruff_linter::registry::AsRule;
-use ruff_linter::settings::types::PythonVersion;
 use ruff_linter::settings::{flags, DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX};
 use ruff_linter::source_kind::SourceKind;
 use ruff_linter::Locator;
@@ -18,7 +18,7 @@ use ruff_python_ast::{Mod, PySourceType};
 use ruff_python_codegen::Stylist;
 use ruff_python_formatter::{format_module_ast, pretty_comments, PyFormatContext, QuoteStyle};
 use ruff_python_index::Indexer;
-use ruff_python_parser::{parse, parse_unchecked, parse_unchecked_source, Mode, Parsed};
+use ruff_python_parser::{parse, parse_unchecked, Mode, ParseOptions, Parsed};
 use ruff_python_trivia::CommentRanges;
 use ruff_source_file::SourceLocation;
 use ruff_text_size::Ranged;
@@ -161,8 +161,14 @@ impl Workspace {
         // TODO(dhruvmanila): Support Jupyter Notebooks
         let source_kind = SourceKind::Python(contents.to_string());
 
+        // Use the unresolved version because we don't have a file path.
+        let target_version = self.settings.linter.unresolved_target_version;
+
         // Parse once.
-        let parsed = parse_unchecked_source(source_kind.source_code(), source_type);
+        let options = ParseOptions::from(source_type).with_target_version(target_version);
+        let parsed = parse_unchecked(source_kind.source_code(), options)
+            .try_into_module()
+            .expect("`PySourceType` always parses to a `ModModule`.");
 
         // Map row and column locations to byte slices (lazily).
         let locator = Locator::new(contents);
@@ -194,9 +200,16 @@ impl Workspace {
             &source_kind,
             source_type,
             &parsed,
+            target_version,
         );
 
         let source_code = locator.to_source_code();
+
+        let unsupported_syntax_errors = if self.settings.linter.preview.is_enabled() {
+            parsed.unsupported_syntax_errors()
+        } else {
+            &[]
+        };
 
         let messages: Vec<ExpandedMessage> = diagnostics
             .into_iter()
@@ -235,6 +248,18 @@ impl Workspace {
                     fix: None,
                 }
             }))
+            .chain(unsupported_syntax_errors.iter().map(|error| {
+                let start_location = source_code.source_location(error.range.start());
+                let end_location = source_code.source_location(error.range.end());
+
+                ExpandedMessage {
+                    code: None,
+                    message: format!("SyntaxError: {error}"),
+                    location: start_location,
+                    end_location,
+                    fix: None,
+                }
+            }))
             .collect();
 
         serde_wasm_bindgen::to_value(&messages).map_err(into_error)
@@ -264,13 +289,13 @@ impl Workspace {
 
     /// Parses the content and returns its AST
     pub fn parse(&self, contents: &str) -> Result<String, Error> {
-        let parsed = parse_unchecked(contents, Mode::Module);
+        let parsed = parse_unchecked(contents, ParseOptions::from(Mode::Module));
 
         Ok(format!("{:#?}", parsed.into_syntax()))
     }
 
     pub fn tokens(&self, contents: &str) -> Result<String, Error> {
-        let parsed = parse_unchecked(contents, Mode::Module);
+        let parsed = parse_unchecked(contents, ParseOptions::from(Mode::Module));
 
         Ok(format!("{:#?}", parsed.tokens().as_ref()))
     }
@@ -288,7 +313,7 @@ struct ParsedModule<'a> {
 
 impl<'a> ParsedModule<'a> {
     fn from_source(source_code: &'a str) -> Result<Self, Error> {
-        let parsed = parse(source_code, Mode::Module).map_err(into_error)?;
+        let parsed = parse(source_code, ParseOptions::from(Mode::Module)).map_err(into_error)?;
         let comment_ranges = CommentRanges::from(parsed.tokens());
         Ok(Self {
             source_code,
@@ -301,7 +326,7 @@ impl<'a> ParsedModule<'a> {
         // TODO(konstin): Add an options for py/pyi to the UI (2/2)
         let options = settings
             .formatter
-            .to_format_options(PySourceType::default(), self.source_code)
+            .to_format_options(PySourceType::default(), self.source_code, None)
             .with_source_map_generation(SourceMapGeneration::Enabled);
 
         format_module_ast(

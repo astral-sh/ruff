@@ -1,4 +1,4 @@
-use std::io::{self, BufWriter, Write};
+use std::io::{self, stdout, BufWriter, Write};
 use std::process::{ExitCode, Termination};
 
 use anyhow::Result;
@@ -15,14 +15,13 @@ use red_knot_project::watch::ProjectWatcher;
 use red_knot_project::{watch, Db};
 use red_knot_project::{ProjectDatabase, ProjectMetadata};
 use red_knot_server::run_server;
-use ruff_db::diagnostic::{Diagnostic, Severity};
-use ruff_db::system::{OsSystem, System, SystemPath, SystemPathBuf};
+use ruff_db::diagnostic::{DisplayDiagnosticConfig, OldDiagnosticTrait, Severity};
+use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
 use salsa::plumbing::ZalsaDatabase;
 
 mod args;
 mod logging;
 mod python_version;
-mod verbosity;
 mod version;
 
 #[allow(clippy::print_stdout, clippy::unnecessary_wraps, clippy::print_stderr)]
@@ -40,6 +39,15 @@ pub fn main() -> ExitStatus {
         // the configuration it is help to chain errors ("resolving configuration failed" ->
         // "failed to read file: subdir/pyproject.toml")
         for cause in error.chain() {
+            // Exit "gracefully" on broken pipe errors.
+            //
+            // See: https://github.com/BurntSushi/ripgrep/blob/bf63fe8f258afc09bae6caa48f0ae35eaf115005/crates/core/main.rs#L47C1-L61C14
+            if let Some(ioerr) = cause.downcast_ref::<io::Error>() {
+                if ioerr.kind() == io::ErrorKind::BrokenPipe {
+                    return ExitStatus::Success;
+                }
+            }
+
             writeln!(stderr, "  {} {cause}", "Cause:".bold()).ok();
         }
 
@@ -48,7 +56,10 @@ pub fn main() -> ExitStatus {
 }
 
 fn run() -> anyhow::Result<ExitStatus> {
-    let args = Args::parse_from(std::env::args());
+    let args = wild::args_os();
+    let args = argfile::expand_args_from(args, argfile::parse_fromfile, argfile::PREFIX)
+        .context("Failed to read CLI arguments from file")?;
+    let args = Args::parse_from(args);
 
     match args.command {
         Command::Server => run_server().map(|()| ExitStatus::Success),
@@ -70,7 +81,7 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     let _guard = setup_tracing(verbosity)?;
 
     // The base path to which all CLI arguments are relative to.
-    let cli_base_path = {
+    let cwd = {
         let cwd = std::env::current_dir().context("Failed to get the current working directory")?;
         SystemPathBuf::from_path_buf(cwd)
             .map_err(|path| {
@@ -81,28 +92,41 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
             })?
     };
 
-    let cwd = args
+    let project_path = args
         .project
         .as_ref()
-        .map(|cwd| {
-            if cwd.as_std_path().is_dir() {
-                Ok(SystemPath::absolute(cwd, &cli_base_path))
+        .map(|project| {
+            if project.as_std_path().is_dir() {
+                Ok(SystemPath::absolute(project, &cwd))
             } else {
-                Err(anyhow!("Provided project path `{cwd}` is not a directory"))
+                Err(anyhow!(
+                    "Provided project path `{project}` is not a directory"
+                ))
             }
         })
         .transpose()?
-        .unwrap_or_else(|| cli_base_path.clone());
+        .unwrap_or_else(|| cwd.clone());
+
+    let check_paths: Vec<_> = args
+        .paths
+        .iter()
+        .map(|path| SystemPath::absolute(path, &cwd))
+        .collect();
 
     let system = OsSystem::new(cwd);
     let watch = args.watch;
     let exit_zero = args.exit_zero;
 
     let cli_options = args.into_options();
-    let mut workspace_metadata = ProjectMetadata::discover(system.current_directory(), &system)?;
-    workspace_metadata.apply_cli_options(cli_options.clone());
+    let mut project_metadata = ProjectMetadata::discover(&project_path, &system)?;
+    project_metadata.apply_cli_options(cli_options.clone());
+    project_metadata.apply_configuration_files(&system)?;
 
-    let mut db = ProjectDatabase::new(workspace_metadata, system)?;
+    let mut db = ProjectDatabase::new(project_metadata, system)?;
+
+    if !check_paths.is_empty() {
+        db.project().set_included_paths(&mut db, check_paths);
+    }
 
     let (main_loop, main_loop_cancellation_token) = MainLoop::new(cli_options);
 
@@ -119,7 +143,7 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     let exit_status = if watch {
         main_loop.watch(&mut db)?
     } else {
-        main_loop.run(&mut db)
+        main_loop.run(&mut db)?
     };
 
     tracing::trace!("Counts for entire CLI run:\n{}", countme::get_all());
@@ -179,7 +203,7 @@ impl MainLoop {
         )
     }
 
-    fn watch(mut self, db: &mut ProjectDatabase) -> anyhow::Result<ExitStatus> {
+    fn watch(mut self, db: &mut ProjectDatabase) -> Result<ExitStatus> {
         tracing::debug!("Starting watch mode");
         let sender = self.sender.clone();
         let watcher = watch::directory_watcher(move |event| {
@@ -188,12 +212,12 @@ impl MainLoop {
 
         self.watcher = Some(ProjectWatcher::new(watcher, db));
 
-        self.run(db);
+        self.run(db)?;
 
         Ok(ExitStatus::Success)
     }
 
-    fn run(mut self, db: &mut ProjectDatabase) -> ExitStatus {
+    fn run(mut self, db: &mut ProjectDatabase) -> Result<ExitStatus> {
         self.sender.send(MainLoopMessage::CheckWorkspace).unwrap();
 
         let result = self.main_loop(db);
@@ -203,7 +227,7 @@ impl MainLoop {
         result
     }
 
-    fn main_loop(&mut self, db: &mut ProjectDatabase) -> ExitStatus {
+    fn main_loop(&mut self, db: &mut ProjectDatabase) -> Result<ExitStatus> {
         // Schedule the first check.
         tracing::debug!("Starting main loop");
 
@@ -231,6 +255,9 @@ impl MainLoop {
                     result,
                     revision: check_revision,
                 } => {
+                    let display_config = DisplayDiagnosticConfig::default()
+                        .color(colored::control::SHOULD_COLORIZE.should_colorize());
+
                     let min_error_severity =
                         if db.project().settings(db).terminal().error_on_warning {
                             Severity::Warning
@@ -238,27 +265,48 @@ impl MainLoop {
                             Severity::Error
                         };
 
-                    let failed = result
-                        .iter()
-                        .any(|diagnostic| diagnostic.severity() >= min_error_severity);
-
                     if check_revision == revision {
-                        #[allow(clippy::print_stdout)]
-                        for diagnostic in result {
-                            println!("{}", diagnostic.display(db));
+                        if db.project().files(db).is_empty() {
+                            tracing::warn!("No python files found under the given path(s)");
+                        }
+
+                        let mut stdout = stdout().lock();
+
+                        if result.is_empty() {
+                            writeln!(stdout, "All checks passed!")?;
+
+                            if self.watcher.is_none() {
+                                return Ok(ExitStatus::Success);
+                            }
+                        } else {
+                            let mut failed = false;
+                            let diagnostics_count = result.len();
+
+                            for diagnostic in result {
+                                writeln!(stdout, "{}", diagnostic.display(db, &display_config))?;
+
+                                failed |= diagnostic.severity() >= min_error_severity;
+                            }
+
+                            writeln!(
+                                stdout,
+                                "Found {} diagnostic{}",
+                                diagnostics_count,
+                                if diagnostics_count > 1 { "s" } else { "" }
+                            )?;
+
+                            if self.watcher.is_none() {
+                                return Ok(if failed {
+                                    ExitStatus::Failure
+                                } else {
+                                    ExitStatus::Success
+                                });
+                            }
                         }
                     } else {
                         tracing::debug!(
                             "Discarding check result for outdated revision: current: {revision}, result revision: {check_revision}"
                         );
-                    }
-
-                    if self.watcher.is_none() {
-                        return if failed {
-                            ExitStatus::Failure
-                        } else {
-                            ExitStatus::Success
-                        };
                     }
 
                     tracing::trace!("Counts after last check:\n{}", countme::get_all());
@@ -278,14 +326,14 @@ impl MainLoop {
                     // TODO: Don't use Salsa internal APIs
                     //  [Zulip-Thread](https://salsa.zulipchat.com/#narrow/stream/333573-salsa-3.2E0/topic/Expose.20an.20API.20to.20cancel.20other.20queries)
                     let _ = db.zalsa_mut();
-                    return ExitStatus::Success;
+                    return Ok(ExitStatus::Success);
                 }
             }
 
             tracing::debug!("Waiting for next main loop message.");
         }
 
-        ExitStatus::Success
+        Ok(ExitStatus::Success)
     }
 }
 
@@ -305,7 +353,8 @@ impl MainLoopCancellationToken {
 enum MainLoopMessage {
     CheckWorkspace,
     CheckCompleted {
-        result: Vec<Box<dyn Diagnostic>>,
+        /// The diagnostics that were found during the check.
+        result: Vec<Box<dyn OldDiagnosticTrait>>,
         revision: u64,
     },
     ApplyChanges(Vec<watch::ChangeEvent>),

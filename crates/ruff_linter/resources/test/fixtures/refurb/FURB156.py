@@ -27,8 +27,26 @@ _ = (
     # with comment
 ).capitalize()
 
+# example with augmented assignment
+_ += "0123456789"
+
 # OK
 
 _ = "1234567890"
 _ = "1234"
 _ = "12" in "12345670"
+
+
+# No errors as the string is considered as a docstring
+class C:
+    "01234567"
+
+
+class C:
+    def method(self):
+        "01234567"
+
+
+def function():
+    """01234567"""
+

@@ -1,0 +1,69 @@
+name: Run mypy_primer
+
+permissions: {}
+
+on:
+  pull_request:
+    paths:
+      - "crates/red_knot*/**"
+      - "crates/ruff_db"
+      - "crates/ruff_python_ast"
+      - "crates/ruff_python_parser"
+      - ".github/workflows/mypy_primer.yaml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref_name }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
+env:
+  CARGO_INCREMENTAL: 0
+  CARGO_NET_RETRY: 10
+  CARGO_TERM_COLOR: always
+  RUSTUP_MAX_RETRIES: 10
+
+jobs:
+  mypy_primer:
+    name: Run mypy_primer
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: ruff
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install the latest version of uv
+        uses: astral-sh/setup-uv@v5
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "ruff"
+      - name: Install Rust toolchain
+        run: rustup show
+
+      - name: Run mypy_primer
+        shell: bash
+        run: |
+          cd ruff
+
+          echo "new commit"
+          git rev-list --format=%s --max-count=1 "$GITHUB_SHA"
+
+          MERGE_BASE="$(git merge-base "$GITHUB_SHA" "origin/$GITHUB_BASE_REF")"
+          git checkout -b base_commit "$MERGE_BASE"
+          echo "base commit"
+          git rev-list --format=%s --max-count=1 base_commit
+
+          cd ..
+
+          echo "Running mypy_primer"
+
+          uvx --from "git+https://github.com/astral-sh/mypy_primer.git@add-red-knot-support" mypy_primer \
+            --repo ruff \
+            --type-checker knot \
+            --old base_commit \
+            --new "$GITHUB_SHA" \
+            --project-selector '/(mypy_primer|black|pyp|git-revise|zipp|arrow)$' \
+            --output concise \
+            --debug
