@@ -13,7 +13,7 @@ use crate::checkers::ast::Checker;
 /// `os.environ` is not a `dict` object, but rather, a proxy object. As such, mutating a shallow
 /// copy of `os.environ` will also mutate the original object.
 ///
-/// See: [#15373] for more information.
+/// See [BPO 15373] for more information.
 ///
 /// ## Example
 /// ```python
@@ -41,7 +41,7 @@ use crate::checkers::ast::Checker;
 /// - [Python documentation: `copy` — Shallow and deep copy operations](https://docs.python.org/3/library/copy.html)
 /// - [Python documentation: `os.environ`](https://docs.python.org/3/library/os.html#os.environ)
 ///
-/// [#15373]: https://bugs.python.org/issue15373
+/// [BPO 15373]: https://bugs.python.org/issue15373
 #[derive(ViolationMetadata)]
 pub(crate) struct ShallowCopyEnviron;
 
