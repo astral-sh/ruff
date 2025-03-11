@@ -1,5 +1,6 @@
 use super::{
-    Argument, CallArguments, CallError, CallOutcome, InferContext, Overloads, Signature, Type,
+    Argument, CallArguments, CallError, CallOutcome, CallableSignature, InferContext, Signature,
+    Type,
 };
 use crate::db::Db;
 use crate::types::diagnostic::{
@@ -12,14 +13,14 @@ use ruff_db::diagnostic::{OldSecondaryDiagnosticMessage, Span};
 use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
-/// Bind a [`CallArguments`] against a callable [`Signature`].
+/// Bind a [`CallArguments`] against a [`CallableSignature`].
 ///
 /// The returned [`CallBinding`] provides the return type of the call, the bound types for all
 /// parameters, and any errors resulting from binding the call.
 pub(crate) fn bind_call<'db>(
     db: &'db dyn Db,
     arguments: &CallArguments<'_, 'db>,
-    overloads: &Overloads<'db>,
+    overloads: &CallableSignature<'db>,
     callable_ty: Type<'db>,
 ) -> CallBinding<'db> {
     // TODO: This checks every overload. In the proposed more detailed call checking spec [1],

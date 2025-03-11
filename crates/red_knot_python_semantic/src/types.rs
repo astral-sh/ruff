@@ -20,7 +20,7 @@ pub(crate) use self::infer::{
     infer_scope_types,
 };
 pub use self::narrow::KnownConstraintFunction;
-pub(crate) use self::signatures::{Overloads, Signature};
+pub(crate) use self::signatures::{CallableSignature, Signature};
 pub use self::subclass_of::SubclassOfType;
 use crate::module_name::ModuleName;
 use crate::module_resolver::{file_to_module, resolve_module, KnownModule};
@@ -2316,9 +2316,9 @@ impl<'db> Type<'db> {
                 // ```
 
                 #[salsa::tracked(return_ref)]
-                fn overloads<'db>(db: &'db dyn Db) -> Overloads<'db> {
+                fn overloads<'db>(db: &'db dyn Db) -> CallableSignature<'db> {
                     let not_none = Type::none(db).negate(db);
-                    Overloads::from_overloads([
+                    CallableSignature::from_overloads([
                         Signature::new(
                             Parameters::new([
                                 Parameter::new(
@@ -2396,9 +2396,9 @@ impl<'db> Type<'db> {
                 // since the previous one is just this signature with the `self` parameters
                 // removed.
                 #[salsa::tracked(return_ref)]
-                fn overloads<'db>(db: &'db dyn Db) -> Overloads<'db> {
+                fn overloads<'db>(db: &'db dyn Db) -> CallableSignature<'db> {
                     let not_none = Type::none(db).negate(db);
-                    Overloads::from_overloads([
+                    CallableSignature::from_overloads([
                         Signature::new(
                             Parameters::new([
                                 Parameter::new(
@@ -2655,7 +2655,7 @@ impl<'db> Type<'db> {
                 //     def __new__(cls, o: object = ..., /) -> Self: ...
                 // ```
                 #[salsa::tracked(return_ref)]
-                fn overloads<'db>(db: &'db dyn Db) -> Overloads<'db> {
+                fn overloads<'db>(db: &'db dyn Db) -> CallableSignature<'db> {
                     Signature::new(
                         Parameters::new([Parameter::new(
                             Some(Name::new_static("o")),
@@ -2693,8 +2693,8 @@ impl<'db> Type<'db> {
                 //     def __new__(cls, object: ReadableBuffer, encoding: str = ..., errors: str = ...) -> Self: ...
                 // ```
                 #[salsa::tracked(return_ref)]
-                fn overloads<'db>(db: &'db dyn Db) -> Overloads<'db> {
-                    Overloads::from_overloads([
+                fn overloads<'db>(db: &'db dyn Db) -> CallableSignature<'db> {
+                    CallableSignature::from_overloads([
                         Signature::new(
                             Parameters::new([Parameter::new(
                                 Some(Name::new_static("o")),
@@ -2754,8 +2754,8 @@ impl<'db> Type<'db> {
                 //     def __init__(self, name: str, bases: tuple[type, ...], dict: dict[str, Any], /, **kwds: Any) -> None: ...
                 // ```
                 #[salsa::tracked(return_ref)]
-                fn overloads<'db>(db: &'db dyn Db) -> Overloads<'db> {
-                    Overloads::from_overloads([
+                fn overloads<'db>(db: &'db dyn Db) -> CallableSignature<'db> {
+                    CallableSignature::from_overloads([
                         Signature::new(
                             Parameters::new([Parameter::new(
                                 Some(Name::new_static("o")),
@@ -2856,7 +2856,7 @@ impl<'db> Type<'db> {
             // Dynamic types are callable, and the return type is the same dynamic type. Similarly,
             // `Never` is always callable and returns `Never`.
             Type::Dynamic(_) | Type::Never => {
-                let overloads = Overloads::dynamic(self);
+                let overloads = CallableSignature::dynamic(self);
                 let binding = bind_call(db, arguments, &overloads, self);
                 binding.into_outcome()
             }
@@ -2866,7 +2866,7 @@ impl<'db> Type<'db> {
             }
 
             Type::Intersection(_) => {
-                let overloads = Overloads::todo("Type::Intersection.call()");
+                let overloads = CallableSignature::todo("Type::Intersection.call()");
                 let binding = bind_call(db, arguments, &overloads, self);
                 binding.into_outcome()
             }
@@ -4310,7 +4310,7 @@ impl<'db> FunctionType<'db> {
     /// Were this not a salsa query, then the calling query
     /// would depend on the function's AST and rerun for every change in that file.
     #[salsa::tracked(return_ref)]
-    pub fn signature(self, db: &'db dyn Db) -> Overloads<'db> {
+    pub fn signature(self, db: &'db dyn Db) -> CallableSignature<'db> {
         let internal_signature = self.internal_signature(db).into();
 
         let decorators = self.decorators(db);
@@ -4323,7 +4323,7 @@ impl<'db> FunctionType<'db> {
             {
                 internal_signature
             } else {
-                Overloads::todo("return type of decorated function")
+                CallableSignature::todo("return type of decorated function")
             }
         } else {
             internal_signature

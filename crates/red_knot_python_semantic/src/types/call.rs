@@ -1,5 +1,5 @@
 use super::context::InferContext;
-use super::{Overloads, Signature, Type};
+use super::{CallableSignature, Signature, Type};
 use crate::types::UnionType;
 use crate::Db;
 

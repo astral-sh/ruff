@@ -6057,8 +6057,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                         Signature::new(parameters, Some(return_type)),
                     )));
 
-                // `Signature` / `Parameters` are not a `Type` variant, so we're storing the outer
-                // callable type on the these expressions instead.
+                // `Signature` / `Parameters` are not a `Type` variant, so we're storing
+                // the outer callable type on the these expressions instead.
                 self.store_expression_type(arguments_slice, callable_type);
                 self.store_expression_type(first_argument, callable_type);
 
