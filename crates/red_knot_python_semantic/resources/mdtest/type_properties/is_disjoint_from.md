@@ -26,7 +26,7 @@ static_assert(not is_disjoint_from(str, type[Any]))
 ## Class hierarchies
 
 ```py
-from knot_extensions import is_disjoint_from, static_assert, Intersection, is_subtype_of
+from knot_extensions import Intersection, Not, is_disjoint_from, static_assert, is_subtype_of
 from typing import final
 
 class A: ...
@@ -55,6 +55,10 @@ static_assert(not is_disjoint_from(FinalSubclass, A))
 # ... which makes it disjoint from B1, B2:
 static_assert(is_disjoint_from(B1, FinalSubclass))
 static_assert(is_disjoint_from(B2, FinalSubclass))
+
+static_assert(is_disjoint_from(B1, Not[B1]))
+static_assert(is_disjoint_from(C, Intersection[A, Not[B1]]))
+static_assert(is_disjoint_from(Intersection[A, Not[B1]], C))
 ```
 
 ## Tuple types
@@ -171,7 +175,7 @@ static_assert(not is_disjoint_from(None, object))
 
 ```py
 from typing_extensions import Literal, LiteralString
-from knot_extensions import TypeOf, is_disjoint_from, static_assert
+from knot_extensions import Intersection, Not, TypeOf, is_disjoint_from, static_assert
 
 static_assert(is_disjoint_from(Literal[True], Literal[False]))
 static_assert(is_disjoint_from(Literal[True], Literal[1]))
@@ -198,6 +202,10 @@ static_assert(not is_disjoint_from(Literal[1], Literal[1]))
 static_assert(not is_disjoint_from(Literal["a"], Literal["a"]))
 static_assert(not is_disjoint_from(Literal["a"], LiteralString))
 static_assert(not is_disjoint_from(Literal["a"], str))
+
+static_assert(is_disjoint_from(Intersection[str, Not[Literal["a"]]], Literal["a"]))
+static_assert(is_disjoint_from(Intersection[str, Not[Literal["a", "b"]]], Literal["a"]))
+static_assert(not is_disjoint_from(Intersection[str, Not[Literal["a"]]], Literal["b"]))
 ```
 
 ### Class, module and function literals

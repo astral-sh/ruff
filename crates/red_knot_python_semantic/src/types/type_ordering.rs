@@ -11,8 +11,9 @@ use super::{
 /// in an [`crate::types::IntersectionType`] or a [`crate::types::UnionType`] in order for them
 /// to be compared for equivalence.
 ///
-/// Two unions with equal sets of elements will only compare equal if they have their element sets
-/// ordered the same way.
+/// Two unions / intersections are compared lexicographically.
+///
+/// Element types must already be sorted.
 ///
 /// ## Why not just implement [`Ord`] on [`Type`]?
 ///
@@ -20,7 +21,11 @@ use super::{
 /// create here is not user-facing. However, it doesn't really "make sense" for `Type` to implement
 /// [`Ord`] in terms of the semantics. There are many different ways in which you could plausibly
 /// sort a list of types; this is only one (somewhat arbitrary, at times) possible ordering.
-pub(super) fn union_elements_ordering<'db>(left: &Type<'db>, right: &Type<'db>) -> Ordering {
+pub(super) fn union_elements_ordering<'db>(
+    left: &Type<'db>,
+    right: &Type<'db>,
+    db: &'db dyn crate::Db,
+) -> Ordering {
     if left == right {
         return Ordering::Equal;
     }
@@ -261,11 +266,38 @@ pub(super) fn union_elements_ordering<'db>(left: &Type<'db>, right: &Type<'db>) 
         (Type::Dynamic(_), _) => Ordering::Less,
         (_, Type::Dynamic(_)) => Ordering::Greater,
 
-        (Type::Union(left), Type::Union(right)) => left.cmp(right),
+        (Type::Union(left), Type::Union(right)) => {
+            // Lexicographically compare the elements of the two unions.
+            for (left, right) in left.elements(db).iter().zip(right.elements(db)) {
+                let ordering = union_elements_ordering(left, right, db);
+                if ordering != Ordering::Equal {
+                    return ordering;
+                }
+            }
+            left.elements(db).len().cmp(&right.elements(db).len())
+        }
         (Type::Union(_), _) => Ordering::Less,
         (_, Type::Union(_)) => Ordering::Greater,
 
-        (Type::Intersection(left), Type::Intersection(right)) => left.cmp(right),
+        (Type::Intersection(left), Type::Intersection(right)) => {
+            // Lexicographically compare the elements of the two intersections.
+            for (left, right) in left.positive(db).iter().zip(right.positive(db)) {
+                let ordering = union_elements_ordering(left, right, db);
+                if ordering != Ordering::Equal {
+                    return ordering;
+                }
+            }
+            if left.positive(db).len() != right.positive(db).len() {
+                return left.positive(db).len().cmp(&right.positive(db).len());
+            }
+            for (left, right) in left.negative(db).iter().zip(right.negative(db)) {
+                let ordering = union_elements_ordering(left, right, db);
+                if ordering != Ordering::Equal {
+                    return ordering;
+                }
+            }
+            left.negative(db).len().cmp(&right.negative(db).len())
+        }
     }
 }
 

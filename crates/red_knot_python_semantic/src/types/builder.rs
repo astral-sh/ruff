@@ -349,15 +349,27 @@ impl<'db> InnerIntersectionBuilder<'db> {
                             // `bool & ~Literal[False]` -> `Literal[True]`
                             // `bool & ~Literal[True]` -> `Literal[False]`
                             Type::BooleanLiteral(bool_value) => {
-                                new_positive = Type::BooleanLiteral(!bool_value);
+                                if new_positive == Type::BooleanLiteral(*bool_value) {
+                                    new_positive = Type::Never;
+                                } else {
+                                    new_positive = Type::BooleanLiteral(!bool_value);
+                                }
                             }
                             // `bool & ~AlwaysTruthy` -> `Literal[False]`
                             Type::AlwaysTruthy => {
-                                new_positive = Type::BooleanLiteral(false);
+                                if new_positive == Type::BooleanLiteral(true) {
+                                    new_positive = Type::Never;
+                                } else {
+                                    new_positive = Type::BooleanLiteral(false);
+                                }
                             }
                             // `bool & ~AlwaysFalsy` -> `Literal[True]`
                             Type::AlwaysFalsy => {
-                                new_positive = Type::BooleanLiteral(true);
+                                if new_positive == Type::BooleanLiteral(false) {
+                                    new_positive = Type::Never;
+                                } else {
+                                    new_positive = Type::BooleanLiteral(true);
+                                }
                             }
                             _ => continue,
                         }
