@@ -136,9 +136,9 @@ enum AttributeKind {
 
 /// This enum is used to control the behavior of the descriptor protocol implementation.
 /// When invoked on a class object, the fallback type (a class attribute) can shadow a
-/// non-data descriptor of the meta type (the class's metaclass). However, this is not
+/// non-data descriptor of the meta-type (the class's metaclass). However, this is not
 /// true for instances. When invoked on an instance, the fallback type (an attribute on
-/// the instance) can not completely shadow a non-data descriptor of the meta type (the
+/// the instance) can not completely shadow a non-data descriptor of the meta-type (the
 /// class), because we do not currently attempt to statically infer if an instance
 /// attribute is definitely defined (i.e. to check whether a particular method has been
 /// called).
@@ -148,17 +148,17 @@ enum InstanceFallbackShadowsNonDataDescriptor {
     No,
 }
 
-/// Dunder methods are looked up on the meta type of a type without potentially falling
+/// Dunder methods are looked up on the meta-type of a type without potentially falling
 /// back on attributes on the type itself. For example, when implicitly invoked on an
 /// instance, dunder methods are not looked up as instance attributes. And when invoked
-/// on a class, dunder methods are only looked up on the meta class, not the class itself.
+/// on a class, dunder methods are only looked up on the metaclass, not the class itself.
 ///
 /// All other attributes use the `WithInstanceFallback` policy.
 #[derive(Clone, Debug, Copy, PartialEq, Eq, Hash)]
 enum MemberLookupPolicy {
-    /// Only look up the attribute on the meta type.
+    /// Only look up the attribute on the meta-type.
     NoInstanceFallback,
-    /// Look up the attribute on the meta type, but fall back to attributes on the instance
+    /// Look up the attribute on the meta-type, but fall back to attributes on the instance
     /// if the meta-type attribute is not found or if the meta-type attribute is not a data
     /// descriptor.
     WithInstanceFallback,
@@ -801,6 +801,28 @@ impl<'db> Type<'db> {
                 .elements(db)
                 .iter()
                 .any(|&elem_ty| ty.is_assignable_to(db, elem_ty)),
+
+            // A type S is assignable to an intersection type T if
+            // S is assignable to all positive elements of T (e.g. `str & int` is assignable to `str & Any`), and
+            // S is disjoint from all negative elements of T (e.g. `int` is not assignable to Intersection[int, Not[Literal[1]]]).
+            (ty, Type::Intersection(intersection)) => {
+                intersection
+                    .positive(db)
+                    .iter()
+                    .all(|&elem_ty| ty.is_assignable_to(db, elem_ty))
+                    && intersection
+                        .negative(db)
+                        .iter()
+                        .all(|&neg_ty| ty.is_disjoint_from(db, neg_ty))
+            }
+
+            // An intersection type S is assignable to a type T if
+            // Any element of S is assignable to T (e.g. `A & B` is assignable to `A`)
+            // Negative elements do not have an effect on assignability - if S is assignable to T then S & ~P is also assignable to T.
+            (Type::Intersection(intersection), ty) => intersection
+                .positive(db)
+                .iter()
+                .any(|&elem_ty| elem_ty.is_assignable_to(db, ty)),
 
             // A tuple type S is assignable to a tuple type T if their lengths are the same, and
             // each element of S is assignable to the corresponding element of T.
@@ -1457,42 +1479,39 @@ impl<'db> Type<'db> {
 
             Type::Dynamic(_) | Type::Never => Some(Symbol::bound(self).into()),
 
-            Type::ClassLiteral(ClassLiteralType { class })
-                if class.is_known(db, KnownClass::FunctionType) && name == "__get__" =>
-            {
-                Some(Symbol::bound(Type::Callable(CallableType::WrapperDescriptorDunderGet)).into())
-            }
-            Type::ClassLiteral(ClassLiteralType { class })
-                if class.is_known(db, KnownClass::FunctionType)
-                    && matches!(name, "__set__" | "__delete__") =>
-            {
-                // Hard code this knowledge, as we look up `__set__` and `__delete__` on `FunctionType` often.
-                Some(Symbol::Unbound.into())
-            }
-            // TODO:
-            // We currently hard-code the knowledge that the following known classes are not
-            // descriptors, i.e. that they have no `__get__` method. This is not wrong and
-            // potentially even beneficial for performance, but it's not very principled.
-            // This case can probably be removed eventually, but we include it at the moment
-            // because we make extensive use of these types in our test suite. Note that some
-            // builtin types are not included here, since they do not have generic bases and
-            // are correctly handled by the `find_name_in_mro` method.
-            Type::ClassLiteral(class)
-                if matches!(
-                    class.class.known(db),
-                    Some(
-                        KnownClass::Int
+            Type::ClassLiteral(class_literal @ ClassLiteralType { class }) => {
+                match (class.known(db), name) {
+                    (Some(KnownClass::FunctionType), "__get__") => Some(
+                        Symbol::bound(Type::Callable(CallableType::WrapperDescriptorDunderGet))
+                            .into(),
+                    ),
+                    (Some(KnownClass::FunctionType), "__set__" | "__delete__") => {
+                        // Hard code this knowledge, as we look up `__set__` and `__delete__` on `FunctionType` often.
+                        Some(Symbol::Unbound.into())
+                    }
+                    // TODO:
+                    // We currently hard-code the knowledge that the following known classes are not
+                    // descriptors, i.e. that they have no `__get__` method. This is not wrong and
+                    // potentially even beneficial for performance, but it's not very principled.
+                    // This case can probably be removed eventually, but we include it at the moment
+                    // because we make extensive use of these types in our test suite. Note that some
+                    // builtin types are not included here, since they do not have generic bases and
+                    // are correctly handled by the `find_name_in_mro` method.
+                    (
+                        Some(
+                            KnownClass::Int
                             | KnownClass::Str
                             | KnownClass::Bytes
                             | KnownClass::Tuple
                             | KnownClass::Slice
                             | KnownClass::Range,
-                    )
-                ) && matches!(name, "__get__" | "__set__" | "__delete__") =>
-            {
-                Some(Symbol::Unbound.into())
+                        ),
+                        "__get__" | "__set__" | "__delete__",
+                    ) => Some(Symbol::Unbound.into()),
+
+                    _ => Some(class_literal.class_member(db, name)),
+                }
             }
-            Type::ClassLiteral(class_literal) => Some(class_literal.class_member(db, name)),
 
             Type::SubclassOf(subclass_of)
                 if name == "__get__"
@@ -1523,6 +1542,7 @@ impl<'db> Type<'db> {
                     .to_class_literal(db)
                     .find_name_in_mro(db, name)
             }
+
             Type::FunctionLiteral(_)
             | Type::Callable(_)
             | Type::ModuleLiteral(_)
@@ -1540,7 +1560,7 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Look up an attribute in the MRO of the meta type of `self`. This returns class-level attributes
+    /// Look up an attribute in the MRO of the meta-type of `self`. This returns class-level attributes
     /// when called on an instance-like type, and metaclass attributes when called on a class-like type.
     ///
     /// Basically corresponds to `self.to_meta_type().find_name_in_mro(name)`, except for the handling
@@ -1555,7 +1575,9 @@ impl<'db> Type<'db> {
             _ => self
                 .to_meta_type(db)
                 .find_name_in_mro(db, name.as_str())
-                .expect("was called on meta type"),
+                .expect(
+                    "`Type::find_name_in_mro()` should return `Some()` when called on a meta-type",
+                ),
         }
     }
 
@@ -1652,14 +1674,14 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Look up `__get__` on the meta type of self, and call it with the arguments `self`, `instance`,
+    /// Look up `__get__` on the meta-type of self, and call it with the arguments `self`, `instance`,
     /// and `owner`. `__get__` is different than other dunder methods in that it is not looked up using
     /// the descriptor protocol itself.
     ///
     /// In addition to the return type of `__get__`, this method also returns the *kind* of attribute
     /// that `self` represents: (1) a data descriptor or (2) a non-data descriptor / normal attribute.
     ///
-    /// If `__get__` is not defined on the meta type, this method returns `None`.
+    /// If `__get__` is not defined on the meta-type, this method returns `None`.
     #[salsa::tracked]
     fn try_call_dunder_get(
         self,
@@ -1698,7 +1720,7 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Look up `__get__` on the meta type of `attribute`, and call it with `attribute`, `instance`,
+    /// Look up `__get__` on the meta-type of `attribute`, and call it with `attribute`, `instance`,
     /// and `owner` as arguments. This method exists as a separate step as we need to handle unions
     /// and intersections explicitly.
     fn try_call_dunder_get_on_attribute(
@@ -1783,7 +1805,7 @@ impl<'db> Type<'db> {
     ///
     /// This method roughly performs the following steps:
     ///
-    /// - Look up the attribute `name` on the meta type of `self`. Call the result `meta_attr`.
+    /// - Look up the attribute `name` on the meta-type of `self`. Call the result `meta_attr`.
     /// - Call `__get__` on the meta-type of `meta_attr`, if it exists. If the call succeeds,
     ///   replace `meta_attr` with the result of the call. Also check if `meta_attr` is a *data*
     ///   descriptor by testing if `__set__` or `__delete__` exist.
@@ -1832,7 +1854,7 @@ impl<'db> Type<'db> {
             }
 
             // `meta_attr` is the return type of a data descriptor, but the attribute on the
-            // meta type is possibly-unbound. This means that we "fall through" to the next
+            // meta-type is possibly-unbound. This means that we "fall through" to the next
             // stage of the descriptor protocol and union with the fallback type.
             (
                 Symbol::Type(meta_attr_ty, Boundness::PossiblyUnbound),
@@ -1873,7 +1895,7 @@ impl<'db> Type<'db> {
             )
             .with_qualifiers(meta_attr_qualifiers.union(fallback_qualifiers)),
 
-            // If the attribute is not found on the meta type, we simply return the fallback.
+            // If the attribute is not found on the meta-type, we simply return the fallback.
             (Symbol::Unbound, _, fallback) => fallback.with_qualifiers(fallback_qualifiers),
         }
     }
@@ -2678,6 +2700,13 @@ impl<'db> Type<'db> {
                 )))
             }
 
+            Type::SubclassOf(subclass_of_type) => match subclass_of_type.subclass_of() {
+                ClassBase::Dynamic(dynamic_type) => Ok(CallOutcome::Single(
+                    CallBinding::from_return_type(Type::Dynamic(dynamic_type)),
+                )),
+                ClassBase::Class(class) => Type::class_literal(class).try_call(db, arguments),
+            },
+
             instance_ty @ Type::Instance(_) => {
                 instance_ty
                     .try_call_dunder(db, "__call__", arguments)
@@ -2736,7 +2765,7 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Look up a dunder method on the meta type of `self` and call it.
+    /// Look up a dunder method on the meta-type of `self` and call it.
     ///
     /// Returns an `Err` if the dunder method can't be called,
     /// or the given arguments are not valid.
@@ -3163,7 +3192,7 @@ impl<'db> Type<'db> {
                 KnownClass::WrapperDescriptorType.to_class_literal(db)
             }
             Type::Callable(CallableType::General(_)) => {
-                // TODO: Get the meta type
+                // TODO: Get the meta-type
                 todo_type!(".to_meta_type() for general callable type")
             }
             Type::ModuleLiteral(_) => KnownClass::ModuleType.to_class_literal(db),

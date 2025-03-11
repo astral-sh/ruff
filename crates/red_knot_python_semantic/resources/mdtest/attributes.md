@@ -737,20 +737,20 @@ object first, i.e. on the metaclass:
 from typing import Literal
 
 class Meta1:
-    attr: Literal["meta class value"] = "meta class value"
+    attr: Literal["metaclass value"] = "metaclass value"
 
 class C1(metaclass=Meta1): ...
 
-reveal_type(C1.attr)  # revealed: Literal["meta class value"]
+reveal_type(C1.attr)  # revealed: Literal["metaclass value"]
 ```
 
-However, the meta class attribute only takes precedence over a class-level attribute if it is a data
+However, the metaclass attribute only takes precedence over a class-level attribute if it is a data
 descriptor. If it is a non-data descriptor or a normal attribute, the class-level attribute is used
 instead (see the [descriptor protocol tests] for data/non-data descriptor attributes):
 
 ```py
 class Meta2:
-    attr: str = "meta class value"
+    attr: str = "metaclass value"
 
 class C2(metaclass=Meta2):
     attr: Literal["class value"] = "class value"
@@ -758,14 +758,14 @@ class C2(metaclass=Meta2):
 reveal_type(C2.attr)  # revealed: Literal["class value"]
 ```
 
-If the class-level attribute is only partially defined, we union the meta class attribute with the
+If the class-level attribute is only partially defined, we union the metaclass attribute with the
 class-level attribute:
 
 ```py
 def _(flag: bool):
     class Meta3:
-        attr1 = "meta class value"
-        attr2: Literal["meta class value"] = "meta class value"
+        attr1 = "metaclass value"
+        attr2: Literal["metaclass value"] = "metaclass value"
 
     class C3(metaclass=Meta3):
         if flag:
@@ -773,39 +773,39 @@ def _(flag: bool):
             # TODO: Neither mypy nor pyright show an error here, but we could consider emitting a conflicting-declaration diagnostic here.
             attr2: Literal["class value"] = "class value"
 
-    reveal_type(C3.attr1)  # revealed: Unknown | Literal["meta class value", "class value"]
-    reveal_type(C3.attr2)  # revealed: Literal["meta class value", "class value"]
+    reveal_type(C3.attr1)  # revealed: Unknown | Literal["metaclass value", "class value"]
+    reveal_type(C3.attr2)  # revealed: Literal["metaclass value", "class value"]
 ```
 
-If the *meta class* attribute is only partially defined, we emit a `possibly-unbound-attribute`
+If the *metaclass* attribute is only partially defined, we emit a `possibly-unbound-attribute`
 diagnostic:
 
 ```py
 def _(flag: bool):
     class Meta4:
         if flag:
-            attr1: str = "meta class value"
+            attr1: str = "metaclass value"
 
     class C4(metaclass=Meta4): ...
     # error: [possibly-unbound-attribute]
     reveal_type(C4.attr1)  # revealed: str
 ```
 
-Finally, if both the meta class attribute and the class-level attribute are only partially defined,
+Finally, if both the metaclass attribute and the class-level attribute are only partially defined,
 we union them and emit a `possibly-unbound-attribute` diagnostic:
 
 ```py
 def _(flag1: bool, flag2: bool):
     class Meta5:
         if flag1:
-            attr1 = "meta class value"
+            attr1 = "metaclass value"
 
     class C5(metaclass=Meta5):
         if flag2:
             attr1 = "class value"
 
     # error: [possibly-unbound-attribute]
-    reveal_type(C5.attr1)  # revealed: Unknown | Literal["meta class value", "class value"]
+    reveal_type(C5.attr1)  # revealed: Unknown | Literal["metaclass value", "class value"]
 ```
 
 ## Union of attributes

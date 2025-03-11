@@ -67,42 +67,6 @@ static EXPECTED_DIAGNOSTICS: &[KeyDiagnosticFields] = &[
         Cow::Borrowed("Module `collections.abc` has no member `Iterable`"),
         Severity::Error,
     ),
-    // We don't handle intersections in `is_assignable_to` yet
-    (
-        DiagnosticId::lint("invalid-return-type"),
-        Some("/src/tomllib/_parser.py"),
-        Some(6122..6178),
-        Cow::Borrowed("Object of type `@Todo & ~AlwaysFalsy | @Todo` is not assignable to return type `bool`"),
-        Severity::Error,
-    ),
-    (
-        DiagnosticId::lint("invalid-return-type"),
-        Some("/src/tomllib/_parser.py"),
-        Some(6814..6818),
-        Cow::Borrowed("Object of type `Unknown | Unknown & dict | @Todo & dict` is not assignable to return type `dict`"),
-        Severity::Error,
-    ),
-    (
-        DiagnosticId::lint("invalid-argument-type"),
-        Some("/src/tomllib/_parser.py"),
-        Some(20158..20172),
-        Cow::Borrowed("Object of type `Unknown & ~AlwaysFalsy | @Todo & ~AlwaysFalsy` cannot be assigned to parameter 1 (`match`) of function `match_to_datetime`; expected type `Match`"),
-        Severity::Error,
-    ),
-    (
-        DiagnosticId::lint("invalid-argument-type"),
-        Some("/src/tomllib/_parser.py"),
-        Some(20464..20479),
-        Cow::Borrowed("Object of type `Unknown & ~AlwaysFalsy | @Todo & ~AlwaysFalsy` cannot be assigned to parameter 1 (`match`) of function `match_to_localtime`; expected type `Match`"),
-        Severity::Error,
-    ),
-    (
-        DiagnosticId::lint("invalid-argument-type"),
-        Some("/src/tomllib/_parser.py"),
-        Some(20774..20786),
-        Cow::Borrowed("Object of type `Unknown & ~AlwaysFalsy | @Todo & ~AlwaysFalsy` cannot be assigned to parameter 1 (`match`) of function `match_to_number`; expected type `Match`"),
-        Severity::Error,
-    ),
     (
         DiagnosticId::lint("unused-ignore-comment"),
         Some("/src/tomllib/_parser.py"),
