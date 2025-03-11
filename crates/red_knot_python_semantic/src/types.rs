@@ -1331,11 +1331,7 @@ impl<'db> Type<'db> {
                 .elements(db)
                 .iter()
                 .all(|elem| elem.is_fully_static(db)),
-            Type::Callable(CallableType::General(_)) => {
-                // TODO: `Callable` is not fully static when the parameter argument is `...` or
-                // when any parameter type or return type is not fully static.
-                false
-            }
+            Type::Callable(CallableType::General(callable)) => callable.is_fully_static(db),
         }
     }
 
@@ -4517,6 +4513,30 @@ impl<'db> GeneralCallableType<'db> {
             db,
             Signature::new(Parameters::unknown(), Some(Type::unknown())),
         )
+    }
+
+    /// Returns `true` if this is a fully static callable type.
+    ///
+    /// A callable type is fully static if all of its parameters and return type are fully static
+    /// and if it does not use gradual form (`...`) for its parameters.
+    pub(crate) fn is_fully_static(self, db: &'db dyn Db) -> bool {
+        let signature = self.signature(db);
+
+        if signature.parameters().is_gradual() {
+            return false;
+        }
+
+        if signature.parameters().iter().any(|parameter| {
+            parameter
+                .annotated_type()
+                .is_some_and(|annotated_type| !annotated_type.is_fully_static(db))
+        }) {
+            return false;
+        }
+
+        signature
+            .return_ty
+            .is_some_and(|return_type| return_type.is_fully_static(db))
     }
 }
 
