@@ -4,4 +4,4 @@ from webhelpers.html import literal
 #       additional markup names to be skipped if we don't import either
 #       markupsafe or flask first.
 content = "<script>alert('Hello, world!')</script>"
-literal(f"unsafe {content}")  # RUF035
+literal(f"unsafe {content}")  # S704

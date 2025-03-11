@@ -1129,7 +1129,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 refurb::rules::int_on_sliced_str(checker, call);
             }
             if checker.enabled(Rule::UnsafeMarkupUse) {
-                ruff::rules::unsafe_markup_call(checker, call);
+                flake8_bandit::rules::unsafe_markup_call(checker, call);
             }
             if checker.enabled(Rule::MapIntVersionParsing) {
                 ruff::rules::map_int_version_parsing(checker, call);
