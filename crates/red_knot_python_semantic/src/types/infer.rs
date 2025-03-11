@@ -263,7 +263,7 @@ impl<'db> InferenceRegion<'db> {
     }
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, salsa::Update)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
 struct TypeAndRange<'db> {
     ty: Type<'db>,
     range: TextRange,
@@ -284,9 +284,6 @@ pub(crate) struct TypeInference<'db> {
     /// The definitions that are deferred.
     deferred: FxHashSet<Definition<'db>>,
 
-    /// The returned types and their corresponding ranges of this region, if it is a function body.
-    return_types_and_ranges: Vec<TypeAndRange<'db>>,
-
     /// The diagnostics for this region.
     diagnostics: TypeCheckDiagnostics,
 
@@ -306,7 +303,6 @@ impl<'db> TypeInference<'db> {
             bindings: FxHashMap::default(),
             declarations: FxHashMap::default(),
             deferred: FxHashSet::default(),
-            return_types_and_ranges: vec![],
             diagnostics: TypeCheckDiagnostics::default(),
             scope,
             cycle_fallback_type: None,
@@ -319,7 +315,6 @@ impl<'db> TypeInference<'db> {
             bindings: FxHashMap::default(),
             declarations: FxHashMap::default(),
             deferred: FxHashSet::default(),
-            return_types_and_ranges: vec![],
             diagnostics: TypeCheckDiagnostics::default(),
             scope,
             cycle_fallback_type: Some(cycle_fallback_type),
@@ -457,6 +452,9 @@ pub(super) struct TypeInferenceBuilder<'db> {
     /// The type inference results
     types: TypeInference<'db>,
 
+    /// The returned types and their corresponding ranges of the region, if it is a function body.
+    return_types_and_ranges: Vec<TypeAndRange<'db>>,
+
     /// The deferred state of inferring types of certain expressions within the region.
     ///
     /// This is different from [`InferenceRegion::Deferred`] which works on the entire definition
@@ -488,6 +486,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             context: InferContext::new(db, scope),
             index,
             region,
+            return_types_and_ranges: vec![],
             deferred_state: DeferredExpressionState::None,
             types: TypeInference::empty(scope),
         }
@@ -1057,8 +1056,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn record_return_type(&mut self, ty: Type<'db>, range: TextRange) {
-        self.types
-            .return_types_and_ranges
+        self.return_types_and_ranges
             .push(TypeAndRange { ty, range });
     }
 
@@ -1183,13 +1181,12 @@ impl<'db> TypeInferenceBuilder<'db> {
             });
             // TODO: Protocol / abstract methods can have empty bodies
             if (self.in_stub() || is_overloaded)
-                && self.types.return_types_and_ranges.is_empty()
+                && self.return_types_and_ranges.is_empty()
                 && is_stub_suite(&function.body)
             {
                 return;
             }
             for invalid in self
-                .types
                 .return_types_and_ranges
                 .iter()
                 .filter(|ty_range| !ty_range.ty.is_assignable_to(self.db(), declared_ty))
