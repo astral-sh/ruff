@@ -55,14 +55,13 @@ def f(x: int | str):
 ## Stub file
 
 If you specify a return type for a function in a stub file, its body must be empty, i.e. it must
-consist only of ellipsis (`...`) or docstrings.
+consist only of ellipsis (`...`) or `pass` or docstrings.
 
 ```pyi
 def f() -> int: ...
 
 def f() -> int:
-    ...
-    ...
+    pass
 
 def f() -> int:
     """Some docstring"""

@@ -262,9 +262,19 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// TODO #14889
+    /// ## What it does
+    /// Detects returned values that can't be assigned to the function's annotated return type.
+    ///
+    /// ## Why is this bad?
+    /// Returning an object of a type incompatible with the annotated return type may cause confusion to the user calling the function.
+    ///
+    /// ## Examples
+    /// ```python
+    /// def func() -> int:
+    ///     return "a"  # error: [invalid-return-type]
+    /// ```
     pub(crate) static INVALID_RETURN_TYPE = {
-        summary: "detects a returned value that can't be assigned to the function's annotated return type",
+        summary: "detects returned values that can't be assigned to the function's annotated return type",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }

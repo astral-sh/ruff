@@ -442,8 +442,8 @@
           ]
         },
         "invalid-return-type": {
-          "title": "detects a returned value that can't be assigned to the function's annotated return type",
-          "description": "TODO #14889",
+          "title": "detects returned values that can't be assigned to the function's annotated return type",
+          "description": "## What it does\nDetects returned values that can't be assigned to the function's annotated return type.\n\n## Why is this bad?\nReturning an object of a type incompatible with the annotated return type may cause confusion to the user calling the function.\n\n## Examples\n```python\ndef func() -> int:\n    return \"a\"  # error: [invalid-return-type]\n```",
           "default": "error",
           "oneOf": [
             {

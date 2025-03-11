@@ -1124,22 +1124,20 @@ impl<'db> TypeInferenceBuilder<'db> {
             .as_deref()
             .map(|ret| self.file_expression_type(ret))
         {
-            fn is_suite_empty(suite: &[ast::Stmt]) -> bool {
-                let mut saw_ellipsis = false;
-                for statement in suite {
-                    if let Some(expr) = statement.as_expr_stmt() {
-                        if expr.value.is_ellipsis_literal_expr() {
-                            saw_ellipsis = true;
-                        } else if expr.value.is_string_literal_expr() {
-                            // docstring
-                        } else {
-                            return false;
-                        }
-                    } else {
-                        return false;
+            fn is_stub_suite(suite: &[ast::Stmt]) -> bool {
+                match suite {
+                    [ast::Stmt::Expr(ast::StmtExpr { value: first, .. }), ast::Stmt::Expr(ast::StmtExpr { value: second, .. }), ..] => {
+                        first.is_string_literal_expr() && second.is_ellipsis_literal_expr()
                     }
+                    [ast::Stmt::Expr(ast::StmtExpr { value, .. }), ast::Stmt::Pass(_), ..] => {
+                        value.is_string_literal_expr()
+                    }
+                    [ast::Stmt::Expr(ast::StmtExpr { value, .. }), ..] => {
+                        value.is_ellipsis_literal_expr()
+                    }
+                    [ast::Stmt::Pass(_)] => true,
+                    _ => false,
                 }
-                saw_ellipsis
             }
             fn does_suite_always_return(suite: &[ast::Stmt]) -> bool {
                 match suite.last() {
@@ -1164,6 +1162,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                         does_suite_always_return(&try_stmt.body)
                             && does_suite_always_return(&try_stmt.orelse)
                             && does_suite_always_return(&try_stmt.finalbody)
+                            && try_stmt.handlers.iter().all(|handler| {
+                                does_suite_always_return(&handler.as_except_handler().unwrap().body)
+                            })
                     }
                     Some(ast::Stmt::With(with_stmt)) => does_suite_always_return(&with_stmt.body),
                     Some(ast::Stmt::Match(match_stmt)) => match_stmt
@@ -1173,20 +1174,17 @@ impl<'db> TypeInferenceBuilder<'db> {
                     _ => false,
                 }
             }
-            let mut is_overloaded = false;
-            for decorator in &function.decorator_list {
-                let deco = self.file_expression_type(&decorator.expression);
-                if deco
+            let is_overloaded = function.decorator_list.iter().any(|decorator| {
+                let decorator_type = self.file_expression_type(&decorator.expression);
+
+                decorator_type
                     .into_function_literal()
                     .is_some_and(|f| f.is_known(self.db(), KnownFunction::Overload))
-                {
-                    is_overloaded = true;
-                }
-            }
+            });
             // TODO: Protocol / abstract methods can have empty bodies
             if (self.in_stub() || is_overloaded)
                 && self.types.return_types_and_ranges.is_empty()
-                && is_suite_empty(&function.body)
+                && is_stub_suite(&function.body)
             {
                 return;
             }
