@@ -293,7 +293,14 @@ impl<'a> Checker<'a> {
         if !self.noqa.is_enabled() {
             return false;
         }
-        noqa::rule_is_ignored(code, offset, self.noqa_line_for, self.locator)
+
+        noqa::rule_is_ignored(
+            code,
+            offset,
+            self.noqa_line_for,
+            self.comment_ranges(),
+            self.locator,
+        )
     }
 
     /// Create a [`Generator`] to generate source code based on the current AST state.
