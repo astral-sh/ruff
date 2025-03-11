@@ -580,38 +580,6 @@ impl<'db> Type<'db> {
                 true
             }
 
-            (Type::Intersection(self_intersection), Type::Intersection(target_intersection)) => {
-                // Check that all target positive values are covered in self positive values
-                target_intersection
-                    .positive(db)
-                    .iter()
-                    .all(|&target_pos_elem| {
-                        self_intersection
-                            .positive(db)
-                            .iter()
-                            .any(|&self_pos_elem| self_pos_elem.is_subtype_of(db, target_pos_elem))
-                    })
-                    // Check that all target negative values are excluded in self, either by being
-                    // subtypes of a self negative value or being disjoint from a self positive value.
-                    && target_intersection
-                        .negative(db)
-                        .iter()
-                        .all(|&target_neg_elem| {
-                            // Is target negative value is subtype of a self negative value
-                            self_intersection.negative(db).iter().any(|&self_neg_elem| {
-                                target_neg_elem.is_subtype_of(db, self_neg_elem)
-                            // Is target negative value is disjoint from a self positive value?
-                            }) || self_intersection.positive(db).iter().any(|&self_pos_elem| {
-                                self_pos_elem.is_disjoint_from(db, target_neg_elem)
-                            })
-                        })
-            }
-
-            (Type::Intersection(intersection), _) => intersection
-                .positive(db)
-                .iter()
-                .any(|&elem_ty| elem_ty.is_subtype_of(db, target)),
-
             (_, Type::Intersection(intersection)) => {
                 intersection
                     .positive(db)
@@ -622,6 +590,11 @@ impl<'db> Type<'db> {
                         .iter()
                         .all(|&neg_ty| self.is_disjoint_from(db, neg_ty))
             }
+
+            (Type::Intersection(intersection), _) => intersection
+                .positive(db)
+                .iter()
+                .any(|&elem_ty| elem_ty.is_subtype_of(db, target)),
 
             // Note that the definition of `Type::AlwaysFalsy` depends on the return value of `__bool__`.
             // If `__bool__` always returns True or False, it can be treated as a subtype of `AlwaysTruthy` or `AlwaysFalsy`, respectively.
