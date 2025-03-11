@@ -890,7 +890,7 @@ impl<'db> KnownClass {
         }
     }
 
-    pub(crate) fn as_str(self, db: &'db dyn Db) -> &'static str {
+    pub(crate) fn name(self, db: &'db dyn Db) -> &'static str {
         match self {
             Self::Bool => "bool",
             Self::Object => "object",
@@ -965,7 +965,7 @@ impl<'db> KnownClass {
                     f,
                     "{module}.{class}",
                     module = known_class.canonical_module(db),
-                    class = known_class.as_str(db)
+                    class = known_class.name(db)
                 )
             }
         }
@@ -992,7 +992,7 @@ impl<'db> KnownClass {
         self,
         db: &'db dyn Db,
     ) -> Result<ClassLiteralType<'db>, KnownClassLookupError<'db>> {
-        let symbol = known_module_symbol(db, self.canonical_module(db), self.as_str(db)).symbol;
+        let symbol = known_module_symbol(db, self.canonical_module(db), self.name(db)).symbol;
         match symbol {
             Symbol::Type(Type::ClassLiteral(class_type), Boundness::Bound) => Ok(class_type),
             Symbol::Type(Type::ClassLiteral(class_type), Boundness::PossiblyUnbound) => {
@@ -1758,7 +1758,7 @@ mod tests {
     fn known_class_roundtrip_from_str() {
         let db = setup_db();
         for class in KnownClass::iter() {
-            let class_name = class.as_str(&db);
+            let class_name = class.name(&db);
             let class_module = resolve_module(&db, &class.canonical_module(&db).name()).unwrap();
 
             assert_eq!(
