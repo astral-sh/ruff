@@ -1641,24 +1641,16 @@ mod tests {
     fn known_class_doesnt_fallback_to_unknown_unexpectedly_on_low_python_version() {
         let mut db = setup_db();
 
-        Program::get(&db)
-            .set_python_version(&mut db)
-            .to(PythonVersion::PY37);
-
         for class in KnownClass::iter() {
-            let current_version = Program::get(&db).python_version(&db);
-
             let version_added = match class {
                 KnownClass::BaseExceptionGroup => PythonVersion::PY311,
                 KnownClass::GenericAlias => PythonVersion::PY39,
                 _ => PythonVersion::PY37,
             };
 
-            if current_version != version_added {
-                Program::get(&db)
-                    .set_python_version(&mut db)
-                    .to(version_added);
-            }
+            Program::get(&db)
+                .set_python_version(&mut db)
+                .to(version_added);
 
             assert_ne!(
                 class.to_instance(&db),
