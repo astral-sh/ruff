@@ -285,7 +285,6 @@ mod tests {
         let diagnostics = test_path(
             Path::new("pyupgrade/UP044.py"),
             &settings::LinterSettings {
-                preview: PreviewMode::Enabled,
                 unresolved_target_version: PythonVersion::PY311,
                 ..settings::LinterSettings::for_rule(Rule::NonPEP646Unpack)
             },
