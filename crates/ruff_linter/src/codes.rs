@@ -362,7 +362,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Bugbear, "904") => (RuleGroup::Stable, rules::flake8_bugbear::rules::RaiseWithoutFromInsideExcept),
         (Flake8Bugbear, "905") => (RuleGroup::Stable, rules::flake8_bugbear::rules::ZipWithoutExplicitStrict),
         (Flake8Bugbear, "909") => (RuleGroup::Preview, rules::flake8_bugbear::rules::LoopIteratorMutation),
-        (Flake8Bugbear, "911") => (RuleGroup::Preview, rules::flake8_bugbear::rules::BatchedWithoutExplicitStrict),
+        (Flake8Bugbear, "911") => (RuleGroup::Stable, rules::flake8_bugbear::rules::BatchedWithoutExplicitStrict),
 
         // flake8-blind-except
         (Flake8BlindExcept, "001") => (RuleGroup::Stable, rules::flake8_blind_except::rules::BlindExcept),
@@ -872,7 +872,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8TypeChecking, "004") => (RuleGroup::Stable, rules::flake8_type_checking::rules::RuntimeImportInTypeCheckingBlock),
         (Flake8TypeChecking, "005") => (RuleGroup::Stable, rules::flake8_type_checking::rules::EmptyTypeCheckingBlock),
         (Flake8TypeChecking, "006") => (RuleGroup::Preview, rules::flake8_type_checking::rules::RuntimeCastValue),
-        (Flake8TypeChecking, "007") => (RuleGroup::Preview, rules::flake8_type_checking::rules::UnquotedTypeAlias),
+        (Flake8TypeChecking, "007") => (RuleGroup::Stable, rules::flake8_type_checking::rules::UnquotedTypeAlias),
         (Flake8TypeChecking, "008") => (RuleGroup::Preview, rules::flake8_type_checking::rules::QuotedTypeAlias),
         (Flake8TypeChecking, "010") => (RuleGroup::Stable, rules::flake8_type_checking::rules::RuntimeStringUnion),
 
@@ -922,8 +922,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8UsePathlib, "205") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::OsPathGetctime),
         (Flake8UsePathlib, "206") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::OsSepSplit),
         (Flake8UsePathlib, "207") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::Glob),
-        (Flake8UsePathlib, "208") => (RuleGroup::Preview, rules::flake8_use_pathlib::violations::OsListdir),
-        (Flake8UsePathlib, "210") => (RuleGroup::Preview, rules::flake8_use_pathlib::rules::InvalidPathlibWithSuffix),
+        (Flake8UsePathlib, "208") => (RuleGroup::Stable, rules::flake8_use_pathlib::violations::OsListdir),
+        (Flake8UsePathlib, "210") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::InvalidPathlibWithSuffix),
 
         // flake8-logging-format
         (Flake8LoggingFormat, "001") => (RuleGroup::Stable, rules::flake8_logging_format::violations::LoggingStringFormat),
@@ -997,15 +997,15 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "037") => (RuleGroup::Preview, rules::ruff::rules::UnnecessaryEmptyIterableWithinDequeCall),
         (Ruff, "038") => (RuleGroup::Preview, rules::ruff::rules::RedundantBoolLiteral),
         (Ruff, "039") => (RuleGroup::Preview, rules::ruff::rules::UnrawRePattern),
-        (Ruff, "040") => (RuleGroup::Preview, rules::ruff::rules::InvalidAssertMessageLiteralArgument),
+        (Ruff, "040") => (RuleGroup::Stable, rules::ruff::rules::InvalidAssertMessageLiteralArgument),
         (Ruff, "041") => (RuleGroup::Stable, rules::ruff::rules::UnnecessaryNestedLiteral),
         (Ruff, "043") => (RuleGroup::Preview, rules::ruff::rules::PytestRaisesAmbiguousPattern),
         (Ruff, "045") => (RuleGroup::Preview, rules::ruff::rules::ImplicitClassVarInDataclass),
-        (Ruff, "046") => (RuleGroup::Preview, rules::ruff::rules::UnnecessaryCastToInt),
+        (Ruff, "046") => (RuleGroup::Stable, rules::ruff::rules::UnnecessaryCastToInt),
         (Ruff, "047") => (RuleGroup::Preview, rules::ruff::rules::NeedlessElse),
-        (Ruff, "048") => (RuleGroup::Preview, rules::ruff::rules::MapIntVersionParsing),
+        (Ruff, "048") => (RuleGroup::Stable, rules::ruff::rules::MapIntVersionParsing),
         (Ruff, "049") => (RuleGroup::Preview, rules::ruff::rules::DataclassEnum),
-        (Ruff, "051") => (RuleGroup::Preview, rules::ruff::rules::IfKeyInDictDel),
+        (Ruff, "051") => (RuleGroup::Stable, rules::ruff::rules::IfKeyInDictDel),
         (Ruff, "052") => (RuleGroup::Preview, rules::ruff::rules::UsedDummyVariable),
         (Ruff, "053") => (RuleGroup::Preview, rules::ruff::rules::ClassWithMixedTypeVars),
         (Ruff, "054") => (RuleGroup::Preview, rules::ruff::rules::IndentedFormFeed),
@@ -1136,7 +1136,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Logging, "007") => (RuleGroup::Stable, rules::flake8_logging::rules::ExceptionWithoutExcInfo),
         (Flake8Logging, "009") => (RuleGroup::Stable, rules::flake8_logging::rules::UndocumentedWarn),
         (Flake8Logging, "014") => (RuleGroup::Preview, rules::flake8_logging::rules::ExcInfoOutsideExceptHandler),
-        (Flake8Logging, "015") => (RuleGroup::Preview, rules::flake8_logging::rules::RootLoggerCall),
+        (Flake8Logging, "015") => (RuleGroup::Stable, rules::flake8_logging::rules::RootLoggerCall),
 
         _ => return None,
     })

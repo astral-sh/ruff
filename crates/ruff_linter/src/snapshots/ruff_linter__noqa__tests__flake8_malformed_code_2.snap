@@ -1,0 +1,22 @@
+---
+source: crates/ruff_linter/src/noqa.rs
+expression: directive
+---
+Ok(
+    Some(
+        NoqaLexerOutput {
+            warnings: [],
+            directive: Codes(
+                Codes {
+                    range: 0..22,
+                    codes: [
+                        Code {
+                            code: "RUF001",
+                            range: 16..22,
+                        },
+                    ],
+                },
+            ),
+        },
+    ),
+)
