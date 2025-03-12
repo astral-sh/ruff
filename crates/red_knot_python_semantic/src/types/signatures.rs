@@ -17,28 +17,158 @@ use crate::types::todo_type;
 use crate::Db;
 use ruff_python_ast::{self as ast, name::Name};
 
+/// The signature of a possible union of callables.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
+pub(crate) struct Signatures<'db> {
+    pub(crate) ty: Type<'db>,
+    inner: SignaturesInner<'db>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
+enum SignaturesInner<'db> {
+    Single(CallableSignature<'db>),
+    Union(Box<[CallableSignature<'db>]>),
+}
+
+impl<'db> Signatures<'db> {
+    pub(crate) fn not_callable(ty: Type<'db>) -> Self {
+        Self {
+            ty,
+            inner: SignaturesInner::Single(CallableSignature::not_callable(ty)),
+        }
+    }
+
+    pub(crate) fn single(signature: CallableSignature<'db>) -> Self {
+        Self {
+            ty: signature.ty,
+            inner: SignaturesInner::Single(signature),
+        }
+    }
+
+    /// Creates a new `Signatures` from an iterator of [`Signature`]s. Panics if the iterator is
+    /// empty.
+    pub(crate) fn from_union<I>(ty: Type<'db>, elements: I) -> Self
+    where
+        I: IntoIterator,
+        I::IntoIter: Iterator<Item = Signatures<'db>>,
+    {
+        let mut signatures = Vec::new();
+        for element in elements {
+            match element.inner {
+                SignaturesInner::Single(signature) => signatures.push(signature),
+                SignaturesInner::Union(union) => signatures.extend(union),
+            }
+        }
+        if signatures.len() == 1 {
+            let first_signature = signatures.pop().expect("signatures sould have one element");
+            return Self {
+                ty,
+                inner: SignaturesInner::Single(first_signature),
+            };
+        }
+
+        Self {
+            ty,
+            inner: SignaturesInner::Union(signatures.into()),
+        }
+    }
+
+    /// Replaces one of the callable types that part of this signature applies to. This is used,
+    /// for instance, with `__call__` methods, where the signature is for the method, but we want
+    /// to report errors for the containing object.
+    pub(crate) fn replace_type(&mut self, before: Type<'db>, after: Type<'db>) {
+        match &mut self.inner {
+            SignaturesInner::Single(signature) => signature.replace_type(before, after),
+            SignaturesInner::Union(signatures) => {
+                for signature in signatures {
+                    signature.replace_type(before, after);
+                }
+            }
+        }
+    }
+
+    pub(crate) fn as_single(&self) -> Option<&CallableSignature<'db>> {
+        match &self.inner {
+            SignaturesInner::Single(signature) => Some(signature),
+            SignaturesInner::Union(_) => None,
+        }
+    }
+
+    pub(crate) fn iter(&self) -> std::slice::Iter<CallableSignature<'db>> {
+        match &self.inner {
+            SignaturesInner::Single(signature) => std::slice::from_ref(signature).iter(),
+            SignaturesInner::Union(signatures) => signatures.iter(),
+        }
+    }
+
+    /// Returns whether this signature is callable. A union type is callable if _all_ of its
+    /// elements are callable.
+    pub(crate) fn is_callable(&self) -> bool {
+        self.iter().all(CallableSignature::is_callable)
+    }
+
+    pub(crate) fn set_dunder_call_boundness(&mut self, boundness: Boundness) {
+        match &mut self.inner {
+            SignaturesInner::Single(signature) => {
+                signature.dunder_call_boundness = Some(boundness);
+            }
+            SignaturesInner::Union(signatures) => {
+                for signature in signatures {
+                    signature.dunder_call_boundness = Some(boundness);
+                }
+            }
+        }
+    }
+}
+
 /// The signature of a single callable. If the callable is overloaded, there is a separate
 /// [`Signature`] for each overload.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
-pub enum CallableSignature<'db> {
-    Single {
-        signature: Signature<'db>,
-        /// If this is a callable object (i.e. called via a `__call__` method), the boundness of
-        /// that call method.
-        dunder_call: Option<Boundness>,
-    },
-    Overloaded {
-        overloads: Box<[Signature<'db>]>,
-        /// If this is a callable object (i.e. called via a `__call__` method), the boundness of
-        /// that call method.
-        dunder_call: Option<Boundness>,
-    },
+pub struct CallableSignature<'db> {
+    /// Type of the object (function, class...). If the object is callable via a `__call__` method,
+    /// this is the type of the object, not of the dunder method.
+    pub(crate) ty: Type<'db>,
+
+    /// If this is a callable object (i.e. called via a `__call__` method), the boundness of
+    /// that call method.
+    pub(crate) dunder_call_boundness: Option<Boundness>,
+
+    /// The type of the bound `self` or `cls` parameter if this signature is for a bound method.
+    pub(crate) bound_type: Option<Type<'db>>,
+
+    inner: CallableSignatureInner<'db>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
+enum CallableSignatureInner<'db> {
+    /// The type being called is not callable
+    NotCallable,
+    Single(Signature<'db>),
+    Overloaded(Box<[Signature<'db>]>),
 }
 
 impl<'db> CallableSignature<'db> {
-    /// Creates a new `CallableSignature` from an non-empty iterator of [`Signature`]s.
-    /// Panics if the iterator is empty.
-    pub(crate) fn from_overloads<I>(overloads: I) -> Self
+    pub(crate) fn not_callable(ty: Type<'db>) -> Self {
+        Self {
+            ty,
+            dunder_call_boundness: None,
+            bound_type: None,
+            inner: CallableSignatureInner::NotCallable,
+        }
+    }
+
+    pub(crate) fn new(ty: Type<'db>, signature: Signature<'db>) -> Self {
+        Self {
+            ty,
+            dunder_call_boundness: None,
+            bound_type: None,
+            inner: CallableSignatureInner::Single(signature),
+        }
+    }
+
+    /// Creates a new `CallableSignature` from a non-empty iterator of [`Signature`]s. Panics if
+    /// the iterator is empty.
+    pub(crate) fn from_overloads<I>(ty: Type<'db>, overloads: I) -> Self
     where
         I: IntoIterator,
         I::IntoIter: Iterator<Item = Signature<'db>>,
@@ -46,23 +176,20 @@ impl<'db> CallableSignature<'db> {
         let mut iter = overloads.into_iter();
         let first_overload = iter.next().expect("overloads should not be empty");
         let Some(second_overload) = iter.next() else {
-            return CallableSignature::Single {
-                signature: first_overload,
-                dunder_call: None,
+            return Self {
+                ty,
+                dunder_call_boundness: None,
+                bound_type: None,
+                inner: CallableSignatureInner::Single(first_overload),
             };
         };
         let mut overloads = vec![first_overload, second_overload];
         overloads.extend(iter);
-        CallableSignature::Overloaded {
-            overloads: overloads.into(),
-            dunder_call: None,
-        }
-    }
-
-    pub(crate) fn iter(&self) -> std::slice::Iter<Signature<'db>> {
-        match self {
-            CallableSignature::Single { signature, .. } => std::slice::from_ref(signature).iter(),
-            CallableSignature::Overloaded { overloads, .. } => overloads.iter(),
+        Self {
+            ty,
+            dunder_call_boundness: None,
+            bound_type: None,
+            inner: CallableSignatureInner::Overloaded(overloads.into()),
         }
     }
 
@@ -72,25 +199,44 @@ impl<'db> CallableSignature<'db> {
             parameters: Parameters::gradual_form(),
             return_ty: Some(ty),
         };
-        signature.into()
+        Self::new(ty, signature)
     }
 
     /// Return a todo signature: (*args: Todo, **kwargs: Todo) -> Todo
     #[allow(unused_variables)] // 'reason' only unused in debug builds
     pub(crate) fn todo(reason: &'static str) -> Self {
+        let ty = todo_type!(reason);
         let signature = Signature {
             parameters: Parameters::todo(),
-            return_ty: Some(todo_type!(reason)),
+            return_ty: Some(ty),
         };
-        signature.into()
+        Self::new(ty, signature)
     }
-}
 
-impl<'db> From<Signature<'db>> for CallableSignature<'db> {
-    fn from(signature: Signature<'db>) -> Self {
-        CallableSignature::Single {
-            signature,
-            dunder_call: None,
+    fn replace_type(&mut self, before: Type<'db>, after: Type<'db>) {
+        if self.ty == before {
+            self.ty = after;
+        }
+    }
+
+    pub(crate) fn iter(&self) -> std::slice::Iter<Signature<'db>> {
+        match &self.inner {
+            CallableSignatureInner::NotCallable => [].iter(),
+            CallableSignatureInner::Single(signature) => std::slice::from_ref(signature).iter(),
+            CallableSignatureInner::Overloaded(signatures) => signatures.iter(),
+        }
+    }
+
+    /// Returns whether this signature is callable.
+    pub(crate) fn is_callable(&self) -> bool {
+        !matches!(&self.inner, CallableSignatureInner::NotCallable)
+    }
+
+    pub(crate) fn as_single(&self) -> Option<&Signature<'db>> {
+        match &self.inner {
+            CallableSignatureInner::NotCallable => None,
+            CallableSignatureInner::Single(signature) => Some(signature),
+            CallableSignatureInner::Overloaded(_) => None,
         }
     }
 }
@@ -117,6 +263,15 @@ impl<'db> Signature<'db> {
         Self {
             parameters,
             return_ty,
+        }
+    }
+
+    /// Return a todo signature: (*args: Todo, **kwargs: Todo) -> Todo
+    #[allow(unused_variables)] // 'reason' only unused in debug builds
+    pub(crate) fn todo(reason: &'static str) -> Self {
+        Signature {
+            parameters: Parameters::todo(),
+            return_ty: Some(todo_type!(reason)),
         }
     }
 
@@ -805,7 +960,7 @@ mod tests {
         .unwrap();
         let func = get_function_f(&db, "/src/a.py");
 
-        let expected_sig = func.internal_signature(&db).into();
+        let expected_sig = func.internal_signature(&db);
 
         // With no decorators, internal and external signature are the same
         assert_eq!(func.signature(&db), &expected_sig);
@@ -826,7 +981,7 @@ mod tests {
         .unwrap();
         let func = get_function_f(&db, "/src/a.py");
 
-        let expected_sig = CallableSignature::todo("return type of decorated function");
+        let expected_sig = Signature::todo("return type of decorated function");
 
         // With no decorators, internal and external signature are the same
         assert_eq!(func.signature(&db), &expected_sig);

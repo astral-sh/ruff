@@ -12,7 +12,7 @@ use crate::{
     },
     types::{
         definition_expression_type, CallArguments, CallError, DynamicType, MetaclassCandidate,
-        TupleType, UnionBuilder, UnionCallError, UnionType,
+        TupleType, UnionBuilder, UnionType,
     },
     Db, KnownModule, Program,
 };
@@ -235,55 +235,17 @@ impl<'db> Class<'db> {
             let return_ty_result = match metaclass.try_call(db, &arguments) {
                 Ok(outcome) => Ok(outcome.return_type(db)),
 
-                Err(CallError::NotCallable { not_callable_type }) => Err(MetaclassError {
-                    kind: MetaclassErrorKind::NotCallable(not_callable_type),
-                }),
-
-                Err(CallError::Union(UnionCallError {
-                    called_type,
-                    errors,
-                    bindings,
-                })) => {
-                    let mut partly_not_callable = false;
-
-                    let return_ty = errors
-                        .iter()
-                        .fold(None, |acc, error| {
-                            let ty = error.return_type(db);
-
-                            match (acc, ty) {
-                                (acc, None) => {
-                                    partly_not_callable = true;
-                                    acc
-                                }
-                                (None, Some(ty)) => Some(UnionBuilder::new(db).add(ty)),
-                                (Some(builder), Some(ty)) => Some(builder.add(ty)),
-                            }
-                        })
-                        .map(|mut builder| {
-                            for binding in bindings {
-                                builder = builder.add(binding.return_type());
-                            }
-
-                            builder.build()
-                        });
-
-                    if partly_not_callable {
-                        Err(MetaclassError {
-                            kind: MetaclassErrorKind::PartlyNotCallable(called_type),
-                        })
-                    } else {
-                        Ok(return_ty.unwrap_or(Type::unknown()))
-                    }
-                }
-
-                Err(CallError::PossiblyUnboundDunderCall { .. }) => Err(MetaclassError {
-                    kind: MetaclassErrorKind::PartlyNotCallable(metaclass),
+                Err(CallError::NotCallable(bindings)) => Err(MetaclassError {
+                    kind: MetaclassErrorKind::NotCallable(bindings.ty),
                 }),
 
                 // TODO we should also check for binding errors that would indicate the metaclass
                 // does not accept the right arguments
-                Err(CallError::BindingError { binding }) => Ok(binding.return_type()),
+                Err(CallError::BindingError(bindings)) => Ok(bindings.return_type(db)),
+
+                Err(CallError::PossiblyNotCallable(_)) => Err(MetaclassError {
+                    kind: MetaclassErrorKind::PartlyNotCallable(metaclass),
+                }),
             };
 
             return return_ty_result.map(|ty| ty.to_meta_type(db));

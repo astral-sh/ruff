@@ -16,7 +16,7 @@ use crate::{resolve_module, Db, KnownModule, Module, Program};
 pub(crate) use implicit_globals::module_type_implicit_global_symbol;
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
-pub enum Boundness {
+pub(crate) enum Boundness {
     Bound,
     PossiblyUnbound,
 }

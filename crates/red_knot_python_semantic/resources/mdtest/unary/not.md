@@ -210,7 +210,7 @@ reveal_type(not PossiblyUnboundBool())
 
 ```py
 class NotBoolable:
-    __bool__ = 3
+    __bool__: int = 3
 
 # error: [unsupported-bool-conversion]
 not NotBoolable()

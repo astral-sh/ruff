@@ -61,7 +61,7 @@ use crate::symbol::{
     module_type_implicit_global_symbol, symbol, symbol_from_bindings, symbol_from_declarations,
     typing_extensions_symbol, Boundness, LookupError,
 };
-use crate::types::call::{Argument, CallArguments, UnionCallError};
+use crate::types::call::{Argument, CallArguments};
 use crate::types::diagnostic::{
     report_implicit_return_type, report_invalid_arguments_to_annotated,
     report_invalid_arguments_to_callable, report_invalid_assignment,
@@ -88,7 +88,6 @@ use crate::unpack::Unpack;
 use crate::util::subscript::{PyIndex, PySlice};
 use crate::Db;
 
-use super::call::CallError;
 use super::class_base::ClassBase;
 use super::context::{InNoTypeCheck, InferContext, WithDiagnostics};
 use super::diagnostic::{
@@ -3551,7 +3550,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             Ok(outcome) => {
                 for binding in outcome.bindings() {
                     let Some(known_function) = binding
-                        .callable_type()
+                        .ty
                         .into_function_literal()
                         .and_then(|function_type| function_type.known(self.db()))
                     else {
@@ -3659,57 +3658,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                 outcome.return_type(self.db())
             }
             Err(err) => {
-                // TODO: We currently only report the first error. Ideally, we'd report
-                //  an error saying that the union type can't be called, followed by a sub
-                //  diagnostic explaining why.
-                fn report_call_error(
-                    context: &InferContext,
-                    err: CallError,
-                    call_expression: &ast::ExprCall,
-                ) {
-                    match err {
-                        CallError::NotCallable { not_callable_type } => {
-                            context.report_lint(
-                                &CALL_NON_CALLABLE,
-                                call_expression,
-                                format_args!(
-                                    "Object of type `{}` is not callable",
-                                    not_callable_type.display(context.db())
-                                ),
-                            );
-                        }
-
-                        CallError::Union(UnionCallError { errors, .. }) => {
-                            if let Some(first) = IntoIterator::into_iter(errors).next() {
-                                report_call_error(context, first, call_expression);
-                            } else {
-                                debug_assert!(
-                                    false,
-                                    "Expected `CalLError::Union` to at least have one error"
-                                );
-                            }
-                        }
-
-                        CallError::PossiblyUnboundDunderCall { called_type, .. } => {
-                            context.report_lint(
-                                &CALL_NON_CALLABLE,
-                                call_expression,
-                                format_args!(
-                                    "Object of type `{}` is not callable (possibly unbound `__call__` method)",
-                                    called_type.display(context.db())
-                                ),
-                            );
-                        }
-                        CallError::BindingError { binding, .. } => {
-                            binding.report_diagnostics(context, call_expression.into());
-                        }
-                    }
-                }
-
-                let return_type = err.fallback_return_type(self.db());
-                report_call_error(&self.context, err, call_expression);
-
-                return_type
+                err.bindings()
+                    .report_diagnostics(&self.context, call_expression.into());
+                err.fallback_return_type(self.db())
             }
         }
     }
