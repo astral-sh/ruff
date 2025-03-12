@@ -2715,6 +2715,58 @@ from typing import Union;foo: Union[int, str] = 1
 
 /// ```
 /// tmp
+/// ├── pyproject.toml #<-- no [tool.ruff]
+/// ├── ruff.toml #<-- no `target-version`
+/// └── test.py
+/// ```
+#[test]
+fn requires_python_ruff_toml_no_target_fallback_check() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let project_dir = tempdir.path().canonicalize()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"[lint]
+select = ["UP007"]
+"#,
+    )?;
+
+    let pyproject_toml = tempdir.path().join("pyproject.toml");
+    fs::write(
+        &pyproject_toml,
+        r#"[project]
+requires-python = ">= 3.11"
+"#,
+    )?;
+
+    let testpy = tempdir.path().join("test.py");
+    fs::write(
+        &testpy,
+        r#"
+from typing import Union;foo: Union[int, str] = 1
+"#,
+    )?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&project_dir).as_str(), "[TMP]/")]
+    }, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .arg(".")
+            .current_dir(project_dir), @r###"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        All checks passed!
+
+        ----- stderr -----
+        "###);
+    });
+    Ok(())
+}
+
+/// ```
+/// tmp
 /// ├── foo
 /// │   ├── pyproject.toml #<-- no [tool.ruff], no `requires-python`
 /// │   └── test.py
