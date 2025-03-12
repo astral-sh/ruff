@@ -87,6 +87,7 @@ mod tests {
     #[test_case(Rule::DjangoExtra, Path::new("S610.py"))]
     #[test_case(Rule::DjangoRawSql, Path::new("S611.py"))]
     #[test_case(Rule::TarfileUnsafeMembers, Path::new("S202.py"))]
+    #[test_case(Rule::UnsafeMarkupUse, Path::new("S704.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
@@ -103,7 +104,6 @@ mod tests {
     #[test_case(Rule::SuspiciousURLOpenUsage, Path::new("S310.py"))]
     #[test_case(Rule::SuspiciousNonCryptographicRandomUsage, Path::new("S311.py"))]
     #[test_case(Rule::SuspiciousTelnetUsage, Path::new("S312.py"))]
-    #[test_case(Rule::UnsafeMarkupUse, Path::new("S704.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",
@@ -136,7 +136,6 @@ mod tests {
                     extend_markup_names: vec!["webhelpers.html.literal".to_string()],
                     ..Default::default()
                 },
-                preview: PreviewMode::Enabled,
                 ..LinterSettings::for_rule(rule_code)
             },
         )?;
@@ -158,7 +157,6 @@ mod tests {
                     allowed_markup_calls: vec!["bleach.clean".to_string()],
                     ..Default::default()
                 },
-                preview: PreviewMode::Enabled,
                 ..LinterSettings::for_rule(rule_code)
             },
         )?;
