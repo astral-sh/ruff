@@ -28,7 +28,7 @@ use ruff_linter::rules::{
     pycodestyle, pydoclint, pydocstyle, pyflakes, pylint, pyupgrade, ruff,
 };
 use ruff_linter::settings::types::{
-    IdentifierPattern, OutputFormat, PreviewMode, PythonVersion, RequiredVersion,
+    IdentifierPattern, OutputFormat, PythonVersion, RequiredVersion,
 };
 use ruff_linter::{warn_user_once, RuleSelector};
 use ruff_macros::{CombineOptions, OptionsMetadata};
@@ -1267,9 +1267,9 @@ pub struct Flake8BuiltinsOptions {
     ///
     /// This option is ignored if both `strict-checking` and `builtins-strict-checking` are set.
     #[option(
-        default = r#"true"#,
+        default = r#"false"#,
         value_type = "bool",
-        example = "builtins-strict-checking = false"
+        example = "builtins-strict-checking = true"
     )]
     #[deprecated(
         since = "0.10.0",
@@ -1280,21 +1280,16 @@ pub struct Flake8BuiltinsOptions {
     /// Compare module names instead of full module paths.
     ///
     /// Used by [`A005` - `stdlib-module-shadowing`](https://docs.astral.sh/ruff/rules/stdlib-module-shadowing/).
-    ///
-    /// In preview mode the default value is `false` rather than `true`.
     #[option(
-        default = r#"true"#,
+        default = r#"false"#,
         value_type = "bool",
-        example = "strict-checking = false"
+        example = "strict-checking = true"
     )]
     pub strict_checking: Option<bool>,
 }
 
 impl Flake8BuiltinsOptions {
-    pub fn into_settings(
-        self,
-        preview: PreviewMode,
-    ) -> ruff_linter::rules::flake8_builtins::settings::Settings {
+    pub fn into_settings(self) -> ruff_linter::rules::flake8_builtins::settings::Settings {
         #[allow(deprecated)]
         ruff_linter::rules::flake8_builtins::settings::Settings {
             ignorelist: self
@@ -1309,7 +1304,7 @@ impl Flake8BuiltinsOptions {
                 .strict_checking
                 .or(self.builtins_strict_checking)
                 // use the old default of true on non-preview
-                .unwrap_or(preview.is_disabled()),
+                .unwrap_or_default(),
         }
     }
 }
