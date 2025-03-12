@@ -2008,12 +2008,50 @@ impl<'db> Type<'db> {
             | Type::FunctionLiteral(..) => {
                 let fallback = self.instance_member(db, name_str);
 
-                self.invoke_descriptor_protocol(
+                let result = self.invoke_descriptor_protocol(
                     db,
                     name_str,
                     fallback,
                     InstanceFallbackShadowsNonDataDescriptor::No,
-                )
+                );
+
+                let custom_getattr_result =
+                    || {
+                        // Typeshed has a fake `__getattr__` on `types.ModuleType` to help out with dynamic imports.
+                        // We explicitly hide it here to prevent arbitrary attributes from being available on modules.
+                        if self.into_instance().is_some_and(|instance| {
+                            instance.class.is_known(db, KnownClass::ModuleType)
+                        }) {
+                            return Symbol::Unbound.into();
+                        }
+
+                        self.try_call_dunder(
+                            db,
+                            "__getattr__",
+                            &CallArguments::positional([Type::StringLiteral(
+                                StringLiteralType::new(db, Box::from(name.as_str())),
+                            )]),
+                        )
+                        .map(|outcome| Symbol::bound(outcome.return_type(db)))
+                        // TODO: Handle call errors here.
+                        .unwrap_or(Symbol::Unbound)
+                        .into()
+                    };
+
+                match result {
+                    member @ SymbolAndQualifiers {
+                        symbol: Symbol::Type(_, Boundness::Bound),
+                        qualifiers: _,
+                    } => member,
+                    member @ SymbolAndQualifiers {
+                        symbol: Symbol::Type(_, Boundness::PossiblyUnbound),
+                        qualifiers: _,
+                    } => member.or_fall_back_to(db, custom_getattr_result),
+                    SymbolAndQualifiers {
+                        symbol: Symbol::Unbound,
+                        qualifiers: _,
+                    } => custom_getattr_result(),
+                }
             }
 
             Type::ClassLiteral(..) | Type::SubclassOf(..) => {
