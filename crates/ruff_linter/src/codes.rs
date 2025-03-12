@@ -922,7 +922,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8UsePathlib, "205") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::OsPathGetctime),
         (Flake8UsePathlib, "206") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::OsSepSplit),
         (Flake8UsePathlib, "207") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::Glob),
-        (Flake8UsePathlib, "208") => (RuleGroup::Preview, rules::flake8_use_pathlib::violations::OsListdir),
+        (Flake8UsePathlib, "208") => (RuleGroup::Stable, rules::flake8_use_pathlib::violations::OsListdir),
         (Flake8UsePathlib, "210") => (RuleGroup::Preview, rules::flake8_use_pathlib::rules::InvalidPathlibWithSuffix),
 
         // flake8-logging-format
