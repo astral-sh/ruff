@@ -453,7 +453,7 @@ pub fn python_files_in_path<'a>(
                         let (root, settings) = resolve_scoped_settings(
                             &pyproject,
                             transformer,
-                            ConfigurationOrigin::Unknown,
+                            ConfigurationOrigin::Ancestor,
                         )?;
                         resolver.add(root, settings);
                         // We found the closest configuration.
@@ -607,7 +607,7 @@ impl ParallelVisitor for PythonFilesVisitor<'_, '_> {
                         Ok(Some(pyproject)) => match resolve_scoped_settings(
                             &pyproject,
                             self.transformer,
-                            ConfigurationOrigin::Unknown,
+                            ConfigurationOrigin::Ancestor,
                         ) {
                             Ok((root, settings)) => {
                                 self.global.resolver.write().unwrap().add(root, settings);
