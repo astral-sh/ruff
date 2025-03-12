@@ -1,8 +1,7 @@
 # Function return type
 
 When a function's return type is annotated, all return statements are checked to ensure that the
-type of the returned value is assignable to the annotated return type. A `raise` is equivalent to a
-return of `Never`, which is assignable to any annotated return type.
+type of the returned value is assignable to the annotated return type.
 
 ## Basic examples
 
