@@ -198,8 +198,8 @@ def _(c: Callable[[int, Unpack[Ts]], int]):
 from typing import Callable
 
 def _(c: Callable[[int], int]):
-    reveal_type(c.__init__)  # revealed: <bound method `__init__` of `object`>
-    reveal_type(c.__class__)  # revealed: Literal[type]
+    reveal_type(c.__init__)  # revealed: Literal[__init__]
+    reveal_type(c.__class__)  # revealed: type
 
     # TODO: The member lookup for `Callable` uses `object` which does not have a `__call__`
     # attribute. We could special case `__call__` in this context. Refer to

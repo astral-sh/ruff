@@ -1625,7 +1625,7 @@ impl<'db> Type<'db> {
                     .instance_member(db, name)
             }
             Type::Callable(CallableType::General(_)) => {
-                KnownClass::Object.to_instance(db).member(db, name)
+                KnownClass::Object.to_instance(db).instance_member(db, name)
             }
 
             Type::IntLiteral(_) => KnownClass::Int.to_instance(db).instance_member(db, name),
@@ -3313,7 +3313,7 @@ impl<'db> Type<'db> {
             Type::Callable(CallableType::WrapperDescriptorDunderGet) => {
                 KnownClass::WrapperDescriptorType.to_class_literal(db)
             }
-            Type::Callable(CallableType::General(_)) => KnownClass::Type.to_class_literal(db),
+            Type::Callable(CallableType::General(_)) => KnownClass::Type.to_instance(db),
             Type::ModuleLiteral(_) => KnownClass::ModuleType.to_class_literal(db),
             Type::Tuple(_) => KnownClass::Tuple.to_class_literal(db),
             Type::ClassLiteral(ClassLiteralType { class }) => class.metaclass(db),
