@@ -75,7 +75,6 @@ fields = [
   { name = "is_async", type = "bool" },
   { name = "decorator_list", type = "Decorator*" },
   { name = "name", type = "Identifier" },
-  # check remove
   { name = "type_params", type = "Box<crate::TypeParams>?" },
   { name = "parameters", type = "Box<crate::Parameters>" },
 
