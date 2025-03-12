@@ -100,7 +100,7 @@ use super::slots::check_class_slots;
 use super::string_annotation::{
     parse_string_annotation, BYTE_STRING_TYPE_ANNOTATION, FSTRING_TYPE_ANNOTATION,
 };
-use super::CallDunderError;
+use super::{CallDunderError, MemberLookupPolicy};
 
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
 /// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
@@ -2535,7 +2535,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 class_attr_ty,
                                 class_attr_boundness,
                             ) = object_ty
-                                .find_name_in_mro(db, attribute)
+                                .find_name_in_mro(db, attribute, MemberLookupPolicy::default())
                                 .expect("called on Type::ClassLiteral or Type::SubclassOf")
                                 .symbol
                             {
@@ -2565,7 +2565,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         ..
                     } => {
                         if let Symbol::Type(class_attr_ty, class_attr_boundness) = object_ty
-                            .find_name_in_mro(db, attribute)
+                            .find_name_in_mro(db, attribute, MemberLookupPolicy::default())
                             .expect("called on Type::ClassLiteral or Type::SubclassOf")
                             .symbol
                         {
@@ -3970,8 +3970,25 @@ impl<'db> TypeInferenceBuilder<'db> {
         // arguments after matching them to parameters, but before checking that the argument types
         // are assignable to any parameter annotations.
         let mut call_arguments = Self::parse_arguments(arguments);
-        let function_type = self.infer_expression(func);
-        let signatures = function_type.signatures(self.db());
+        let callable_type = self.infer_expression(func);
+
+        // For class literals we model the entire class instantiation logic, so it is handled
+        // in a separate function.
+
+        if callable_type.is_class_literal() {
+            let argument_forms = vec![Some(ParameterForm::Value); call_arguments.len()];
+            let call_argument_types =
+                self.infer_argument_types(arguments, call_arguments, &argument_forms);
+
+            return callable_type
+                .try_call_class_literal(self.db(), call_argument_types)
+                .unwrap_or_else(|err| {
+                    err.report_diagnostic(&self.context, callable_type, call_expression.into());
+                    err.return_type()
+                });
+        }
+
+        let signatures = callable_type.signatures(self.db());
         let bindings = Bindings::match_parameters(signatures, &mut call_arguments);
         let mut call_argument_types =
             self.infer_argument_types(arguments, call_arguments, &bindings.argument_forms);
