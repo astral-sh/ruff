@@ -26,6 +26,13 @@
 //! stringified annotations. We have a fourth Salsa query for inferring the deferred types
 //! associated with a particular definition. Scope-level inference infers deferred types for all
 //! definitions once the rest of the types in the scope have been inferred.
+//!
+//! Many of our type inference Salsa queries implement cycle recovery via fixed-point iteration. In
+//! general, they initiate fixed-point iteration by returning a `TypeInference` that returns
+//! `Type::Never` for all expressions, bindings, and declarations, and then they continue iterating
+//! the query cycle until a fixed-point is reached. Salsa has a built-in fixed limit on the number
+//! of iterations, so if we fail to converge, Salsa will eventually panic. (This should of course
+//! be considered a bug.)
 use std::num::NonZeroU32;
 
 use itertools::{Either, Itertools};
