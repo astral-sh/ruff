@@ -1073,6 +1073,76 @@ reveal_type(C.__mro__)  # revealed: tuple[Literal[C], Literal[B], Any, Literal[A
 reveal_type(C.x)  # revealed: Literal[1] & Any
 ```
 
+## Classes with custom `__getattr__` methods
+
+### Basic
+
+If a type provides a custom `__getattr__` method, we use the return type of that method as the type
+for unknown attributes. Consider the following `CustomGetAttr` class:
+
+```py
+from typing import Literal
+
+def flag() -> bool:
+    return True
+
+class GetAttrReturnType: ...
+
+class CustomGetAttr:
+    class_attr: int = 1
+
+    if flag():
+        possibly_unbound: bytes = b"a"
+
+    def __init__(self) -> None:
+        self.instance_attr: str = "a"
+
+    def __getattr__(self, name: str) -> GetAttrReturnType:
+        return GetAttrReturnType()
+```
+
+We can access arbitrary attributes on instances of this class, and the type of the attribute will be
+`GetAttrReturnType`:
+
+```py
+c = CustomGetAttr()
+
+reveal_type(c.whatever)  # revealed: GetAttrReturnType
+```
+
+If an attribute is defined on the class, it takes precedence over the `__getattr__` method:
+
+```py
+reveal_type(c.class_attr)  # revealed: int
+```
+
+If the class attribute is possibly unbound, we union the type of the attribute with the fallback
+type of the `__getattr__` method:
+
+```py
+reveal_type(c.possibly_unbound)  # revealed: bytes | GetAttrReturnType
+```
+
+Instance attributes also take precedence over the `__getattr__` method:
+
+```py
+# Note: we could attempt to union with the fallback type of `__getattr__` here, as we currently do not
+# attempt to determine if instance attributes are always bound or not. Neither mypy nor pyright do this,
+# so it's not a priority.
+reveal_type(c.instance_attr)  # revealed: str
+```
+
+### `argparse.Namespace`
+
+A standard library example of a class with a custom `__getattr__` method is `argparse.Namespace`:
+
+```py
+import argparse
+
+def _(ns: argparse.Namespace):
+    reveal_type(ns.whatever)  # revealed: Any
+```
+
 ## Objects of all types have a `__class__` method
 
 The type of `x.__class__` is the same as `x`'s meta-type. `x.__class__` is always the same value as
