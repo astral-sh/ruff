@@ -26,7 +26,7 @@ use crate::settings::LinterSettings;
 /// By default, the module path relative to the project root or [`src`] directories is considered,
 /// so a top-level `logging.py` or `logging/__init__.py` will clash with the builtin `logging`
 /// module, but `utils/logging.py`, for example, will not. With the
-/// [`lint.flake8-builtins.builtins-strict-checking`] option set to `true`, only the last component
+/// [`lint.flake8-builtins.strict-checking`] option set to `true`, only the last component
 /// of the module name is considered, so `logging.py`, `utils/logging.py`, and
 /// `utils/logging/__init__.py` will all trigger the rule.
 ///
