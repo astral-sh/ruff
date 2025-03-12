@@ -89,7 +89,6 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Rule::InvalidArgumentName, Path::new("N803.py"))]
     #[test_case(Rule::InvalidArgumentName, Path::new("N804.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
