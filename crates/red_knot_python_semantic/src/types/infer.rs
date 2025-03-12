@@ -6281,6 +6281,44 @@ impl<'db> TypeInferenceBuilder<'db> {
                     argument_type
                 }
             },
+            KnownInstanceType::CallableTypeFromFunction => match arguments_slice {
+                ast::Expr::Tuple(_) => {
+                    self.context.report_lint(
+                        &INVALID_TYPE_FORM,
+                        subscript,
+                        format_args!(
+                            "Special form `{}` expected exactly one type parameter",
+                            known_instance.repr(self.db())
+                        ),
+                    );
+                    Type::unknown()
+                }
+                _ => {
+                    let argument_type = self.infer_expression(arguments_slice);
+                    let Some(function_type) = argument_type.into_function_literal() else {
+                        self.context.report_lint(
+                            &INVALID_TYPE_FORM,
+                            arguments_slice,
+                            format_args!(
+                                "Expected the first argument to `{}` to be a function literal, but got `{}`",
+                                known_instance.repr(self.db()),
+                                argument_type.display(self.db())
+                            ),
+                        );
+                        return Type::unknown();
+                    };
+                    function_type
+                        .into_callable_type(self.db())
+                        .unwrap_or_else(|| {
+                            self.context.report_lint(
+                                &INVALID_TYPE_FORM,
+                                arguments_slice,
+                                format_args!("Overloaded function literal is not yet supported"),
+                            );
+                            Type::unknown()
+                        })
+                }
+            },
 
             // TODO: Generics
             KnownInstanceType::ChainMap => {

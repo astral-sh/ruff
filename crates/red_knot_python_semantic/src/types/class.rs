@@ -1434,6 +1434,8 @@ pub enum KnownInstanceType<'db> {
     Intersection,
     /// The symbol `knot_extensions.TypeOf`
     TypeOf,
+    /// The symbol `knot_extensions.CallableTypeFromFunction`
+    CallableTypeFromFunction,
 
     // Various special forms, special aliases and type qualifiers that we don't yet understand
     // (all currently inferred as TODO in most contexts):
@@ -1495,7 +1497,8 @@ impl<'db> KnownInstanceType<'db> {
             | Self::AlwaysFalsy
             | Self::Not
             | Self::Intersection
-            | Self::TypeOf => Truthiness::AlwaysTrue,
+            | Self::TypeOf
+            | Self::CallableTypeFromFunction => Truthiness::AlwaysTrue,
         }
     }
 
@@ -1542,6 +1545,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::Not => "knot_extensions.Not",
             Self::Intersection => "knot_extensions.Intersection",
             Self::TypeOf => "knot_extensions.TypeOf",
+            Self::CallableTypeFromFunction => "knot_extensions.CallableTypeFromFunction",
         }
     }
 
@@ -1585,6 +1589,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::TypeOf => KnownClass::SpecialForm,
             Self::Not => KnownClass::SpecialForm,
             Self::Intersection => KnownClass::SpecialForm,
+            Self::CallableTypeFromFunction => KnownClass::SpecialForm,
             Self::Unknown => KnownClass::Object,
             Self::AlwaysTruthy => KnownClass::Object,
             Self::AlwaysFalsy => KnownClass::Object,
@@ -1649,6 +1654,7 @@ impl<'db> KnownInstanceType<'db> {
             "Not" => Self::Not,
             "Intersection" => Self::Intersection,
             "TypeOf" => Self::TypeOf,
+            "CallableTypeFromFunction" => Self::CallableTypeFromFunction,
             _ => return None,
         };
 
@@ -1704,7 +1710,8 @@ impl<'db> KnownInstanceType<'db> {
             | Self::AlwaysFalsy
             | Self::Not
             | Self::Intersection
-            | Self::TypeOf => module.is_knot_extensions(),
+            | Self::TypeOf
+            | Self::CallableTypeFromFunction => module.is_knot_extensions(),
         }
     }
 }
