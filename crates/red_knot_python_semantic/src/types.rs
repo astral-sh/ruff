@@ -1936,7 +1936,7 @@ impl<'db> Type<'db> {
             .into(),
 
             Type::ClassLiteral(ClassLiteralType { class })
-                if class.is_known(db, KnownClass::FunctionType) && name == "__get__" =>
+                if name == "__get__" && class.is_known(db, KnownClass::FunctionType) =>
             {
                 Symbol::bound(Type::Callable(CallableType::WrapperDescriptorDunderGet)).into()
             }
@@ -1972,20 +1972,16 @@ impl<'db> Type<'db> {
             }
 
             Type::Instance(InstanceType { class })
-                if class.is_known(db, KnownClass::VersionInfo) && name == "major" =>
+                if matches!(name.as_str(), "major" | "minor")
+                    && class.is_known(db, KnownClass::VersionInfo) =>
             {
-                Symbol::bound(Type::IntLiteral(
-                    Program::get(db).python_version(db).major.into(),
-                ))
-                .into()
-            }
-            Type::Instance(InstanceType { class })
-                if class.is_known(db, KnownClass::VersionInfo) && name == "minor" =>
-            {
-                Symbol::bound(Type::IntLiteral(
-                    Program::get(db).python_version(db).minor.into(),
-                ))
-                .into()
+                let python_version = Program::get(db).python_version(db);
+                let segment = if name == "major" {
+                    python_version.major
+                } else {
+                    python_version.minor
+                };
+                Symbol::bound(Type::IntLiteral(segment.into())).into()
             }
 
             Type::IntLiteral(_) if matches!(name_str, "real" | "numerator") => {
