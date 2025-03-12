@@ -894,8 +894,12 @@ where
                             let pre_return_state = matches!(last_stmt, ast::Stmt::Return(_))
                                 .then(|| builder.flow_snapshot());
                             builder.visit_stmt(last_stmt);
+                            let scope_start_visibility =
+                                builder.current_use_def_map().scope_start_visibility;
                             if let Some(pre_return_state) = pre_return_state {
                                 builder.flow_restore(pre_return_state);
+                                builder.current_use_def_map_mut().scope_start_visibility =
+                                    scope_start_visibility;
                             }
                         }
 

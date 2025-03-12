@@ -56,8 +56,9 @@ use crate::symbol::{
 };
 use crate::types::call::{Argument, CallArguments, UnionCallError};
 use crate::types::diagnostic::{
-    report_invalid_arguments_to_annotated, report_invalid_arguments_to_callable,
-    report_invalid_assignment, report_invalid_attribute_assignment, report_unresolved_module,
+    report_implicit_return_type, report_invalid_arguments_to_annotated,
+    report_invalid_arguments_to_callable, report_invalid_assignment,
+    report_invalid_attribute_assignment, report_invalid_return_type, report_unresolved_module,
     TypeCheckDiagnostics, CALL_NON_CALLABLE, CALL_POSSIBLY_UNBOUND_METHOD,
     CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS, CYCLIC_CLASS_DEFINITION, DIVISION_BY_ZERO,
     DUPLICATE_BASE, INCONSISTENT_MRO, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE, INVALID_DECLARATION,
@@ -269,6 +270,12 @@ impl<'db> InferenceRegion<'db> {
     }
 }
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+struct TypeAndRange<'db> {
+    ty: Type<'db>,
+    range: TextRange,
+}
+
 /// The inferred types for a single region.
 #[derive(Debug, Eq, PartialEq, salsa::Update)]
 pub(crate) struct TypeInference<'db> {
@@ -452,6 +459,9 @@ pub(super) struct TypeInferenceBuilder<'db> {
     /// The type inference results
     types: TypeInference<'db>,
 
+    /// The returned types and their corresponding ranges of the region, if it is a function body.
+    return_types_and_ranges: Vec<TypeAndRange<'db>>,
+
     /// The deferred state of inferring types of certain expressions within the region.
     ///
     /// This is different from [`InferenceRegion::Deferred`] which works on the entire definition
@@ -483,6 +493,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             context: InferContext::new(db, scope),
             index,
             region,
+            return_types_and_ranges: vec![],
             deferred_state: DeferredExpressionState::None,
             types: TypeInference::empty(scope),
         }
@@ -1051,6 +1062,11 @@ impl<'db> TypeInferenceBuilder<'db> {
         );
     }
 
+    fn record_return_type(&mut self, ty: Type<'db>, range: TextRange) {
+        self.return_types_and_ranges
+            .push(TypeAndRange { ty, range });
+    }
+
     fn infer_module(&mut self, module: &ast::ModModule) {
         self.infer_body(&module.body);
     }
@@ -1107,6 +1123,68 @@ impl<'db> TypeInferenceBuilder<'db> {
             self.infer_definition(parameter);
         }
         self.infer_body(&function.body);
+
+        if let Some(declared_ty) = function
+            .returns
+            .as_deref()
+            .map(|ret| self.file_expression_type(ret))
+        {
+            fn is_stub_suite(suite: &[ast::Stmt]) -> bool {
+                match suite {
+                    [ast::Stmt::Expr(ast::StmtExpr { value: first, .. }), ast::Stmt::Expr(ast::StmtExpr { value: second, .. }), ..] => {
+                        first.is_string_literal_expr() && second.is_ellipsis_literal_expr()
+                    }
+                    [ast::Stmt::Expr(ast::StmtExpr { value, .. }), ast::Stmt::Pass(_), ..] => {
+                        value.is_string_literal_expr()
+                    }
+                    [ast::Stmt::Expr(ast::StmtExpr { value, .. }), ..] => {
+                        value.is_ellipsis_literal_expr() || value.is_string_literal_expr()
+                    }
+                    [ast::Stmt::Pass(_)] => true,
+                    _ => false,
+                }
+            }
+            let is_overload = function.decorator_list.iter().any(|decorator| {
+                let decorator_type = self.file_expression_type(&decorator.expression);
+
+                decorator_type
+                    .into_function_literal()
+                    .is_some_and(|f| f.is_known(self.db(), KnownFunction::Overload))
+            });
+            // TODO: Protocol / abstract methods can have empty bodies
+            if (self.in_stub() || is_overload)
+                && self.return_types_and_ranges.is_empty()
+                && is_stub_suite(&function.body)
+            {
+                return;
+            }
+            for invalid in self
+                .return_types_and_ranges
+                .iter()
+                .filter(|ty_range| !ty_range.ty.is_assignable_to(self.db(), declared_ty))
+            {
+                report_invalid_return_type(
+                    &self.context,
+                    invalid.range,
+                    function.returns.as_ref().unwrap().range(),
+                    declared_ty,
+                    invalid.ty,
+                );
+            }
+            let scope_id = self.index.node_scope(NodeWithScopeRef::Function(function));
+            let use_def = self.index.use_def_map(scope_id);
+            if use_def.can_implicit_return(self.db())
+                && !KnownClass::NoneType
+                    .to_instance(self.db())
+                    .is_assignable_to(self.db(), declared_ty)
+            {
+                report_implicit_return_type(
+                    &self.context,
+                    function.returns.as_ref().unwrap().range(),
+                    declared_ty,
+                );
+            }
+        }
     }
 
     fn infer_body(&mut self, suite: &[ast::Stmt]) {
@@ -2743,7 +2821,15 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn infer_return_statement(&mut self, ret: &ast::StmtReturn) {
-        self.infer_optional_expression(ret.value.as_deref());
+        if let Some(ty) = self.infer_optional_expression(ret.value.as_deref()) {
+            let range = ret
+                .value
+                .as_ref()
+                .map_or(ret.range(), |value| value.range());
+            self.record_return_type(ty, range);
+        } else {
+            self.record_return_type(KnownClass::NoneType.to_instance(self.db()), ret.range());
+        }
     }
 
     fn infer_delete_statement(&mut self, delete: &ast::StmtDelete) {

@@ -13,7 +13,7 @@ use ruff_db::diagnostic::{
 };
 use ruff_db::files::File;
 use ruff_python_ast::{self as ast, AnyNodeRef};
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 use std::borrow::Cow;
 use std::fmt::Formatter;
@@ -33,6 +33,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INCONSISTENT_MRO);
     registry.register_lint(&INDEX_OUT_OF_BOUNDS);
     registry.register_lint(&INVALID_ARGUMENT_TYPE);
+    registry.register_lint(&INVALID_RETURN_TYPE);
     registry.register_lint(&INVALID_ASSIGNMENT);
     registry.register_lint(&INVALID_BASE);
     registry.register_lint(&INVALID_CONTEXT_MANAGER);
@@ -256,6 +257,25 @@ declare_lint! {
     /// ```
     pub(crate) static INVALID_ARGUMENT_TYPE = {
         summary: "detects call arguments whose type is not assignable to the corresponding typed parameter",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Detects returned values that can't be assigned to the function's annotated return type.
+    ///
+    /// ## Why is this bad?
+    /// Returning an object of a type incompatible with the annotated return type may cause confusion to the user calling the function.
+    ///
+    /// ## Examples
+    /// ```python
+    /// def func() -> int:
+    ///     return "a"  # error: [invalid-return-type]
+    /// ```
+    pub(crate) static INVALID_RETURN_TYPE = {
+        summary: "detects returned values that can't be assigned to the function's annotated return type",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
@@ -1083,6 +1103,47 @@ pub(super) fn report_invalid_attribute_assignment(
             "Object of type `{}` is not assignable to attribute `{attribute_name}` of type `{}`",
             source_ty.display(context.db()),
             target_ty.display(context.db()),
+        ),
+    );
+}
+
+pub(super) fn report_invalid_return_type(
+    context: &InferContext,
+    object_range: impl Ranged,
+    return_type_range: impl Ranged,
+    expected_ty: Type,
+    actual_ty: Type,
+) {
+    let return_type_span = Span::from(context.file()).with_range(return_type_range.range());
+    context.report_lint_with_secondary_messages(
+        &INVALID_RETURN_TYPE,
+        object_range,
+        format_args!(
+            "Object of type `{}` is not assignable to return type `{}`",
+            actual_ty.display(context.db()),
+            expected_ty.display(context.db())
+        ),
+        vec![OldSecondaryDiagnosticMessage::new(
+            return_type_span,
+            format!(
+                "Return type is declared here as `{}`",
+                expected_ty.display(context.db())
+            ),
+        )],
+    );
+}
+
+pub(super) fn report_implicit_return_type(
+    context: &InferContext,
+    range: impl Ranged,
+    expected_ty: Type,
+) {
+    context.report_lint(
+        &INVALID_RETURN_TYPE,
+        range,
+        format_args!(
+            "Function can implicitly return `None`, which is not assignable to return type `{}`",
+            expected_ty.display(context.db())
         ),
     );
 }
