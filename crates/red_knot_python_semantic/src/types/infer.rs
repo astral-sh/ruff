@@ -1144,41 +1144,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                     _ => false,
                 }
             }
-            fn does_suite_always_return(suite: &[ast::Stmt]) -> bool {
-                match suite.last() {
-                    Some(ast::Stmt::Return(_) | ast::Stmt::Raise(_)) => true,
-                    Some(ast::Stmt::If(if_stmt)) => {
-                        !if_stmt.elif_else_clauses.is_empty()
-                            && does_suite_always_return(&if_stmt.body)
-                            && if_stmt
-                                .elif_else_clauses
-                                .iter()
-                                .all(|clause| does_suite_always_return(&clause.body))
-                    }
-                    Some(ast::Stmt::While(while_stmt)) => {
-                        does_suite_always_return(&while_stmt.body)
-                            && does_suite_always_return(&while_stmt.orelse)
-                    }
-                    Some(ast::Stmt::For(for_stmt)) => {
-                        does_suite_always_return(&for_stmt.body)
-                            && does_suite_always_return(&for_stmt.orelse)
-                    }
-                    Some(ast::Stmt::Try(try_stmt)) => {
-                        does_suite_always_return(&try_stmt.body)
-                            && does_suite_always_return(&try_stmt.orelse)
-                            && does_suite_always_return(&try_stmt.finalbody)
-                            && try_stmt.handlers.iter().all(|handler| {
-                                does_suite_always_return(&handler.as_except_handler().unwrap().body)
-                            })
-                    }
-                    Some(ast::Stmt::With(with_stmt)) => does_suite_always_return(&with_stmt.body),
-                    Some(ast::Stmt::Match(match_stmt)) => match_stmt
-                        .cases
-                        .iter()
-                        .all(|case| does_suite_always_return(&case.body)),
-                    _ => false,
-                }
-            }
             let is_overloaded = function.decorator_list.iter().any(|decorator| {
                 let decorator_type = self.file_expression_type(&decorator.expression);
 
@@ -1209,7 +1174,6 @@ impl<'db> TypeInferenceBuilder<'db> {
             let scope_id = self.index.node_scope(NodeWithScopeRef::Function(function));
             let use_def = self.index.use_def_map(scope_id);
             if use_def.can_implicit_return(self.db())
-                && !does_suite_always_return(&function.body)
                 && !KnownClass::NoneType
                     .to_instance(self.db())
                     .is_assignable_to(self.db(), declared_ty)
@@ -2678,9 +2642,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                 report_invalid_exception_cause(&self.context, cause, cause_type);
             }
         }
-
-        let range = cause.as_ref().map_or(raise.range(), |cause| cause.range());
-        self.record_return_type(Type::Never, range);
     }
 
     /// Given a `from .foo import bar` relative import, resolve the relative module

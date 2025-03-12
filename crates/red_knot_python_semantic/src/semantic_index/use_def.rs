@@ -387,14 +387,10 @@ impl<'db> UseDefMap<'db> {
 
     /// This function is intended to be called only once inside `TypeInferenceBuilder::infer_function_body`.
     pub(crate) fn can_implicit_return(&self, db: &dyn crate::Db) -> bool {
-        let mut visibility = self.scope_start_visibility;
-        while !visibility.is_terminal() {
-            let interior = self.visibility_constraints.get_interior(visibility);
-            let predicate = self.predicates[interior.atom()];
-            let truthiness = VisibilityConstraints::analyze_single(db, &predicate);
-            visibility = interior.visibility_constraint(truthiness);
-        }
-        visibility != ScopedVisibilityConstraintId::ALWAYS_FALSE
+        !self
+            .visibility_constraints
+            .evaluate(db, &self.predicates, self.scope_start_visibility)
+            .is_always_false()
     }
 
     fn bindings_iterator<'map>(
@@ -559,7 +555,7 @@ pub(super) struct UseDefMapBuilder<'db> {
     /// whether or not the start of the scope is visible. This is important for cases like
     /// `if True: x = 1; use(x)` where we need to hide the implicit "x = unbound" binding
     /// in the "else" branch.
-    scope_start_visibility: ScopedVisibilityConstraintId,
+    pub(super) scope_start_visibility: ScopedVisibilityConstraintId,
 
     /// Live bindings at each so-far-recorded use.
     bindings_by_use: IndexVec<ScopedUseId, SymbolBindings>,

@@ -232,7 +232,7 @@ impl std::fmt::Debug for ScopedVisibilityConstraintId {
 // arena Vec, with the constraint ID providing an index into the arena.
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub(crate) struct InteriorNode {
+struct InteriorNode {
     /// A "variable" that is evaluated as part of a TDD ternary function. For visibility
     /// constraints, this is a `Predicate` that represents some runtime property of the Python
     /// code that we are evaluating.
@@ -240,23 +240,6 @@ pub(crate) struct InteriorNode {
     if_true: ScopedVisibilityConstraintId,
     if_ambiguous: ScopedVisibilityConstraintId,
     if_false: ScopedVisibilityConstraintId,
-}
-
-impl InteriorNode {
-    pub(crate) fn atom(&self) -> ScopedPredicateId {
-        self.atom
-    }
-
-    pub(crate) fn visibility_constraint(
-        &self,
-        truthiness: Truthiness,
-    ) -> ScopedVisibilityConstraintId {
-        match truthiness {
-            Truthiness::AlwaysTrue => self.if_true,
-            Truthiness::AlwaysFalse => self.if_false,
-            Truthiness::Ambiguous => self.if_ambiguous,
-        }
-    }
 }
 
 impl ScopedVisibilityConstraintId {
@@ -272,7 +255,7 @@ impl ScopedVisibilityConstraintId {
     pub(crate) const ALWAYS_FALSE: ScopedVisibilityConstraintId =
         ScopedVisibilityConstraintId(0xffff_fffd);
 
-    pub(crate) fn is_terminal(self) -> bool {
+    fn is_terminal(self) -> bool {
         self.0 >= SMALLEST_TERMINAL.0
     }
 }
@@ -302,12 +285,6 @@ const SMALLEST_TERMINAL: ScopedVisibilityConstraintId = ALWAYS_FALSE;
 #[derive(Debug, PartialEq, Eq, salsa::Update)]
 pub(crate) struct VisibilityConstraints {
     interiors: IndexVec<ScopedVisibilityConstraintId, InteriorNode>,
-}
-
-impl VisibilityConstraints {
-    pub(crate) fn get_interior(&self, id: ScopedVisibilityConstraintId) -> InteriorNode {
-        self.interiors[id]
-    }
 }
 
 #[derive(Debug, Default, PartialEq, Eq)]
@@ -576,7 +553,7 @@ impl VisibilityConstraints {
         }
     }
 
-    pub(crate) fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
+    fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
         match predicate.node {
             PredicateNode::Expression(test_expr) => {
                 let ty = infer_expression_type(db, test_expr);
