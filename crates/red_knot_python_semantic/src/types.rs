@@ -971,6 +971,20 @@ impl<'db> Type<'db> {
                 .iter()
                 .all(|e| e.is_disjoint_from(db, other)),
 
+            // If we have two intersections, we test the positive elements of each one against the other intersection
+            // Negative elements need a positive element on the other side in order to be disjoint.
+            // This is similar to what would happen if we tried to build a new intersection that combines the two
+            (Type::Intersection(self_intersection), Type::Intersection(other_intersection)) => {
+                self_intersection
+                    .positive(db)
+                    .iter()
+                    .any(|p| p.is_disjoint_from(db, other))
+                    || other_intersection
+                        .positive(db)
+                        .iter()
+                        .any(|p: &Type<'_>| p.is_disjoint_from(db, self))
+            }
+
             (Type::Intersection(intersection), other)
             | (other, Type::Intersection(intersection)) => {
                 intersection
@@ -981,7 +995,7 @@ impl<'db> Type<'db> {
                     || intersection
                         .negative(db)
                         .iter()
-                        .any(|&neg_ty| other.is_assignable_to(db, neg_ty))
+                        .any(|&neg_ty| other.is_subtype_of(db, neg_ty))
             }
 
             // any single-valued type is disjoint from another single-valued type
