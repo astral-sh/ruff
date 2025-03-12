@@ -125,7 +125,7 @@ fn scope_cycle_recover<'db>(
 }
 
 fn scope_cycle_initial<'db>(_db: &'db dyn Db, scope: ScopeId<'db>) -> TypeInference<'db> {
-    TypeInference::empty(scope, Some(Type::Never))
+    TypeInference::cycle_fallback(scope, Type::Never)
 }
 
 /// Infer all types for a [`Definition`] (including sub-expressions).
@@ -199,7 +199,7 @@ fn deferred_cycle_recover<'db>(
 }
 
 fn deferred_cycle_initial<'db>(db: &'db dyn Db, definition: Definition<'db>) -> TypeInference<'db> {
-    TypeInference::empty(definition.scope(db), Some(Type::Never))
+    TypeInference::cycle_fallback(definition.scope(db), Type::Never)
 }
 
 /// Infer all types for an [`Expression`] (including sub-expressions).
