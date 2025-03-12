@@ -441,10 +441,7 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(
-        Rule::RepeatedEqualityComparison,
-        Path::new("repeated_equality_comparison.py")
-    )]
+
     #[test_case(Rule::BadStrStripCall, Path::new("bad_str_strip_call.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(

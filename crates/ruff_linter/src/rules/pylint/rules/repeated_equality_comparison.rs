@@ -15,7 +15,7 @@ use crate::fix::snippet::SourceCodeSnippet;
 use crate::Locator;
 
 /// ## What it does
-/// Checks for repeated equality comparisons that can rewritten as a membership
+/// Checks for repeated equality comparisons that can be rewritten as a membership
 /// test.
 ///
 /// ## Why is this bad?
@@ -28,7 +28,7 @@ use crate::Locator;
 /// If the items are hashable, use a `set` for efficiency; otherwise, use a
 /// `tuple`.
 ///
-/// In [preview], this rule will try to determine if the values are hashable
+/// This rule will try to determine if the values are hashable
 /// and the fix will use a `set` if they are. If unable to determine, the fix
 /// will use a `tuple` and continue to suggest the use of a `set`.
 ///
@@ -46,8 +46,6 @@ use crate::Locator;
 /// - [Python documentation: Comparisons](https://docs.python.org/3/reference/expressions.html#comparisons)
 /// - [Python documentation: Membership test operations](https://docs.python.org/3/reference/expressions.html#membership-test-operations)
 /// - [Python documentation: `set`](https://docs.python.org/3/library/stdtypes.html#set)
-///
-/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 pub(crate) struct RepeatedEqualityComparison {
     expression: SourceCodeSnippet,
@@ -135,10 +133,9 @@ pub(crate) fn repeated_equality_comparison(checker: &Checker, bool_op: &ast::Exp
 
             // if we can determine that all the values are hashable, we can use a set
             // TODO: improve with type inference
-            let all_hashable = checker.settings.preview.is_enabled()
-                && comparators
-                    .iter()
-                    .all(|comparator| comparator.is_literal_expr());
+            let all_hashable = comparators
+                .iter()
+                .all(|comparator| comparator.is_literal_expr());
 
             let mut diagnostic = Diagnostic::new(
                 RepeatedEqualityComparison {
