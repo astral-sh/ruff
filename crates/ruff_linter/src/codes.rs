@@ -1001,7 +1001,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "041") => (RuleGroup::Preview, rules::ruff::rules::UnnecessaryNestedLiteral),
         (Ruff, "043") => (RuleGroup::Preview, rules::ruff::rules::PytestRaisesAmbiguousPattern),
         (Ruff, "045") => (RuleGroup::Preview, rules::ruff::rules::ImplicitClassVarInDataclass),
-        (Ruff, "046") => (RuleGroup::Preview, rules::ruff::rules::UnnecessaryCastToInt),
+        (Ruff, "046") => (RuleGroup::Stable, rules::ruff::rules::UnnecessaryCastToInt),
         (Ruff, "047") => (RuleGroup::Preview, rules::ruff::rules::NeedlessElse),
         (Ruff, "048") => (RuleGroup::Preview, rules::ruff::rules::MapIntVersionParsing),
         (Ruff, "049") => (RuleGroup::Preview, rules::ruff::rules::DataclassEnum),
