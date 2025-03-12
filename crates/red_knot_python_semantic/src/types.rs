@@ -5065,17 +5065,16 @@ impl<'db> IntersectionType<'db> {
 
         let mut builder = IntersectionBuilder::new(db);
 
-        let mut any_unbound = false;
-        let mut any_possibly_unbound = false;
+        let mut all_unbound = true;
+        let mut any_definitely_bound = false;
         for ty in self.positive(db) {
             let ty_member = transform_fn(ty);
             match ty_member {
-                Symbol::Unbound => {
-                    any_unbound = true;
-                }
+                Symbol::Unbound => {}
                 Symbol::Type(ty_member, member_boundness) => {
-                    if member_boundness == Boundness::PossiblyUnbound {
-                        any_possibly_unbound = true;
+                    all_unbound = false;
+                    if member_boundness == Boundness::Bound {
+                        any_definitely_bound = true;
                     }
 
                     builder = builder.add_positive(ty_member);
@@ -5083,15 +5082,15 @@ impl<'db> IntersectionType<'db> {
             }
         }
 
-        if any_unbound {
+        if all_unbound {
             Symbol::Unbound
         } else {
             Symbol::Type(
                 builder.build(),
-                if any_possibly_unbound {
-                    Boundness::PossiblyUnbound
-                } else {
+                if any_definitely_bound {
                     Boundness::Bound
+                } else {
+                    Boundness::PossiblyUnbound
                 },
             )
         }

@@ -1042,6 +1042,132 @@ reveal_type(A.__mro__)
 reveal_type(A.X)  # revealed: Unknown | Literal[42]
 ```
 
+## Intersections of attributes
+
+### Attribute only available on one element
+
+```py
+from knot_extensions import Intersection
+
+class A:
+    x: int = 1
+
+class B: ...
+
+def _(a_and_b: Intersection[A, B]):
+    reveal_type(a_and_b.x)  # revealed: int
+
+# Same for class objects
+def _(a_and_b: Intersection[type[A], type[B]]):
+    reveal_type(a_and_b.x)  # revealed: int
+```
+
+### Attribute available on both elements
+
+```py
+from knot_extensions import Intersection
+
+class P: ...
+class Q: ...
+
+class A:
+    x: P = P()
+
+class B:
+    x: Q = Q()
+
+def _(a_and_b: Intersection[A, B]):
+    reveal_type(a_and_b.x)  # revealed: P & Q
+
+# Same for class objects
+def _(a_and_b: Intersection[type[A], type[B]]):
+    reveal_type(a_and_b.x)  # revealed: P & Q
+```
+
+### Possible unboundness
+
+```py
+from knot_extensions import Intersection
+
+class P: ...
+class Q: ...
+
+def _(flag: bool):
+    class A1:
+        if flag:
+            x: P = P()
+
+    class B1: ...
+
+    def inner1(a_and_b: Intersection[A1, B1]):
+        # error: [possibly-unbound-attribute]
+        reveal_type(a_and_b.x)  # revealed: P
+    # Same for class objects
+    def inner1_class(a_and_b: Intersection[type[A1], type[B1]]):
+        # error: [possibly-unbound-attribute]
+        reveal_type(a_and_b.x)  # revealed: P
+
+    class A2:
+        if flag:
+            x: P = P()
+
+    class B1:
+        x: Q = Q()
+
+    def inner2(a_and_b: Intersection[A2, B1]):
+        reveal_type(a_and_b.x)  # revealed: P & Q
+    # Same for class objects
+    def inner2_class(a_and_b: Intersection[type[A2], type[B1]]):
+        reveal_type(a_and_b.x)  # revealed: P & Q
+
+    class A3:
+        if flag:
+            x: P = P()
+
+    class B3:
+        if flag:
+            x: Q = Q()
+
+    def inner3(a_and_b: Intersection[A3, B3]):
+        # error: [possibly-unbound-attribute]
+        reveal_type(a_and_b.x)  # revealed: P & Q
+    # Same for class objects
+    def inner3_class(a_and_b: Intersection[type[A3], type[B3]]):
+        # error: [possibly-unbound-attribute]
+        reveal_type(a_and_b.x)  # revealed: P & Q
+
+    class A4: ...
+    class B4: ...
+
+    def inner4(a_and_b: Intersection[A4, B4]):
+        # error: [unresolved-attribute]
+        reveal_type(a_and_b.x)  # revealed: Unknown
+    # Same for class objects
+    def inner4_class(a_and_b: Intersection[type[A4], type[B4]]):
+        # error: [unresolved-attribute]
+        reveal_type(a_and_b.x)  # revealed: Unknown
+```
+
+### Intersection of implicit instance attributes
+
+```py
+from knot_extensions import Intersection
+
+class P: ...
+class Q: ...
+
+class A:
+    def __init__(self):
+        self.x: P = P()
+
+class B:
+    def __init__(self):
+        self.x: Q = Q()
+
+def _(a_and_b: Intersection[A, B]):
+    reveal_type(a_and_b.x)  # revealed: P & Q
+```
+
 ## Attribute access on `Any`
 
 The union of the set of types that `Any` could materialise to is equivalent to `object`. It follows
