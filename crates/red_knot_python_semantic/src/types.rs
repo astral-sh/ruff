@@ -580,6 +580,9 @@ impl<'db> Type<'db> {
                 true
             }
 
+            // If both sides are intersections we need to handle the right side first
+            // (A & B & C) is a subtype of (A & B) because the left is a subtype of both A and B,
+            // but none of A, B, or C is a subtype of (A & B).
             (_, Type::Intersection(intersection)) => {
                 intersection
                     .positive(db)
@@ -775,6 +778,10 @@ impl<'db> Type<'db> {
                 .iter()
                 .any(|&elem_ty| ty.is_assignable_to(db, elem_ty)),
 
+            // If both sides are intersections we need to handle the right side first
+            // (A & B & C) is assignable to (A & B) because the left is assignable to both A and B,
+            // but none of A, B, or C is assignable to (A & B).
+            //
             // A type S is assignable to an intersection type T if
             // S is assignable to all positive elements of T (e.g. `str & int` is assignable to `str & Any`), and
             // S is disjoint from all negative elements of T (e.g. `int` is not assignable to Intersection[int, Not[Literal[1]]]).
