@@ -1132,6 +1132,28 @@ Instance attributes also take precedence over the `__getattr__` method:
 reveal_type(c.instance_attr)  # revealed: str
 ```
 
+### Type of the `name` parameter
+
+If the `name` parameter of the `__getattr__` method is annotated with a (union of) literal type(s),
+we only consider the attribute access to be valid if the accessed attribute is one of them:
+
+```py
+from typing import Literal
+
+class Date:
+    def __getattr__(self, name: Literal["day", "month", "year"]) -> int:
+        return 0
+
+date = Date()
+
+reveal_type(date.day)  # revealed: int
+reveal_type(date.month)  # revealed: int
+reveal_type(date.year)  # revealed: int
+
+# error: [unresolved-attribute] "Type `Date` has no attribute `century`"
+reveal_type(date.century)  # revealed: Unknown
+```
+
 ### `argparse.Namespace`
 
 A standard library example of a class with a custom `__getattr__` method is `argparse.Namespace`:
