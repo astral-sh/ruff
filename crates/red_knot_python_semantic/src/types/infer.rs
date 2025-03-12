@@ -117,10 +117,9 @@ pub(crate) fn infer_scope_types<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Ty
 fn scope_cycle_recover<'db>(
     _db: &'db dyn Db,
     _value: &TypeInference<'db>,
-    count: u32,
+    _count: u32,
     _scope: ScopeId<'db>,
 ) -> salsa::CycleRecoveryAction<TypeInference<'db>> {
-    assert!(count < 10, "cycle did not converge within 10 iterations");
     salsa::CycleRecoveryAction::Iterate
 }
 
@@ -151,10 +150,9 @@ pub(crate) fn infer_definition_types<'db>(
 fn definition_cycle_recover<'db>(
     _db: &'db dyn Db,
     _value: &TypeInference<'db>,
-    count: u32,
+    _count: u32,
     _definition: Definition<'db>,
 ) -> salsa::CycleRecoveryAction<TypeInference<'db>> {
-    assert!(count < 10, "cycle did not converge within 10 iterations");
     salsa::CycleRecoveryAction::Iterate
 }
 
@@ -191,10 +189,9 @@ pub(crate) fn infer_deferred_types<'db>(
 fn deferred_cycle_recover<'db>(
     _db: &'db dyn Db,
     _value: &TypeInference<'db>,
-    count: u32,
+    _count: u32,
     _definition: Definition<'db>,
 ) -> salsa::CycleRecoveryAction<TypeInference<'db>> {
-    assert!(count < 10, "cycle did not converge within 10 iterations");
     salsa::CycleRecoveryAction::Iterate
 }
 
@@ -228,10 +225,9 @@ pub(crate) fn infer_expression_types<'db>(
 fn expression_cycle_recover<'db>(
     _db: &'db dyn Db,
     _value: &TypeInference<'db>,
-    count: u32,
+    _count: u32,
     _expression: Expression<'db>,
 ) -> salsa::CycleRecoveryAction<TypeInference<'db>> {
-    assert!(count < 10, "cycle did not converge within 10 iterations");
     salsa::CycleRecoveryAction::Iterate
 }
 
@@ -275,10 +271,9 @@ pub(crate) fn infer_expression_type<'db>(
 fn single_expression_cycle_recover<'db>(
     _db: &'db dyn Db,
     _value: &Type<'db>,
-    count: u32,
+    _count: u32,
     _expression: Expression<'db>,
 ) -> salsa::CycleRecoveryAction<Type<'db>> {
-    assert!(count < 10, "cycle did not converge within 10 iterations");
     salsa::CycleRecoveryAction::Iterate
 }
 

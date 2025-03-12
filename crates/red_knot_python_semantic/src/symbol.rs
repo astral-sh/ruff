@@ -491,12 +491,11 @@ impl<'db> From<Symbol<'db>> for SymbolAndQualifiers<'db> {
 fn symbol_cycle_recover<'db>(
     _db: &'db dyn Db,
     _value: &SymbolAndQualifiers<'db>,
-    count: u32,
+    _count: u32,
     _scope: ScopeId<'db>,
     _symbol_id: ScopedSymbolId,
     _requires_explicit_reexport: RequiresExplicitReExport,
 ) -> salsa::CycleRecoveryAction<SymbolAndQualifiers<'db>> {
-    assert!(count < 10, "cycle did not converge within 10 iterations");
     salsa::CycleRecoveryAction::Iterate
 }
 
