@@ -808,7 +808,7 @@ def _(flag1: bool, flag2: bool):
     reveal_type(C5.attr1)  # revealed: Unknown | Literal["metaclass value", "class value"]
 ```
 
-## Union of attributes
+## Unions of attributes
 
 If the (meta)class is a union type or if the attribute on the (meta) class has a union type, we
 infer those union types accordingly:
@@ -852,43 +852,6 @@ def _(flag: bool):
 
     class C4(metaclass=Meta4): ...
     reveal_type(C4.x)  # revealed: Unknown | Literal[7, 8]
-```
-
-## Inherited class attributes
-
-### Basic
-
-```py
-class A:
-    X = "foo"
-
-class B(A): ...
-class C(B): ...
-
-reveal_type(C.X)  # revealed: Unknown | Literal["foo"]
-```
-
-### Multiple inheritance
-
-```py
-class O: ...
-
-class F(O):
-    X = 56
-
-class E(O):
-    X = 42
-
-class D(O): ...
-class C(D, F): ...
-class B(E, D): ...
-class A(B, C): ...
-
-# revealed: tuple[Literal[A], Literal[B], Literal[E], Literal[C], Literal[D], Literal[F], Literal[O], Literal[object]]
-reveal_type(A.__mro__)
-
-# `E` is earlier in the MRO than `F`, so we should use the type of `E.X`
-reveal_type(A.X)  # revealed: Unknown | Literal[42]
 ```
 
 ## Unions with possibly unbound paths
@@ -1028,7 +991,58 @@ def _(flag: bool):
     reveal_type(Foo().x)  # revealed: Unknown | Literal[1]
 ```
 
-### Attribute access on `Any`
+### Unions with all paths unbound
+
+If the symbol is unbound in all elements of the union, we detect that:
+
+```py
+def _(flag: bool):
+    class C1: ...
+    class C2: ...
+    C = C1 if flag else C2
+
+    # error: [unresolved-attribute] "Type `Literal[C1, C2]` has no attribute `x`"
+    reveal_type(C.x)  # revealed: Unknown
+```
+
+## Inherited class attributes
+
+### Basic
+
+```py
+class A:
+    X = "foo"
+
+class B(A): ...
+class C(B): ...
+
+reveal_type(C.X)  # revealed: Unknown | Literal["foo"]
+```
+
+### Multiple inheritance
+
+```py
+class O: ...
+
+class F(O):
+    X = 56
+
+class E(O):
+    X = 42
+
+class D(O): ...
+class C(D, F): ...
+class B(E, D): ...
+class A(B, C): ...
+
+# revealed: tuple[Literal[A], Literal[B], Literal[E], Literal[C], Literal[D], Literal[F], Literal[O], Literal[object]]
+reveal_type(A.__mro__)
+
+# `E` is earlier in the MRO than `F`, so we should use the type of `E.X`
+reveal_type(A.X)  # revealed: Unknown | Literal[42]
+```
+
+## Attribute access on `Any`
 
 The union of the set of types that `Any` could materialise to is equivalent to `object`. It follows
 from this that attribute access on `Any` resolves to `Any` if the attribute does not exist on
@@ -1057,20 +1071,6 @@ class C(B, A): ...
 
 reveal_type(C.__mro__)  # revealed: tuple[Literal[C], Literal[B], Any, Literal[A], Literal[object]]
 reveal_type(C.x)  # revealed: Literal[1] & Any
-```
-
-### Unions with all paths unbound
-
-If the symbol is unbound in all elements of the union, we detect that:
-
-```py
-def _(flag: bool):
-    class C1: ...
-    class C2: ...
-    C = C1 if flag else C2
-
-    # error: [unresolved-attribute] "Type `Literal[C1, C2]` has no attribute `x`"
-    reveal_type(C.x)  # revealed: Unknown
 ```
 
 ## Objects of all types have a `__class__` method
@@ -1125,6 +1125,8 @@ reveal_type(Foo.__class__)  # revealed: Literal[type]
 
 ## Module attributes
 
+### Basic
+
 `mod.py`:
 
 ```py
@@ -1159,7 +1161,7 @@ for mod.global_symbol in IntIterable():
     pass
 ```
 
-## Nested attributes
+### Nested module attributes
 
 `outer/__init__.py`:
 
