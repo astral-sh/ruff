@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
-snapshot_kind: text
 ---
 RUF043.py:8:43: RUF043 Pattern passed to `match=` contains metacharacters but is neither escaped nor raw
    |
