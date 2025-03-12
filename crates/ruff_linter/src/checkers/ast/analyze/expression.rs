@@ -428,7 +428,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 flake8_2020::rules::name_or_attribute(checker, expr);
             }
             if checker.enabled(Rule::DatetimeMinMax) {
-                flake8_datetimez::rules::datetime_max_min(checker, expr);
+                flake8_datetimez::rules::datetime_min_max(checker, expr);
             }
             if checker.enabled(Rule::BannedApi) {
                 flake8_tidy_imports::rules::banned_attribute_access(checker, expr);
