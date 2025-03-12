@@ -2754,10 +2754,12 @@ from typing import Union;foo: Union[int, str] = 1
             .args(STDIN_BASE_OPTIONS)
             .arg(".")
             .current_dir(project_dir), @r###"
-        success: true
-        exit_code: 0
+        success: false
+        exit_code: 1
         ----- stdout -----
-        All checks passed!
+        test.py:2:31: UP007 [*] Use `X | Y` for type annotations
+        Found 1 error.
+        [*] 1 fixable with the `--fix` option.
 
         ----- stderr -----
         "###);
