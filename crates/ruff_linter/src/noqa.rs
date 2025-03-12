@@ -1251,6 +1251,30 @@ mod tests {
     }
 
     #[test]
+    fn noqa_no_code() {
+        let source = "# noqa:";
+        let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
+        assert_debug_snapshot!(directive);
+        assert_lexed_ranges_match_slices(directive, source);
+    }
+
+    #[test]
+    fn noqa_no_code_invalid_suffix() {
+        let source = "# noqa: foo";
+        let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
+        assert_debug_snapshot!(directive);
+        assert_lexed_ranges_match_slices(directive, source);
+    }
+
+    #[test]
+    fn noqa_no_code_trailing_content() {
+        let source = "# noqa:  # Foo";
+        let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
+        assert_debug_snapshot!(directive);
+        assert_lexed_ranges_match_slices(directive, source);
+    }
+
+    #[test]
     fn noqa_code() {
         let source = "# noqa: F401";
         let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
@@ -1483,8 +1507,56 @@ mod tests {
     }
 
     #[test]
+    fn flake8_noqa_no_code() {
+        let source = "# flake8: noqa:";
+        let exemption = lex_file_exemption(TextRange::up_to(source.text_len()), source);
+        assert_debug_snapshot!(exemption);
+        assert_lexed_ranges_match_slices(exemption, source);
+    }
+
+    #[test]
+    fn flake8_noqa_no_code_invalid_suffix() {
+        let source = "# flake8: noqa: foo";
+        let exemption = lex_file_exemption(TextRange::up_to(source.text_len()), source);
+        assert_debug_snapshot!(exemption);
+        assert_lexed_ranges_match_slices(exemption, source);
+    }
+
+    #[test]
+    fn flake8_noqa_no_code_trailing_content() {
+        let source = "# flake8: noqa:  # Foo";
+        let exemption = lex_file_exemption(TextRange::up_to(source.text_len()), source);
+        assert_debug_snapshot!(exemption);
+        assert_lexed_ranges_match_slices(exemption, source);
+    }
+
+    #[test]
     fn ruff_exemption_all() {
         let source = "# ruff: noqa";
+        let exemption = lex_file_exemption(TextRange::up_to(source.text_len()), source);
+        assert_debug_snapshot!(exemption);
+        assert_lexed_ranges_match_slices(exemption, source);
+    }
+
+    #[test]
+    fn ruff_noqa_no_code() {
+        let source = "# ruff: noqa:";
+        let exemption = lex_file_exemption(TextRange::up_to(source.text_len()), source);
+        assert_debug_snapshot!(exemption);
+        assert_lexed_ranges_match_slices(exemption, source);
+    }
+
+    #[test]
+    fn ruff_noqa_no_code_invalid_suffix() {
+        let source = "# ruff: noqa: foo";
+        let exemption = lex_file_exemption(TextRange::up_to(source.text_len()), source);
+        assert_debug_snapshot!(exemption);
+        assert_lexed_ranges_match_slices(exemption, source);
+    }
+
+    #[test]
+    fn ruff_noqa_no_code_trailing_content() {
+        let source = "# ruff: noqa:  # Foo";
         let exemption = lex_file_exemption(TextRange::up_to(source.text_len()), source);
         assert_debug_snapshot!(exemption);
         assert_lexed_ranges_match_slices(exemption, source);
