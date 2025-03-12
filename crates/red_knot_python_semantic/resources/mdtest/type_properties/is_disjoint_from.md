@@ -97,7 +97,7 @@ static_assert(not is_disjoint_from(Literal[1, 2], Literal[2, 3]))
 
 ```py
 from typing_extensions import Literal, final, Any
-from knot_extensions import Intersection, is_disjoint_from, is_subtype_of, static_assert, Not, TypeOf
+from knot_extensions import Intersection, is_disjoint_from, static_assert, Not
 
 @final
 class P: ...
