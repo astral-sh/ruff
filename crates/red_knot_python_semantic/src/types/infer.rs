@@ -1138,7 +1138,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         value.is_string_literal_expr()
                     }
                     [ast::Stmt::Expr(ast::StmtExpr { value, .. }), ..] => {
-                        value.is_ellipsis_literal_expr()
+                        value.is_ellipsis_literal_expr() || value.is_string_literal_expr()
                     }
                     [ast::Stmt::Pass(_)] => true,
                     _ => false,

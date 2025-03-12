@@ -1,33 +1,74 @@
 # Function return type
 
-When a function's return type is specified, all return statements are checked to ensure that the
-type of the returned value is assignable to the specified type. A raise statement is interpreted as
-returning a value of type `Never`. The type of the value obtained by calling a function is the one
-specified as the return type, not the inferred return type.
+When a function's return type is annotated, all return statements are checked to ensure that the
+type of the returned value is assignable to the annotated return type. A `raise` is equivalent to a
+return of `Never`, which is assignable to any annotated return type.
 
-## Basic example
+## Basic examples
+
+A return value assignable to the annotated return type is valid.
 
 ```py
-from typing import Any
-
 def f() -> int:
     return 1
+```
 
+The type of the value obtained by calling a function is the annotated return type, not the inferred
+return type.
+
+```py
 reveal_type(f())  # revealed: int
+```
 
+A `raise` is equivalent to a return of `Never`, which is assignable to any annotated return type.
+
+```py
 def f() -> str:
     raise ValueError()
 
 reveal_type(f())  # revealed: str
-
-def f(x: Any) -> Any:
-    reveal_type(x)  # revealed: Any
 ```
 
-## Empty function with return type
+## Stub functions
+
+"Stub" function definitions (that is, function definitions with an empty body) are permissible in
+stub files, or in a few other locations: Protocol method definitions, abstract methods, and
+overloads. In this case the function body is considered to be omitted (thus no return type checking
+is performed on it), not assumed to implicitly return `None`.
+
+A stub function's "empty" body may contain only an optional docstring, followed (optionally) by an
+ellipsis (`...`) or `pass`.
+
+### In stub file
+
+```pyi
+def f() -> int: ...
+
+def f() -> int:
+    pass
+
+def f() -> int:
+    """Some docstring"""
+
+def f() -> int:
+    """Some docstring"""
+    ...
+```
+
+### In Protocol
 
 ```py
-from typing import overload, Protocol
+from typing import Protocol
+
+class Bar(Protocol):
+    # TODO: no error
+    # error: [invalid-return-type]
+    def f(self) -> int: ...
+```
+
+### In abstract method
+
+```py
 from abc import ABC, abstractmethod
 
 class Foo(ABC):
@@ -38,11 +79,12 @@ class Foo(ABC):
     @abstractmethod
     # error: [invalid-return-type]
     def g[T](self, x: T) -> T: ...
+```
 
-class Bar(Protocol):
-    # TODO: no error
-    # error: [invalid-return-type]
-    def f(self) -> int: ...
+### In overload
+
+```py
+from typing import overload
 
 @overload
 def f(x: int) -> int: ...
@@ -50,22 +92,6 @@ def f(x: int) -> int: ...
 def f(x: str) -> str: ...
 def f(x: int | str):
     return x
-```
-
-## Stub file
-
-If you specify a return type for a function in a stub file, its body must be empty, i.e. it must
-consist only of ellipsis (`...`) or `pass` or docstrings.
-
-```pyi
-def f() -> int: ...
-
-def f() -> int:
-    pass
-
-def f() -> int:
-    """Some docstring"""
-    ...
 ```
 
 ## Conditional return type
