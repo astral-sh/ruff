@@ -87,6 +87,8 @@ mod tests {
     #[test_case(Rule::NeedlessElse, Path::new("RUF047_for.py"))]
     #[test_case(Rule::NeedlessElse, Path::new("RUF047_while.py"))]
     #[test_case(Rule::NeedlessElse, Path::new("RUF047_try.py"))]
+    #[test_case(Rule::MapIntVersionParsing, Path::new("RUF048.py"))]
+    #[test_case(Rule::MapIntVersionParsing, Path::new("RUF048_1.py"))]
     #[test_case(Rule::IfKeyInDictDel, Path::new("RUF051.py"))]
     #[test_case(Rule::UsedDummyVariable, Path::new("RUF052.py"))]
     #[test_case(Rule::FalsyDictGetFallback, Path::new("RUF056.py"))]
@@ -419,8 +421,6 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Rule::MapIntVersionParsing, Path::new("RUF048.py"))]
-    #[test_case(Rule::MapIntVersionParsing, Path::new("RUF048_1.py"))]
     #[test_case(Rule::UnrawRePattern, Path::new("RUF039.py"))]
     #[test_case(Rule::UnrawRePattern, Path::new("RUF039_concat.py"))]
     #[test_case(Rule::UnnecessaryRegularExpression, Path::new("RUF055_0.py"))]
