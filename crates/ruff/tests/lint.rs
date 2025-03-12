@@ -2220,10 +2220,12 @@ requires-python = ">= 3.11"
         	/dev/shm,
         ]
         linter.flake8_bandit.check_typed_exception = false
+        linter.flake8_bandit.extend_markup_names = []
+        linter.flake8_bandit.allowed_markup_calls = []
         linter.flake8_bugbear.extend_immutable_calls = []
-        linter.flake8_builtins.builtins_allowed_modules = []
-        linter.flake8_builtins.builtins_ignorelist = []
-        linter.flake8_builtins.builtins_strict_checking = true
+        linter.flake8_builtins.allowed_modules = []
+        linter.flake8_builtins.ignorelist = []
+        linter.flake8_builtins.strict_checking = false
         linter.flake8_comprehensions.allow_dict_calls_with_keyword_arguments = false
         linter.flake8_copyright.notice_rgx = (?i)Copyright\s+((?:\(C\)|©)\s+)?\d{4}((-|,\s)\d{4})*
         linter.flake8_copyright.author = none
@@ -2363,8 +2365,6 @@ requires-python = ">= 3.11"
         linter.pylint.max_locals = 15
         linter.pyupgrade.keep_runtime_typing = false
         linter.ruff.parenthesize_tuple_in_subscript = false
-        linter.ruff.extend_markup_names = []
-        linter.ruff.allowed_markup_calls = []
 
         # Formatter Settings
         formatter.exclude = []
@@ -2539,10 +2539,12 @@ from typing import Union;foo: Union[int, str] = 1
         	/dev/shm,
         ]
         linter.flake8_bandit.check_typed_exception = false
+        linter.flake8_bandit.extend_markup_names = []
+        linter.flake8_bandit.allowed_markup_calls = []
         linter.flake8_bugbear.extend_immutable_calls = []
-        linter.flake8_builtins.builtins_allowed_modules = []
-        linter.flake8_builtins.builtins_ignorelist = []
-        linter.flake8_builtins.builtins_strict_checking = true
+        linter.flake8_builtins.allowed_modules = []
+        linter.flake8_builtins.ignorelist = []
+        linter.flake8_builtins.strict_checking = false
         linter.flake8_comprehensions.allow_dict_calls_with_keyword_arguments = false
         linter.flake8_copyright.notice_rgx = (?i)Copyright\s+((?:\(C\)|©)\s+)?\d{4}((-|,\s)\d{4})*
         linter.flake8_copyright.author = none
@@ -2682,8 +2684,6 @@ from typing import Union;foo: Union[int, str] = 1
         linter.pylint.max_locals = 15
         linter.pyupgrade.keep_runtime_typing = false
         linter.ruff.parenthesize_tuple_in_subscript = false
-        linter.ruff.extend_markup_names = []
-        linter.ruff.allowed_markup_calls = []
 
         # Formatter Settings
         formatter.exclude = []
@@ -2917,10 +2917,12 @@ from typing import Union;foo: Union[int, str] = 1
         	/dev/shm,
         ]
         linter.flake8_bandit.check_typed_exception = false
+        linter.flake8_bandit.extend_markup_names = []
+        linter.flake8_bandit.allowed_markup_calls = []
         linter.flake8_bugbear.extend_immutable_calls = []
-        linter.flake8_builtins.builtins_allowed_modules = []
-        linter.flake8_builtins.builtins_ignorelist = []
-        linter.flake8_builtins.builtins_strict_checking = true
+        linter.flake8_builtins.allowed_modules = []
+        linter.flake8_builtins.ignorelist = []
+        linter.flake8_builtins.strict_checking = false
         linter.flake8_comprehensions.allow_dict_calls_with_keyword_arguments = false
         linter.flake8_copyright.notice_rgx = (?i)Copyright\s+((?:\(C\)|©)\s+)?\d{4}((-|,\s)\d{4})*
         linter.flake8_copyright.author = none
@@ -3060,8 +3062,6 @@ from typing import Union;foo: Union[int, str] = 1
         linter.pylint.max_locals = 15
         linter.pyupgrade.keep_runtime_typing = false
         linter.ruff.parenthesize_tuple_in_subscript = false
-        linter.ruff.extend_markup_names = []
-        linter.ruff.allowed_markup_calls = []
 
         # Formatter Settings
         formatter.exclude = []
@@ -3243,10 +3243,12 @@ from typing import Union;foo: Union[int, str] = 1
         	/dev/shm,
         ]
         linter.flake8_bandit.check_typed_exception = false
+        linter.flake8_bandit.extend_markup_names = []
+        linter.flake8_bandit.allowed_markup_calls = []
         linter.flake8_bugbear.extend_immutable_calls = []
-        linter.flake8_builtins.builtins_allowed_modules = []
-        linter.flake8_builtins.builtins_ignorelist = []
-        linter.flake8_builtins.builtins_strict_checking = true
+        linter.flake8_builtins.allowed_modules = []
+        linter.flake8_builtins.ignorelist = []
+        linter.flake8_builtins.strict_checking = false
         linter.flake8_comprehensions.allow_dict_calls_with_keyword_arguments = false
         linter.flake8_copyright.notice_rgx = (?i)Copyright\s+((?:\(C\)|©)\s+)?\d{4}((-|,\s)\d{4})*
         linter.flake8_copyright.author = none
@@ -3386,8 +3388,6 @@ from typing import Union;foo: Union[int, str] = 1
         linter.pylint.max_locals = 15
         linter.pyupgrade.keep_runtime_typing = false
         linter.ruff.parenthesize_tuple_in_subscript = false
-        linter.ruff.extend_markup_names = []
-        linter.ruff.allowed_markup_calls = []
 
         # Formatter Settings
         formatter.exclude = []
@@ -3569,10 +3569,12 @@ from typing import Union;foo: Union[int, str] = 1
         	/dev/shm,
         ]
         linter.flake8_bandit.check_typed_exception = false
+        linter.flake8_bandit.extend_markup_names = []
+        linter.flake8_bandit.allowed_markup_calls = []
         linter.flake8_bugbear.extend_immutable_calls = []
-        linter.flake8_builtins.builtins_allowed_modules = []
-        linter.flake8_builtins.builtins_ignorelist = []
-        linter.flake8_builtins.builtins_strict_checking = true
+        linter.flake8_builtins.allowed_modules = []
+        linter.flake8_builtins.ignorelist = []
+        linter.flake8_builtins.strict_checking = false
         linter.flake8_comprehensions.allow_dict_calls_with_keyword_arguments = false
         linter.flake8_copyright.notice_rgx = (?i)Copyright\s+((?:\(C\)|©)\s+)?\d{4}((-|,\s)\d{4})*
         linter.flake8_copyright.author = none
@@ -3712,8 +3714,6 @@ from typing import Union;foo: Union[int, str] = 1
         linter.pylint.max_locals = 15
         linter.pyupgrade.keep_runtime_typing = false
         linter.ruff.parenthesize_tuple_in_subscript = false
-        linter.ruff.extend_markup_names = []
-        linter.ruff.allowed_markup_calls = []
 
         # Formatter Settings
         formatter.exclude = []
@@ -4188,10 +4188,12 @@ from typing import Union;foo: Union[int, str] = 1
         	/dev/shm,
         ]
         linter.flake8_bandit.check_typed_exception = false
+        linter.flake8_bandit.extend_markup_names = []
+        linter.flake8_bandit.allowed_markup_calls = []
         linter.flake8_bugbear.extend_immutable_calls = []
-        linter.flake8_builtins.builtins_allowed_modules = []
-        linter.flake8_builtins.builtins_ignorelist = []
-        linter.flake8_builtins.builtins_strict_checking = true
+        linter.flake8_builtins.allowed_modules = []
+        linter.flake8_builtins.ignorelist = []
+        linter.flake8_builtins.strict_checking = false
         linter.flake8_comprehensions.allow_dict_calls_with_keyword_arguments = false
         linter.flake8_copyright.notice_rgx = (?i)Copyright\s+((?:\(C\)|©)\s+)?\d{4}((-|,\s)\d{4})*
         linter.flake8_copyright.author = none
@@ -4331,8 +4333,6 @@ from typing import Union;foo: Union[int, str] = 1
         linter.pylint.max_locals = 15
         linter.pyupgrade.keep_runtime_typing = false
         linter.ruff.parenthesize_tuple_in_subscript = false
-        linter.ruff.extend_markup_names = []
-        linter.ruff.allowed_markup_calls = []
 
         # Formatter Settings
         formatter.exclude = []
