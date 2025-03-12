@@ -488,7 +488,27 @@ impl<'db> From<Symbol<'db>> for SymbolAndQualifiers<'db> {
     }
 }
 
-#[salsa::tracked]
+fn symbol_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &SymbolAndQualifiers<'db>,
+    _count: u32,
+    _scope: ScopeId<'db>,
+    _symbol_id: ScopedSymbolId,
+    _requires_explicit_reexport: RequiresExplicitReExport,
+) -> salsa::CycleRecoveryAction<SymbolAndQualifiers<'db>> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn symbol_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    _scope: ScopeId<'db>,
+    _symbol_id: ScopedSymbolId,
+    _requires_explicit_reexport: RequiresExplicitReExport,
+) -> SymbolAndQualifiers<'db> {
+    Symbol::bound(Type::Never).into()
+}
+
+#[salsa::tracked(cycle_fn=symbol_cycle_recover, cycle_initial=symbol_cycle_initial)]
 fn symbol_by_id<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
