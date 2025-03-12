@@ -132,6 +132,27 @@ static_assert(not is_disjoint_from(Intersection[X, Z], Y))
 static_assert(not is_disjoint_from(Intersection[Y, Z], X))
 ```
 
+## Negation / complement
+
+The complement of a type `T` is disjoint from `T`. In fact, it is disjoint from every subtype of
+`T`:
+
+```py
+from knot_extensions import Not, Intersection, is_disjoint_from, static_assert
+
+class T: ...
+class S(T): ...
+
+static_assert(is_disjoint_from(Not[T], T))
+static_assert(is_disjoint_from(Not[T], S))
+
+static_assert(is_disjoint_from(Intersection[T, Any], Not[T]))
+static_assert(is_disjoint_from(Not[T], Intersection[T, Any]))
+
+static_assert(is_disjoint_from(Intersection[S, Any], Not[T]))
+static_assert(is_disjoint_from(Not[T], Intersection[S, Any]))
+```
+
 ## Special types
 
 ### `Never`
@@ -244,7 +265,7 @@ static_assert(not is_disjoint_from(TypeOf[f], object))
 ### `AlwaysTruthy` and `AlwaysFalsy`
 
 ```py
-from knot_extensions import AlwaysFalsy, AlwaysTruthy, is_disjoint_from, static_assert
+from knot_extensions import AlwaysFalsy, AlwaysTruthy, Intersection, Not, is_disjoint_from, static_assert
 from typing import Literal
 
 static_assert(is_disjoint_from(None, AlwaysTruthy))
@@ -256,6 +277,14 @@ static_assert(not is_disjoint_from(str, AlwaysTruthy))
 
 static_assert(is_disjoint_from(Literal[1, 2], AlwaysFalsy))
 static_assert(not is_disjoint_from(Literal[0, 1], AlwaysTruthy))
+
+type Truthy = Not[AlwaysFalsy]
+type Falsy = Not[AlwaysTruthy]
+
+type AmbiguousTruthiness = Intersection[Truthy, Falsy]
+
+static_assert(is_disjoint_from(AlwaysTruthy, AmbiguousTruthiness))
+static_assert(is_disjoint_from(AlwaysFalsy, AmbiguousTruthiness))
 ```
 
 ### Instance types versus `type[T]` types

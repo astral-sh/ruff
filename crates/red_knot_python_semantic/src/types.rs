@@ -995,19 +995,42 @@ impl<'db> Type<'db> {
                 .iter()
                 .all(|e| e.is_disjoint_from(db, other)),
 
-            (Type::Intersection(intersection), other)
-            | (other, Type::Intersection(intersection)) => {
-                if intersection
+            (Type::Intersection(inter_left), Type::Intersection(inter_right)) => {
+                // We explicitly make this case a symmetric version of the case below, as there
+                // are some type pairs like `Any & T` and `~T` that would otherwise lead to non-
+                // symmetric results.
+                inter_left
                     .positive(db)
                     .iter()
                     .any(|p| p.is_disjoint_from(db, other))
-                {
-                    true
-                } else {
-                    // TODO we can do better here. For example:
-                    // X & ~Literal[1] is disjoint from Literal[1]
-                    false
-                }
+                    || inter_right
+                        .positive(db)
+                        .iter()
+                        .any(|p| p.is_disjoint_from(db, self))
+                    || inter_left.negative(db).iter().any(|n| {
+                        other.is_subtype_of(db, *n)
+                            && self.is_fully_static(db)
+                            && other.is_fully_static(db)
+                    })
+                    || inter_right.negative(db).iter().any(|n| {
+                        self.is_subtype_of(db, *n)
+                            && self.is_fully_static(db)
+                            && other.is_fully_static(db)
+                    })
+            }
+            (Type::Intersection(intersection), t) | (t, Type::Intersection(intersection)) => {
+                // TODO: There are certainly more cases that could be handled here. For example,
+                // it is possible that both A and B overlap with C, but the intersection A & B
+                // does not overlap with C.
+                intersection
+                    .positive(db)
+                    .iter()
+                    .any(|p| p.is_disjoint_from(db, t))
+                    || intersection.negative(db).iter().any(|n| {
+                        t.is_subtype_of(db, *n)
+                            && self.is_fully_static(db)
+                            && other.is_fully_static(db)
+                    })
             }
 
             // any single-valued type is disjoint from another single-valued type
