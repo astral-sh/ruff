@@ -6,7 +6,7 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for invalid use of literals in assert message argument.
+/// Checks for invalid use of literals in assert message arguments.
 ///
 /// ## Why is this bad?
 /// An assert message which is a non-string literal was likely intended
