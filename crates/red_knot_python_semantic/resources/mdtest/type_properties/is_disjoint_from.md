@@ -152,7 +152,6 @@ static_assert(not is_disjoint_from(Intersection[Any, Not[Y]], Intersection[Any, 
 
 static_assert(is_disjoint_from(Intersection[int, Any], Not[int]))
 static_assert(is_disjoint_from(Not[int], Intersection[int, Any]))
-
 ```
 
 ## Special types
