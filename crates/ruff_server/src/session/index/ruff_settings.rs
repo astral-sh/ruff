@@ -6,9 +6,11 @@ use std::sync::Arc;
 
 use anyhow::Context;
 use ignore::{WalkBuilder, WalkState};
+use ruff_python_ast::PythonVersion;
 
 use ruff_linter::settings::types::GlobPath;
 use ruff_linter::{settings::types::FilePattern, settings::types::PreviewMode};
+use ruff_workspace::pyproject::find_fallback_target_version;
 use ruff_workspace::resolver::match_exclusion;
 use ruff_workspace::Settings;
 use ruff_workspace::{
@@ -83,8 +85,13 @@ impl RuffSettings {
     /// Constructs [`RuffSettings`] by merging the editor-defined settings with the
     /// default configuration.
     fn editor_only(editor_settings: &ResolvedEditorSettings, root: &Path) -> RuffSettings {
+        let mut config = Configuration::default();
+        if let Some(fallback_version) = find_fallback_target_version(root) {
+            config.target_version = Some(PythonVersion::from(fallback_version));
+        };
+
         let settings = EditorConfigurationTransformer(editor_settings, root)
-            .transform(Configuration::default())
+            .transform(config)
             .into_settings(root)
             .expect("editor configuration should merge successfully with default configuration");
 
@@ -292,7 +299,10 @@ impl RuffSettingsIndex {
                             }
                         }
                     }
-                    Ok(None) => {}
+                    Ok(None) => {
+                        let settings = RuffSettings::editor_only(editor_settings, &directory);
+                        index.write().unwrap().insert(directory, Arc::new(settings));
+                    }
                     Err(err) => {
                         tracing::error!("{err:#}");
                         has_error.store(true, Ordering::Relaxed);
