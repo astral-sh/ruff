@@ -322,7 +322,7 @@ pub(crate) struct UseDefMap<'db> {
     eager_bindings: EagerBindings,
 
     /// Whether or not the start of the scope is visible.
-    /// This is used to check if the scope can implicitly return a value.
+    /// This is used to check if the function can implicitly return `None`.
     /// For example:
     ///
     /// ```python
@@ -331,11 +331,9 @@ pub(crate) struct UseDefMap<'db> {
     ///        return 1
     /// ```
     ///
-    /// In this case, the scope may implicitly return `None`.
+    /// In this case, the function may implicitly return `None`.
     ///
-    /// The check is basically done by seeing if `scope_start_visibility != ALWAYS_FALSE`,
-    /// but if `scope_start_visibility` is not terminal, delayed evaluations of the predicates must be performed.
-    /// This can be done by executing `UseDefMap::can_implicit_return`.
+    /// This is used by `UseDefMap::can_implicit_return`.
     scope_start_visibility: ScopedVisibilityConstraintId,
 }
 

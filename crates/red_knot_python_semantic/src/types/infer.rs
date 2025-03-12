@@ -1144,7 +1144,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     _ => false,
                 }
             }
-            let is_overloaded = function.decorator_list.iter().any(|decorator| {
+            let is_overload = function.decorator_list.iter().any(|decorator| {
                 let decorator_type = self.file_expression_type(&decorator.expression);
 
                 decorator_type
@@ -1152,7 +1152,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     .is_some_and(|f| f.is_known(self.db(), KnownFunction::Overload))
             });
             // TODO: Protocol / abstract methods can have empty bodies
-            if (self.in_stub() || is_overloaded)
+            if (self.in_stub() || is_overload)
                 && self.return_types_and_ranges.is_empty()
                 && is_stub_suite(&function.body)
             {
