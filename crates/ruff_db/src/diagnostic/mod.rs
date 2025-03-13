@@ -516,7 +516,7 @@ impl Severity {
 }
 
 /// Configuration for rendering diagnostics.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct DisplayDiagnosticConfig {
     /// The format to use for diagnostic rendering.
     ///
@@ -526,6 +526,15 @@ pub struct DisplayDiagnosticConfig {
     ///
     /// Disabled by default.
     color: bool,
+    /// The number of non-empty lines to show around each snippet.
+    ///
+    /// NOTE: It seems like making this a property of rendering *could*
+    /// be wrong. In particular, I have a suspicion that we may want
+    /// more granular control over this, perhaps based on the kind of
+    /// diagnostic or even the snippet itself. But I chose to put this
+    /// here for now as the most "sensible" place for it to live until
+    /// we had more concrete use cases. ---AG
+    context: usize,
 }
 
 impl DisplayDiagnosticConfig {
@@ -537,6 +546,24 @@ impl DisplayDiagnosticConfig {
     /// Whether to enable colors or not.
     pub fn color(self, yes: bool) -> DisplayDiagnosticConfig {
         DisplayDiagnosticConfig { color: yes, ..self }
+    }
+
+    /// Set the number of contextual lines to show around each snippet.
+    pub fn context(self, lines: usize) -> DisplayDiagnosticConfig {
+        DisplayDiagnosticConfig {
+            context: lines,
+            ..self
+        }
+    }
+}
+
+impl Default for DisplayDiagnosticConfig {
+    fn default() -> DisplayDiagnosticConfig {
+        DisplayDiagnosticConfig {
+            format: DiagnosticFormat::default(),
+            color: false,
+            context: 2,
+        }
     }
 }
 
