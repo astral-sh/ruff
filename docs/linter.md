@@ -353,6 +353,26 @@ Ruff can _automatically add_ `noqa` directives to all lines that contain violati
 useful when migrating a new codebase to Ruff. To automatically add `noqa` directives to all
 relevant lines (with the appropriate rule codes), run: `ruff check /path/to/file.py --add-noqa`.
 
+### Full suppression comment specification
+
+The full specification is as follows:
+
+- An inline blanket `noqa` comment is given by a case-insensitive match for
+  `#noqa` with optional whitespace after the `#` symbol, followed by either: the
+  end of the comment, the beginning of a new comment (`#`), or whitespace
+  followed by any character other than `:`.
+- An inline rule suppression is given by first finding a case-insensitive match
+  for `#noqa` with optional whitespace after the `#` symbol, optional whitespace
+  after noqa, and followed by the symbol `:`. After this we are expected to have
+  a list of rule codes which is given by sequences of uppercase ascii characters
+  followed by ascii digits, separated by whitespace or commas. The list ends at
+  the last valid code. We will attempt to interpret rules with a missing
+  delimiter (e.g. `F401F841`), though a warning will be emitted in this case.
+- A file-level exemption comment is given by a case-sensitive match for `#ruff:`
+  or `#flake8:`, with optional whitespace after `#` and before `:`, followed by
+  optional whitespace and a case-insensitive match for `noqa`. After this, the
+  specification is as in the inline case.
+
 ### Action comments
 
 Ruff respects isort's [action comments](https://pycqa.github.io/isort/docs/configuration/action_comments.html)
