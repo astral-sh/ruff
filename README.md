@@ -278,6 +278,9 @@ skip-magic-trailing-comma = false
 
 # Like Black, automatically detect the appropriate line ending.
 line-ending = "auto"
+
+# Use uppercase or lowercase on hex expressions.
+format_hex = "upper"
 ```
 
 Note that, in a `pyproject.toml`, each section header should be prefixed with `tool.ruff`. For

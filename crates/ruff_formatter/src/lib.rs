@@ -140,6 +140,15 @@ impl From<NonZeroU8> for IndentWidth {
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct LineWidth(NonZeroU16);
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, CacheKey)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub enum HexFormat {
+    #[default]
+    Upper,
+    Lower,
+}
+
 impl LineWidth {
     /// Return the numeric value for this [`LineWidth`]
     pub const fn value(&self) -> u16 {

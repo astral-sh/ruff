@@ -3,7 +3,7 @@ use std::path::Path;
 use std::str::FromStr;
 
 use ruff_formatter::printer::{LineEnding, PrinterOptions, SourceMapGeneration};
-use ruff_formatter::{FormatOptions, IndentStyle, IndentWidth, LineWidth};
+use ruff_formatter::{FormatOptions, HexFormat, IndentStyle, IndentWidth, LineWidth};
 use ruff_macros::CacheKey;
 use ruff_python_ast::{self as ast, PySourceType};
 
@@ -62,6 +62,9 @@ pub struct PyFormatOptions {
 
     /// Whether preview style formatting is enabled or not
     preview: PreviewMode,
+
+    /// The preferred hex format for a given hex number.
+    hex_format: HexFormat,
 }
 
 fn default_line_width() -> LineWidth {
@@ -91,6 +94,7 @@ impl Default for PyFormatOptions {
             docstring_code: DocstringCode::default(),
             docstring_code_line_width: DocstringCodeLineWidth::default(),
             preview: PreviewMode::default(),
+            hex_format: HexFormat::default(),
         }
     }
 }
@@ -142,6 +146,10 @@ impl PyFormatOptions {
 
     pub const fn preview(&self) -> PreviewMode {
         self.preview
+    }
+
+    pub const fn hex_format(&self) -> HexFormat {
+        self.hex_format
     }
 
     #[must_use]
@@ -201,6 +209,12 @@ impl PyFormatOptions {
     #[must_use]
     pub fn with_preview(mut self, preview: PreviewMode) -> Self {
         self.preview = preview;
+        self
+    }
+
+    #[must_use]
+    pub fn with_hex_format(mut self, hex_format: HexFormat) -> Self {
+        self.hex_format = hex_format;
         self
     }
 

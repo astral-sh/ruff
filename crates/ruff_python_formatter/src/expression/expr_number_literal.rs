@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 
+use ruff_formatter::{FormatContext, HexFormat};
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{ExprNumberLiteral, Number};
 use ruff_text_size::{Ranged, TextSize, TextSlice};
@@ -15,7 +16,8 @@ impl FormatNodeRule<ExprNumberLiteral> for FormatExprNumberLiteral {
         match item.value {
             Number::Int(_) => {
                 let content = f.context().source().slice(item);
-                let normalized = normalize_integer(content);
+                let hex_format = f.context().options().hex_format();
+                let normalized = normalize_integer(content, hex_format);
 
                 match normalized {
                     Cow::Borrowed(_) => source_text_slice(item.range()).fmt(f),
@@ -62,7 +64,7 @@ impl NeedsParentheses for ExprNumberLiteral {
 }
 
 /// Returns the normalized integer string.
-fn normalize_integer(input: &str) -> Cow<str> {
+fn normalize_integer(input: &str, hex_format: HexFormat) -> Cow<str> {
     // The normalized string if `input` is not yet normalized.
     // `output` must remain empty if `input` is already normalized.
     let mut output = String::new();
@@ -90,9 +92,11 @@ fn normalize_integer(input: &str) -> Cow<str> {
     if is_hex {
         for (index, c) in chars {
             if matches!(c, 'a'..='f') {
-                // Uppercase hexdigits.
                 output.push_str(&input[last_index..index]);
-                output.push(c.to_ascii_uppercase());
+                output.push(match hex_format {
+                    HexFormat::Upper => c.to_ascii_uppercase()
+                    HexFormat::Lower => c.to_ascii_lowercase()
+                });
                 last_index = index + c.len_utf8();
             }
         }
