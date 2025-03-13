@@ -277,6 +277,22 @@ fn format() {
     );
 }
 
+#[test]
+fn test_format_module_with_hex_format() {
+    use ruff_formatter::HexFormat;
+    use ruff_python_formatter::{format_module_source, PyFormatOptions};
+
+    let source = "x = 0x1a3f";
+
+    let options = PyFormatOptions::default().with_hex_format(HexFormat::Upper);
+    let formatted_upper = format_module_source(source, options).unwrap().into_code();
+    assert!(formatted_upper.contains("0x1A3F"));
+
+    let options = PyFormatOptions::default().with_hex_format(HexFormat::Lower);
+    let formatted_lower = format_module_source(source, options).unwrap().into_code();
+    assert!(formatted_lower.contains("0x1a3f"));
+}
+
 fn format_file(source: &str, options: &PyFormatOptions, input_path: &Path) -> String {
     let (unformatted, formatted_code) = if source.contains("<RANGE_START>") {
         let mut content = source.to_string();
