@@ -1552,6 +1552,7 @@ impl<'db> Type<'db> {
     /// of union and intersection types.
     #[salsa::tracked]
     fn class_member(self, db: &'db dyn Db, name: Name) -> SymbolAndQualifiers<'db> {
+        tracing::trace!("class_member: {}.{}", self.display(db), name);
         match self {
             Type::Union(union) => union
                 .map_with_boundness_and_qualifiers(db, |elem| elem.class_member(db, name.clone())),
@@ -1673,6 +1674,12 @@ impl<'db> Type<'db> {
         instance: Type<'db>,
         owner: Type<'db>,
     ) -> Option<(Type<'db>, AttributeKind)> {
+        tracing::trace!(
+            "try_call_dunder_get: {}, {}, {}",
+            self.display(db),
+            instance.display(db),
+            owner.display(db)
+        );
         let descr_get = self.class_member(db, "__get__".into()).symbol;
 
         if let Symbol::Type(descr_get, descr_get_boundness) = descr_get {
@@ -1905,6 +1912,7 @@ impl<'db> Type<'db> {
         name: Name,
         policy: MemberLookupPolicy,
     ) -> SymbolAndQualifiers<'db> {
+        tracing::trace!("member_lookup_with_policy: {}.{}", self.display(db), name);
         if name == "__class__" {
             return Symbol::bound(self.to_meta_type(db)).into();
         }
