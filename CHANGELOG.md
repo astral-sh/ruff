@@ -14,7 +14,7 @@ See also, the "Remapped rules" section which may result in disabled rules.
 
 - **Updated `TYPE_CHECKING` behavior** ([#16669](https://github.com/astral-sh/ruff/pull/16669))
 
-    The conditions `if 0` and `if False` are no longer interpreted as beginning type checking blocks.
+    Previously, Ruff only recognized typechecking blocks that tested the `typing.TYPE_CHECKING` symbol. Now, Ruff recognizes any local variable named `TYPE_CHECKING`. This release also removes support for the legacy `if 0:` and `if False:` typechecking checks. Use a local `TYPE_CHECKING` variable instead.
 
 - **More robust noqa parsing** ([#16483](https://github.com/astral-sh/ruff/pull/16483))
 
