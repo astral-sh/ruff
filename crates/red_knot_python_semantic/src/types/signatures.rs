@@ -41,6 +41,14 @@ impl<'db> CallableSignature<'db> {
         CallableSignature::Overloaded(overloads.into())
     }
 
+    /// Returns the [`Signature`] if this is a non-overloaded callable, [None] otherwise.
+    pub(crate) fn as_single(&self) -> Option<&Signature<'db>> {
+        match self {
+            CallableSignature::Single(signature) => Some(signature),
+            CallableSignature::Overloaded(_) => None,
+        }
+    }
+
     pub(crate) fn iter(&self) -> std::slice::Iter<Signature<'db>> {
         match self {
             CallableSignature::Single(signature) => std::slice::from_ref(signature).iter(),

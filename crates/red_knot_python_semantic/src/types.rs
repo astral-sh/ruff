@@ -4326,6 +4326,17 @@ impl<'db> FunctionType<'db> {
         })
     }
 
+    /// Convert the `FunctionType` into a [`Type::Callable`].
+    ///
+    /// Returns `None` if the function is overloaded. This powers the `CallableTypeFromFunction`
+    /// special form from the `knot_extensions` module.
+    pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        // TODO: Add support for overloaded callables; return `Type`, not `Option<Type>`.
+        Some(Type::Callable(CallableType::General(
+            GeneralCallableType::new(db, self.signature(db).as_single()?.clone()),
+        )))
+    }
+
     /// Typed externally-visible signature for this function.
     ///
     /// This is the signature as seen by external callers, possibly modified by decorators and/or
