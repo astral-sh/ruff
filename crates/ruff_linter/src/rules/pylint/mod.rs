@@ -445,7 +445,6 @@ mod tests {
         Rule::RepeatedEqualityComparison,
         Path::new("repeated_equality_comparison.py")
     )]
-    #[test_case(Rule::InvalidEnvvarDefault, Path::new("invalid_envvar_default.py"))]
     #[test_case(Rule::BadStrStripCall, Path::new("bad_str_strip_call.py"))]
     #[test_case(
         Rule::BadStaticmethodArgument,
