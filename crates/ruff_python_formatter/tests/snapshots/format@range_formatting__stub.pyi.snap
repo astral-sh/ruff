@@ -36,6 +36,7 @@ docstring-code-line-width  = "dynamic"
 preview                    = Disabled
 target_version             = 3.9
 source_type                = Stub
+hex_format                = Upper
 ```
 
 ```python

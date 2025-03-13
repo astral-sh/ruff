@@ -94,8 +94,8 @@ fn normalize_integer(input: &str, hex_format: HexFormat) -> Cow<str> {
             if matches!(c, 'a'..='f') {
                 output.push_str(&input[last_index..index]);
                 output.push(match hex_format {
-                    HexFormat::Upper => c.to_ascii_uppercase()
-                    HexFormat::Lower => c.to_ascii_lowercase()
+                    HexFormat::Upper => c.to_ascii_uppercase(),
+                    HexFormat::Lower => c.to_ascii_lowercase(),
                 });
                 last_index = index + c.len_utf8();
             }

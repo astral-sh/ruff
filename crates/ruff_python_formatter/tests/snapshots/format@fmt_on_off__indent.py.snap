@@ -20,6 +20,7 @@ docstring-code-line-width  = "dynamic"
 preview                    = Disabled
 target_version             = 3.9
 source_type                = Python
+hex_format                = Upper
 ```
 
 ```python
@@ -39,6 +40,7 @@ docstring-code-line-width  = "dynamic"
 preview                    = Disabled
 target_version             = 3.9
 source_type                = Python
+hex_format                = Upper
 ```
 
 ```python
@@ -58,6 +60,7 @@ docstring-code-line-width  = "dynamic"
 preview                    = Disabled
 target_version             = 3.9
 source_type                = Python
+hex_format                = Upper
 ```
 
 ```python

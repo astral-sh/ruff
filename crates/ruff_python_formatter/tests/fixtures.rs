@@ -516,7 +516,8 @@ docstring-code             = {docstring_code:?}
 docstring-code-line-width  = {docstring_code_line_width:?}
 preview                    = {preview:?}
 target_version             = {target_version}
-source_type                = {source_type:?}"#,
+source_type                = {source_type:?}
+hex_format                = {hex_format:?}"#,
             indent_style = self.0.indent_style(),
             indent_width = self.0.indent_width().value(),
             line_width = self.0.line_width().value(),
@@ -527,7 +528,8 @@ source_type                = {source_type:?}"#,
             docstring_code_line_width = self.0.docstring_code_line_width(),
             preview = self.0.preview(),
             target_version = self.0.target_version(),
-            source_type = self.0.source_type()
+            source_type = self.0.source_type(),
+            hex_format = self.0.hex_format()
         )
     }
 }
