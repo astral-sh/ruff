@@ -68,7 +68,7 @@ The following rules have been stabilized and are no longer in preview:
 The following behaviors have been stabilized:
 
 - [`bad-staticmethod-argument`](https://docs.astral.sh/ruff/rules/bad-staticmethod-argument/) (`PLW0211`) [`invalid-first-argument-name-for-class-method`](https://docs.astral.sh/ruff/rules/invalid-first-argument-name-for-class-method/) (`N804`): `__new__` methods are now no longer flagged by `invalid-first-argument-name-for-class-method` (`N804`) but instead by `bad-staticmethod-argument` (`PLW0211`)
-- [`bad-str-strip-call`](https://docs.astral.sh/ruff/rules/bad-str-strip-call/) (`PLE1310`): Rule now applies to objects which are known to have type `str` or `bytes`.
+- [`bad-str-strip-call`](https://docs.astral.sh/ruff/rules/bad-str-strip-call/) (`PLE1310`): The rule now applies to objects which are known to have type `str` or `bytes`.
 - [`blanket-noqa`](https://docs.astral.sh/ruff/rules/blanket-noqa/) (`PGH004`): Also detect blanked file-level noqa comments (and not just line level comments).
 - [`custom-type-var-for-self`](https://docs.astral.sh/ruff/rules/custom-type-var-for-self/) (`PYI019`): More accurate detection of custom `TypeVars` replaceable by `Self`. The range of the diagnostic is now the full function header rather than just the return annotation.
 - [`invalid-argument-name`](https://docs.astral.sh/ruff/rules/invalid-argument-name/) (`N803`): Ignore argument names of functions decorated with typing.override
