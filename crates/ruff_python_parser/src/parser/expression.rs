@@ -1343,6 +1343,11 @@ impl<'src> Parser<'src> {
         // f"test {a \
         //     } more"                        # line continuation
 
+        // test_ok pep701_f_string_py311
+        // # parse_options: {"target-version": "3.11"}
+        // f"outer {'# not a comment'}"
+        // f'outer {x:{"# not a comment"} }'
+
         // test_err pep701_f_string_py311
         // # parse_options: {"target-version": "3.11"}
         // f'Magic wand: { bag['wand'] }'     # nested quotes
