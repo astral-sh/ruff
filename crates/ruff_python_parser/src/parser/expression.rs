@@ -1347,6 +1347,8 @@ impl<'src> Parser<'src> {
         // # parse_options: {"target-version": "3.11"}
         // f"outer {'# not a comment'}"
         // f'outer {x:{"# not a comment"} }'
+        // f"""{f'''{f'{"# not a comment"}'}'''}"""
+        // f"""{f'''# before expression {f'# aro{f"#{1+1}#"}und #'}'''} # after expression"""
 
         // test_err pep701_f_string_py311
         // # parse_options: {"target-version": "3.11"}
@@ -1376,38 +1378,6 @@ impl<'src> Parser<'src> {
                     );
                 };
 
-                fn check_f_string_comments(tokens: &[Token]) -> Option<TextRange> {
-                    // stack to check nested f-string status
-                    let mut f_strings = Vec::new();
-                    for token in tokens.iter().rev() {
-                        match token.kind() {
-                            TokenKind::FStringEnd => {
-                                f_strings.push(());
-                            }
-                            TokenKind::FStringStart if f_strings.len() == 1 => {
-                                // found the start of the current f-string
-                                break;
-                            }
-                            TokenKind::FStringStart => {
-                                f_strings.pop().expect("Expected a valid f-string");
-                            }
-                            TokenKind::Comment if !f_strings.is_empty() => {
-                                return Some(token.range());
-                            }
-                            _ => {}
-                        }
-                    }
-
-                    None
-                }
-
-                if let Some(comment_range) = check_f_string_comments(&self.tokens.tokens) {
-                    self.add_unsupported_syntax_error(
-                        UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::Comment),
-                        comment_range,
-                    );
-                }
-
                 if let Some(quote_index) = self.source[expr.range].find(quote_str) {
                     let Ok(quote_index) = TextSize::try_from(quote_index) else {
                         continue;
@@ -1417,6 +1387,38 @@ impl<'src> Parser<'src> {
                         TextRange::at(expr.range.start() + quote_index, TextSize::from(1)),
                     );
                 };
+            }
+
+            fn check_f_string_comments(tokens: &[Token]) -> Option<TextRange> {
+                // stack to check nested f-string status
+                let mut f_strings = Vec::new();
+                for token in tokens.iter().rev() {
+                    match token.kind() {
+                        TokenKind::FStringEnd => {
+                            f_strings.push(());
+                        }
+                        TokenKind::FStringStart if f_strings.len() == 1 => {
+                            // found the start of the outer f-string
+                            break;
+                        }
+                        TokenKind::FStringStart => {
+                            f_strings.pop().expect("Expected a valid f-string");
+                        }
+                        TokenKind::Comment if !f_strings.is_empty() => {
+                            return Some(token.range());
+                        }
+                        _ => {}
+                    }
+                }
+
+                None
+            }
+
+            if let Some(comment_range) = check_f_string_comments(&self.tokens.tokens) {
+                self.add_unsupported_syntax_error(
+                    UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::Comment),
+                    comment_range,
+                );
             }
         }
 
