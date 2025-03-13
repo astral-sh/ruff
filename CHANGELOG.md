@@ -2,8 +2,6 @@
 
 ## 0.10.0
 
-TODO: Populate the changes from <https://github.com/astral-sh/ruff/pull/16600> (the script didn't pick them up)
-
 Check out the [blog post](https://astral.sh/blog/ruff-v0.10.0) for a migration guide and overview of the changes!
 
 ### Breaking changes
