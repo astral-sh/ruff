@@ -66,7 +66,9 @@ impl<'db> Signatures<'db> {
             }
         }
         if signatures.len() == 1 {
-            let first_signature = signatures.pop().expect("signatures sould have one element");
+            let first_signature = signatures
+                .pop()
+                .expect("signatures should have one element");
             return Self {
                 ty,
                 signature_ty,
