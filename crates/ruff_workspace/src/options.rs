@@ -312,7 +312,7 @@ pub struct Options {
     /// ```
     ///
     /// If both are specified, `target-version` takes precedence over
-    /// `requires-python`. See [_Config file discovery_](https://docs.astral.sh/ruff/configuration/#config-file-discovery)
+    /// `requires-python`. See [_Inferring the Python version_](https://docs.astral.sh/ruff/configuration/#inferring-the-python-version)
     /// for a complete description of how the `target-version` is determined
     /// when left unspecified.
     ///
