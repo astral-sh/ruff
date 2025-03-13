@@ -16,10 +16,10 @@ use crate::rules::flake8_builtins::helpers::shadows_builtin;
 /// builtin, and vice versa.
 ///
 /// Builtins can be marked as exceptions to this rule via the
-/// [`lint.flake8-builtins.builtins-ignorelist`] configuration option.
+/// [`lint.flake8-builtins.ignorelist`] configuration option.
 ///
 /// ## Options
-/// - `lint.flake8-builtins.builtins-ignorelist`
+/// - `lint.flake8-builtins.ignorelist`
 #[derive(ViolationMetadata)]
 pub(crate) struct BuiltinLambdaArgumentShadowing {
     name: String,
@@ -43,7 +43,7 @@ pub(crate) fn builtin_lambda_argument_shadowing(checker: &Checker, lambda: &Expr
         if shadows_builtin(
             name,
             checker.source_type,
-            &checker.settings.flake8_builtins.builtins_ignorelist,
+            &checker.settings.flake8_builtins.ignorelist,
             checker.target_version(),
         ) {
             checker.report_diagnostic(Diagnostic::new(

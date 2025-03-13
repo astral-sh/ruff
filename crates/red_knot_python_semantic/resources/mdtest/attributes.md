@@ -155,7 +155,9 @@ reveal_type(c_instance.declared_in_body_and_init)  # revealed: str | None
 
 reveal_type(c_instance.declared_in_body_defined_in_init)  # revealed: str | None
 
-reveal_type(c_instance.bound_in_body_declared_in_init)  # revealed: str | None
+# TODO: This should be `str | None`. Fixing this requires an overhaul of the `Symbol` API,
+# which is planned in https://github.com/astral-sh/ruff/issues/14297
+reveal_type(c_instance.bound_in_body_declared_in_init)  # revealed: Unknown | str | None
 
 reveal_type(c_instance.bound_in_body_and_init)  # revealed: Unknown | None | Literal["a"]
 ```
@@ -346,8 +348,11 @@ reveal_type(C().y)  # revealed: Unknown | str
 
 ```py
 class ContextManager:
-    def __enter__(self) -> int | None: ...
-    def __exit__(self, exc_type, exc_value, traceback) -> None: ...
+    def __enter__(self) -> int | None:
+        return 1
+
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
+        pass
 
 class C:
     def __init__(self) -> None:
@@ -356,9 +361,28 @@ class C:
 
 c_instance = C()
 
-# TODO: Should be `Unknown | int | None`
-# error: [unresolved-attribute]
-reveal_type(c_instance.x)  # revealed: Unknown
+reveal_type(c_instance.x)  # revealed: Unknown | int | None
+```
+
+#### Attributes defined in `with` statements, but with unpacking
+
+```py
+class ContextManager:
+    def __enter__(self) -> tuple[int | None, int]:
+        return 1, 2
+
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
+        pass
+
+class C:
+    def __init__(self) -> None:
+        with ContextManager() as (self.x, self.y):
+            pass
+
+c_instance = C()
+
+reveal_type(c_instance.x)  # revealed: Unknown | int | None
+reveal_type(c_instance.y)  # revealed: Unknown | int
 ```
 
 #### Attributes defined in comprehensions
@@ -704,7 +728,90 @@ reveal_type(Derived().declared_in_body)  # revealed: int | None
 reveal_type(Derived().defined_in_init)  # revealed: str | None
 ```
 
-## Union of attributes
+## Accessing attributes on class objects
+
+When accessing attributes on class objects, they are always looked up on the type of the class
+object first, i.e. on the metaclass:
+
+```py
+from typing import Literal
+
+class Meta1:
+    attr: Literal["metaclass value"] = "metaclass value"
+
+class C1(metaclass=Meta1): ...
+
+reveal_type(C1.attr)  # revealed: Literal["metaclass value"]
+```
+
+However, the metaclass attribute only takes precedence over a class-level attribute if it is a data
+descriptor. If it is a non-data descriptor or a normal attribute, the class-level attribute is used
+instead (see the [descriptor protocol tests] for data/non-data descriptor attributes):
+
+```py
+class Meta2:
+    attr: str = "metaclass value"
+
+class C2(metaclass=Meta2):
+    attr: Literal["class value"] = "class value"
+
+reveal_type(C2.attr)  # revealed: Literal["class value"]
+```
+
+If the class-level attribute is only partially defined, we union the metaclass attribute with the
+class-level attribute:
+
+```py
+def _(flag: bool):
+    class Meta3:
+        attr1 = "metaclass value"
+        attr2: Literal["metaclass value"] = "metaclass value"
+
+    class C3(metaclass=Meta3):
+        if flag:
+            attr1 = "class value"
+            # TODO: Neither mypy nor pyright show an error here, but we could consider emitting a conflicting-declaration diagnostic here.
+            attr2: Literal["class value"] = "class value"
+
+    reveal_type(C3.attr1)  # revealed: Unknown | Literal["metaclass value", "class value"]
+    reveal_type(C3.attr2)  # revealed: Literal["metaclass value", "class value"]
+```
+
+If the *metaclass* attribute is only partially defined, we emit a `possibly-unbound-attribute`
+diagnostic:
+
+```py
+def _(flag: bool):
+    class Meta4:
+        if flag:
+            attr1: str = "metaclass value"
+
+    class C4(metaclass=Meta4): ...
+    # error: [possibly-unbound-attribute]
+    reveal_type(C4.attr1)  # revealed: str
+```
+
+Finally, if both the metaclass attribute and the class-level attribute are only partially defined,
+we union them and emit a `possibly-unbound-attribute` diagnostic:
+
+```py
+def _(flag1: bool, flag2: bool):
+    class Meta5:
+        if flag1:
+            attr1 = "metaclass value"
+
+    class C5(metaclass=Meta5):
+        if flag2:
+            attr1 = "class value"
+
+    # error: [possibly-unbound-attribute]
+    reveal_type(C5.attr1)  # revealed: Unknown | Literal["metaclass value", "class value"]
+```
+
+## Unions of attributes
+
+If the (meta)class is a union type or if the attribute on the (meta) class has a union type, we
+infer those union types accordingly:
 
 ```py
 def _(flag: bool):
@@ -716,51 +823,35 @@ def _(flag: bool):
         class C1:
             x = 2
 
+    reveal_type(C1.x)  # revealed: Unknown | Literal[1, 2]
+
     class C2:
         if flag:
             x = 3
         else:
             x = 4
 
-    reveal_type(C1.x)  # revealed: Unknown | Literal[1, 2]
     reveal_type(C2.x)  # revealed: Unknown | Literal[3, 4]
-```
 
-## Inherited class attributes
+    if flag:
+        class Meta3(type):
+            x = 5
 
-### Basic
+    else:
+        class Meta3(type):
+            x = 6
 
-```py
-class A:
-    X = "foo"
+    class C3(metaclass=Meta3): ...
+    reveal_type(C3.x)  # revealed: Unknown | Literal[5, 6]
 
-class B(A): ...
-class C(B): ...
+    class Meta4(type):
+        if flag:
+            x = 7
+        else:
+            x = 8
 
-reveal_type(C.X)  # revealed: Unknown | Literal["foo"]
-```
-
-### Multiple inheritance
-
-```py
-class O: ...
-
-class F(O):
-    X = 56
-
-class E(O):
-    X = 42
-
-class D(O): ...
-class C(D, F): ...
-class B(E, D): ...
-class A(B, C): ...
-
-# revealed: tuple[Literal[A], Literal[B], Literal[E], Literal[C], Literal[D], Literal[F], Literal[O], Literal[object]]
-reveal_type(A.__mro__)
-
-# `E` is earlier in the MRO than `F`, so we should use the type of `E.X`
-reveal_type(A.X)  # revealed: Unknown | Literal[42]
+    class C4(metaclass=Meta4): ...
+    reveal_type(C4.x)  # revealed: Unknown | Literal[7, 8]
 ```
 
 ## Unions with possibly unbound paths
@@ -883,7 +974,7 @@ def _(flag: bool):
                 self.x = 1
 
     # error: [possibly-unbound-attribute]
-    reveal_type(Foo().x)  # revealed: int
+    reveal_type(Foo().x)  # revealed: int | Unknown
 ```
 
 #### Possibly unbound
@@ -900,7 +991,184 @@ def _(flag: bool):
     reveal_type(Foo().x)  # revealed: Unknown | Literal[1]
 ```
 
-### Attribute access on `Any`
+### Unions with all paths unbound
+
+If the symbol is unbound in all elements of the union, we detect that:
+
+```py
+def _(flag: bool):
+    class C1: ...
+    class C2: ...
+    C = C1 if flag else C2
+
+    # error: [unresolved-attribute] "Type `Literal[C1, C2]` has no attribute `x`"
+    reveal_type(C.x)  # revealed: Unknown
+```
+
+## Inherited class attributes
+
+### Basic
+
+```py
+class A:
+    X = "foo"
+
+class B(A): ...
+class C(B): ...
+
+reveal_type(C.X)  # revealed: Unknown | Literal["foo"]
+```
+
+### Multiple inheritance
+
+```py
+class O: ...
+
+class F(O):
+    X = 56
+
+class E(O):
+    X = 42
+
+class D(O): ...
+class C(D, F): ...
+class B(E, D): ...
+class A(B, C): ...
+
+# revealed: tuple[Literal[A], Literal[B], Literal[E], Literal[C], Literal[D], Literal[F], Literal[O], Literal[object]]
+reveal_type(A.__mro__)
+
+# `E` is earlier in the MRO than `F`, so we should use the type of `E.X`
+reveal_type(A.X)  # revealed: Unknown | Literal[42]
+```
+
+## Intersections of attributes
+
+### Attribute only available on one element
+
+```py
+from knot_extensions import Intersection
+
+class A:
+    x: int = 1
+
+class B: ...
+
+def _(a_and_b: Intersection[A, B]):
+    reveal_type(a_and_b.x)  # revealed: int
+
+# Same for class objects
+def _(a_and_b: Intersection[type[A], type[B]]):
+    reveal_type(a_and_b.x)  # revealed: int
+```
+
+### Attribute available on both elements
+
+```py
+from knot_extensions import Intersection
+
+class P: ...
+class Q: ...
+
+class A:
+    x: P = P()
+
+class B:
+    x: Q = Q()
+
+def _(a_and_b: Intersection[A, B]):
+    reveal_type(a_and_b.x)  # revealed: P & Q
+
+# Same for class objects
+def _(a_and_b: Intersection[type[A], type[B]]):
+    reveal_type(a_and_b.x)  # revealed: P & Q
+```
+
+### Possible unboundness
+
+```py
+from knot_extensions import Intersection
+
+class P: ...
+class Q: ...
+
+def _(flag: bool):
+    class A1:
+        if flag:
+            x: P = P()
+
+    class B1: ...
+
+    def inner1(a_and_b: Intersection[A1, B1]):
+        # error: [possibly-unbound-attribute]
+        reveal_type(a_and_b.x)  # revealed: P
+    # Same for class objects
+    def inner1_class(a_and_b: Intersection[type[A1], type[B1]]):
+        # error: [possibly-unbound-attribute]
+        reveal_type(a_and_b.x)  # revealed: P
+
+    class A2:
+        if flag:
+            x: P = P()
+
+    class B1:
+        x: Q = Q()
+
+    def inner2(a_and_b: Intersection[A2, B1]):
+        reveal_type(a_and_b.x)  # revealed: P & Q
+    # Same for class objects
+    def inner2_class(a_and_b: Intersection[type[A2], type[B1]]):
+        reveal_type(a_and_b.x)  # revealed: P & Q
+
+    class A3:
+        if flag:
+            x: P = P()
+
+    class B3:
+        if flag:
+            x: Q = Q()
+
+    def inner3(a_and_b: Intersection[A3, B3]):
+        # error: [possibly-unbound-attribute]
+        reveal_type(a_and_b.x)  # revealed: P & Q
+    # Same for class objects
+    def inner3_class(a_and_b: Intersection[type[A3], type[B3]]):
+        # error: [possibly-unbound-attribute]
+        reveal_type(a_and_b.x)  # revealed: P & Q
+
+    class A4: ...
+    class B4: ...
+
+    def inner4(a_and_b: Intersection[A4, B4]):
+        # error: [unresolved-attribute]
+        reveal_type(a_and_b.x)  # revealed: Unknown
+    # Same for class objects
+    def inner4_class(a_and_b: Intersection[type[A4], type[B4]]):
+        # error: [unresolved-attribute]
+        reveal_type(a_and_b.x)  # revealed: Unknown
+```
+
+### Intersection of implicit instance attributes
+
+```py
+from knot_extensions import Intersection
+
+class P: ...
+class Q: ...
+
+class A:
+    def __init__(self):
+        self.x: P = P()
+
+class B:
+    def __init__(self):
+        self.x: Q = Q()
+
+def _(a_and_b: Intersection[A, B]):
+    reveal_type(a_and_b.x)  # revealed: P & Q
+```
+
+## Attribute access on `Any`
 
 The union of the set of types that `Any` could materialise to is equivalent to `object`. It follows
 from this that attribute access on `Any` resolves to `Any` if the attribute does not exist on
@@ -931,18 +1199,96 @@ reveal_type(C.__mro__)  # revealed: tuple[Literal[C], Literal[B], Any, Literal[A
 reveal_type(C.x)  # revealed: Literal[1] & Any
 ```
 
-### Unions with all paths unbound
+## Classes with custom `__getattr__` methods
 
-If the symbol is unbound in all elements of the union, we detect that:
+### Basic
+
+If a type provides a custom `__getattr__` method, we use the return type of that method as the type
+for unknown attributes. Consider the following `CustomGetAttr` class:
 
 ```py
-def _(flag: bool):
-    class C1: ...
-    class C2: ...
-    C = C1 if flag else C2
+from typing import Literal
 
-    # error: [unresolved-attribute] "Type `Literal[C1, C2]` has no attribute `x`"
-    reveal_type(C.x)  # revealed: Unknown
+def flag() -> bool:
+    return True
+
+class GetAttrReturnType: ...
+
+class CustomGetAttr:
+    class_attr: int = 1
+
+    if flag():
+        possibly_unbound: bytes = b"a"
+
+    def __init__(self) -> None:
+        self.instance_attr: str = "a"
+
+    def __getattr__(self, name: str) -> GetAttrReturnType:
+        return GetAttrReturnType()
+```
+
+We can access arbitrary attributes on instances of this class, and the type of the attribute will be
+`GetAttrReturnType`:
+
+```py
+c = CustomGetAttr()
+
+reveal_type(c.whatever)  # revealed: GetAttrReturnType
+```
+
+If an attribute is defined on the class, it takes precedence over the `__getattr__` method:
+
+```py
+reveal_type(c.class_attr)  # revealed: int
+```
+
+If the class attribute is possibly unbound, we union the type of the attribute with the fallback
+type of the `__getattr__` method:
+
+```py
+reveal_type(c.possibly_unbound)  # revealed: bytes | GetAttrReturnType
+```
+
+Instance attributes also take precedence over the `__getattr__` method:
+
+```py
+# Note: we could attempt to union with the fallback type of `__getattr__` here, as we currently do not
+# attempt to determine if instance attributes are always bound or not. Neither mypy nor pyright do this,
+# so it's not a priority.
+reveal_type(c.instance_attr)  # revealed: str
+```
+
+### Type of the `name` parameter
+
+If the `name` parameter of the `__getattr__` method is annotated with a (union of) literal type(s),
+we only consider the attribute access to be valid if the accessed attribute is one of them:
+
+```py
+from typing import Literal
+
+class Date:
+    def __getattr__(self, name: Literal["day", "month", "year"]) -> int:
+        return 0
+
+date = Date()
+
+reveal_type(date.day)  # revealed: int
+reveal_type(date.month)  # revealed: int
+reveal_type(date.year)  # revealed: int
+
+# error: [unresolved-attribute] "Type `Date` has no attribute `century`"
+reveal_type(date.century)  # revealed: Unknown
+```
+
+### `argparse.Namespace`
+
+A standard library example of a class with a custom `__getattr__` method is `argparse.Namespace`:
+
+```py
+import argparse
+
+def _(ns: argparse.Namespace):
+    reveal_type(ns.whatever)  # revealed: Any
 ```
 
 ## Objects of all types have a `__class__` method
@@ -997,6 +1343,8 @@ reveal_type(Foo.__class__)  # revealed: Literal[type]
 
 ## Module attributes
 
+### Basic
+
 `mod.py`:
 
 ```py
@@ -1031,7 +1379,7 @@ for mod.global_symbol in IntIterable():
     pass
 ```
 
-## Nested attributes
+### Nested module attributes
 
 `outer/__init__.py`:
 
@@ -1105,8 +1453,8 @@ Most attribute accesses on bool-literal types are delegated to `builtins.bool`, 
 bools are instances of that class:
 
 ```py
-reveal_type(True.__and__)  # revealed: @Todo(overloaded method)
-reveal_type(False.__or__)  # revealed: @Todo(overloaded method)
+reveal_type(True.__and__)  # revealed: <bound method `__and__` of `Literal[True]`>
+reveal_type(False.__or__)  # revealed: <bound method `__or__` of `Literal[False]`>
 ```
 
 Some attributes are special-cased, however:
@@ -1262,6 +1610,7 @@ reveal_type(C.a_none)  # revealed: None
 Some of the tests in the *Class and instance variables* section draw inspiration from
 [pyright's documentation] on this topic.
 
+[descriptor protocol tests]: descriptor_protocol.md
 [pyright's documentation]: https://microsoft.github.io/pyright/#/type-concepts-advanced?id=class-and-instance-variables
 [typing spec on `classvar`]: https://typing.readthedocs.io/en/latest/spec/class-compat.html#classvar
 [`typing.classvar`]: https://docs.python.org/3/library/typing.html#typing.ClassVar

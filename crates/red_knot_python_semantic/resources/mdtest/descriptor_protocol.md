@@ -6,7 +6,9 @@ A descriptor is an attribute value that has one of the methods in the descriptor
 methods are `__get__()`, `__set__()`, and `__delete__()`. If any of those methods are defined for an
 attribute, it is said to be a descriptor.
 
-## Basic example
+## Basic properties
+
+### Example
 
 An introductory example, modeled after a [simple example] in the primer on descriptors, involving a
 descriptor that returns a constant value:
@@ -31,21 +33,17 @@ reveal_type(c.ten)  # revealed: Literal[10]
 reveal_type(C.ten)  # revealed: Literal[10]
 
 # These are fine:
-# TODO: This should not be an error
-c.ten = 10  # error: [invalid-assignment]
+c.ten = 10
 C.ten = 10
 
-# TODO: This should be an error (as the wrong type is being implicitly passed to `Ten.__set__`),
-# but the error message is misleading.
-# error: [invalid-assignment] "Object of type `Literal[11]` is not assignable to attribute `ten` of type `Ten`"
+# error: [invalid-assignment] "Object of type `Literal[11]` is not assignable to attribute `ten` of type `Literal[10]`"
 c.ten = 11
 
-# TODO: same as above
 # error: [invalid-assignment] "Object of type `Literal[11]` is not assignable to attribute `ten` of type `Literal[10]`"
 C.ten = 11
 ```
 
-## Different types for `__get__` and `__set__`
+### Different types for `__get__` and `__set__`
 
 The return type of `__get__` and the value type of `__set__` can be different:
 
@@ -67,28 +65,25 @@ c = C()
 
 reveal_type(c.flexible_int)  # revealed: int | None
 
-# TODO: These should not be errors
-# error: [invalid-assignment]
 c.flexible_int = 42  # okay
+# TODO: This should not be an error
 # error: [invalid-assignment]
 c.flexible_int = "42"  # also okay!
 
 reveal_type(c.flexible_int)  # revealed: int | None
 
-# TODO: This should be an error, but the message needs to be improved.
-# error: [invalid-assignment] "Object of type `None` is not assignable to attribute `flexible_int` of type `FlexibleInt`"
+# TODO: This should be an error
 c.flexible_int = None  # not okay
 
 reveal_type(c.flexible_int)  # revealed: int | None
 ```
 
-## Data and non-data descriptors
+### Data and non-data descriptors
 
-Descriptors that define `__set__` or `__delete__` are called *data descriptors*. An example\
-of a data descriptor is a `property` with a setter and/or a deleter.\
-Descriptors that only define `__get__`, meanwhile, are called *non-data descriptors*. Examples
-include\
-functions, `classmethod` or `staticmethod`).
+Descriptors that define `__set__` or `__delete__` are called *data descriptors*. An example of a
+data descriptor is a `property` with a setter and/or a deleter. Descriptors that only define
+`__get__`, meanwhile, are called *non-data descriptors*. Examples include functions, `classmethod`
+or `staticmethod`.
 
 The precedence chain for attribute access is (1) data descriptors, (2) instance attributes, and (3)
 non-data descriptors.
@@ -100,7 +95,7 @@ class DataDescriptor:
     def __get__(self, instance: object, owner: type | None = None) -> Literal["data"]:
         return "data"
 
-    def __set__(self, instance: int, value) -> None:
+    def __set__(self, instance: object, value: int) -> None:
         pass
 
 class NonDataDescriptor:
@@ -124,12 +119,7 @@ class C:
 
 c = C()
 
-# TODO: This should ideally be `Unknown | Literal["data"]`.
-#
-#     - Pyright also wrongly shows `int | Literal['data']` here
-#     - Mypy shows Literal["data"] here, but also shows Literal["non-data"] below.
-#
-reveal_type(c.data_descriptor)  # revealed: Unknown | Literal["data", 1]
+reveal_type(c.data_descriptor)  # revealed: Unknown | Literal["data"]
 
 reveal_type(c.non_data_descriptor)  # revealed: Unknown | Literal["non-data", 1]
 
@@ -143,76 +133,58 @@ reveal_type(C.non_data_descriptor)  # revealed: Unknown | Literal["non-data"]
 C.data_descriptor = "something else"  # This is okay
 ```
 
-## Built-in `property` descriptor
+### Partial fall back
 
-The built-in `property` decorator creates a descriptor. The names for attribute reads/writes are
-determined by the return type of the `name` method and the parameter type of the setter,
-respectively.
-
-```py
-class C:
-    _name: str | None = None
-
-    @property
-    def name(self) -> str:
-        return self._name or "Unset"
-    # TODO: No diagnostic should be emitted here
-    # error: [unresolved-attribute] "Type `Literal[name]` has no attribute `setter`"
-    @name.setter
-    def name(self, value: str | None) -> None:
-        self._value = value
-
-c = C()
-
-reveal_type(c._name)  # revealed: str | None
-
-# Should be `str`
-reveal_type(c.name)  # revealed: @Todo(decorated method)
-
-# Should be `builtins.property`
-reveal_type(C.name)  # revealed: Literal[name]
-
-# This is fine:
-c.name = "new"
-
-c.name = None
-
-# TODO: this should be an error
-c.name = 42
-```
-
-## Built-in `classmethod` descriptor
-
-Similarly to `property`, `classmethod` decorator creates an implicit descriptor that binds the first
-argument to the class instead of the instance.
+Our implementation of the descriptor protocol takes into account that symbols can be possibly
+unbound. In those cases, we fall back to lower precedence steps of the descriptor protocol and union
+all possible results accordingly. We start by defining a data and a non-data descriptor:
 
 ```py
-class C:
-    def __init__(self, value: str) -> None:
-        self._name: str = value
+from typing import Literal
 
-    @classmethod
-    def factory(cls, value: str) -> "C":
-        return cls(value)
+class DataDescriptor:
+    def __get__(self, instance: object, owner: type | None = None) -> Literal["data"]:
+        return "data"
 
-    @classmethod
-    def get_name(cls) -> str:
-        return cls.__name__
+    def __set__(self, instance: object, value: int) -> None:
+        pass
 
-c1 = C.factory("test")  # okay
-
-reveal_type(c1)  # revealed: C
-
-reveal_type(C.get_name())  # revealed: str
-
-reveal_type(C("42").get_name())  # revealed: str
+class NonDataDescriptor:
+    def __get__(self, instance: object, owner: type | None = None) -> Literal["non-data"]:
+        return "non-data"
 ```
 
-## Descriptors only work when used as class variables
+Then, we demonstrate that we fall back to an instance attribute if a data descriptor is possibly
+unbound:
 
-From the descriptor guide:
+```py
+def f1(flag: bool):
+    class C1:
+        if flag:
+            attr = DataDescriptor()
 
-> Descriptors only work when used as class variables. When put in instances, they have no effect.
+        def f(self):
+            self.attr = "normal"
+
+    reveal_type(C1().attr)  # revealed: Unknown | Literal["data", "normal"]
+```
+
+We never treat implicit instance attributes as definitely bound, so we fall back to the non-data
+descriptor here:
+
+```py
+def f2(flag: bool):
+    class C2:
+        def f(self):
+            self.attr = "normal"
+        attr = NonDataDescriptor()
+
+    reveal_type(C2().attr)  # revealed: Unknown | Literal["non-data", "normal"]
+```
+
+### Descriptors only work when used as class variables
+
+Descriptors only work when used as class variables. When put in instances, they have no effect.
 
 ```py
 from typing import Literal
@@ -225,8 +197,182 @@ class C:
     def __init__(self):
         self.ten: Ten = Ten()
 
-# TODO: Should be Ten
-reveal_type(C().ten)  # revealed: Literal[10]
+reveal_type(C().ten)  # revealed: Ten
+```
+
+## Descriptor protocol for class objects
+
+When attributes are accessed on a class object, the following [precedence chain] is used:
+
+- Data descriptor on the metaclass
+- Data or non-data descriptor on the class
+- Class attribute
+- Non-data descriptor on the metaclass
+- Metaclass attribute
+
+To verify this, we define a data and a non-data descriptor:
+
+```py
+from typing import Literal, Any
+
+class DataDescriptor:
+    def __get__(self, instance: object, owner: type | None = None) -> Literal["data"]:
+        return "data"
+
+    def __set__(self, instance: object, value: str) -> None:
+        pass
+
+class NonDataDescriptor:
+    def __get__(self, instance: object, owner: type | None = None) -> Literal["non-data"]:
+        return "non-data"
+```
+
+First, we make sure that the descriptors are correctly accessed when defined on the metaclass or the
+class:
+
+```py
+class Meta1(type):
+    meta_data_descriptor: DataDescriptor = DataDescriptor()
+    meta_non_data_descriptor: NonDataDescriptor = NonDataDescriptor()
+
+class C1(metaclass=Meta1):
+    class_data_descriptor: DataDescriptor = DataDescriptor()
+    class_non_data_descriptor: NonDataDescriptor = NonDataDescriptor()
+
+reveal_type(C1.meta_data_descriptor)  # revealed: Literal["data"]
+reveal_type(C1.meta_non_data_descriptor)  # revealed: Literal["non-data"]
+
+reveal_type(C1.class_data_descriptor)  # revealed: Literal["data"]
+reveal_type(C1.class_non_data_descriptor)  # revealed: Literal["non-data"]
+```
+
+Next, we demonstrate that a *metaclass data descriptor* takes precedence over all class-level
+attributes:
+
+```py
+class Meta2(type):
+    meta_data_descriptor1: DataDescriptor = DataDescriptor()
+    meta_data_descriptor2: DataDescriptor = DataDescriptor()
+
+class ClassLevelDataDescriptor:
+    def __get__(self, instance: object, owner: type | None = None) -> Literal["class level data descriptor"]:
+        return "class level data descriptor"
+
+    def __set__(self, instance: object, value: str) -> None:
+        pass
+
+class C2(metaclass=Meta2):
+    meta_data_descriptor1: Literal["value on class"] = "value on class"
+    meta_data_descriptor2: ClassLevelDataDescriptor = ClassLevelDataDescriptor()
+
+reveal_type(C2.meta_data_descriptor1)  # revealed: Literal["data"]
+reveal_type(C2.meta_data_descriptor2)  # revealed: Literal["data"]
+```
+
+On the other hand, normal metaclass attributes and metaclass non-data descriptors are shadowed by
+class-level attributes (descriptor or not):
+
+```py
+class Meta3(type):
+    meta_attribute1: Literal["value on metaclass"] = "value on metaclass"
+    meta_attribute2: Literal["value on metaclass"] = "value on metaclass"
+    meta_non_data_descriptor1: NonDataDescriptor = NonDataDescriptor()
+    meta_non_data_descriptor2: NonDataDescriptor = NonDataDescriptor()
+
+class C3(metaclass=Meta3):
+    meta_attribute1: Literal["value on class"] = "value on class"
+    meta_attribute2: ClassLevelDataDescriptor = ClassLevelDataDescriptor()
+    meta_non_data_descriptor1: Literal["value on class"] = "value on class"
+    meta_non_data_descriptor2: ClassLevelDataDescriptor = ClassLevelDataDescriptor()
+
+reveal_type(C3.meta_attribute1)  # revealed: Literal["value on class"]
+reveal_type(C3.meta_attribute2)  # revealed: Literal["class level data descriptor"]
+reveal_type(C3.meta_non_data_descriptor1)  # revealed: Literal["value on class"]
+reveal_type(C3.meta_non_data_descriptor2)  # revealed: Literal["class level data descriptor"]
+```
+
+Finally, metaclass attributes and metaclass non-data descriptors are only accessible when they are
+not shadowed by class-level attributes:
+
+```py
+class Meta4(type):
+    meta_attribute: Literal["value on metaclass"] = "value on metaclass"
+    meta_non_data_descriptor: NonDataDescriptor = NonDataDescriptor()
+
+class C4(metaclass=Meta4): ...
+
+reveal_type(C4.meta_attribute)  # revealed: Literal["value on metaclass"]
+reveal_type(C4.meta_non_data_descriptor)  # revealed: Literal["non-data"]
+```
+
+When a metaclass data descriptor is possibly unbound, we union the result type of its `__get__`
+method with an underlying class level attribute, if present:
+
+```py
+def _(flag: bool):
+    class Meta5(type):
+        if flag:
+            meta_data_descriptor1: DataDescriptor = DataDescriptor()
+            meta_data_descriptor2: DataDescriptor = DataDescriptor()
+
+    class C5(metaclass=Meta5):
+        meta_data_descriptor1: Literal["value on class"] = "value on class"
+
+    reveal_type(C5.meta_data_descriptor1)  # revealed: Literal["data", "value on class"]
+    # error: [possibly-unbound-attribute]
+    reveal_type(C5.meta_data_descriptor2)  # revealed: Literal["data"]
+```
+
+When a class-level attribute is possibly unbound, we union its (descriptor protocol) type with the
+metaclass attribute (unless it's a data descriptor, which always takes precedence):
+
+```py
+from typing import Any
+
+def _(flag: bool):
+    class Meta6(type):
+        attribute1: DataDescriptor = DataDescriptor()
+        attribute2: NonDataDescriptor = NonDataDescriptor()
+        attribute3: Literal["value on metaclass"] = "value on metaclass"
+
+    class C6(metaclass=Meta6):
+        if flag:
+            attribute1: Literal["value on class"] = "value on class"
+            attribute2: Literal["value on class"] = "value on class"
+            attribute3: Literal["value on class"] = "value on class"
+            attribute4: Literal["value on class"] = "value on class"
+
+    reveal_type(C6.attribute1)  # revealed: Literal["data"]
+    reveal_type(C6.attribute2)  # revealed: Literal["non-data", "value on class"]
+    reveal_type(C6.attribute3)  # revealed: Literal["value on metaclass", "value on class"]
+    # error: [possibly-unbound-attribute]
+    reveal_type(C6.attribute4)  # revealed: Literal["value on class"]
+```
+
+Finally, we can also have unions of various types of attributes:
+
+```py
+def _(flag: bool):
+    class Meta7(type):
+        if flag:
+            union_of_metaclass_attributes: Literal[1] = 1
+            union_of_metaclass_data_descriptor_and_attribute: DataDescriptor = DataDescriptor()
+        else:
+            union_of_metaclass_attributes: Literal[2] = 2
+            union_of_metaclass_data_descriptor_and_attribute: Literal[2] = 2
+
+    class C7(metaclass=Meta7):
+        if flag:
+            union_of_class_attributes: Literal[1] = 1
+            union_of_class_data_descriptor_and_attribute: DataDescriptor = DataDescriptor()
+        else:
+            union_of_class_attributes: Literal[2] = 2
+            union_of_class_data_descriptor_and_attribute: Literal[2] = 2
+
+    reveal_type(C7.union_of_metaclass_attributes)  # revealed: Literal[1, 2]
+    reveal_type(C7.union_of_metaclass_data_descriptor_and_attribute)  # revealed: Literal["data", 2]
+    reveal_type(C7.union_of_class_attributes)  # revealed: Literal[1, 2]
+    reveal_type(C7.union_of_class_data_descriptor_and_attribute)  # revealed: Literal["data", 2]
 ```
 
 ## Descriptors distinguishing between class and instance access
@@ -259,88 +405,12 @@ reveal_type(C.d)  # revealed: LiteralString
 reveal_type(C().d)  # revealed: LiteralString
 ```
 
-## Undeclared descriptor arguments
+## Descriptor protocol for dunder methods
 
-If a descriptor attribute is not declared, we union with `Unknown`, just like for regular
-attributes, since that attribute could be overwritten externally. Even a data descriptor with a
-`__set__` method can be overwritten when accessed through a class object.
-
-```py
-class Descriptor:
-    def __get__(self, instance: object, owner: type | None = None) -> int:
-        return 1
-
-    def __set__(self, instance: object, value: int) -> None:
-        pass
-
-class C:
-    descriptor = Descriptor()
-
-C.descriptor = "something else"
-
-# This could also be `Literal["something else"]` if we support narrowing of attribute types based on assignments
-reveal_type(C.descriptor)  # revealed: Unknown | int
-```
-
-## `__get__` is called with correct arguments
-
-```py
-from __future__ import annotations
-
-class TailoredForClassObjectAccess:
-    def __get__(self, instance: None, owner: type[C]) -> int:
-        return 1
-
-class TailoredForInstanceAccess:
-    def __get__(self, instance: C, owner: type[C] | None = None) -> str:
-        return "a"
-
-class C:
-    class_object_access: TailoredForClassObjectAccess = TailoredForClassObjectAccess()
-    instance_access: TailoredForInstanceAccess = TailoredForInstanceAccess()
-
-reveal_type(C.class_object_access)  # revealed: int
-reveal_type(C().instance_access)  # revealed: str
-
-# TODO: These should emit a diagnostic
-reveal_type(C().class_object_access)  # revealed: TailoredForClassObjectAccess
-reveal_type(C.instance_access)  # revealed: TailoredForInstanceAccess
-```
-
-## Descriptors with incorrect `__get__` signature
-
-```py
-class Descriptor:
-    # `__get__` method with missing parameters:
-    def __get__(self) -> int:
-        return 1
-
-class C:
-    descriptor: Descriptor = Descriptor()
-
-# TODO: This should be an error
-reveal_type(C.descriptor)  # revealed: Descriptor
-```
-
-## Possibly-unbound `__get__` method
-
-```py
-def _(flag: bool):
-    class MaybeDescriptor:
-        if flag:
-            def __get__(self, instance: object, owner: type | None = None) -> int:
-                return 1
-
-    class C:
-        descriptor: MaybeDescriptor = MaybeDescriptor()
-
-    # TODO: This should be `MaybeDescriptor | int`
-    reveal_type(C.descriptor)  # revealed: int
-```
-
-## Dunder methods
-
-Dunder methods are looked up on the meta type, but we still need to invoke the descriptor protocol:
+Dunder methods are always looked up on the meta-type. There is no instance fallback. This means that
+an implicit dunder call on an instance-like object will not only look up the dunder method on the
+class object, without considering instance attributes. And an implicit dunder call on a class object
+will look up the dunder method on the metaclass, without considering class attributes.
 
 ```py
 class SomeCallable:
@@ -360,7 +430,77 @@ reveal_type(b_instance(1))  # revealed: str
 b_instance("bla")  # error: [invalid-argument-type]
 ```
 
-## Functions as descriptors
+## Special descriptors
+
+### Built-in `property` descriptor
+
+The built-in `property` decorator creates a descriptor. The names for attribute reads/writes are
+determined by the return type of the `name` method and the parameter type of the setter,
+respectively.
+
+```py
+class C:
+    _name: str | None = None
+
+    @property
+    def name(self) -> str:
+        return self._name or "Unset"
+    # TODO: No diagnostic should be emitted here
+    # error: [unresolved-attribute] "Type `Literal[name]` has no attribute `setter`"
+    @name.setter
+    def name(self, value: str | None) -> None:
+        self._value = value
+
+c = C()
+
+reveal_type(c._name)  # revealed: str | None
+
+# TODO: Should be `str`
+reveal_type(c.name)  # revealed: <bound method `name` of `C`>
+
+# Should be `builtins.property`
+reveal_type(C.name)  # revealed: Literal[name]
+
+# TODO: These should not emit errors
+# error: [invalid-assignment]
+c.name = "new"
+
+# error: [invalid-assignment]
+c.name = None
+
+# TODO: this should be an error, but with a proper error message
+# error: [invalid-assignment] "Object of type `Literal[42]` is not assignable to attribute `name` of type `<bound method `name` of `C`>`"
+c.name = 42
+```
+
+### Built-in `classmethod` descriptor
+
+Similarly to `property`, `classmethod` decorator creates an implicit descriptor that binds the first
+argument to the class instead of the instance.
+
+```py
+class C:
+    def __init__(self, value: str) -> None:
+        self._name: str = value
+
+    @classmethod
+    def factory(cls, value: str) -> "C":
+        return cls(value)
+
+    @classmethod
+    def get_name(cls) -> str:
+        return cls.__name__
+
+c1 = C.factory("test")  # okay
+
+reveal_type(c1)  # revealed: C
+
+reveal_type(C.get_name())  # revealed: str
+
+reveal_type(C("42").get_name())  # revealed: str
+```
+
+### Functions as descriptors
 
 Functions are descriptors because they implement a `__get__` method. This is crucial in making sure
 that method calls work as expected. See [this test suite](./call/methods.md) for more information.
@@ -410,32 +550,202 @@ Finally, we test some error cases for the call to the wrapper descriptor:
 
 ```py
 # Calling the wrapper descriptor without any arguments is an
-# error: [missing-argument] "No arguments provided for required parameters `self`, `instance`"
+# error: [no-matching-overload] "No overload of wrapper descriptor `FunctionType.__get__` matches arguments"
 wrapper_descriptor()
 
 # Calling it without the `instance` argument is an also an
-# error: [missing-argument] "No argument provided for required parameter `instance`"
+# error: [no-matching-overload] "No overload of wrapper descriptor `FunctionType.__get__` matches arguments"
 wrapper_descriptor(f)
 
 # Calling it without the `owner` argument if `instance` is not `None` is an
-# error: [missing-argument] "No argument provided for required parameter `owner`"
+# error: [no-matching-overload] "No overload of wrapper descriptor `FunctionType.__get__` matches arguments"
 wrapper_descriptor(f, None)
 
 # But calling it with an instance is fine (in this case, the `owner` argument is optional):
 wrapper_descriptor(f, C())
 
 # Calling it with something that is not a `FunctionType` as the first argument is an
-# error: [invalid-argument-type] "Object of type `Literal[1]` cannot be assigned to parameter 1 (`self`) of wrapper descriptor `FunctionType.__get__`; expected type `FunctionType`"
+# error: [no-matching-overload] "No overload of wrapper descriptor `FunctionType.__get__` matches arguments"
 wrapper_descriptor(1, None, type(f))
 
 # Calling it with something that is not a `type` as the `owner` argument is an
-# error: [invalid-argument-type] "Object of type `Literal[f]` cannot be assigned to parameter 3 (`owner`) of wrapper descriptor `FunctionType.__get__`; expected type `type`"
+# error: [no-matching-overload] "No overload of wrapper descriptor `FunctionType.__get__` matches arguments"
 wrapper_descriptor(f, None, f)
 
 # Calling it with too many positional arguments is an
-# error: [too-many-positional-arguments] "Too many positional arguments to wrapper descriptor `FunctionType.__get__`: expected 3, got 4"
+# error: [no-matching-overload] "No overload of wrapper descriptor `FunctionType.__get__` matches arguments"
 wrapper_descriptor(f, None, type(f), "one too many")
 ```
 
+## Error handling and edge cases
+
+### `__get__` is called with correct arguments
+
+This test makes sure that we call `__get__` with the right argument types for various scenarios:
+
+```py
+from __future__ import annotations
+
+class TailoredForClassObjectAccess:
+    def __get__(self, instance: None, owner: type[C]) -> int:
+        return 1
+
+class TailoredForInstanceAccess:
+    def __get__(self, instance: C, owner: type[C] | None = None) -> str:
+        return "a"
+
+class TailoredForMetaclassAccess:
+    def __get__(self, instance: type[C], owner: type[Meta]) -> bytes:
+        return b"a"
+
+class Meta(type):
+    metaclass_access: TailoredForMetaclassAccess = TailoredForMetaclassAccess()
+
+class C(metaclass=Meta):
+    class_object_access: TailoredForClassObjectAccess = TailoredForClassObjectAccess()
+    instance_access: TailoredForInstanceAccess = TailoredForInstanceAccess()
+
+reveal_type(C.class_object_access)  # revealed: int
+reveal_type(C().instance_access)  # revealed: str
+reveal_type(C.metaclass_access)  # revealed: bytes
+
+# TODO: These should emit a diagnostic
+reveal_type(C().class_object_access)  # revealed: TailoredForClassObjectAccess
+reveal_type(C.instance_access)  # revealed: TailoredForInstanceAccess
+```
+
+### Descriptors with incorrect `__get__` signature
+
+```py
+class Descriptor:
+    # `__get__` method with missing parameters:
+    def __get__(self) -> int:
+        return 1
+
+class C:
+    descriptor: Descriptor = Descriptor()
+
+# TODO: This should be an error
+reveal_type(C.descriptor)  # revealed: Descriptor
+
+# TODO: This should be an error
+reveal_type(C().descriptor)  # revealed: Descriptor
+```
+
+### Undeclared descriptor arguments
+
+If a descriptor attribute is not declared, we union with `Unknown`, just like for regular
+attributes, since that attribute could be overwritten externally. Even a data descriptor with a
+`__set__` method can be overwritten when accessed through a class object.
+
+```py
+class Descriptor:
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        return 1
+
+    def __set__(self, instance: object, value: int) -> None:
+        pass
+
+class C:
+    descriptor = Descriptor()
+
+C.descriptor = "something else"
+
+# This could also be `Literal["something else"]` if we support narrowing of attribute types based on assignments
+reveal_type(C.descriptor)  # revealed: Unknown | int
+```
+
+### Possibly unbound descriptor attributes
+
+```py
+class DataDescriptor:
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        return 1
+
+    def __set__(self, instance: int, value) -> None:
+        pass
+
+class NonDataDescriptor:
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        return 1
+
+def _(flag: bool):
+    class PossiblyUnbound:
+        if flag:
+            non_data: NonDataDescriptor = NonDataDescriptor()
+            data: DataDescriptor = DataDescriptor()
+
+    # error: [possibly-unbound-attribute] "Attribute `non_data` on type `Literal[PossiblyUnbound]` is possibly unbound"
+    reveal_type(PossiblyUnbound.non_data)  # revealed: int
+
+    # error: [possibly-unbound-attribute] "Attribute `non_data` on type `PossiblyUnbound` is possibly unbound"
+    reveal_type(PossiblyUnbound().non_data)  # revealed: int
+
+    # error: [possibly-unbound-attribute] "Attribute `data` on type `Literal[PossiblyUnbound]` is possibly unbound"
+    reveal_type(PossiblyUnbound.data)  # revealed: int
+
+    # error: [possibly-unbound-attribute] "Attribute `data` on type `PossiblyUnbound` is possibly unbound"
+    reveal_type(PossiblyUnbound().data)  # revealed: int
+```
+
+### Possibly-unbound `__get__` method
+
+```py
+def _(flag: bool):
+    class MaybeDescriptor:
+        if flag:
+            def __get__(self, instance: object, owner: type | None = None) -> int:
+                return 1
+
+    class C:
+        descriptor: MaybeDescriptor = MaybeDescriptor()
+
+    reveal_type(C.descriptor)  # revealed: int | MaybeDescriptor
+
+    reveal_type(C().descriptor)  # revealed: int | MaybeDescriptor
+```
+
+### Descriptors with non-function `__get__` callables that are descriptors themselves
+
+The descriptor protocol is recursive, i.e. looking up `__get__` can involve triggering the
+descriptor protocol on the callable's `__call__` method:
+
+```py
+from __future__ import annotations
+
+class ReturnedCallable2:
+    def __call__(self, descriptor: Descriptor1, instance: None, owner: type[C]) -> int:
+        return 1
+
+class ReturnedCallable1:
+    def __call__(self, descriptor: Descriptor2, instance: Callable1, owner: type[Callable1]) -> ReturnedCallable2:
+        return ReturnedCallable2()
+
+class Callable3:
+    def __call__(self, descriptor: Descriptor3, instance: Callable2, owner: type[Callable2]) -> ReturnedCallable1:
+        return ReturnedCallable1()
+
+class Descriptor3:
+    __get__: Callable3 = Callable3()
+
+class Callable2:
+    __call__: Descriptor3 = Descriptor3()
+
+class Descriptor2:
+    __get__: Callable2 = Callable2()
+
+class Callable1:
+    __call__: Descriptor2 = Descriptor2()
+
+class Descriptor1:
+    __get__: Callable1 = Callable1()
+
+class C:
+    d: Descriptor1 = Descriptor1()
+
+reveal_type(C.d)  # revealed: int
+```
+
 [descriptors]: https://docs.python.org/3/howto/descriptor.html
+[precedence chain]: https://github.com/python/cpython/blob/3.13/Objects/typeobject.c#L5393-L5481
 [simple example]: https://docs.python.org/3/howto/descriptor.html#simple-example-a-descriptor-that-returns-a-constant

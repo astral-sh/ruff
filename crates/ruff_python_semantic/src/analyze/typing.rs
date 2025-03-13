@@ -1,10 +1,10 @@
 //! Analysis rules for the `typing` module.
 
-use ruff_python_ast::helpers::{any_over_expr, is_const_false, map_subscript};
+use ruff_python_ast::helpers::{any_over_expr, map_subscript};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{
-    self as ast, Expr, ExprCall, ExprName, Int, Operator, ParameterWithDefault, Parameters, Stmt,
+    self as ast, Expr, ExprCall, ExprName, Operator, ParameterWithDefault, Parameters, Stmt,
     StmtAssign,
 };
 use ruff_python_stdlib::typing::{
@@ -391,44 +391,19 @@ pub fn is_mutable_expr(expr: &Expr, semantic: &SemanticModel) -> bool {
 pub fn is_type_checking_block(stmt: &ast::StmtIf, semantic: &SemanticModel) -> bool {
     let ast::StmtIf { test, .. } = stmt;
 
-    if semantic.use_new_type_checking_block_detection_semantics() {
-        return match test.as_ref() {
-            // As long as the symbol's name is "TYPE_CHECKING" we will treat it like `typing.TYPE_CHECKING`
-            // for this specific check even if it's defined somewhere else, like the current module.
-            // Ex) `if TYPE_CHECKING:`
-            Expr::Name(ast::ExprName { id, .. }) => {
-                id == "TYPE_CHECKING"
+    match test.as_ref() {
+        // As long as the symbol's name is "TYPE_CHECKING" we will treat it like `typing.TYPE_CHECKING`
+        // for this specific check even if it's defined somewhere else, like the current module.
+        // Ex) `if TYPE_CHECKING:`
+        Expr::Name(ast::ExprName { id, .. }) => {
+            id == "TYPE_CHECKING"
                 // Ex) `if TC:` with `from typing import TYPE_CHECKING as TC`
                 || semantic.match_typing_expr(test, "TYPE_CHECKING")
-            }
-            // Ex) `if typing.TYPE_CHECKING:`
-            Expr::Attribute(ast::ExprAttribute { attr, .. }) => attr == "TYPE_CHECKING",
-            _ => false,
-        };
+        }
+        // Ex) `if typing.TYPE_CHECKING:`
+        Expr::Attribute(ast::ExprAttribute { attr, .. }) => attr == "TYPE_CHECKING",
+        _ => false,
     }
-
-    // Ex) `if False:`
-    if is_const_false(test) {
-        return true;
-    }
-
-    // Ex) `if 0:`
-    if matches!(
-        test.as_ref(),
-        Expr::NumberLiteral(ast::ExprNumberLiteral {
-            value: ast::Number::Int(Int::ZERO),
-            ..
-        })
-    ) {
-        return true;
-    }
-
-    // Ex) `if typing.TYPE_CHECKING:`
-    if semantic.match_typing_expr(test, "TYPE_CHECKING") {
-        return true;
-    }
-
-    false
 }
 
 /// Returns `true` if the [`ast::StmtIf`] is a version-checking block (e.g., `if sys.version_info >= ...:`).
