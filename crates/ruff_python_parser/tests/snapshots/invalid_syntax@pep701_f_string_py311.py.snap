@@ -607,7 +607,7 @@ Module(
 3 | f"{'\n'.join(a)}"                  # escape sequence
 4 | f'''A complex trick: {
 5 |     bag['bag']                     # comment
-  |                                    ^ Syntax Error: Cannot use comments in f-strings on Python 3.11 (syntax was added in Python 3.12)
+  |                                    ^^^^^^^^^ Syntax Error: Cannot use comments in f-strings on Python 3.11 (syntax was added in Python 3.12)
 6 | }'''
 7 | f"{f"{f"{f"{f"{f"{1+1}"}"}"}"}"}"  # arbitrary nesting
   |

@@ -17,7 +17,7 @@ use crate::parser::{helpers, FunctionKind, Parser};
 use crate::string::{parse_fstring_literal_element, parse_string_literal, StringType};
 use crate::token::{TokenKind, TokenValue};
 use crate::token_set::TokenSet;
-use crate::{FStringErrorType, Mode, ParseErrorType, UnsupportedSyntaxErrorKind};
+use crate::{FStringErrorType, Mode, ParseErrorType, Token, UnsupportedSyntaxErrorKind};
 
 use super::{FStringElementsKind, Parenthesized, RecoveryContextKind};
 
@@ -1376,15 +1376,37 @@ impl<'src> Parser<'src> {
                     );
                 };
 
-                if let Some(comment_index) = self.source[expr.range].find('#') {
-                    let Ok(comment_index) = TextSize::try_from(comment_index) else {
-                        continue;
-                    };
+                fn check_f_string_comments(tokens: &[Token]) -> Option<TextRange> {
+                    // stack to check nested f-string status
+                    let mut f_strings = Vec::new();
+                    for token in tokens.iter().rev() {
+                        match token.kind() {
+                            TokenKind::FStringEnd => {
+                                f_strings.push(());
+                            }
+                            TokenKind::FStringStart if f_strings.len() == 1 => {
+                                // found the start of the current f-string
+                                break;
+                            }
+                            TokenKind::FStringStart => {
+                                f_strings.pop().expect("Expected a valid f-string");
+                            }
+                            TokenKind::Comment if !f_strings.is_empty() => {
+                                return Some(token.range());
+                            }
+                            _ => {}
+                        }
+                    }
+
+                    None
+                }
+
+                if let Some(comment_range) = check_f_string_comments(&self.tokens.tokens) {
                     self.add_unsupported_syntax_error(
                         UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::Comment),
-                        TextRange::at(expr.range.start() + comment_index, TextSize::from(1)),
+                        comment_range,
                     );
-                };
+                }
 
                 if let Some(quote_index) = self.source[expr.range].find(quote_str) {
                     let Ok(quote_index) = TextSize::try_from(quote_index) else {

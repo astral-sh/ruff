@@ -14,7 +14,7 @@ pub(crate) struct TokenSource<'src> {
     /// A vector containing all the tokens emitted by the lexer. This is returned when the parser
     /// is finished consuming all the tokens. Note that unlike the emitted tokens, this vector
     /// holds both the trivia and non-trivia tokens.
-    tokens: Vec<Token>,
+    pub(crate) tokens: Vec<Token>,
 }
 
 impl<'src> TokenSource<'src> {
