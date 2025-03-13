@@ -898,6 +898,10 @@ impl<'db> Type<'db> {
                 left.is_equivalent_to(db, right)
             }
             (Type::Tuple(left), Type::Tuple(right)) => left.is_equivalent_to(db, right),
+            (
+                Type::Callable(CallableType::General(left)),
+                Type::Callable(CallableType::General(right)),
+            ) => left.is_equivalent_to(db, right),
             _ => self == other && self.is_fully_static(db) && other.is_fully_static(db),
         }
     }
@@ -4540,6 +4544,77 @@ impl<'db> GeneralCallableType<'db> {
         signature
             .return_ty
             .is_some_and(|return_type| return_type.is_fully_static(db))
+    }
+
+    /// Return `true` if `self` represents the exact same set of possible runtime objects as `other`.
+    pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+        let self_signature = self.signature(db);
+        let other_signature = other.signature(db);
+
+        let self_parameters = self_signature.parameters();
+        let other_parameters = other_signature.parameters();
+
+        if self_parameters.len() != other_parameters.len() {
+            return false;
+        }
+
+        if self_parameters.is_gradual() || other_parameters.is_gradual() {
+            return false;
+        }
+
+        // Check equivalence relationship between two optional types. If either of them is `None`,
+        // then it is not a fully static type which means it's not equivalent either.
+        let is_equivalent = |self_type: Option<Type<'db>>, other_type: Option<Type<'db>>| match (
+            self_type, other_type,
+        ) {
+            (Some(self_type), Some(other_type)) => self_type.is_equivalent_to(db, other_type),
+            _ => false,
+        };
+
+        if !is_equivalent(self_signature.return_ty, other_signature.return_ty) {
+            return false;
+        }
+
+        for (self_parameter, other_parameter) in self_parameters.iter().zip(other_parameters) {
+            if self_parameter.name() != other_parameter.name() {
+                return false;
+            }
+
+            if self_parameter.default_type().is_some() != other_parameter.default_type().is_some() {
+                return false;
+            }
+
+            if !matches!(
+                (self_parameter.kind(), other_parameter.kind()),
+                (
+                    ParameterKind::PositionalOnly { .. },
+                    ParameterKind::PositionalOnly { .. }
+                ) | (
+                    ParameterKind::PositionalOrKeyword { .. },
+                    ParameterKind::PositionalOrKeyword { .. }
+                ) | (
+                    ParameterKind::Variadic { .. },
+                    ParameterKind::Variadic { .. }
+                ) | (
+                    ParameterKind::KeywordOnly { .. },
+                    ParameterKind::KeywordOnly { .. }
+                ) | (
+                    ParameterKind::KeywordVariadic { .. },
+                    ParameterKind::KeywordVariadic { .. }
+                )
+            ) {
+                return false;
+            }
+
+            if !is_equivalent(
+                self_parameter.annotated_type(),
+                other_parameter.annotated_type(),
+            ) {
+                return false;
+            }
+        }
+
+        true
     }
 
     /// Return `true` if `self` has exactly the same set of possible static materializations as
