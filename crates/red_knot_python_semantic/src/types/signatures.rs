@@ -95,12 +95,6 @@ impl<'db> Signatures<'db> {
         }
     }
 
-    /// Returns whether this signature is callable. A union type is callable if _all_ of its
-    /// elements are callable.
-    pub(crate) fn is_callable(&self) -> bool {
-        self.iter().all(CallableSignature::is_callable)
-    }
-
     pub(crate) fn set_dunder_call_boundness(&mut self, boundness: Boundness) {
         match &mut self.inner {
             SignaturesInner::Single(signature) => {
@@ -118,7 +112,7 @@ impl<'db> Signatures<'db> {
 /// The signature of a single callable. If the callable is overloaded, there is a separate
 /// [`Signature`] for each overload.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
-pub struct CallableSignature<'db> {
+pub(crate) struct CallableSignature<'db> {
     /// The type that is (hopefully) callable.
     pub(crate) ty: Type<'db>,
 

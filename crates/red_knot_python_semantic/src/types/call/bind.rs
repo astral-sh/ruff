@@ -159,22 +159,6 @@ impl<'db> Bindings<'db> {
         self.bindings().iter().all(|b| !b.is_callable())
     }
 
-    /// Returns whether there were any errors binding this call site. If the callable is a union,
-    /// an error for _any_ element causes the call to fail.
-    pub(crate) fn has_binding_errors(&self) -> bool {
-        self.bindings()
-            .iter()
-            .any(CallableBinding::has_binding_errors)
-    }
-
-    /// Returns whether any binding is for an object that is callable via a `__call__` method that
-    /// is possibly unbound.
-    pub(crate) fn any_dunder_is_possibly_unbound(&self) -> bool {
-        self.bindings()
-            .iter()
-            .any(CallableBinding::dunder_is_possibly_unbound)
-    }
-
     pub(crate) fn bindings(&self) -> &[CallableBinding<'db>] {
         match &self.inner {
             BindingsInner::Single(binding) => std::slice::from_ref(binding),
