@@ -1,5 +1,112 @@
 # Changelog
 
+## 0.10.0
+
+TODO: Populate the changes from <https://github.com/astral-sh/ruff/pull/16600> (the script didn't pick them up)
+
+Check out the [blog post](https://astral.sh/blog/ruff-v0.10.0) for a migration guide and overview of the changes!
+
+### Breaking changes
+
+See also, the "Remapped rules" section which may result in disabled rules.
+
+<!-- TODO: Fill in text -->
+
+- **Changes to how the Python version is inferred when a `ruff.toml` and `pyproject.toml` with a `tool.ruff` section are missing** ([#16319](https://github.com/astral-sh/ruff/pull/16319))
+    TODO
+
+- **Updated `TYPE_CHECKING` behavior** ([#16669](https://github.com/astral-sh/ruff/pull/16669))
+
+    TODO
+
+- **More robust noqa parsing** ([#16483](https://github.com/astral-sh/ruff/pull/16483))
+    TODO
+
+- **Avoid unnecessary parentheses around with statements with a single context manager and a trailing comment** ([#14005](https://github.com/astral-sh/ruff/pull/14005))
+
+    This change fixes a bug in the formatter where it introduced unnecessary parentheses around with statements with a single context manager and a trailing comment. This change may result in a change in formatting for some users.
+
+- **Bump alpine default tag to 3.21 for derived Docker images** ([#16456](https://github.com/astral-sh/ruff/pull/16456))
+
+    Alpine 3.21 was released in Dec 2024 and is used in the official Alpine-based Python images. Now the uv:alpine image will use 3.21 instead of 3.20 and uv:alpine3.20 will no longer be updated.
+
+### Deprecated Rules
+
+The following rules have been deprecated:
+
+- [`non-pep604-isinstance`](https://docs.astral.sh/ruff/rules/non-pep604-isinstance/) (`UP038`)
+- [`suspicious-xmle-tree-usage`](https://docs.astral.sh/ruff/rules/suspicious-xmle-tree-usage/) (`S320`)
+
+### Remapped rules
+
+The following rules have been remapped to new rule codes:
+
+- \[`unsafe-markup-use`\]: `RUF035` to `S704`
+
+### Stabilization
+
+The following rules have been stabilized and are no longer in preview:
+
+- [`batched-without-explicit-strict`](https://docs.astral.sh/ruff/rules/batched-without-explicit-strict) (`B911`)
+- [`unnecessary-dict-comprehension-for-iterable`](https://docs.astral.sh/ruff/rules/unnecessary-dict-comprehension-for-iterable) (`C420`)
+- [`datetime-min-max`](https://docs.astral.sh/ruff/rules/datetime-min-max) (`DTZ901`)
+- [`fast-api-unused-path-parameter`](https://docs.astral.sh/ruff/rules/fast-api-unused-path-parameter) (`FAST003`)
+- [`root-logger-call`](https://docs.astral.sh/ruff/rules/root-logger-call) (`LOG015`)
+- [`len-test`](https://docs.astral.sh/ruff/rules/len-test) (`PLC1802`)
+- [`shallow-copy-environ`](https://docs.astral.sh/ruff/rules/shallow-copy-environ) (`PLW1507`)
+- [`os-listdir`](https://docs.astral.sh/ruff/rules/os-listdir) (`PTH208`)
+- [`invalid-pathlib-with-suffix`](https://docs.astral.sh/ruff/rules/invalid-pathlib-with-suffix) (`PTH210`)
+- [`invalid-assert-message-literal-argument`](https://docs.astral.sh/ruff/rules/invalid-assert-message-literal-argument) (`RUF040`)
+- [`unnecessary-nested-literal`](https://docs.astral.sh/ruff/rules/unnecessary-nested-literal) (`RUF041`)
+- [`unnecessary-cast-to-int`](https://docs.astral.sh/ruff/rules/unnecessary-cast-to-int) (`RUF046`)
+- [`map-int-version-parsing`](https://docs.astral.sh/ruff/rules/map-int-version-parsing) (`RUF048`)
+- [`if-key-in-dict-del`](https://docs.astral.sh/ruff/rules/if-key-in-dict-del) (`RUF051`)
+- [`unsafe-markup-use`](https://docs.astral.sh/ruff/rules/unsafe-markup-use) (`S704`). This rule has also been renamed from `RUF035`.
+- [`split-static-string`](https://docs.astral.sh/ruff/rules/split-static-string) (`SIM905`)
+- [`runtime-cast-value`](https://docs.astral.sh/ruff/rules/runtime-cast-value) (`TC006`)
+- [`unquoted-type-alias`](https://docs.astral.sh/ruff/rules/unquoted-type-alias) (`TC007`)
+- [`non-pep646-unpack`](https://docs.astral.sh/ruff/rules/non-pep646-unpack) (`UP044`)
+
+The following behaviors have been stabilized:
+
+<!-- TODO: Replace, these are just examples -->
+
+- [`pytest-parametrize-names-wrong-type`](https://docs.astral.sh/ruff/rules/pytest-parametrize-names-wrong-type/) (`PT006`): Detect [`pytest.parametrize`](https://docs.pytest.org/en/7.1.x/how-to/parametrize.html#parametrize) calls outside decorators and calls with keyword arguments.
+- [`module-import-not-at-top-of-file`](https://docs.astral.sh/ruff/rules/module-import-not-at-top-of-file/) (`E402`): Ignore [`pytest.importorskip`](https://docs.pytest.org/en/7.1.x/reference/reference.html#pytest-importorskip) calls between import statements.
+- [`mutable-dataclass-default`](https://docs.astral.sh/ruff/rules/mutable-dataclass-default/) (`RUF008`) and [`function-call-in-dataclass-default-argument`](https://docs.astral.sh/ruff/rules/function-call-in-dataclass-default-argument/) (`RUF009`): Add support for [`attrs`](https://www.attrs.org/en/stable/).
+- [`bad-version-info-comparison`](https://docs.astral.sh/ruff/rules/bad-version-info-comparison/) (`PYI006`): Extend the rule to check non-stub files.
+
+The following fixes or improvements to fixes have been stabilized:
+
+<!-- TODO: Replace, these are just examples -->
+
+- [`repeated-equality-comparison`](https://docs.astral.sh/ruff/rules/repeated-equality-comparison/) (`PLR1714`) ([#16685](https://github.com/astral-sh/ruff/pull/16685))
+- [`needless-bool`](https://docs.astral.sh/ruff/rules/needless-bool/) (`SIM103`) ([#16684](https://github.com/astral-sh/ruff/pull/16684))
+- [`unused-private-type-var`](https://docs.astral.sh/ruff/rules/unused-private-type-var/) (`PYI018`) ([#16682](https://github.com/astral-sh/ruff/pull/16682))
+
+### Rule changes
+
+<!-- TODO: Replace, these are just examples -->
+
+- \[`flake8-builtins`\] Ignore [`stdlib-module-shadowing`](https://docs.astral.sh/ruff/rules/stdlib-module-shadowing/) in stub files(`A005`) ([#15350](https://github.com/astral-sh/ruff/pull/15350))
+- \[`flake8-return`\] Add support for functions returning `typing.Never` (`RET503`) ([#15298](https://github.com/astral-sh/ruff/pull/15298))
+
+### Server
+
+- Remove logging output for `ruff.printDebugInformation` ([#16617](https://github.com/astral-sh/ruff/pull/16617))
+
+### Configuration
+
+- \[`flake8-builtins`\] Deprecate the `builtins-` prefixed options in favor of the unprefixed options (e.g. `builtins-allowed-modules` is now deprecated in favor of `allowed-modules`) ([#16092](https://github.com/astral-sh/ruff/pull/16092))
+
+### Bug fixes
+
+- [flake8-bandit] Fix mixed-case hash algorithm names (S324) ([#16552](https://github.com/astral-sh/ruff/pull/16552))
+
+### CLI
+
+- [ruff] Fix `last_tag`/`commits_since_last_tag` for `version` command ([#16686](https://github.com/astral-sh/ruff/pull/16686))
+
 ## 0.9.10
 
 ### Preview features
