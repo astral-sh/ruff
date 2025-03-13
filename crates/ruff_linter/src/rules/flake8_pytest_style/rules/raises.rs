@@ -13,16 +13,16 @@ use super::helpers::is_empty_or_null_string;
 /// ## What it does
 /// Checks for `pytest.raises` context managers with multiple statements.
 ///
+/// This rule allows `pytest.raises` bodies to contain `for`
+/// loops with empty bodies (e.g., `pass` or `...` statements), to test
+/// iterator behavior.
+///
 /// ## Why is this bad?
 /// When a `pytest.raises` is used as a context manager and contains multiple
 /// statements, it can lead to the test passing when it actually should fail.
 ///
 /// A `pytest.raises` context manager should only contain a single simple
 /// statement that raises the expected exception.
-///
-/// In [preview], this rule allows `pytest.raises` bodies to contain `for`
-/// loops with empty bodies (e.g., `pass` or `...` statements), to test
-/// iterator behavior.
 ///
 /// ## Example
 /// ```python
@@ -50,8 +50,6 @@ use super::helpers::is_empty_or_null_string;
 ///
 /// ## References
 /// - [`pytest` documentation: `pytest.raises`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-raises)
-///
-/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 pub(crate) struct PytestRaisesWithMultipleStatements;
 
@@ -206,14 +204,12 @@ pub(crate) fn complex_raises(checker: &Checker, stmt: &Stmt, items: &[WithItem],
     // Check body for `pytest.raises` context manager
     if raises_called {
         let is_too_complex = if let [stmt] = body {
-            let in_preview = checker.settings.preview.is_enabled();
-
             match stmt {
                 Stmt::With(ast::StmtWith { body, .. }) => is_non_trivial_with_body(body),
                 // Allow function and class definitions to test decorators.
                 Stmt::ClassDef(_) | Stmt::FunctionDef(_) => false,
                 // Allow empty `for` loops to test iterators.
-                Stmt::For(ast::StmtFor { body, .. }) if in_preview => match &body[..] {
+                Stmt::For(ast::StmtFor { body, .. }) => match &body[..] {
                     [Stmt::Pass(_)] => false,
                     [Stmt::Expr(ast::StmtExpr { value, .. })] => !value.is_ellipsis_literal_expr(),
                     _ => true,
