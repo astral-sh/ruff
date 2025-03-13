@@ -1,6 +1,7 @@
 use ruff_python_ast::{self as ast, CmpOp, Expr, ExprContext};
+use ruff_text_size::{Ranged, TextRange};
 
-use crate::TokenKind;
+use crate::{Token, TokenKind};
 
 /// Set the `ctx` for `Expr::Id`, `Expr::Attribute`, `Expr::Subscript`, `Expr::Starred`,
 /// `Expr::Tuple` and `Expr::List`. If `expr` is either `Expr::Tuple` or `Expr::List`,
@@ -54,4 +55,31 @@ pub(super) fn is_name_or_attribute_expression(expr: &Expr) -> bool {
         Expr::Name(_) => true,
         _ => false,
     }
+}
+
+/// Iterates backwards over `tokens` checking for comments inside of the f-string closest to the
+/// end.
+pub(super) fn check_f_string_comments(tokens: &[Token]) -> Option<TextRange> {
+    // stack to check nested f-string status
+    let mut f_strings = Vec::new();
+    for token in tokens.iter().rev() {
+        match token.kind() {
+            TokenKind::FStringEnd => {
+                f_strings.push(());
+            }
+            TokenKind::FStringStart if f_strings.len() == 1 => {
+                // found the start of the outer f-string
+                break;
+            }
+            TokenKind::FStringStart => {
+                f_strings.pop().expect("Expected a valid f-string");
+            }
+            TokenKind::Comment if !f_strings.is_empty() => {
+                return Some(token.range());
+            }
+            _ => {}
+        }
+    }
+
+    None
 }
