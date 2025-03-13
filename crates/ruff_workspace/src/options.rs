@@ -312,7 +312,9 @@ pub struct Options {
     /// ```
     ///
     /// If both are specified, `target-version` takes precedence over
-    /// `requires-python`.
+    /// `requires-python`. See [_Config file discovery_](https://docs.astral.sh/ruff/configuration/#config-file-discovery)
+    /// for a complete description of how the `target-version` is determined
+    /// when left unspecified.
     ///
     /// Note that a stub file can [sometimes make use of a typing feature](https://typing.readthedocs.io/en/latest/spec/distributing.html#syntax)
     /// before it is available at runtime, as long as the stub does not make

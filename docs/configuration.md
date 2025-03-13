@@ -275,6 +275,17 @@ There are a few exceptions to these rules:
 1. Any config-file-supported settings that are provided on the command-line (e.g., via
     `--select`) will override the settings in _every_ resolved configuration file.
 
+When no discovered configuration specifies a [`target-version`](settings.md#target-version), Ruff will attempt to fallback to the minimum version compatible with the `requires-python` field in a nearby `pyproject.toml`.
+If this attempt fails, Ruff will use the default `target-version`.
+The rules for this behavior are as follows:
+
+1. If a configuration file is passed directly, Ruff does not attempt to infer a missing `target-version`.
+1. If a configuration file is found in the filesystem hierarchy, Ruff will infer a missing `target-version` from the `requires-python` field in a `pyproject.toml` file in the same directory as the found configuration.
+1. If we are using a user-level configuration from `${config_dir}/ruff/pyproject.toml`, Ruff will infer a missing `target-version` from the `requires-python` field in the first `pyproject.toml` file found in an ancestor of the current working directory.
+1. If no configuration files are found, Ruff will infer the `target-version` from the `requires-python` field in the first `pyproject.toml` file found in an ancestor of the current working directory.
+
+Note that in these last two cases, the behavior of Ruff may differ depending on the working directory from which it is invoked.
+
 Unlike [ESLint](https://eslint.org/docs/latest/use/configure/configuration-files#cascading-configuration-objects),
 Ruff does not merge settings across configuration files; instead, the "closest" configuration file
 is used, and any parent configuration files are ignored. In lieu of this implicit cascade, Ruff
