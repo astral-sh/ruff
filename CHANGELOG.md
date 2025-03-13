@@ -10,7 +10,24 @@ See also, the "Remapped rules" section which may result in disabled rules.
 
 - **Changes to how the Python version is inferred when a `target-version` is not specified** ([#16319](https://github.com/astral-sh/ruff/pull/16319))
 
-    Ruff will attempt to use the nearest [`project.requires-python`](https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#python-requires) from a `pyrpoject.toml` to infer the [`ruff.target-version`](https://docs.astral.sh/ruff/settings/#target-version) in certain situations. Please refer to the documentation on [_Config file discovery_](https://docs.astral.sh/ruff/configuration/#config-file-discovery) for a detailed explanation of this behavior.
+    In previous versions of Ruff, you could specify your Python version with:
+
+    - The `target-version` option in a `ruff.toml` file or the `[tool.ruff]` section of a pyproject.toml file.
+    - The `project.requires-python` field in a `pyproject.toml` file with a `[tool.ruff]` section.
+
+    These options worked well in most cases, and are still recommended for fine control of the Python version. However, because of the way Ruff discovers config files, `pyproject.toml` files without a `[tool.ruff]` section would be ignored, including the `requires-python` setting. Ruff would then use the default Python version (3.9 as of this writing) instead, which is surprising when you've attempted to request another version.
+
+    In v0.10, config discovery has been updated to address this issue:
+
+    - If Ruff finds a `ruff.toml` file without a `target-version`, it will check
+        for a `pyproject.toml` file in the same directory and respect its
+        `requires-python` version, even if it does not contain a `[tool.ruff]`
+        section.
+    - If Ruff finds a user-level configuration, the `requires-python` field of the closest `pyproject.toml` in a parent directory will take precedence.
+    - If there is no config file (`ruff.toml`or `pyproject.toml` with a
+        `[tool.ruff]` section) in the directory of the file being checked, Ruff will
+        search for the closest `pyproject.toml` in the parent directories and use its
+        `requires-python` setting.
 
 - **Updated `TYPE_CHECKING` behavior** ([#16669](https://github.com/astral-sh/ruff/pull/16669))
 
