@@ -67,12 +67,13 @@ pub(super) fn check_f_string_comments(tokens: &[Token]) -> Option<TextRange> {
             TokenKind::FStringEnd => {
                 f_strings.push(());
             }
-            TokenKind::FStringStart if f_strings.len() == 1 => {
-                // found the start of the outer f-string
+            TokenKind::FStringStart if f_strings.len() <= 1 => {
+                // Either at the end of the outermost f-string or encountering some kind of invalid
+                // f-string
                 break;
             }
             TokenKind::FStringStart => {
-                f_strings.pop().expect("Expected a valid f-string");
+                f_strings.pop();
             }
             TokenKind::Comment if !f_strings.is_empty() => {
                 return Some(token.range());
