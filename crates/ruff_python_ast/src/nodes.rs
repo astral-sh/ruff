@@ -3100,8 +3100,7 @@ mod tests {
         assert!(std::mem::size_of::<StmtClassDef>() <= 104);
         assert!(std::mem::size_of::<StmtTry>() <= 112);
         assert!(std::mem::size_of::<Mod>() <= 32);
-        // 96 for Rustc < 1.76
-        assert!(matches!(std::mem::size_of::<Pattern>(), 88 | 96));
+        assert!(matches!(std::mem::size_of::<Pattern>(), 88));
 
         assert_eq!(std::mem::size_of::<Expr>(), 64);
         assert_eq!(std::mem::size_of::<ExprAttribute>(), 56);
@@ -3115,8 +3114,7 @@ mod tests {
         assert_eq!(std::mem::size_of::<ExprDict>(), 32);
         assert_eq!(std::mem::size_of::<ExprDictComp>(), 48);
         assert_eq!(std::mem::size_of::<ExprEllipsisLiteral>(), 8);
-        // 56 for Rustc < 1.76
-        assert!(matches!(std::mem::size_of::<ExprFString>(), 48 | 56));
+        assert!(matches!(std::mem::size_of::<ExprFString>(), 48));
         assert_eq!(std::mem::size_of::<ExprGenerator>(), 48);
         assert_eq!(std::mem::size_of::<ExprIf>(), 32);
         assert_eq!(std::mem::size_of::<ExprIpyEscapeCommand>(), 32);
