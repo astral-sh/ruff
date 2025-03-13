@@ -4,7 +4,6 @@ use ruff_python_trivia::Cursor;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::noqa::{self, Directive, FileNoqaDirectives, NoqaDirectives};
-use crate::settings::types::PreviewMode;
 use crate::Locator;
 
 /// ## What it does
@@ -17,9 +16,6 @@ use crate::Locator;
 /// Blanket `noqa` annotations are also more difficult to interpret and
 /// maintain, as the annotation does not clarify which diagnostics are intended
 /// to be suppressed.
-///
-/// In [preview], this rule also checks for blanket file-level annotations (e.g.,
-/// `# ruff: noqa`, as opposed to `# ruff: noqa: F401`).
 ///
 /// ## Example
 /// ```python
@@ -41,8 +37,6 @@ use crate::Locator;
 ///
 /// ## References
 /// - [Ruff documentation](https://docs.astral.sh/ruff/configuration/#error-suppression)
-///
-/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 pub(crate) struct BlanketNOQA {
     missing_colon: bool,
@@ -84,19 +78,16 @@ pub(crate) fn blanket_noqa(
     noqa_directives: &NoqaDirectives,
     locator: &Locator,
     file_noqa_directives: &FileNoqaDirectives,
-    preview: PreviewMode,
 ) {
-    if preview.is_enabled() {
-        for line in file_noqa_directives.lines() {
-            if let Directive::All(_) = line.parsed_file_exemption {
-                diagnostics.push(Diagnostic::new(
-                    BlanketNOQA {
-                        missing_colon: false,
-                        file_exemption: true,
-                    },
-                    line.range(),
-                ));
-            }
+    for line in file_noqa_directives.lines() {
+        if let Directive::All(_) = line.parsed_file_exemption {
+            diagnostics.push(Diagnostic::new(
+                BlanketNOQA {
+                    missing_colon: false,
+                    file_exemption: true,
+                },
+                line.range(),
+            ));
         }
     }
 
