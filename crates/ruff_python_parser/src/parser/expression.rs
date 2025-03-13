@@ -2130,7 +2130,10 @@ impl<'src> Parser<'src> {
             // rest = (4, 5, 6)
             // def g(): yield 1, 2, 3, *rest
             // def h(): yield 1, (yield 2, *rest), 3
-            self.check_tuple_unpacking(&parsed_expr, StarTupleKind::Yield);
+            self.check_tuple_unpacking(
+                &parsed_expr,
+                UnsupportedSyntaxErrorKind::StarTuple(StarTupleKind::Yield),
+            );
 
             Box::new(parsed_expr.expr)
         });
