@@ -308,7 +308,7 @@ precedence over the `ruff.toml` file, and the `ruff.toml` file will take precede
 the `pyproject.toml` file.
 
 ### Inferring the Python version
-When no discovered configuration specifies a [`target-version`](settings.md#target-version), Ruff will attempt to fallback to the minimum version compatible with the `requires-python` field in a nearby `pyproject.toml`.
+When no discovered configuration specifies a [`target-version`](settings.md#target-version), Ruff will attempt to fall back to the minimum version compatible with the `requires-python` field in a nearby `pyproject.toml`.
 The rules for this behavior are as follows:
 
 1. If a configuration file is passed directly, Ruff does not attempt to infer a missing `target-version`.
