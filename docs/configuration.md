@@ -276,7 +276,6 @@ There are a few exceptions to these rules:
     `--select`) will override the settings in _every_ resolved configuration file.
 
 When no discovered configuration specifies a [`target-version`](settings.md#target-version), Ruff will attempt to fallback to the minimum version compatible with the `requires-python` field in a nearby `pyproject.toml`.
-If this attempt fails, Ruff will use the default `target-version`.
 The rules for this behavior are as follows:
 
 1. If a configuration file is passed directly, Ruff does not attempt to infer a missing `target-version`.
