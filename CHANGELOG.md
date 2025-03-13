@@ -10,17 +10,17 @@ Check out the [blog post](https://astral.sh/blog/ruff-v0.10.0) for a migration g
 
 See also, the "Remapped rules" section which may result in disabled rules.
 
-<!-- TODO: Fill in text -->
+- **Changes to how the Python version is inferred when a `target-version` is not specified** ([#16319](https://github.com/astral-sh/ruff/pull/16319))
 
-- **Changes to how the Python version is inferred when a `ruff.toml` and `pyproject.toml` with a `tool.ruff` section are missing** ([#16319](https://github.com/astral-sh/ruff/pull/16319))
-    TODO
+    Ruff will attempt to use the nearest [`project.requires-python`](https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#python-requires) from a `pyrpoject.toml` to infer the [`ruff.target-version`](https://docs.astral.sh/ruff/settings/#target-version) in certain situations. Please refer to the documentation on [_Config file discovery_](https://docs.astral.sh/ruff/configuration/#config-file-discovery) for a detailed explanation of this behavior.
 
 - **Updated `TYPE_CHECKING` behavior** ([#16669](https://github.com/astral-sh/ruff/pull/16669))
 
-    TODO
+    The conditions `if 0` and `if False` are no longer interpreted as beginning type checking blocks.
 
 - **More robust noqa parsing** ([#16483](https://github.com/astral-sh/ruff/pull/16483))
-    TODO
+
+    The syntax for both file-level and in-line suppression comments has been unified and made more robust to certain errors. In most cases, this will result in more suppression comments being read by Ruff, but there are a few instances where previously read comments will now log an error to the user instead. Please refer to the documentation on [_Error suppression_](https://docs.astral.sh/ruff/linter/#error-suppression) for the full specification.
 
 - **Avoid unnecessary parentheses around with statements with a single context manager and a trailing comment** ([#14005](https://github.com/astral-sh/ruff/pull/14005))
 
@@ -1438,7 +1438,7 @@ The following fixes have been stabilized:
 
 ## 0.5.6
 
-Ruff 0.5.6 automatically enables linting and formatting of notebooks in *preview mode*.
+Ruff 0.5.6 automatically enables linting and formatting of notebooks in _preview mode_.
 You can opt-out of this behavior by adding `*.ipynb` to the `extend-exclude` setting.
 
 ```toml
@@ -2191,7 +2191,7 @@ To setup `ruff server` with your editor, refer to the [README.md](https://github
 
 ### Server
 
-*This section is devoted to updates for our new language server, written in Rust.*
+_This section is devoted to updates for our new language server, written in Rust._
 
 - Enable ruff-specific source actions ([#10916](https://github.com/astral-sh/ruff/pull/10916))
 - Refreshes diagnostics for open files when file configuration is changed ([#10988](https://github.com/astral-sh/ruff/pull/10988))
@@ -3598,7 +3598,7 @@ Read Ruff's new [versioning policy](https://docs.astral.sh/ruff/versioning/).
 - \[`refurb`\] Add `single-item-membership-test` (`FURB171`) ([#7815](https://github.com/astral-sh/ruff/pull/7815))
 - \[`pylint`\] Add `and-or-ternary` (`R1706`) ([#7811](https://github.com/astral-sh/ruff/pull/7811))
 
-*New rules are added in [preview](https://docs.astral.sh/ruff/preview/).*
+_New rules are added in [preview](https://docs.astral.sh/ruff/preview/)._
 
 ### Configuration
 
