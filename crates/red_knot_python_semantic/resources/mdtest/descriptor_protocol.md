@@ -32,14 +32,22 @@ reveal_type(c.ten)  # revealed: Literal[10]
 
 reveal_type(C.ten)  # revealed: Literal[10]
 
-# These are fine:
+# This is fine:
 c.ten = 10
-C.ten = 10
 
-# error: [invalid-assignment] "Object of type `Literal[11]` is not assignable to attribute `ten` of type `Literal[10]`"
+# error: [invalid-assignment] "Invalid assignment to data descriptor attribute `ten` on type `C` with custom `__set__` method"
 c.ten = 11
+```
 
-# error: [invalid-assignment] "Object of type `Literal[11]` is not assignable to attribute `ten` of type `Literal[10]`"
+When assigning to the `ten` attribute from the class object, we get an error. The descriptor
+protocol is *not* triggered in this case. Since the attribute is declared as `Ten` in the class
+body, we do not allow these assignments, preventing users from accidentally overwriting the data
+descriptor, which is what would happen at runtime:
+
+```py
+# error: [invalid-assignment] "Object of type `Literal[10]` is not assignable to attribute `ten` of type `Ten`"
+C.ten = 10
+# error: [invalid-assignment] "Object of type `Literal[11]` is not assignable to attribute `ten` of type `Ten`"
 C.ten = 11
 ```
 
@@ -66,13 +74,11 @@ c = C()
 reveal_type(c.flexible_int)  # revealed: int | None
 
 c.flexible_int = 42  # okay
-# TODO: This should not be an error
-# error: [invalid-assignment]
 c.flexible_int = "42"  # also okay!
 
 reveal_type(c.flexible_int)  # revealed: int | None
 
-# TODO: This should be an error
+# error: [invalid-assignment] "Invalid assignment to data descriptor attribute `flexible_int` on type `C` with custom `__set__` method"
 c.flexible_int = None  # not okay
 
 reveal_type(c.flexible_int)  # revealed: int | None
@@ -167,19 +173,24 @@ def f1(flag: bool):
             self.attr = "normal"
 
     reveal_type(C1().attr)  # revealed: Unknown | Literal["data", "normal"]
+
+    # Assigning to the attribute also causes no `possibly-unbound` diagnostic:
+    C1().attr = 1
 ```
 
 We never treat implicit instance attributes as definitely bound, so we fall back to the non-data
 descriptor here:
 
 ```py
-def f2(flag: bool):
-    class C2:
-        def f(self):
-            self.attr = "normal"
-        attr = NonDataDescriptor()
+class C2:
+    def f(self):
+        self.attr = "normal"
+    attr = NonDataDescriptor()
 
-    reveal_type(C2().attr)  # revealed: Unknown | Literal["non-data", "normal"]
+reveal_type(C2().attr)  # revealed: Unknown | Literal["non-data", "normal"]
+
+# Assignments always go to the instance attribute in this case
+C2().attr = 1
 ```
 
 ### Descriptors only work when used as class variables
@@ -198,6 +209,12 @@ class C:
         self.ten: Ten = Ten()
 
 reveal_type(C().ten)  # revealed: Ten
+
+C().ten = Ten()
+
+# The instance attribute is declared as `Ten`, so this is an
+# error: [invalid-assignment] "Object of type `Literal[10]` is not assignable to attribute `ten` of type `Ten`"
+C().ten = 10
 ```
 
 ## Descriptor protocol for class objects
@@ -219,7 +236,7 @@ class DataDescriptor:
     def __get__(self, instance: object, owner: type | None = None) -> Literal["data"]:
         return "data"
 
-    def __set__(self, instance: object, value: str) -> None:
+    def __set__(self, instance: object, value: int) -> None:
         pass
 
 class NonDataDescriptor:
@@ -246,7 +263,28 @@ reveal_type(C1.class_data_descriptor)  # revealed: Literal["data"]
 reveal_type(C1.class_non_data_descriptor)  # revealed: Literal["non-data"]
 ```
 
-Next, we demonstrate that a *metaclass data descriptor* takes precedence over all class-level
+Assignments to class object attribute only trigger the descriptor protocol if the data descriptor is
+on the metaclass:
+
+```py
+C1.meta_data_descriptor = 1
+
+# error: [invalid-assignment] "Invalid assignment to data descriptor attribute `meta_data_descriptor` on type `Literal[C1]` with custom `__set__` method"
+C1.meta_data_descriptor = "invalid"
+```
+
+When writing to a class-level data descriptor from the class object itself, the descriptor protocol
+is *not* triggered (this is in contrast to what happens when you read class-level descriptor
+attributes!). So the following assignment does not call `__set__`. At runtime, the assignment would
+overwrite the data descriptor, but the attribute is declared as `DataDescriptor` in the class body,
+so we do not allow this:
+
+```py
+# error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to attribute `class_data_descriptor` of type `DataDescriptor`"
+C1.class_data_descriptor = 1
+```
+
+We now demonstrate that a *metaclass data descriptor* takes precedence over all class-level
 attributes:
 
 ```py
@@ -267,6 +305,14 @@ class C2(metaclass=Meta2):
 
 reveal_type(C2.meta_data_descriptor1)  # revealed: Literal["data"]
 reveal_type(C2.meta_data_descriptor2)  # revealed: Literal["data"]
+
+C2.meta_data_descriptor1 = 1
+C2.meta_data_descriptor2 = 1
+
+# error: [invalid-assignment]
+C2.meta_data_descriptor1 = "invalid"
+# error: [invalid-assignment]
+C2.meta_data_descriptor2 = "invalid"
 ```
 
 On the other hand, normal metaclass attributes and metaclass non-data descriptors are shadowed by
@@ -321,6 +367,16 @@ def _(flag: bool):
     reveal_type(C5.meta_data_descriptor1)  # revealed: Literal["data", "value on class"]
     # error: [possibly-unbound-attribute]
     reveal_type(C5.meta_data_descriptor2)  # revealed: Literal["data"]
+
+    # TODO: We currently emit two diagnostics here, corresponding to the two states of `flag`. The diagnostics are not
+    # wrong, but they could be subsumed under a higher-level diagnostic.
+
+    # error: [invalid-assignment] "Invalid assignment to data descriptor attribute `meta_data_descriptor1` on type `Literal[C5]` with custom `__set__` method"
+    # error: [invalid-assignment] "Object of type `None` is not assignable to attribute `meta_data_descriptor1` of type `Literal["value on class"]`"
+    C5.meta_data_descriptor1 = None
+
+    # error: [possibly-unbound-attribute]
+    C5.meta_data_descriptor2 = 1
 ```
 
 When a class-level attribute is possibly unbound, we union its (descriptor protocol) type with the
@@ -373,6 +429,11 @@ def _(flag: bool):
     reveal_type(C7.union_of_metaclass_data_descriptor_and_attribute)  # revealed: Literal["data", 2]
     reveal_type(C7.union_of_class_attributes)  # revealed: Literal[1, 2]
     reveal_type(C7.union_of_class_data_descriptor_and_attribute)  # revealed: Literal["data", 2]
+
+    C7.union_of_metaclass_attributes = 2 if flag else 1
+    C7.union_of_metaclass_data_descriptor_and_attribute = 2 if flag else 100
+    C7.union_of_class_attributes = 2 if flag else 1
+    C7.union_of_class_data_descriptor_and_attribute = 2 if flag else DataDescriptor()
 ```
 
 ## Descriptors distinguishing between class and instance access
@@ -468,8 +529,7 @@ c.name = "new"
 # error: [invalid-assignment]
 c.name = None
 
-# TODO: this should be an error, but with a proper error message
-# error: [invalid-assignment] "Object of type `Literal[42]` is not assignable to attribute `name` of type `<bound method `name` of `C`>`"
+# error: [invalid-assignment] "Implicit shadowing of function `name`; annotate to make it explicit if this is intentional"
 c.name = 42
 ```
 
