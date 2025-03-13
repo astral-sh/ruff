@@ -649,7 +649,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Bandit, "317") => (RuleGroup::Stable, rules::flake8_bandit::rules::SuspiciousXMLSaxUsage),
         (Flake8Bandit, "318") => (RuleGroup::Stable, rules::flake8_bandit::rules::SuspiciousXMLMiniDOMUsage),
         (Flake8Bandit, "319") => (RuleGroup::Stable, rules::flake8_bandit::rules::SuspiciousXMLPullDOMUsage),
-        (Flake8Bandit, "320") => (RuleGroup::Stable, rules::flake8_bandit::rules::SuspiciousXMLETreeUsage),
+        (Flake8Bandit, "320") => (RuleGroup::Deprecated, rules::flake8_bandit::rules::SuspiciousXMLETreeUsage),
         (Flake8Bandit, "321") => (RuleGroup::Stable, rules::flake8_bandit::rules::SuspiciousFTPLibUsage),
         (Flake8Bandit, "323") => (RuleGroup::Stable, rules::flake8_bandit::rules::SuspiciousUnverifiedContextUsage),
         (Flake8Bandit, "324") => (RuleGroup::Stable, rules::flake8_bandit::rules::HashlibInsecureHashFunction),
