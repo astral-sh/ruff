@@ -43,7 +43,7 @@ See also, the "Remapped rules" section which may result in disabled rules.
 
 - **Bump alpine default tag to 3.21 for derived Docker images** ([#16456](https://github.com/astral-sh/ruff/pull/16456))
 
-    Alpine 3.21 was released in Dec 2024 and is used in the official Alpine-based Python images. Now the uv:alpine image will use 3.21 instead of 3.20 and uv:alpine3.20 will no longer be updated.
+    Alpine 3.21 was released in Dec 2024 and is used in the official Alpine-based Python images. Now the ruff:alpine image will use 3.21 instead of 3.20 and ruff:alpine3.20 will no longer be updated.
 
 ### Deprecated Rules
 
