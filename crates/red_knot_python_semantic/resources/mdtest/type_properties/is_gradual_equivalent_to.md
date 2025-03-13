@@ -96,4 +96,33 @@ def f2(a, b) -> None:
 static_assert(is_gradual_equivalent_to(CallableTypeFromFunction[f2], Callable[[Any, Any], None]))
 ```
 
+Additionally, as per the spec, a function definition that includes both `*args` and `**kwargs`
+parameter that are annotated as `Any` or kept unannotated should be gradual equivalent to a callable
+with `...` as the parameter type.
+
+```py
+def variadic_without_annotation(*args, **kwargs):
+    return
+
+def variadic_with_annotation(*args: Any, **kwargs: Any) -> Any:
+    return
+
+static_assert(is_gradual_equivalent_to(CallableTypeFromFunction[variadic_without_annotation], Callable[..., Any]))
+static_assert(is_gradual_equivalent_to(CallableTypeFromFunction[variadic_with_annotation], Callable[..., Any]))
+```
+
+But, a function with either `*args` or `**kwargs` is not gradual equivalent to a callable with `...`
+as the parameter type.
+
+```py
+def variadic_args(*args):
+    return
+
+def variadic_kwargs(**kwargs):
+    return
+
+static_assert(not is_gradual_equivalent_to(CallableTypeFromFunction[variadic_args], Callable[..., Any]))
+static_assert(not is_gradual_equivalent_to(CallableTypeFromFunction[variadic_kwargs], Callable[..., Any]))
+```
+
 [materializations]: https://typing.readthedocs.io/en/latest/spec/glossary.html#term-materialize

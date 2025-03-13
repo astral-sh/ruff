@@ -4588,10 +4588,6 @@ impl<'db> GeneralCallableType<'db> {
         let self_signature = self.signature(db);
         let other_signature = other.signature(db);
 
-        if self_signature.parameters().is_gradual() != other_signature.parameters().is_gradual() {
-            return false;
-        }
-
         if self_signature.parameters().len() != other_signature.parameters().len() {
             return false;
         }
@@ -4612,6 +4608,9 @@ impl<'db> GeneralCallableType<'db> {
             return false;
         }
 
+        // N.B. We don't need to explicitly check for the use of gradual form (`...`) in the
+        // parameters because it is internally represented by adding `*Any` and `**Any` to the
+        // parameter list.
         self_signature
             .parameters()
             .iter()
