@@ -241,6 +241,7 @@ impl<'db> Bindings<'db> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct CallableBinding<'db> {
     pub(crate) ty: Type<'db>,
+    pub(crate) signature_ty: Type<'db>,
     pub(crate) dunder_call_boundness: Option<Boundness>,
     inner: CallableBindingInner<'db>,
 }
@@ -265,6 +266,7 @@ impl<'db> CallableBinding<'db> {
         if !signature.is_callable() {
             return CallableBinding {
                 ty: signature.ty,
+                signature_ty: signature.signature_ty,
                 dunder_call_boundness: signature.dunder_call_boundness,
                 inner: CallableBindingInner::NotCallable,
             };
@@ -282,6 +284,7 @@ impl<'db> CallableBinding<'db> {
             let binding = Binding::bind(db, single, arguments.as_ref());
             return CallableBinding {
                 ty: signature.ty,
+                signature_ty: signature.signature_ty,
                 dunder_call_boundness: signature.dunder_call_boundness,
                 inner: CallableBindingInner::Single(binding),
             };
@@ -300,6 +303,7 @@ impl<'db> CallableBinding<'db> {
             .into_boxed_slice();
         CallableBinding {
             ty: signature.ty,
+            signature_ty: signature.signature_ty,
             dunder_call_boundness: signature.dunder_call_boundness,
             inner: CallableBindingInner::Overloaded(overloads),
         }
@@ -428,8 +432,14 @@ impl<'db> CallableBinding<'db> {
             return;
         }
 
+        let callable_descriptor = CallableDescriptor::new(context.db(), self.signature_ty);
         for overload in self.overloads() {
-            overload.report_diagnostics(context, node, self.ty, callable_descriptor.as_ref());
+            overload.report_diagnostics(
+                context,
+                node,
+                self.signature_ty,
+                callable_descriptor.as_ref(),
+            );
         }
     }
 }

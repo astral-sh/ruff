@@ -2297,7 +2297,7 @@ impl<'db> Type<'db> {
         match self {
             Type::Callable(CallableType::BoundMethod(bound_method)) => {
                 let signature = bound_method.function(db).signature(db);
-                let mut signature = CallableSignature::new(callable_ty, signature.clone());
+                let mut signature = CallableSignature::new(callable_ty, self, signature.clone());
                 signature.bound_type = Some(bound_method.self_instance(db));
                 Signatures::single(signature.into())
             }
@@ -2319,6 +2319,7 @@ impl<'db> Type<'db> {
                 let not_none = Type::none(db).negate(db);
                 let signature = CallableSignature::from_overloads(
                     callable_ty,
+                    self,
                     [
                         Signature::new(
                             Parameters::new([
@@ -2370,6 +2371,7 @@ impl<'db> Type<'db> {
                 let not_none = Type::none(db).negate(db);
                 let signature = CallableSignature::from_overloads(
                     callable_ty,
+                    self,
                     [
                         Signature::new(
                             Parameters::new([
@@ -2423,6 +2425,7 @@ impl<'db> Type<'db> {
 
             Type::FunctionLiteral(function_type) => Signatures::single(CallableSignature::new(
                 callable_ty,
+                self,
                 function_type.signature(db).clone(),
             )),
 
@@ -2435,6 +2438,7 @@ impl<'db> Type<'db> {
                 // ```
                 let signature = CallableSignature::new(
                     callable_ty,
+                    self,
                     Signature::new(
                         Parameters::new([Parameter::new(
                             Some(Name::new_static("o")),
@@ -2461,6 +2465,7 @@ impl<'db> Type<'db> {
                 // ```
                 let signature = CallableSignature::from_overloads(
                     callable_ty,
+                    self,
                     [
                         Signature::new(
                             Parameters::new([Parameter::new(
@@ -2509,6 +2514,7 @@ impl<'db> Type<'db> {
                 // ```
                 let signature = CallableSignature::from_overloads(
                     callable_ty,
+                    self,
                     [
                         Signature::new(
                             Parameters::new([Parameter::new(
@@ -2548,6 +2554,7 @@ impl<'db> Type<'db> {
             Type::ClassLiteral(ClassLiteralType { .. }) => {
                 let signature = CallableSignature::new(
                     callable_ty,
+                    self,
                     Signature::new(Parameters::gradual_form(), self.to_instance(db)),
                 );
                 Signatures::single(signature)
@@ -2564,7 +2571,7 @@ impl<'db> Type<'db> {
                 let Some((mut signatures, boundness)) =
                     self.dunder_signature(db, Some(callable_ty), "__call__")
                 else {
-                    return Signatures::not_callable(self);
+                    return Signatures::not_callable(callable_ty, self);
                 };
                 signatures.set_dunder_call_boundness(boundness);
                 signatures
@@ -2577,6 +2584,7 @@ impl<'db> Type<'db> {
             // Note that this correctly returns `None` if none of the union elements are callable.
             Type::Union(union) => Signatures::from_union(
                 callable_ty,
+                self,
                 union
                     .elements(db)
                     .iter()
@@ -2587,7 +2595,7 @@ impl<'db> Type<'db> {
                 Signatures::single(CallableSignature::todo("Type::Intersection.call()"))
             }
 
-            _ => Signatures::not_callable(self),
+            _ => Signatures::not_callable(callable_ty, self),
         }
     }
 
