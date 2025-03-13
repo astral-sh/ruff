@@ -91,17 +91,11 @@ fn create_diagnostic(
     mode: OpenMode,
     checker: &Checker,
 ) -> Diagnostic {
-    let range = if checker.settings.preview.is_enabled() {
-        mode_arg.range()
-    } else {
-        call.range
-    };
-
     let mut diagnostic = Diagnostic::new(
         RedundantOpenModes {
             replacement: mode.to_string(),
         },
-        range,
+        mode_arg.range(),
     );
 
     if mode.is_empty() {
