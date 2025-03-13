@@ -7,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/inline/ok/pep701_f_string_py311.
 ```
 Module(
     ModModule {
-        range: 0..231,
+        range: 0..264,
         body: [
             Expr(
                 StmtExpr {
@@ -432,6 +432,59 @@ Module(
                                                 quote_style: Double,
                                                 prefix: Regular,
                                                 triple_quoted: true,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 231..263,
+                    value: FString(
+                        ExprFString {
+                            range: 231..263,
+                            value: FStringValue {
+                                inner: Single(
+                                    FString(
+                                        FString {
+                                            range: 231..263,
+                                            elements: [
+                                                Literal(
+                                                    FStringLiteralElement {
+                                                        range: 233..254,
+                                                        value: "escape outside of \t ",
+                                                    },
+                                                ),
+                                                Expression(
+                                                    FStringExpressionElement {
+                                                        range: 254..260,
+                                                        expression: Name(
+                                                            ExprName {
+                                                                range: 255..259,
+                                                                id: Name("expr"),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                        debug_text: None,
+                                                        conversion: None,
+                                                        format_spec: None,
+                                                    },
+                                                ),
+                                                Literal(
+                                                    FStringLiteralElement {
+                                                        range: 260..262,
+                                                        value: "\n",
+                                                    },
+                                                ),
+                                            ],
+                                            flags: FStringFlags {
+                                                quote_style: Double,
+                                                prefix: Regular,
+                                                triple_quoted: false,
                                             },
                                         },
                                     ),
