@@ -913,6 +913,7 @@ where
                     .iter_non_variadic_params()
                     .filter_map(|param| param.default.as_deref())
                 {
+                    self.add_standalone_expression(default);
                     self.visit_expr(default);
                 }
                 // The symbol for the function name itself has to be evaluated
@@ -1738,6 +1739,7 @@ where
                         .iter_non_variadic_params()
                         .filter_map(|param| param.default.as_deref())
                     {
+                        self.add_standalone_expression(default);
                         self.visit_expr(default);
                     }
                     self.visit_parameters(parameters);
