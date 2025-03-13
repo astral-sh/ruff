@@ -9,10 +9,14 @@ pub use crate::diagnostic::old::{
     OldDiagnosticTrait, OldDisplayDiagnostic, OldParseDiagnostic, OldSecondaryDiagnosticMessage,
 };
 use crate::files::File;
+use crate::Db;
+
+use self::render::{DisplayDiagnostic, FileResolver};
 
 // This module should not be exported. We are planning to migrate off
 // the APIs in this module.
 mod old;
+mod render;
 
 /// A collection of information that can be rendered into a diagnostic.
 ///
@@ -98,6 +102,45 @@ impl Diagnostic {
     /// using a method like [`Diagnostic::info`] may be more convenient.
     pub fn sub(&mut self, sub: SubDiagnostic) {
         self.inner.subs.push(sub);
+    }
+
+    /// Print this diagnostic to the given writer.
+    ///
+    /// This also marks the diagnostic as having been printed. If a
+    /// diagnostic is not rendered this way, then it will panic when
+    /// it's dropped when `debug_assertions` is enabled.
+    pub fn print(
+        &mut self,
+        db: &dyn Db,
+        config: &DisplayDiagnosticConfig,
+        mut wtr: impl std::io::Write,
+    ) -> std::io::Result<()> {
+        let resolver = FileResolver::new(db);
+        let display = DisplayDiagnostic::new(&resolver, config, self);
+        let result = writeln!(wtr, "{display}");
+        // NOTE: This is called specifically even if
+        // `writeln!` fails. The reasoning here is that
+        // the `Drop` impl panicking is meant as a guard
+        // against *programmers* forgetting to print a
+        // diagnostic. We should not punish them if they
+        // remember to do that when the operation itself
+        // failed for some reason. ---AG
+        self.printed();
+        result
+    }
+
+    /// Mark this diagnostic as having been printed.
+    ///
+    /// If a diagnostic has not been marked as printed before being dropped,
+    /// then its `Drop` implementation will panic in debug mode.
+    pub(crate) fn printed(&mut self) {
+        #[cfg(debug_assertions)]
+        {
+            self.inner.printed = true;
+            for sub in &mut self.inner.subs {
+                sub.printed();
+            }
+        }
     }
 }
 
@@ -186,6 +229,17 @@ impl SubDiagnostic {
     /// have no annotations.
     pub fn annotate(&mut self, ann: Annotation) {
         self.inner.annotations.push(ann);
+    }
+
+    /// Mark this sub-diagnostic as having been printed.
+    ///
+    /// If a sub-diagnostic has not been marked as printed before being
+    /// dropped, then its `Drop` implementation will panic in debug mode.
+    pub(crate) fn printed(&mut self) {
+        #[cfg(debug_assertions)]
+        {
+            self.inner.printed = true;
+        }
     }
 }
 
