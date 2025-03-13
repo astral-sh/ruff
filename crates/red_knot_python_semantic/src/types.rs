@@ -2299,7 +2299,7 @@ impl<'db> Type<'db> {
                 let signature = bound_method.function(db).signature(db);
                 let mut signature = CallableSignature::new(callable_ty, self, signature.clone());
                 signature.bound_type = Some(bound_method.self_instance(db));
-                Signatures::single(signature.into())
+                Signatures::single(signature)
             }
 
             Type::Callable(CallableType::MethodWrapperDunderGet(_)) => {

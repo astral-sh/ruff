@@ -81,12 +81,12 @@ impl<'db> Bindings<'db> {
                 // The return types from successfully bound elements should come first, then the
                 // fallback return types for any bindings with errors.
                 let mut builder = UnionBuilder::new(db);
-                for binding in bindings.iter() {
+                for binding in bindings {
                     if !binding.has_binding_errors() {
                         builder = builder.add(binding.return_type());
                     }
                 }
-                for binding in bindings.iter() {
+                for binding in bindings {
                     if binding.has_binding_errors() {
                         builder = builder.add(binding.return_type());
                     }
@@ -119,7 +119,7 @@ impl<'db> Bindings<'db> {
         let mut all_not_callable = true;
         for binding in self.bindings() {
             let result = binding.as_result();
-            all_ok &= matches!(result, Ok(_));
+            all_ok &= result.is_ok();
             any_binding_error |= matches!(result, Err(CallError::BindingError(())));
             all_not_callable &= matches!(result, Err(CallError::NotCallable(())));
         }
@@ -196,12 +196,7 @@ impl<'db> Bindings<'db> {
         // TODO: We currently only report errors for the first union element. Ideally, we'd report
         // an error saying that the union type can't be called, followed by subdiagnostics
         // explaining why.
-        if let Some(first) = self
-            .bindings()
-            .iter()
-            .filter(|b| b.as_result().is_err())
-            .next()
-        {
+        if let Some(first) = self.bindings().iter().find(|b| b.as_result().is_err()) {
             first.report_diagnostics(context, node);
         }
     }
@@ -368,7 +363,7 @@ impl<'db> CallableBinding<'db> {
         if let Some((_, overload)) = self.matching_overload() {
             return overload.return_type();
         }
-        if let [overload] = self.overloads().as_ref() {
+        if let [overload] = self.overloads() {
             return overload.return_type();
         }
         Type::unknown()
