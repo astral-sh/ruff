@@ -154,6 +154,7 @@ toml = { version = "0.8.11" }
 tracing = { version = "0.1.40" }
 tracing-flame = { version = "0.2.0" }
 tracing-indicatif = { version = "0.3.6" }
+tracing-log = { version = "0.2.0" }
 tracing-subscriber = { version = "0.3.18", default-features = false, features = [
     "env-filter",
     "fmt",
