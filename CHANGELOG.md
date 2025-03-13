@@ -71,7 +71,7 @@ The following behaviors have been stabilized:
 - [`bad-str-strip-call`](https://docs.astral.sh/ruff/rules/bad-str-strip-call/) (`PLE1310`): The rule now applies to objects which are known to have type `str` or `bytes`.
 - [`blanket-noqa`](https://docs.astral.sh/ruff/rules/blanket-noqa/) (`PGH004`): Also detect blanked file-level noqa comments (and not just line level comments).
 - [`custom-type-var-for-self`](https://docs.astral.sh/ruff/rules/custom-type-var-for-self/) (`PYI019`): More accurate detection of custom `TypeVars` replaceable by `Self`. The range of the diagnostic is now the full function header rather than just the return annotation.
-- [`invalid-argument-name`](https://docs.astral.sh/ruff/rules/invalid-argument-name/) (`N803`): Ignore argument names of functions decorated with typing.override
+- [`invalid-argument-name`](https://docs.astral.sh/ruff/rules/invalid-argument-name/) (`N803`): Ignore argument names of functions decorated with `typing.override`
 - [`invalid-envvar-default`](https://docs.astral.sh/ruff/rules/invalid-envvar-default/) (`PLW1508`): Detect default value arguments to `os.environ.get` with invalid type.
 - [`pytest-raises-with-multiple-statements`](https://docs.astral.sh/ruff/rules/pytest-raises-with-multiple-statements/) (`PT012`) [`pytest-warns-with-multiple-statements`](https://docs.astral.sh/ruff/rules/pytest-warns-with-multiple-statements/) (`PT031`): Allow `for` statements with an empty body in `pytest.raises` and `pytest.warns` `with` statements.
 - [`redundant-open-modes`](https://docs.astral.sh/ruff/rules/redundant-open-modes/) (`UP015`): The diagnostic range is now the range of the redundant mode argument where it previously was the range of the entire open call
