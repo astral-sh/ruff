@@ -3123,8 +3123,8 @@ from typing import Union;foo: Union[int, str] = 1
 /// ```
 /// tmp
 /// ├── foo
-/// │   ├── pyproject.toml #<-- no [tool.ruff], no `requires-python`
-/// │   └── test.py
+/// │  ├── pyproject.toml #<-- no [tool.ruff], no `requires-python`
+/// │  └── test.py
 /// └── pyproject.toml #<-- no [tool.ruff], has `requires-python`
 /// ```
 #[test]
@@ -3447,8 +3447,8 @@ from typing import Union;foo: Union[int, str] = 1
 /// ```
 /// tmp
 /// ├── foo
-/// │   ├── pyproject.toml #<-- has [tool.ruff], no `requires-python`
-/// │   └── test.py
+/// │  ├── pyproject.toml #<-- has [tool.ruff], no `requires-python`
+/// │  └── test.py
 /// └── pyproject.toml #<-- no [tool.ruff], has `requires-python`
 /// ```
 #[test]
@@ -3773,8 +3773,8 @@ from typing import Union;foo: Union[int, str] = 1
 /// ```
 /// tmp
 /// ├── foo
-/// │   ├── pyproject.toml #<-- no [tool.ruff]
-/// │   └── test.py
+/// │  ├── pyproject.toml #<-- no [tool.ruff]
+/// │  └── test.py
 /// └── ruff.toml #<-- no `target-version`
 /// ```
 #[test]
@@ -4384,7 +4384,7 @@ from typing import Union;foo: Union[int, str] = 1
 /// ├── pyproject.toml <-- requires >=3.10
 /// ├── ruff.toml <--- extends base
 /// ├── shared
-/// │   └── base_config.toml <-- targets 3.11
+/// │   └── base_config.toml <-- targets 3.11
 /// └── test.py
 /// ```
 #[test]
@@ -5058,23 +5058,23 @@ class Foo[_T, __T]:
 /// construct a directory tree with this structure:
 /// .
 /// ├── abc
-/// │   └── __init__.py
+/// │  └── __init__.py
 /// ├── collections
-/// │   ├── __init__.py
-/// │   ├── abc
-/// │   │   └── __init__.py
-/// │   └── foobar
-/// │       └── __init__.py
+/// │  ├── __init__.py
+/// │  ├── abc
+/// │  │  └── __init__.py
+/// │  └── foobar
+/// │      └── __init__.py
 /// ├── foobar
-/// │   ├── __init__.py
-/// │   ├── abc
-/// │   │   └── __init__.py
-/// │   └── collections
-/// │       ├── __init__.py
-/// │       ├── abc
-/// │       │   └── __init__.py
-/// │       └── foobar
-/// │           └── __init__.py
+/// │  ├── __init__.py
+/// │  ├── abc
+/// │  │  └── __init__.py
+/// │  └── collections
+/// │      ├── __init__.py
+/// │      ├── abc
+/// │      │  └── __init__.py
+/// │      └── foobar
+/// │          └── __init__.py
 /// ├── ruff.toml
 /// └── urlparse
 ///     └── __init__.py
