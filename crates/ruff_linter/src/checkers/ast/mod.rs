@@ -246,11 +246,7 @@ impl<'a> Checker<'a> {
         notebook_index: Option<&'a NotebookIndex>,
         target_version: PythonVersion,
     ) -> Checker<'a> {
-        let mut semantic = SemanticModel::new(&settings.typing_modules, path, module);
-        if settings.preview.is_enabled() {
-            // Set the feature flag to test `TYPE_CHECKING` semantic changes
-            semantic.flags |= SemanticModelFlags::NEW_TYPE_CHECKING_BLOCK_DETECTION;
-        }
+        let semantic = SemanticModel::new(&settings.typing_modules, path, module);
         Self {
             parsed,
             parsed_type_annotation: None,
