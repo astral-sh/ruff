@@ -81,13 +81,33 @@ pub fn resolve(
     // end up the "closest" `pyproject.toml` file for every Python file later on, so
     // these act as the "default" settings.)
     if let Some(pyproject) = pyproject::find_user_settings_toml() {
+        struct FallbackTransformer<'a> {
+            arguments: &'a ConfigArguments,
+        }
+
+        impl ConfigurationTransformer for FallbackTransformer<'_> {
+            fn transform(&self, mut configuration: Configuration) -> Configuration {
+                // The `requires-python` constraint from the `pyproject.toml` takes precedence
+                // over the `target-version` from the user configuration.
+                let fallback = find_fallback_target_version(&*path_dedot::CWD);
+                if let Some(fallback) = fallback {
+                    debug!("Derived `target-version` from found `requires-python`: {fallback:?}");
+                    configuration.target_version = Some(fallback.into());
+                }
+
+                self.arguments.transform(configuration)
+            }
+        }
+
         debug!(
             "Using configuration file (via cwd) at: {}",
             pyproject.display()
         );
         let settings = resolve_root_settings(
             &pyproject,
-            config_arguments,
+            &FallbackTransformer {
+                arguments: config_arguments,
+            },
             ConfigurationOrigin::UserSettings,
         )?;
         return Ok(PyprojectConfig::new(
