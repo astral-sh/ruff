@@ -92,7 +92,7 @@ The following behaviors have been stabilized:
 - [`invalid-envvar-default`](https://docs.astral.sh/ruff/rules/invalid-envvar-default/) (`PLW1508`): Detect default value arguments to `os.environ.get` with invalid type.
 - [`pytest-raises-with-multiple-statements`](https://docs.astral.sh/ruff/rules/pytest-raises-with-multiple-statements/) (`PT012`) [`pytest-warns-with-multiple-statements`](https://docs.astral.sh/ruff/rules/pytest-warns-with-multiple-statements/) (`PT031`): Allow `for` statements with an empty body in `pytest.raises` and `pytest.warns` `with` statements.
 - [`redundant-open-modes`](https://docs.astral.sh/ruff/rules/redundant-open-modes/) (`UP015`): The diagnostic range is now the range of the redundant mode argument where it previously was the range of the entire open call. You may have to replace your `noqa` comments when suppressing `UP015`.
-- [`stdlib-module-shadowing`](https://docs.astral.sh/ruff/rules/stdlib-module-shadowing/): Changes the default value of `lint.flake8-builtins.builtins-strict-checking` from `true` to `false`.
+- [`stdlib-module-shadowing`](https://docs.astral.sh/ruff/rules/stdlib-module-shadowing/) (`A005`): Changes the default value of `lint.flake8-builtins.strict-checking` from `true` to `false`.
 - [`type-none-comparison`](https://docs.astral.sh/ruff/rules/type-none-comparison/) (`FURB169`): Now also recognizes `type(expr) is type(None)` comparisons where `expr` isn't a name expression.
 
 The following fixes or improvements to fixes have been stabilized:
