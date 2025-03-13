@@ -73,7 +73,9 @@ impl<'db> Bindings<'db> {
         matches!(&self.inner, BindingsInner::Single(_))
     }
 
-    /// The type returned by this call.
+    /// Returns the return type of the call. For successful calls, this is the actual return type.
+    /// For calls with binding errors, this is a type that best approximates the return type. For
+    /// types that are not callable, returns `Type::Unknown`.
     pub(crate) fn return_type(&self, db: &'db dyn Db) -> Type<'db> {
         match &self.inner {
             BindingsInner::Single(binding) => binding.return_type(),
@@ -98,7 +100,7 @@ impl<'db> Bindings<'db> {
 
     /// Returns whether all bindings were successful, or an error describing why some bindings were
     /// unsuccessful.
-    pub(crate) fn as_result(&self) -> Result<(), CallError<()>> {
+    pub(crate) fn as_result(&self) -> Result<(), CallError> {
         // In order of precedence:
         //
         // - If every union element is Ok, then the union is too.
@@ -120,43 +122,19 @@ impl<'db> Bindings<'db> {
         for binding in self.bindings() {
             let result = binding.as_result();
             all_ok &= result.is_ok();
-            any_binding_error |= matches!(result, Err(CallError::BindingError(())));
-            all_not_callable &= matches!(result, Err(CallError::NotCallable(())));
+            any_binding_error |= matches!(result, Err(CallError::BindingError));
+            all_not_callable &= matches!(result, Err(CallError::NotCallable));
         }
 
         if all_ok {
             Ok(())
         } else if any_binding_error {
-            Err(CallError::BindingError(()))
+            Err(CallError::BindingError)
         } else if all_not_callable {
-            Err(CallError::NotCallable(()))
+            Err(CallError::NotCallable)
         } else {
-            Err(CallError::PossiblyNotCallable(()))
+            Err(CallError::PossiblyNotCallable)
         }
-    }
-
-    /// Wraps a successful binding in `Ok`, or returns an error describing why the binding was
-    /// unsuccessful.
-    pub(crate) fn into_result(self) -> Result<Self, CallError<Self>> {
-        match self.as_result() {
-            Ok(()) => Ok(self),
-            Err(CallError::NotCallable(())) => Err(CallError::NotCallable(self)),
-            Err(CallError::BindingError(())) => Err(CallError::BindingError(self)),
-            Err(CallError::PossiblyNotCallable(())) => Err(CallError::PossiblyNotCallable(self)),
-        }
-    }
-
-    pub(crate) fn len(&self) -> usize {
-        match &self.inner {
-            BindingsInner::Single(_) => 1,
-            BindingsInner::Union(bindings) => bindings.len(),
-        }
-    }
-
-    /// Returns whether this binding is callable. A union type is callable if _all_ of its elements
-    /// are callable.
-    pub(crate) fn is_not_callable(&self) -> bool {
-        self.bindings().iter().all(|b| !b.is_callable())
     }
 
     pub(crate) fn bindings(&self) -> &[CallableBinding<'db>] {
@@ -304,17 +282,17 @@ impl<'db> CallableBinding<'db> {
         }
     }
 
-    fn as_result(&self) -> Result<(), CallError<()>> {
+    fn as_result(&self) -> Result<(), CallError> {
         if matches!(self.inner, CallableBindingInner::NotCallable) {
-            return Err(CallError::NotCallable(()));
+            return Err(CallError::NotCallable);
         }
 
         if self.has_binding_errors() {
-            return Err(CallError::BindingError(()));
+            return Err(CallError::BindingError);
         }
 
         if self.dunder_is_possibly_unbound() {
-            return Err(CallError::PossiblyNotCallable(()));
+            return Err(CallError::PossiblyNotCallable);
         }
 
         Ok(())
@@ -584,9 +562,9 @@ impl<'db> Binding<'db> {
         }
     }
 
-    fn as_result(&self) -> Result<(), CallError<()>> {
+    fn as_result(&self) -> Result<(), CallError> {
         if !self.errors.is_empty() {
-            return Err(CallError::BindingError(()));
+            return Err(CallError::BindingError);
         }
         Ok(())
     }

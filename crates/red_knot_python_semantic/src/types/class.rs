@@ -232,18 +232,19 @@ impl<'db> Class<'db> {
             // TODO: Other keyword arguments?
             let arguments = CallArguments::positional([name, bases, namespace]);
 
-            let return_ty_result = match metaclass.try_call(db, &arguments) {
-                Ok(outcome) => Ok(outcome.return_type(db)),
+            let bindings = metaclass.call(db, &arguments);
+            let return_ty_result = match bindings.as_result() {
+                Ok(()) => Ok(bindings.return_type(db)),
 
-                Err(CallError::NotCallable(bindings)) => Err(MetaclassError {
+                Err(CallError::NotCallable) => Err(MetaclassError {
                     kind: MetaclassErrorKind::NotCallable(bindings.ty),
                 }),
 
                 // TODO we should also check for binding errors that would indicate the metaclass
                 // does not accept the right arguments
-                Err(CallError::BindingError(bindings)) => Ok(bindings.return_type(db)),
+                Err(CallError::BindingError) => Ok(bindings.return_type(db)),
 
-                Err(CallError::PossiblyNotCallable(_)) => Err(MetaclassError {
+                Err(CallError::PossiblyNotCallable) => Err(MetaclassError {
                     kind: MetaclassErrorKind::PartlyNotCallable(metaclass),
                 }),
             };

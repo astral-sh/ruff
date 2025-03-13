@@ -1676,13 +1676,14 @@ impl<'db> Type<'db> {
         let descr_get = self.class_member(db, "__get__".into()).symbol;
 
         if let Symbol::Type(descr_get, descr_get_boundness) = descr_get {
-            let return_ty = descr_get
-                .try_call(db, &CallArguments::positional([self, instance, owner]))
-                .map(|outcome| {
+            let bindings = descr_get.call(db, &CallArguments::positional([self, instance, owner]));
+            let return_ty = bindings
+                .as_result()
+                .map(|()| {
                     if descr_get_boundness == Boundness::Bound {
-                        outcome.return_type(db)
+                        bindings.return_type(db)
                     } else {
-                        UnionType::from_elements(db, [outcome.return_type(db), self])
+                        UnionType::from_elements(db, [bindings.return_type(db), self])
                     }
                 })
                 .ok()?;
@@ -2169,26 +2170,24 @@ impl<'db> Type<'db> {
                                 Truthiness::Ambiguous
                             }
                         }
-                        Err(CallDunderError::MethodNotAvailable) => Truthiness::Ambiguous,
-                        Err(CallDunderError::Call(err)) => match err {
-                            CallError::BindingError(binding) => {
-                                return Err(BoolError::IncorrectArguments {
-                                    truthiness: type_to_truthiness(binding.return_type(db)),
-                                    not_boolable_type: *instance_ty,
-                                });
-                            }
-                            CallError::NotCallable(_) => {
-                                return Err(BoolError::NotCallable {
-                                    not_boolable_type: *instance_ty,
-                                });
-                            }
 
-                            CallError::PossiblyNotCallable(_) => {
-                                return Err(BoolError::Other {
-                                    not_boolable_type: *self,
-                                })
-                            }
-                        },
+                        Err(CallDunderError::MethodNotAvailable) => Truthiness::Ambiguous,
+                        Err(CallDunderError::Call(binding, CallError::BindingError)) => {
+                            return Err(BoolError::IncorrectArguments {
+                                truthiness: type_to_truthiness(binding.return_type(db)),
+                                not_boolable_type: *instance_ty,
+                            });
+                        }
+                        Err(CallDunderError::Call(_, CallError::NotCallable)) => {
+                            return Err(BoolError::NotCallable {
+                                not_boolable_type: *instance_ty,
+                            });
+                        }
+                        Err(CallDunderError::Call(_, CallError::PossiblyNotCallable)) => {
+                            return Err(BoolError::Other {
+                                not_boolable_type: *self,
+                            })
+                        }
                     }
                 }
             },
@@ -2282,10 +2281,13 @@ impl<'db> Type<'db> {
         }
 
         let return_ty = match self.try_call_dunder(db, "__len__", &CallArguments::none()) {
-            Ok(outcome) | Err(CallDunderError::PossiblyUnbound(outcome)) => outcome.return_type(db),
+            Ok(bindings) | Err(CallDunderError::PossiblyUnbound(bindings)) => {
+                bindings.return_type(db)
+            }
 
             // TODO: emit a diagnostic
-            Err(err) => err.return_type(db)?,
+            Err(CallDunderError::MethodNotAvailable) => return None,
+            Err(CallDunderError::Call(bindings, _)) => bindings.return_type(db),
         };
 
         non_negative_int_literal(db, return_ty)
@@ -2568,6 +2570,10 @@ impl<'db> Type<'db> {
             },
 
             Type::Instance(_) => {
+                // Note that for objects that are callable via a `__call__` method, we will get the
+                // signature of the dunder method, but will pass in the type of the object as the
+                // "callable type". That ensures that we get errors like "`X` is not callable"
+                // instead of "`<type of illegal '__call__'>` is not callable".
                 let Some((mut signatures, boundness)) =
                     self.dunder_signature(db, Some(callable_ty), "__call__")
                 else {
@@ -2600,25 +2606,16 @@ impl<'db> Type<'db> {
     }
 
     /// Calls `self`
-    fn try_call(
-        self,
-        db: &'db dyn Db,
-        arguments: &CallArguments<'_, 'db>,
-    ) -> Result<Bindings<'db>, CallError<Bindings<'db>>> {
-        // Note that for objects that are callable via a `__call__` method, we will get the
-        // signature of the dunder method, but will pass in the type of the object as the "callable
-        // type". That ensures that we get errors like "`X` is not callable" instead of "`<type of
-        // illegal '__call__'>` is not callable".
+    fn call(self, db: &'db dyn Db, arguments: &CallArguments<'_, 'db>) -> Bindings<'db> {
         let signatures = self.signatures(db, self);
-        let mut bindings = Bindings::bind(db, &signatures, arguments).into_result()?;
-
+        let mut bindings = Bindings::bind(db, &signatures, arguments);
         for binding in bindings.bindings_mut() {
             // For certain known callables, we have special case logic to determine the return type
             // in a way that isn't directly expressible in the type system. Each special case
             // listed here should have a corresponding clause above in `signatures`.
-            let (overload_index, overload) = binding
-                .matching_overload_mut()
-                .expect("bindings with no error should have a matching overload");
+            let Some((overload_index, overload)) = binding.matching_overload_mut() else {
+                continue;
+            };
 
             match self {
                 Type::Callable(CallableType::MethodWrapperDunderGet(function)) => {
@@ -2907,7 +2904,7 @@ impl<'db> Type<'db> {
             }
         }
 
-        Ok(bindings)
+        bindings
     }
 
     /// Looks up a dunder method on the meta-type of `self` and returns its signature and
@@ -2940,10 +2937,13 @@ impl<'db> Type<'db> {
         name: &str,
         arguments: &CallArguments<'_, 'db>,
     ) -> Result<Bindings<'db>, CallDunderError<'db>> {
-        let (signature, boundness) = self
-            .dunder_signature(db, None, name)
-            .ok_or(CallDunderError::MethodNotAvailable)?;
-        let bindings = Bindings::bind(db, &signature, arguments).into_result()?;
+        let Some((signature, boundness)) = self.dunder_signature(db, None, name) else {
+            return Err(CallDunderError::MethodNotAvailable);
+        };
+        let bindings = Bindings::bind(db, &signature, arguments);
+        if let Err(err) = bindings.as_result() {
+            return Err(CallDunderError::Call(bindings, err));
+        }
         if boundness == Boundness::PossiblyUnbound {
             return Err(CallDunderError::PossiblyUnbound(bindings));
         }
@@ -3039,9 +3039,9 @@ impl<'db> Type<'db> {
             }
 
             // `__iter__` is definitely bound but it can't be called with the expected arguments
-            Err(CallDunderError::Call(dunder_iter_call_error)) => {
-                Err(IterationErrorKind::IterCallError(dunder_iter_call_error))
-            }
+            Err(CallDunderError::Call(bindings, dunder_iter_call_error)) => Err(
+                IterationErrorKind::IterCallError(bindings, dunder_iter_call_error),
+            ),
 
             // There's no `__iter__` method. Try `__getitem__` instead...
             Err(CallDunderError::MethodNotAvailable) => {
@@ -3703,7 +3703,8 @@ impl<'db> ContextManagerErrorKind<'db> {
                 CallDunderError::PossiblyUnbound(call_outcome) => {
                     Some(call_outcome.return_type(db))
                 }
-                CallDunderError::Call(call_error) => call_error.return_type(db),
+                CallDunderError::Call(_, CallError::NotCallable) => None,
+                CallDunderError::Call(bindings, _) => Some(bindings.return_type(db)),
                 CallDunderError::MethodNotAvailable => None,
             },
         }
@@ -3724,7 +3725,7 @@ impl<'db> ContextManagerErrorKind<'db> {
                 // TODO: Use more specific error messages for the different error cases.
                 //  E.g. hint toward the union variant that doesn't correctly implement enter,
                 //  distinguish between a not callable `__enter__` attribute and a wrong signature.
-                CallDunderError::Call(_) => format!("it does not correctly implement `{name}`"),
+                CallDunderError::Call(_, _) => format!("it does not correctly implement `{name}`"),
             }
         };
 
@@ -3739,7 +3740,7 @@ impl<'db> ContextManagerErrorKind<'db> {
                 (CallDunderError::MethodNotAvailable, CallDunderError::MethodNotAvailable) => {
                     format!("it does not implement `{name_a}` and `{name_b}`")
                 }
-                (CallDunderError::Call(_), CallDunderError::Call(_)) => {
+                (CallDunderError::Call(_, _), CallDunderError::Call(_, _)) => {
                     format!("it does not correctly implement `{name_a}` or `{name_b}`")
                 }
                 (_, _) => format!(
@@ -3806,7 +3807,7 @@ impl<'db> IterationError<'db> {
 enum IterationErrorKind<'db> {
     /// The object being iterated over has a bound `__iter__` method,
     /// but calling it with the expected arguments results in an error.
-    IterCallError(CallError<Bindings<'db>>),
+    IterCallError(Bindings<'db>, CallError),
 
     /// The object being iterated over has a bound `__iter__` method that can be called
     /// with the expected types, but it returns an object that is not a valid iterator.
@@ -3846,8 +3847,8 @@ impl<'db> IterationErrorKind<'db> {
                 dunder_next_error, ..
             } => dunder_next_error.return_type(db),
 
-            Self::IterCallError(dunder_iter_call_error) => dunder_iter_call_error
-                .fallback_return_type(db)
+            Self::IterCallError(dunder_iter_bindings, _) => dunder_iter_bindings
+                .return_type(db)
                 .try_call_dunder(db, "__next__", &CallArguments::none())
                 .map(|dunder_next_outcome| Some(dunder_next_outcome.return_type(db)))
                 .unwrap_or_else(|dunder_next_call_error| dunder_next_call_error.return_type(db)),
@@ -3863,15 +3864,12 @@ impl<'db> IterationErrorKind<'db> {
                         [*dunder_next_return, dunder_getitem_outcome.return_type(db)],
                     ))
                 }
-                CallDunderError::Call(dunder_getitem_call_error) => Some(
-                    dunder_getitem_call_error
-                        .return_type(db)
-                        .map(|dunder_getitem_return| {
-                            let elements = [*dunder_next_return, dunder_getitem_return];
-                            UnionType::from_elements(db, elements)
-                        })
-                        .unwrap_or(*dunder_next_return),
-                ),
+                CallDunderError::Call(_, CallError::NotCallable) => Some(*dunder_next_return),
+                CallDunderError::Call(dunder_getitem_bindings, _) => {
+                    let dunder_getitem_return = dunder_getitem_bindings.return_type(db);
+                    let elements = [*dunder_next_return, dunder_getitem_return];
+                    Some(UnionType::from_elements(db, elements))
+                }
             },
 
             Self::UnboundIterAndGetitemError {
@@ -3898,15 +3896,15 @@ impl<'db> IterationErrorKind<'db> {
         // or similar, rather than as part of the same sentence as the error message.
 
         match self {
-            Self::IterCallError(dunder_iter_call_error) => match dunder_iter_call_error {
-                CallError::NotCallable(bindings) => report_not_iterable(format_args!(
+            Self::IterCallError(bindings, dunder_iter_call_error) => match dunder_iter_call_error {
+                CallError::NotCallable => report_not_iterable(format_args!(
                     "Object of type `{iterable_type}` is not iterable \
                         because its `__iter__` attribute has type `{dunder_iter_type}`, \
                         which is not callable",
                     iterable_type = iterable_type.display(db),
                     dunder_iter_type = bindings.ty.display(db),
                 )),
-                CallError::PossiblyNotCallable(bindings) if bindings.is_single() => {
+                CallError::PossiblyNotCallable if bindings.is_single() => {
                     report_not_iterable(format_args!(
                         "Object of type `{iterable_type}` may not be iterable \
                             because its `__iter__` attribute (with type `{dunder_iter_type}`) \
@@ -3915,7 +3913,7 @@ impl<'db> IterationErrorKind<'db> {
                         dunder_iter_type = bindings.ty.display(db),
                     ));
                 }
-                CallError::PossiblyNotCallable(bindings) => {
+                CallError::PossiblyNotCallable => {
                     report_not_iterable(format_args!(
                         "Object of type `{iterable_type}` may not be iterable \
                             because its `__iter__` attribute (with type `{dunder_iter_type}`) \
@@ -3924,14 +3922,13 @@ impl<'db> IterationErrorKind<'db> {
                         dunder_iter_type = bindings.ty.display(db),
                     ));
                 }
-                CallError::BindingError(bindings)
-                    if bindings.len() == 1 => report_not_iterable(format_args!(
+                CallError::BindingError if bindings.is_single() => report_not_iterable(format_args!(
                     "Object of type `{iterable_type}` is not iterable \
                         because its `__iter__` method has an invalid signature \
                         (expected `def __iter__(self): ...`)",
                     iterable_type = iterable_type.display(db),
                 )),
-                CallError::BindingError(bindings) => report_not_iterable(format_args!(
+                CallError::BindingError => report_not_iterable(format_args!(
                     "Object of type `{iterable_type}` may not be iterable \
                         because its `__iter__` method (with type `{dunder_iter_type}`) \
                         may have an invalid signature (expected `def __iter__(self): ...`)",
@@ -3958,29 +3955,29 @@ impl<'db> IterationErrorKind<'db> {
                     iterable_type = iterable_type.display(db),
                     iterator_type = iterator.display(db),
                 )),
-                CallDunderError::Call(dunder_next_call_error) => match dunder_next_call_error {
-                    CallError::NotCallable(_) => report_not_iterable(format_args!(
+                CallDunderError::Call(bindings, dunder_next_call_error) => match dunder_next_call_error {
+                    CallError::NotCallable => report_not_iterable(format_args!(
                         "Object of type `{iterable_type}` is not iterable \
                             because its `__iter__` method returns an object of type `{iterator_type}`, \
                             which has a `__next__` attribute that is not callable",
                         iterable_type = iterable_type.display(db),
                         iterator_type = iterator.display(db),
                     )),
-                    CallError::PossiblyNotCallable(_) => report_not_iterable(format_args!(
+                    CallError::PossiblyNotCallable => report_not_iterable(format_args!(
                         "Object of type `{iterable_type}` may not be iterable \
                             because its `__iter__` method returns an object of type `{iterator_type}`, \
                             which has a `__next__` attribute that may not be callable",
                         iterable_type = iterable_type.display(db),
                         iterator_type = iterator.display(db),
                     )),
-                    CallError::BindingError(bindings) if bindings.len() == 1 => report_not_iterable(format_args!(
+                    CallError::BindingError if bindings.is_single() => report_not_iterable(format_args!(
                         "Object of type `{iterable_type}` is not iterable \
                             because its `__iter__` method returns an object of type `{iterator_type}`, \
                             which has an invalid `__next__` method (expected `def __next__(self): ...`)",
                         iterable_type = iterable_type.display(db),
                         iterator_type = iterator.display(db),
                     )),
-                    CallError::BindingError(_) => report_not_iterable(format_args!(
+                    CallError::BindingError => report_not_iterable(format_args!(
                         "Object of type `{iterable_type}` may not be iterable \
                             because its `__iter__` method returns an object of type `{iterator_type}`, \
                             which may have an invalid `__next__` method (expected `def __next__(self): ...`)",
@@ -4004,8 +4001,8 @@ impl<'db> IterationErrorKind<'db> {
                         because it may not have an `__iter__` method or a `__getitem__` method",
                     iterable_type.display(db)
                 )),
-                CallDunderError::Call(dunder_getitem_call_error) => match dunder_getitem_call_error {
-                    CallError::NotCallable(bindings) => report_not_iterable(format_args!(
+                CallDunderError::Call(bindings, dunder_getitem_call_error) => match dunder_getitem_call_error {
+                    CallError::NotCallable => report_not_iterable(format_args!(
                         "Object of type `{iterable_type}` may not be iterable \
                             because it may not have an `__iter__` method \
                             and its `__getitem__` attribute has type `{dunder_getitem_type}`, \
@@ -4013,13 +4010,13 @@ impl<'db> IterationErrorKind<'db> {
                         iterable_type = iterable_type.display(db),
                         dunder_getitem_type = bindings.ty.display(db),
                     )),
-                    CallError::PossiblyNotCallable(bindings) if bindings.is_single() => report_not_iterable(format_args!(
+                    CallError::PossiblyNotCallable if bindings.is_single() => report_not_iterable(format_args!(
                         "Object of type `{iterable_type}` may not be iterable \
                             because it may not have an `__iter__` method \
                             and its `__getitem__` attribute may not be callable",
                         iterable_type = iterable_type.display(db),
                     )),
-                    CallError::PossiblyNotCallable(bindings) => {
+                    CallError::PossiblyNotCallable => {
                         report_not_iterable(format_args!(
                             "Object of type `{iterable_type}` may not be iterable \
                                 because it may not have an `__iter__` method \
@@ -4029,7 +4026,7 @@ impl<'db> IterationErrorKind<'db> {
                             dunder_getitem_type = bindings.ty.display(db),
                         ));
                     }
-                    CallError::BindingError(bindings) if bindings.len() == 1 => report_not_iterable(format_args!(
+                    CallError::BindingError if bindings.is_single() => report_not_iterable(format_args!(
                         "Object of type `{iterable_type}` may not be iterable \
                             because it may not have an `__iter__` method \
                             and its `__getitem__` method has an incorrect signature \
@@ -4038,7 +4035,7 @@ impl<'db> IterationErrorKind<'db> {
                             `def __getitem__(self, key: int): ...`)",
                         iterable_type = iterable_type.display(db),
                     )),
-                    CallError::BindingError(bindings)=> report_not_iterable(format_args!(
+                    CallError::BindingError => report_not_iterable(format_args!(
                         "Object of type `{iterable_type}` may not be iterable \
                             because it may not have an `__iter__` method \
                             and its `__getitem__` method (with type `{dunder_getitem_type}`)
@@ -4062,8 +4059,8 @@ impl<'db> IterationErrorKind<'db> {
                         and it may not have a `__getitem__` method",
                     iterable_type.display(db)
                 )),
-                CallDunderError::Call(dunder_getitem_call_error) => match dunder_getitem_call_error {
-                    CallError::NotCallable(bindings) => report_not_iterable(format_args!(
+                CallDunderError::Call(bindings, dunder_getitem_call_error) => match dunder_getitem_call_error {
+                    CallError::NotCallable => report_not_iterable(format_args!(
                         "Object of type `{iterable_type}` is not iterable \
                             because it has no `__iter__` method and \
                             its `__getitem__` attribute has type `{dunder_getitem_type}`, \
@@ -4071,13 +4068,13 @@ impl<'db> IterationErrorKind<'db> {
                         iterable_type = iterable_type.display(db),
                         dunder_getitem_type = bindings.ty.display(db),
                     )),
-                    CallError::PossiblyNotCallable(bindings) if bindings.is_single() => report_not_iterable(format_args!(
+                    CallError::PossiblyNotCallable if bindings.is_single() => report_not_iterable(format_args!(
                         "Object of type `{iterable_type}` may not be iterable \
                             because it has no `__iter__` method and its `__getitem__` attribute \
                             may not be callable",
                         iterable_type = iterable_type.display(db),
                     )),
-                    CallError::PossiblyNotCallable(bindings) => {
+                    CallError::PossiblyNotCallable => {
                         report_not_iterable(format_args!(
                             "Object of type `{iterable_type}` may not be iterable \
                                 because it has no `__iter__` method and its `__getitem__` attribute \
@@ -4086,7 +4083,7 @@ impl<'db> IterationErrorKind<'db> {
                             dunder_getitem_type = bindings.ty.display(db),
                         ));
                     }
-                    CallError::BindingError(bindings) if bindings.is_single() => report_not_iterable(format_args!(
+                    CallError::BindingError if bindings.is_single() => report_not_iterable(format_args!(
                         "Object of type `{iterable_type}` is not iterable \
                             because it has no `__iter__` method and \
                             its `__getitem__` method has an incorrect signature \
@@ -4095,7 +4092,7 @@ impl<'db> IterationErrorKind<'db> {
                             `def __getitem__(self, key: int): ...`)",
                         iterable_type = iterable_type.display(db),
                     )),
-                    CallError::BindingError(bindings) => report_not_iterable(format_args!(
+                    CallError::BindingError => report_not_iterable(format_args!(
                         "Object of type `{iterable_type}` may not be iterable \
                             because it has no `__iter__` method and \
                             its `__getitem__` method (with type `{dunder_getitem_type}`) \
