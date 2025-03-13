@@ -86,13 +86,6 @@ The following fixes or improvements to fixes have been stabilized:
 - [`needless-bool`](https://docs.astral.sh/ruff/rules/needless-bool/) (`SIM103`) ([#16684](https://github.com/astral-sh/ruff/pull/16684))
 - [`unused-private-type-var`](https://docs.astral.sh/ruff/rules/unused-private-type-var/) (`PYI018`) ([#16682](https://github.com/astral-sh/ruff/pull/16682))
 
-### Rule changes
-
-<!-- TODO: Replace, these are just examples -->
-
-- \[`flake8-builtins`\] Ignore [`stdlib-module-shadowing`](https://docs.astral.sh/ruff/rules/stdlib-module-shadowing/) in stub files(`A005`) ([#15350](https://github.com/astral-sh/ruff/pull/15350))
-- \[`flake8-return`\] Add support for functions returning `typing.Never` (`RET503`) ([#15298](https://github.com/astral-sh/ruff/pull/15298))
-
 ### Server
 
 - Remove logging output for `ruff.printDebugInformation` ([#16617](https://github.com/astral-sh/ruff/pull/16617))
