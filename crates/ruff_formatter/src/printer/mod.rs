@@ -1,3 +1,4 @@
+use std::cmp::min;
 use std::num::NonZeroU8;
 
 use drop_bomb::DebugDropBomb;
@@ -20,8 +21,8 @@ use crate::printer::queue::{
 };
 use crate::source_code::SourceCode;
 use crate::{
-    ActualStart, FormatElement, GroupId, IndentStyle, InvalidDocumentError, PrintError,
-    PrintResult, Printed, SourceMarker, TextRange,
+    ActualStart, FormatElement, GroupId, IndentStyle, InvalidDocumentError, PrintError, PrintResult,
+    Printed, SourceMarker, TextRange,
 };
 
 mod call_stack;
@@ -62,8 +63,9 @@ impl<'a> Printer<'a> {
     ) -> PrintResult<Printed> {
         let indentation = Indentation::Level(indent);
         self.state.pending_indent = indentation;
+        let line_width = self.options.line_width;
 
-        let mut stack = PrintCallStack::new(PrintElementArgs::new(indentation));
+        let mut stack = PrintCallStack::new(PrintElementArgs::new(indentation, line_width.into()));
         let mut queue: PrintQueue<'a> = PrintQueue::new(document.as_ref());
 
         loop {
@@ -323,6 +325,7 @@ impl<'a> Printer<'a> {
 
             FormatElement::Tag(StartLineSuffix { reserved_width }) => {
                 self.state.line_width += reserved_width;
+                self.state.line_suffix_reserved_width += reserved_width;
                 self.state
                     .line_suffixes
                     .extend(args, queue.iter_content(TagKind::LineSuffix));
@@ -362,6 +365,19 @@ impl<'a> Printer<'a> {
                 stack.push(TagKind::FitsExpanded, args);
             }
 
+            FormatElement::Tag(StartWidthLimitedBlock { limit_from_current_position: block_width_limit, inherit_enclosing_limit: inherit }) => {
+                let current_column = self.state.line_width - self.state.line_suffix_reserved_width;
+                let current_column = u16::try_from(current_column).unwrap_or(u16::MAX);
+                let indented_width_limit = block_width_limit.indented_by(current_column);
+                let width_limit = if *inherit {
+                    min(indented_width_limit, args.line_width_limit().into())
+                } else {
+                    indented_width_limit
+                };
+
+                stack.push(TagKind::WidthLimitedBlock, args.with_line_width_limit(width_limit));
+            }
+
             FormatElement::Tag(
                 tag @ (StartLabelled(_) | StartEntry | StartBestFittingEntry { .. }),
             ) => {
@@ -382,7 +398,8 @@ impl<'a> Printer<'a> {
                 | EndVerbatim
                 | EndLineSuffix
                 | EndBestFittingEntry
-                | EndFill),
+                | EndFill
+                | EndWidthLimitedBlock),
             ) => {
                 stack.pop(tag.kind())?;
             }
@@ -825,6 +842,7 @@ impl<'a> Printer<'a> {
                 .push_str(self.options.line_ending.as_str());
 
             self.state.line_width = 0;
+            self.state.line_suffix_reserved_width = 0;
             self.state.line_start = self.state.buffer.len();
 
             // Fit's only tests if groups up to the first line break fit.
@@ -889,6 +907,9 @@ struct PrinterState<'a> {
 
     /// The accumulated unicode-width of all characters on the current line.
     line_width: u32,
+
+    /// The unicode-width that is reserved for line suffixes yet to be printed on this line.
+    line_suffix_reserved_width: u32,
 
     /// The line suffixes that should be printed at the end of the line.
     line_suffixes: LineSuffixes<'a>,
@@ -1071,7 +1092,11 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
         let fits_state = FitsState {
             pending_indent: printer.state.pending_indent,
             line_width: printer.state.line_width,
-            has_line_suffix: printer.state.line_suffixes.has_pending(),
+            line_suffix_reserved_width: if printer.state.line_suffixes.has_pending() {
+                Some(printer.state.line_suffix_reserved_width)
+            } else {
+                None
+            },
         };
 
         Self {
@@ -1186,6 +1211,7 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
                             MeasureMode::AllLines | MeasureMode::AllLinesAllowTextOverflow => {
                                 // Continue measuring on the next line
                                 self.state.line_width = 0;
+                                self.state.line_suffix_reserved_width = None;
                                 self.state.pending_indent = args.indentation();
                             }
                         }
@@ -1214,7 +1240,7 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
                 ));
             }
             FormatElement::LineSuffixBoundary => {
-                if self.state.has_line_suffix {
+                if self.state.line_suffix_reserved_width.is_some() {
                     return Ok(Fits::No);
                 }
             }
@@ -1297,6 +1323,7 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
                     // to ensure any trailing comments (that, unfortunately, are attached to the statement and not the expression)
                     // fit too.
                     self.state.line_width = 0;
+                    self.state.line_suffix_reserved_width = None;
                     self.state.pending_indent = unindented.indentation();
 
                     return Ok(self.fits_text(Text::Token(")"), unindented));
@@ -1356,12 +1383,12 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
             FormatElement::Tag(StartLineSuffix { reserved_width }) => {
                 if *reserved_width > 0 {
                     self.state.line_width += reserved_width;
+                    self.state.line_suffix_reserved_width = Some(self.state.line_suffix_reserved_width.unwrap_or(0) + reserved_width);
                     if self.state.line_width > self.options().line_width.into() {
                         return Ok(Fits::No);
                     }
                 }
                 self.queue.skip_content(TagKind::LineSuffix);
-                self.state.has_line_suffix = true;
             }
 
             FormatElement::Tag(EndLineSuffix) => {
@@ -1411,6 +1438,19 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
                 }
             }
 
+            FormatElement::Tag(StartWidthLimitedBlock { limit_from_current_position: block_width_limit, inherit_enclosing_limit: inherit }) => {
+                let current_column: u32 = self.state.line_width - self.state.line_suffix_reserved_width.unwrap_or(0);
+                let current_column: u16 = current_column.try_into().unwrap_or(u16::MAX);
+                let indented_width_limit = block_width_limit.indented_by(current_column);
+                let line_width = if *inherit {
+                    min(indented_width_limit, args.line_width_limit())
+                } else {
+                    indented_width_limit
+                };
+
+                self.stack.push(TagKind::WidthLimitedBlock, args.with_line_width_limit(line_width));
+            }
+
             FormatElement::Tag(
                 tag @ (StartFill
                 | StartVerbatim(_)
@@ -1434,7 +1474,8 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
                 | EndDedent
                 | EndIndent
                 | EndBestFittingEntry
-                | EndFitsExpanded),
+                | EndFitsExpanded
+                | EndWidthLimitedBlock),
             ) => {
                 self.stack.pop(tag.kind())?;
             }
@@ -1473,7 +1514,7 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
 
     fn fits_text(&mut self, text: Text, args: PrintElementArgs) -> Fits {
         fn exceeds_width(fits: &FitsMeasurer, args: PrintElementArgs) -> bool {
-            fits.state.line_width > fits.options().line_width.into()
+            args.line_width_limit().fits(fits.state.line_width)
                 && !args.measure_mode().allows_text_overflow()
         }
 
@@ -1508,6 +1549,7 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
                                     MeasureMode::AllLines
                                     | MeasureMode::AllLinesAllowTextOverflow => {
                                         self.state.line_width = 0;
+                                        self.state.line_suffix_reserved_width = None;
                                         continue;
                                     }
                                 }
@@ -1611,8 +1653,8 @@ impl From<bool> for Fits {
 #[derive(Debug)]
 struct FitsState {
     pending_indent: Indentation,
-    has_line_suffix: bool,
     line_width: u32,
+    line_suffix_reserved_width: Option<u32>,
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]

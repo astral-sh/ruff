@@ -1,9 +1,8 @@
-use ruff_formatter::{format_args, write, FormatRuleWithOptions};
-use ruff_python_ast::AnyNodeRef;
-use ruff_python_ast::ExprGenerator;
-
 use crate::expression::parentheses::{parenthesized, NeedsParentheses, OptionalParentheses};
 use crate::prelude::*;
+use ruff_formatter::{write, FormatRuleWithOptions};
+use ruff_python_ast::AnyNodeRef;
+use ruff_python_ast::ExprGenerator;
 
 #[derive(Eq, PartialEq, Debug, Default)]
 pub enum GeneratorExpParentheses {
@@ -32,7 +31,6 @@ impl FormatRuleWithOptions<ExprGenerator, PyFormatContext<'_>> for FormatExprGen
 pub struct FormatExprGenerator {
     parentheses: GeneratorExpParentheses,
 }
-
 impl FormatNodeRule<ExprGenerator> for FormatExprGenerator {
     fn fmt_fields(&self, item: &ExprGenerator, f: &mut PyFormatter) -> FormatResult<()> {
         let ExprGenerator {
@@ -42,33 +40,39 @@ impl FormatNodeRule<ExprGenerator> for FormatExprGenerator {
             parenthesized: is_parenthesized,
         } = item;
 
-        let joined = format_with(|f| {
+        let comments = f.context().comments().clone();
+        let dangling = comments.dangling(item);
+
+        let inner_content = format_with(|f| {
+            write!(f, [
+                group(&elt.format()),
+                soft_line_break_or_space(),
+            ])?;
+
             f.join_with(soft_line_break_or_space())
                 .entries(generators.iter().formatted())
                 .finish()
         });
 
-        let comments = f.context().comments().clone();
-        let dangling = comments.dangling(item);
-
         if self.parentheses == GeneratorExpParentheses::Preserve
             && dangling.is_empty()
             && !is_parenthesized
         {
-            write!(
-                f,
-                [group(&elt.format()), soft_line_break_or_space(), &joined]
-            )
+            write!(f, [group_with_flat_width_limit(
+                &inner_content,
+                f.options().generator_expression_width_limit().into(),
+                true,
+            )])
         } else {
             write!(
                 f,
                 [parenthesized(
                     "(",
-                    &group(&format_args!(
-                        group(&elt.format()),
-                        soft_line_break_or_space(),
-                        joined
-                    )),
+                    &group_with_flat_width_limit(
+                        &inner_content,
+                        f.options().generator_expression_width_limit().into(),
+                        true,
+                    ),
                     ")"
                 )
                 .with_dangling_comments(dangling)]

@@ -135,7 +135,7 @@ impl From<NonZeroU8> for IndentWidth {
 }
 
 /// The maximum visual width to which the formatter should try to limit a line.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, CacheKey)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, CacheKey)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct LineWidth(NonZeroU16);
@@ -179,11 +179,75 @@ impl From<LineWidth> for u32 {
     }
 }
 
+impl From<LineWidth> for NonZeroU16 {
+    fn from(value: LineWidth) -> Self {
+        value.0
+    }
+}
+
 impl From<NonZeroU16> for LineWidth {
     fn from(value: NonZeroU16) -> Self {
         Self(value)
     }
 }
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub enum LineWidthLimit {
+    /// The width of the block is limited to the specified width.
+    Limited(LineWidth),
+    /// The width of the block is not limited (unless there is an inherited limit from a parent block).
+    Unlimited,
+}
+
+impl LineWidthLimit {
+    pub fn indented_by(self, indent: u16) -> Self {
+        match self {
+            LineWidthLimit::Limited(width) => {
+                let old_width: NonZeroU16 = width.into();
+                let new_width: NonZeroU16 = old_width.saturating_add(indent);
+                LineWidthLimit::Limited(new_width.into())
+            },
+            LineWidthLimit::Unlimited => LineWidthLimit::Unlimited,
+        }
+    }
+
+    pub fn fits(&self, width: u32) -> bool {
+        match self {
+            LineWidthLimit::Limited(limit) => width <= u32::from(*limit),
+            LineWidthLimit::Unlimited => true,
+        }
+    }
+}
+
+impl Ord for LineWidthLimit {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        match (self, other) {
+            (LineWidthLimit::Limited(w1), LineWidthLimit::Limited(w2)) => w1.cmp(w2),
+            (LineWidthLimit::Limited(_), LineWidthLimit::Unlimited) => std::cmp::Ordering::Less,
+            (LineWidthLimit::Unlimited, LineWidthLimit::Limited(_)) => std::cmp::Ordering::Greater,
+            (LineWidthLimit::Unlimited, LineWidthLimit::Unlimited) => std::cmp::Ordering::Equal,
+        }
+    }
+}
+
+impl PartialOrd for LineWidthLimit {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl From <LineWidth> for LineWidthLimit {
+    fn from(width: LineWidth) -> Self {
+        LineWidthLimit::Limited(width)
+    }
+}
+
+impl Default for LineWidthLimit{
+    fn default() -> Self {
+        LineWidth::default().into()
+    }
+}
+
 
 /// Context object storing data relevant when formatting an object.
 pub trait FormatContext {

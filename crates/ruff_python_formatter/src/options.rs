@@ -3,7 +3,7 @@ use std::path::Path;
 use std::str::FromStr;
 
 use ruff_formatter::printer::{LineEnding, PrinterOptions, SourceMapGeneration};
-use ruff_formatter::{FormatOptions, IndentStyle, IndentWidth, LineWidth};
+use ruff_formatter::{FormatOptions, IndentStyle, IndentWidth, LineWidth, LineWidthLimit};
 use ruff_macros::CacheKey;
 use ruff_python_ast::{self as ast, PySourceType};
 
@@ -60,6 +60,18 @@ pub struct PyFormatOptions {
     /// is enabled.
     docstring_code_line_width: DocstringCodeLineWidth,
 
+    /// Print list comprehensions in the expanded form if the flt form would exceed the given width.
+    list_comprehension_width_limit: FlatExpressionExpandWidth,
+
+    /// Print dict comprehensions in the expanded form if the flt form would exceed the given width.
+    dict_comprehension_width_limit: FlatExpressionExpandWidth,
+
+    /// Print set comprehensions in the expanded form if the flt form would exceed the given width.
+    set_comprehension_width_limit: FlatExpressionExpandWidth,
+
+    /// Print generator expressions in the expanded form if the flt form would exceed the given width.
+    generator_expression_width_limit: FlatExpressionExpandWidth,
+
     /// Whether preview style formatting is enabled or not
     preview: PreviewMode,
 }
@@ -90,6 +102,10 @@ impl Default for PyFormatOptions {
             source_map_generation: SourceMapGeneration::default(),
             docstring_code: DocstringCode::default(),
             docstring_code_line_width: DocstringCodeLineWidth::default(),
+            list_comprehension_width_limit: FlatExpressionExpandWidth::default(),
+            dict_comprehension_width_limit: FlatExpressionExpandWidth::default(),
+            set_comprehension_width_limit: FlatExpressionExpandWidth::default(),
+            generator_expression_width_limit: FlatExpressionExpandWidth::default(),
             preview: PreviewMode::default(),
         }
     }
@@ -138,6 +154,22 @@ impl PyFormatOptions {
 
     pub const fn docstring_code_line_width(&self) -> DocstringCodeLineWidth {
         self.docstring_code_line_width
+    }
+
+    pub const fn list_comprehension_width_limit(&self) -> FlatExpressionExpandWidth {
+        self.list_comprehension_width_limit
+    }
+
+    pub const fn dict_comprehension_width_limit(&self) -> FlatExpressionExpandWidth {
+        self.dict_comprehension_width_limit
+    }
+
+    pub const fn set_comprehension_width_limit(&self) -> FlatExpressionExpandWidth {
+        self.set_comprehension_width_limit
+    }
+
+    pub const fn generator_expression_width_limit(&self) -> FlatExpressionExpandWidth {
+        self.generator_expression_width_limit
     }
 
     pub const fn preview(&self) -> PreviewMode {
@@ -195,6 +227,30 @@ impl PyFormatOptions {
     #[must_use]
     pub fn with_docstring_code_line_width(mut self, line_width: DocstringCodeLineWidth) -> Self {
         self.docstring_code_line_width = line_width;
+        self
+    }
+
+    #[must_use]
+    pub fn with_list_comprehension_width_limit(mut self, width: FlatExpressionExpandWidth) -> Self {
+        self.list_comprehension_width_limit = width;
+        self
+    }
+
+    #[must_use]
+    pub fn with_dict_comprehension_width_limit(mut self, width: FlatExpressionExpandWidth) -> Self {
+        self.dict_comprehension_width_limit = width;
+        self
+    }
+
+    #[must_use]
+    pub fn with_set_comprehension_width_limit(mut self, width: FlatExpressionExpandWidth) -> Self {
+        self.set_comprehension_width_limit = width;
+        self
+    }
+
+    #[must_use]
+    pub fn with_generator_expression_width_limit(mut self, width: FlatExpressionExpandWidth) -> Self {
+        self.generator_expression_width_limit = width;
         self
     }
 
@@ -466,5 +522,72 @@ where
             serde::de::Unexpected::Str(s),
             &"dynamic",
         )),
+    }
+}
+
+#[derive(Copy, Clone, Default, Eq, PartialEq, CacheKey)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(untagged, rename_all = "lowercase")
+)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub enum FlatExpressionExpandWidth {
+    /// The expression should be printed in expanded form if it exceeds the given width.
+    /// The limit does not apply when the expression is in expanded form.
+    /// Document width limits will continue to apply.
+    #[cfg_attr(feature = "schemars", schemars(schema_with = "schema::fixed"))]
+    Fixed(LineWidth),
+
+    /// The expression should be formatted according to the document width limit.
+    #[default]
+    #[cfg_attr(
+        feature = "serde",
+        serde(deserialize_with = "deserialize_flat_expression_width_limit_dynamic")
+    )]
+    #[cfg_attr(feature = "schemars", schemars(schema_with = "schema::dynamic"))]
+    Dynamic,
+}
+
+impl fmt::Debug for FlatExpressionExpandWidth {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            Self::Fixed(width) => width.value().fmt(f),
+            Self::Dynamic => "dynamic".fmt(f),
+        }
+    }
+}
+
+impl fmt::Display for FlatExpressionExpandWidth {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Fixed(width) => width.fmt(f),
+            Self::Dynamic => write!(f, "dynamic"),
+        }
+    }
+}
+
+fn deserialize_flat_expression_width_limit_dynamic<'de, D>(d: D) -> Result<(), D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::{de::Error, Deserialize};
+
+    let value = String::deserialize(d)?;
+    match &*value {
+        "dynamic" => Ok(()),
+        s => Err(D::Error::invalid_value(
+            serde::de::Unexpected::Str(s),
+            &"dynamic",
+        )),
+    }
+}
+
+impl From<FlatExpressionExpandWidth> for LineWidthLimit {
+    fn from(width: FlatExpressionExpandWidth) -> Self {
+        match width {
+            FlatExpressionExpandWidth::Fixed(width) => LineWidthLimit::Limited(width),
+            FlatExpressionExpandWidth::Dynamic => LineWidthLimit::Unlimited,
+        }
     }
 }

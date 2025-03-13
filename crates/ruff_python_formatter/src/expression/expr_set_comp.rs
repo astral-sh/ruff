@@ -1,4 +1,4 @@
-use ruff_formatter::{format_args, write, Buffer, FormatResult};
+use ruff_formatter::{write, Buffer, FormatResult};
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::ExprSetComp;
 
@@ -16,24 +16,29 @@ impl FormatNodeRule<ExprSetComp> for FormatExprSetComp {
             generators,
         } = item;
 
-        let joined = format_with(|f| {
+        let comments = f.context().comments().clone();
+        let dangling = comments.dangling(item);
+
+        let inner_content = format_with(|f| {
+            write!(f, [
+                group(&elt.format()),
+                soft_line_break_or_space(),
+            ])?;
+
             f.join_with(soft_line_break_or_space())
                 .entries(generators.iter().formatted())
                 .finish()
         });
 
-        let comments = f.context().comments().clone();
-        let dangling = comments.dangling(item);
-
         write!(
             f,
             [parenthesized(
                 "{",
-                &group(&format_args!(
-                    group(&elt.format()),
-                    soft_line_break_or_space(),
-                    joined
-                )),
+                &group_with_flat_width_limit(
+                    &inner_content,
+                    f.options().set_comprehension_width_limit().into(),
+                    true,
+                ),
                 "}"
             )
             .with_dangling_comments(dangling)]

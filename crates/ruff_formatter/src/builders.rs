@@ -9,7 +9,10 @@ use Tag::*;
 use crate::format_element::tag::{Condition, Tag};
 use crate::prelude::tag::{DedentMode, GroupMode, LabelId};
 use crate::prelude::*;
-use crate::{write, Argument, Arguments, FormatContext, FormatOptions, GroupId, TextSize};
+use crate::{
+    format_args, write, Argument, Arguments, FormatContext, FormatOptions, GroupId, LineWidthLimit,
+    TextSize,
+};
 use crate::{Buffer, VecBuffer};
 
 /// A line break that only gets printed if the enclosing `Group` doesn't fit on a single line.
@@ -2706,5 +2709,96 @@ impl<Context> Format<Context> for BestFitting<'_, Context> {
         f.write_element(element);
 
         Ok(())
+    }
+}
+
+#[inline]
+pub fn with_line_width_limit<Context>(
+    content: &impl Format<Context>,
+    line_width: LineWidthLimit,
+    inherit_enclosing_limit: bool,
+) -> WithLineWidthLimit<Context> {
+    WithLineWidthLimit {
+        content: Argument::new(content),
+        line_width,
+        inherit_enclosing_limit,
+    }
+}
+
+#[derive(Copy, Clone)]
+pub struct WithLineWidthLimit<'a, Context> {
+    content: Argument<'a, Context>,
+    line_width: LineWidthLimit,
+    inherit_enclosing_limit: bool,
+}
+
+impl<Context> Format<Context> for WithLineWidthLimit<'_, Context> {
+    fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
+        f.write_element(FormatElement::Tag(StartWidthLimitedBlock {
+            limit_from_current_position: self.line_width,
+            inherit_enclosing_limit: self.inherit_enclosing_limit,
+        }));
+        Arguments::from(&self.content).fmt(f)?;
+        f.write_element(FormatElement::Tag(EndWidthLimitedBlock));
+
+        Ok(())
+    }
+}
+
+impl<Context> std::fmt::Debug for WithLineWidthLimit<'_, Context> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("WithLineWidthLimit")
+            .field("line_width", &self.line_width)
+            .field("inherit_enclosing_limit", &self.inherit_enclosing_limit)
+            .field("content", &"{{content}}")
+            .finish()
+    }
+}
+
+#[inline]
+pub fn group_with_flat_width_limit<Context>(
+    content: &impl Format<Context>,
+    width_limit: LineWidthLimit,
+    inherit_enclosing_limit: bool,
+) -> GroupWithFlatWidthLimit<Context> {
+    GroupWithFlatWidthLimit {
+        content: Argument::new(content),
+        width_limit,
+        inherit_enclosing_limit,
+    }
+}
+
+#[derive(Copy, Clone)]
+pub struct GroupWithFlatWidthLimit<'a, Context> {
+    content: Argument<'a, Context>,
+    width_limit: LineWidthLimit,
+    inherit_enclosing_limit: bool,
+}
+
+impl<Context> Format<Context> for GroupWithFlatWidthLimit<'_, Context> {
+    fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
+        match self {
+            GroupWithFlatWidthLimit {
+                content,
+                width_limit: LineWidthLimit::Unlimited,
+                inherit_enclosing_limit: true,
+            } => f.write_fmt(Arguments::from(content)),
+
+            GroupWithFlatWidthLimit {
+                content,
+                width_limit,
+                inherit_enclosing_limit,
+            } => write!(
+                f,
+                [group(&format_args![
+                    &if_group_fits_on_line(&with_line_width_limit(
+                        &Arguments::from(content),
+                        *width_limit,
+                        *inherit_enclosing_limit,
+                    )),
+                    &if_group_breaks(&Arguments::from(&self.content)),
+                ])]
+            ),
+        }
     }
 }

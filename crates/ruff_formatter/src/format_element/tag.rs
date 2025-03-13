@@ -1,5 +1,5 @@
 use crate::format_element::PrintMode;
-use crate::{GroupId, TextSize};
+use crate::{GroupId, LineWidthLimit, TextSize};
 use std::cell::Cell;
 use std::num::NonZeroU8;
 
@@ -96,6 +96,17 @@ pub enum Tag {
         id: Option<GroupId>,
     },
     EndBestFitParenthesize,
+
+    /// Marks the start and end of a block that has a different width limit than the surrounding content.
+    StartWidthLimitedBlock {
+        /// The width limit to use for the content inside the block. 
+        /// Final line width will the sum of the current cursor position and this limit.
+        limit_from_current_position: LineWidthLimit,
+        /// If true, respect enclosing limits and the document width limit.
+        /// If false, all enclosing limits and the document limit will be overridden for this block.
+        inherit_enclosing_limit: bool,
+    },
+    EndWidthLimitedBlock,
 }
 
 impl Tag {
@@ -118,6 +129,7 @@ impl Tag {
                 | Tag::StartFitsExpanded(_)
                 | Tag::StartBestFittingEntry
                 | Tag::StartBestFitParenthesize { .. }
+                | Tag::StartWidthLimitedBlock { .. }
         )
     }
 
@@ -148,6 +160,7 @@ impl Tag {
             StartBestFitParenthesize { .. } | EndBestFitParenthesize => {
                 TagKind::BestFitParenthesize
             }
+            StartWidthLimitedBlock { .. } | EndWidthLimitedBlock => TagKind::WidthLimitedBlock,
         }
     }
 }
@@ -173,6 +186,7 @@ pub enum TagKind {
     FitsExpanded,
     BestFittingEntry,
     BestFitParenthesize,
+    WidthLimitedBlock,
 }
 
 #[derive(Debug, Copy, Default, Clone, Eq, PartialEq)]

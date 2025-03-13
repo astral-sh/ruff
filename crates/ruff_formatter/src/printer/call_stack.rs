@@ -2,7 +2,7 @@ use crate::format_element::tag::TagKind;
 use crate::format_element::PrintMode;
 use crate::printer::stack::{Stack, StackedStack};
 use crate::printer::{Indentation, MeasureMode};
-use crate::{IndentStyle, InvalidDocumentError, PrintError, PrintResult};
+use crate::{IndentStyle, InvalidDocumentError, LineWidthLimit, PrintError, PrintResult};
 use std::fmt::Debug;
 use std::num::NonZeroU8;
 
@@ -29,12 +29,14 @@ pub(super) struct PrintElementArgs {
     indent: Indentation,
     mode: PrintMode,
     measure_mode: MeasureMode,
+    line_width_limit: LineWidthLimit,
 }
 
 impl PrintElementArgs {
-    pub(crate) fn new(indent: Indentation) -> Self {
+    pub(crate) fn new(indent: Indentation, line_width: LineWidthLimit) -> Self {
         Self {
             indent,
+            line_width_limit: line_width,
             ..Self::default()
         }
     }
@@ -49,6 +51,10 @@ impl PrintElementArgs {
 
     pub(super) fn indentation(self) -> Indentation {
         self.indent
+    }
+
+    pub(super) fn line_width_limit(self) -> LineWidthLimit {
+        self.line_width_limit
     }
 
     pub(crate) fn increment_indent_level(mut self, indent_style: IndentStyle) -> Self {
@@ -80,6 +86,11 @@ impl PrintElementArgs {
         self.measure_mode = mode;
         self
     }
+
+    pub(crate) fn with_line_width_limit(mut self, line_width_limit: LineWidthLimit) -> Self {
+        self.line_width_limit = line_width_limit;
+        self
+    }
 }
 
 impl Default for PrintElementArgs {
@@ -88,6 +99,7 @@ impl Default for PrintElementArgs {
             indent: Indentation::Level(0),
             mode: PrintMode::Expanded,
             measure_mode: MeasureMode::FirstLine,
+            line_width_limit: LineWidthLimit::default()
         }
     }
 }
