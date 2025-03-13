@@ -2752,86 +2752,53 @@ impl<'db> TypeInferenceBuilder<'db> {
         // If the target defines, e.g., `__iadd__`, infer the augmented assignment as a call to that
         // dunder.
         let op = assignment.op;
-        match target_type {
-            Type::Union(union) => {
-                return union.map(self.db(), |&target_type| {
-                    self.infer_augmented_op(assignment, target_type, value_type)
+        let db = self.db();
+
+        let report_unsupported_augmented_op = |ctx: &mut InferContext| {
+            ctx.report_lint(
+                &UNSUPPORTED_OPERATOR,
+                assignment,
+                format_args!(
+                    "Operator `{op}=` is unsupported between objects of type `{}` and `{}`",
+                    target_type.display(db),
+                    value_type.display(db)
+                ),
+            );
+        };
+
+        // Fall back to non-augmented binary operator inference.
+        let mut binary_return_ty = || {
+            self.infer_binary_expression_type(target_type, value_type, op)
+                .unwrap_or_else(|| {
+                    report_unsupported_augmented_op(&mut self.context);
+                    Type::unknown()
                 })
-            }
-            Type::Instance(instance) => {
-                if let Symbol::Type(class_member, boundness) = instance
-                    .class()
-                    .class_member(self.db(), op.in_place_dunder())
-                    .symbol
-                {
-                    let call = class_member.try_call(
-                        self.db(),
-                        &CallArguments::positional([target_type, value_type]),
-                    );
-                    let augmented_return_ty = match call {
-                        Ok(t) => t.return_type(self.db()),
-                        Err(e) => {
-                            self.context.report_lint(
-                                &UNSUPPORTED_OPERATOR,
-                                assignment,
-                                format_args!(
-                                    "Operator `{op}=` is unsupported between objects of type `{}` and `{}`",
-                                    target_type.display(self.db()),
-                                    value_type.display(self.db())
-                                ),
-                            );
-                            e.fallback_return_type(self.db())
-                        }
-                    };
+        };
 
-                    return match boundness {
-                        Boundness::Bound => augmented_return_ty,
-                        Boundness::PossiblyUnbound => {
-                            let left_ty = target_type;
-                            let right_ty = value_type;
+        match target_type {
+            Type::Union(union) => union.map(db, |&elem_type| {
+                self.infer_augmented_op(assignment, elem_type, value_type)
+            }),
+            _ => {
+                let call = target_type.try_call_dunder(
+                    db,
+                    op.in_place_dunder(),
+                    &CallArguments::positional([value_type]),
+                );
 
-                            let binary_return_ty = self.infer_binary_expression_type(left_ty, right_ty, op)
-                                .unwrap_or_else(|| {
-                                    self.context.report_lint(
-                                        &UNSUPPORTED_OPERATOR,
-                                        assignment,
-                                        format_args!(
-                                            "Operator `{op}=` is unsupported between objects of type `{}` and `{}`",
-                                            left_ty.display(self.db()),
-                                            right_ty.display(self.db())
-                                        ),
-                                    );
-                                    Type::unknown()
-                                });
-
-                            UnionType::from_elements(
-                                self.db(),
-                                [augmented_return_ty, binary_return_ty],
-                            )
-                        }
-                    };
+                match call {
+                    Ok(outcome) => outcome.return_type(db),
+                    Err(CallDunderError::MethodNotAvailable) => binary_return_ty(),
+                    Err(CallDunderError::PossiblyUnbound(outcome)) => {
+                        UnionType::from_elements(db, [outcome.return_type(db), binary_return_ty()])
+                    }
+                    Err(CallDunderError::Call(call_error)) => {
+                        report_unsupported_augmented_op(&mut self.context);
+                        call_error.fallback_return_type(db)
+                    }
                 }
             }
-            _ => {}
         }
-
-        // By default, fall back to non-augmented binary operator inference.
-        let left_ty = target_type;
-        let right_ty = value_type;
-
-        self.infer_binary_expression_type(left_ty, right_ty, op)
-            .unwrap_or_else(|| {
-                self.context.report_lint(
-                    &UNSUPPORTED_OPERATOR,
-                    assignment,
-                    format_args!(
-                        "Operator `{op}=` is unsupported between objects of type `{}` and `{}`",
-                        left_ty.display(self.db()),
-                        right_ty.display(self.db())
-                    ),
-                );
-                Type::unknown()
-            })
     }
 
     fn infer_augment_assignment_definition(
