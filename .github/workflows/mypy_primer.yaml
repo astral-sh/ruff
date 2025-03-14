@@ -68,7 +68,7 @@ jobs:
             --type-checker knot \
             --old base_commit \
             --new "$GITHUB_SHA" \
-            --project-selector '/(mypy_primer|black|pyp|git-revise|zipp|arrow)$' \
+            --project-selector '/(mypy_primer|black|pyp|git-revise|zipp|arrow|isort|itsdangerous|rich|packaging|pybind11|pyinstrument)$' \
             --output concise \
             --debug > mypy_primer.diff || [ $? -eq 1 ]
 
