@@ -47,6 +47,8 @@ See also, the "Remapped rules" section which may result in disabled rules.
 
 - **Changes to how the Python version is inferred when a `target-version` is not specified** ([#16319](https://github.com/astral-sh/ruff/pull/16319))
 
+    > Note: Because of a mistake in the release process, the `requires-python` inference changes are not included in this release and instead shipped as part of 0.11.0.
+
     In previous versions of Ruff, you could specify your Python version with:
 
     - The `target-version` option in a `ruff.toml` file or the `[tool.ruff]` section of a pyproject.toml file.
