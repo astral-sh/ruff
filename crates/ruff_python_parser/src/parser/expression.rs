@@ -1402,19 +1402,15 @@ impl<'src> Parser<'src> {
         }
     }
 
-    fn check_fstring_comments(&mut self, fstring_range: TextRange) {
-        let tokens = self.tokens.in_range(fstring_range);
+    /// Check `range` for comment tokens and report an `UnsupportedSyntaxError` for each one found.
+    fn check_fstring_comments(&mut self, range: TextRange) {
         self.unsupported_syntax_errors
-            .extend(tokens.iter().filter_map(|token| {
-                if token.kind().is_comment() {
-                    Some(UnsupportedSyntaxError {
-                        kind: UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::Comment),
-                        range: token.range(),
-                        target_version: self.options.target_version,
-                    })
-                } else {
-                    None
-                }
+            .extend(self.tokens.in_range(range).iter().filter_map(|token| {
+                token.kind().is_comment().then_some(UnsupportedSyntaxError {
+                    kind: UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::Comment),
+                    range: token.range(),
+                    target_version: self.options.target_version,
+                })
             }));
     }
 
