@@ -1365,6 +1365,8 @@ impl<'src> Parser<'src> {
         // f"test {a \
         //     } more"                        # line continuation
 
+        let range = self.node_range(start);
+
         // the inner variant here doesn't matter, just checking if PEP 701 f-strings are supported
         if UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::NestedQuote)
             .is_unsupported(self.options.target_version)
@@ -1392,12 +1394,12 @@ impl<'src> Parser<'src> {
                 };
             }
 
-            self.check_fstring_comments(self.node_range(start));
+            self.check_fstring_comments(range);
         }
 
         ast::FString {
             elements,
-            range: self.node_range(start),
+            range,
             flags: ast::FStringFlags::from(flags),
         }
     }
