@@ -617,6 +617,33 @@ pub enum UnsupportedSyntaxErrorKind {
     TypeAliasStatement,
     TypeParamDefault,
 
+    /// Represents the use of a [PEP 646] star expression in an index.
+    ///
+    /// ## Examples
+    ///
+    /// Before Python 3.11, star expressions were not allowed in index/subscript operations (within
+    /// square brackets). This restriction was lifted in [PEP 646] to allow for star-unpacking of
+    /// `typing.TypeVarTuple`s, also added in Python 3.11. As such, this is the primary motivating
+    /// example from the PEP:
+    ///
+    /// ```python
+    /// from typing import TypeVar, TypeVarTuple
+    ///
+    /// DType = TypeVar('DType')
+    /// Shape = TypeVarTuple('Shape')
+    ///
+    /// class Array(Generic[DType, *Shape]): ...
+    /// ```
+    ///
+    /// But it applies to simple indexing as well:
+    ///
+    /// ```python
+    /// vector[*x]
+    /// array[a, *b]
+    /// ```
+    ///
+    /// [PEP 646]: https://peps.python.org/pep-0646/#change-1-star-expressions-in-indexes
+    StarExpressionInIndex,
     /// Represents the use of tuple unpacking in a `for` statement iterator clause before Python
     /// 3.9.
     ///
@@ -669,6 +696,9 @@ impl Display for UnsupportedSyntaxError {
             UnsupportedSyntaxErrorKind::TypeParamDefault => {
                 "Cannot set default type for a type parameter"
             }
+            UnsupportedSyntaxErrorKind::StarExpressionInIndex => {
+                "Cannot use star expression in index"
+            }
             UnsupportedSyntaxErrorKind::UnparenthesizedUnpackInFor => {
                 "Cannot use iterable unpacking in `for` statements"
             }
@@ -717,6 +747,9 @@ impl UnsupportedSyntaxErrorKind {
             UnsupportedSyntaxErrorKind::TypeParameterList => Change::Added(PythonVersion::PY312),
             UnsupportedSyntaxErrorKind::TypeAliasStatement => Change::Added(PythonVersion::PY312),
             UnsupportedSyntaxErrorKind::TypeParamDefault => Change::Added(PythonVersion::PY313),
+            UnsupportedSyntaxErrorKind::StarExpressionInIndex => {
+                Change::Added(PythonVersion::PY311)
+            }
             UnsupportedSyntaxErrorKind::UnparenthesizedUnpackInFor => {
                 Change::Added(PythonVersion::PY39)
             }
