@@ -26,6 +26,7 @@ use std::path::Path;
 
 use itertools::Itertools;
 use log::debug;
+use ruff_python_syntax_errors::{SyntaxChecker, SyntaxError, SyntaxErrorKind};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_diagnostics::{Diagnostic, IsolationLevel};
@@ -63,6 +64,7 @@ use crate::importer::Importer;
 use crate::noqa::NoqaMapping;
 use crate::package::PackageRoot;
 use crate::registry::Rule;
+use crate::rules::pyflakes::rules::LateFutureImport;
 use crate::rules::{flake8_pyi, flake8_type_checking, pyflakes, pyupgrade};
 use crate::settings::{flags, LinterSettings};
 use crate::{docstrings, noqa, Locator};
@@ -225,6 +227,9 @@ pub(crate) struct Checker<'a> {
     docstring_state: DocstringState,
     /// The target [`PythonVersion`] for version-dependent checks
     target_version: PythonVersion,
+
+    #[allow(clippy::struct_field_names)]
+    syntax_checker: SyntaxChecker,
 }
 
 impl<'a> Checker<'a> {
@@ -272,6 +277,7 @@ impl<'a> Checker<'a> {
             last_stmt_end: TextSize::default(),
             docstring_state: DocstringState::default(),
             target_version,
+            syntax_checker: SyntaxChecker::new(target_version),
         }
     }
 }
@@ -516,6 +522,8 @@ impl<'a> Checker<'a> {
 
 impl<'a> Visitor<'a> for Checker<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
+        self.syntax_checker.enter_stmt(stmt);
+
         // Step 0: Pre-processing
         self.semantic.push_node(stmt);
 
@@ -2739,5 +2747,21 @@ pub(crate) fn check_ast(
     checker.analyze.scopes.push(ScopeId::global());
     analyze::deferred_scopes(&checker);
 
+    checker.report_diagnostics(
+        checker
+            .syntax_checker
+            .finish()
+            .filter_map(|error| try_diagnostic_from_syntax_error(error, &checker)),
+    );
+
     checker.diagnostics.take()
+}
+
+fn try_diagnostic_from_syntax_error(error: &SyntaxError, checker: &Checker) -> Option<Diagnostic> {
+    match error.kind {
+        SyntaxErrorKind::LateFutureImport if checker.enabled(Rule::LateFutureImport) => {
+            Some(Diagnostic::new(LateFutureImport, error.range))
+        }
+        SyntaxErrorKind::LateFutureImport => None,
+    }
 }
