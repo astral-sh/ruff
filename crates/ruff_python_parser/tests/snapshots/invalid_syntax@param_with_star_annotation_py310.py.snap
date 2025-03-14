@@ -1,0 +1,78 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/param_with_star_annotation_py310.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..69,
+        body: [
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 44..68,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("foo"),
+                        range: 48..51,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 51..63,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: Some(
+                            Parameter {
+                                range: 52..62,
+                                name: Identifier {
+                                    id: Name("args"),
+                                    range: 53..57,
+                                },
+                                annotation: Some(
+                                    Starred(
+                                        ExprStarred {
+                                            range: 59..62,
+                                            value: Name(
+                                                ExprName {
+                                                    range: 60..62,
+                                                    id: Name("Ts"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ),
+                            },
+                        ),
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 65..68,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 65..68,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Unsupported Syntax Errors
+
+  |
+1 | # parse_options: {"target-version": "3.10"}
+2 | def foo(*args: *Ts): ...
+  |                ^^^ Syntax Error: Cannot use star annotation on Python 3.10 (syntax was added in Python 3.11)
+  |
