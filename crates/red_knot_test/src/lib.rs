@@ -79,13 +79,13 @@ pub fn run(
                 }
             }
 
+            let escaped_test_name = test.name().replace('\'', "\\'");
+
             println!(
-                "\nTo rerun this specific test, set the environment variable: {MDTEST_TEST_FILTER}=\"{}\"",
-                test.name()
+                "\nTo rerun this specific test, set the environment variable: {MDTEST_TEST_FILTER}='{escaped_test_name}'",
             );
             println!(
-                "{MDTEST_TEST_FILTER}=\"{}\" cargo test -p red_knot_python_semantic --test mdtest -- {test_name}",
-                test.name()
+                "{MDTEST_TEST_FILTER}='{escaped_test_name}' cargo test -p red_knot_python_semantic --test mdtest -- {test_name}",
             );
         }
     }

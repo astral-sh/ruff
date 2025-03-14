@@ -1,0 +1,28 @@
+---
+source: crates/red_knot_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: no_matching_overload.md - No matching overload diagnostics - Calls to overloaded functions
+mdtest path: crates/red_knot_python_semantic/resources/mdtest/diagnostics/no_matching_overload.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | type("Foo", ())  # error: [no-matching-overload]
+```
+
+# Diagnostics
+
+```
+error: lint:no-matching-overload
+ --> /src/mdtest_snippet.py:1:1
+  |
+1 | type("Foo", ())  # error: [no-matching-overload]
+  | ^^^^^^^^^^^^^^^ No overload of class `type` matches arguments
+  |
+
+```

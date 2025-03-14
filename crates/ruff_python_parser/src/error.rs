@@ -1,7 +1,7 @@
 use std::fmt::{self, Display};
 
 use ruff_python_ast::PythonVersion;
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::TokenKind;
 
@@ -439,14 +439,20 @@ pub struct UnsupportedSyntaxError {
     pub target_version: PythonVersion,
 }
 
+impl Ranged for UnsupportedSyntaxError {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
+
 /// The type of tuple unpacking for [`UnsupportedSyntaxErrorKind::StarTuple`].
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum StarTupleKind {
     Return,
     Yield,
 }
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum UnsupportedSyntaxErrorKind {
     Match,
     Walrus,
@@ -665,6 +671,33 @@ pub enum UnsupportedSyntaxErrorKind {
     ///
     /// [PEP 646]: https://peps.python.org/pep-0646/#change-2-args-as-a-typevartuple
     StarAnnotation,
+
+    /// Represents the use of tuple unpacking in a `for` statement iterator clause before Python
+    /// 3.9.
+    ///
+    /// ## Examples
+    ///
+    /// Like [`UnsupportedSyntaxErrorKind::StarTuple`] in `return` and `yield` statements, prior to
+    /// Python 3.9, tuple unpacking in the iterator clause of a `for` statement required
+    /// parentheses:
+    ///
+    /// ```python
+    /// # valid on Python 3.8 and earlier
+    /// for i in (*a, *b): ...
+    /// ```
+    ///
+    /// Omitting the parentheses was invalid:
+    ///
+    /// ```python
+    /// for i in *a, *b: ...  # SyntaxError
+    /// ```
+    ///
+    /// This was changed as part of the [PEG parser rewrite] included in Python 3.9 but not
+    /// documented directly until the [Python 3.11 release].
+    ///
+    /// [PEG parser rewrite]: https://peps.python.org/pep-0617/
+    /// [Python 3.11 release]: https://docs.python.org/3/whatsnew/3.11.html#other-language-changes
+    UnparenthesizedUnpackInFor,
 }
 
 impl Display for UnsupportedSyntaxError {
@@ -695,6 +728,9 @@ impl Display for UnsupportedSyntaxError {
                 "Cannot use star expression in index"
             }
             UnsupportedSyntaxErrorKind::StarAnnotation => "Cannot use star annotation",
+            UnsupportedSyntaxErrorKind::UnparenthesizedUnpackInFor => {
+                "Cannot use iterable unpacking in `for` statements"
+            }
         };
 
         write!(
@@ -744,6 +780,9 @@ impl UnsupportedSyntaxErrorKind {
                 Change::Added(PythonVersion::PY311)
             }
             UnsupportedSyntaxErrorKind::StarAnnotation => Change::Added(PythonVersion::PY311),
+            UnsupportedSyntaxErrorKind::UnparenthesizedUnpackInFor => {
+                Change::Added(PythonVersion::PY39)
+            }
         }
     }
 

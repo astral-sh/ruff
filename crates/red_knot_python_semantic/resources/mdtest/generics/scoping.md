@@ -37,8 +37,11 @@ from typing import TypeVar
 
 T = TypeVar("T")
 
-def f1(x: T) -> T: ...
-def f2(x: T) -> T: ...
+def f1(x: T) -> T:
+    return x
+
+def f2(x: T) -> T:
+    return x
 
 f1(1)
 f2("a")
@@ -53,7 +56,8 @@ This also applies to a single generic function being used multiple times, instan
 to a different type each time.
 
 ```py
-def f[T](x: T) -> T: ...
+def f[T](x: T) -> T:
+    return x
 
 # TODO: no error
 # TODO: revealed: int or Literal[1]
@@ -72,8 +76,11 @@ reveal_type(f("a"))  # revealed: T
 
 ```py
 class C[T]:
-    def m1(self, x: T) -> T: ...
-    def m2(self, x: T) -> T: ...
+    def m1(self, x: T) -> T:
+        return x
+
+    def m2(self, x: T) -> T:
+        return x
 
 c: C[int] = C()
 # TODO: no error
@@ -101,7 +108,8 @@ S = TypeVar("S")
 # TODO: no error
 # error: [invalid-base]
 class Legacy(Generic[T]):
-    def m(self, x: T, y: S) -> S: ...
+    def m(self, x: T, y: S) -> S:
+        return y
 
 legacy: Legacy[int] = Legacy()
 # TODO: revealed: str
@@ -112,7 +120,8 @@ With PEP 695 syntax, it is clearer that the method uses a separate typevar:
 
 ```py
 class C[T]:
-    def m[S](self, x: T, y: S) -> S: ...
+    def m[S](self, x: T, y: S) -> S:
+        return y
 
 c: C[int] = C()
 # TODO: no errors
@@ -147,7 +156,8 @@ class C(Generic[T]):
     x: list[S] = []
 
     # This is not an error, as shown in the previous test
-    def m(self, x: S) -> S: ...
+    def m(self, x: S) -> S:
+        return x
 ```
 
 This is true with PEP 695 syntax, as well, though we must use the legacy syntax to define the
@@ -169,8 +179,11 @@ class C[T]:
     # TODO: error
     x: list[S] = []
 
-    def m1(self, x: S) -> S: ...
-    def m2[S](self, x: S) -> S: ...
+    def m1(self, x: S) -> S:
+        return x
+
+    def m2[S](self, x: S) -> S:
+        return x
 ```
 
 ## Nested formal typevars must be distinct
@@ -216,9 +229,10 @@ from typing import Iterable
 
 def f[T](x: T, y: T) -> None:
     class Ok[S]: ...
-    # TODO: error
+    # TODO: error for reuse of typevar
     class Bad1[T]: ...
-    # TODO: error
+    # TODO: no non-subscriptable error, error for reuse of typevar
+    # error: [non-subscriptable]
     class Bad2(Iterable[T]): ...
 ```
 
@@ -229,9 +243,10 @@ from typing import Iterable
 
 class C[T]:
     class Ok1[S]: ...
-    # TODO: error
+    # TODO: error for reuse of typevar
     class Bad1[T]: ...
-    # TODO: error
+    # TODO: no non-subscriptable error, error for reuse of typevar
+    # error: [non-subscriptable]
     class Bad2(Iterable[T]): ...
 ```
 

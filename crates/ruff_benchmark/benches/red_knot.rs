@@ -67,28 +67,6 @@ static EXPECTED_DIAGNOSTICS: &[KeyDiagnosticFields] = &[
         Cow::Borrowed("Module `collections.abc` has no member `Iterable`"),
         Severity::Error,
     ),
-    // We don't handle intersections in `is_assignable_to` yet
-    (
-        DiagnosticId::lint("invalid-argument-type"),
-        Some("/src/tomllib/_parser.py"),
-        Some(20158..20172),
-        Cow::Borrowed("Object of type `Unknown & ~AlwaysFalsy | @Todo & ~AlwaysFalsy` cannot be assigned to parameter 1 (`match`) of function `match_to_datetime`; expected type `Match`"),
-        Severity::Error,
-    ),
-    (
-        DiagnosticId::lint("invalid-argument-type"),
-        Some("/src/tomllib/_parser.py"),
-        Some(20464..20479),
-        Cow::Borrowed("Object of type `Unknown & ~AlwaysFalsy | @Todo & ~AlwaysFalsy` cannot be assigned to parameter 1 (`match`) of function `match_to_localtime`; expected type `Match`"),
-        Severity::Error,
-    ),
-    (
-        DiagnosticId::lint("invalid-argument-type"),
-        Some("/src/tomllib/_parser.py"),
-        Some(20774..20786),
-        Cow::Borrowed("Object of type `Unknown & ~AlwaysFalsy | @Todo & ~AlwaysFalsy` cannot be assigned to parameter 1 (`match`) of function `match_to_number`; expected type `Match`"),
-        Severity::Error,
-    ),
     (
         DiagnosticId::lint("unused-ignore-comment"),
         Some("/src/tomllib/_parser.py"),
