@@ -383,7 +383,7 @@ static_assert(is_subtype_of(LiteralStr, type[object]))
 
 static_assert(not is_subtype_of(type[str], LiteralStr))
 
-# custom meta classes
+# custom metaclasses
 
 type LiteralHasCustomMetaclass = TypeOf[HasCustomMetaclass]
 

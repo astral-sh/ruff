@@ -38,7 +38,7 @@ impl super::RequestHandler for ExecuteCommand {
 impl super::SyncRequestHandler for ExecuteCommand {
     fn run(
         session: &mut Session,
-        notifier: client::Notifier,
+        _notifier: client::Notifier,
         requester: &mut client::Requester,
         params: types::ExecuteCommandParams,
     ) -> server::Result<Option<serde_json::Value>> {
@@ -46,19 +46,16 @@ impl super::SyncRequestHandler for ExecuteCommand {
             .with_failure_code(ErrorCode::InvalidParams)?;
 
         if command == SupportedCommand::Debug {
+            // TODO: Currently we only use the first argument i.e., the first document that's
+            // provided but we could expand this to consider all *open* documents.
             let argument: DebugCommandArgument = params.arguments.into_iter().next().map_or_else(
                 || Ok(DebugCommandArgument::default()),
                 |value| serde_json::from_value(value).with_failure_code(ErrorCode::InvalidParams),
             )?;
-            let output = debug_information(session, argument.text_document)
-                .with_failure_code(ErrorCode::InternalError)?;
-            notifier
-                .notify::<types::notification::LogMessage>(types::LogMessageParams {
-                    message: output.clone(),
-                    typ: types::MessageType::INFO,
-                })
-                .with_failure_code(ErrorCode::InternalError)?;
-            return Ok(Some(serde_json::Value::String(output)));
+            return Ok(Some(serde_json::Value::String(
+                debug_information(session, argument.text_document)
+                    .with_failure_code(ErrorCode::InternalError)?,
+            )));
         }
 
         // check if we can apply a workspace edit

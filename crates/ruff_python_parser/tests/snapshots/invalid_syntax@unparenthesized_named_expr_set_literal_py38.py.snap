@@ -1,0 +1,185 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/unparenthesized_named_expr_set_literal_py38.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..88,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 43..57,
+                    value: Set(
+                        ExprSet {
+                            range: 43..57,
+                            elts: [
+                                Named(
+                                    ExprNamed {
+                                        range: 44..50,
+                                        target: Name(
+                                            ExprName {
+                                                range: 44..45,
+                                                id: Name("x"),
+                                                ctx: Store,
+                                            },
+                                        ),
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 49..50,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ),
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 52..53,
+                                        value: Int(
+                                            2,
+                                        ),
+                                    },
+                                ),
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 55..56,
+                                        value: Int(
+                                            3,
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 58..72,
+                    value: Set(
+                        ExprSet {
+                            range: 58..72,
+                            elts: [
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 59..60,
+                                        value: Int(
+                                            1,
+                                        ),
+                                    },
+                                ),
+                                Named(
+                                    ExprNamed {
+                                        range: 62..68,
+                                        target: Name(
+                                            ExprName {
+                                                range: 62..63,
+                                                id: Name("x"),
+                                                ctx: Store,
+                                            },
+                                        ),
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 67..68,
+                                                value: Int(
+                                                    2,
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ),
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 70..71,
+                                        value: Int(
+                                            3,
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 73..87,
+                    value: Set(
+                        ExprSet {
+                            range: 73..87,
+                            elts: [
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 74..75,
+                                        value: Int(
+                                            1,
+                                        ),
+                                    },
+                                ),
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 77..78,
+                                        value: Int(
+                                            2,
+                                        ),
+                                    },
+                                ),
+                                Named(
+                                    ExprNamed {
+                                        range: 80..86,
+                                        target: Name(
+                                            ExprName {
+                                                range: 80..81,
+                                                id: Name("x"),
+                                                ctx: Store,
+                                            },
+                                        ),
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 85..86,
+                                                value: Int(
+                                                    3,
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Unsupported Syntax Errors
+
+  |
+1 | # parse_options: {"target-version": "3.8"}
+2 | {x := 1, 2, 3}
+  |  ^^^^^^ Syntax Error: Cannot use unparenthesized assignment expression as an element in a set literal on Python 3.8 (syntax was added in Python 3.9)
+3 | {1, x := 2, 3}
+4 | {1, 2, x := 3}
+  |
+
+
+  |
+1 | # parse_options: {"target-version": "3.8"}
+2 | {x := 1, 2, 3}
+3 | {1, x := 2, 3}
+  |     ^^^^^^ Syntax Error: Cannot use unparenthesized assignment expression as an element in a set literal on Python 3.8 (syntax was added in Python 3.9)
+4 | {1, 2, x := 3}
+  |
+
+
+  |
+2 | {x := 1, 2, 3}
+3 | {1, x := 2, 3}
+4 | {1, 2, x := 3}
+  |        ^^^^^^ Syntax Error: Cannot use unparenthesized assignment expression as an element in a set literal on Python 3.8 (syntax was added in Python 3.9)
+  |

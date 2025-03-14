@@ -406,7 +406,10 @@ impl<'src> Parser<'src> {
             // # parse_options: {"target-version": "3.7"}
             // rest = (4, 5, 6)
             // def f(): return 1, 2, 3, *rest
-            self.check_tuple_unpacking(&parsed_expr, StarTupleKind::Return);
+            self.check_tuple_unpacking(
+                &parsed_expr,
+                UnsupportedSyntaxErrorKind::StarTuple(StarTupleKind::Return),
+            );
 
             Box::new(parsed_expr.expr)
         });
@@ -420,10 +423,12 @@ impl<'src> Parser<'src> {
     /// Report [`UnsupportedSyntaxError`]s for each starred element in `expr` if it is an
     /// unparenthesized tuple.
     ///
-    /// This method can be used to check for tuple unpacking in return and yield statements, which
-    /// are only allowed in Python 3.8 and later: <https://github.com/python/cpython/issues/76298>.
-    pub(crate) fn check_tuple_unpacking(&mut self, expr: &Expr, kind: StarTupleKind) {
-        let kind = UnsupportedSyntaxErrorKind::StarTuple(kind);
+    /// This method can be used to check for tuple unpacking in `return`, `yield`, and `for`
+    /// statements, which are only allowed after [Python 3.8] and [Python 3.9], respectively.
+    ///
+    /// [Python 3.8]: https://github.com/python/cpython/issues/76298
+    /// [Python 3.9]: https://github.com/python/cpython/issues/90881
+    pub(super) fn check_tuple_unpacking(&mut self, expr: &Expr, kind: UnsupportedSyntaxErrorKind) {
         if kind.is_supported(self.options.target_version) {
             return;
         }
@@ -1732,6 +1737,28 @@ impl<'src> Parser<'src> {
         // for target in x := 1: ...
         let iter = self.parse_expression_list(ExpressionContext::starred_bitwise_or());
 
+        // test_ok for_iter_unpack_py39
+        // # parse_options: {"target-version": "3.9"}
+        // for x in *a,  b: ...
+        // for x in  a, *b: ...
+        // for x in *a, *b: ...
+
+        // test_ok for_iter_unpack_py38
+        // # parse_options: {"target-version": "3.8"}
+        // for x in (*a,  b): ...
+        // for x in ( a, *b): ...
+        // for x in (*a, *b): ...
+
+        // test_err for_iter_unpack_py38
+        // # parse_options: {"target-version": "3.8"}
+        // for x in *a,  b: ...
+        // for x in  a, *b: ...
+        // for x in *a, *b: ...
+        self.check_tuple_unpacking(
+            &iter,
+            UnsupportedSyntaxErrorKind::UnparenthesizedUnpackInFor,
+        );
+
         self.expect(TokenKind::Colon);
 
         let body = self.parse_body(Clause::For);
@@ -2896,9 +2923,23 @@ impl<'src> Parser<'src> {
                             // def foo(*args: *int or str): ...
                             // def foo(*args: *yield x): ...
                             // # def foo(*args: **int): ...
-                            self.parse_conditional_expression_or_higher_impl(
+                            let parsed_expr = self.parse_conditional_expression_or_higher_impl(
                                 ExpressionContext::starred_bitwise_or(),
-                            )
+                            );
+
+                            // test_ok param_with_star_annotation_py311
+                            // # parse_options: {"target-version": "3.11"}
+                            // def foo(*args: *Ts): ...
+
+                            // test_err param_with_star_annotation_py310
+                            // # parse_options: {"target-version": "3.10"}
+                            // def foo(*args: *Ts): ...
+                            self.add_unsupported_syntax_error(
+                                UnsupportedSyntaxErrorKind::StarAnnotation,
+                                parsed_expr.range(),
+                            );
+
+                            parsed_expr
                         }
                         AllowStarAnnotation::No => {
                             // test_ok param_with_annotation

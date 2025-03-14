@@ -6,7 +6,7 @@
 class NotBool:
     __bool__ = None
 
-# TODO: We should emit an `invalid-argument` error here for `2` because `bool` only takes one argument.
+# error: [too-many-positional-arguments] "Too many positional arguments to class `bool`: expected 1, got 2"
 bool(1, 2)
 
 # TODO: We should emit an `unsupported-bool-conversion` error here because the argument doesn't implement `__bool__` correctly.
@@ -29,9 +29,12 @@ But a three-argument call to type creates a dynamic instance of the `type` class
 reveal_type(type("Foo", (), {}))  # revealed: type
 ```
 
-Other numbers of arguments are invalid (TODO -- these should emit a diagnostic)
+Other numbers of arguments are invalid
 
 ```py
+# error: [no-matching-overload] "No overload of class `type` matches arguments"
 type("Foo", ())
+
+# error: [no-matching-overload] "No overload of class `type` matches arguments"
 type("Foo", (), {}, weird_other_arg=42)
 ```

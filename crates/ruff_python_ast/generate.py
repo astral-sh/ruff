@@ -30,6 +30,14 @@ types_requiring_create_prefix = [
     "UnaryOp",
     "BoolOp",
     "Operator",
+    "Decorator",
+    "TypeParams",
+    "Parameters",
+    "Arguments",
+    "ElifElseClause",
+    "WithItem",
+    "MatchCase",
+    "Alias",
 ]
 
 

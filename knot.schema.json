@@ -49,6 +49,25 @@
   },
   "additionalProperties": false,
   "definitions": {
+    "DiagnosticFormat": {
+      "description": "The diagnostic output format.",
+      "oneOf": [
+        {
+          "description": "The default full mode will print \"pretty\" diagnostics.\n\nThat is, color will be used when printing to a `tty`. Moreover, diagnostic messages may include additional context and annotations on the input to help understand the message.",
+          "type": "string",
+          "enum": [
+            "full"
+          ]
+        },
+        {
+          "description": "Print diagnostics in a concise mode.\n\nThis will guarantee that each diagnostic is printed on a single line. Only the most important or primary aspects of the diagnostic are included. Contextual information is dropped.\n\nThis may use color when printing to a `tty`.",
+          "type": "string",
+          "enum": [
+            "concise"
+          ]
+        }
+      ]
+    },
     "EnvironmentOptions": {
       "type": "object",
       "properties": {
@@ -441,6 +460,16 @@
             }
           ]
         },
+        "invalid-return-type": {
+          "title": "detects returned values that can't be assigned to the function's annotated return type",
+          "description": "## What it does\nDetects returned values that can't be assigned to the function's annotated return type.\n\n## Why is this bad?\nReturning an object of a type incompatible with the annotated return type may cause confusion to the user calling the function.\n\n## Examples\n```python\ndef func() -> int:\n    return \"a\"  # error: [invalid-return-type]\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "invalid-syntax-in-forward-annotation": {
           "title": "detects invalid syntax in forward annotations",
           "description": "TODO #14889",
@@ -484,6 +513,16 @@
         "missing-argument": {
           "title": "detects missing required arguments in a call",
           "description": "## What it does\nChecks for missing required arguments in a call.\n\n## Why is this bad?\nFailing to provide a required argument will raise a `TypeError` at runtime.\n\n## Examples\n```python\ndef func(x: int): ...\nfunc()  # TypeError: func() missing 1 required positional argument: 'x'\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "no-matching-overload": {
+          "title": "detects calls that do not match any overload",
+          "description": "## What it does\nChecks for calls to an overloaded function that do not match any of the overloads.\n\n## Why is this bad?\nFailing to provide the correct arguments to one of the overloads will raise a `TypeError`\nat runtime.\n\n## Examples\n```python\n@overload\ndef func(x: int): ...\n@overload\ndef func(x: bool): ...\nfunc(\"string\")  # error: [no-matching-overload]\n```",
           "default": "error",
           "oneOf": [
             {
@@ -727,6 +766,17 @@
           "type": [
             "boolean",
             "null"
+          ]
+        },
+        "output-format": {
+          "description": "The format to use for printing diagnostic messages.\n\nDefaults to `full`.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/DiagnosticFormat"
+            },
+            {
+              "type": "null"
+            }
           ]
         }
       },

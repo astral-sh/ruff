@@ -9,7 +9,7 @@ use ruff_source_file::{OneIndexed, SourceCode};
 use ruff_text_size::TextRange;
 
 use crate::{
-    diagnostic::{DiagnosticId, DisplayDiagnosticConfig, Severity, Span},
+    diagnostic::{DiagnosticFormat, DiagnosticId, DisplayDiagnosticConfig, Severity, Span},
     files::File,
     source::{line_index, source_text},
     Db,
@@ -74,6 +74,28 @@ pub struct OldDisplayDiagnostic<'db, 'diag, 'config> {
 
 impl std::fmt::Display for OldDisplayDiagnostic<'_, '_, '_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if matches!(self.config.format, DiagnosticFormat::Concise) {
+            match self.diagnostic.severity() {
+                Severity::Info => f.write_str("info")?,
+                Severity::Warning => f.write_str("warning")?,
+                Severity::Error => f.write_str("error")?,
+                Severity::Fatal => f.write_str("fatal")?,
+            }
+
+            write!(f, "[{rule}]", rule = self.diagnostic.id())?;
+            if let Some(span) = self.diagnostic.span() {
+                write!(f, " {path}", path = span.file().path(self.db))?;
+                if let Some(range) = span.range() {
+                    let index = line_index(self.db, span.file());
+                    let source = source_text(self.db, span.file());
+                    let start = index.source_location(range.start(), &source);
+                    write!(f, ":{line}:{col}", line = start.row, col = start.column)?;
+                }
+                write!(f, ":")?;
+            }
+            return write!(f, " {message}", message = self.diagnostic.message());
+        }
+
         let render = |f: &mut std::fmt::Formatter, message| {
             let renderer = if self.config.color {
                 AnnotateRenderer::styled()

@@ -10,6 +10,10 @@ reveal_type(x)  # revealed: Literal[2]
 x = 1.0
 x /= 2
 reveal_type(x)  # revealed: int | float
+
+x = (1, 2)
+x += (3, 4)
+reveal_type(x)  # revealed: tuple[Literal[1], Literal[2], Literal[3], Literal[4]]
 ```
 
 ## Dunder methods
@@ -75,8 +79,7 @@ def _(flag: bool):
 
     f = Foo()
 
-    # TODO: We should emit an `unsupported-operator` error here, possibly with the information
-    # that `Foo.__iadd__` may be unbound as additional context.
+    # error: [unsupported-operator] "Operator `+=` is unsupported between objects of type `Foo` and `Literal["Hello, world!"]`"
     f += "Hello, world!"
 
     reveal_type(f)  # revealed: int | Unknown
@@ -161,4 +164,19 @@ def f(flag: bool, flag2: bool):
     f += 12
 
     reveal_type(f)  # revealed: int | str | float
+```
+
+## Implicit dunder calls on class objects
+
+```py
+class Meta(type):
+    def __iadd__(cls, other: int) -> str:
+        return ""
+
+class C(metaclass=Meta): ...
+
+cls = C
+cls += 1
+
+reveal_type(cls)  # revealed: str
 ```

@@ -779,6 +779,13 @@ impl Violation for SuspiciousXMLPullDOMUsage {
     }
 }
 
+/// ## Deprecation
+///
+/// This rule was deprecated as the `lxml` library has been modified to address
+/// known vulnerabilities and unsafe defaults. As such, the `defusedxml`
+/// library is no longer necessary, `defusedxml` has [deprecated] its `lxml`
+/// module.
+///
 /// ## What it does
 /// Checks for uses of insecure XML parsers.
 ///
@@ -802,6 +809,7 @@ impl Violation for SuspiciousXMLPullDOMUsage {
 /// - [Common Weakness Enumeration: CWE-776](https://cwe.mitre.org/data/definitions/776.html)
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
+/// [deprecated]: https://pypi.org/project/defusedxml/0.8.0rc2/#defusedxml-lxml
 #[derive(ViolationMetadata)]
 pub(crate) struct SuspiciousXMLETreeUsage;
 
