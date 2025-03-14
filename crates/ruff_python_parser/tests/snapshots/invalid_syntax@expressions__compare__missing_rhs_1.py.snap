@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/expressions/compare/missing_rhs_1.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -77,7 +76,7 @@ Module(
 1 | # Without the `in`, this is considered to be a unary `not`
 2 | x not
   |   ^^^ Syntax Error: Simple statements must be separated by newlines or semicolons
-3 | 
+3 |
 4 | 1 + 2
   |
 
@@ -86,6 +85,6 @@ Module(
 1 | # Without the `in`, this is considered to be a unary `not`
 2 | x not
   |      ^ Syntax Error: Expected an expression
-3 | 
+3 |
 4 | 1 + 2
   |

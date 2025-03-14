@@ -82,7 +82,7 @@ export default function Chrome() {
         onShare={handleShare}
       />
 
-      <div className="flex flex-grow">
+      <div className="flex grow">
         {source != null && (
           <Editor
             theme={theme}

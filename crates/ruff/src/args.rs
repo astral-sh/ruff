@@ -21,6 +21,7 @@ use ruff_linter::settings::types::{
     PythonVersion, UnsafeFixes,
 };
 use ruff_linter::{RuleParser, RuleSelector, RuleSelectorParser};
+use ruff_python_ast as ast;
 use ruff_source_file::{LineIndex, OneIndexed};
 use ruff_text_size::TextRange;
 use ruff_workspace::configuration::{Configuration, RuleSelection};
@@ -29,6 +30,8 @@ use ruff_workspace::options_base::{OptionEntry, OptionsMetadata};
 use ruff_workspace::resolver::ConfigurationTransformer;
 use rustc_hash::FxHashMap;
 use toml;
+
+use crate::commands::completions::config::{OptionString, OptionStringParser};
 
 /// All configuration options that can be passed "globally",
 /// i.e., can be passed to all subcommands
@@ -114,7 +117,11 @@ pub enum Command {
     /// List or describe the available configuration options.
     Config {
         /// Config key to show
-        option: Option<String>,
+        #[arg(
+            value_parser = OptionStringParser,
+            hide_possible_values = true
+        )]
+        option: Option<OptionString>,
         /// Output format
         #[arg(long, value_enum, default_value = "text")]
         output_format: HelpFormat,
@@ -722,7 +729,7 @@ impl CheckCommand {
             preview: resolve_bool_arg(self.preview, self.no_preview).map(PreviewMode::from),
             respect_gitignore: resolve_bool_arg(self.respect_gitignore, self.no_respect_gitignore),
             select: self.select,
-            target_version: self.target_version,
+            target_version: self.target_version.map(ast::PythonVersion::from),
             unfixable: self.unfixable,
             // TODO(charlie): Included in `pyproject.toml`, but not inherited.
             cache_dir: self.cache_dir,
@@ -764,7 +771,7 @@ impl FormatCommand {
             exclude: self.exclude,
             preview: resolve_bool_arg(self.preview, self.no_preview).map(PreviewMode::from),
             force_exclude: resolve_bool_arg(self.force_exclude, self.no_force_exclude),
-            target_version: self.target_version,
+            target_version: self.target_version.map(ast::PythonVersion::from),
             cache_dir: self.cache_dir,
             extension: self.extension,
             ..ExplicitConfigOverrides::default()
@@ -794,7 +801,7 @@ impl AnalyzeGraphCommand {
                 None
             },
             preview: resolve_bool_arg(self.preview, self.no_preview).map(PreviewMode::from),
-            target_version: self.target_version,
+            target_version: self.target_version.map(ast::PythonVersion::from),
             ..ExplicitConfigOverrides::default()
         };
 
@@ -823,7 +830,7 @@ enum InvalidConfigFlagReason {
     ValidTomlButInvalidRuffSchema(toml::de::Error),
     /// It was a valid ruff config file, but the user tried to pass a
     /// value for `extend` as part of the config override.
-    // `extend` is special, because it affects which config files we look at
+    /// `extend` is special, because it affects which config files we look at
     /// in the first place. We currently only parse --config overrides *after*
     /// we've combined them with all the arguments from the various config files
     /// that we found, so trying to override `extend` as part of a --config
@@ -959,7 +966,7 @@ A `--config` flag must either be a path to a `.toml` configuration file
         // We want to display the most helpful error to the user as possible.
         if Path::new(value)
             .extension()
-            .map_or(false, |ext| ext.eq_ignore_ascii_case("toml"))
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("toml"))
         {
             if !value.contains('=') {
                 tip.push_str(&format!(
@@ -1258,7 +1265,7 @@ struct ExplicitConfigOverrides {
     preview: Option<PreviewMode>,
     respect_gitignore: Option<bool>,
     select: Option<Vec<RuleSelector>>,
-    target_version: Option<PythonVersion>,
+    target_version: Option<ast::PythonVersion>,
     unfixable: Option<Vec<RuleSelector>>,
     // TODO(charlie): Captured in pyproject.toml as a default, but not part of `Settings`.
     cache_dir: Option<PathBuf>,

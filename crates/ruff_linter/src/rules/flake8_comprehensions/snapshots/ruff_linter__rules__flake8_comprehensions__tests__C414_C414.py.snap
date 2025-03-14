@@ -451,7 +451,7 @@ C414.py:28:1: C414 [*] Unnecessary `reversed()` call within `sorted()`
 27 | set(tuple())
 28 | sorted(reversed())
    | ^^^^^^^^^^^^^^^^^^ C414
-29 | 
+29 |
 30 | # Nested sorts with differing keyword arguments. Not flagged.
    |
    = help: Remove the inner `reversed()` call
@@ -477,7 +477,7 @@ C414.py:37:27: C414 [*] Unnecessary `list()` call within `sorted()`
 41 | |     key=lambda xxxxx: xxxxx or "",
 42 | | )
    | |_^ C414
-43 |   
+43 |
 44 |   xxxxxxxxxxx_xxxxx_xxxxx = sorted(
    |
    = help: Remove the inner `list()` call
@@ -495,7 +495,7 @@ C414.py:37:27: C414 [*] Unnecessary `list()` call within `sorted()`
 C414.py:44:27: C414 [*] Unnecessary `list()` call within `sorted()`
    |
 42 |   )
-43 |   
+43 |
 44 |   xxxxxxxxxxx_xxxxx_xxxxx = sorted(
    |  ___________________________^
 45 | |     list(x_xxxx_xxxxxxxxxxx_xxxxx.xxxx()),  # xxxxxxxxxxx xxxxx xxxx xxx xx Nxxx

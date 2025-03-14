@@ -1,11 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
-snapshot_kind: text
 ---
 PYI059.pyi:8:17: PYI059 [*] `Generic[]` should always be the last base class
    |
  6 | V = TypeVar('V')
- 7 | 
+ 7 |
  8 | class LinkedList(Generic[T], Sized):  # PYI059
    |                 ^^^^^^^^^^^^^^^^^^^ PYI059
  9 |     def __init__(self) -> None: ...
@@ -26,7 +25,7 @@ PYI059.pyi:8:17: PYI059 [*] `Generic[]` should always be the last base class
 PYI059.pyi:12:16: PYI059 [*] `Generic[]` should always be the last base class
    |
 10 |       def push(self, item: T) -> None: ...
-11 |   
+11 |
 12 |   class MyMapping(  # PYI059
    |  ________________^
 13 | |     t.Generic[K, V],

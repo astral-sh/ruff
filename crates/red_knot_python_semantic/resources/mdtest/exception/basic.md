@@ -124,42 +124,49 @@ def _(e: Exception | type[Exception] | None):
 ## Exception cause is not an exception
 
 ```py
-try:
-    raise EOFError() from GeneratorExit  # fine
-except:
-    ...
+def _():
+    try:
+        raise EOFError() from GeneratorExit  # fine
+    except:
+        ...
 
-try:
-    raise StopIteration from MemoryError()  # fine
-except:
-    ...
+def _():
+    try:
+        raise StopIteration from MemoryError()  # fine
+    except:
+        ...
 
-try:
-    raise BufferError() from None  # fine
-except:
-    ...
+def _():
+    try:
+        raise BufferError() from None  # fine
+    except:
+        ...
 
-try:
-    raise ZeroDivisionError from False  # error: [invalid-raise]
-except:
-    ...
+def _():
+    try:
+        raise ZeroDivisionError from False  # error: [invalid-raise]
+    except:
+        ...
 
-try:
-    raise SystemExit from bool()  # error: [invalid-raise]
-except:
-    ...
+def _():
+    try:
+        raise SystemExit from bool()  # error: [invalid-raise]
+    except:
+        ...
 
-try:
-    raise
-except KeyboardInterrupt as e:  # fine
-    reveal_type(e)  # revealed: KeyboardInterrupt
-    raise LookupError from e  # fine
+def _():
+    try:
+        raise
+    except KeyboardInterrupt as e:  # fine
+        reveal_type(e)  # revealed: KeyboardInterrupt
+        raise LookupError from e  # fine
 
-try:
-    raise
-except int as e:  # error: [invalid-exception-caught]
-    reveal_type(e)  # revealed: Unknown
-    raise KeyError from e
+def _():
+    try:
+        raise
+    except int as e:  # error: [invalid-exception-caught]
+        reveal_type(e)  # revealed: Unknown
+        raise KeyError from e
 
 def _(e: Exception | type[Exception]):
     raise ModuleNotFoundError from e  # fine

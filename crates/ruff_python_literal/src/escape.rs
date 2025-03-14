@@ -1,4 +1,7 @@
-use ruff_python_ast::str::Quote;
+use ruff_python_ast::{
+    str::{Quote, TripleQuotes},
+    BytesLiteralFlags, StringFlags, StringLiteralFlags,
+};
 
 pub struct EscapeLayout {
     pub quote: Quote,
@@ -60,23 +63,32 @@ impl<'a> UnicodeEscape<'a> {
         Self::with_preferred_quote(source, Quote::Single)
     }
     #[inline]
-    pub fn str_repr<'r>(&'a self) -> StrRepr<'r, 'a> {
-        StrRepr(self)
+    pub fn str_repr<'r>(&'a self, triple_quotes: TripleQuotes) -> StrRepr<'r, 'a> {
+        StrRepr {
+            escape: self,
+            triple_quotes,
+        }
     }
 }
 
-pub struct StrRepr<'r, 'a>(&'r UnicodeEscape<'a>);
+pub struct StrRepr<'r, 'a> {
+    escape: &'r UnicodeEscape<'a>,
+    triple_quotes: TripleQuotes,
+}
 
 impl StrRepr<'_, '_> {
     pub fn write(&self, formatter: &mut impl std::fmt::Write) -> std::fmt::Result {
-        let quote = self.0.layout().quote.as_char();
-        formatter.write_char(quote)?;
-        self.0.write_body(formatter)?;
-        formatter.write_char(quote)
+        let flags = StringLiteralFlags::empty()
+            .with_quote_style(self.escape.layout().quote)
+            .with_triple_quotes(self.triple_quotes);
+        formatter.write_str(flags.quote_str())?;
+        self.escape.write_body(formatter)?;
+        formatter.write_str(flags.quote_str())?;
+        Ok(())
     }
 
     pub fn to_string(&self) -> Option<String> {
-        let mut s = String::with_capacity(self.0.layout().len?);
+        let mut s = String::with_capacity(self.escape.layout().len?);
         self.write(&mut s).unwrap();
         Some(s)
     }
@@ -244,8 +256,11 @@ impl<'a> AsciiEscape<'a> {
         Self::with_preferred_quote(source, Quote::Single)
     }
     #[inline]
-    pub fn bytes_repr<'r>(&'a self) -> BytesRepr<'r, 'a> {
-        BytesRepr(self)
+    pub fn bytes_repr<'r>(&'a self, triple_quotes: TripleQuotes) -> BytesRepr<'r, 'a> {
+        BytesRepr {
+            escape: self,
+            triple_quotes,
+        }
     }
 }
 
@@ -360,19 +375,26 @@ impl Escape for AsciiEscape<'_> {
     }
 }
 
-pub struct BytesRepr<'r, 'a>(&'r AsciiEscape<'a>);
+pub struct BytesRepr<'r, 'a> {
+    escape: &'r AsciiEscape<'a>,
+    triple_quotes: TripleQuotes,
+}
 
 impl BytesRepr<'_, '_> {
     pub fn write(&self, formatter: &mut impl std::fmt::Write) -> std::fmt::Result {
-        let quote = self.0.layout().quote.as_char();
+        let flags = BytesLiteralFlags::empty()
+            .with_quote_style(self.escape.layout().quote)
+            .with_triple_quotes(self.triple_quotes);
+
         formatter.write_char('b')?;
-        formatter.write_char(quote)?;
-        self.0.write_body(formatter)?;
-        formatter.write_char(quote)
+        formatter.write_str(flags.quote_str())?;
+        self.escape.write_body(formatter)?;
+        formatter.write_str(flags.quote_str())?;
+        Ok(())
     }
 
     pub fn to_string(&self) -> Option<String> {
-        let mut s = String::with_capacity(self.0.layout().len?);
+        let mut s = String::with_capacity(self.escape.layout().len?);
         self.write(&mut s).unwrap();
         Some(s)
     }

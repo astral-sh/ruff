@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::iter;
 
 use anyhow::Result;
 use anyhow::{bail, Context};
@@ -13,10 +14,11 @@ use ruff_python_ast::helpers::Truthiness;
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{
-    self as ast, Arguments, BoolOp, ExceptHandler, Expr, Keyword, Stmt, UnaryOp,
+    self as ast, AnyNodeRef, Arguments, BoolOp, ExceptHandler, Expr, Keyword, Stmt, UnaryOp,
 };
 use ruff_python_ast::{visitor, whitespace};
 use ruff_python_codegen::Stylist;
+use ruff_python_semantic::{Binding, BindingKind};
 use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
 
@@ -271,42 +273,43 @@ pub(crate) fn unittest_assertion(
     func: &Expr,
     args: &[Expr],
     keywords: &[Keyword],
-) -> Option<Diagnostic> {
-    match func {
-        Expr::Attribute(ast::ExprAttribute { attr, .. }) => {
-            if let Ok(unittest_assert) = UnittestAssert::try_from(attr.as_str()) {
-                let mut diagnostic = Diagnostic::new(
-                    PytestUnittestAssertion {
-                        assertion: unittest_assert.to_string(),
-                    },
-                    func.range(),
-                );
-                // We're converting an expression to a statement, so avoid applying the fix if
-                // the assertion is part of a larger expression.
-                if checker.semantic().current_statement().is_expr_stmt()
-                    && checker.semantic().current_expression_parent().is_none()
-                    && !checker.comment_ranges().intersects(expr.range())
-                {
-                    if let Ok(stmt) = unittest_assert.generate_assert(args, keywords) {
-                        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                            checker.generator().stmt(&stmt),
-                            parenthesized_range(
-                                expr.into(),
-                                checker.semantic().current_statement().into(),
-                                checker.comment_ranges(),
-                                checker.locator().contents(),
-                            )
-                            .unwrap_or(expr.range()),
-                        )));
-                    }
-                }
-                Some(diagnostic)
-            } else {
-                None
-            }
+) {
+    let Expr::Attribute(ast::ExprAttribute { attr, .. }) = func else {
+        return;
+    };
+
+    let Ok(unittest_assert) = UnittestAssert::try_from(attr.as_str()) else {
+        return;
+    };
+
+    let mut diagnostic = Diagnostic::new(
+        PytestUnittestAssertion {
+            assertion: unittest_assert.to_string(),
+        },
+        func.range(),
+    );
+
+    // We're converting an expression to a statement, so avoid applying the fix if
+    // the assertion is part of a larger expression.
+    if checker.semantic().current_statement().is_expr_stmt()
+        && checker.semantic().current_expression_parent().is_none()
+        && !checker.comment_ranges().intersects(expr.range())
+    {
+        if let Ok(stmt) = unittest_assert.generate_assert(args, keywords) {
+            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+                checker.generator().stmt(&stmt),
+                parenthesized_range(
+                    expr.into(),
+                    checker.semantic().current_statement().into(),
+                    checker.comment_ranges(),
+                    checker.locator().contents(),
+                )
+                .unwrap_or(expr.range()),
+            )));
         }
-        _ => None,
     }
+
+    checker.report_diagnostic(diagnostic);
 }
 
 /// ## What it does
@@ -364,9 +367,96 @@ impl Violation for PytestUnittestRaisesAssertion {
 }
 
 /// PT027
-pub(crate) fn unittest_raises_assertion(
+pub(crate) fn unittest_raises_assertion_call(checker: &Checker, call: &ast::ExprCall) {
+    // Bindings in `with` statements are handled by `unittest_raises_assertion_bindings`.
+    if let Stmt::With(ast::StmtWith { items, .. }) = checker.semantic().current_statement() {
+        let call_ref = AnyNodeRef::from(call);
+
+        if items.iter().any(|item| {
+            AnyNodeRef::from(&item.context_expr).ptr_eq(call_ref) && item.optional_vars.is_some()
+        }) {
+            return;
+        }
+    }
+
+    if let Some(diagnostic) = unittest_raises_assertion(call, vec![], checker) {
+        checker.report_diagnostic(diagnostic);
+    }
+}
+
+/// PT027
+pub(crate) fn unittest_raises_assertion_binding(
     checker: &Checker,
+    binding: &Binding,
+) -> Option<Diagnostic> {
+    if !matches!(binding.kind, BindingKind::WithItemVar) {
+        return None;
+    }
+
+    let semantic = checker.semantic();
+
+    let Stmt::With(with) = binding.statement(semantic)? else {
+        return None;
+    };
+
+    let Expr::Call(call) = corresponding_context_expr(binding, with)? else {
+        return None;
+    };
+
+    let mut edits = vec![];
+
+    // Rewrite all references to `.exception` to `.value`:
+    // ```py
+    // # Before
+    // with self.assertRaises(Exception) as e:
+    //     ...
+    // print(e.exception)
+    //
+    // # After
+    // with pytest.raises(Exception) as e:
+    //     ...
+    // print(e.value)
+    // ```
+    for reference_id in binding.references() {
+        let reference = semantic.reference(reference_id);
+        let node_id = reference.expression_id()?;
+
+        let mut ancestors = semantic.expressions(node_id).skip(1);
+
+        let Expr::Attribute(ast::ExprAttribute { attr, .. }) = ancestors.next()? else {
+            continue;
+        };
+
+        if attr.as_str() == "exception" {
+            edits.push(Edit::range_replacement("value".to_string(), attr.range));
+        }
+    }
+
+    unittest_raises_assertion(call, edits, checker)
+}
+
+fn corresponding_context_expr<'a>(binding: &Binding, with: &'a ast::StmtWith) -> Option<&'a Expr> {
+    with.items.iter().find_map(|item| {
+        let Some(optional_var) = &item.optional_vars else {
+            return None;
+        };
+
+        let Expr::Name(name) = optional_var.as_ref() else {
+            return None;
+        };
+
+        if name.range == binding.range {
+            Some(&item.context_expr)
+        } else {
+            None
+        }
+    })
+}
+
+fn unittest_raises_assertion(
     call: &ast::ExprCall,
+    extra_edits: Vec<Edit>,
+    checker: &Checker,
 ) -> Option<Diagnostic> {
     let Expr::Attribute(ast::ExprAttribute { attr, .. }) = call.func.as_ref() else {
         return None;
@@ -385,19 +475,25 @@ pub(crate) fn unittest_raises_assertion(
         },
         call.func.range(),
     );
+
     if !checker
         .comment_ranges()
         .has_comments(call, checker.source())
     {
         if let Some(args) = to_pytest_raises_args(checker, attr.as_str(), &call.arguments) {
             diagnostic.try_set_fix(|| {
-                let (import_edit, binding) = checker.importer().get_or_import_symbol(
+                let (import_pytest_raises, binding) = checker.importer().get_or_import_symbol(
                     &ImportRequest::import("pytest", "raises"),
                     call.func.start(),
                     checker.semantic(),
                 )?;
-                let edit = Edit::range_replacement(format!("{binding}({args})"), call.range());
-                Ok(Fix::unsafe_edits(import_edit, [edit]))
+                let replace_call =
+                    Edit::range_replacement(format!("{binding}({args})"), call.range());
+
+                Ok(Fix::unsafe_edits(
+                    import_pytest_raises,
+                    iter::once(replace_call).chain(extra_edits),
+                ))
             });
         }
     }
@@ -491,30 +587,24 @@ fn to_pytest_raises_args<'a>(
 }
 
 /// PT015
-pub(crate) fn assert_falsy(checker: &mut Checker, stmt: &Stmt, test: &Expr) {
+pub(crate) fn assert_falsy(checker: &Checker, stmt: &Stmt, test: &Expr) {
     let truthiness = Truthiness::from_expr(test, |id| checker.semantic().has_builtin_binding(id));
     if truthiness.into_bool() == Some(false) {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(PytestAssertAlwaysFalse, stmt.range()));
+        checker.report_diagnostic(Diagnostic::new(PytestAssertAlwaysFalse, stmt.range()));
     }
 }
 
 /// PT017
-pub(crate) fn assert_in_exception_handler(checker: &mut Checker, handlers: &[ExceptHandler]) {
-    checker
-        .diagnostics
-        .extend(handlers.iter().flat_map(|handler| match handler {
-            ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
-                name, body, ..
-            }) => {
-                if let Some(name) = name {
-                    check_assert_in_except(name, body)
-                } else {
-                    Vec::new()
-                }
+pub(crate) fn assert_in_exception_handler(checker: &Checker, handlers: &[ExceptHandler]) {
+    checker.report_diagnostics(handlers.iter().flat_map(|handler| match handler {
+        ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { name, body, .. }) => {
+            if let Some(name) = name {
+                check_assert_in_except(name, body)
+            } else {
+                Vec::new()
             }
-        }));
+        }
+    }));
 }
 
 #[derive(Copy, Clone)]
@@ -734,12 +824,7 @@ fn fix_composite_condition(stmt: &Stmt, locator: &Locator, stylist: &Stylist) ->
 }
 
 /// PT018
-pub(crate) fn composite_condition(
-    checker: &mut Checker,
-    stmt: &Stmt,
-    test: &Expr,
-    msg: Option<&Expr>,
-) {
+pub(crate) fn composite_condition(checker: &Checker, stmt: &Stmt, test: &Expr, msg: Option<&Expr>) {
     let composite = is_composite_condition(test);
     if matches!(composite, CompositionKind::Simple | CompositionKind::Mixed) {
         let mut diagnostic = Diagnostic::new(PytestCompositeAssertion, stmt.range());
@@ -755,6 +840,6 @@ pub(crate) fn composite_condition(
                     .map(Fix::unsafe_edit)
             });
         }
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }

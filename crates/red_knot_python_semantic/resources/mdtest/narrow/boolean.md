@@ -57,6 +57,8 @@ def _(flag1: bool, flag2: bool, flag3: bool, flag4: bool):
 ## Multiple predicates
 
 ```py
+from typing import Literal
+
 def _(flag1: bool, flag2: bool):
     class A: ...
     x: A | None | Literal[1] = A() if flag1 else None if flag2 else 1
@@ -67,6 +69,8 @@ def _(flag1: bool, flag2: bool):
 ## Mix of `and` and `or`
 
 ```py
+from typing import Literal
+
 def _(flag1: bool, flag2: bool):
     class A: ...
     x: A | None | Literal[1] = A() if flag1 else None if flag2 else 1

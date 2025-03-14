@@ -1,7 +1,7 @@
 import sys
 import types
 from _typeshed import SupportsAllComparisons, SupportsItems
-from collections.abc import Callable, Hashable, Iterable, Sequence, Sized
+from collections.abc import Callable, Hashable, Iterable, Sized
 from typing import Any, Generic, Literal, NamedTuple, TypedDict, TypeVar, final, overload
 from typing_extensions import ParamSpec, Self, TypeAlias
 
@@ -97,26 +97,26 @@ if sys.version_info >= (3, 12):
     def update_wrapper(
         wrapper: Callable[_PWrapper, _RWrapper],
         wrapped: Callable[_PWrapped, _RWrapped],
-        assigned: Sequence[str] = ("__module__", "__name__", "__qualname__", "__doc__", "__annotations__", "__type_params__"),
-        updated: Sequence[str] = ("__dict__",),
+        assigned: Iterable[str] = ("__module__", "__name__", "__qualname__", "__doc__", "__annotations__", "__type_params__"),
+        updated: Iterable[str] = ("__dict__",),
     ) -> _Wrapped[_PWrapped, _RWrapped, _PWrapper, _RWrapper]: ...
     def wraps(
         wrapped: Callable[_PWrapped, _RWrapped],
-        assigned: Sequence[str] = ("__module__", "__name__", "__qualname__", "__doc__", "__annotations__", "__type_params__"),
-        updated: Sequence[str] = ("__dict__",),
+        assigned: Iterable[str] = ("__module__", "__name__", "__qualname__", "__doc__", "__annotations__", "__type_params__"),
+        updated: Iterable[str] = ("__dict__",),
     ) -> _Wrapper[_PWrapped, _RWrapped]: ...
 
 else:
     def update_wrapper(
         wrapper: Callable[_PWrapper, _RWrapper],
         wrapped: Callable[_PWrapped, _RWrapped],
-        assigned: Sequence[str] = ("__module__", "__name__", "__qualname__", "__doc__", "__annotations__"),
-        updated: Sequence[str] = ("__dict__",),
+        assigned: Iterable[str] = ("__module__", "__name__", "__qualname__", "__doc__", "__annotations__"),
+        updated: Iterable[str] = ("__dict__",),
     ) -> _Wrapped[_PWrapped, _RWrapped, _PWrapper, _RWrapper]: ...
     def wraps(
         wrapped: Callable[_PWrapped, _RWrapped],
-        assigned: Sequence[str] = ("__module__", "__name__", "__qualname__", "__doc__", "__annotations__"),
-        updated: Sequence[str] = ("__dict__",),
+        assigned: Iterable[str] = ("__module__", "__name__", "__qualname__", "__doc__", "__annotations__"),
+        updated: Iterable[str] = ("__dict__",),
     ) -> _Wrapper[_PWrapped, _RWrapped]: ...
 
 def total_ordering(cls: type[_T]) -> type[_T]: ...

@@ -15,7 +15,7 @@ use crate::checkers::ast::Checker;
 /// Using the generator more than once will do nothing on the second usage.
 /// If that data is needed later, it should be stored as a list.
 ///
-/// ## Examples:
+/// ## Example:
 /// ```python
 /// import itertools
 ///
@@ -307,7 +307,7 @@ impl<'a> Visitor<'a> for GroupNameFinder<'a> {
 
 /// B031
 pub(crate) fn reuse_of_groupby_generator(
-    checker: &mut Checker,
+    checker: &Checker,
     target: &Expr,
     body: &[Stmt],
     iter: &Expr,
@@ -339,8 +339,6 @@ pub(crate) fn reuse_of_groupby_generator(
         finder.visit_stmt(stmt);
     }
     for expr in finder.exprs {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(ReuseOfGroupbyGenerator, expr.range()));
+        checker.report_diagnostic(Diagnostic::new(ReuseOfGroupbyGenerator, expr.range()));
     }
 }

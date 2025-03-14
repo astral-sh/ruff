@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pygrep_hooks/mod.rs
-snapshot_kind: text
 ---
 PGH005_0.py:2:8: PGH005 Non-existent mock method: `not_called`
   |
@@ -86,6 +85,6 @@ PGH005_0.py:10:1: PGH005 Mock method should be called: `assert_called_once_with`
  9 | my_mock.assert_called_once_with
 10 | MyMock.assert_called_once_with
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PGH005
-11 | 
+11 |
 12 | # OK
    |

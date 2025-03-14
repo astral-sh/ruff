@@ -15,7 +15,7 @@ use ruff_python_semantic::{Definition, SemanticModel};
 use ruff_text_size::{TextRange, TextSize};
 
 use crate::importer::{ImportRequest, Importer};
-use crate::settings::types::PythonVersion;
+use ruff_python_ast::PythonVersion;
 
 /// Return the name of the function, if it's overloaded.
 pub(crate) fn overloaded_name<'a>(
@@ -130,7 +130,7 @@ impl AutoPythonType {
                     .get_or_import_symbol(
                         &ImportRequest::import_from(
                             "typing",
-                            if target_version >= PythonVersion::Py311 {
+                            if target_version >= PythonVersion::PY311 {
                                 "Never"
                             } else {
                                 "NoReturn"
@@ -152,7 +152,7 @@ impl AutoPythonType {
                 Some((expr, vec![]))
             }
             AutoPythonType::Union(python_types) => {
-                if target_version >= PythonVersion::Py310 {
+                if target_version >= PythonVersion::PY310 {
                     // Aggregate all the individual types (e.g., `int`, `float`).
                     let names = python_types
                         .iter()

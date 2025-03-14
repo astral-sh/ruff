@@ -1,6 +1,7 @@
-use std::fmt;
+use std::fmt::{self, Display};
 
-use ruff_text_size::TextRange;
+use ruff_python_ast::PythonVersion;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::TokenKind;
 
@@ -423,6 +424,316 @@ impl std::fmt::Display for LexicalErrorType {
                 write!(f, "Missing `}}` in Unicode escape sequence")
             }
         }
+    }
+}
+
+/// Represents a version-related syntax error detected during parsing.
+///
+/// An example of a version-related error is the use of a `match` statement before Python 3.10, when
+/// it was first introduced. See [`UnsupportedSyntaxErrorKind`] for other kinds of errors.
+#[derive(Debug, PartialEq, Clone)]
+pub struct UnsupportedSyntaxError {
+    pub kind: UnsupportedSyntaxErrorKind,
+    pub range: TextRange,
+    /// The target [`PythonVersion`] for which this error was detected.
+    pub target_version: PythonVersion,
+}
+
+impl Ranged for UnsupportedSyntaxError {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
+
+/// The type of tuple unpacking for [`UnsupportedSyntaxErrorKind::StarTuple`].
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
+pub enum StarTupleKind {
+    Return,
+    Yield,
+}
+
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
+pub enum UnsupportedSyntaxErrorKind {
+    Match,
+    Walrus,
+    ExceptStar,
+
+    /// Represents the use of a parenthesized keyword argument name after Python 3.8.
+    ///
+    /// ## Example
+    ///
+    /// From [BPO 34641] it sounds like this was only accidentally supported and was removed when
+    /// noticed. Code like this used to be valid:
+    ///
+    /// ```python
+    /// f((a)=1)
+    /// ```
+    ///
+    /// After Python 3.8, you have to omit the parentheses around `a`:
+    ///
+    /// ```python
+    /// f(a=1)
+    /// ```
+    ///
+    /// [BPO 34641]: https://github.com/python/cpython/issues/78822
+    ParenthesizedKeywordArgumentName,
+
+    /// Represents the use of unparenthesized tuple unpacking in a `return` statement or `yield`
+    /// expression before Python 3.8.
+    ///
+    /// ## Examples
+    ///
+    /// Before Python 3.8, this syntax was allowed:
+    ///
+    /// ```python
+    /// rest = (4, 5, 6)
+    ///
+    /// def f():
+    ///     t = 1, 2, 3, *rest
+    ///     return t
+    ///
+    /// def g():
+    ///     t = 1, 2, 3, *rest
+    ///     yield t
+    /// ```
+    ///
+    /// But this was not:
+    ///
+    /// ```python
+    /// rest = (4, 5, 6)
+    ///
+    /// def f():
+    ///     return 1, 2, 3, *rest
+    ///
+    /// def g():
+    ///     yield 1, 2, 3, *rest
+    /// ```
+    ///
+    /// Instead, parentheses were required in the `return` and `yield` cases:
+    ///
+    /// ```python
+    /// rest = (4, 5, 6)
+    ///
+    /// def f():
+    ///     return (1, 2, 3, *rest)
+    ///
+    /// def g():
+    ///     yield (1, 2, 3, *rest)
+    /// ```
+    ///
+    /// This was reported in [BPO 32117] and updated in Python 3.8 to allow the unparenthesized
+    /// form.
+    ///
+    /// [BPO 32117]: https://github.com/python/cpython/issues/76298
+    StarTuple(StarTupleKind),
+
+    /// Represents the use of a "relaxed" [PEP 614] decorator before Python 3.9.
+    ///
+    /// ## Examples
+    ///
+    /// Prior to Python 3.9, decorators were defined to be [`dotted_name`]s, optionally followed by
+    /// an argument list. For example:
+    ///
+    /// ```python
+    /// @buttons.clicked.connect
+    /// def foo(): ...
+    ///
+    /// @buttons.clicked.connect(1, 2, 3)
+    /// def foo(): ...
+    /// ```
+    ///
+    /// As pointed out in the PEP, this prevented reasonable extensions like subscripts:
+    ///
+    /// ```python
+    /// buttons = [QPushButton(f'Button {i}') for i in range(10)]
+    ///
+    /// @buttons[0].clicked.connect
+    /// def spam(): ...
+    /// ```
+    ///
+    /// Python 3.9 removed these restrictions and expanded the [decorator grammar] to include any
+    /// assignment expression and include cases like the example above.
+    ///
+    /// [PEP 614]: https://peps.python.org/pep-0614/
+    /// [`dotted_name`]: https://docs.python.org/3.8/reference/compound_stmts.html#grammar-token-dotted-name
+    /// [decorator grammar]: https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-decorator
+    RelaxedDecorator,
+
+    /// Represents the use of a [PEP 570] positional-only parameter before Python 3.8.
+    ///
+    /// ## Examples
+    ///
+    /// Python 3.8 added the `/` syntax for marking preceding parameters as positional-only:
+    ///
+    /// ```python
+    /// def foo(a, b, /, c): ...
+    /// ```
+    ///
+    /// This means `a` and `b` in this case can only be provided by position, not by name. In other
+    /// words, this code results in a `TypeError` at runtime:
+    ///
+    /// ```pycon
+    /// >>> def foo(a, b, /, c): ...
+    /// ...
+    /// >>> foo(a=1, b=2, c=3)
+    /// Traceback (most recent call last):
+    ///   File "<python-input-3>", line 1, in <module>
+    ///     foo(a=1, b=2, c=3)
+    ///     ~~~^^^^^^^^^^^^^^^
+    /// TypeError: foo() got some positional-only arguments passed as keyword arguments: 'a, b'
+    /// ```
+    ///
+    /// [PEP 570]: https://peps.python.org/pep-0570/
+    PositionalOnlyParameter,
+
+    /// Represents the use of a [type parameter list] before Python 3.12.
+    ///
+    /// ## Examples
+    ///
+    /// Before Python 3.12, generic parameters had to be declared separately using a class like
+    /// [`typing.TypeVar`], which could then be used in a function or class definition:
+    ///
+    /// ```python
+    /// from typing import Generic, TypeVar
+    ///
+    /// T = TypeVar("T")
+    ///
+    /// def f(t: T): ...
+    /// class C(Generic[T]): ...
+    /// ```
+    ///
+    /// [PEP 695], included in Python 3.12, introduced the new type parameter syntax, which allows
+    /// these to be written more compactly and without a separate type variable:
+    ///
+    /// ```python
+    /// def f[T](t: T): ...
+    /// class C[T]: ...
+    /// ```
+    ///
+    /// [type parameter list]: https://docs.python.org/3/reference/compound_stmts.html#type-parameter-lists
+    /// [PEP 695]: https://peps.python.org/pep-0695/
+    /// [`typing.TypeVar`]: https://docs.python.org/3/library/typing.html#typevar
+    TypeParameterList,
+    TypeAliasStatement,
+    TypeParamDefault,
+
+    /// Represents the use of tuple unpacking in a `for` statement iterator clause before Python
+    /// 3.9.
+    ///
+    /// ## Examples
+    ///
+    /// Like [`UnsupportedSyntaxErrorKind::StarTuple`] in `return` and `yield` statements, prior to
+    /// Python 3.9, tuple unpacking in the iterator clause of a `for` statement required
+    /// parentheses:
+    ///
+    /// ```python
+    /// # valid on Python 3.8 and earlier
+    /// for i in (*a, *b): ...
+    /// ```
+    ///
+    /// Omitting the parentheses was invalid:
+    ///
+    /// ```python
+    /// for i in *a, *b: ...  # SyntaxError
+    /// ```
+    ///
+    /// This was changed as part of the [PEG parser rewrite] included in Python 3.9 but not
+    /// documented directly until the [Python 3.11 release].
+    ///
+    /// [PEG parser rewrite]: https://peps.python.org/pep-0617/
+    /// [Python 3.11 release]: https://docs.python.org/3/whatsnew/3.11.html#other-language-changes
+    UnparenthesizedUnpackInFor,
+}
+
+impl Display for UnsupportedSyntaxError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let kind = match self.kind {
+            UnsupportedSyntaxErrorKind::Match => "Cannot use `match` statement",
+            UnsupportedSyntaxErrorKind::Walrus => "Cannot use named assignment expression (`:=`)",
+            UnsupportedSyntaxErrorKind::ExceptStar => "Cannot use `except*`",
+            UnsupportedSyntaxErrorKind::ParenthesizedKeywordArgumentName => {
+                "Cannot use parenthesized keyword argument name"
+            }
+            UnsupportedSyntaxErrorKind::StarTuple(StarTupleKind::Return) => {
+                "Cannot use iterable unpacking in return statements"
+            }
+            UnsupportedSyntaxErrorKind::StarTuple(StarTupleKind::Yield) => {
+                "Cannot use iterable unpacking in yield expressions"
+            }
+            UnsupportedSyntaxErrorKind::RelaxedDecorator => "Unsupported expression in decorators",
+            UnsupportedSyntaxErrorKind::PositionalOnlyParameter => {
+                "Cannot use positional-only parameter separator"
+            }
+            UnsupportedSyntaxErrorKind::TypeParameterList => "Cannot use type parameter lists",
+            UnsupportedSyntaxErrorKind::TypeAliasStatement => "Cannot use `type` alias statement",
+            UnsupportedSyntaxErrorKind::TypeParamDefault => {
+                "Cannot set default type for a type parameter"
+            }
+            UnsupportedSyntaxErrorKind::UnparenthesizedUnpackInFor => {
+                "Cannot use iterable unpacking in `for` statements"
+            }
+        };
+
+        write!(
+            f,
+            "{kind} on Python {} (syntax was {changed})",
+            self.target_version,
+            changed = self.kind.changed_version(),
+        )
+    }
+}
+
+/// Represents the kind of change in Python syntax between versions.
+enum Change {
+    Added(PythonVersion),
+    Removed(PythonVersion),
+}
+
+impl Display for Change {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Change::Added(version) => write!(f, "added in Python {version}"),
+            Change::Removed(version) => write!(f, "removed in Python {version}"),
+        }
+    }
+}
+
+impl UnsupportedSyntaxErrorKind {
+    /// Returns the Python version when the syntax associated with this error was changed, and the
+    /// type of [`Change`] (added or removed).
+    const fn changed_version(self) -> Change {
+        match self {
+            UnsupportedSyntaxErrorKind::Match => Change::Added(PythonVersion::PY310),
+            UnsupportedSyntaxErrorKind::Walrus => Change::Added(PythonVersion::PY38),
+            UnsupportedSyntaxErrorKind::ExceptStar => Change::Added(PythonVersion::PY311),
+            UnsupportedSyntaxErrorKind::StarTuple(_) => Change::Added(PythonVersion::PY38),
+            UnsupportedSyntaxErrorKind::RelaxedDecorator => Change::Added(PythonVersion::PY39),
+            UnsupportedSyntaxErrorKind::PositionalOnlyParameter => {
+                Change::Added(PythonVersion::PY38)
+            }
+            UnsupportedSyntaxErrorKind::ParenthesizedKeywordArgumentName => {
+                Change::Removed(PythonVersion::PY38)
+            }
+            UnsupportedSyntaxErrorKind::TypeParameterList => Change::Added(PythonVersion::PY312),
+            UnsupportedSyntaxErrorKind::TypeAliasStatement => Change::Added(PythonVersion::PY312),
+            UnsupportedSyntaxErrorKind::TypeParamDefault => Change::Added(PythonVersion::PY313),
+            UnsupportedSyntaxErrorKind::UnparenthesizedUnpackInFor => {
+                Change::Added(PythonVersion::PY39)
+            }
+        }
+    }
+
+    /// Returns whether or not this kind of syntax is unsupported on `target_version`.
+    pub(crate) fn is_unsupported(self, target_version: PythonVersion) -> bool {
+        match self.changed_version() {
+            Change::Added(version) => target_version < version,
+            Change::Removed(version) => target_version >= version,
+        }
+    }
+
+    /// Returns `true` if this kind of syntax is supported on `target_version`.
+    pub(crate) fn is_supported(self, target_version: PythonVersion) -> bool {
+        !self.is_unsupported(target_version)
     }
 }
 

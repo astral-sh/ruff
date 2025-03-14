@@ -19,7 +19,7 @@ use super::helpers;
 /// removed. Otherwise, if a tuple literal is passed in, then it should be
 /// rewritten as a list literal.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// list([1, 2])
 /// list((1, 2))
@@ -63,8 +63,11 @@ impl AlwaysFixableViolation for UnnecessaryLiteralWithinListCall {
 }
 
 /// C410
-pub(crate) fn unnecessary_literal_within_list_call(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn unnecessary_literal_within_list_call(checker: &Checker, call: &ast::ExprCall) {
     if !call.arguments.keywords.is_empty() {
+        return;
+    }
+    if call.arguments.args.len() > 1 {
         return;
     }
     let Some(argument) =
@@ -116,7 +119,7 @@ pub(crate) fn unnecessary_literal_within_list_call(checker: &mut Checker, call: 
         }
     };
 
-    checker.diagnostics.push(diagnostic.with_fix(fix));
+    checker.report_diagnostic(diagnostic.with_fix(fix));
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

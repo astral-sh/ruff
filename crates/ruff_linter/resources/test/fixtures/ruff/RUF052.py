@@ -1,4 +1,6 @@
+##############
 # Correct
+##############
 
 for _ in range(5):
     pass
@@ -37,6 +39,17 @@ def fun():
     _x = "reassigned global"
     return _x
 
+# (we had a false positive when a global var is used like this in 2 functions)
+_num: int
+
+def set_num():
+    global _num
+    _num = 1
+
+def print_num():
+    print(_num)
+
+
 class _ValidClass:
     pass
 
@@ -70,7 +83,9 @@ def fun(x):
         return ___
     return x
 
+###########
 # Incorrect
+###########
 
 class Class_:
     def fun(self):
@@ -145,3 +160,38 @@ def special_calls():
     _NotADynamicClass = type("_NotADynamicClass")
 
     print(_T, _P, _NT, _E, _NT2, _NT3, _DynamicClass, _NotADynamicClass)
+
+# Do not emit diagnostic if parameter is private
+# even if it is later shadowed in the body of the function
+# see https://github.com/astral-sh/ruff/issues/14968
+class Node:
+
+    connected: list[Node]
+
+    def recurse(self, *, _seen: set[Node] | None = None):
+        if _seen is None:
+            _seen = set()
+        elif self in _seen:
+            return
+        _seen.add(self)
+        for other in self.connected:
+            other.recurse(_seen=_seen)
+
+
+def foo():
+    _dummy_var = 42
+
+    def bar():
+        dummy_var = 43
+        print(_dummy_var)
+
+
+def foo():
+    # Unfixable because both possible candidates for the new name are shadowed
+    # in the scope of one of the references to the variable
+    _dummy_var = 42
+
+    def bar():
+        dummy_var = 43
+        dummy_var_ = 44
+        print(_dummy_var)

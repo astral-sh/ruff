@@ -29,18 +29,7 @@ use crate::importer::ImportRequest;
 ///
 /// ## Example
 /// ```python
-/// scores = [85, 100, 60]
-/// passing_scores = [60, 80, 70]
-///
-///
-/// def passed_test(score: int, passing_score: int) -> bool:
-///     return score >= passing_score
-///
-///
-/// passed_all_tests = all(
-///     passed_test(score, passing_score)
-///     for score, passing_score in zip(scores, passing_scores)
-/// )
+/// all(predicate(a, b) for a, b in some_iterable)
 /// ```
 ///
 /// Use instead:
@@ -48,15 +37,7 @@ use crate::importer::ImportRequest;
 /// from itertools import starmap
 ///
 ///
-/// scores = [85, 100, 60]
-/// passing_scores = [60, 80, 70]
-///
-///
-/// def passed_test(score: int, passing_score: int) -> bool:
-///     return score >= passing_score
-///
-///
-/// passed_all_tests = all(starmap(passed_test, zip(scores, passing_scores)))
+/// all(starmap(predicate, some_iterable))
 /// ```
 ///
 /// ## References
@@ -81,9 +62,9 @@ impl Violation for ReimplementedStarmap {
 }
 
 /// FURB140
-pub(crate) fn reimplemented_starmap(checker: &mut Checker, target: &StarmapCandidate) {
+pub(crate) fn reimplemented_starmap(checker: &Checker, target: &StarmapCandidate) {
     // Generator should have exactly one comprehension.
-    let [comprehension @ ast::Comprehension { .. }] = target.generators() else {
+    let [comprehension] = target.generators() else {
         return;
     };
 
@@ -175,7 +156,7 @@ pub(crate) fn reimplemented_starmap(checker: &mut Checker, target: &StarmapCandi
         );
         Ok(Fix::safe_edits(import_edit, [main_edit]))
     });
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// An enum for a node that can be considered a candidate for replacement with `starmap`.

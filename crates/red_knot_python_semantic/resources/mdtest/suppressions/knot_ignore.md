@@ -77,7 +77,8 @@ def test(a: f"f-string type annotation", b: b"byte-string-type-annotation"): ...
 ```py
 # error: [invalid-syntax]
 # error: [unused-ignore-comment]
-def test(  # knot: ignore
+def test($):  # knot: ignore
+    pass
 ```
 
 <!-- blacken-docs:on -->
@@ -179,4 +180,12 @@ a = 4 / 0  # error: [division-by-zero]
 ```py
 # error: [unknown-rule] "Unknown rule `is-equal-14`"
 a = 10 + 4  # knot: ignore[is-equal-14]
+```
+
+## Code with `lint:` prefix
+
+```py
+# error:[unknown-rule] "Unknown rule `lint:division-by-zero`. Did you mean `division-by-zero`?"
+# error: [division-by-zero]
+a = 10 / 0  # knot: ignore[lint:division-by-zero]
 ```

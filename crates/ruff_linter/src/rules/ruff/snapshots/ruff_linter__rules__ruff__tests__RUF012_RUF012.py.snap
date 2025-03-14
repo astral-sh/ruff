@@ -1,12 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
-assertion_line: 82
-snapshot_kind: text
 ---
 RUF012.py:9:34: RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
    |
  7 |     }
- 8 | 
+ 8 |
  9 |     mutable_default: list[int] = []
    |                                  ^^ RUF012
 10 |     immutable_annotation: Sequence[int] = []
@@ -33,12 +31,78 @@ RUF012.py:25:26: RUF012 Mutable class attributes should be annotated with `typin
 27 |     class_variable: ClassVar[list[int]] = []
    |
 
-RUF012.py:89:38: RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
-   |
-87 |     class I(SQLModel):
-88 |         id: int
-89 |         mutable_default: list[int] = []
-   |                                      ^^ RUF012
-90 | 
-91 | from sqlmodel import SQLModel
-   |
+RUF012.py:103:38: RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
+    |
+101 |     class K(SQLModel):
+102 |         id: int
+103 |         mutable_default: list[int] = []
+    |                                      ^^ RUF012
+104 |
+105 | from sqlmodel import SQLModel
+    |
+
+RUF012.py:128:36: RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
+    |
+126 |     }
+127 |
+128 |     mutable_default: 'list[int]' = []
+    |                                    ^^ RUF012
+129 |     immutable_annotation: 'Sequence[int]'= []
+130 |     without_annotation = []
+    |
+
+RUF012.py:129:44: RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
+    |
+128 |     mutable_default: 'list[int]' = []
+129 |     immutable_annotation: 'Sequence[int]'= []
+    |                                            ^^ RUF012
+130 |     without_annotation = []
+131 |     class_variable: 'ClassVar[list[int]]' = []
+    |
+
+RUF012.py:130:26: RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
+    |
+128 |     mutable_default: 'list[int]' = []
+129 |     immutable_annotation: 'Sequence[int]'= []
+130 |     without_annotation = []
+    |                          ^^ RUF012
+131 |     class_variable: 'ClassVar[list[int]]' = []
+132 |     final_variable: 'Final[list[int]]' = []
+    |
+
+RUF012.py:131:45: RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
+    |
+129 |     immutable_annotation: 'Sequence[int]'= []
+130 |     without_annotation = []
+131 |     class_variable: 'ClassVar[list[int]]' = []
+    |                                             ^^ RUF012
+132 |     final_variable: 'Final[list[int]]' = []
+133 |     class_variable_without_subscript: 'ClassVar' = []
+    |
+
+RUF012.py:132:42: RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
+    |
+130 |     without_annotation = []
+131 |     class_variable: 'ClassVar[list[int]]' = []
+132 |     final_variable: 'Final[list[int]]' = []
+    |                                          ^^ RUF012
+133 |     class_variable_without_subscript: 'ClassVar' = []
+134 |     final_variable_without_subscript: 'Final' = []
+    |
+
+RUF012.py:133:52: RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
+    |
+131 |     class_variable: 'ClassVar[list[int]]' = []
+132 |     final_variable: 'Final[list[int]]' = []
+133 |     class_variable_without_subscript: 'ClassVar' = []
+    |                                                    ^^ RUF012
+134 |     final_variable_without_subscript: 'Final' = []
+    |
+
+RUF012.py:134:49: RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
+    |
+132 |     final_variable: 'Final[list[int]]' = []
+133 |     class_variable_without_subscript: 'ClassVar' = []
+134 |     final_variable_without_subscript: 'Final' = []
+    |                                                 ^^ RUF012
+    |

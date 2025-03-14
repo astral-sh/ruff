@@ -86,7 +86,7 @@ impl Violation for IterMethodReturnIterable {
 }
 
 /// PYI045
-pub(crate) fn iter_method_return_iterable(checker: &mut Checker, definition: &Definition) {
+pub(crate) fn iter_method_return_iterable(checker: &Checker, definition: &Definition) {
     let Definition::Member(Member {
         kind: MemberKind::Method(function),
         ..
@@ -125,7 +125,7 @@ pub(crate) fn iter_method_return_iterable(checker: &mut Checker, definition: &De
             }
         })
     {
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             IterMethodReturnIterable { is_async },
             returns.range(),
         ));

@@ -1,11 +1,10 @@
 //! This module takes care of parsing a type annotation.
 
 use ruff_python_ast::relocate::relocate_expr;
-use ruff_python_ast::str::raw_contents;
-use ruff_python_ast::{Expr, ExprStringLiteral, ModExpression, StringFlags, StringLiteral};
+use ruff_python_ast::{Expr, ExprStringLiteral, ModExpression, StringLiteral};
 use ruff_text_size::Ranged;
 
-use crate::{parse_expression, parse_expression_range, ParseError, Parsed};
+use crate::{parse_expression, parse_string_annotation, ParseError, Parsed};
 
 type AnnotationParseResult = Result<ParsedAnnotation, ParseError>;
 
@@ -57,14 +56,10 @@ pub fn parse_type_annotation(
     string_expr: &ExprStringLiteral,
     source: &str,
 ) -> AnnotationParseResult {
-    let expr_text = &source[string_expr.range()];
-
-    if let [string_literal] = string_expr.value.as_slice() {
+    if let Some(string_literal) = string_expr.as_single_part_string() {
         // Compare the raw contents (without quotes) of the expression with the parsed contents
         // contained in the string literal.
-        if raw_contents(expr_text)
-            .is_some_and(|raw_contents| raw_contents == string_literal.as_str())
-        {
+        if &source[string_literal.content_range()] == string_literal.as_str() {
             parse_simple_type_annotation(string_literal, source)
         } else {
             // The raw contents of the string doesn't match the parsed content. This could be the
@@ -81,12 +76,8 @@ fn parse_simple_type_annotation(
     string_literal: &StringLiteral,
     source: &str,
 ) -> AnnotationParseResult {
-    let range_excluding_quotes = string_literal
-        .range()
-        .add_start(string_literal.flags.opener_len())
-        .sub_end(string_literal.flags.closer_len());
     Ok(ParsedAnnotation {
-        parsed: parse_expression_range(source, range_excluding_quotes)?,
+        parsed: parse_string_annotation(source, string_literal)?,
         kind: AnnotationKind::Simple,
     })
 }

@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::lint::{LintRegistry, RuleSelection};
 use ruff_db::files::File;
 use ruff_db::{Db as SourceDb, Upcast};
@@ -7,7 +9,7 @@ use ruff_db::{Db as SourceDb, Upcast};
 pub trait Db: SourceDb + Upcast<dyn SourceDb> {
     fn is_file_open(&self, file: File) -> bool;
 
-    fn rule_selection(&self) -> &RuleSelection;
+    fn rule_selection(&self) -> Arc<RuleSelection>;
 
     fn lint_registry(&self) -> &LintRegistry;
 }
@@ -17,16 +19,18 @@ pub(crate) mod tests {
     use std::sync::Arc;
 
     use crate::program::{Program, SearchPathSettings};
-    use crate::python_version::PythonVersion;
     use crate::{default_lint_registry, ProgramSettings, PythonPlatform};
 
     use super::Db;
     use crate::lint::{LintRegistry, RuleSelection};
     use anyhow::Context;
     use ruff_db::files::{File, Files};
-    use ruff_db::system::{DbWithTestSystem, System, SystemPathBuf, TestSystem};
+    use ruff_db::system::{
+        DbWithTestSystem, DbWithWritableSystem as _, System, SystemPathBuf, TestSystem,
+    };
     use ruff_db::vendored::VendoredFileSystem;
     use ruff_db::{Db as SourceDb, Upcast};
+    use ruff_python_ast::PythonVersion;
 
     #[salsa::db]
     #[derive(Clone)]
@@ -111,8 +115,8 @@ pub(crate) mod tests {
             !file.path(self).is_vendored_path()
         }
 
-        fn rule_selection(&self) -> &RuleSelection {
-            &self.rule_selection
+        fn rule_selection(&self) -> Arc<RuleSelection> {
+            self.rule_selection.clone()
         }
 
         fn lint_registry(&self) -> &LintRegistry {
@@ -156,11 +160,6 @@ pub(crate) mod tests {
             self
         }
 
-        pub(crate) fn with_custom_typeshed(mut self, path: &str) -> Self {
-            self.custom_typeshed = Some(SystemPathBuf::from(path));
-            self
-        }
-
         pub(crate) fn with_file(mut self, path: &'a str, content: &'a str) -> Self {
             self.files.push((path, content));
             self
@@ -175,12 +174,12 @@ pub(crate) mod tests {
             db.write_files(self.files)
                 .context("Failed to write test files")?;
 
-            let mut search_paths = SearchPathSettings::new(src_root);
-            search_paths.typeshed = self.custom_typeshed;
+            let mut search_paths = SearchPathSettings::new(vec![src_root]);
+            search_paths.custom_typeshed = self.custom_typeshed;
 
             Program::from_settings(
                 &db,
-                &ProgramSettings {
+                ProgramSettings {
                     python_version: self.python_version,
                     python_platform: self.python_platform,
                     search_paths,

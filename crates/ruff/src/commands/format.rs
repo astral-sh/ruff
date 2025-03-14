@@ -11,6 +11,7 @@ use itertools::Itertools;
 use log::{error, warn};
 use rayon::iter::Either::{Left, Right};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use ruff_python_parser::ParseError;
 use rustc_hash::FxHashSet;
 use thiserror::Error;
 use tracing::debug;
@@ -233,7 +234,7 @@ pub(crate) fn format(
 }
 
 /// Format the file at the given [`Path`].
-#[tracing::instrument(level="debug", skip_all, fields(path = %path.display()))]
+#[tracing::instrument(level = "debug", skip_all, fields(path = %path.display()))]
 pub(crate) fn format_path(
     path: &Path,
     settings: &FormatterSettings,
@@ -341,7 +342,7 @@ pub(crate) fn format_source(
 ) -> Result<FormattedSource, FormatCommandError> {
     match &source_kind {
         SourceKind::Python(unformatted) => {
-            let options = settings.to_format_options(source_type, unformatted);
+            let options = settings.to_format_options(source_type, unformatted, path);
 
             let formatted = if let Some(range) = range {
                 let line_index = LineIndex::from_source_text(unformatted);
@@ -391,7 +392,7 @@ pub(crate) fn format_source(
                 ));
             }
 
-            let options = settings.to_format_options(source_type, notebook.source_code());
+            let options = settings.to_format_options(source_type, notebook.source_code(), path);
 
             let mut output: Option<String> = None;
             let mut last: Option<TextSize> = None;
@@ -406,8 +407,12 @@ pub(crate) fn format_source(
                 let formatted =
                     format_module_source(unformatted, options.clone()).map_err(|err| {
                         if let FormatModuleError::ParseError(err) = err {
+                            // Offset the error by the start of the cell
                             DisplayParseError::from_source_kind(
-                                err,
+                                ParseError {
+                                    error: err.error,
+                                    location: err.location.checked_add(*start).unwrap(),
+                                },
                                 path.map(Path::to_path_buf),
                                 source_kind,
                             )
@@ -788,8 +793,6 @@ pub(super) fn warn_incompatible_formatter_settings(resolver: &Resolver) {
     let mut incompatible_rules = FxHashSet::default();
     for setting in resolver.settings() {
         for rule in [
-            // The formatter might collapse implicit string concatenation on a single line.
-            Rule::SingleLineImplicitStringConcatenation,
             // Flags missing trailing commas when all arguments are on its own line:
             // ```python
             // def args(
@@ -827,6 +830,19 @@ pub(super) fn warn_incompatible_formatter_settings(resolver: &Resolver) {
             && setting.formatter.indent_style.is_tab()
         {
             warn_user_once!("The `format.indent-style=\"tab\"` option is incompatible with `W191`, which lints against all uses of tabs. We recommend disabling these rules when using the formatter, which enforces a consistent indentation style. Alternatively, set the `format.indent-style` option to `\"space\"`.");
+        }
+
+        if !setting
+            .linter
+            .rules
+            .enabled(Rule::SingleLineImplicitStringConcatenation)
+            && setting
+                .linter
+                .rules
+                .enabled(Rule::MultiLineImplicitStringConcatenation)
+            && !setting.linter.flake8_implicit_str_concat.allow_multiline
+        {
+            warn_user_once!("The `lint.flake8-implicit-str-concat.allow-multiline = false` option is incompatible with the formatter unless `ISC001` is enabled. We recommend enabling `ISC001` or setting `allow-multiline=true`.");
         }
 
         // Validate all rules that rely on tab styles.
@@ -882,7 +898,7 @@ pub(super) fn warn_incompatible_formatter_settings(resolver: &Resolver) {
                 QuoteStyle::Single | QuoteStyle::Double
             )
         {
-            warn_user_once!("The `flake8-quotes.multiline-quotes=\"single\"` option is incompatible with the formatter. We recommend disabling `Q002` when using the formatter, which enforces double quotes for docstrings. Alternatively, set the `flake8-quotes.docstring-quotes` option to `\"double\"`.`");
+            warn_user_once!("The `flake8-quotes.docstring-quotes=\"single\"` option is incompatible with the formatter. We recommend disabling `Q002` when using the formatter, which enforces double quotes for docstrings. Alternatively, set the `flake8-quotes.docstring-quotes` option to `\"double\"`.`");
         }
 
         // Validate all isort settings.

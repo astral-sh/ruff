@@ -12,6 +12,7 @@ mod tests {
 
     use crate::assert_messages;
     use crate::registry::Rule;
+    use crate::settings::types::PreviewMode;
     use crate::settings::LinterSettings;
     use crate::test::test_path;
 
@@ -51,19 +52,33 @@ mod tests {
     #[test_case(Rule::SuspiciousNonCryptographicRandomUsage, Path::new("S311.py"))]
     #[test_case(Rule::SuspiciousTelnetUsage, Path::new("S312.py"))]
     #[test_case(Rule::SuspiciousTelnetlibImport, Path::new("S401.py"))]
+    #[test_case(Rule::SuspiciousTelnetlibImport, Path::new("S401.pyi"))]
     #[test_case(Rule::SuspiciousFtplibImport, Path::new("S402.py"))]
+    #[test_case(Rule::SuspiciousFtplibImport, Path::new("S402.pyi"))]
     #[test_case(Rule::SuspiciousPickleImport, Path::new("S403.py"))]
+    #[test_case(Rule::SuspiciousPickleImport, Path::new("S403.pyi"))]
     #[test_case(Rule::SuspiciousSubprocessImport, Path::new("S404.py"))]
+    #[test_case(Rule::SuspiciousSubprocessImport, Path::new("S404.pyi"))]
     #[test_case(Rule::SuspiciousXmlEtreeImport, Path::new("S405.py"))]
+    #[test_case(Rule::SuspiciousXmlEtreeImport, Path::new("S405.pyi"))]
     #[test_case(Rule::SuspiciousXmlSaxImport, Path::new("S406.py"))]
+    #[test_case(Rule::SuspiciousXmlSaxImport, Path::new("S406.pyi"))]
     #[test_case(Rule::SuspiciousXmlExpatImport, Path::new("S407.py"))]
+    #[test_case(Rule::SuspiciousXmlExpatImport, Path::new("S407.pyi"))]
     #[test_case(Rule::SuspiciousXmlMinidomImport, Path::new("S408.py"))]
+    #[test_case(Rule::SuspiciousXmlMinidomImport, Path::new("S408.pyi"))]
     #[test_case(Rule::SuspiciousXmlPulldomImport, Path::new("S409.py"))]
+    #[test_case(Rule::SuspiciousXmlPulldomImport, Path::new("S409.pyi"))]
     #[test_case(Rule::SuspiciousLxmlImport, Path::new("S410.py"))]
+    #[test_case(Rule::SuspiciousLxmlImport, Path::new("S410.pyi"))]
     #[test_case(Rule::SuspiciousXmlrpcImport, Path::new("S411.py"))]
+    #[test_case(Rule::SuspiciousXmlrpcImport, Path::new("S411.pyi"))]
     #[test_case(Rule::SuspiciousHttpoxyImport, Path::new("S412.py"))]
+    #[test_case(Rule::SuspiciousHttpoxyImport, Path::new("S412.pyi"))]
     #[test_case(Rule::SuspiciousPycryptoImport, Path::new("S413.py"))]
+    #[test_case(Rule::SuspiciousPycryptoImport, Path::new("S413.pyi"))]
     #[test_case(Rule::SuspiciousPyghmiImport, Path::new("S415.py"))]
+    #[test_case(Rule::SuspiciousPyghmiImport, Path::new("S415.pyi"))]
     #[test_case(Rule::TryExceptContinue, Path::new("S112.py"))]
     #[test_case(Rule::TryExceptPass, Path::new("S110.py"))]
     #[test_case(Rule::UnixCommandWildcardInjection, Path::new("S609.py"))]
@@ -72,11 +87,78 @@ mod tests {
     #[test_case(Rule::DjangoExtra, Path::new("S610.py"))]
     #[test_case(Rule::DjangoRawSql, Path::new("S611.py"))]
     #[test_case(Rule::TarfileUnsafeMembers, Path::new("S202.py"))]
+    #[test_case(Rule::UnsafeMarkupUse, Path::new("S704.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_bandit").join(path).as_path(),
             &LinterSettings::for_rule(rule_code),
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::SuspiciousPickleUsage, Path::new("S301.py"))]
+    #[test_case(Rule::SuspiciousEvalUsage, Path::new("S307.py"))]
+    #[test_case(Rule::SuspiciousMarkSafeUsage, Path::new("S308.py"))]
+    #[test_case(Rule::SuspiciousURLOpenUsage, Path::new("S310.py"))]
+    #[test_case(Rule::SuspiciousNonCryptographicRandomUsage, Path::new("S311.py"))]
+    #[test_case(Rule::SuspiciousTelnetUsage, Path::new("S312.py"))]
+    fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "preview__{}_{}",
+            rule_code.noqa_code(),
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("flake8_bandit").join(path).as_path(),
+            &LinterSettings {
+                preview: PreviewMode::Enabled,
+                ..LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::UnsafeMarkupUse, Path::new("S704_extend_markup_names.py"))]
+    #[test_case(Rule::UnsafeMarkupUse, Path::new("S704_skip_early_out.py"))]
+    fn extend_allowed_callable(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "extend_allow_callables__{}_{}",
+            rule_code.noqa_code(),
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("flake8_bandit").join(path).as_path(),
+            &LinterSettings {
+                flake8_bandit: super::settings::Settings {
+                    extend_markup_names: vec!["webhelpers.html.literal".to_string()],
+                    ..Default::default()
+                },
+                ..LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::UnsafeMarkupUse, Path::new("S704_whitelisted_markup_calls.py"))]
+    fn whitelisted_markup_calls(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "whitelisted_markup_calls__{}_{}",
+            rule_code.noqa_code(),
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("flake8_bandit").join(path).as_path(),
+            &LinterSettings {
+                flake8_bandit: super::settings::Settings {
+                    allowed_markup_calls: vec!["bleach.clean".to_string()],
+                    ..Default::default()
+                },
+                ..LinterSettings::for_rule(rule_code)
+            },
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
@@ -94,7 +176,7 @@ mod tests {
                         "/dev/shm".to_string(),
                         "/foo".to_string(),
                     ],
-                    check_typed_exception: false,
+                    ..Default::default()
                 },
                 ..LinterSettings::for_rule(Rule::HardcodedTempFile)
             },

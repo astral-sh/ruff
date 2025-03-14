@@ -13,7 +13,7 @@ use ruff_text_size::{Ranged, TextLen, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::{adjust_indentation, delete_stmt};
-use crate::settings::types::PythonVersion;
+use ruff_python_ast::PythonVersion;
 
 /// ## What it does
 /// Checks for conditional blocks gated on `sys.version_info` comparisons
@@ -82,7 +82,7 @@ enum Reason {
 }
 
 /// UP036
-pub(crate) fn outdated_version_block(checker: &mut Checker, stmt_if: &StmtIf) {
+pub(crate) fn outdated_version_block(checker: &Checker, stmt_if: &StmtIf) {
     for branch in if_elif_branches(stmt_if) {
         let Expr::Compare(ast::ExprCompare {
             left,
@@ -115,7 +115,7 @@ pub(crate) fn outdated_version_block(checker: &mut Checker, stmt_if: &StmtIf) {
                     let Some(version) = extract_version(elts) else {
                         return;
                     };
-                    let target = checker.settings.target_version;
+                    let target = checker.target_version();
                     match version_always_less_than(
                         &version,
                         target,
@@ -142,10 +142,10 @@ pub(crate) fn outdated_version_block(checker: &mut Checker, stmt_if: &StmtIf) {
                             } {
                                 diagnostic.set_fix(fix);
                             }
-                            checker.diagnostics.push(diagnostic);
+                            checker.report_diagnostic(diagnostic);
                         }
                         Err(_) => {
-                            checker.diagnostics.push(Diagnostic::new(
+                            checker.report_diagnostic(Diagnostic::new(
                                 OutdatedVersionBlock {
                                     reason: Reason::Invalid,
                                 },
@@ -183,7 +183,7 @@ pub(crate) fn outdated_version_block(checker: &mut Checker, stmt_if: &StmtIf) {
                         if let Some(fix) = fix_always_true_branch(checker, stmt_if, &branch) {
                             diagnostic.set_fix(fix);
                         }
-                        checker.diagnostics.push(diagnostic);
+                        checker.report_diagnostic(diagnostic);
                     }
                     Reason::AlwaysFalse => {
                         let mut diagnostic =
@@ -191,10 +191,10 @@ pub(crate) fn outdated_version_block(checker: &mut Checker, stmt_if: &StmtIf) {
                         if let Some(fix) = fix_always_false_branch(checker, stmt_if, &branch) {
                             diagnostic.set_fix(fix);
                         }
-                        checker.diagnostics.push(diagnostic);
+                        checker.report_diagnostic(diagnostic);
                     }
                     Reason::Invalid => {
-                        checker.diagnostics.push(Diagnostic::new(
+                        checker.report_diagnostic(Diagnostic::new(
                             OutdatedVersionBlock {
                                 reason: Reason::Invalid,
                             },
@@ -236,14 +236,27 @@ fn version_always_less_than(
                 return Err(anyhow::anyhow!("invalid minor version: {if_minor}"));
             };
 
+            let if_micro = match check_version_iter.next() {
+                None => None,
+                Some(micro) => match micro.as_u8() {
+                    Some(micro) => Some(micro),
+                    None => anyhow::bail!("invalid micro version: {micro}"),
+                },
+            };
+
             Ok(if or_equal {
                 // Ex) `sys.version_info <= 3.8`. If Python 3.8 is the minimum supported version,
                 // the condition won't always evaluate to `false`, so we want to return `false`.
                 if_minor < py_minor
             } else {
-                // Ex) `sys.version_info < 3.8`. If Python 3.8 is the minimum supported version,
-                // the condition _will_ always evaluate to `false`, so we want to return `true`.
-                if_minor <= py_minor
+                if let Some(if_micro) = if_micro {
+                    // Ex) `sys.version_info < 3.8.3`
+                    if_minor < py_minor || if_minor == py_minor && if_micro == 0
+                } else {
+                    // Ex) `sys.version_info < 3.8`. If Python 3.8 is the minimum supported version,
+                    // the condition _will_ always evaluate to `false`, so we want to return `true`.
+                    if_minor <= py_minor
+                }
             })
         }
     }
@@ -366,7 +379,7 @@ fn fix_always_false_branch(
 /// if sys.version_info >= (3, 8): ...
 /// ```
 fn fix_always_true_branch(
-    checker: &mut Checker,
+    checker: &Checker,
     stmt_if: &StmtIf,
     branch: &IfElifBranch,
 ) -> Option<Fix> {
@@ -443,17 +456,17 @@ mod tests {
 
     use super::*;
 
-    #[test_case(PythonVersion::Py37, & [2], true, true; "compare-2.0")]
-    #[test_case(PythonVersion::Py37, & [2, 0], true, true; "compare-2.0-whole")]
-    #[test_case(PythonVersion::Py37, & [3], true, true; "compare-3.0")]
-    #[test_case(PythonVersion::Py37, & [3, 0], true, true; "compare-3.0-whole")]
-    #[test_case(PythonVersion::Py37, & [3, 1], true, true; "compare-3.1")]
-    #[test_case(PythonVersion::Py37, & [3, 5], true, true; "compare-3.5")]
-    #[test_case(PythonVersion::Py37, & [3, 7], true, false; "compare-3.7")]
-    #[test_case(PythonVersion::Py37, & [3, 7], false, true; "compare-3.7-not-equal")]
-    #[test_case(PythonVersion::Py37, & [3, 8], false, false; "compare-3.8")]
-    #[test_case(PythonVersion::Py310, & [3, 9], true, true; "compare-3.9")]
-    #[test_case(PythonVersion::Py310, & [3, 11], true, false; "compare-3.11")]
+    #[test_case(PythonVersion::PY37, & [2], true, true; "compare-2.0")]
+    #[test_case(PythonVersion::PY37, & [2, 0], true, true; "compare-2.0-whole")]
+    #[test_case(PythonVersion::PY37, & [3], true, true; "compare-3.0")]
+    #[test_case(PythonVersion::PY37, & [3, 0], true, true; "compare-3.0-whole")]
+    #[test_case(PythonVersion::PY37, & [3, 1], true, true; "compare-3.1")]
+    #[test_case(PythonVersion::PY37, & [3, 5], true, true; "compare-3.5")]
+    #[test_case(PythonVersion::PY37, & [3, 7], true, false; "compare-3.7")]
+    #[test_case(PythonVersion::PY37, & [3, 7], false, true; "compare-3.7-not-equal")]
+    #[test_case(PythonVersion::PY37, & [3, 8], false, false; "compare-3.8")]
+    #[test_case(PythonVersion::PY310, & [3, 9], true, true; "compare-3.9")]
+    #[test_case(PythonVersion::PY310, & [3, 11], true, false; "compare-3.11")]
     fn test_compare_version(
         version: PythonVersion,
         target_versions: &[u8],

@@ -61,7 +61,7 @@ impl AlwaysFixableViolation for SuperWithoutBrackets {
 }
 
 /// PLW0245
-pub(crate) fn super_without_brackets(checker: &mut Checker, func: &Expr) {
+pub(crate) fn super_without_brackets(checker: &Checker, func: &Expr) {
     // The call must be to `super` (without parentheses).
     let Expr::Attribute(ast::ExprAttribute { value, .. }) = func else {
         return;
@@ -115,5 +115,5 @@ pub(crate) fn super_without_brackets(checker: &mut Checker, func: &Expr) {
         value.range(),
     )));
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

@@ -151,8 +151,7 @@ PERF401.py:210:13: PERF401 Use a list comprehension to create a transformed list
     |
 208 |       ):  # Comment 3
 209 |           if i % 2:  # Comment 4
-210 |               result.append(
-    |  _____________^
+210 | /             result.append(
 211 | |                 (
 212 | |                     i + 1,
 213 | |                     # Comment 5
@@ -188,7 +187,7 @@ PERF401.py:239:9: PERF401 Use a list comprehension to create a transformed list
 238 |     for a in values:
 239 |         result.append(a + 1)  # PERF401
     |         ^^^^^^^^^^^^^^^^^^^^ PERF401
-240 | 
+240 |
 241 | def f():
     |
     = help: Replace for loop with list comprehension

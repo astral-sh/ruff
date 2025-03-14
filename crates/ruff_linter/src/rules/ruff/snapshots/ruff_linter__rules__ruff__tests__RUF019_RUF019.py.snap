@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
-snapshot_kind: text
 ---
 RUF019.py:3:4: RUF019 [*] Unnecessary key check before dictionary access
   |
@@ -43,7 +42,7 @@ RUF019.py:7:4: RUF019 [*] Unnecessary key check before dictionary access
 RUF019.py:10:4: RUF019 [*] Unnecessary key check before dictionary access
    |
  8 |     pass
- 9 | 
+ 9 |
 10 | if (k) in d and d[k]:
    |    ^^^^^^^^^^^^^^^^^ RUF019
 11 |     pass
@@ -63,7 +62,7 @@ RUF019.py:10:4: RUF019 [*] Unnecessary key check before dictionary access
 RUF019.py:13:4: RUF019 [*] Unnecessary key check before dictionary access
    |
 11 |     pass
-12 | 
+12 |
 13 | if k in d and d[(k)]:
    |    ^^^^^^^^^^^^^^^^^ RUF019
 14 |     pass
@@ -83,10 +82,10 @@ RUF019.py:13:4: RUF019 [*] Unnecessary key check before dictionary access
 RUF019.py:16:6: RUF019 [*] Unnecessary key check before dictionary access
    |
 14 |     pass
-15 | 
+15 |
 16 | not ("key" in dct and dct["key"])
    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF019
-17 | 
+17 |
 18 | bool("key" in dct and dct["key"])
    |
    = help: Replace with `dict.get`
@@ -104,10 +103,10 @@ RUF019.py:16:6: RUF019 [*] Unnecessary key check before dictionary access
 RUF019.py:18:6: RUF019 [*] Unnecessary key check before dictionary access
    |
 16 | not ("key" in dct and dct["key"])
-17 | 
+17 |
 18 | bool("key" in dct and dct["key"])
    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF019
-19 | 
+19 |
 20 | # OK
    |
    = help: Replace with `dict.get`

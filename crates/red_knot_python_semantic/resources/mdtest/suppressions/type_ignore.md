@@ -37,17 +37,16 @@ child expression now suppresses errors in the outer expression.
 For example, the `type: ignore` comment in this example suppresses the error of adding `2` to
 `"test"` and adding `"other"` to the result of the cast.
 
-```py path=nested.py
-# fmt: off
+```py
 from typing import cast
 
 y = (
-    cast(int, "test" +
-            # TODO: Remove the expected error after implementing `invalid-operator` for binary expressions
-            # error: [unused-ignore-comment]
-            2 # type: ignore
+    # error: [unsupported-operator]
+    cast(
+        int,
+        2 + "test",  # type: ignore
     )
-    + "other"  # TODO: expected-error[invalid-operator]
+    + "other"
 )
 ```
 
@@ -151,7 +150,7 @@ b = a / 0
 ```py
 """
 File level suppressions must come before any non-trivia token,
-including module docstrings. 
+including module docstrings.
 """
 
 # error: [unused-ignore-comment] "Unused blanket `type: ignore` directive"

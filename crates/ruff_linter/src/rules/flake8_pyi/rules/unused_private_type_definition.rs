@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::{self as ast, Expr, Stmt};
@@ -6,6 +6,7 @@ use ruff_python_semantic::{Scope, SemanticModel};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::fix;
 
 /// ## What it does
 /// Checks for the presence of unused private `TypeVar`, `ParamSpec` or
@@ -13,7 +14,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Why is this bad?
 /// A private `TypeVar` that is defined but not used is likely a mistake. It
-/// should either be used, made public, or removed to avoid confusion.
+/// should either be used, made public, or removed to avoid confusion. A type
+/// variable is considered "private" if its name starts with an underscore.
 ///
 /// ## Example
 /// ```pyi
@@ -23,6 +25,10 @@ use crate::checkers::ast::Checker;
 /// _T = typing.TypeVar("_T")
 /// _Ts = typing_extensions.TypeVarTuple("_Ts")
 /// ```
+///
+/// ## Fix safety
+/// The fix is always marked as unsafe, as it would break your code if the type
+/// variable is imported by another module.
 #[derive(ViolationMetadata)]
 pub(crate) struct UnusedPrivateTypeVar {
     type_var_like_name: String,
@@ -30,6 +36,8 @@ pub(crate) struct UnusedPrivateTypeVar {
 }
 
 impl Violation for UnusedPrivateTypeVar {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         let UnusedPrivateTypeVar {
@@ -37,6 +45,16 @@ impl Violation for UnusedPrivateTypeVar {
             type_var_like_kind,
         } = self;
         format!("Private {type_var_like_kind} `{type_var_like_name}` is never used")
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        let UnusedPrivateTypeVar {
+            type_var_like_name,
+            type_var_like_kind,
+        } = self;
+        Some(format!(
+            "Remove unused private {type_var_like_kind} `{type_var_like_name}`"
+        ))
     }
 }
 
@@ -159,11 +177,7 @@ impl Violation for UnusedPrivateTypedDict {
 }
 
 /// PYI018
-pub(crate) fn unused_private_type_var(
-    checker: &Checker,
-    scope: &Scope,
-    diagnostics: &mut Vec<Diagnostic>,
-) {
+pub(crate) fn unused_private_type_var(checker: &Checker, scope: &Scope) {
     for binding in scope
         .binding_ids()
         .map(|binding_id| checker.semantic().binding(binding_id))
@@ -178,7 +192,7 @@ pub(crate) fn unused_private_type_var(
         let Some(source) = binding.source else {
             continue;
         };
-        let Stmt::Assign(ast::StmtAssign { targets, value, .. }) =
+        let stmt @ Stmt::Assign(ast::StmtAssign { targets, value, .. }) =
             checker.semantic().statement(source)
         else {
             continue;
@@ -210,22 +224,26 @@ pub(crate) fn unused_private_type_var(
             continue;
         };
 
-        diagnostics.push(Diagnostic::new(
+        let diagnostic = Diagnostic::new(
             UnusedPrivateTypeVar {
                 type_var_like_name: id.to_string(),
                 type_var_like_kind: type_var_like_kind.to_string(),
             },
             binding.range(),
-        ));
+        )
+        .with_fix(Fix::unsafe_edit(fix::edits::delete_stmt(
+            stmt,
+            None,
+            checker.locator(),
+            checker.indexer(),
+        )));
+
+        checker.report_diagnostic(diagnostic);
     }
 }
 
 /// PYI046
-pub(crate) fn unused_private_protocol(
-    checker: &Checker,
-    scope: &Scope,
-    diagnostics: &mut Vec<Diagnostic>,
-) {
+pub(crate) fn unused_private_protocol(checker: &Checker, scope: &Scope) {
     for binding in scope
         .binding_ids()
         .map(|binding_id| checker.semantic().binding(binding_id))
@@ -253,7 +271,7 @@ pub(crate) fn unused_private_protocol(
             continue;
         }
 
-        diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             UnusedPrivateProtocol {
                 name: class_def.name.to_string(),
             },
@@ -263,11 +281,7 @@ pub(crate) fn unused_private_protocol(
 }
 
 /// PYI047
-pub(crate) fn unused_private_type_alias(
-    checker: &Checker,
-    scope: &Scope,
-    diagnostics: &mut Vec<Diagnostic>,
-) {
+pub(crate) fn unused_private_type_alias(checker: &Checker, scope: &Scope) {
     let semantic = checker.semantic();
 
     for binding in scope
@@ -289,7 +303,7 @@ pub(crate) fn unused_private_type_alias(
             continue;
         };
 
-        diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             UnusedPrivateTypeAlias {
                 name: alias_name.to_string(),
             },
@@ -319,11 +333,7 @@ fn extract_type_alias_name<'a>(stmt: &'a ast::Stmt, semantic: &SemanticModel) ->
 }
 
 /// PYI049
-pub(crate) fn unused_private_typed_dict(
-    checker: &Checker,
-    scope: &Scope,
-    diagnostics: &mut Vec<Diagnostic>,
-) {
+pub(crate) fn unused_private_typed_dict(checker: &Checker, scope: &Scope) {
     let semantic = checker.semantic();
 
     for binding in scope
@@ -348,7 +358,7 @@ pub(crate) fn unused_private_typed_dict(
             continue;
         };
 
-        diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             UnusedPrivateTypedDict {
                 name: class_name.to_string(),
             },

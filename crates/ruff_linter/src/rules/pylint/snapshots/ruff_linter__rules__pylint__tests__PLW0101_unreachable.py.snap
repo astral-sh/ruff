@@ -7,7 +7,7 @@ unreachable.py:3:5: PLW0101 Unreachable code in `after_return`
 2 |     return "reachable"
 3 |     return "unreachable"
   |     ^^^^^^^^^^^^^^^^^^^^ PLW0101
-4 | 
+4 |
 5 | async def also_works_on_async_functions():
   |
 
@@ -17,7 +17,7 @@ unreachable.py:7:5: PLW0101 Unreachable code in `also_works_on_async_functions`
 6 |     return "reachable"
 7 |     return "unreachable"
   |     ^^^^^^^^^^^^^^^^^^^^ PLW0101
-8 | 
+8 |
 9 | def if_always_true():
   |
 
@@ -27,7 +27,7 @@ unreachable.py:12:5: PLW0101 Unreachable code in `if_always_true`
 11 |         return "reachable"
 12 |     return "unreachable"
    |     ^^^^^^^^^^^^^^^^^^^^ PLW0101
-13 | 
+13 |
 14 | def if_always_false():
    |
 
@@ -44,8 +44,7 @@ unreachable.py:21:9: PLW0101 Unreachable code in `if_elif_always_false`
    |
 19 |   def if_elif_always_false():
 20 |       if False:
-21 |           return "unreachable"
-   |  _________^
+21 | /         return "unreachable"
 22 | |     elif False:
 23 | |         return "also unreachable"
    | |_________________________________^ PLW0101
@@ -68,7 +67,7 @@ unreachable.py:31:5: PLW0101 Unreachable code in `if_elif_always_true`
 30 |         return "reachable"
 31 |     return "also unreachable"
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^ PLW0101
-32 | 
+32 |
 33 | def ends_with_if():
    |
 
@@ -88,7 +87,7 @@ unreachable.py:42:5: PLW0101 Unreachable code in `infinite_loop`
 41 |         continue
 42 |     return "unreachable"
    |     ^^^^^^^^^^^^^^^^^^^^ PLW0101
-43 | 
+43 |
 44 | '''  TODO: we could determine these, but we don't yet.
    |
 
@@ -98,7 +97,7 @@ unreachable.py:75:5: PLW0101 Unreachable code in `match_wildcard`
 74 |             return "reachable"
 75 |     return "unreachable"
    |     ^^^^^^^^^^^^^^^^^^^^ PLW0101
-76 | 
+76 |
 77 | def match_case_and_wildcard(status):
    |
 
@@ -108,7 +107,7 @@ unreachable.py:83:5: PLW0101 Unreachable code in `match_case_and_wildcard`
 82 |             return "reachable"
 83 |     return "unreachable"
    |     ^^^^^^^^^^^^^^^^^^^^ PLW0101
-84 | 
+84 |
 85 | def raise_exception():
    |
 
@@ -118,7 +117,7 @@ unreachable.py:87:5: PLW0101 Unreachable code in `raise_exception`
 86 |     raise Exception
 87 |     return "unreachable"
    |     ^^^^^^^^^^^^^^^^^^^^ PLW0101
-88 | 
+88 |
 89 | def while_false():
    |
 
@@ -157,7 +156,7 @@ unreachable.py:105:5: PLW0101 Unreachable code in `while_false_else_return`
 104 |         return "reachable"
 105 |     return "also unreachable"
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^ PLW0101
-106 | 
+106 |
 107 | def while_true():
     |
 
@@ -167,7 +166,7 @@ unreachable.py:110:5: PLW0101 Unreachable code in `while_true`
 109 |         return "reachable"
 110 |     return "unreachable"
     |     ^^^^^^^^^^^^^^^^^^^^ PLW0101
-111 | 
+111 |
 112 | def while_true_else():
     |
 
@@ -177,7 +176,7 @@ unreachable.py:116:9: PLW0101 Unreachable code in `while_true_else`
 115 |     else:
 116 |         return "unreachable"
     |         ^^^^^^^^^^^^^^^^^^^^ PLW0101
-117 | 
+117 |
 118 | def while_true_else_return():
     |
 
@@ -185,11 +184,10 @@ unreachable.py:122:9: PLW0101 Unreachable code in `while_true_else_return`
     |
 120 |           return "reachable"
 121 |       else:
-122 |           return "unreachable"
-    |  _________^
+122 | /         return "unreachable"
 123 | |     return "also unreachable"
     | |_____________________________^ PLW0101
-124 |   
+124 |
 125 |   def while_false_var_i():
     |
 
@@ -208,7 +206,7 @@ unreachable.py:135:5: PLW0101 Unreachable code in `while_true_var_i`
 134 |         i += 1
 135 |     return i
     |     ^^^^^^^^ PLW0101
-136 | 
+136 |
 137 | def while_infinite():
     |
 
@@ -218,7 +216,7 @@ unreachable.py:140:5: PLW0101 Unreachable code in `while_infinite`
 139 |         pass
 140 |     return "unreachable"
     |     ^^^^^^^^^^^^^^^^^^^^ PLW0101
-141 | 
+141 |
 142 | def while_if_true():
     |
 
@@ -228,7 +226,7 @@ unreachable.py:146:5: PLW0101 Unreachable code in `while_if_true`
 145 |             return "reachable"
 146 |     return "unreachable"
     |     ^^^^^^^^^^^^^^^^^^^^ PLW0101
-147 | 
+147 |
 148 | def while_break():
     |
 
@@ -245,8 +243,7 @@ unreachable.py:248:5: PLW0101 Unreachable code in `after_return`
     |
 246 |   def after_return():
 247 |       return "reachable"
-248 |       print("unreachable")
-    |  _____^
+248 | /     print("unreachable")
 249 | |     print("unreachable")
 250 | |     print("unreachable")
 251 | |     print("unreachable")
@@ -258,8 +255,7 @@ unreachable.py:257:5: PLW0101 Unreachable code in `check_if_url_exists`
     |
 255 |   def check_if_url_exists(url: str) -> bool:  # type: ignore[return]
 256 |       return True  # uncomment to check URLs
-257 |       response = requests.head(url, allow_redirects=True)
-    |  _____^
+257 | /     response = requests.head(url, allow_redirects=True)
 258 | |     if response.status_code == 200:
 259 | |         return True
 260 | |     if response.status_code == 404:

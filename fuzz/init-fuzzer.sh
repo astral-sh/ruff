@@ -23,7 +23,7 @@ if [ ! -d corpus/ruff_fix_validity ]; then
 
     # Build a smaller corpus in addition to the (optional) larger corpus
     curl -L 'https://github.com/python/cpython/archive/refs/tags/v3.13.0.tar.gz' | tar xz
-    cp -r "../../../crates/red_knot_workspace/resources/test/corpus" "red_knot_workspace"
+    cp -r "../../../crates/red_knot_project/resources/test/corpus" "red_knot_project"
     cp -r "../../../crates/ruff_linter/resources/test/fixtures" "ruff_linter"
     cp -r "../../../crates/ruff_python_formatter/resources/test/fixtures" "ruff_python_formatter"
     cp -r "../../../crates/ruff_python_parser/resources" "ruff_python_parser"

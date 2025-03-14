@@ -95,14 +95,7 @@
       matchManagers: ["cargo"],
       matchPackageNames: ["strum"],
       description: "Weekly update of strum dependencies",
-    },
-    {
-      groupName: "ESLint",
-      matchManagers: ["npm"],
-      matchPackageNames: ["eslint"],
-      allowedVersions: "<9",
-      description: "Constraint ESLint to version 8 until TypeScript-eslint supports ESLint 9", // https://github.com/typescript-eslint/typescript-eslint/issues/8211
-    },
+    }
   ],
   vulnerabilityAlerts: {
     commitMessageSuffix: "",

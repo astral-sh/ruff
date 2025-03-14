@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
-snapshot_kind: text
 ---
 B005.py:4:1: B005 Using `.strip()` with multi-character strings is misleading
   |
@@ -78,6 +77,6 @@ B005.py:24:1: B005 Using `.strip()` with multi-character strings is misleading
 23 | s.strip("\ufeff")  # no warning
 24 | s.strip("\u0074\u0065\u0073\u0074")  # warning
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B005
-25 | 
+25 |
 26 | from somewhere import other_type, strip
    |

@@ -1,16 +1,17 @@
+use crate::checkers::ast::Checker;
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_python_ast::helpers::map_callable;
 use ruff_python_ast::{
     name::QualifiedName, Arguments, Expr, ExprAttribute, ExprCall, ExprContext, ExprName,
-    StmtClassDef,
+    ExprStringLiteral, ExprSubscript, Stmt, StmtClassDef, StmtFunctionDef,
 };
 use ruff_python_semantic::analyze::typing;
 use ruff_python_semantic::Modules;
 use ruff_python_semantic::ScopeKind;
+use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 use ruff_text_size::TextRange;
-
-use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for uses of deprecated Airflow functions and values.
@@ -71,8 +72,15 @@ impl Violation for Airflow3Removal {
     }
 }
 
+#[derive(Debug, Eq, PartialEq)]
+enum Replacement {
+    None,
+    Name(&'static str),
+    Message(&'static str),
+}
+
 /// AIR302
-pub(crate) fn removed_in_3(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn airflow_3_removal_expr(checker: &Checker, expr: &Expr) {
     if !checker.semantic().seen_module(Modules::AIRFLOW) {
         return;
     }
@@ -83,10 +91,11 @@ pub(crate) fn removed_in_3(checker: &mut Checker, expr: &Expr) {
                 func, arguments, ..
             },
         ) => {
-            if let Some(qualname) = checker.semantic().resolve_qualified_name(func) {
-                check_call_arguments(checker, &qualname, arguments);
+            if let Some(qualified_name) = checker.semantic().resolve_qualified_name(func) {
+                check_call_arguments(checker, &qualified_name, arguments);
             };
             check_method(checker, call_expr);
+            check_context_key_usage_in_call(checker, call_expr);
         }
         Expr::Attribute(attribute_expr @ ExprAttribute { attr, .. }) => {
             check_name(checker, expr, attr.range());
@@ -100,15 +109,69 @@ pub(crate) fn removed_in_3(checker: &mut Checker, expr: &Expr) {
                 }
             }
         }
+        Expr::Subscript(subscript_expr) => {
+            check_context_key_usage_in_subscript(checker, subscript_expr);
+        }
         _ => {}
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
-enum Replacement {
-    None,
-    Name(&'static str),
-    Message(&'static str),
+/// AIR302
+pub(crate) fn airflow_3_removal_function_def(checker: &Checker, function_def: &StmtFunctionDef) {
+    if !checker.semantic().seen_module(Modules::AIRFLOW) {
+        return;
+    }
+
+    check_function_parameters(checker, function_def);
+}
+
+const REMOVED_CONTEXT_KEYS: [&str; 12] = [
+    "conf",
+    "execution_date",
+    "next_ds",
+    "next_ds_nodash",
+    "next_execution_date",
+    "prev_ds",
+    "prev_ds_nodash",
+    "prev_execution_date",
+    "prev_execution_date_success",
+    "tomorrow_ds",
+    "yesterday_ds",
+    "yesterday_ds_nodash",
+];
+
+/// Check the function parameters for removed context keys.
+///
+/// For example:
+///
+/// ```python
+/// from airflow.decorators import task
+///
+/// @task
+/// def another_task(execution_date, **kwargs):
+///     #            ^^^^^^^^^^^^^^
+///     #            'execution_date' is removed in Airflow 3.0
+///     pass
+/// ```
+fn check_function_parameters(checker: &Checker, function_def: &StmtFunctionDef) {
+    if !is_airflow_task(function_def, checker.semantic())
+        && !is_execute_method_inherits_from_airflow_operator(function_def, checker.semantic())
+    {
+        return;
+    }
+
+    for param in function_def.parameters.iter_non_variadic_params() {
+        let param_name = param.name();
+        if REMOVED_CONTEXT_KEYS.contains(&param_name.as_str()) {
+            checker.report_diagnostic(Diagnostic::new(
+                Airflow3Removal {
+                    deprecated: param_name.to_string(),
+                    replacement: Replacement::None,
+                },
+                param_name.range(),
+            ));
+        }
+    }
 }
 
 /// Check whether a removed Airflow argument is passed.
@@ -120,29 +183,34 @@ enum Replacement {
 ///
 /// DAG(schedule_interval="@daily")
 /// ```
-fn check_call_arguments(checker: &mut Checker, qualname: &QualifiedName, arguments: &Arguments) {
-    match qualname.segments() {
+fn check_call_arguments(checker: &Checker, qualified_name: &QualifiedName, arguments: &Arguments) {
+    match qualified_name.segments() {
         ["airflow", .., "DAG" | "dag"] => {
-            checker.diagnostics.extend(diagnostic_for_argument(
+            checker.report_diagnostics(diagnostic_for_argument(
                 arguments,
                 "schedule_interval",
                 Some("schedule"),
             ));
-            checker.diagnostics.extend(diagnostic_for_argument(
+            checker.report_diagnostics(diagnostic_for_argument(
                 arguments,
                 "timetable",
                 Some("schedule"),
             ));
-            checker.diagnostics.extend(diagnostic_for_argument(
+            checker.report_diagnostics(diagnostic_for_argument(
                 arguments,
                 "sla_miss_callback",
                 None,
             ));
+            checker.report_diagnostics(diagnostic_for_argument(
+                arguments,
+                "fail_stop",
+                Some("fail_fast"),
+            ));
         }
         _ => {
-            if is_airflow_auth_manager(qualname.segments()) {
+            if is_airflow_auth_manager(qualified_name.segments()) {
                 if !arguments.is_empty() {
-                    checker.diagnostics.push(Diagnostic::new(
+                    checker.report_diagnostic(Diagnostic::new(
                         Airflow3Removal {
                             deprecated: String::from("appbuilder"),
                             replacement: Replacement::Message(
@@ -152,45 +220,43 @@ fn check_call_arguments(checker: &mut Checker, qualname: &QualifiedName, argumen
                         arguments.range(),
                     ));
                 }
-            } else if is_airflow_task_handler(qualname.segments()) {
-                checker.diagnostics.extend(diagnostic_for_argument(
+            } else if is_airflow_task_handler(qualified_name.segments()) {
+                checker.report_diagnostics(diagnostic_for_argument(
                     arguments,
                     "filename_template",
                     None,
                 ));
-            } else if is_airflow_operator(qualname.segments()) {
-                checker
-                    .diagnostics
-                    .extend(diagnostic_for_argument(arguments, "sla", None));
-                checker.diagnostics.extend(diagnostic_for_argument(
+            } else if is_airflow_operator(qualified_name.segments()) {
+                checker.report_diagnostics(diagnostic_for_argument(arguments, "sla", None));
+                checker.report_diagnostics(diagnostic_for_argument(
                     arguments,
                     "task_concurrency",
                     Some("max_active_tis_per_dag"),
                 ));
-                match qualname.segments() {
+                match qualified_name.segments() {
                     ["airflow", .., "operators", "trigger_dagrun", "TriggerDagRunOperator"] => {
-                        checker.diagnostics.extend(diagnostic_for_argument(
+                        checker.report_diagnostics(diagnostic_for_argument(
                             arguments,
                             "execution_date",
                             Some("logical_date"),
                         ));
                     }
                     ["airflow", .., "operators", "datetime", "BranchDateTimeOperator"] => {
-                        checker.diagnostics.extend(diagnostic_for_argument(
+                        checker.report_diagnostics(diagnostic_for_argument(
                             arguments,
                             "use_task_execution_day",
                             Some("use_task_logical_date"),
                         ));
                     }
                     ["airflow", .., "operators", "weekday", "DayOfWeekSensor"] => {
-                        checker.diagnostics.extend(diagnostic_for_argument(
+                        checker.report_diagnostics(diagnostic_for_argument(
                             arguments,
                             "use_task_execution_day",
                             Some("use_task_logical_date"),
                         ));
                     }
                     ["airflow", .., "operators", "weekday", "BranchDayOfWeekOperator"] => {
-                        checker.diagnostics.extend(diagnostic_for_argument(
+                        checker.report_diagnostics(diagnostic_for_argument(
                             arguments,
                             "use_task_execution_day",
                             Some("use_task_logical_date"),
@@ -213,7 +279,7 @@ fn check_call_arguments(checker: &mut Checker, qualname: &QualifiedName, argumen
 /// info = DatasetLineageInfo()
 /// info.dataset
 /// ```
-fn check_class_attribute(checker: &mut Checker, attribute_expr: &ExprAttribute) {
+fn check_class_attribute(checker: &Checker, attribute_expr: &ExprAttribute) {
     let ExprAttribute { value, attr, .. } = attribute_expr;
 
     let Some(qualname) = typing::resolve_assignment(value, checker.semantic()) else {
@@ -237,7 +303,7 @@ fn check_class_attribute(checker: &mut Checker, attribute_expr: &ExprAttribute) 
     };
 
     if let Some(replacement) = replacement {
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             Airflow3Removal {
                 deprecated: attr.to_string(),
                 replacement,
@@ -245,6 +311,137 @@ fn check_class_attribute(checker: &mut Checker, attribute_expr: &ExprAttribute) 
             attr.range(),
         ));
     }
+}
+
+/// Checks whether an Airflow 3.0–removed context key is used in a function decorated with `@task`.
+///
+/// Specifically, it flags the following two scenarios:
+///
+/// 1. A removed context key accessed via `context.get("...")` where context is coming from
+///    `get_current_context` function.
+///
+/// ```python
+/// from airflow.decorators import task
+/// from airflow.utils.context import get_current_context
+///
+///
+/// @task
+/// def my_task():
+///     context = get_current_context()
+///     context.get("conf")  # 'conf' is removed in Airflow 3.0
+/// ```
+///
+/// 2. A removed context key accessed via `context.get("...")` where context is a kwarg parameter.
+///
+/// ```python
+/// from airflow.decorators import task
+///
+///
+/// @task
+/// def my_task(**context):
+///     context.get("conf")  # 'conf' is removed in Airflow 3.0
+/// ```
+fn check_context_key_usage_in_call(checker: &Checker, call_expr: &ExprCall) {
+    if !in_airflow_task_function(checker.semantic()) {
+        return;
+    }
+
+    let Expr::Attribute(ExprAttribute { value, attr, .. }) = &*call_expr.func else {
+        return;
+    };
+
+    if attr.as_str() != "get" {
+        return;
+    }
+
+    let is_kwarg_parameter = value
+        .as_name_expr()
+        .is_some_and(|name| is_kwarg_parameter(checker.semantic(), name));
+
+    let is_assigned_from_get_current_context =
+        typing::resolve_assignment(value, checker.semantic()).is_some_and(|qualified_name| {
+            matches!(
+                qualified_name.segments(),
+                ["airflow", "utils", "context", "get_current_context"]
+            )
+        });
+
+    if !(is_kwarg_parameter || is_assigned_from_get_current_context) {
+        return;
+    }
+
+    for removed_key in REMOVED_CONTEXT_KEYS {
+        let Some(Expr::StringLiteral(ExprStringLiteral { value, range })) =
+            call_expr.arguments.find_positional(0)
+        else {
+            continue;
+        };
+        if value == removed_key {
+            checker.report_diagnostic(Diagnostic::new(
+                Airflow3Removal {
+                    deprecated: removed_key.to_string(),
+                    replacement: Replacement::None,
+                },
+                *range,
+            ));
+        }
+    }
+}
+
+/// Check if a subscript expression accesses a removed Airflow context variable.
+/// If a removed key is found, push a corresponding diagnostic.
+fn check_context_key_usage_in_subscript(checker: &Checker, subscript: &ExprSubscript) {
+    if !in_airflow_task_function(checker.semantic()) {
+        return;
+    }
+
+    let ExprSubscript { value, slice, .. } = subscript;
+
+    let Some(ExprStringLiteral { value: key, .. }) = slice.as_string_literal_expr() else {
+        return;
+    };
+
+    let is_kwarg_parameter = value
+        .as_name_expr()
+        .is_some_and(|name| is_kwarg_parameter(checker.semantic(), name));
+
+    let is_assigned_from_get_current_context =
+        typing::resolve_assignment(value, checker.semantic()).is_some_and(|qualified_name| {
+            matches!(
+                qualified_name.segments(),
+                ["airflow", "utils", "context", "get_current_context"]
+            )
+        });
+
+    if !(is_kwarg_parameter || is_assigned_from_get_current_context) {
+        return;
+    }
+
+    if REMOVED_CONTEXT_KEYS.contains(&key.to_str()) {
+        checker.report_diagnostic(Diagnostic::new(
+            Airflow3Removal {
+                deprecated: key.to_string(),
+                replacement: Replacement::None,
+            },
+            slice.range(),
+        ));
+    }
+}
+
+/// Finds the parameter definition for a given name expression in a function.
+fn is_kwarg_parameter(semantic: &SemanticModel, name: &ExprName) -> bool {
+    let Some(binding_id) = semantic.only_binding(name) else {
+        return false;
+    };
+    let binding = semantic.binding(binding_id);
+    let Some(Stmt::FunctionDef(StmtFunctionDef { parameters, .. })) = binding.statement(semantic)
+    else {
+        return false;
+    };
+    parameters
+        .kwarg
+        .as_deref()
+        .is_some_and(|kwarg| kwarg.name.as_str() == name.id.as_str())
 }
 
 /// Check whether a removed Airflow class method is called.
@@ -257,7 +454,7 @@ fn check_class_attribute(checker: &mut Checker, attribute_expr: &ExprAttribute) 
 /// manager = DatasetManager()
 /// manager.register_datsaet_change()
 /// ```
-fn check_method(checker: &mut Checker, call_expr: &ExprCall) {
+fn check_method(checker: &Checker, call_expr: &ExprCall) {
     let Expr::Attribute(ExprAttribute { attr, value, .. }) = &*call_expr.func else {
         return;
     };
@@ -294,6 +491,11 @@ fn check_method(checker: &mut Checker, call_expr: &ExprCall) {
             )),
             _ => None,
         },
+        ["airflow", "secrets", "local_filesystem", "LocalFilesystemBackend"] => match attr.as_str()
+        {
+            "get_connections" => Some(Replacement::Name("get_connection")),
+            _ => None,
+        },
         ["airflow", "datasets", ..] | ["airflow", "Dataset"] => match attr.as_str() {
             "iter_datasets" => Some(Replacement::Name("iter_assets")),
             "iter_dataset_aliases" => Some(Replacement::Name("iter_asset_aliases")),
@@ -317,7 +519,7 @@ fn check_method(checker: &mut Checker, call_expr: &ExprCall) {
         }
     };
     if let Some(replacement) = replacement {
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             Airflow3Removal {
                 deprecated: attr.to_string(),
                 replacement,
@@ -341,7 +543,7 @@ fn check_method(checker: &mut Checker, call_expr: &ExprCall) {
 /// # Or, directly
 /// SubDagOperator()
 /// ```
-fn check_name(checker: &mut Checker, expr: &Expr, range: TextRange) {
+fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
     let Some(qualified_name) = checker.semantic().resolve_qualified_name(expr) else {
         return;
     };
@@ -473,22 +675,10 @@ fn check_name(checker: &mut Checker, expr: &Expr, range: TextRange) {
         ["airflow", "operators", "subdag", ..] => {
             Replacement::Message("The whole `airflow.subdag` module has been removed.")
         }
-        ["airflow", "operators", "bash_operator", "BashOperator"] => {
-            Replacement::Name("airflow.operators.bash.BashOperator")
-        }
         ["airflow", "operators", "branch_operator", "BaseBranchOperator"] => {
             Replacement::Name("airflow.operators.branch.BaseBranchOperator")
         }
-        ["airflow", "operators", " dummy", "EmptyOperator"] => {
-            Replacement::Name("airflow.operators.empty.EmptyOperator")
-        }
-        ["airflow", "operators", "dummy", "DummyOperator"] => {
-            Replacement::Name("airflow.operators.empty.EmptyOperator")
-        }
-        ["airflow", "operators", "dummy_operator", "EmptyOperator"] => {
-            Replacement::Name("airflow.operators.empty.EmptyOperator")
-        }
-        ["airflow", "operators", "dummy_operator", "DummyOperator"] => {
+        ["airflow", "operators", "dummy" | "dummy_operator", "EmptyOperator" | "DummyOperator"] => {
             Replacement::Name("airflow.operators.empty.EmptyOperator")
         }
         ["airflow", "operators", "email_operator", "EmailOperator"] => {
@@ -517,23 +707,20 @@ fn check_name(checker: &mut Checker, expr: &Expr, range: TextRange) {
         }
 
         // airflow.sensors
-        ["airflow", "sensors", "external_task", "ExternalTaskSensorLink"] => {
-            Replacement::Name("airflow.sensors.external_task.ExternalDagLink")
-        }
         ["airflow", "sensors", "base_sensor_operator", "BaseSensorOperator"] => {
             Replacement::Name("airflow.sensors.base.BaseSensorOperator")
         }
         ["airflow", "sensors", "date_time_sensor", "DateTimeSensor"] => {
             Replacement::Name("airflow.sensors.date_time.DateTimeSensor")
         }
-        ["airflow", "sensors", "external_task_sensor", "ExternalTaskMarker"] => {
+        ["airflow", "sensors", "external_task" | "external_task_sensor", "ExternalTaskMarker"] => {
             Replacement::Name("airflow.sensors.external_task.ExternalTaskMarker")
         }
-        ["airflow", "sensors", "external_task_sensor", "ExternalTaskSensor"] => {
-            Replacement::Name("airflow.sensors.external_task.ExternalTaskSensor")
-        }
-        ["airflow", "sensors", "external_task_sensor", "ExternalTaskSensorLink"] => {
+        ["airflow", "sensors", "external_task" | "external_task_sensor", "ExternalTaskSensorLink"] => {
             Replacement::Name("airflow.sensors.external_task.ExternalDagLink")
+        }
+        ["airflow", "sensors", "external_task" | "external_task_sensor", "ExternalTaskSensor"] => {
+            Replacement::Name("airflow.sensors.external_task.ExternalTaskSensor")
         }
         ["airflow", "sensors", "time_delta_sensor", "TimeDeltaSensor"] => {
             Replacement::Name("airflow.sensors.time_delta.TimeDeltaSensor")
@@ -543,19 +730,19 @@ fn check_name(checker: &mut Checker, expr: &Expr, range: TextRange) {
         ["airflow", "secrets", "local_filesystem", "load_connections"] => {
             Replacement::Name("airflow.secrets.local_filesystem.load_connections_dict")
         }
-        ["airflow", "secrets", "local_filesystem", "get_connection"] => {
-            Replacement::Name("airflow.secrets.local_filesystem.load_connections_dict")
-        }
 
+        // airflow.utils.dag_parsing_context
+        ["airflow", "utils", "dag_parsing_context", "get_parsing_context"] => {
+            Replacement::Name("airflow.sdk.get_parsing_context")
+        }
         // airflow.utils.dates
-        ["airflow", "utils", "dates", "date_range"] => Replacement::Name("airflow.timetables."),
+        ["airflow", "utils", "dates", "date_range"] => Replacement::None,
         ["airflow", "utils", "dates", "days_ago"] => {
             Replacement::Name("pendulum.today('UTC').add(days=-N, ...)")
         }
-        ["airflow", "utils", "dates", "parse_execution_date"] => Replacement::None,
-        ["airflow", "utils", "dates", "round_time"] => Replacement::None,
-        ["airflow", "utils", "dates", "scale_time_units"] => Replacement::None,
-        ["airflow", "utils", "dates", "infer_time_unit"] => Replacement::None,
+        ["airflow", "utils", "dates", "parse_execution_date" | "round_time" | "scale_time_units" | "infer_time_unit"] => {
+            Replacement::None
+        }
 
         // airflow.utils.file
         ["airflow", "utils", "file", "TemporaryDirectory"] => Replacement::None,
@@ -572,12 +759,10 @@ fn check_name(checker: &mut Checker, expr: &Expr, range: TextRange) {
         }
 
         // airflow.utils.state
-        ["airflow", "utils", "state", "SHUTDOWN"] => Replacement::None,
-        ["airflow", "utils", "state", "terminating_states"] => Replacement::None,
+        ["airflow", "utils", "state", "SHUTDOWN" | "terminating_states"] => Replacement::None,
 
         // airflow.utils.trigger_rule
-        ["airflow", "utils", "trigger_rule", "TriggerRule", "DUMMY"] => Replacement::None,
-        ["airflow", "utils", "trigger_rule", "TriggerRule", "NONE_FAILED_OR_SKIPPED"] => {
+        ["airflow", "utils", "trigger_rule", "TriggerRule", "DUMMY" | "NONE_FAILED_OR_SKIPPED"] => {
             Replacement::None
         }
 
@@ -679,7 +864,7 @@ fn check_name(checker: &mut Checker, expr: &Expr, range: TextRange) {
         _ => return,
     };
 
-    checker.diagnostics.push(Diagnostic::new(
+    checker.report_diagnostic(Diagnostic::new(
         Airflow3Removal {
             deprecated: qualified_name.to_string(),
             replacement,
@@ -700,7 +885,7 @@ fn check_name(checker: &mut Checker, expr: &Expr, range: TextRange) {
 ///     executors = "some.third.party.executor"
 /// ```
 fn check_airflow_plugin_extension(
-    checker: &mut Checker,
+    checker: &Checker,
     expr: &Expr,
     name: &str,
     class_def: &StmtClassDef,
@@ -717,7 +902,7 @@ fn check_airflow_plugin_extension(
                     )
                 })
         }) {
-            checker.diagnostics.push(Diagnostic::new(
+            checker.report_diagnostic(Diagnostic::new(
                 Airflow3Removal {
                     deprecated: name.to_string(),
                     replacement: Replacement::Message(
@@ -848,4 +1033,56 @@ fn is_airflow_builtin_or_provider(segments: &[&str], module: &str, symbol_suffix
 
         _ => false,
     }
+}
+
+/// Returns `true` if the current statement hierarchy has a function that's decorated with
+/// `@airflow.decorators.task`.
+fn in_airflow_task_function(semantic: &SemanticModel) -> bool {
+    semantic
+        .current_statements()
+        .find_map(|stmt| stmt.as_function_def_stmt())
+        .is_some_and(|function_def| is_airflow_task(function_def, semantic))
+}
+
+/// Returns `true` if the given function is decorated with `@airflow.decorators.task`.
+fn is_airflow_task(function_def: &StmtFunctionDef, semantic: &SemanticModel) -> bool {
+    function_def.decorator_list.iter().any(|decorator| {
+        semantic
+            .resolve_qualified_name(map_callable(&decorator.expression))
+            .is_some_and(|qualified_name| {
+                matches!(qualified_name.segments(), ["airflow", "decorators", "task"])
+            })
+    })
+}
+
+/// Check it's "execute" method inherits from Airflow base operator
+///
+/// For example:
+///
+/// ```python
+/// from airflow.models.baseoperator import BaseOperator
+///
+/// class CustomOperator(BaseOperator):
+///     def execute(self):
+///         pass
+/// ```
+fn is_execute_method_inherits_from_airflow_operator(
+    function_def: &StmtFunctionDef,
+    semantic: &SemanticModel,
+) -> bool {
+    if function_def.name.as_str() != "execute" {
+        return false;
+    }
+
+    let ScopeKind::Class(class_def) = semantic.current_scope().kind else {
+        return false;
+    };
+
+    class_def.bases().iter().any(|class_base| {
+        semantic
+            .resolve_qualified_name(class_base)
+            .is_some_and(|qualified_name| {
+                matches!(qualified_name.segments(), ["airflow", .., "BaseOperator"])
+            })
+    })
 }

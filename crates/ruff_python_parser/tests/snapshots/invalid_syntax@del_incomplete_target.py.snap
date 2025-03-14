@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/err/del_incomplete_target.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -122,4 +121,5 @@ Module(
   |
 3 | del x, y[
 4 | z
+  |  ^ Syntax Error: unexpected EOF while parsing
   |

@@ -1,0 +1,475 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF053.py:23:12: RUF053 [*] Class with type parameter list inherits from `Generic`
+   |
+21 | ### Errors
+22 |
+23 | class C[T](Generic[_A]): ...
+   |            ^^^^^^^^^^^ RUF053
+24 | class C[T](Generic[_B], str): ...
+25 | class C[T](int, Generic[_C]): ...
+   |
+   = help: Remove `Generic` base class
+
+ℹ Unsafe fix
+20 20 | 
+21 21 | ### Errors
+22 22 | 
+23    |-class C[T](Generic[_A]): ...
+   23 |+class C[T, _A]: ...
+24 24 | class C[T](Generic[_B], str): ...
+25 25 | class C[T](int, Generic[_C]): ...
+26 26 | class C[T](bytes, Generic[_D], bool): ...  # TODO: Type parameter defaults
+
+RUF053.py:24:12: RUF053 [*] Class with type parameter list inherits from `Generic`
+   |
+23 | class C[T](Generic[_A]): ...
+24 | class C[T](Generic[_B], str): ...
+   |            ^^^^^^^^^^^ RUF053
+25 | class C[T](int, Generic[_C]): ...
+26 | class C[T](bytes, Generic[_D], bool): ...  # TODO: Type parameter defaults
+   |
+   = help: Remove `Generic` base class
+
+ℹ Unsafe fix
+21 21 | ### Errors
+22 22 | 
+23 23 | class C[T](Generic[_A]): ...
+24    |-class C[T](Generic[_B], str): ...
+   24 |+class C[T, _B: int](str): ...
+25 25 | class C[T](int, Generic[_C]): ...
+26 26 | class C[T](bytes, Generic[_D], bool): ...  # TODO: Type parameter defaults
+27 27 | class C[T](Generic[_E], list[_E]): ...  # TODO: Type parameter defaults
+
+RUF053.py:25:17: RUF053 [*] Class with type parameter list inherits from `Generic`
+   |
+23 | class C[T](Generic[_A]): ...
+24 | class C[T](Generic[_B], str): ...
+25 | class C[T](int, Generic[_C]): ...
+   |                 ^^^^^^^^^^^ RUF053
+26 | class C[T](bytes, Generic[_D], bool): ...  # TODO: Type parameter defaults
+27 | class C[T](Generic[_E], list[_E]): ...  # TODO: Type parameter defaults
+   |
+   = help: Remove `Generic` base class
+
+ℹ Unsafe fix
+22 22 | 
+23 23 | class C[T](Generic[_A]): ...
+24 24 | class C[T](Generic[_B], str): ...
+25    |-class C[T](int, Generic[_C]): ...
+   25 |+class C[T, _C: (str, bytes)](int): ...
+26 26 | class C[T](bytes, Generic[_D], bool): ...  # TODO: Type parameter defaults
+27 27 | class C[T](Generic[_E], list[_E]): ...  # TODO: Type parameter defaults
+28 28 | class C[T](list[_F], Generic[_F]): ...  # TODO: Type parameter defaults
+
+RUF053.py:26:19: RUF053 Class with type parameter list inherits from `Generic`
+   |
+24 | class C[T](Generic[_B], str): ...
+25 | class C[T](int, Generic[_C]): ...
+26 | class C[T](bytes, Generic[_D], bool): ...  # TODO: Type parameter defaults
+   |                   ^^^^^^^^^^^ RUF053
+27 | class C[T](Generic[_E], list[_E]): ...  # TODO: Type parameter defaults
+28 | class C[T](list[_F], Generic[_F]): ...  # TODO: Type parameter defaults
+   |
+   = help: Remove `Generic` base class
+
+RUF053.py:27:12: RUF053 Class with type parameter list inherits from `Generic`
+   |
+25 | class C[T](int, Generic[_C]): ...
+26 | class C[T](bytes, Generic[_D], bool): ...  # TODO: Type parameter defaults
+27 | class C[T](Generic[_E], list[_E]): ...  # TODO: Type parameter defaults
+   |            ^^^^^^^^^^^ RUF053
+28 | class C[T](list[_F], Generic[_F]): ...  # TODO: Type parameter defaults
+   |
+   = help: Remove `Generic` base class
+
+RUF053.py:28:22: RUF053 Class with type parameter list inherits from `Generic`
+   |
+26 | class C[T](bytes, Generic[_D], bool): ...  # TODO: Type parameter defaults
+27 | class C[T](Generic[_E], list[_E]): ...  # TODO: Type parameter defaults
+28 | class C[T](list[_F], Generic[_F]): ...  # TODO: Type parameter defaults
+   |                      ^^^^^^^^^^^ RUF053
+29 |
+30 | class C[*Ts](Generic[*_As]): ...
+   |
+   = help: Remove `Generic` base class
+
+RUF053.py:30:14: RUF053 [*] Class with type parameter list inherits from `Generic`
+   |
+28 | class C[T](list[_F], Generic[_F]): ...  # TODO: Type parameter defaults
+29 |
+30 | class C[*Ts](Generic[*_As]): ...
+   |              ^^^^^^^^^^^^^ RUF053
+31 | class C[*Ts](Generic[Unpack[_As]]): ...
+32 | class C[*Ts](Generic[Unpack[_Bs]], tuple[*Bs]): ...
+   |
+   = help: Remove `Generic` base class
+
+ℹ Unsafe fix
+27 27 | class C[T](Generic[_E], list[_E]): ...  # TODO: Type parameter defaults
+28 28 | class C[T](list[_F], Generic[_F]): ...  # TODO: Type parameter defaults
+29 29 | 
+30    |-class C[*Ts](Generic[*_As]): ...
+   30 |+class C[*Ts, *_As]: ...
+31 31 | class C[*Ts](Generic[Unpack[_As]]): ...
+32 32 | class C[*Ts](Generic[Unpack[_Bs]], tuple[*Bs]): ...
+33 33 | class C[*Ts](Callable[[*_Cs], tuple[*Ts]], Generic[_Cs]): ...  # TODO: Type parameter defaults
+
+RUF053.py:31:14: RUF053 [*] Class with type parameter list inherits from `Generic`
+   |
+30 | class C[*Ts](Generic[*_As]): ...
+31 | class C[*Ts](Generic[Unpack[_As]]): ...
+   |              ^^^^^^^^^^^^^^^^^^^^ RUF053
+32 | class C[*Ts](Generic[Unpack[_Bs]], tuple[*Bs]): ...
+33 | class C[*Ts](Callable[[*_Cs], tuple[*Ts]], Generic[_Cs]): ...  # TODO: Type parameter defaults
+   |
+   = help: Remove `Generic` base class
+
+ℹ Unsafe fix
+28 28 | class C[T](list[_F], Generic[_F]): ...  # TODO: Type parameter defaults
+29 29 | 
+30 30 | class C[*Ts](Generic[*_As]): ...
+31    |-class C[*Ts](Generic[Unpack[_As]]): ...
+   31 |+class C[*Ts, *_As]: ...
+32 32 | class C[*Ts](Generic[Unpack[_Bs]], tuple[*Bs]): ...
+33 33 | class C[*Ts](Callable[[*_Cs], tuple[*Ts]], Generic[_Cs]): ...  # TODO: Type parameter defaults
+34 34 | 
+
+RUF053.py:32:14: RUF053 Class with type parameter list inherits from `Generic`
+   |
+30 | class C[*Ts](Generic[*_As]): ...
+31 | class C[*Ts](Generic[Unpack[_As]]): ...
+32 | class C[*Ts](Generic[Unpack[_Bs]], tuple[*Bs]): ...
+   |              ^^^^^^^^^^^^^^^^^^^^ RUF053
+33 | class C[*Ts](Callable[[*_Cs], tuple[*Ts]], Generic[_Cs]): ...  # TODO: Type parameter defaults
+   |
+   = help: Remove `Generic` base class
+
+RUF053.py:33:44: RUF053 Class with type parameter list inherits from `Generic`
+   |
+31 | class C[*Ts](Generic[Unpack[_As]]): ...
+32 | class C[*Ts](Generic[Unpack[_Bs]], tuple[*Bs]): ...
+33 | class C[*Ts](Callable[[*_Cs], tuple[*Ts]], Generic[_Cs]): ...  # TODO: Type parameter defaults
+   |                                            ^^^^^^^^^^^^ RUF053
+   |
+   = help: Remove `Generic` base class
+
+RUF053.py:36:14: RUF053 [*] Class with type parameter list inherits from `Generic`
+   |
+36 | class C[**P](Generic[_P1]): ...
+   |              ^^^^^^^^^^^^ RUF053
+37 | class C[**P](Generic[_P2]): ...
+38 | class C[**P](Generic[_P3]): ...  # TODO: Type parameter defaults
+   |
+   = help: Remove `Generic` base class
+
+ℹ Unsafe fix
+33 33 | class C[*Ts](Callable[[*_Cs], tuple[*Ts]], Generic[_Cs]): ...  # TODO: Type parameter defaults
+34 34 | 
+35 35 | 
+36    |-class C[**P](Generic[_P1]): ...
+   36 |+class C[**P, **_P1]: ...
+37 37 | class C[**P](Generic[_P2]): ...
+38 38 | class C[**P](Generic[_P3]): ...  # TODO: Type parameter defaults
+39 39 | 
+
+RUF053.py:37:14: RUF053 Class with type parameter list inherits from `Generic`
+   |
+36 | class C[**P](Generic[_P1]): ...
+37 | class C[**P](Generic[_P2]): ...
+   |              ^^^^^^^^^^^^ RUF053
+38 | class C[**P](Generic[_P3]): ...  # TODO: Type parameter defaults
+   |
+   = help: Remove `Generic` base class
+
+RUF053.py:38:14: RUF053 Class with type parameter list inherits from `Generic`
+   |
+36 | class C[**P](Generic[_P1]): ...
+37 | class C[**P](Generic[_P2]): ...
+38 | class C[**P](Generic[_P3]): ...  # TODO: Type parameter defaults
+   |              ^^^^^^^^^^^^ RUF053
+   |
+   = help: Remove `Generic` base class
+
+RUF053.py:41:12: RUF053 [*] Class with type parameter list inherits from `Generic`
+   |
+41 | class C[T](Generic[T, _A]): ...
+   |            ^^^^^^^^^^^^^^ RUF053
+   |
+   = help: Remove `Generic` base class
+
+ℹ Unsafe fix
+38 38 | class C[**P](Generic[_P3]): ...  # TODO: Type parameter defaults
+39 39 | 
+40 40 | 
+41    |-class C[T](Generic[T, _A]): ...
+   41 |+class C[T, _A]: ...
+42 42 | 
+43 43 | 
+44 44 | # See `is_existing_param_of_same_class`.
+
+RUF053.py:47:35: RUF053 Class with type parameter list inherits from `Generic`
+   |
+45 | # `expr_name_to_type_var` doesn't handle named expressions,
+46 | # only simple assignments, so there is no fix.
+47 | class C[T: (_Z := TypeVar('_Z'))](Generic[_Z]): ...
+   |                                   ^^^^^^^^^^^ RUF053
+   |
+   = help: Remove `Generic` base class
+
+RUF053.py:51:16: RUF053 [*] Class with type parameter list inherits from `Generic`
+   |
+50 | class C(Generic[_B]):
+51 |     class D[T](Generic[_B, T]): ...
+   |                ^^^^^^^^^^^^^^ RUF053
+   |
+   = help: Remove `Generic` base class
+
+ℹ Unsafe fix
+48 48 | 
+49 49 | 
+50 50 | class C(Generic[_B]):
+51    |-    class D[T](Generic[_B, T]): ...
+   51 |+    class D[T, _B: int]: ...
+52 52 | 
+53 53 | 
+54 54 | class C[T]:
+
+RUF053.py:55:16: RUF053 Class with type parameter list inherits from `Generic`
+   |
+54 | class C[T]:
+55 |     class D[U](Generic[T, U]): ...
+   |                ^^^^^^^^^^^^^ RUF053
+   |
+   = help: Remove `Generic` base class
+
+RUF053.py:60:12: RUF053 [*] Class with type parameter list inherits from `Generic`
+   |
+58 | # In a single run, only the first is reported.
+59 | # Others will be reported/fixed in following iterations.
+60 | class C[T](Generic[_C], Generic[_D]): ...
+   |            ^^^^^^^^^^^ RUF053
+61 | class C[T, _C: (str, bytes)](Generic[_D]): ...  # TODO: Type parameter defaults
+   |
+   = help: Remove `Generic` base class
+
+ℹ Unsafe fix
+57 57 | 
+58 58 | # In a single run, only the first is reported.
+59 59 | # Others will be reported/fixed in following iterations.
+60    |-class C[T](Generic[_C], Generic[_D]): ...
+   60 |+class C[T, _C: (str, bytes)](Generic[_D]): ...
+61 61 | class C[T, _C: (str, bytes)](Generic[_D]): ...  # TODO: Type parameter defaults
+62 62 | 
+63 63 | 
+
+RUF053.py:61:30: RUF053 Class with type parameter list inherits from `Generic`
+   |
+59 | # Others will be reported/fixed in following iterations.
+60 | class C[T](Generic[_C], Generic[_D]): ...
+61 | class C[T, _C: (str, bytes)](Generic[_D]): ...  # TODO: Type parameter defaults
+   |                              ^^^^^^^^^^^ RUF053
+   |
+   = help: Remove `Generic` base class
+
+RUF053.py:66:3: RUF053 Class with type parameter list inherits from `Generic`
+   |
+64 | class C[
+65 | T  # Comment
+66 | ](Generic[_E]): ...  # TODO: Type parameter defaults
+   |   ^^^^^^^^^^^ RUF053
+   |
+   = help: Remove `Generic` base class
+
+RUF053.py:69:12: RUF053 Class with type parameter list inherits from `Generic`
+   |
+69 | class C[T](Generic[Generic[_F]]): ...
+   |            ^^^^^^^^^^^^^^^^^^^^ RUF053
+70 | class C[T](Generic[Unpack[_A]]): ...
+71 | class C[T](Generic[Unpack[_P1]]): ...
+   |
+   = help: Remove `Generic` base class
+
+RUF053.py:70:12: RUF053 Class with type parameter list inherits from `Generic`
+   |
+69 | class C[T](Generic[Generic[_F]]): ...
+70 | class C[T](Generic[Unpack[_A]]): ...
+   |            ^^^^^^^^^^^^^^^^^^^ RUF053
+71 | class C[T](Generic[Unpack[_P1]]): ...
+72 | class C[T](Generic[Unpack[Unpack[_P2]]]): ...
+   |
+   = help: Remove `Generic` base class
+
+RUF053.py:71:12: RUF053 Class with type parameter list inherits from `Generic`
+   |
+69 | class C[T](Generic[Generic[_F]]): ...
+70 | class C[T](Generic[Unpack[_A]]): ...
+71 | class C[T](Generic[Unpack[_P1]]): ...
+   |            ^^^^^^^^^^^^^^^^^^^^ RUF053
+72 | class C[T](Generic[Unpack[Unpack[_P2]]]): ...
+73 | class C[T](Generic[Unpack[*_As]]): ...
+   |
+   = help: Remove `Generic` base class
+
+RUF053.py:72:12: RUF053 Class with type parameter list inherits from `Generic`
+   |
+70 | class C[T](Generic[Unpack[_A]]): ...
+71 | class C[T](Generic[Unpack[_P1]]): ...
+72 | class C[T](Generic[Unpack[Unpack[_P2]]]): ...
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF053
+73 | class C[T](Generic[Unpack[*_As]]): ...
+74 | class C[T](Generic[Unpack[_As, _Bs]]): ...
+   |
+   = help: Remove `Generic` base class
+
+RUF053.py:73:12: RUF053 Class with type parameter list inherits from `Generic`
+   |
+71 | class C[T](Generic[Unpack[_P1]]): ...
+72 | class C[T](Generic[Unpack[Unpack[_P2]]]): ...
+73 | class C[T](Generic[Unpack[*_As]]): ...
+   |            ^^^^^^^^^^^^^^^^^^^^^ RUF053
+74 | class C[T](Generic[Unpack[_As, _Bs]]): ...
+   |
+   = help: Remove `Generic` base class
+
+RUF053.py:74:12: RUF053 Class with type parameter list inherits from `Generic`
+   |
+72 | class C[T](Generic[Unpack[Unpack[_P2]]]): ...
+73 | class C[T](Generic[Unpack[*_As]]): ...
+74 | class C[T](Generic[Unpack[_As, _Bs]]): ...
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^^ RUF053
+   |
+   = help: Remove `Generic` base class
+
+RUF053.py:77:12: RUF053 [*] Class with type parameter list inherits from `Generic`
+   |
+77 | class C[T](Generic[_A, _A]): ...
+   |            ^^^^^^^^^^^^^^^ RUF053
+78 | class C[T](Generic[_A, Unpack[_As]]): ...
+79 | class C[T](Generic[*_As, _A]): ...
+   |
+   = help: Remove `Generic` base class
+
+ℹ Unsafe fix
+74 74 | class C[T](Generic[Unpack[_As, _Bs]]): ...
+75 75 | 
+76 76 | 
+77    |-class C[T](Generic[_A, _A]): ...
+   77 |+class C[T, _A]: ...
+78 78 | class C[T](Generic[_A, Unpack[_As]]): ...
+79 79 | class C[T](Generic[*_As, _A]): ...
+80 80 | 
+
+RUF053.py:78:12: RUF053 [*] Class with type parameter list inherits from `Generic`
+   |
+77 | class C[T](Generic[_A, _A]): ...
+78 | class C[T](Generic[_A, Unpack[_As]]): ...
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^ RUF053
+79 | class C[T](Generic[*_As, _A]): ...
+   |
+   = help: Remove `Generic` base class
+
+ℹ Unsafe fix
+75 75 | 
+76 76 | 
+77 77 | class C[T](Generic[_A, _A]): ...
+78    |-class C[T](Generic[_A, Unpack[_As]]): ...
+   78 |+class C[T, _A, *_As]: ...
+79 79 | class C[T](Generic[*_As, _A]): ...
+80 80 | 
+81 81 | 
+
+RUF053.py:79:12: RUF053 [*] Class with type parameter list inherits from `Generic`
+   |
+77 | class C[T](Generic[_A, _A]): ...
+78 | class C[T](Generic[_A, Unpack[_As]]): ...
+79 | class C[T](Generic[*_As, _A]): ...
+   |            ^^^^^^^^^^^^^^^^^ RUF053
+   |
+   = help: Remove `Generic` base class
+
+ℹ Unsafe fix
+76 76 | 
+77 77 | class C[T](Generic[_A, _A]): ...
+78 78 | class C[T](Generic[_A, Unpack[_As]]): ...
+79    |-class C[T](Generic[*_As, _A]): ...
+   79 |+class C[T, *_As, _A]: ...
+80 80 | 
+81 81 | 
+82 82 | from somewhere import APublicTypeVar
+
+RUF053.py:83:12: RUF053 Class with type parameter list inherits from `Generic`
+   |
+82 | from somewhere import APublicTypeVar
+83 | class C[T](Generic[APublicTypeVar]): ...
+   |            ^^^^^^^^^^^^^^^^^^^^^^^ RUF053
+84 | class C[T](Generic[APublicTypeVar, _A]): ...
+   |
+   = help: Remove `Generic` base class
+
+RUF053.py:84:12: RUF053 Class with type parameter list inherits from `Generic`
+   |
+82 | from somewhere import APublicTypeVar
+83 | class C[T](Generic[APublicTypeVar]): ...
+84 | class C[T](Generic[APublicTypeVar, _A]): ...
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF053
+   |
+   = help: Remove `Generic` base class
+
+RUF053.py:91:12: RUF053 [*] Class with type parameter list inherits from `Generic`
+   |
+89 | # as named expressions are forbidden within type parameter lists.
+90 | # See also the `_Z` example above.
+91 | class C[T](Generic[_G]): ...  # Should be moved down below eventually
+   |            ^^^^^^^^^^^ RUF053
+   |
+   = help: Remove `Generic` base class
+
+ℹ Unsafe fix
+88 88 | # The latter cannot be used as a PEP 695 constraint,
+89 89 | # as named expressions are forbidden within type parameter lists.
+90 90 | # See also the `_Z` example above.
+91    |-class C[T](Generic[_G]): ...  # Should be moved down below eventually
+   91 |+class C[T, _G: (str, a := int)]: ...  # Should be moved down below eventually
+92 92 | 
+93 93 | 
+94 94 | # Single-element constraints should not be converted to a bound.
+
+RUF053.py:95:20: RUF053 [*] Class with type parameter list inherits from `Generic`
+   |
+94 | # Single-element constraints should not be converted to a bound.
+95 | class C[T: (str,)](Generic[_A]): ...
+   |                    ^^^^^^^^^^^ RUF053
+96 | class C[T: [a]](Generic[_A]): ...
+   |
+   = help: Remove `Generic` base class
+
+ℹ Unsafe fix
+92 92 | 
+93 93 | 
+94 94 | # Single-element constraints should not be converted to a bound.
+95    |-class C[T: (str,)](Generic[_A]): ...
+   95 |+class C[T: (str), _A]: ...
+96 96 | class C[T: [a]](Generic[_A]): ...
+97 97 | 
+98 98 | 
+
+RUF053.py:96:17: RUF053 [*] Class with type parameter list inherits from `Generic`
+   |
+94 | # Single-element constraints should not be converted to a bound.
+95 | class C[T: (str,)](Generic[_A]): ...
+96 | class C[T: [a]](Generic[_A]): ...
+   |                 ^^^^^^^^^^^ RUF053
+   |
+   = help: Remove `Generic` base class
+
+ℹ Unsafe fix
+93 93 | 
+94 94 | # Single-element constraints should not be converted to a bound.
+95 95 | class C[T: (str,)](Generic[_A]): ...
+96    |-class C[T: [a]](Generic[_A]): ...
+   96 |+class C[T: [a], _A]: ...
+97 97 | 
+98 98 | 
+99 99 | # Existing bounds should not be deparenthesized.

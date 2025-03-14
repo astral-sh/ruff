@@ -33,7 +33,7 @@ reveal_type(a >= b)  # revealed: Literal[False]
 
 Even when tuples have different lengths, comparisons should be handled appropriately.
 
-```py path=different_length.py
+```py
 a = (1, 2, 3)
 b = (1, 2, 3, 4)
 
@@ -92,17 +92,20 @@ reveal_type(a == b)  # revealed: bool
 # TODO: should be Literal[True], once we implement (in)equality for mismatched literals
 reveal_type(a != b)  # revealed: bool
 
-# TODO: should be Unknown and add more informative diagnostics
-reveal_type(a < b)  # revealed: bool
-reveal_type(a <= b)  # revealed: bool
-reveal_type(a > b)  # revealed: bool
-reveal_type(a >= b)  # revealed: bool
+# error: [unsupported-operator] "Operator `<` is not supported for types `int` and `str`, in comparing `tuple[Literal[1], Literal[2]]` with `tuple[Literal[1], Literal["hello"]]`"
+reveal_type(a < b)  # revealed: Unknown
+# error: [unsupported-operator] "Operator `<=` is not supported for types `int` and `str`, in comparing `tuple[Literal[1], Literal[2]]` with `tuple[Literal[1], Literal["hello"]]`"
+reveal_type(a <= b)  # revealed: Unknown
+# error: [unsupported-operator] "Operator `>` is not supported for types `int` and `str`, in comparing `tuple[Literal[1], Literal[2]]` with `tuple[Literal[1], Literal["hello"]]`"
+reveal_type(a > b)  # revealed: Unknown
+# error: [unsupported-operator] "Operator `>=` is not supported for types `int` and `str`, in comparing `tuple[Literal[1], Literal[2]]` with `tuple[Literal[1], Literal["hello"]]`"
+reveal_type(a >= b)  # revealed: Unknown
 ```
 
 However, if the lexicographic comparison completes without reaching a point where str and int are
 compared, Python will still produce a result based on the prior elements.
 
-```py path=short_circuit.py
+```py
 a = (1, 2)
 b = (999999, "hello")
 
@@ -144,33 +147,40 @@ of the dunder methods.)
 ```py
 from __future__ import annotations
 
+class EqReturnType: ...
+class NeReturnType: ...
+class LtReturnType: ...
+class LeReturnType: ...
+class GtReturnType: ...
+class GeReturnType: ...
+
 class A:
-    def __eq__(self, o: object) -> str:
-        return "hello"
+    def __eq__(self, o: object) -> EqReturnType:
+        return EqReturnType()
 
-    def __ne__(self, o: object) -> bytes:
-        return b"world"
+    def __ne__(self, o: object) -> NeReturnType:
+        return NeReturnType()
 
-    def __lt__(self, o: A) -> float:
-        return 3.14
+    def __lt__(self, o: A) -> LtReturnType:
+        return LtReturnType()
 
-    def __le__(self, o: A) -> complex:
-        return complex(0.5, -0.5)
+    def __le__(self, o: A) -> LeReturnType:
+        return LeReturnType()
 
-    def __gt__(self, o: A) -> tuple:
-        return (1, 2, 3)
+    def __gt__(self, o: A) -> GtReturnType:
+        return GtReturnType()
 
-    def __ge__(self, o: A) -> list:
-        return [1, 2, 3]
+    def __ge__(self, o: A) -> GeReturnType:
+        return GeReturnType()
 
 a = (A(), A())
 
 reveal_type(a == a)  # revealed: bool
 reveal_type(a != a)  # revealed: bool
-reveal_type(a < a)  # revealed: float | Literal[False]
-reveal_type(a <= a)  # revealed: complex | Literal[True]
-reveal_type(a > a)  # revealed: tuple | Literal[False]
-reveal_type(a >= a)  # revealed: list | Literal[True]
+reveal_type(a < a)  # revealed: LtReturnType | Literal[False]
+reveal_type(a <= a)  # revealed: LeReturnType | Literal[True]
+reveal_type(a > a)  # revealed: GtReturnType | Literal[False]
+reveal_type(a >= a)  # revealed: GeReturnType | Literal[True]
 
 # If lexicographic comparison is finished before comparing A()
 b = ("1_foo", A())
@@ -183,11 +193,13 @@ reveal_type(b <= c)  # revealed: Literal[True]
 reveal_type(b > c)  # revealed: Literal[False]
 reveal_type(b >= c)  # revealed: Literal[False]
 
-class B:
-    def __lt__(self, o: B) -> set:
-        return set()
+class LtReturnTypeOnB: ...
 
-reveal_type((A(), B()) < (A(), B()))  # revealed: float | set | Literal[False]
+class B:
+    def __lt__(self, o: B) -> LtReturnTypeOnB:
+        return LtReturnTypeOnB()
+
+reveal_type((A(), B()) < (A(), B()))  # revealed: LtReturnType | LtReturnTypeOnB | Literal[False]
 ```
 
 #### Special Handling of Eq and NotEq in Lexicographic Comparisons
@@ -322,3 +334,61 @@ reveal_type(a is not c)  # revealed: Literal[True]
 For tuples like `tuple[int, ...]`, `tuple[Any, ...]`
 
 // TODO
+
+## Chained comparisons with elements that incorrectly implement `__bool__`
+
+<!-- snapshot-diagnostics -->
+
+For an operation `A() < A()` to succeed at runtime, the `A.__lt__` method does not necessarily need
+to return an object that is convertible to a `bool`. However, the return type _does_ need to be
+convertible to a `bool` for the operation `A() < A() < A()` (a _chained_ comparison) to succeed.
+This is because `A() < A() < A()` desugars to something like this, which involves several implicit
+conversions to `bool`:
+
+```ignore
+def compute_chained_comparison():
+  a1 = A()
+  a2 = A()
+  first_comparison = a1 < a2
+  return first_comparison and (a2 < A())
+```
+
+```py
+class NotBoolable:
+    __bool__ = 5
+
+class Comparable:
+    def __lt__(self, other) -> NotBoolable:
+        return NotBoolable()
+
+    def __gt__(self, other) -> NotBoolable:
+        return NotBoolable()
+
+a = (1, Comparable())
+b = (1, Comparable())
+
+# error: [unsupported-bool-conversion]
+a < b < b
+
+a < b  # fine
+```
+
+## Equality with elements that incorrectly implement `__bool__`
+
+<!-- snapshot-diagnostics -->
+
+Python does not generally attempt to coerce the result of `==` and `!=` operations between two
+arbitrary objects to a `bool`, but a comparison of tuples will fail if the result of comparing any
+pair of elements at equivalent positions cannot be converted to a `bool`:
+
+```py
+class A:
+    def __eq__(self, other) -> NotBoolable:
+        return NotBoolable()
+
+class NotBoolable:
+    __bool__ = None
+
+# error: [unsupported-bool-conversion]
+(A(),) == (A(),)
+```

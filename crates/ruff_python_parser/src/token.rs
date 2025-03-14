@@ -10,7 +10,7 @@ use std::fmt;
 use bitflags::bitflags;
 
 use ruff_python_ast::name::Name;
-use ruff_python_ast::str::Quote;
+use ruff_python_ast::str::{Quote, TripleQuotes};
 use ruff_python_ast::str_prefix::{
     AnyStringPrefix, ByteStringPrefix, FStringPrefix, StringLiteralPrefix,
 };
@@ -50,8 +50,7 @@ impl Token {
     ///
     /// If it isn't a string or any f-string tokens.
     pub fn is_triple_quoted_string(self) -> bool {
-        assert!(self.is_any_string());
-        self.flags.is_triple_quoted()
+        self.unwrap_string_flags().is_triple_quoted()
     }
 
     /// Returns the [`Quote`] style for the current string token of any kind.
@@ -60,8 +59,26 @@ impl Token {
     ///
     /// If it isn't a string or any f-string tokens.
     pub fn string_quote_style(self) -> Quote {
-        assert!(self.is_any_string());
-        self.flags.quote_style()
+        self.unwrap_string_flags().quote_style()
+    }
+
+    /// Returns the [`AnyStringFlags`] style for the current string token of any kind.
+    ///
+    /// # Panics
+    ///
+    /// If it isn't a string or any f-string tokens.
+    pub fn unwrap_string_flags(self) -> AnyStringFlags {
+        self.string_flags()
+            .unwrap_or_else(|| panic!("token to be a string"))
+    }
+
+    /// Returns true if the current token is a string and it is raw.
+    pub fn string_flags(self) -> Option<AnyStringFlags> {
+        if self.is_any_string() {
+            Some(self.flags.as_any_string_flags())
+        } else {
+            None
+        }
     }
 
     /// Returns `true` if this is any kind of string token.
@@ -718,8 +735,12 @@ impl StringFlags for TokenFlags {
         }
     }
 
-    fn is_triple_quoted(self) -> bool {
-        self.intersects(TokenFlags::TRIPLE_QUOTED_STRING)
+    fn triple_quotes(self) -> TripleQuotes {
+        if self.intersects(TokenFlags::TRIPLE_QUOTED_STRING) {
+            TripleQuotes::Yes
+        } else {
+            TripleQuotes::No
+        }
     }
 
     fn prefix(self) -> AnyStringPrefix {
@@ -765,11 +786,6 @@ impl TokenFlags {
     /// Returns `true` if the token is a raw string.
     pub(crate) const fn is_raw_string(self) -> bool {
         self.intersects(TokenFlags::RAW_STRING)
-    }
-
-    /// Converts this type to [`AnyStringFlags`], setting the equivalent flags.
-    pub(crate) fn as_any_string_flags(self) -> AnyStringFlags {
-        AnyStringFlags::new(self.prefix(), self.quote_style(), self.is_triple_quoted())
     }
 }
 

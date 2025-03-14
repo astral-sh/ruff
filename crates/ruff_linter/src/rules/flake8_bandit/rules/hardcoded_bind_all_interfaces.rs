@@ -37,13 +37,12 @@ impl Violation for HardcodedBindAllInterfaces {
 }
 
 /// S104
-pub(crate) fn hardcoded_bind_all_interfaces(checker: &mut Checker, string: StringLike) {
+pub(crate) fn hardcoded_bind_all_interfaces(checker: &Checker, string: StringLike) {
     match string {
         StringLike::String(ast::ExprStringLiteral { value, .. }) => {
             if value == "0.0.0.0" {
                 checker
-                    .diagnostics
-                    .push(Diagnostic::new(HardcodedBindAllInterfaces, string.range()));
+                    .report_diagnostic(Diagnostic::new(HardcodedBindAllInterfaces, string.range()));
             }
         }
         StringLike::FString(ast::ExprFString { value, .. }) => {
@@ -51,15 +50,16 @@ pub(crate) fn hardcoded_bind_all_interfaces(checker: &mut Checker, string: Strin
                 match part {
                     ast::FStringPart::Literal(literal) => {
                         if &**literal == "0.0.0.0" {
-                            checker
-                                .diagnostics
-                                .push(Diagnostic::new(HardcodedBindAllInterfaces, literal.range()));
+                            checker.report_diagnostic(Diagnostic::new(
+                                HardcodedBindAllInterfaces,
+                                literal.range(),
+                            ));
                         }
                     }
                     ast::FStringPart::FString(f_string) => {
                         for literal in f_string.elements.literals() {
                             if &**literal == "0.0.0.0" {
-                                checker.diagnostics.push(Diagnostic::new(
+                                checker.report_diagnostic(Diagnostic::new(
                                     HardcodedBindAllInterfaces,
                                     literal.range(),
                                 ));

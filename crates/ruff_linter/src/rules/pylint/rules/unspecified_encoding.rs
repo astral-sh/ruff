@@ -3,7 +3,7 @@ use std::fmt::{Display, Formatter};
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::{self as ast, Expr, StringLiteralFlags};
+use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -24,7 +24,7 @@ use crate::fix::edits::add_argument;
 /// encoding. [PEP 597] recommends the use of `encoding="utf-8"` as a default,
 /// and suggests that it may become the default in future versions of Python.
 ///
-/// If a local-specific encoding is intended, use `encoding="local"`  on
+/// If a locale-specific encoding is intended, use `encoding="locale"`  on
 /// Python 3.10 and later, or `locale.getpreferredencoding()` on earlier versions,
 /// to make the encoding explicit.
 ///
@@ -72,7 +72,7 @@ impl AlwaysFixableViolation for UnspecifiedEncoding {
 }
 
 /// PLW1514
-pub(crate) fn unspecified_encoding(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn unspecified_encoding(checker: &Checker, call: &ast::ExprCall) {
     let Some((function_name, mode)) = Callee::try_from_call_expression(call, checker.semantic())
         .filter(|segments| is_violation(call, segments))
         .map(|segments| (segments.to_string(), segments.mode_argument()))
@@ -88,7 +88,7 @@ pub(crate) fn unspecified_encoding(checker: &mut Checker, call: &ast::ExprCall) 
         call.func.range(),
     );
     diagnostic.set_fix(generate_keyword_fix(checker, call));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// Represents the path of the function or method being called.
@@ -158,16 +158,11 @@ fn generate_keyword_fix(checker: &Checker, call: &ast::ExprCall) -> Fix {
     Fix::unsafe_edit(add_argument(
         &format!(
             "encoding={}",
-            checker
-                .generator()
-                .expr(&Expr::StringLiteral(ast::ExprStringLiteral {
-                    value: ast::StringLiteralValue::single(ast::StringLiteral {
-                        value: "utf-8".to_string().into_boxed_str(),
-                        flags: StringLiteralFlags::default(),
-                        range: TextRange::default(),
-                    }),
-                    range: TextRange::default(),
-                }))
+            checker.generator().expr(&Expr::from(ast::StringLiteral {
+                value: Box::from("utf-8"),
+                flags: checker.default_string_flags(),
+                range: TextRange::default(),
+            }))
         ),
         &call.arguments,
         checker.comment_ranges(),

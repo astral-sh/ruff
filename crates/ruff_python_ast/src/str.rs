@@ -24,6 +24,14 @@ impl Quote {
         }
     }
 
+    #[inline]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Single => "'",
+            Self::Double => "\"",
+        }
+    }
+
     #[must_use]
     #[inline]
     pub const fn opposite(self) -> Self {
@@ -57,6 +65,24 @@ impl TryFrom<char> for Quote {
             '"' => Ok(Quote::Double),
             _ => Err(()),
         }
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum TripleQuotes {
+    Yes,
+    No,
+}
+
+impl TripleQuotes {
+    #[must_use]
+    pub const fn is_yes(self) -> bool {
+        matches!(self, Self::Yes)
+    }
+
+    #[must_use]
+    pub const fn is_no(self) -> bool {
+        matches!(self, Self::No)
     }
 }
 

@@ -11,6 +11,7 @@ mod tests {
 
     use anyhow::Result;
     use regex::Regex;
+    use ruff_python_parser::ParseOptions;
     use rustc_hash::FxHashMap;
     use test_case::test_case;
 
@@ -56,6 +57,7 @@ mod tests {
     #[test_case(Rule::UnusedImport, Path::new("F401_22.py"))]
     #[test_case(Rule::UnusedImport, Path::new("F401_23.py"))]
     #[test_case(Rule::UnusedImport, Path::new("F401_32.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_34.py"))]
     #[test_case(Rule::ImportShadowedByLoopVar, Path::new("F402.py"))]
     #[test_case(Rule::ImportShadowedByLoopVar, Path::new("F402.ipynb"))]
     #[test_case(Rule::UndefinedLocalWithImportStar, Path::new("F403.py"))]
@@ -129,6 +131,7 @@ mod tests {
     #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_29.pyi"))]
     #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_30.py"))]
     #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_31.py"))]
+    #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_32.py"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_0.py"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_1.py"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_2.py"))]
@@ -163,6 +166,7 @@ mod tests {
     #[test_case(Rule::UndefinedName, Path::new("F821_28.py"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_30.py"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_31.py"))]
+    #[test_case(Rule::UndefinedName, Path::new("F821_32.pyi"))]
     #[test_case(Rule::UndefinedExport, Path::new("F822_0.py"))]
     #[test_case(Rule::UndefinedExport, Path::new("F822_0.pyi"))]
     #[test_case(Rule::UndefinedExport, Path::new("F822_1.py"))]
@@ -174,7 +178,6 @@ mod tests {
     #[test_case(Rule::UnusedVariable, Path::new("F841_1.py"))]
     #[test_case(Rule::UnusedVariable, Path::new("F841_2.py"))]
     #[test_case(Rule::UnusedVariable, Path::new("F841_3.py"))]
-    #[test_case(Rule::UnusedVariable, Path::new("F841_4.py"))]
     #[test_case(Rule::UnusedAnnotation, Path::new("F842.py"))]
     #[test_case(Rule::RaiseNotImplemented, Path::new("F901.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
@@ -215,14 +218,13 @@ mod tests {
         let diagnostics = test_snippet(
             "PythonFinalizationError",
             &LinterSettings {
-                target_version: crate::settings::types::PythonVersion::Py312,
+                unresolved_target_version: ruff_python_ast::PythonVersion::PY312,
                 ..LinterSettings::for_rule(Rule::UndefinedName)
             },
         );
         assert_messages!(diagnostics);
     }
 
-    #[test_case(Rule::UnusedVariable, Path::new("F841_4.py"))]
     #[test_case(Rule::UnusedImport, Path::new("__init__.py"))]
     #[test_case(Rule::UnusedImport, Path::new("F401_24/__init__.py"))]
     #[test_case(Rule::UnusedImport, Path::new("F401_25__all_nonempty/__init__.py"))]
@@ -284,6 +286,35 @@ mod tests {
         )
         .0;
         assert_messages!(snapshot, diagnostics);
+    }
+
+    // Regression test for https://github.com/astral-sh/ruff/issues/12897
+    #[test_case(Rule::UnusedImport, Path::new("F401_33/__init__.py"))]
+    fn f401_preview_local_init_import(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "preview__{}_{}",
+            rule_code.noqa_code(),
+            path.to_string_lossy()
+        );
+        let settings = LinterSettings {
+            preview: PreviewMode::Enabled,
+            isort: isort::settings::Settings {
+                // Like `f401_preview_first_party_submodule`, this test requires the input module to
+                // be first-party
+                known_modules: isort::categorize::KnownModules::new(
+                    vec!["F401_*".parse()?],
+                    vec![],
+                    vec![],
+                    vec![],
+                    FxHashMap::default(),
+                ),
+                ..isort::settings::Settings::default()
+            },
+            ..LinterSettings::for_rule(rule_code)
+        };
+        let diagnostics = test_path(Path::new("pyflakes").join(path).as_path(), &settings)?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
     }
 
     #[test_case(Rule::UnusedImport, Path::new("F401_24/__init__.py"))]
@@ -712,8 +743,11 @@ mod tests {
         let source_type = PySourceType::default();
         let source_kind = SourceKind::Python(contents.to_string());
         let settings = LinterSettings::for_rules(Linter::Pyflakes.rules());
-        let parsed =
-            ruff_python_parser::parse_unchecked_source(source_kind.source_code(), source_type);
+        let options =
+            ParseOptions::from(source_type).with_target_version(settings.unresolved_target_version);
+        let parsed = ruff_python_parser::parse_unchecked(source_kind.source_code(), options)
+            .try_into_module()
+            .expect("PySourceType always parses into a module");
         let locator = Locator::new(&contents);
         let stylist = Stylist::from_tokens(parsed.tokens(), locator.contents());
         let indexer = Indexer::from_tokens(parsed.tokens(), locator.contents());
@@ -735,6 +769,7 @@ mod tests {
             &source_kind,
             source_type,
             &parsed,
+            settings.unresolved_target_version,
         );
         diagnostics.sort_by_key(Ranged::start);
         let actual = diagnostics

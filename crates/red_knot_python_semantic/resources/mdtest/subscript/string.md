@@ -22,65 +22,65 @@ reveal_type(b)  # revealed: Unknown
 def _(n: int):
     a = "abcde"[n]
     # TODO: Support overloads... Should be `str`
-    reveal_type(a)  # revealed: @Todo(return type)
+    reveal_type(a)  # revealed: @Todo(return type of decorated function)
 ```
 
 ## Slices
 
 ```py
-s = "abcde"
-
-reveal_type(s[0:0])  # revealed: Literal[""]
-reveal_type(s[0:1])  # revealed: Literal["a"]
-reveal_type(s[0:2])  # revealed: Literal["ab"]
-reveal_type(s[0:5])  # revealed: Literal["abcde"]
-reveal_type(s[0:6])  # revealed: Literal["abcde"]
-reveal_type(s[1:3])  # revealed: Literal["bc"]
-
-reveal_type(s[-3:5])  # revealed: Literal["cde"]
-reveal_type(s[-4:-2])  # revealed: Literal["bc"]
-reveal_type(s[-10:10])  # revealed: Literal["abcde"]
-
-reveal_type(s[0:])  # revealed: Literal["abcde"]
-reveal_type(s[2:])  # revealed: Literal["cde"]
-reveal_type(s[5:])  # revealed: Literal[""]
-reveal_type(s[:2])  # revealed: Literal["ab"]
-reveal_type(s[:0])  # revealed: Literal[""]
-reveal_type(s[:2])  # revealed: Literal["ab"]
-reveal_type(s[:10])  # revealed: Literal["abcde"]
-reveal_type(s[:])  # revealed: Literal["abcde"]
-
-reveal_type(s[::-1])  # revealed: Literal["edcba"]
-reveal_type(s[::2])  # revealed: Literal["ace"]
-reveal_type(s[-2:-5:-1])  # revealed: Literal["dcb"]
-reveal_type(s[::-2])  # revealed: Literal["eca"]
-reveal_type(s[-1::-3])  # revealed: Literal["eb"]
-
-reveal_type(s[None:2:None])  # revealed: Literal["ab"]
-reveal_type(s[1:None:1])  # revealed: Literal["bcde"]
-reveal_type(s[None:None:None])  # revealed: Literal["abcde"]
-
-start = 1
-stop = None
-step = 2
-reveal_type(s[start:stop:step])  # revealed: Literal["bd"]
-
-reveal_type(s[False:True])  # revealed: Literal["a"]
-reveal_type(s[True:3])  # revealed: Literal["bc"]
-
-s[0:4:0]  # error: [zero-stepsize-in-slice]
-s[:4:0]  # error: [zero-stepsize-in-slice]
-s[0::0]  # error: [zero-stepsize-in-slice]
-s[::0]  # error: [zero-stepsize-in-slice]
-
 def _(m: int, n: int, s2: str):
+    s = "abcde"
+
+    reveal_type(s[0:0])  # revealed: Literal[""]
+    reveal_type(s[0:1])  # revealed: Literal["a"]
+    reveal_type(s[0:2])  # revealed: Literal["ab"]
+    reveal_type(s[0:5])  # revealed: Literal["abcde"]
+    reveal_type(s[0:6])  # revealed: Literal["abcde"]
+    reveal_type(s[1:3])  # revealed: Literal["bc"]
+
+    reveal_type(s[-3:5])  # revealed: Literal["cde"]
+    reveal_type(s[-4:-2])  # revealed: Literal["bc"]
+    reveal_type(s[-10:10])  # revealed: Literal["abcde"]
+
+    reveal_type(s[0:])  # revealed: Literal["abcde"]
+    reveal_type(s[2:])  # revealed: Literal["cde"]
+    reveal_type(s[5:])  # revealed: Literal[""]
+    reveal_type(s[:2])  # revealed: Literal["ab"]
+    reveal_type(s[:0])  # revealed: Literal[""]
+    reveal_type(s[:2])  # revealed: Literal["ab"]
+    reveal_type(s[:10])  # revealed: Literal["abcde"]
+    reveal_type(s[:])  # revealed: Literal["abcde"]
+
+    reveal_type(s[::-1])  # revealed: Literal["edcba"]
+    reveal_type(s[::2])  # revealed: Literal["ace"]
+    reveal_type(s[-2:-5:-1])  # revealed: Literal["dcb"]
+    reveal_type(s[::-2])  # revealed: Literal["eca"]
+    reveal_type(s[-1::-3])  # revealed: Literal["eb"]
+
+    reveal_type(s[None:2:None])  # revealed: Literal["ab"]
+    reveal_type(s[1:None:1])  # revealed: Literal["bcde"]
+    reveal_type(s[None:None:None])  # revealed: Literal["abcde"]
+
+    start = 1
+    stop = None
+    step = 2
+    reveal_type(s[start:stop:step])  # revealed: Literal["bd"]
+
+    reveal_type(s[False:True])  # revealed: Literal["a"]
+    reveal_type(s[True:3])  # revealed: Literal["bc"]
+
+    s[0:4:0]  # error: [zero-stepsize-in-slice]
+    s[:4:0]  # error: [zero-stepsize-in-slice]
+    s[0::0]  # error: [zero-stepsize-in-slice]
+    s[::0]  # error: [zero-stepsize-in-slice]
+
     substring1 = s[m:n]
     # TODO: Support overloads... Should be `LiteralString`
-    reveal_type(substring1)  # revealed: @Todo(return type)
+    reveal_type(substring1)  # revealed: @Todo(return type of decorated function)
 
     substring2 = s2[0:5]
     # TODO: Support overloads... Should be `str`
-    reveal_type(substring2)  # revealed: @Todo(return type)
+    reveal_type(substring2)  # revealed: @Todo(return type of decorated function)
 ```
 
 ## Unsupported slice types

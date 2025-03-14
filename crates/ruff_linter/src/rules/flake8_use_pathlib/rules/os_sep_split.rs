@@ -63,7 +63,7 @@ impl Violation for OsSepSplit {
 }
 
 /// PTH206
-pub(crate) fn os_sep_split(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn os_sep_split(checker: &Checker, call: &ast::ExprCall) {
     if !checker.semantic().seen_module(Modules::OS) {
         return;
     }
@@ -94,7 +94,5 @@ pub(crate) fn os_sep_split(checker: &mut Checker, call: &ast::ExprCall) {
         return;
     }
 
-    checker
-        .diagnostics
-        .push(Diagnostic::new(OsSepSplit, attr.range()));
+    checker.report_diagnostic(Diagnostic::new(OsSepSplit, attr.range()));
 }

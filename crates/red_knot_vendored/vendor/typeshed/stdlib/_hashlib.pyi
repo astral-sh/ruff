@@ -2,12 +2,25 @@ import sys
 from _typeshed import ReadableBuffer
 from collections.abc import Callable
 from types import ModuleType
-from typing import AnyStr, final, overload
+from typing import AnyStr, Protocol, final, overload, type_check_only
 from typing_extensions import Self, TypeAlias
 
-_DigestMod: TypeAlias = str | Callable[[], HASH] | ModuleType | None
+_DigestMod: TypeAlias = str | Callable[[], _HashObject] | ModuleType | None
 
 openssl_md_meth_names: frozenset[str]
+
+@type_check_only
+class _HashObject(Protocol):
+    @property
+    def digest_size(self) -> int: ...
+    @property
+    def block_size(self) -> int: ...
+    @property
+    def name(self) -> str: ...
+    def copy(self) -> Self: ...
+    def digest(self) -> bytes: ...
+    def hexdigest(self) -> str: ...
+    def update(self, obj: ReadableBuffer, /) -> None: ...
 
 class HASH:
     @property

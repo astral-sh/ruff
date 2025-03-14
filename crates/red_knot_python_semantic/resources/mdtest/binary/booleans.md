@@ -50,46 +50,44 @@ reveal_type(b | b)  # revealed: Literal[False]
 ## Arithmetic with a variable
 
 ```py
-a = True
-b = False
+def _(a: bool):
+    def lhs_is_int(x: int):
+        reveal_type(x + a)  # revealed: int
+        reveal_type(x - a)  # revealed: int
+        reveal_type(x * a)  # revealed: int
+        reveal_type(x // a)  # revealed: int
+        reveal_type(x / a)  # revealed: int | float
+        reveal_type(x % a)  # revealed: int
 
-def lhs_is_int(x: int):
-    reveal_type(x + a)  # revealed: int
-    reveal_type(x - a)  # revealed: int
-    reveal_type(x * a)  # revealed: int
-    reveal_type(x // a)  # revealed: int
-    reveal_type(x / a)  # revealed: float
-    reveal_type(x % a)  # revealed: int
+    def rhs_is_int(x: int):
+        reveal_type(a + x)  # revealed: int
+        reveal_type(a - x)  # revealed: int
+        reveal_type(a * x)  # revealed: int
+        reveal_type(a // x)  # revealed: int
+        reveal_type(a / x)  # revealed: int | float
+        reveal_type(a % x)  # revealed: int
 
-def rhs_is_int(x: int):
-    reveal_type(a + x)  # revealed: int
-    reveal_type(a - x)  # revealed: int
-    reveal_type(a * x)  # revealed: int
-    reveal_type(a // x)  # revealed: int
-    reveal_type(a / x)  # revealed: float
-    reveal_type(a % x)  # revealed: int
+    def lhs_is_bool(x: bool):
+        reveal_type(x + a)  # revealed: int
+        reveal_type(x - a)  # revealed: int
+        reveal_type(x * a)  # revealed: int
+        reveal_type(x // a)  # revealed: int
+        reveal_type(x / a)  # revealed: int | float
+        reveal_type(x % a)  # revealed: int
 
-def lhs_is_bool(x: bool):
-    reveal_type(x + a)  # revealed: int
-    reveal_type(x - a)  # revealed: int
-    reveal_type(x * a)  # revealed: int
-    reveal_type(x // a)  # revealed: int
-    reveal_type(x / a)  # revealed: float
-    reveal_type(x % a)  # revealed: int
+    def rhs_is_bool(x: bool):
+        reveal_type(a + x)  # revealed: int
+        reveal_type(a - x)  # revealed: int
+        reveal_type(a * x)  # revealed: int
+        reveal_type(a // x)  # revealed: int
+        reveal_type(a / x)  # revealed: int | float
+        reveal_type(a % x)  # revealed: int
 
-def rhs_is_bool(x: bool):
-    reveal_type(a + x)  # revealed: int
-    reveal_type(a - x)  # revealed: int
-    reveal_type(a * x)  # revealed: int
-    reveal_type(a // x)  # revealed: int
-    reveal_type(a / x)  # revealed: float
-    reveal_type(a % x)  # revealed: int
-
-def both_are_bool(x: bool, y: bool):
-    reveal_type(x + y)  # revealed: int
-    reveal_type(x - y)  # revealed: int
-    reveal_type(x * y)  # revealed: int
-    reveal_type(x // y)  # revealed: int
-    reveal_type(x / y)  # revealed: float
-    reveal_type(x % y)  # revealed: int
+    def both_are_bool(x: bool, y: bool):
+        reveal_type(x + y)  # revealed: int
+        reveal_type(x - y)  # revealed: int
+        reveal_type(x * y)  # revealed: int
+        reveal_type(x // y)  # revealed: int
+        reveal_type(x / y)  # revealed: int | float
+        reveal_type(x % y)  # revealed: int
 ```

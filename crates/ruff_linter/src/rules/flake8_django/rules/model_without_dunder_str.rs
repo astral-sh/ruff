@@ -51,7 +51,7 @@ impl Violation for DjangoModelWithoutDunderStr {
 }
 
 /// DJ008
-pub(crate) fn model_without_dunder_str(checker: &mut Checker, class_def: &ast::StmtClassDef) {
+pub(crate) fn model_without_dunder_str(checker: &Checker, class_def: &ast::StmtClassDef) {
     if !checker.semantic().seen_module(Modules::DJANGO) {
         return;
     }
@@ -64,7 +64,7 @@ pub(crate) fn model_without_dunder_str(checker: &mut Checker, class_def: &ast::S
         return;
     }
 
-    checker.diagnostics.push(Diagnostic::new(
+    checker.report_diagnostic(Diagnostic::new(
         DjangoModelWithoutDunderStr,
         class_def.identifier(),
     ));

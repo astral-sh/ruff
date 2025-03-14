@@ -91,19 +91,13 @@ if isinstance(x, (A, B)):
 elif isinstance(x, (A, C)):
     reveal_type(x)  # revealed: C & ~A & ~B
 else:
-    # TODO: Should be simplified to ~A & ~B & ~C
-    reveal_type(x)  # revealed: object & ~A & ~B & ~C
+    reveal_type(x)  # revealed: ~A & ~B & ~C
 ```
 
 ## No narrowing for instances of `builtins.type`
 
 ```py
-def _(flag: bool):
-    t = type("t", (), {})
-
-    # This isn't testing what we want it to test if we infer anything more precise here:
-    reveal_type(t)  # revealed: type
-
+def _(flag: bool, t: type):
     x = 1 if flag else "foo"
 
     if isinstance(x, t):
@@ -180,4 +174,40 @@ def _(flag: bool):
 def _(x: object, y: type[int]):
     if isinstance(x, y):
         reveal_type(x)  # revealed: int
+```
+
+## Adding a disjoint element to an existing intersection
+
+We used to incorrectly infer `Literal` booleans for some of these.
+
+```py
+from knot_extensions import Not, Intersection, AlwaysTruthy, AlwaysFalsy
+
+class P: ...
+
+def f(
+    a: Intersection[P, AlwaysTruthy],
+    b: Intersection[P, AlwaysFalsy],
+    c: Intersection[P, Not[AlwaysTruthy]],
+    d: Intersection[P, Not[AlwaysFalsy]],
+):
+    if isinstance(a, bool):
+        reveal_type(a)  # revealed: Never
+    else:
+        reveal_type(a)  # revealed: P & AlwaysTruthy
+
+    if isinstance(b, bool):
+        reveal_type(b)  # revealed: Never
+    else:
+        reveal_type(b)  # revealed: P & AlwaysFalsy
+
+    if isinstance(c, bool):
+        reveal_type(c)  # revealed: Never
+    else:
+        reveal_type(c)  # revealed: P & ~AlwaysTruthy
+
+    if isinstance(d, bool):
+        reveal_type(d)  # revealed: Never
+    else:
+        reveal_type(d)  # revealed: P & ~AlwaysFalsy
 ```

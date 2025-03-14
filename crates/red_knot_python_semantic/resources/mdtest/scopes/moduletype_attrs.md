@@ -29,7 +29,7 @@ def foo():
 However, three attributes on `types.ModuleType` are not present as implicit module globals; these
 are excluded:
 
-```py path=unbound_dunders.py
+```py
 # error: [unresolved-reference]
 # revealed: Unknown
 reveal_type(__getattr__)
@@ -54,25 +54,23 @@ inside the module:
 import typing
 
 reveal_type(typing.__name__)  # revealed: str
-reveal_type(typing.__init__)  # revealed: Literal[__init__]
+reveal_type(typing.__init__)  # revealed: <bound method `__init__` of `ModuleType`>
 
 # These come from `builtins.object`, not `types.ModuleType`:
-reveal_type(typing.__eq__)  # revealed: Literal[__eq__]
+reveal_type(typing.__eq__)  # revealed: <bound method `__eq__` of `ModuleType`>
 
 reveal_type(typing.__class__)  # revealed: Literal[ModuleType]
 
 # TODO: needs support for attribute access on instances, properties and generics;
 # should be `dict[str, Any]`
-reveal_type(typing.__dict__)  # revealed: @Todo(instance attributes)
+reveal_type(typing.__dict__)  # revealed: @Todo(@property)
 ```
 
 Typeshed includes a fake `__getattr__` method in the stub for `types.ModuleType` to help out with
 dynamic imports; but we ignore that for module-literal types where we know exactly which module
 we're dealing with:
 
-```py path=__getattr__.py
-import typing
-
+```py
 # error: [unresolved-attribute]
 reveal_type(typing.__getattr__)  # revealed: Unknown
 ```
@@ -83,20 +81,24 @@ It's impossible to override the `__dict__` attribute of `types.ModuleType` insta
 module; we should prioritise the attribute in the `types.ModuleType` stub over a variable named
 `__dict__` in the module's global namespace:
 
-```py path=foo.py
+`foo.py`:
+
+```py
 __dict__ = "foo"
 
 reveal_type(__dict__)  # revealed: Literal["foo"]
 ```
 
-```py path=bar.py
+`bar.py`:
+
+```py
 import foo
 from foo import __dict__ as foo_dict
 
 # TODO: needs support for attribute access on instances, properties, and generics;
 # should be `dict[str, Any]` for both of these:
-reveal_type(foo.__dict__)  # revealed: @Todo(instance attributes)
-reveal_type(foo_dict)  # revealed: @Todo(instance attributes)
+reveal_type(foo.__dict__)  # revealed: @Todo(@property)
+reveal_type(foo_dict)  # revealed: @Todo(@property)
 ```
 
 ## Conditionally global or `ModuleType` attribute
@@ -133,4 +135,44 @@ if returns_bool():
 
 reveal_type(__file__)  # revealed: Literal[42]
 reveal_type(__name__)  # revealed: Literal[1] | str
+```
+
+## Implicit global attributes in the current module override implicit globals from builtins
+
+Here, we take the type of the implicit global symbol `__name__` from the `types.ModuleType` stub
+(which in this custom typeshed specifies the type as `bytes`). This is because the `main` module has
+an implicit `__name__` global that shadows the builtin `__name__` symbol.
+
+```toml
+[environment]
+typeshed = "/typeshed"
+```
+
+`/typeshed/stdlib/builtins.pyi`:
+
+```pyi
+class object: ...
+class int: ...
+class bytes: ...
+
+__name__: int = 42
+```
+
+`/typeshed/stdlib/types.pyi`:
+
+```pyi
+class ModuleType:
+    __name__: bytes
+```
+
+`/typeshed/stdlib/typing_extensions.pyi`:
+
+```pyi
+def reveal_type(obj, /): ...
+```
+
+`main.py`:
+
+```py
+reveal_type(__name__)  # revealed: bytes
 ```

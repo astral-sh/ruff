@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/expressions/subscript/invalid_slice_element.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -255,7 +254,7 @@ Module(
   |
 1 | x[x := 1:]
   |   ^^^^^^ Syntax Error: Unparenthesized named expression cannot be used here
-2 | 
+2 |
 3 | # Starred expression
   |
 
@@ -283,7 +282,7 @@ Module(
 5 | x[:*x]
 6 | x[::*x]
   |     ^^ Syntax Error: Starred expression cannot be used here
-7 | 
+7 |
 8 | # Empty slice
   |
 
@@ -292,7 +291,7 @@ Module(
  8 | # Empty slice
  9 | x[]
    |   ^ Syntax Error: Expected index or slice expression
-10 | 
+10 |
 11 | # Mixed starred expression and named expression
    |
 

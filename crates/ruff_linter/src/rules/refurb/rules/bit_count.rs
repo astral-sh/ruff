@@ -1,10 +1,11 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_python_ast::PythonVersion;
 use ruff_python_ast::{self as ast, Expr, ExprAttribute, ExprCall};
 use ruff_text_size::Ranged;
 
+use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
-use crate::{checkers::ast::Checker, settings::types::PythonVersion};
 
 /// ## What it does
 /// Checks for uses of `bin(...).count("1")` to perform a population count.
@@ -56,9 +57,9 @@ impl AlwaysFixableViolation for BitCount {
 }
 
 /// FURB161
-pub(crate) fn bit_count(checker: &mut Checker, call: &ExprCall) {
+pub(crate) fn bit_count(checker: &Checker, call: &ExprCall) {
     // `int.bit_count()` was added in Python 3.10
-    if checker.settings.target_version < PythonVersion::Py310 {
+    if checker.target_version() < PythonVersion::PY310 {
         return;
     }
 
@@ -177,5 +178,5 @@ pub(crate) fn bit_count(checker: &mut Checker, call: &ExprCall) {
         call.range(),
     )));
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

@@ -12,6 +12,7 @@ export default function AstralButton({
         "uppercase",
         "ease-in-out",
         "font-heading",
+        "outline-radiate",
         "transition-all duration-200",
         "bg-radiate",
         "text-black",

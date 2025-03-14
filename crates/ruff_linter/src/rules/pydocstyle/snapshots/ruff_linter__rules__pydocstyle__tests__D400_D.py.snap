@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
-snapshot_kind: text
 ---
 D.py:355:5: D400 [*] First line should end with a period
     |
@@ -245,9 +244,8 @@ D.py:615:5: D400 [*] First line should end with a period
     |
 613 |   @expect('D212: Multi-line docstring summary should start at the first line')
 614 |   def one_liner():
-615 |       """Wrong."
-    |  _____^
-616 | | 
+615 | /     """Wrong."
+616 | |
 617 | |     """
     | |_______^ D400
     |
@@ -267,7 +265,7 @@ D.py:639:17: D400 [*] First line should end with a period
     |
 639 | class SameLine: """This is a docstring on the same line"""
     |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D400
-640 | 
+640 |
 641 | def same_line(): """This is a docstring on the same line"""
     |
     = help: Add period
@@ -285,7 +283,7 @@ D.py:639:17: D400 [*] First line should end with a period
 D.py:641:18: D400 [*] First line should end with a period
     |
 639 | class SameLine: """This is a docstring on the same line"""
-640 | 
+640 |
 641 | def same_line(): """This is a docstring on the same line"""
     |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D400
     |
@@ -304,8 +302,7 @@ D.py:641:18: D400 [*] First line should end with a period
 D.py:664:5: D400 [*] First line should end with a period
     |
 663 |   def newline_after_closing_quote(self):
-664 |       "We enforce a newline after the closing quote for a multi-line docstring \
-    |  _____^
+664 | /     "We enforce a newline after the closing quote for a multi-line docstring \
 665 | |     but continuations shouldn't be considered multi-line"
     | |_________________________________________________________^ D400
     |

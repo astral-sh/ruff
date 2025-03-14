@@ -1,11 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
-snapshot_kind: text
 ---
 S103.py:6:25: S103 `os.chmod` setting a permissive mask `0o227` on file or directory
   |
 4 | keyfile = "foo"
-5 | 
+5 |
 6 | os.chmod("/etc/passwd", 0o227)  # Error
   |                         ^^^^^ S103
 7 | os.chmod("/etc/passwd", 0o7)  # Error

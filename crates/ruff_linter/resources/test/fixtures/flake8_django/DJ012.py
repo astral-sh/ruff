@@ -145,3 +145,11 @@ class StrBeforeFieldInheritedModel(BaseModel):
 
     first_name = models.CharField(max_length=32)
 
+
+# https://github.com/astral-sh/ruff/issues/13892
+class DunderMethodOtherThanStrBeforeSave(models.Model):
+    name = models.CharField()
+
+    def __init__(self, *args, **kwargs): ...
+
+    def save(*args, **kwargs): ...

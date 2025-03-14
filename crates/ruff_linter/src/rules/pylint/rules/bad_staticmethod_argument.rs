@@ -3,6 +3,7 @@ use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_python_ast::ParameterWithDefault;
 use ruff_python_semantic::analyze::function_type;
+use ruff_python_semantic::analyze::function_type::FunctionType;
 use ruff_python_semantic::Scope;
 use ruff_text_size::Ranged;
 
@@ -10,6 +11,7 @@ use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for static methods that use `self` or `cls` as their first argument.
+/// This rule also applies to `__new__` methods, which are implicitly static.
 ///
 /// ## Why is this bad?
 /// [PEP 8] recommends the use of `self` and `cls` as the first arguments for
@@ -48,11 +50,7 @@ impl Violation for BadStaticmethodArgument {
 }
 
 /// PLW0211
-pub(crate) fn bad_staticmethod_argument(
-    checker: &Checker,
-    scope: &Scope,
-    diagnostics: &mut Vec<Diagnostic>,
-) {
+pub(crate) fn bad_staticmethod_argument(checker: &Checker, scope: &Scope) {
     let Some(func) = scope.kind.as_function() else {
         return;
     };
@@ -76,9 +74,13 @@ pub(crate) fn bad_staticmethod_argument(
         &checker.settings.pep8_naming.classmethod_decorators,
         &checker.settings.pep8_naming.staticmethod_decorators,
     );
-    if !matches!(type_, function_type::FunctionType::StaticMethod) {
-        return;
-    }
+
+    match type_ {
+        FunctionType::StaticMethod | FunctionType::NewMethod => {}
+        FunctionType::Function | FunctionType::Method | FunctionType::ClassMethod => {
+            return;
+        }
+    };
 
     let Some(ParameterWithDefault {
         parameter: self_or_cls,
@@ -99,7 +101,7 @@ pub(crate) fn bad_staticmethod_argument(
         _ => return,
     }
 
-    diagnostics.push(Diagnostic::new(
+    checker.report_diagnostic(Diagnostic::new(
         BadStaticmethodArgument {
             argument_name: self_or_cls.name.to_string(),
         },

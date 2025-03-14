@@ -4,8 +4,8 @@
 use itertools::Either;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{self as ast, Decorator, Expr, ExprCall, Operator};
-use ruff_text_size::Ranged;
+use ruff_python_ast::{self as ast, Arguments, Decorator, Expr, ExprCall, Operator};
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -27,6 +27,8 @@ use crate::registry::AsRule;
 /// payload, This will prevent an attacker from injecting arbitrary objects
 /// into the serialized data.
 ///
+/// In [preview], this rule will also flag references to `pickle` functions.
+///
 /// ## Example
 /// ```python
 /// import pickle
@@ -46,6 +48,8 @@ use crate::registry::AsRule;
 /// ## References
 /// - [Python documentation: `pickle` — Python object serialization](https://docs.python.org/3/library/pickle.html)
 /// - [Common Weakness Enumeration: CWE-502](https://cwe.mitre.org/data/definitions/502.html)
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 pub(crate) struct SuspiciousPickleUsage;
 
@@ -72,6 +76,8 @@ impl Violation for SuspiciousPickleUsage {
 /// payload. This will prevent an attacker from injecting arbitrary objects
 /// into the serialized data.
 ///
+/// In [preview], this rule will also flag references to `marshal` functions.
+///
 /// ## Example
 /// ```python
 /// import marshal
@@ -91,6 +97,8 @@ impl Violation for SuspiciousPickleUsage {
 /// ## References
 /// - [Python documentation: `marshal` — Internal Python object serialization](https://docs.python.org/3/library/marshal.html)
 /// - [Common Weakness Enumeration: CWE-502](https://cwe.mitre.org/data/definitions/502.html)
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 pub(crate) struct SuspiciousMarshalUsage;
 
@@ -113,6 +121,8 @@ impl Violation for SuspiciousMarshalUsage {
 ///
 /// Avoid using weak or broken cryptographic hash functions in security
 /// contexts. Instead, use a known secure hash function such as SHA-256.
+///
+/// In [preview], this rule will also flag references to insecure hash functions.
 ///
 /// ## Example
 /// ```python
@@ -137,6 +147,8 @@ impl Violation for SuspiciousMarshalUsage {
 /// - [Common Weakness Enumeration: CWE-327](https://cwe.mitre.org/data/definitions/327.html)
 /// - [Common Weakness Enumeration: CWE-328](https://cwe.mitre.org/data/definitions/328.html)
 /// - [Common Weakness Enumeration: CWE-916](https://cwe.mitre.org/data/definitions/916.html)
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 pub(crate) struct SuspiciousInsecureHashUsage;
 
@@ -157,6 +169,8 @@ impl Violation for SuspiciousInsecureHashUsage {
 ///
 /// Use strong, modern cryptographic ciphers instead of weak or broken ones.
 ///
+/// In [preview], this rule will also flag references to insecure ciphers.
+///
 /// ## Example
 /// ```python
 /// from cryptography.hazmat.primitives.ciphers import Cipher, algorithms
@@ -175,6 +189,8 @@ impl Violation for SuspiciousInsecureHashUsage {
 ///
 /// ## References
 /// - [Common Weakness Enumeration: CWE-327](https://cwe.mitre.org/data/definitions/327.html)
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 pub(crate) struct SuspiciousInsecureCipherUsage;
 
@@ -194,6 +210,8 @@ impl Violation for SuspiciousInsecureCipherUsage {
 /// otherwise compromise the security of the cipher, such as forgeries.
 ///
 /// Use strong, modern cryptographic ciphers instead of weak or broken ones.
+///
+/// In [preview], this rule will also flag references to insecure cipher modes.
 ///
 /// ## Example
 /// ```python
@@ -215,6 +233,8 @@ impl Violation for SuspiciousInsecureCipherUsage {
 ///
 /// ## References
 /// - [Common Weakness Enumeration: CWE-327](https://cwe.mitre.org/data/definitions/327.html)
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 pub(crate) struct SuspiciousInsecureCipherModeUsage;
 
@@ -241,6 +261,8 @@ impl Violation for SuspiciousInsecureCipherModeUsage {
 /// instead, either directly or via a context manager such as
 /// `tempfile.TemporaryFile`.
 ///
+/// In [preview], this rule will also flag references to `tempfile.mktemp`.
+///
 /// ## Example
 /// ```python
 /// import tempfile
@@ -260,6 +282,8 @@ impl Violation for SuspiciousInsecureCipherModeUsage {
 ///
 /// ## References
 /// - [Python documentation:`mktemp`](https://docs.python.org/3/library/tempfile.html#tempfile.mktemp)
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 pub(crate) struct SuspiciousMktempUsage;
 
@@ -280,6 +304,8 @@ impl Violation for SuspiciousMktempUsage {
 /// `ast.literal_eval()` instead, which will raise an exception if the
 /// expression is not a valid Python literal.
 ///
+/// In [preview], this rule will also flag references to `eval`.
+///
 /// ## Example
 /// ```python
 /// x = eval(input("Enter a number: "))
@@ -296,6 +322,8 @@ impl Violation for SuspiciousMktempUsage {
 /// - [Python documentation: `eval`](https://docs.python.org/3/library/functions.html#eval)
 /// - [Python documentation: `literal_eval`](https://docs.python.org/3/library/ast.html#ast.literal_eval)
 /// - [_Eval really is dangerous_ by Ned Batchelder](https://nedbatchelder.com/blog/201206/eval_really_is_dangerous.html)
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 pub(crate) struct SuspiciousEvalUsage;
 
@@ -319,6 +347,8 @@ impl Violation for SuspiciousEvalUsage {
 /// templates, bypassing XSS protection. This is dangerous because it may allow
 /// cross-site scripting attacks if the string is not properly escaped.
 ///
+/// In [preview], this rule will also flag references to `django.utils.safestring.mark_safe`.
+///
 /// ## Example
 /// ```python
 /// from django.utils.safestring import mark_safe
@@ -335,6 +365,8 @@ impl Violation for SuspiciousEvalUsage {
 /// - [Django documentation: `mark_safe`](https://docs.djangoproject.com/en/dev/ref/utils/#django.utils.safestring.mark_safe)
 /// - [Django documentation: Cross Site Scripting (XSS) protection](https://docs.djangoproject.com/en/dev/topics/security/#cross-site-scripting-xss-protection)
 /// - [Common Weakness Enumeration: CWE-80](https://cwe.mitre.org/data/definitions/80.html)
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 pub(crate) struct SuspiciousMarkSafeUsage;
 
@@ -357,6 +389,8 @@ impl Violation for SuspiciousMarkSafeUsage {
 /// To mitigate this risk, audit all uses of URL open functions and ensure that
 /// only permitted schemes are used (e.g., allowing `http:` and `https:`, and
 /// disallowing `file:` and `ftp:`).
+///
+/// In [preview], this rule will also flag references to URL open functions.
 ///
 /// ## Example
 /// ```python
@@ -383,6 +417,8 @@ impl Violation for SuspiciousMarkSafeUsage {
 ///
 /// ## References
 /// - [Python documentation: `urlopen`](https://docs.python.org/3/library/urllib.request.html#urllib.request.urlopen)
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 pub(crate) struct SuspiciousURLOpenUsage;
 
@@ -405,6 +441,8 @@ impl Violation for SuspiciousURLOpenUsage {
 /// (such as using the [`secrets` module](https://docs.python.org/3/library/secrets.html))
 /// when generating random numbers for security purposes.
 ///
+/// In [preview], this rule will also flag references to these generators.
+///
 /// ## Example
 /// ```python
 /// import random
@@ -421,6 +459,8 @@ impl Violation for SuspiciousURLOpenUsage {
 ///
 /// ## References
 /// - [Python documentation: `random` — Generate pseudo-random numbers](https://docs.python.org/3/library/random.html)
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 pub(crate) struct SuspiciousNonCryptographicRandomUsage;
 
@@ -442,6 +482,8 @@ impl Violation for SuspiciousNonCryptographicRandomUsage {
 /// Consider using the `defusedxml` package when parsing untrusted XML data,
 /// to protect against XML attacks.
 ///
+/// In [preview], this rule will also flag references to insecure XML parsers.
+///
 /// ## Example
 /// ```python
 /// from xml.etree.cElementTree import parse
@@ -461,6 +503,8 @@ impl Violation for SuspiciousNonCryptographicRandomUsage {
 /// - [PyPI: `defusedxml`](https://pypi.org/project/defusedxml/)
 /// - [Common Weakness Enumeration: CWE-400](https://cwe.mitre.org/data/definitions/400.html)
 /// - [Common Weakness Enumeration: CWE-776](https://cwe.mitre.org/data/definitions/776.html)
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 pub(crate) struct SuspiciousXMLCElementTreeUsage;
 
@@ -482,6 +526,8 @@ impl Violation for SuspiciousXMLCElementTreeUsage {
 /// Consider using the `defusedxml` package when parsing untrusted XML data,
 /// to protect against XML attacks.
 ///
+/// In [preview], this rule will also flag references to insecure XML parsers.
+///
 /// ## Example
 /// ```python
 /// from xml.etree.ElementTree import parse
@@ -501,6 +547,8 @@ impl Violation for SuspiciousXMLCElementTreeUsage {
 /// - [PyPI: `defusedxml`](https://pypi.org/project/defusedxml/)
 /// - [Common Weakness Enumeration: CWE-400](https://cwe.mitre.org/data/definitions/400.html)
 /// - [Common Weakness Enumeration: CWE-776](https://cwe.mitre.org/data/definitions/776.html)
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 pub(crate) struct SuspiciousXMLElementTreeUsage;
 
@@ -522,6 +570,8 @@ impl Violation for SuspiciousXMLElementTreeUsage {
 /// Consider using the `defusedxml` package when parsing untrusted XML data,
 /// to protect against XML attacks.
 ///
+/// In [preview], this rule will also flag references to insecure XML parsers.
+///
 /// ## Example
 /// ```python
 /// from xml.sax.expatreader import create_parser
@@ -541,6 +591,8 @@ impl Violation for SuspiciousXMLElementTreeUsage {
 /// - [PyPI: `defusedxml`](https://pypi.org/project/defusedxml/)
 /// - [Common Weakness Enumeration: CWE-400](https://cwe.mitre.org/data/definitions/400.html)
 /// - [Common Weakness Enumeration: CWE-776](https://cwe.mitre.org/data/definitions/776.html)
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 pub(crate) struct SuspiciousXMLExpatReaderUsage;
 
@@ -562,6 +614,8 @@ impl Violation for SuspiciousXMLExpatReaderUsage {
 /// Consider using the `defusedxml` package when parsing untrusted XML data,
 /// to protect against XML attacks.
 ///
+/// In [preview], this rule will also flag references to insecure XML parsers.
+///
 /// ## Example
 /// ```python
 /// from xml.dom.expatbuilder import parse
@@ -581,6 +635,8 @@ impl Violation for SuspiciousXMLExpatReaderUsage {
 /// - [PyPI: `defusedxml`](https://pypi.org/project/defusedxml/)
 /// - [Common Weakness Enumeration: CWE-400](https://cwe.mitre.org/data/definitions/400.html)
 /// - [Common Weakness Enumeration: CWE-776](https://cwe.mitre.org/data/definitions/776.html)
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 pub(crate) struct SuspiciousXMLExpatBuilderUsage;
 
@@ -602,6 +658,8 @@ impl Violation for SuspiciousXMLExpatBuilderUsage {
 /// Consider using the `defusedxml` package when parsing untrusted XML data,
 /// to protect against XML attacks.
 ///
+/// In [preview], this rule will also flag references to insecure XML parsers.
+///
 /// ## Example
 /// ```python
 /// from xml.sax import make_parser
@@ -621,6 +679,8 @@ impl Violation for SuspiciousXMLExpatBuilderUsage {
 /// - [PyPI: `defusedxml`](https://pypi.org/project/defusedxml/)
 /// - [Common Weakness Enumeration: CWE-400](https://cwe.mitre.org/data/definitions/400.html)
 /// - [Common Weakness Enumeration: CWE-776](https://cwe.mitre.org/data/definitions/776.html)
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 pub(crate) struct SuspiciousXMLSaxUsage;
 
@@ -642,6 +702,8 @@ impl Violation for SuspiciousXMLSaxUsage {
 /// Consider using the `defusedxml` package when parsing untrusted XML data,
 /// to protect against XML attacks.
 ///
+/// In [preview], this rule will also flag references to insecure XML parsers.
+///
 /// ## Example
 /// ```python
 /// from xml.dom.minidom import parse
@@ -661,6 +723,8 @@ impl Violation for SuspiciousXMLSaxUsage {
 /// - [PyPI: `defusedxml`](https://pypi.org/project/defusedxml/)
 /// - [Common Weakness Enumeration: CWE-400](https://cwe.mitre.org/data/definitions/400.html)
 /// - [Common Weakness Enumeration: CWE-776](https://cwe.mitre.org/data/definitions/776.html)
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 pub(crate) struct SuspiciousXMLMiniDOMUsage;
 
@@ -682,6 +746,8 @@ impl Violation for SuspiciousXMLMiniDOMUsage {
 /// Consider using the `defusedxml` package when parsing untrusted XML data,
 /// to protect against XML attacks.
 ///
+/// In [preview], this rule will also flag references to insecure XML parsers.
+///
 /// ## Example
 /// ```python
 /// from xml.dom.pulldom import parse
@@ -701,6 +767,8 @@ impl Violation for SuspiciousXMLMiniDOMUsage {
 /// - [PyPI: `defusedxml`](https://pypi.org/project/defusedxml/)
 /// - [Common Weakness Enumeration: CWE-400](https://cwe.mitre.org/data/definitions/400.html)
 /// - [Common Weakness Enumeration: CWE-776](https://cwe.mitre.org/data/definitions/776.html)
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 pub(crate) struct SuspiciousXMLPullDOMUsage;
 
@@ -711,6 +779,13 @@ impl Violation for SuspiciousXMLPullDOMUsage {
     }
 }
 
+/// ## Deprecation
+///
+/// This rule was deprecated as the `lxml` library has been modified to address
+/// known vulnerabilities and unsafe defaults. As such, the `defusedxml`
+/// library is no longer necessary, `defusedxml` has [deprecated] its `lxml`
+/// module.
+///
 /// ## What it does
 /// Checks for uses of insecure XML parsers.
 ///
@@ -718,6 +793,8 @@ impl Violation for SuspiciousXMLPullDOMUsage {
 /// Many XML parsers are vulnerable to XML attacks (such as entity expansion),
 /// which cause excessive memory and CPU usage by exploiting recursion. An
 /// attacker could use such methods to access unauthorized resources.
+///
+/// In [preview], this rule will also flag references to insecure XML parsers.
 ///
 /// ## Example
 /// ```python
@@ -730,6 +807,9 @@ impl Violation for SuspiciousXMLPullDOMUsage {
 /// - [PyPI: `lxml`](https://pypi.org/project/lxml/)
 /// - [Common Weakness Enumeration: CWE-400](https://cwe.mitre.org/data/definitions/400.html)
 /// - [Common Weakness Enumeration: CWE-776](https://cwe.mitre.org/data/definitions/776.html)
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
+/// [deprecated]: https://pypi.org/project/defusedxml/0.8.0rc2/#defusedxml-lxml
 #[derive(ViolationMetadata)]
 pub(crate) struct SuspiciousXMLETreeUsage;
 
@@ -754,6 +834,8 @@ impl Violation for SuspiciousXMLETreeUsage {
 /// the previous behavior that does perform verification. Otherwise, use
 /// `ssl.create_default_context` to create a secure context.
 ///
+/// In [preview], this rule will also flag references to `ssl._create_unverified_context`.
+///
 /// ## Example
 /// ```python
 /// import ssl
@@ -773,6 +855,7 @@ impl Violation for SuspiciousXMLETreeUsage {
 /// - [Python documentation: `ssl` — TLS/SSL wrapper for socket objects](https://docs.python.org/3/library/ssl.html)
 ///
 /// [PEP 476]: https://peps.python.org/pep-0476/
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 pub(crate) struct SuspiciousUnverifiedContextUsage;
 
@@ -792,15 +875,19 @@ impl Violation for SuspiciousUnverifiedContextUsage {
 ///
 /// Instead, consider using a more secure protocol such as SSH.
 ///
+/// In [preview], this rule will also flag references to Telnet-related functions.
+///
 /// ## References
 /// - [Python documentation: `telnetlib` — Telnet client](https://docs.python.org/3/library/telnetlib.html)
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 pub(crate) struct SuspiciousTelnetUsage;
 
 impl Violation for SuspiciousTelnetUsage {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Telnet-related functions are being called. Telnet is considered insecure. Use SSH or some other encrypted protocol.".to_string()
+        "Telnet is considered insecure. Use SSH or some other encrypted protocol.".to_string()
     }
 }
 
@@ -813,8 +900,12 @@ impl Violation for SuspiciousTelnetUsage {
 ///
 /// Instead, consider using FTPS (which secures FTP using SSL/TLS) or SFTP.
 ///
+/// In [preview], this rule will also flag references to FTP-related functions.
+///
 /// ## References
 /// - [Python documentation: `ftplib` — FTP protocol client](https://docs.python.org/3/library/ftplib.html)
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 pub(crate) struct SuspiciousFTPLibUsage;
 
@@ -825,8 +916,56 @@ impl Violation for SuspiciousFTPLibUsage {
     }
 }
 
+pub(crate) fn suspicious_function_call(checker: &Checker, call: &ExprCall) {
+    suspicious_function(
+        checker,
+        call.func.as_ref(),
+        Some(&call.arguments),
+        call.range,
+    );
+}
+
+pub(crate) fn suspicious_function_reference(checker: &Checker, func: &Expr) {
+    if checker.settings.preview.is_disabled() {
+        return;
+    }
+
+    match checker.semantic().current_expression_parent() {
+        Some(Expr::Call(parent)) => {
+            // Avoid duplicate diagnostics. For example:
+            //
+            // ```python
+            // # vvvvvvvvvvvvvvvvvvvvvvvvv Already reported as a call expression
+            //   shelve.open(lorem, ipsum)
+            // # ^^^^^^ Should not be reported as a reference
+            // ```
+            if parent.func.range().contains_range(func.range()) {
+                return;
+            }
+        }
+        Some(Expr::Attribute(_)) => {
+            // Avoid duplicate diagnostics. For example:
+            //
+            // ```python
+            // # vvvvvvvvvvv Already reported as an attribute expression
+            //   shelve.open
+            // # ^^^^^^ Should not be reported as a reference
+            // ```
+            return;
+        }
+        _ => {}
+    }
+
+    suspicious_function(checker, func, None, func.range());
+}
+
 /// S301, S302, S303, S304, S305, S306, S307, S308, S310, S311, S312, S313, S314, S315, S316, S317, S318, S319, S320, S321, S323
-pub(crate) fn suspicious_function_call(checker: &mut Checker, call: &ExprCall) {
+fn suspicious_function(
+    checker: &Checker,
+    func: &Expr,
+    arguments: Option<&Arguments>,
+    range: TextRange,
+) {
     /// Returns `true` if the iterator starts with the given prefix.
     fn has_prefix(mut chars: impl Iterator<Item = char>, prefix: &str) -> bool {
         for expected in prefix.chars() {
@@ -877,126 +1016,182 @@ pub(crate) fn suspicious_function_call(checker: &mut Checker, call: &ExprCall) {
         }
     }
 
-    let Some(diagnostic_kind) = checker.semantic().resolve_qualified_name(call.func.as_ref()).and_then(|qualified_name| {
-        match qualified_name.segments() {
-            // Pickle
-            ["pickle" | "dill", "load" | "loads" | "Unpickler"] |
-            ["shelve", "open" | "DbfilenameShelf"] |
-            ["jsonpickle", "decode"] |
-            ["jsonpickle", "unpickler", "decode"] |
-            ["pandas", "read_pickle"]  => Some(SuspiciousPickleUsage.into()),
-            // Marshal
-            ["marshal", "load" | "loads"] => Some(SuspiciousMarshalUsage.into()),
-            // InsecureHash
-            ["Crypto" | "Cryptodome", "Hash", "SHA" | "MD2" | "MD3" | "MD4" | "MD5", "new"] |
-            ["cryptography", "hazmat", "primitives", "hashes", "SHA1" | "MD5"] => Some(SuspiciousInsecureHashUsage.into()),
-            // InsecureCipher
-            ["Crypto" | "Cryptodome", "Cipher", "ARC2" | "Blowfish"  | "DES" | "XOR", "new"] |
-            ["cryptography", "hazmat", "primitives", "ciphers", "algorithms", "ARC4" | "Blowfish" | "IDEA" ] => Some(SuspiciousInsecureCipherUsage.into()),
-            // InsecureCipherMode
-            ["cryptography", "hazmat", "primitives", "ciphers", "modes", "ECB"] => Some(SuspiciousInsecureCipherModeUsage.into()),
-            // Mktemp
-            ["tempfile", "mktemp"] => Some(SuspiciousMktempUsage.into()),
-            // Eval
-            ["" | "builtins", "eval"] => Some(SuspiciousEvalUsage.into()),
-            // MarkSafe
-            ["django", "utils", "safestring" | "html", "mark_safe"] => Some(SuspiciousMarkSafeUsage.into()),
-            // URLOpen (`Request`)
-            ["urllib", "request", "Request"] |
-            ["six", "moves", "urllib", "request", "Request"] => {
+    if checker.semantic().in_type_definition() {
+        return;
+    }
+
+    let Some(qualified_name) = checker.semantic().resolve_qualified_name(func) else {
+        return;
+    };
+
+    let diagnostic_kind: DiagnosticKind = match qualified_name.segments() {
+        // Pickle
+        ["pickle" | "dill", "load" | "loads" | "Unpickler"]
+        | ["shelve", "open" | "DbfilenameShelf"]
+        | ["jsonpickle", "decode"]
+        | ["jsonpickle", "unpickler", "decode"]
+        | ["pandas", "read_pickle"] => SuspiciousPickleUsage.into(),
+
+        // Marshal
+        ["marshal", "load" | "loads"] => SuspiciousMarshalUsage.into(),
+
+        // InsecureHash
+        ["Crypto" | "Cryptodome", "Hash", "SHA" | "MD2" | "MD3" | "MD4" | "MD5", "new"]
+        | ["cryptography", "hazmat", "primitives", "hashes", "SHA1" | "MD5"] => {
+            SuspiciousInsecureHashUsage.into()
+        }
+
+        // InsecureCipher
+        ["Crypto" | "Cryptodome", "Cipher", "ARC2" | "Blowfish" | "DES" | "XOR", "new"]
+        | ["cryptography", "hazmat", "primitives", "ciphers", "algorithms", "ARC4" | "Blowfish" | "IDEA"] => {
+            SuspiciousInsecureCipherUsage.into()
+        }
+
+        // InsecureCipherMode
+        ["cryptography", "hazmat", "primitives", "ciphers", "modes", "ECB"] => {
+            SuspiciousInsecureCipherModeUsage.into()
+        }
+
+        // Mktemp
+        ["tempfile", "mktemp"] => SuspiciousMktempUsage.into(),
+
+        // Eval
+        ["" | "builtins", "eval"] => SuspiciousEvalUsage.into(),
+
+        // MarkSafe
+        ["django", "utils", "safestring" | "html", "mark_safe"] => SuspiciousMarkSafeUsage.into(),
+
+        // URLOpen (`Request`)
+        ["urllib", "request", "Request"] | ["six", "moves", "urllib", "request", "Request"] => {
+            if let Some(arguments) = arguments {
                 // If the `url` argument is a string literal or an f-string, allow `http` and `https` schemes.
-                if call.arguments.args.iter().all(|arg| !arg.is_starred_expr()) && call.arguments.keywords.iter().all(|keyword| keyword.arg.is_some()) {
-                    if call.arguments.find_argument_value("url", 0).and_then(leading_chars).is_some_and(has_http_prefix) {
-                        return None;
+                if arguments.args.iter().all(|arg| !arg.is_starred_expr())
+                    && arguments
+                        .keywords
+                        .iter()
+                        .all(|keyword| keyword.arg.is_some())
+                {
+                    if arguments
+                        .find_argument_value("url", 0)
+                        .and_then(leading_chars)
+                        .is_some_and(has_http_prefix)
+                    {
+                        return;
                     }
                 }
-                Some(SuspiciousURLOpenUsage.into())
             }
-            // URLOpen (`urlopen`, `urlretrieve`)
-            ["urllib", "request", "urlopen" | "urlretrieve" ] |
-            ["six", "moves", "urllib", "request", "urlopen" | "urlretrieve" ] => {
-                if call.arguments.args.iter().all(|arg| !arg.is_starred_expr()) && call.arguments.keywords.iter().all(|keyword| keyword.arg.is_some()) {
-                    match call.arguments.find_argument_value("url", 0) {
+            SuspiciousURLOpenUsage.into()
+        }
+
+        // URLOpen (`urlopen`, `urlretrieve`)
+        ["urllib", "request", "urlopen" | "urlretrieve"]
+        | ["six", "moves", "urllib", "request", "urlopen" | "urlretrieve"] => {
+            if let Some(arguments) = arguments {
+                if arguments.args.iter().all(|arg| !arg.is_starred_expr())
+                    && arguments
+                        .keywords
+                        .iter()
+                        .all(|keyword| keyword.arg.is_some())
+                {
+                    match arguments.find_argument_value("url", 0) {
                         // If the `url` argument is a `urllib.request.Request` object, allow `http` and `https` schemes.
-                        Some(Expr::Call(ExprCall { func, arguments, .. })) => {
-                            if checker.semantic().resolve_qualified_name(func.as_ref()).is_some_and(|name| name.segments() == ["urllib", "request", "Request"]) {
-                                if arguments.find_argument_value("url", 0).and_then(leading_chars).is_some_and(has_http_prefix) {
-                                    return None;
+                        Some(Expr::Call(ExprCall {
+                            func, arguments, ..
+                        })) => {
+                            if checker
+                                .semantic()
+                                .resolve_qualified_name(func.as_ref())
+                                .is_some_and(|name| {
+                                    name.segments() == ["urllib", "request", "Request"]
+                                })
+                            {
+                                if arguments
+                                    .find_argument_value("url", 0)
+                                    .and_then(leading_chars)
+                                    .is_some_and(has_http_prefix)
+                                {
+                                    return;
                                 }
                             }
-                        },
+                        }
 
                         // If the `url` argument is a string literal, allow `http` and `https` schemes.
                         Some(expr) => {
                             if leading_chars(expr).is_some_and(has_http_prefix) {
-                                return None;
+                                return;
                             }
-                        },
+                        }
 
                         _ => {}
                     }
                 }
-                Some(SuspiciousURLOpenUsage.into())
-            },
-            // URLOpen (`URLopener`, `FancyURLopener`)
-            ["urllib", "request", "URLopener" | "FancyURLopener"] |
-            ["six", "moves", "urllib", "request", "URLopener" | "FancyURLopener"] => Some(SuspiciousURLOpenUsage.into()),
-            // NonCryptographicRandom
-            ["random", "Random" | "random" | "randrange" | "randint" | "choice" | "choices" | "uniform" | "triangular" | "randbytes"] => Some(SuspiciousNonCryptographicRandomUsage.into()),
-            // UnverifiedContext
-            ["ssl", "_create_unverified_context"] => Some(SuspiciousUnverifiedContextUsage.into()),
-            // XMLCElementTree
-            ["xml", "etree", "cElementTree", "parse" | "iterparse" | "fromstring" | "XMLParser"] => Some(SuspiciousXMLCElementTreeUsage.into()),
-            // XMLElementTree
-            ["xml", "etree", "ElementTree", "parse" | "iterparse" | "fromstring" | "XMLParser"] => Some(SuspiciousXMLElementTreeUsage.into()),
-            // XMLExpatReader
-            ["xml", "sax", "expatreader", "create_parser"] => Some(SuspiciousXMLExpatReaderUsage.into()),
-            // XMLExpatBuilder
-            ["xml", "dom", "expatbuilder", "parse" | "parseString"] => Some(SuspiciousXMLExpatBuilderUsage.into()),
-            // XMLSax
-            ["xml", "sax", "parse" | "parseString" | "make_parser"] => Some(SuspiciousXMLSaxUsage.into()),
-            // XMLMiniDOM
-            ["xml", "dom", "minidom", "parse" | "parseString"] => Some(SuspiciousXMLMiniDOMUsage.into()),
-            // XMLPullDOM
-            ["xml", "dom", "pulldom", "parse" | "parseString"] => Some(SuspiciousXMLPullDOMUsage.into()),
-            // XMLETree
-            ["lxml", "etree", "parse" | "fromstring" | "RestrictedElement" | "GlobalParserTLS" | "getDefaultParser" | "check_docinfo"] => Some(SuspiciousXMLETreeUsage.into()),
-            // Telnet
-            ["telnetlib", ..] => Some(SuspiciousTelnetUsage.into()),
-            // FTPLib
-            ["ftplib", ..] => Some(SuspiciousFTPLibUsage.into()),
-            _ => None
+            }
+            SuspiciousURLOpenUsage.into()
         }
-    }) else {
-        return;
+
+        // URLOpen (`URLopener`, `FancyURLopener`)
+        ["urllib", "request", "URLopener" | "FancyURLopener"]
+        | ["six", "moves", "urllib", "request", "URLopener" | "FancyURLopener"] => {
+            SuspiciousURLOpenUsage.into()
+        }
+
+        // NonCryptographicRandom
+        ["random", "Random" | "random" | "randrange" | "randint" | "choice" | "choices" | "uniform"
+        | "triangular" | "randbytes"] => SuspiciousNonCryptographicRandomUsage.into(),
+
+        // UnverifiedContext
+        ["ssl", "_create_unverified_context"] => SuspiciousUnverifiedContextUsage.into(),
+
+        // XMLCElementTree
+        ["xml", "etree", "cElementTree", "parse" | "iterparse" | "fromstring" | "XMLParser"] => {
+            SuspiciousXMLCElementTreeUsage.into()
+        }
+
+        // XMLElementTree
+        ["xml", "etree", "ElementTree", "parse" | "iterparse" | "fromstring" | "XMLParser"] => {
+            SuspiciousXMLElementTreeUsage.into()
+        }
+
+        // XMLExpatReader
+        ["xml", "sax", "expatreader", "create_parser"] => SuspiciousXMLExpatReaderUsage.into(),
+
+        // XMLExpatBuilder
+        ["xml", "dom", "expatbuilder", "parse" | "parseString"] => {
+            SuspiciousXMLExpatBuilderUsage.into()
+        }
+
+        // XMLSax
+        ["xml", "sax", "parse" | "parseString" | "make_parser"] => SuspiciousXMLSaxUsage.into(),
+
+        // XMLMiniDOM
+        ["xml", "dom", "minidom", "parse" | "parseString"] => SuspiciousXMLMiniDOMUsage.into(),
+
+        // XMLPullDOM
+        ["xml", "dom", "pulldom", "parse" | "parseString"] => SuspiciousXMLPullDOMUsage.into(),
+
+        // XMLETree
+        ["lxml", "etree", "parse" | "fromstring" | "RestrictedElement" | "GlobalParserTLS" | "getDefaultParser"
+        | "check_docinfo"] => SuspiciousXMLETreeUsage.into(),
+
+        // Telnet
+        ["telnetlib", ..] => SuspiciousTelnetUsage.into(),
+
+        // FTPLib
+        ["ftplib", ..] => SuspiciousFTPLibUsage.into(),
+
+        _ => return,
     };
 
-    let diagnostic = Diagnostic::new::<DiagnosticKind>(diagnostic_kind, call.range());
+    let diagnostic = Diagnostic::new(diagnostic_kind, range);
     if checker.enabled(diagnostic.kind.rule()) {
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }
 
 /// S308
-pub(crate) fn suspicious_function_decorator(checker: &mut Checker, decorator: &Decorator) {
-    let Some(diagnostic_kind) = checker
-        .semantic()
-        .resolve_qualified_name(&decorator.expression)
-        .and_then(|qualified_name| {
-            match qualified_name.segments() {
-                // MarkSafe
-                ["django", "utils", "safestring" | "html", "mark_safe"] => {
-                    Some(SuspiciousMarkSafeUsage.into())
-                }
-                _ => None,
-            }
-        })
-    else {
-        return;
-    };
-
-    let diagnostic = Diagnostic::new::<DiagnosticKind>(diagnostic_kind, decorator.range());
-    if checker.enabled(diagnostic.kind.rule()) {
-        checker.diagnostics.push(diagnostic);
+pub(crate) fn suspicious_function_decorator(checker: &Checker, decorator: &Decorator) {
+    // In preview mode, references are handled collectively by `suspicious_function_reference`
+    if checker.settings.preview.is_disabled() {
+        suspicious_function(checker, &decorator.expression, None, decorator.range);
     }
 }

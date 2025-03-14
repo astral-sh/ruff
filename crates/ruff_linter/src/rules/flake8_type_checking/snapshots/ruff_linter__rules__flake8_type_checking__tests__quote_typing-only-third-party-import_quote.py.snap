@@ -1,13 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
-snapshot_kind: text
 ---
 quote.py:2:24: TC002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
   |
 1 | def f():
 2 |     from pandas import DataFrame
   |                        ^^^^^^^^^ TC002
-3 | 
+3 |
 4 |     def baz() -> DataFrame:
   |
   = help: Move into type-checking block
@@ -31,7 +30,7 @@ quote.py:9:24: TC002 [*] Move third-party import `pandas.DataFrame` into a type-
  8 | def f():
  9 |     from pandas import DataFrame
    |                        ^^^^^^^^^ TC002
-10 | 
+10 |
 11 |     def baz() -> DataFrame[int]:
    |
    = help: Move into type-checking block
@@ -61,7 +60,7 @@ quote.py:16:22: TC002 [*] Move third-party import `pandas` into a type-checking 
 15 | def f():
 16 |     import pandas as pd
    |                      ^^ TC002
-17 | 
+17 |
 18 |     def baz() -> pd.DataFrame:
    |
    = help: Move into type-checking block
@@ -91,7 +90,7 @@ quote.py:23:22: TC002 [*] Move third-party import `pandas` into a type-checking 
 22 | def f():
 23 |     import pandas as pd
    |                      ^^ TC002
-24 | 
+24 |
 25 |     def baz() -> pd.DataFrame.Extra:
    |
    = help: Move into type-checking block
@@ -121,7 +120,7 @@ quote.py:30:22: TC002 [*] Move third-party import `pandas` into a type-checking 
 29 | def f():
 30 |     import pandas as pd
    |                      ^^ TC002
-31 | 
+31 |
 32 |     def baz() -> pd.DataFrame | int:
    |
    = help: Move into type-checking block
@@ -151,7 +150,7 @@ quote.py:38:24: TC002 [*] Move third-party import `pandas.DataFrame` into a type
 37 | def f():
 38 |     from pandas import DataFrame
    |                        ^^^^^^^^^ TC002
-39 | 
+39 |
 40 |     def baz() -> DataFrame():
    |
    = help: Move into type-checking block
@@ -179,10 +178,10 @@ quote.py:38:24: TC002 [*] Move third-party import `pandas.DataFrame` into a type
 quote.py:47:24: TC002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
    |
 45 |     from typing import Literal
-46 | 
+46 |
 47 |     from pandas import DataFrame
    |                        ^^^^^^^^^ TC002
-48 | 
+48 |
 49 |     def baz() -> DataFrame[Literal["int"]]:
    |
    = help: Move into type-checking block
@@ -212,7 +211,7 @@ quote.py:64:24: TC002 [*] Move third-party import `pandas.DataFrame` into a type
 63 | def f():
 64 |     from pandas import DataFrame, Series
    |                        ^^^^^^^^^ TC002
-65 | 
+65 |
 66 |     def baz() -> DataFrame | Series:
    |
    = help: Move into type-checking block
@@ -242,7 +241,7 @@ quote.py:64:35: TC002 [*] Move third-party import `pandas.Series` into a type-ch
 63 | def f():
 64 |     from pandas import DataFrame, Series
    |                                   ^^^^^^ TC002
-65 | 
+65 |
 66 |     def baz() -> DataFrame | Series:
    |
    = help: Move into type-checking block
@@ -272,7 +271,7 @@ quote.py:71:24: TC002 [*] Move third-party import `pandas.DataFrame` into a type
 70 | def f():
 71 |     from pandas import DataFrame, Series
    |                        ^^^^^^^^^ TC002
-72 | 
+72 |
 73 |     def baz() -> (
    |
    = help: Move into type-checking block
@@ -315,7 +314,7 @@ quote.py:71:35: TC002 [*] Move third-party import `pandas.Series` into a type-ch
 70 | def f():
 71 |     from pandas import DataFrame, Series
    |                                   ^^^^^^ TC002
-72 | 
+72 |
 73 |     def baz() -> (
    |
    = help: Move into type-checking block
@@ -358,7 +357,7 @@ quote.py:89:24: TC002 [*] Move third-party import `pandas.DataFrame` into a type
 88 | def f():
 89 |     from pandas import DataFrame, Series
    |                        ^^^^^^^^^ TC002
-90 | 
+90 |
 91 |     def func(self) -> DataFrame | list[Series]:
    |
    = help: Move into type-checking block
@@ -388,7 +387,7 @@ quote.py:89:35: TC002 [*] Move third-party import `pandas.Series` into a type-ch
 88 | def f():
 89 |     from pandas import DataFrame, Series
    |                                   ^^^^^^ TC002
-90 | 
+90 |
 91 |     def func(self) -> DataFrame | list[Series]:
    |
    = help: Move into type-checking block

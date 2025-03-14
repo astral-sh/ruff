@@ -13,7 +13,7 @@ use crate::checkers::ast::Checker;
 /// into `reversed()`, `set()` or `sorted()` functions as they will change
 /// the order of the elements again.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// sorted(iterable[::-1])
 /// set(iterable[::-1])
@@ -40,7 +40,7 @@ impl Violation for UnnecessarySubscriptReversal {
 }
 
 /// C415
-pub(crate) fn unnecessary_subscript_reversal(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn unnecessary_subscript_reversal(checker: &Checker, call: &ast::ExprCall) {
     let Some(first_arg) = call.arguments.args.first() else {
         return;
     };
@@ -86,7 +86,7 @@ pub(crate) fn unnecessary_subscript_reversal(checker: &mut Checker, call: &ast::
     if !matches!(function_name, "reversed" | "set" | "sorted") {
         return;
     }
-    checker.diagnostics.push(Diagnostic::new(
+    checker.report_diagnostic(Diagnostic::new(
         UnnecessarySubscriptReversal {
             func: function_name.to_string(),
         },

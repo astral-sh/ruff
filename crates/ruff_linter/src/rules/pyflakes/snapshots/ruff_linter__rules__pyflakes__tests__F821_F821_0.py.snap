@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
-snapshot_kind: text
 ---
 F821_0.py:2:12: F821 Undefined name `self`
   |
@@ -33,10 +32,10 @@ F821_0.py:21:12: F821 Undefined name `numeric_string`
 F821_0.py:58:5: F821 Undefined name `Bar`
    |
 56 | y: int = 1
-57 | 
+57 |
 58 | x: "Bar" = 1
    |     ^^^ F821
-59 | 
+59 |
 60 | [first] = ["yup"]
    |
 
@@ -81,7 +80,7 @@ F821_0.py:93:14: F821 Undefined name `B`
 92 | C = f'{A:{B}}'
 93 | C = f'{A:{f"{B}"}}'
    |              ^ F821
-94 | 
+94 |
 95 | from typing import Annotated, Literal
    |
 

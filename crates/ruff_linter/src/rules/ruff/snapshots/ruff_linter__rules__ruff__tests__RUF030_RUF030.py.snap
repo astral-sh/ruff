@@ -7,7 +7,7 @@ RUF030.py:6:14: RUF030 [*] `print()` call in `assert` statement is likely uninte
 5 | # - single StringLiteral
 6 | assert True, print("This print is not intentional.")
   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF030
-7 | 
+7 |
 8 | # Concatenated string literals
   |
   = help: Remove `print`
@@ -28,7 +28,7 @@ RUF030.py:11:14: RUF030 [*] `print()` call in `assert` statement is likely unint
 10 | # - single StringLiteral
 11 | assert True, print("This print" " is not intentional.")
    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF030
-12 | 
+12 |
 13 | # Positional arguments, string literals
    |
    = help: Remove `print`
@@ -49,7 +49,7 @@ RUF030.py:16:14: RUF030 [*] `print()` call in `assert` statement is likely unint
 15 | # - single StringLiteral concatenated with " "
 16 | assert True, print("This print", "is not intentional")
    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF030
-17 | 
+17 |
 18 | # Concatenated string literals combined with Positional arguments
    |
    = help: Remove `print`
@@ -70,7 +70,7 @@ RUF030.py:21:14: RUF030 [*] `print()` call in `assert` statement is likely unint
 20 | # - single stringliteral concatenated with " " only between `print` and `is`
 21 | assert True, print("This " "print", "is not intentional.")
    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF030
-22 | 
+22 |
 23 | # Positional arguments, string literals with a variable
    |
    = help: Remove `print`
@@ -91,7 +91,7 @@ RUF030.py:26:14: RUF030 [*] `print()` call in `assert` statement is likely unint
 25 | # - single FString concatenated with " "
 26 | assert True, print("This", print.__name__, "is not intentional.")
    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF030
-27 | 
+27 |
 28 | # Mixed brackets string literals
    |
    = help: Remove `print`
@@ -112,7 +112,7 @@ RUF030.py:31:14: RUF030 [*] `print()` call in `assert` statement is likely unint
 30 | # - single StringLiteral concatenated with " "
 31 | assert True, print("This print", 'is not intentional', """and should be removed""")
    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF030
-32 | 
+32 |
 33 | # Mixed brackets with other brackets inside
    |
    = help: Remove `print`
@@ -133,7 +133,7 @@ RUF030.py:36:14: RUF030 [*] `print()` call in `assert` statement is likely unint
 35 | # - single StringLiteral concatenated with " " and escaped brackets
 36 | assert True, print("This print", 'is not "intentional"', """and "should" be 'removed'""")
    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF030
-37 | 
+37 |
 38 | # Positional arguments, string literals with a separator
    |
    = help: Remove `print`
@@ -154,7 +154,7 @@ RUF030.py:41:14: RUF030 [*] `print()` call in `assert` statement is likely unint
 40 | # - single StringLiteral concatenated with "|"
 41 | assert True, print("This print", "is not intentional", sep="|")
    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF030
-42 | 
+42 |
 43 | # Positional arguments, string literals with None as separator
    |
    = help: Remove `print`
@@ -175,7 +175,7 @@ RUF030.py:46:14: RUF030 [*] `print()` call in `assert` statement is likely unint
 45 | # - single StringLiteral concatenated with " "
 46 | assert True, print("This print", "is not intentional", sep=None)
    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF030
-47 | 
+47 |
 48 | # Positional arguments, string literals with variable as separator, needs f-string
    |
    = help: Remove `print`
@@ -196,7 +196,7 @@ RUF030.py:51:14: RUF030 [*] `print()` call in `assert` statement is likely unint
 50 | # - single FString concatenated with "{U00A0}"
 51 | assert True, print("This print", "is not intentional", sep=U00A0)
    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF030
-52 | 
+52 |
 53 | # Unnecessary f-string
    |
    = help: Remove `print`
@@ -217,7 +217,7 @@ RUF030.py:56:14: RUF030 [*] `print()` call in `assert` statement is likely unint
 55 | # - single StringLiteral
 56 | assert True, print(f"This f-string is just a literal.")
    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF030
-57 | 
+57 |
 58 | # Positional arguments, string literals and f-strings
    |
    = help: Remove `print`
@@ -238,7 +238,7 @@ RUF030.py:61:14: RUF030 [*] `print()` call in `assert` statement is likely unint
 60 | # - single FString concatenated with " "
 61 | assert True, print("This print", f"is not {'intentional':s}")
    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF030
-62 | 
+62 |
 63 | # Positional arguments, string literals and f-strings with a separator
    |
    = help: Remove `print`
@@ -259,7 +259,7 @@ RUF030.py:66:14: RUF030 [*] `print()` call in `assert` statement is likely unint
 65 | # - single FString concatenated with "|"
 66 | assert True, print("This print", f"is not {'intentional':s}", sep="|")
    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF030
-67 | 
+67 |
 68 | # A single f-string
    |
    = help: Remove `print`
@@ -280,7 +280,7 @@ RUF030.py:71:14: RUF030 [*] `print()` call in `assert` statement is likely unint
 70 | # - single FString
 71 | assert True, print(f"This print is not {'intentional':s}")
    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF030
-72 | 
+72 |
 73 | # A single f-string with a redundant separator
    |
    = help: Remove `print`
@@ -301,7 +301,7 @@ RUF030.py:76:14: RUF030 [*] `print()` call in `assert` statement is likely unint
 75 | # - single FString
 76 | assert True, print(f"This print is not {'intentional':s}", sep="|")
    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF030
-77 | 
+77 |
 78 | # Complex f-string with variable as separator
    |
    = help: Remove `print`
@@ -322,7 +322,7 @@ RUF030.py:83:14: RUF030 [*] `print()` call in `assert` statement is likely unint
 82 | maintainer = "John Doe"
 83 | assert True, print("Unreachable due to", condition, f", ask {maintainer} for advice", sep=U00A0)
    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF030
-84 | 
+84 |
 85 | # Empty print
    |
    = help: Remove `print`
@@ -343,7 +343,7 @@ RUF030.py:88:14: RUF030 [*] `print()` call in `assert` statement is likely unint
 87 | # - `msg` entirely removed from assertion
 88 | assert True, print()
    |              ^^^^^^^ RUF030
-89 | 
+89 |
 90 | # Empty print with separator
    |
    = help: Remove `print`
@@ -364,7 +364,7 @@ RUF030.py:93:14: RUF030 [*] `print()` call in `assert` statement is likely unint
 92 | # - `msg` entirely removed from assertion
 93 | assert True, print(sep=" ")
    |              ^^^^^^^^^^^^^^ RUF030
-94 | 
+94 |
 95 | # Custom print function that actually returns a string
    |
    = help: Remove `print`

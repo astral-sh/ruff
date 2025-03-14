@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/expressions/dict/named_expression_1.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -129,39 +128,39 @@ Module(
 
   |
 1 | # Unparenthesized named expression not allowed in value
-2 | 
+2 |
 3 | {x: y := 1, z: a := 2}
   |       ^^ Syntax Error: Expected ',', found ':='
-4 | 
+4 |
 5 | x + y
   |
 
 
   |
 1 | # Unparenthesized named expression not allowed in value
-2 | 
+2 |
 3 | {x: y := 1, z: a := 2}
   |           ^ Syntax Error: Expected ':', found ','
-4 | 
+4 |
 5 | x + y
   |
 
 
   |
 1 | # Unparenthesized named expression not allowed in value
-2 | 
+2 |
 3 | {x: y := 1, z: a := 2}
   |                  ^^ Syntax Error: Expected ',', found ':='
-4 | 
+4 |
 5 | x + y
   |
 
 
   |
 1 | # Unparenthesized named expression not allowed in value
-2 | 
+2 |
 3 | {x: y := 1, z: a := 2}
   |                      ^ Syntax Error: Expected ':', found '}'
-4 | 
+4 |
 5 | x + y
   |

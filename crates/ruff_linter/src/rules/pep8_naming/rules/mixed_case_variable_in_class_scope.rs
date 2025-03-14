@@ -35,6 +35,10 @@ use crate::rules::pep8_naming::helpers;
 ///     another_variable = "world"
 /// ```
 ///
+/// ## Options
+/// - `lint.pep8-naming.ignore-names`
+/// - `lint.pep8-naming.extend-ignore-names`
+///
 /// [PEP 8]: https://peps.python.org/pep-0008/#function-and-method-arguments
 #[derive(ViolationMetadata)]
 pub(crate) struct MixedCaseVariableInClassScope {
@@ -51,7 +55,7 @@ impl Violation for MixedCaseVariableInClassScope {
 
 /// N815
 pub(crate) fn mixed_case_variable_in_class_scope(
-    checker: &mut Checker,
+    checker: &Checker,
     expr: &Expr,
     name: &str,
     class_def: &ast::StmtClassDef,
@@ -72,7 +76,7 @@ pub(crate) fn mixed_case_variable_in_class_scope(
         return;
     }
 
-    checker.diagnostics.push(Diagnostic::new(
+    checker.report_diagnostic(Diagnostic::new(
         MixedCaseVariableInClassScope {
             name: name.to_string(),
         },

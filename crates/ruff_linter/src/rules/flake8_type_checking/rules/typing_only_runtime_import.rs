@@ -248,7 +248,6 @@ pub(crate) fn typing_only_runtime_import(
     checker: &Checker,
     scope: &Scope,
     runtime_imports: &[&Binding],
-    diagnostics: &mut Vec<Diagnostic>,
 ) {
     // Collect all typing-only imports by statement and import type.
     let mut errors_by_statement: FxHashMap<(NodeId, ImportType), Vec<ImportBinding>> =
@@ -308,7 +307,7 @@ pub(crate) fn typing_only_runtime_import(
                 checker.package(),
                 checker.settings.isort.detect_same_package,
                 &checker.settings.isort.known_modules,
-                checker.settings.target_version,
+                checker.target_version(),
                 checker.settings.isort.no_sections,
                 &checker.settings.isort.section_order,
                 &checker.settings.isort.default_section,
@@ -381,7 +380,7 @@ pub(crate) fn typing_only_runtime_import(
             if let Some(fix) = fix.as_ref() {
                 diagnostic.set_fix(fix.clone());
             }
-            diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 
@@ -402,7 +401,7 @@ pub(crate) fn typing_only_runtime_import(
             if let Some(range) = parent_range {
                 diagnostic.set_parent(range.start());
             }
-            diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 }
@@ -510,6 +509,7 @@ fn fix_imports(checker: &Checker, node_id: NodeId, imports: &[ImportBinding]) ->
                             checker.semantic(),
                             checker.stylist(),
                             checker.locator(),
+                            checker.default_string_flags(),
                         ))
                     } else {
                         None

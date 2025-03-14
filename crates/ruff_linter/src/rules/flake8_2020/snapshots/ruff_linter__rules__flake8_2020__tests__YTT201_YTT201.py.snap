@@ -1,11 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_2020/mod.rs
-snapshot_kind: text
 ---
 YTT201.py:7:7: YTT201 `sys.version_info[0] == 3` referenced (python4), use `>=`
   |
 5 | PY3 = sys.version_info[0] >= 3
-6 | 
+6 |
 7 | PY3 = sys.version_info[0] == 3
   |       ^^^^^^^^^^^^^^^^^^^ YTT201
 8 | PY3 = version_info[0] == 3

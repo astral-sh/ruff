@@ -15,20 +15,25 @@ red_knot_python_semantic = { workspace = true, features = ["serde"] }
 red_knot_vendored = { workspace = true }
 ruff_db = { workspace = true, features = ["testing"] }
 ruff_index = { workspace = true }
+ruff_notebook = { workspace = true }
 ruff_python_trivia = { workspace = true }
 ruff_source_file = { workspace = true }
 ruff_text_size = { workspace = true }
+ruff_python_ast = { workspace = true }
 
 anyhow = { workspace = true }
 camino = { workspace = true }
 colored = { workspace = true }
+insta = { workspace = true, features = ["filters"] }
 memchr = { workspace = true }
 regex = { workspace = true }
 rustc-hash = { workspace = true }
 salsa = { workspace = true }
 smallvec = { workspace = true }
 serde = { workspace = true }
+tempfile = { workspace = true }
 toml = { workspace = true }
+thiserror = { workspace = true }
 
 [lints]
 workspace = true

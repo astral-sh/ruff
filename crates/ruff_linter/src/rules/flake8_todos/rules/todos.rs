@@ -91,6 +91,12 @@ impl Violation for MissingTodoAuthor {
 /// # TODO(charlie): this comment has a 3-digit issue code
 /// # 003
 ///
+/// # TODO(charlie): https://github.com/astral-sh/ruff/issues/3870
+/// # this comment has an issue link
+///
+/// # TODO(charlie): #003 this comment has a 3-digit issue code
+/// # with leading character `#`
+///
 /// # TODO(charlie): this comment has an issue code (matches the regex `[A-Z]+\-?\d+`)
 /// # SIXCHR-003
 /// ```
@@ -100,7 +106,7 @@ pub(crate) struct MissingTodoLink;
 impl Violation for MissingTodoLink {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Missing issue link on the line following this TODO".to_string()
+        "Missing issue link for this TODO".to_string()
     }
 }
 
@@ -224,11 +230,19 @@ impl Violation for MissingSpaceAfterTodoColon {
     }
 }
 
-static ISSUE_LINK_REGEX_SET: LazyLock<RegexSet> = LazyLock::new(|| {
+static ISSUE_LINK_OWN_LINE_REGEX_SET: LazyLock<RegexSet> = LazyLock::new(|| {
     RegexSet::new([
         r"^#\s*(http|https)://.*", // issue link
         r"^#\s*\d+$",              // issue code - like "003"
         r"^#\s*[A-Z]+\-?\d+$",     // issue code - like "TD003"
+    ])
+    .unwrap()
+});
+
+static ISSUE_LINK_TODO_LINE_REGEX_SET: LazyLock<RegexSet> = LazyLock::new(|| {
+    RegexSet::new([
+        r"\s*(http|https)://.*", // issue link
+        r"\s*#\d+.*",            // issue code - like "#003"
     ])
     .unwrap()
 });
@@ -257,6 +271,13 @@ pub(crate) fn todos(
         static_errors(diagnostics, content, range, directive);
 
         let mut has_issue_link = false;
+        // VSCode recommended links on same line are ok:
+        // `# TODO(dylan): #1234`
+        if ISSUE_LINK_TODO_LINE_REGEX_SET
+            .is_match(locator.slice(TextRange::new(directive.range.end(), range.end())))
+        {
+            continue;
+        }
         let mut curr_range = range;
         for next_range in comment_ranges.iter().skip(range_index + 1).copied() {
             // Ensure that next_comment_range is in the same multiline comment "block" as
@@ -274,11 +295,11 @@ pub(crate) fn todos(
                 break;
             }
 
-            if ISSUE_LINK_REGEX_SET.is_match(next_comment) {
+            if ISSUE_LINK_OWN_LINE_REGEX_SET.is_match(next_comment) {
                 has_issue_link = true;
             }
 
-            // If the next_comment isn't a tag or an issue, it's worthles in the context of this
+            // If the next_comment isn't a tag or an issue, it's worthless in the context of this
             // linter. We can increment here instead of waiting for the next iteration of the outer
             // loop.
             curr_range = next_range;

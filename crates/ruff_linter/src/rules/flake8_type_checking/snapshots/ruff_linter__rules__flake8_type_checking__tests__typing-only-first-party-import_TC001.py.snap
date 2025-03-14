@@ -1,13 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
-snapshot_kind: text
 ---
 TC001.py:20:19: TC001 [*] Move application import `.TYP001` into a type-checking block
    |
 19 | def f():
 20 |     from . import TYP001
    |                   ^^^^^^ TC001
-21 | 
+21 |
 22 |     x: TYP001
    |
    = help: Move into type-checking block

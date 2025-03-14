@@ -167,7 +167,7 @@ class A:
     __slots__ = ()
     __slots__ += ("a", "b")
 
-reveal_type(A.__slots__)  # revealed: @Todo(return type)
+reveal_type(A.__slots__)  # revealed: @Todo(return type of decorated function)
 
 class B:
     __slots__ = ("c", "d")
@@ -181,4 +181,35 @@ class C(A, B): ...
 ```py
 # False negative: [incompatible-slots]
 class A(int, str): ...
+```
+
+### Diagnostic if `__slots__` is externally modified
+
+We special-case type inference for `__slots__` and return the pure inferred type, even if the symbol
+is not declared — a case in which we union with `Unknown` for other public symbols. The reason for
+this is that `__slots__` has a special handling in the runtime. Modifying it externally is actually
+allowed, but those changes do not take effect. If you have a class `C` with `__slots__ = ("foo",)`
+and externally set `C.__slots__ = ("bar",)`, you still can't access `C.bar`. And you can still
+access `C.foo`. We therefore issue a diagnostic for such assignments:
+
+```py
+class A:
+    __slots__ = ("a",)
+
+    # Modifying `__slots__` from within the class body is fine:
+    __slots__ = ("a", "b")
+
+# No `Unknown` here:
+reveal_type(A.__slots__)  # revealed: tuple[Literal["a"], Literal["b"]]
+
+# But modifying it externally is not:
+
+# error: [invalid-assignment]
+A.__slots__ = ("a",)
+
+# error: [invalid-assignment]
+A.__slots__ = ("a", "b_new")
+
+# error: [invalid-assignment]
+A.__slots__ = ("a", "b", "c")
 ```

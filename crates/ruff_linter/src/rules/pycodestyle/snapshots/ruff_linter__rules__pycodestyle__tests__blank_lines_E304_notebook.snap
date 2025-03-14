@@ -1,11 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
-snapshot_kind: text
 ---
 E30.ipynb:45:1: E304 [*] Blank lines found after function decorator (1)
    |
 43 | @decorator
-44 | 
+44 |
 45 | def function():
    | ^^^ E304
 46 |     pass

@@ -2,7 +2,7 @@ use rustc_hash::FxHashMap;
 
 use ruff_index::newtype_index;
 use ruff_python_ast as ast;
-use ruff_python_ast::ExpressionRef;
+use ruff_python_ast::ExprRef;
 
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::semantic_index;
@@ -24,7 +24,7 @@ use crate::Db;
 ///
 /// x = foo()
 /// ```
-#[derive(Debug)]
+#[derive(Debug, salsa::Update)]
 pub(crate) struct AstIds {
     /// Maps expressions to their expression id.
     expressions_map: FxHashMap<ExpressionNodeKey, ScopedExpressionId>,
@@ -60,12 +60,12 @@ pub trait HasScopedUseId {
 
 impl HasScopedUseId for ast::ExprName {
     fn scoped_use_id(&self, db: &dyn Db, scope: ScopeId) -> ScopedUseId {
-        let expression_ref = ExpressionRef::from(self);
+        let expression_ref = ExprRef::from(self);
         expression_ref.scoped_use_id(db, scope)
     }
 }
 
-impl HasScopedUseId for ast::ExpressionRef<'_> {
+impl HasScopedUseId for ast::ExprRef<'_> {
     fn scoped_use_id(&self, db: &dyn Db, scope: ScopeId) -> ScopedUseId {
         let ast_ids = ast_ids(db, scope);
         ast_ids.use_id(*self)
@@ -74,6 +74,7 @@ impl HasScopedUseId for ast::ExpressionRef<'_> {
 
 /// Uniquely identifies an [`ast::Expr`] in a [`crate::semantic_index::symbol::FileScopeId`].
 #[newtype_index]
+#[derive(salsa::Update)]
 pub struct ScopedExpressionId;
 
 pub trait HasScopedExpressionId {
@@ -91,7 +92,7 @@ macro_rules! impl_has_scoped_expression_id {
     ($ty: ty) => {
         impl HasScopedExpressionId for $ty {
             fn scoped_expression_id(&self, db: &dyn Db, scope: ScopeId) -> ScopedExpressionId {
-                let expression_ref = ExpressionRef::from(self);
+                let expression_ref = ExprRef::from(self);
                 expression_ref.scoped_expression_id(db, scope)
             }
         }
@@ -132,7 +133,7 @@ impl_has_scoped_expression_id!(ast::ExprSlice);
 impl_has_scoped_expression_id!(ast::ExprIpyEscapeCommand);
 impl_has_scoped_expression_id!(ast::Expr);
 
-impl HasScopedExpressionId for ast::ExpressionRef<'_> {
+impl HasScopedExpressionId for ast::ExprRef<'_> {
     fn scoped_expression_id(&self, db: &dyn Db, scope: ScopeId) -> ScopedExpressionId {
         let ast_ids = ast_ids(db, scope);
         ast_ids.expression_id(*self)
@@ -181,11 +182,11 @@ pub(crate) mod node_key {
 
     use crate::node_key::NodeKey;
 
-    #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
+    #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, salsa::Update)]
     pub(crate) struct ExpressionNodeKey(NodeKey);
 
-    impl From<ast::ExpressionRef<'_>> for ExpressionNodeKey {
-        fn from(value: ast::ExpressionRef<'_>) -> Self {
+    impl From<ast::ExprRef<'_>> for ExpressionNodeKey {
+        fn from(value: ast::ExprRef<'_>) -> Self {
             Self(NodeKey::from_node(value))
         }
     }

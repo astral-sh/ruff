@@ -36,7 +36,7 @@ impl Violation for TooManyNestedBlocks {
 }
 
 /// PLR1702
-pub(crate) fn too_many_nested_blocks(checker: &mut Checker, stmt: &Stmt) {
+pub(crate) fn too_many_nested_blocks(checker: &Checker, stmt: &Stmt) {
     // Only enforce nesting within functions or methods.
     if !checker.semantic().current_scope().kind.is_function() {
         return;
@@ -74,7 +74,7 @@ pub(crate) fn too_many_nested_blocks(checker: &mut Checker, stmt: &Stmt) {
         return;
     }
 
-    checker.diagnostics.push(Diagnostic::new(
+    checker.report_diagnostic(Diagnostic::new(
         TooManyNestedBlocks {
             nested_blocks: count,
             max_nested_blocks,

@@ -112,8 +112,7 @@ def _(flag: bool):
         reveal_type(t)  # revealed: Literal[NoneType]
 
     if issubclass(t, type(None)):
-        # TODO: this should be just `Literal[NoneType]`
-        reveal_type(t)  # revealed: Literal[int, NoneType]
+        reveal_type(t)  # revealed: Literal[NoneType]
 ```
 
 ## `classinfo` contains multiple types
@@ -171,7 +170,8 @@ if issubclass(t, int):
 def issubclass(c, ci):
     return True
 
-def flag() -> bool: ...
+def flag() -> bool:
+    return True
 
 t = int if flag() else str
 if issubclass(t, int):
@@ -183,7 +183,8 @@ if issubclass(t, int):
 ```py
 issubclass_alias = issubclass
 
-def flag() -> bool: ...
+def flag() -> bool:
+    return True
 
 t = int if flag() else str
 if issubclass_alias(t, int):
@@ -195,7 +196,8 @@ if issubclass_alias(t, int):
 ```py
 from builtins import issubclass as imported_issubclass
 
-def flag() -> bool: ...
+def flag() -> bool:
+    return True
 
 t = int if flag() else str
 if imported_issubclass(t, int):
@@ -207,7 +209,8 @@ if imported_issubclass(t, int):
 ```py
 from typing import Any
 
-def flag() -> bool: ...
+def flag() -> bool:
+    return True
 
 t = int if flag() else str
 
@@ -230,7 +233,8 @@ if issubclass(t, Any):
 ### Do not narrow if there are keyword arguments
 
 ```py
-def flag() -> bool: ...
+def flag() -> bool:
+    return True
 
 t = int if flag() else str
 
@@ -245,4 +249,32 @@ if issubclass(t, int, foo="bar"):
 def _(x: type, y: type[int]):
     if issubclass(x, y):
         reveal_type(x)  # revealed: type[int]
+```
+
+### Disjoint `type[]` types are narrowed to `Never`
+
+Here, `type[UsesMeta1]` and `type[UsesMeta2]` are disjoint because a common subclass of `UsesMeta1`
+and `UsesMeta2` could only exist if a common subclass of their metaclasses could exist. This is
+known to be impossible due to the fact that `Meta1` is marked as `@final`.
+
+```py
+from typing import final
+
+@final
+class Meta1(type): ...
+
+class Meta2(type): ...
+class UsesMeta1(metaclass=Meta1): ...
+class UsesMeta2(metaclass=Meta2): ...
+
+def _(x: type[UsesMeta1], y: type[UsesMeta2]):
+    if issubclass(x, y):
+        reveal_type(x)  # revealed: Never
+    else:
+        reveal_type(x)  # revealed: type[UsesMeta1]
+
+    if issubclass(y, x):
+        reveal_type(y)  # revealed: Never
+    else:
+        reveal_type(y)  # revealed: type[UsesMeta2]
 ```

@@ -1,12 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
-snapshot_kind: text
 ---
 SIM210.py:1:5: SIM210 [*] Use `bool(...)` instead of `True if ... else False`
   |
 1 | a = True if b else False  # SIM210
   |     ^^^^^^^^^^^^^^^^^^^^ SIM210
-2 | 
+2 |
 3 | a = True if b != c else False  # SIM210
   |
   = help: Replace with `bool(...)
@@ -21,10 +20,10 @@ SIM210.py:1:5: SIM210 [*] Use `bool(...)` instead of `True if ... else False`
 SIM210.py:3:5: SIM210 [*] Remove unnecessary `True if ... else False`
   |
 1 | a = True if b else False  # SIM210
-2 | 
+2 |
 3 | a = True if b != c else False  # SIM210
   |     ^^^^^^^^^^^^^^^^^^^^^^^^^ SIM210
-4 | 
+4 |
 5 | a = True if b + c else False  # SIM210
   |
   = help: Remove unnecessary `True if ... else False`
@@ -41,10 +40,10 @@ SIM210.py:3:5: SIM210 [*] Remove unnecessary `True if ... else False`
 SIM210.py:5:5: SIM210 [*] Use `bool(...)` instead of `True if ... else False`
   |
 3 | a = True if b != c else False  # SIM210
-4 | 
+4 |
 5 | a = True if b + c else False  # SIM210
   |     ^^^^^^^^^^^^^^^^^^^^^^^^ SIM210
-6 | 
+6 |
 7 | a = False if b else True  # OK
   |
   = help: Replace with `bool(...)
@@ -62,7 +61,7 @@ SIM210.py:5:5: SIM210 [*] Use `bool(...)` instead of `True if ... else False`
 SIM210.py:15:9: SIM210 Use `bool(...)` instead of `True if ... else False`
    |
 13 |         return False
-14 | 
+14 |
 15 |     a = True if b else False
    |         ^^^^^^^^^^^^^^^^^^^^ SIM210
    |

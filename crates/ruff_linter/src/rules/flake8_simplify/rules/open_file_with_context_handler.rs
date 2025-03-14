@@ -114,6 +114,28 @@ fn match_exit_stack(semantic: &SemanticModel) -> bool {
     false
 }
 
+/// Return `true` if the current expression is nested in a call to one of the
+/// unittest context manager methods: `cls.enterClassContext()`,
+/// `self.enterContext()`, or `self.enterAsyncContext()`.
+fn match_unittest_context_methods(semantic: &SemanticModel) -> bool {
+    let Some(expr) = semantic.current_expression_parent() else {
+        return false;
+    };
+    let Expr::Call(ast::ExprCall { func, .. }) = expr else {
+        return false;
+    };
+    let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = func.as_ref() else {
+        return false;
+    };
+    let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() else {
+        return false;
+    };
+    matches!(
+        (id.as_str(), attr.as_str()),
+        ("cls", "enterClassContext") | ("self", "enterContext" | "enterAsyncContext")
+    )
+}
+
 /// Return `true` if the expression is a call to `open()`,
 /// or a call to some other standard-library function that opens a file.
 fn is_open_call(semantic: &SemanticModel, call: &ast::ExprCall) -> bool {
@@ -197,7 +219,7 @@ fn is_immediately_closed(semantic: &SemanticModel) -> bool {
 }
 
 /// SIM115
-pub(crate) fn open_file_with_context_handler(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn open_file_with_context_handler(checker: &Checker, call: &ast::ExprCall) {
     let semantic = checker.semantic();
 
     if !is_open_call(semantic, call) {
@@ -229,6 +251,11 @@ pub(crate) fn open_file_with_context_handler(checker: &mut Checker, call: &ast::
         return;
     }
 
+    // Ex) `self.enterContext(open("foo.txt"))`
+    if match_unittest_context_methods(semantic) {
+        return;
+    }
+
     // Ex) `def __enter__(self): ...`
     if let ScopeKind::Function(ast::StmtFunctionDef { name, .. }) =
         &checker.semantic().current_scope().kind
@@ -238,7 +265,7 @@ pub(crate) fn open_file_with_context_handler(checker: &mut Checker, call: &ast::
         }
     }
 
-    checker.diagnostics.push(Diagnostic::new(
+    checker.report_diagnostic(Diagnostic::new(
         OpenFileWithContextHandler,
         call.func.range(),
     ));

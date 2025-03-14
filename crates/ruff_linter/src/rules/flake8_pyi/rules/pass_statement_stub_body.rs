@@ -39,7 +39,7 @@ impl AlwaysFixableViolation for PassStatementStubBody {
 }
 
 /// PYI009
-pub(crate) fn pass_statement_stub_body(checker: &mut Checker, body: &[Stmt]) {
+pub(crate) fn pass_statement_stub_body(checker: &Checker, body: &[Stmt]) {
     let [Stmt::Pass(pass)] = body else {
         return;
     };
@@ -49,5 +49,5 @@ pub(crate) fn pass_statement_stub_body(checker: &mut Checker, body: &[Stmt]) {
         "...".to_string(),
         pass.range(),
     )));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

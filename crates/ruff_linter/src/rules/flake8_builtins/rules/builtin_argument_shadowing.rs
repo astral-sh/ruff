@@ -19,7 +19,7 @@ use super::super::helpers::shadows_builtin;
 /// builtin and vice versa.
 ///
 /// Builtins can be marked as exceptions to this rule via the
-/// [`lint.flake8-builtins.builtins-ignorelist`] configuration option.
+/// [`lint.flake8-builtins.ignorelist`] configuration option.
 ///
 /// ## Example
 /// ```python
@@ -44,7 +44,7 @@ use super::super::helpers::shadows_builtin;
 /// ```
 ///
 /// ## Options
-/// - `lint.flake8-builtins.builtins-ignorelist`
+/// - `lint.flake8-builtins.ignorelist`
 ///
 /// ## References
 /// - [_Is it bad practice to use a built-in function name as an attribute or method identifier?_](https://stackoverflow.com/questions/9109333/is-it-bad-practice-to-use-a-built-in-function-name-as-an-attribute-or-method-ide)
@@ -63,12 +63,12 @@ impl Violation for BuiltinArgumentShadowing {
 }
 
 /// A002
-pub(crate) fn builtin_argument_shadowing(checker: &mut Checker, parameter: &Parameter) {
+pub(crate) fn builtin_argument_shadowing(checker: &Checker, parameter: &Parameter) {
     if shadows_builtin(
-        parameter.name.as_str(),
+        parameter.name(),
         checker.source_type,
-        &checker.settings.flake8_builtins.builtins_ignorelist,
-        checker.settings.target_version,
+        &checker.settings.flake8_builtins.ignorelist,
+        checker.target_version(),
     ) {
         // Ignore parameters in lambda expressions.
         // (That is the domain of A006.)
@@ -92,7 +92,7 @@ pub(crate) fn builtin_argument_shadowing(checker: &mut Checker, parameter: &Para
             return;
         }
 
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             BuiltinArgumentShadowing {
                 name: parameter.name.to_string(),
             },

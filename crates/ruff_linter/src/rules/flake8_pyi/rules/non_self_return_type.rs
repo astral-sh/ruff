@@ -1,11 +1,11 @@
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
-use crate::settings::types::PythonVersion;
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::identifier::Identifier;
+use ruff_python_ast::PythonVersion;
 use ruff_python_semantic::analyze;
 use ruff_python_semantic::analyze::class::might_be_generic;
 use ruff_python_semantic::analyze::visibility::{is_abstract, is_final, is_overload};
@@ -108,7 +108,7 @@ impl Violation for NonSelfReturnType {
 
 /// PYI034
 pub(crate) fn non_self_return_type(
-    checker: &mut Checker,
+    checker: &Checker,
     stmt: &ast::Stmt,
     is_async: bool,
     name: &str,
@@ -187,7 +187,7 @@ pub(crate) fn non_self_return_type(
 
 /// Add a diagnostic for the given method.
 fn add_diagnostic(
-    checker: &mut Checker,
+    checker: &Checker,
     stmt: &ast::Stmt,
     returns: &ast::Expr,
     class_def: &ast::StmtClassDef,
@@ -203,11 +203,11 @@ fn add_diagnostic(
 
     diagnostic.try_set_fix(|| replace_with_self_fix(checker, stmt, returns, class_def));
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 fn replace_with_self_fix(
-    checker: &mut Checker,
+    checker: &Checker,
     stmt: &ast::Stmt,
     returns: &ast::Expr,
     class_def: &ast::StmtClassDef,
@@ -215,7 +215,7 @@ fn replace_with_self_fix(
     let semantic = checker.semantic();
 
     let (self_import, self_binding) = {
-        let source_module = if checker.settings.target_version >= PythonVersion::Py311 {
+        let source_module = if checker.target_version() >= PythonVersion::PY311 {
             "typing"
         } else {
             "typing_extensions"

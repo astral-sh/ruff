@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
-snapshot_kind: text
 ---
 B009_B010.py:50:1: B010 [*] Do not call `setattr` with a constant attribute value. It is not any safer than normal property access.
    |
@@ -111,7 +110,7 @@ B009_B010.py:55:1: B010 [*] Do not call `setattr` with a constant attribute valu
 54 | setattr(foo, r"abc123", None)
 55 | setattr(foo.bar, r"baz", None)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B010
-56 | 
+56 |
 57 | # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1722458885
    |
    = help: Replace `setattr` with assignment

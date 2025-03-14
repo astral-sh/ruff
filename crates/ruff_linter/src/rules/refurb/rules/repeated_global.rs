@@ -53,7 +53,7 @@ impl AlwaysFixableViolation for RepeatedGlobal {
 }
 
 /// FURB154
-pub(crate) fn repeated_global(checker: &mut Checker, mut suite: &[Stmt]) {
+pub(crate) fn repeated_global(checker: &Checker, mut suite: &[Stmt]) {
     while let Some(idx) = suite
         .iter()
         .position(|stmt| GlobalKind::from_stmt(stmt).is_some())
@@ -74,7 +74,7 @@ pub(crate) fn repeated_global(checker: &mut Checker, mut suite: &[Stmt]) {
         // diagnostic.
         if let [first, .., last] = globals_sequence {
             let range = first.range().cover(last.range());
-            checker.diagnostics.push(
+            checker.report_diagnostic(
                 Diagnostic::new(RepeatedGlobal { global_kind }, range).with_fix(Fix::safe_edit(
                     Edit::range_replacement(
                         format!(

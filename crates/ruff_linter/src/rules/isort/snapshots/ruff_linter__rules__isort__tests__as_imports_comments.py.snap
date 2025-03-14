@@ -1,24 +1,24 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
-snapshot_kind: text
 ---
 as_imports_comments.py:1:1: I001 [*] Import block is un-sorted or un-formatted
    |
  1 | / from foo import (  # Comment on `foo`
  2 | |     Member as Alias,  # Comment on `Alias`
  3 | | )
- 4 | | 
+ 4 | |
  5 | | from bar import (  # Comment on `bar`
  6 | |     Member,  # Comment on `Member`
  7 | | )
- 8 | | 
+ 8 | |
  9 | | from baz import (  # Comment on `baz`
 10 | |     Member as Alias  # Comment on `Alias`
 11 | | )
-12 | | 
+12 | |
 13 | | from bop import (  # Comment on `bop`
 14 | |     Member  # Comment on `Member`
 15 | | )
+   | |_^ I001
    |
    = help: Organize imports
 

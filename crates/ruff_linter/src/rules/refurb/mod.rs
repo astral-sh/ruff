@@ -8,10 +8,10 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
+    use ruff_python_ast::PythonVersion;
     use test_case::test_case;
 
     use crate::registry::Rule;
-    use crate::settings::types::PythonVersion;
     use crate::test::test_path;
     use crate::{assert_messages, settings};
 
@@ -19,6 +19,7 @@ mod tests {
     #[test_case(Rule::RepeatedAppend, Path::new("FURB113.py"))]
     #[test_case(Rule::IfExpInsteadOfOrOperator, Path::new("FURB110.py"))]
     #[test_case(Rule::ReimplementedOperator, Path::new("FURB118.py"))]
+    #[test_case(Rule::ForLoopWrites, Path::new("FURB122.py"))]
     #[test_case(Rule::ReadlinesInFor, Path::new("FURB129.py"))]
     #[test_case(Rule::DeleteFullSlice, Path::new("FURB131.py"))]
     #[test_case(Rule::CheckAndRemoveFromSet, Path::new("FURB132.py"))]
@@ -49,6 +50,7 @@ mod tests {
     #[test_case(Rule::SortedMinMax, Path::new("FURB192.py"))]
     #[test_case(Rule::SliceToRemovePrefixOrSuffix, Path::new("FURB188.py"))]
     #[test_case(Rule::SubclassBuiltin, Path::new("FURB189.py"))]
+    #[test_case(Rule::FromisoformatReplaceZ, Path::new("FURB162.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
@@ -64,7 +66,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("refurb/FURB103.py"),
             &settings::LinterSettings::for_rule(Rule::WriteWholeFile)
-                .with_target_version(PythonVersion::Py39),
+                .with_target_version(PythonVersion::PY39),
         )?;
         assert_messages!(diagnostics);
         Ok(())

@@ -1,8 +1,12 @@
 //! Analysis rules for the `typing` module.
 
-use ruff_python_ast::helpers::{any_over_expr, is_const_false, map_subscript};
+use ruff_python_ast::helpers::{any_over_expr, map_subscript};
+use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::{self as ast, Expr, Int, Operator, ParameterWithDefault, Parameters, Stmt};
+use ruff_python_ast::{
+    self as ast, Expr, ExprCall, ExprName, Operator, ParameterWithDefault, Parameters, Stmt,
+    StmtAssign,
+};
 use ruff_python_stdlib::typing::{
     as_pep_585_generic, has_pep_585_generic, is_immutable_generic_type,
     is_immutable_non_generic_type, is_immutable_return_type, is_literal_member,
@@ -26,6 +30,7 @@ pub enum Callable {
     NamedTuple,
     TypedDict,
     MypyExtension,
+    TypeAliasType,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -40,6 +45,14 @@ pub enum SubscriptKind {
     ///
     /// [PEP 764]: https://github.com/python/peps/pull/4082
     TypedDict,
+}
+
+pub fn is_known_to_be_of_type_dict(semantic: &SemanticModel, expr: &ExprName) -> bool {
+    let Some(binding) = semantic.only_binding(expr).map(|id| semantic.binding(id)) else {
+        return false;
+    };
+
+    is_dict(binding, semantic)
 }
 
 pub fn match_annotated_subscript<'a>(
@@ -301,6 +314,56 @@ pub fn is_immutable_func(
         })
 }
 
+/// Return `true` if `name` is bound to the `typing.NewType` call where the original type is
+/// immutable.
+///
+/// For example:
+/// ```python
+/// from typing import NewType
+///
+/// UserId = NewType("UserId", int)
+/// ```
+///
+/// Here, `name` would be `UserId`.
+pub fn is_immutable_newtype_call(
+    name: &ast::ExprName,
+    semantic: &SemanticModel,
+    extend_immutable_calls: &[QualifiedName],
+) -> bool {
+    let Some(binding) = semantic.only_binding(name).map(|id| semantic.binding(id)) else {
+        return false;
+    };
+
+    if !binding.kind.is_assignment() {
+        return false;
+    }
+
+    let Some(Stmt::Assign(StmtAssign { value, .. })) = binding.statement(semantic) else {
+        return false;
+    };
+
+    let Expr::Call(ExprCall {
+        func, arguments, ..
+    }) = value.as_ref()
+    else {
+        return false;
+    };
+
+    if !semantic.match_typing_expr(func, "NewType") {
+        return false;
+    }
+
+    if arguments.len() != 2 {
+        return false;
+    }
+
+    let Some(original_type) = arguments.find_argument_value("tp", 1) else {
+        return false;
+    };
+
+    is_immutable_annotation(original_type, semantic, extend_immutable_calls)
+}
+
 /// Return `true` if `func` is a function that returns a mutable value.
 pub fn is_mutable_func(func: &Expr, semantic: &SemanticModel) -> bool {
     semantic
@@ -328,28 +391,19 @@ pub fn is_mutable_expr(expr: &Expr, semantic: &SemanticModel) -> bool {
 pub fn is_type_checking_block(stmt: &ast::StmtIf, semantic: &SemanticModel) -> bool {
     let ast::StmtIf { test, .. } = stmt;
 
-    // Ex) `if False:`
-    if is_const_false(test) {
-        return true;
+    match test.as_ref() {
+        // As long as the symbol's name is "TYPE_CHECKING" we will treat it like `typing.TYPE_CHECKING`
+        // for this specific check even if it's defined somewhere else, like the current module.
+        // Ex) `if TYPE_CHECKING:`
+        Expr::Name(ast::ExprName { id, .. }) => {
+            id == "TYPE_CHECKING"
+                // Ex) `if TC:` with `from typing import TYPE_CHECKING as TC`
+                || semantic.match_typing_expr(test, "TYPE_CHECKING")
+        }
+        // Ex) `if typing.TYPE_CHECKING:`
+        Expr::Attribute(ast::ExprAttribute { attr, .. }) => attr == "TYPE_CHECKING",
+        _ => false,
     }
-
-    // Ex) `if 0:`
-    if matches!(
-        test.as_ref(),
-        Expr::NumberLiteral(ast::ExprNumberLiteral {
-            value: ast::Number::Int(Int::ZERO),
-            ..
-        })
-    ) {
-        return true;
-    }
-
-    // Ex) `if typing.TYPE_CHECKING:`
-    if semantic.match_typing_expr(test, "TYPE_CHECKING") {
-        return true;
-    }
-
-    false
 }
 
 /// Returns `true` if the [`ast::StmtIf`] is a version-checking block (e.g., `if sys.version_info >= ...:`).
@@ -493,7 +547,7 @@ pub trait TypeChecker {
 /// NOTE: this function doesn't perform more serious type inference, so it won't be able
 ///       to understand if the value gets initialized from a call to a function always returning
 ///       lists. This also implies no interfile analysis.
-fn check_type<T: TypeChecker>(binding: &Binding, semantic: &SemanticModel) -> bool {
+pub fn check_type<T: TypeChecker>(binding: &Binding, semantic: &SemanticModel) -> bool {
     match binding.kind {
         BindingKind::Assignment => match binding.statement(semantic) {
             // Given:
@@ -564,7 +618,7 @@ fn check_type<T: TypeChecker>(binding: &Binding, semantic: &SemanticModel) -> bo
                 let Some(parameter) = find_parameter(parameters, binding) else {
                     return false;
                 };
-                let Some(ref annotation) = parameter.parameter.annotation else {
+                let Some(annotation) = parameter.annotation() else {
                     return false;
                 };
                 T::match_annotation(annotation, semantic)
@@ -660,6 +714,22 @@ impl BuiltinTypeChecker for SetChecker {
     const BUILTIN_TYPE_NAME: &'static str = "set";
     const TYPING_NAME: Option<&'static str> = Some("Set");
     const EXPR_TYPE: PythonType = PythonType::Set;
+}
+
+struct StringChecker;
+
+impl BuiltinTypeChecker for StringChecker {
+    const BUILTIN_TYPE_NAME: &'static str = "str";
+    const TYPING_NAME: Option<&'static str> = None;
+    const EXPR_TYPE: PythonType = PythonType::String;
+}
+
+struct BytesChecker;
+
+impl BuiltinTypeChecker for BytesChecker {
+    const BUILTIN_TYPE_NAME: &'static str = "bytes";
+    const TYPING_NAME: Option<&'static str> = None;
+    const EXPR_TYPE: PythonType = PythonType::Bytes;
 }
 
 struct TupleChecker;
@@ -905,6 +975,16 @@ pub fn is_float(binding: &Binding, semantic: &SemanticModel) -> bool {
     check_type::<FloatChecker>(binding, semantic)
 }
 
+/// Test whether the given binding can be considered an instance of `str`.
+pub fn is_string(binding: &Binding, semantic: &SemanticModel) -> bool {
+    check_type::<StringChecker>(binding, semantic)
+}
+
+/// Test whether the given binding can be considered an instance of `bytes`.
+pub fn is_bytes(binding: &Binding, semantic: &SemanticModel) -> bool {
+    check_type::<BytesChecker>(binding, semantic)
+}
+
 /// Test whether the given binding can be considered a set.
 ///
 /// For this, we check what value might be associated with it through it's initialization and
@@ -973,7 +1053,7 @@ fn find_parameter<'a>(
 ) -> Option<&'a ParameterWithDefault> {
     parameters
         .iter_non_variadic_params()
-        .find(|arg| arg.parameter.name.range() == binding.range())
+        .find(|param| param.identifier() == binding.range())
 }
 
 /// Return the [`QualifiedName`] of the value to which the given [`Expr`] is assigned, if any.

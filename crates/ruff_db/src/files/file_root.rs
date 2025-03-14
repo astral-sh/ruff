@@ -11,7 +11,7 @@ use crate::Db;
 ///
 /// We currently create roots for:
 /// * static module resolution paths
-/// * the workspace root
+/// * the project root
 ///
 /// The main usage of file roots is to determine a file's durability. But it can also be used
 /// to make a salsa query dependent on whether a file in a root has changed without writing any
@@ -43,17 +43,17 @@ impl FileRoot {
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum FileRootKind {
-    /// The root of a workspace.
-    Workspace,
+    /// The root of a project.
+    Project,
 
-    /// A non-workspace module resolution search path.
+    /// A non-project module resolution search path.
     LibrarySearchPath,
 }
 
 impl FileRootKind {
     const fn durability(self) -> Durability {
         match self {
-            FileRootKind::Workspace => Durability::LOW,
+            FileRootKind::Project => Durability::LOW,
             FileRootKind::LibrarySearchPath => Durability::HIGH,
         }
     }

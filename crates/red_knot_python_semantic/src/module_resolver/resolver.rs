@@ -6,12 +6,13 @@ use rustc_hash::{FxBuildHasher, FxHashSet};
 use ruff_db::files::{File, FilePath, FileRootKind};
 use ruff_db::system::{DirectoryEntry, System, SystemPath, SystemPathBuf};
 use ruff_db::vendored::{VendoredFileSystem, VendoredPath};
+use ruff_python_ast::PythonVersion;
 
 use crate::db::Db;
 use crate::module_name::ModuleName;
 use crate::module_resolver::typeshed::{vendored_typeshed_versions, TypeshedVersions};
 use crate::site_packages::VirtualEnvironment;
-use crate::{Program, PythonVersion, SearchPathSettings, SitePackages};
+use crate::{Program, PythonPath, SearchPathSettings};
 
 use super::module::{Module, ModuleKind};
 use super::path::{ModulePath, SearchPath, SearchPathValidationError};
@@ -133,7 +134,7 @@ pub(crate) fn search_paths(db: &dyn Db) -> SearchPathIterator {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub(crate) struct SearchPaths {
+pub struct SearchPaths {
     /// Search paths that have been statically determined purely from reading Ruff's configuration settings.
     /// These shouldn't ever change unless the config settings themselves change.
     static_paths: Vec<SearchPath>,
@@ -168,9 +169,9 @@ impl SearchPaths {
 
         let SearchPathSettings {
             extra_paths,
-            src_root,
-            typeshed,
-            site_packages: site_packages_paths,
+            src_roots,
+            custom_typeshed: typeshed,
+            python_path,
         } = settings;
 
         let system = db.system();
@@ -186,8 +187,10 @@ impl SearchPaths {
             static_paths.push(SearchPath::extra(system, path)?);
         }
 
-        tracing::debug!("Adding first-party search path '{src_root}'");
-        static_paths.push(SearchPath::first_party(system, src_root.to_path_buf())?);
+        for src_root in src_roots {
+            tracing::debug!("Adding first-party search path '{src_root}'");
+            static_paths.push(SearchPath::first_party(system, src_root.to_path_buf())?);
+        }
 
         let (typeshed_versions, stdlib_path) = if let Some(typeshed) = typeshed {
             let typeshed = canonicalize(typeshed, system);
@@ -219,10 +222,16 @@ impl SearchPaths {
 
         static_paths.push(stdlib_path);
 
-        let site_packages_paths = match site_packages_paths {
-            SitePackages::Derived { venv_path } => VirtualEnvironment::new(venv_path, system)
-                .and_then(|venv| venv.site_packages_directories(system))?,
-            SitePackages::Known(paths) => paths
+        let site_packages_paths = match python_path {
+            PythonPath::SysPrefix(sys_prefix) => {
+                // TODO: We may want to warn here if the venv's python version is older
+                //  than the one resolved in the program settings because it indicates
+                //  that the `target-version` is incorrectly configured or that the
+                //  venv is out of date.
+                VirtualEnvironment::new(sys_prefix, system)
+                    .and_then(|venv| venv.site_packages_directories(system))?
+            }
+            PythonPath::KnownSitePackages(paths) => paths
                 .iter()
                 .map(|path| canonicalize(path, system))
                 .collect(),
@@ -711,17 +720,17 @@ impl<'db> ResolverContext<'db> {
 #[cfg(test)]
 mod tests {
     use ruff_db::files::{system_path_to_file, File, FilePath};
-    use ruff_db::system::DbWithTestSystem;
+    use ruff_db::system::{DbWithTestSystem as _, DbWithWritableSystem as _};
     use ruff_db::testing::{
         assert_const_function_query_was_not_run, assert_function_query_was_not_run,
     };
     use ruff_db::Db;
+    use ruff_python_ast::PythonVersion;
 
     use crate::db::tests::TestDb;
     use crate::module_name::ModuleName;
     use crate::module_resolver::module::ModuleKind;
     use crate::module_resolver::testing::{FileSpec, MockedTypeshed, TestCase, TestCaseBuilder};
-    use crate::PythonVersion;
     use crate::{ProgramSettings, PythonPlatform};
 
     use super::*;
@@ -1294,14 +1303,14 @@ mod tests {
 
         Program::from_settings(
             &db,
-            &ProgramSettings {
+            ProgramSettings {
                 python_version: PythonVersion::PY38,
                 python_platform: PythonPlatform::default(),
                 search_paths: SearchPathSettings {
                     extra_paths: vec![],
-                    src_root: src.clone(),
-                    typeshed: Some(custom_typeshed),
-                    site_packages: SitePackages::Known(vec![site_packages]),
+                    src_roots: vec![src.clone()],
+                    custom_typeshed: Some(custom_typeshed),
+                    python_path: PythonPath::KnownSitePackages(vec![site_packages]),
                 },
             },
         )
@@ -1800,14 +1809,14 @@ not_a_directory
 
         Program::from_settings(
             &db,
-            &ProgramSettings {
+            ProgramSettings {
                 python_version: PythonVersion::default(),
                 python_platform: PythonPlatform::default(),
                 search_paths: SearchPathSettings {
                     extra_paths: vec![],
-                    src_root: SystemPathBuf::from("/src"),
-                    typeshed: None,
-                    site_packages: SitePackages::Known(vec![
+                    src_roots: vec![SystemPathBuf::from("/src")],
+                    custom_typeshed: None,
+                    python_path: PythonPath::KnownSitePackages(vec![
                         venv_site_packages,
                         system_site_packages,
                     ]),

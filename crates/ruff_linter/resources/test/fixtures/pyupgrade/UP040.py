@@ -1,5 +1,5 @@
 import typing
-from typing import TypeAlias
+from typing import Any, TypeAlias
 
 # UP040
 x: typing.TypeAlias = int
@@ -41,6 +41,10 @@ class Foo:
 
 # UP040 won't add generics in fix
 T = typing.TypeVar(*args)
+x: typing.TypeAlias = list[T]
+
+# `default` should be skipped for now, added in Python 3.13
+T = typing.TypeVar("T", default=Any)
 x: typing.TypeAlias = list[T]
 
 # OK
@@ -85,3 +89,42 @@ T = TypeVar("T", bound=SupportGt)
 PositiveList = TypeAliasType(
     "PositiveList2", list[Annotated[T, Gt(0)]], type_params=(T,)
 )
+
+# `default` should be skipped for now, added in Python 3.13
+T = typing.TypeVar("T", default=Any)
+AnyList = TypeAliasType("AnyList", list[T], typep_params=(T,))
+
+# unsafe fix if comments within the fix
+T = TypeVar("T")
+PositiveList = TypeAliasType(  # eaten comment
+    "PositiveList", list[Annotated[T, Gt(0)]], type_params=(T,)
+)
+
+T = TypeVar("T")
+PositiveList = TypeAliasType(
+    "PositiveList", list[Annotated[T, Gt(0)]], type_params=(T,)
+) # this comment should be okay
+
+
+# this comment will actually be preserved because it's inside the "value" part
+T = TypeVar("T")
+PositiveList = TypeAliasType(
+    "PositiveList", list[
+        Annotated[T, Gt(0)],  # preserved comment
+    ], type_params=(T,)
+)
+
+T: TypeAlias = (
+    int
+    | str
+)
+
+T: TypeAlias = ( # comment0
+    # comment1
+    int  # comment2
+    # comment3
+    | # comment4
+    # comment5
+    str  # comment6
+    # comment7
+) # comment8

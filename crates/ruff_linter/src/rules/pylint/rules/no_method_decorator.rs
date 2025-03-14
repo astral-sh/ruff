@@ -88,16 +88,16 @@ enum MethodType {
 }
 
 /// PLR0202
-pub(crate) fn no_classmethod_decorator(checker: &mut Checker, stmt: &Stmt) {
+pub(crate) fn no_classmethod_decorator(checker: &Checker, stmt: &Stmt) {
     get_undecorated_methods(checker, stmt, &MethodType::Classmethod);
 }
 
 /// PLR0203
-pub(crate) fn no_staticmethod_decorator(checker: &mut Checker, stmt: &Stmt) {
+pub(crate) fn no_staticmethod_decorator(checker: &Checker, stmt: &Stmt) {
     get_undecorated_methods(checker, stmt, &MethodType::Staticmethod);
 }
 
-fn get_undecorated_methods(checker: &mut Checker, class_stmt: &Stmt, method_type: &MethodType) {
+fn get_undecorated_methods(checker: &Checker, class_stmt: &Stmt, method_type: &MethodType) {
     let Stmt::ClassDef(class_def) = class_stmt else {
         return;
     };
@@ -191,7 +191,7 @@ fn get_undecorated_methods(checker: &mut Checker, class_stmt: &Stmt, method_type
                             checker.indexer(),
                         )],
                     ));
-                    checker.diagnostics.push(diagnostic);
+                    checker.report_diagnostic(diagnostic);
                 }
                 None => {
                     continue;

@@ -22,7 +22,7 @@ use crate::checkers::ast::Checker;
 /// User.objects.all().extra(select={"test": "%secure" % "nos"})
 /// ```
 ///
-/// ## Use instead:
+/// Use instead:
 /// ```python
 /// from django.contrib.auth.models import User
 ///
@@ -44,7 +44,7 @@ impl Violation for DjangoExtra {
 }
 
 /// S610
-pub(crate) fn django_extra(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn django_extra(checker: &Checker, call: &ast::ExprCall) {
     let Expr::Attribute(ExprAttribute { attr, .. }) = call.func.as_ref() else {
         return;
     };
@@ -54,9 +54,7 @@ pub(crate) fn django_extra(checker: &mut Checker, call: &ast::ExprCall) {
     }
 
     if is_call_insecure(call) {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(DjangoExtra, call.arguments.range()));
+        checker.report_diagnostic(Diagnostic::new(DjangoExtra, call.arguments.range()));
     }
 }
 

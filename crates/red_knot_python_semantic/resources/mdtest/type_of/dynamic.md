@@ -6,6 +6,8 @@ This file contains tests for non-fully-static `type[]` types, such as `type[Any]
 ## Simple
 
 ```py
+from typing import Any
+
 def f(x: type[Any], y: type[str]):
     reveal_type(x)  # revealed: type[Any]
     # TODO: could be `<object.__repr__ type> & Any`
@@ -33,7 +35,7 @@ in strict mode.
 ```py
 def f(x: type):
     reveal_type(x)  # revealed: type
-    reveal_type(x.__repr__)  # revealed: @Todo(instance attributes)
+    reveal_type(x.__repr__)  # revealed: <bound method `__repr__` of `type`>
 
 class A: ...
 
@@ -48,7 +50,7 @@ x: type = A()  # error: [invalid-assignment]
 ```py
 def f(x: type[object]):
     reveal_type(x)  # revealed: type
-    reveal_type(x.__repr__)  # revealed: @Todo(instance attributes)
+    reveal_type(x.__repr__)  # revealed: <bound method `__repr__` of `type`>
 
 class A: ...
 

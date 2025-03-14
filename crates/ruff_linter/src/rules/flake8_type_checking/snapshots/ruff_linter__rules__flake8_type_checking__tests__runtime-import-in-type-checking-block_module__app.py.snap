@@ -28,7 +28,7 @@ app.py:10:23: TC004 [*] Move import `array.array` out of type-checking block. Im
  9 |     import datetime  # TC004
 10 |     from array import array  # TC004
    |                       ^^^^^ TC004
-11 | 
+11 |
 12 | app = fastapi.FastAPI("First application")
    |
    = help: Move out of type-checking block

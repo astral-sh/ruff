@@ -17,7 +17,7 @@ use crate::rules::flake8_comprehensions::settings::Settings;
 /// literal (`{}`). The former is slower because the name `dict` must be
 /// looked up in the global scope in case it has been rebound.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// dict()
 /// dict(a=1, b=2)
@@ -58,7 +58,7 @@ impl AlwaysFixableViolation for UnnecessaryCollectionCall {
 
 /// C408
 pub(crate) fn unnecessary_collection_call(
-    checker: &mut Checker,
+    checker: &Checker,
     call: &ast::ExprCall,
     settings: &Settings,
 ) {
@@ -129,7 +129,7 @@ pub(crate) fn unnecessary_collection_call(
         });
     }
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

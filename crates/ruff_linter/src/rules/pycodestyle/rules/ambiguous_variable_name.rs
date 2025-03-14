@@ -45,12 +45,12 @@ impl Violation for AmbiguousVariableName {
 }
 
 /// E741
-pub(crate) fn ambiguous_variable_name(checker: &mut Checker, name: &str, range: TextRange) {
+pub(crate) fn ambiguous_variable_name(checker: &Checker, name: &str, range: TextRange) {
     if checker.source_type.is_stub() {
         return;
     }
     if is_ambiguous_name(name) {
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             AmbiguousVariableName(name.to_string()),
             range,
         ));

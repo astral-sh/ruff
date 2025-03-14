@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
-snapshot_kind: text
 ---
 SIM108.py:2:1: SIM108 [*] Use ternary operator `b = c if a else d` instead of `if`-`else`-block
   |
@@ -10,7 +9,7 @@ SIM108.py:2:1: SIM108 [*] Use ternary operator `b = c if a else d` instead of `i
 4 | | else:
 5 | |     b = d
   | |_________^ SIM108
-6 |   
+6 |
 7 |   # OK
   |
   = help: Replace `if`-`else`-block with `b = c if a else d`
@@ -30,8 +29,7 @@ SIM108.py:30:5: SIM108 [*] Use ternary operator `b = 1 if a else 2` instead of `
    |
 28 |       pass
 29 |   else:
-30 |       if a:
-   |  _____^
+30 | /     if a:
 31 | |         b = 1
 32 | |     else:
 33 | |         b = 2
@@ -129,7 +127,7 @@ SIM108.py:141:1: SIM108 [*] Use ternary operator `z = cond if cond else other_co
 143 | | else:
 144 | |     z = other_cond
     | |__________________^ SIM108
-145 |   
+145 |
 146 |   # SIM108 - should suggest
     |
     = help: Replace `if`-`else`-block with `z = cond if cond else other_cond`
@@ -156,7 +154,7 @@ SIM108.py:148:1: SIM108 [*] Use ternary operator `z = cond if not cond else othe
 150 | | else:
 151 | |     z = other_cond
     | |__________________^ SIM108
-152 |   
+152 |
 153 |   # SIM108 - should suggest
     |
     = help: Replace `if`-`else`-block with `z = cond if not cond else other_cond`
@@ -183,7 +181,7 @@ SIM108.py:155:1: SIM108 [*] Use ternary operator `z = not cond if cond else othe
 157 | | else:
 158 | |     z = other_cond
     | |__________________^ SIM108
-159 |   
+159 |
 160 |   # SIM108 does not suggest
     |
     = help: Replace `if`-`else`-block with `z = not cond if cond else other_cond`
@@ -210,7 +208,7 @@ SIM108.py:167:1: SIM108 [*] Use ternary operator `z = 1 if True else other` inst
 169 | | else:
 170 | |     z = other
     | |_____________^ SIM108
-171 |   
+171 |
 172 |   if False:
     |
     = help: Replace `if`-`else`-block with `z = 1 if True else other`
@@ -228,16 +226,43 @@ SIM108.py:167:1: SIM108 [*] Use ternary operator `z = 1 if True else other` inst
 172 169 | if False:
 173 170 |     z = 1
 
+SIM108.py:172:1: SIM108 [*] Use ternary operator `z = 1 if False else other` instead of `if`-`else`-block
+    |
+170 |       z = other
+171 |
+172 | / if False:
+173 | |     z = 1
+174 | | else:
+175 | |     z = other
+    | |_____________^ SIM108
+176 |
+177 |   if 1:
+    |
+    = help: Replace `if`-`else`-block with `z = 1 if False else other`
+
+ℹ Unsafe fix
+169 169 | else:
+170 170 |     z = other
+171 171 | 
+172     |-if False:
+173     |-    z = 1
+174     |-else:
+175     |-    z = other
+    172 |+z = 1 if False else other
+176 173 | 
+177 174 | if 1:
+178 175 |     z = True
+
 SIM108.py:177:1: SIM108 [*] Use ternary operator `z = True if 1 else other` instead of `if`-`else`-block
     |
 175 |       z = other
-176 |   
+176 |
 177 | / if 1:
 178 | |     z = True
 179 | | else:
 180 | |     z = other
     | |_____________^ SIM108
-181 |   
+181 |
 182 |   # SIM108 does not suggest a binary option in this
     |
     = help: Replace `if`-`else`-block with `z = True if 1 else other`
@@ -264,7 +289,7 @@ SIM108.py:185:1: SIM108 [*] Use ternary operator `z = foo() if foo() else other`
 187 | | else:
 188 | |     z = other
     | |_____________^ SIM108
-189 |   
+189 |
 190 |   # SIM108 does not suggest a binary option in this
     |
     = help: Replace `if`-`else`-block with `z = foo() if foo() else other`
@@ -303,3 +328,55 @@ SIM108.py:193:1: SIM108 [*] Use ternary operator `z = not foo() if foo() else ot
 195     |-else:
 196     |-    z = other
     193 |+z = not foo() if foo() else other
+197 194 | 
+198 195 | 
+199 196 | # These two cases double as tests for f-string quote preservation. The first
+
+SIM108.py:202:1: SIM108 [*] Use ternary operator `var = "str" if cond else f"{first}-{second}"` instead of `if`-`else`-block
+    |
+200 |   # f-string should preserve its double quotes, and the second should preserve
+201 |   # single quotes
+202 | / if cond:
+203 | |     var = "str"
+204 | | else:
+205 | |     var = f"{first}-{second}"
+    | |_____________________________^ SIM108
+206 |
+207 |   if cond:
+    |
+    = help: Replace `if`-`else`-block with `var = "str" if cond else f"{first}-{second}"`
+
+ℹ Unsafe fix
+199 199 | # These two cases double as tests for f-string quote preservation. The first
+200 200 | # f-string should preserve its double quotes, and the second should preserve
+201 201 | # single quotes
+202     |-if cond:
+203     |-    var = "str"
+204     |-else:
+205     |-    var = f"{first}-{second}"
+    202 |+var = "str" if cond else f"{first}-{second}"
+206 203 | 
+207 204 | if cond:
+208 205 |     var = "str"
+
+SIM108.py:207:1: SIM108 [*] Use ternary operator `var = "str" if cond else f'{first}-{second}'` instead of `if`-`else`-block
+    |
+205 |       var = f"{first}-{second}"
+206 |
+207 | / if cond:
+208 | |     var = "str"
+209 | | else:
+210 | |     var = f'{first}-{second}'
+    | |_____________________________^ SIM108
+    |
+    = help: Replace `if`-`else`-block with `var = "str" if cond else f'{first}-{second}'`
+
+ℹ Unsafe fix
+204 204 | else:
+205 205 |     var = f"{first}-{second}"
+206 206 | 
+207     |-if cond:
+208     |-    var = "str"
+209     |-else:
+210     |-    var = f'{first}-{second}'
+    207 |+var = "str" if cond else f'{first}-{second}'

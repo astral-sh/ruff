@@ -19,7 +19,7 @@ use crate::checkers::ast::Checker;
 /// Prefer `dict.fromkeys(iterable)` over `{value: None for value in iterable}`,
 /// as `dict.fromkeys` is more readable and efficient.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// {a: None for a in iterable}
 /// {a: 1 for a in iterable}
@@ -58,7 +58,7 @@ impl Violation for UnnecessaryDictComprehensionForIterable {
 
 /// C420
 pub(crate) fn unnecessary_dict_comprehension_for_iterable(
-    checker: &mut Checker,
+    checker: &Checker,
     dict_comp: &ast::ExprDictComp,
 ) {
     let [generator] = dict_comp.generators.as_slice() else {
@@ -99,6 +99,14 @@ pub(crate) fn unnecessary_dict_comprehension_for_iterable(
 
         let binding = checker.semantic().binding(id);
 
+        // Builtin bindings have a range of 0..0, and are never
+        // defined within the comprehension, so we abort before
+        // checking the range overlap below. Note this only matters
+        // if the comprehension appears at the top of the file!
+        if binding.kind.is_builtin() {
+            return false;
+        }
+
         dict_comp.range().contains_range(binding.range())
     });
     if self_referential {
@@ -124,7 +132,7 @@ pub(crate) fn unnecessary_dict_comprehension_for_iterable(
         )));
     }
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// Returns `true` if the expression can be shared across multiple values.

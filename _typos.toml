@@ -1,10 +1,9 @@
 [files]
 # https://github.com/crate-ci/typos/issues/868
 extend-exclude = [
-  "crates/red_knot_vendored/vendor/**/*",
-  "**/resources/**/*",
-  "**/snapshots/**/*",
-  "crates/red_knot_workspace/src/workspace/pyproject/package_name.rs"
+    "crates/red_knot_vendored/vendor/**/*",
+    "**/resources/**/*",
+    "**/snapshots/**/*",
 ]
 
 [default.extend-words]
@@ -21,7 +20,14 @@ Numer = "Numer" # Library name 'NumerBlox' in "Who's Using Ruff?"
 
 [default]
 extend-ignore-re = [
-  # Line ignore with trailing "spellchecker:disable-line"
-  "(?Rm)^.*#\\s*spellchecker:disable-line$",
-  "LICENSEs",
+    # Line ignore with trailing "spellchecker:disable-line"
+    "(?Rm)^.*#\\s*spellchecker:disable-line$",
+    "LICENSEs",
+    # Various third party dependencies uses `typ` as struct field names (e.g., lsp_types::LogMessageParams)
+    "typ",
+    # TODO: Remove this once the `TYP` redirects are removed from `rule_redirects.rs`
+    "TYP",
 ]
+
+[default.extend-identifiers]
+"FrIeNdLy" = "FrIeNdLy"

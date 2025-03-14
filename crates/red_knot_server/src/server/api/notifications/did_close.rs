@@ -1,7 +1,7 @@
 use lsp_server::ErrorCode;
 use lsp_types::notification::DidCloseTextDocument;
 use lsp_types::DidCloseTextDocumentParams;
-use red_knot_workspace::watch::ChangeEvent;
+use red_knot_project::watch::ChangeEvent;
 
 use crate::server::api::diagnostics::clear_diagnostics;
 use crate::server::api::traits::{NotificationHandler, SyncNotificationHandler};
@@ -34,7 +34,7 @@ impl SyncNotificationHandler for DidCloseTextDocumentHandler {
             .with_failure_code(ErrorCode::InternalError)?;
 
         if let AnySystemPath::SystemVirtual(virtual_path) = path {
-            let db = session.default_workspace_db_mut();
+            let db = session.default_project_db_mut();
             db.apply_changes(vec![ChangeEvent::DeletedVirtual(virtual_path)], None);
         }
 

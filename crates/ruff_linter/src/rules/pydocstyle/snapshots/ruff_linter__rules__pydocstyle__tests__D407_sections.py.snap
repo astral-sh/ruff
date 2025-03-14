@@ -4,7 +4,7 @@ source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 sections.py:44:5: D407 [*] Missing dashed underline after section ("Returns")
    |
 42 |     """Toggle the gizmo.
-43 | 
+43 |
 44 |     Returns
    |     ^^^^^^^ D407
 45 |     A value of some sort.
@@ -23,10 +23,10 @@ sections.py:44:5: D407 [*] Missing dashed underline after section ("Returns")
 sections.py:56:5: D407 [*] Missing dashed underline after section ("Returns")
    |
 54 |     """Toggle the gizmo.
-55 | 
+55 |
 56 |     Returns
    |     ^^^^^^^ D407
-57 | 
+57 |
 58 |     """
    |
    = help: Add dashed line under "Returns"
@@ -43,7 +43,7 @@ sections.py:56:5: D407 [*] Missing dashed underline after section ("Returns")
 sections.py:67:5: D407 [*] Missing dashed underline after section ("Returns")
    |
 65 |     """Toggle the gizmo.
-66 | 
+66 |
 67 |     Returns"""
    |     ^^^^^^^ D407
    |
@@ -120,7 +120,7 @@ sections.py:530:5: D407 [*] Missing dashed underline after section ("Parameters"
 sections.py:613:4: D407 [*] Missing dashed underline after section ("Parameters")
     |
 611 |    """Test that lower case subsection header is valid even if it is of a different kind.
-612 | 
+612 |
 613 |    Parameters
     |    ^^^^^^^^^^ D407
 614 |    -‐-----------------

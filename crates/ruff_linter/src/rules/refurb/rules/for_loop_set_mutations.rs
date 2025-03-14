@@ -1,9 +1,11 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{Expr, Stmt, StmtFor};
 use ruff_python_semantic::analyze::typing;
 
 use crate::checkers::ast::Checker;
+
+use super::helpers::parenthesize_loop_iter_if_necessary;
 
 /// ## What it does
 /// Checks for code that updates a set with the contents of an iterable by
@@ -34,6 +36,10 @@ use crate::checkers::ast::Checker;
 /// s.difference_update((1, 2, 3))
 /// ```
 ///
+/// ## Fix safety
+/// The fix will be marked as unsafe if applying the fix would delete any comments.
+/// Otherwise, it is marked as safe.
+///
 /// ## References
 /// - [Python documentation: `set`](https://docs.python.org/3/library/stdtypes.html#set)
 #[derive(ViolationMetadata)]
@@ -53,8 +59,8 @@ impl AlwaysFixableViolation for ForLoopSetMutations {
     }
 }
 
-// FURB142
-pub(crate) fn for_loop_set_mutations(checker: &mut Checker, for_stmt: &StmtFor) {
+/// FURB142
+pub(crate) fn for_loop_set_mutations(checker: &Checker, for_stmt: &StmtFor) {
     if !for_stmt.orelse.is_empty() {
         return;
     }
@@ -94,34 +100,41 @@ pub(crate) fn for_loop_set_mutations(checker: &mut Checker, for_stmt: &StmtFor) 
         return;
     };
 
+    let locator = checker.locator();
     let content = match (for_stmt.target.as_ref(), arg) {
         (Expr::Name(for_target), Expr::Name(arg)) if for_target.id == arg.id => {
             format!(
                 "{}.{batch_method_name}({})",
                 set.id,
-                checker.locator().slice(for_stmt.iter.as_ref())
+                parenthesize_loop_iter_if_necessary(for_stmt, checker),
             )
         }
         (for_target, arg) => format!(
             "{}.{batch_method_name}({} for {} in {})",
             set.id,
-            checker.locator().slice(arg),
-            checker.locator().slice(for_target),
-            checker.locator().slice(for_stmt.iter.as_ref())
+            locator.slice(arg),
+            locator.slice(for_target),
+            parenthesize_loop_iter_if_necessary(for_stmt, checker),
         ),
     };
 
-    checker.diagnostics.push(
-        Diagnostic::new(
-            ForLoopSetMutations {
-                method_name,
-                batch_method_name,
-            },
-            for_stmt.range,
-        )
-        .with_fix(Fix::safe_edit(Edit::range_replacement(
-            content,
-            for_stmt.range,
-        ))),
+    let applicability = if checker.comment_ranges().intersects(for_stmt.range) {
+        Applicability::Unsafe
+    } else {
+        Applicability::Safe
+    };
+    let fix = Fix::applicable_edit(
+        Edit::range_replacement(content, for_stmt.range),
+        applicability,
     );
+
+    let diagnostic = Diagnostic::new(
+        ForLoopSetMutations {
+            method_name,
+            batch_method_name,
+        },
+        for_stmt.range,
+    );
+
+    checker.report_diagnostic(diagnostic.with_fix(fix));
 }

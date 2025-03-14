@@ -48,7 +48,7 @@ impl Violation for SurroundingWhitespace {
 }
 
 /// D210
-pub(crate) fn no_surrounding_whitespace(checker: &mut Checker, docstring: &Docstring) {
+pub(crate) fn no_surrounding_whitespace(checker: &Checker, docstring: &Docstring) {
     let body = docstring.body();
 
     let mut lines = NewlineWithTrailingNewline::from(body.as_str());
@@ -63,7 +63,7 @@ pub(crate) fn no_surrounding_whitespace(checker: &mut Checker, docstring: &Docst
         return;
     }
     let mut diagnostic = Diagnostic::new(SurroundingWhitespace, docstring.range());
-    let quote = docstring.contents.chars().last().unwrap();
+    let quote = docstring.quote_style().as_char();
     // If removing whitespace would lead to an invalid string of quote
     // characters, avoid applying the fix.
     if !trimmed.ends_with(quote) && !trimmed.starts_with(quote) && !ends_with_backslash(trimmed) {
@@ -72,5 +72,5 @@ pub(crate) fn no_surrounding_whitespace(checker: &mut Checker, docstring: &Docst
             TextRange::at(body.start(), line.text_len()),
         )));
     }
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

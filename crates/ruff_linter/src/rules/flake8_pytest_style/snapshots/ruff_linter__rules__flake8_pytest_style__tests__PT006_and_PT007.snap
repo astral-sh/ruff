@@ -1,11 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
-snapshot_kind: text
 ---
 PT006_and_PT007.py:3:26: PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
   |
 1 | import pytest
-2 | 
+2 |
 3 | @pytest.mark.parametrize(("param",), [[1], [2]])
   |                          ^^^^^^^^^^ PT006
 4 | def test_PT006_and_PT007_do_not_conflict(param):
@@ -24,7 +23,7 @@ PT006_and_PT007.py:3:26: PT006 [*] Wrong type passed to first argument of `pytes
 PT006_and_PT007.py:3:39: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `list` of `tuple`
   |
 1 | import pytest
-2 | 
+2 |
 3 | @pytest.mark.parametrize(("param",), [[1], [2]])
   |                                       ^^^ PT007
 4 | def test_PT006_and_PT007_do_not_conflict(param):
@@ -43,7 +42,7 @@ PT006_and_PT007.py:3:39: PT007 [*] Wrong values type in `pytest.mark.parametrize
 PT006_and_PT007.py:3:44: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `list` of `tuple`
   |
 1 | import pytest
-2 | 
+2 |
 3 | @pytest.mark.parametrize(("param",), [[1], [2]])
   |                                            ^^^ PT007
 4 | def test_PT006_and_PT007_do_not_conflict(param):

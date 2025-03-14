@@ -25,6 +25,11 @@ use crate::checkers::ast::Checker;
 /// a != b
 /// ```
 ///
+/// ## Fix safety
+/// The fix is marked as unsafe, as it might change the behaviour
+/// if `a` and/or `b` overrides `__eq__`/`__ne__`
+/// in such a manner that they don't return booleans.
+///
 /// ## References
 /// - [Python documentation: Comparisons](https://docs.python.org/3/reference/expressions.html#comparisons)
 #[derive(ViolationMetadata)]
@@ -61,6 +66,11 @@ impl AlwaysFixableViolation for NegateEqualOp {
 /// ```python
 /// a == b
 /// ```
+///
+/// ## Fix safety
+/// The fix is marked as unsafe, as it might change the behaviour
+/// if `a` and/or `b` overrides `__ne__`/`__eq__`
+/// in such a manner that they don't return booleans.
 ///
 /// ## References
 /// - [Python documentation: Comparisons](https://docs.python.org/3/reference/expressions.html#comparisons)
@@ -134,12 +144,7 @@ fn is_exception_check(stmt: &Stmt) -> bool {
 }
 
 /// SIM201
-pub(crate) fn negation_with_equal_op(
-    checker: &mut Checker,
-    expr: &Expr,
-    op: UnaryOp,
-    operand: &Expr,
-) {
+pub(crate) fn negation_with_equal_op(checker: &Checker, expr: &Expr, op: UnaryOp, operand: &Expr) {
     if !matches!(op, UnaryOp::Not) {
         return;
     }
@@ -181,16 +186,16 @@ pub(crate) fn negation_with_equal_op(
         comparators: comparators.clone(),
         range: TextRange::default(),
     };
-    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
         checker.generator().expr(&node.into()),
         expr.range(),
     )));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// SIM202
 pub(crate) fn negation_with_not_equal_op(
-    checker: &mut Checker,
+    checker: &Checker,
     expr: &Expr,
     op: UnaryOp,
     operand: &Expr,
@@ -236,15 +241,15 @@ pub(crate) fn negation_with_not_equal_op(
         comparators: comparators.clone(),
         range: TextRange::default(),
     };
-    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
         checker.generator().expr(&node.into()),
         expr.range(),
     )));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// SIM208
-pub(crate) fn double_negation(checker: &mut Checker, expr: &Expr, op: UnaryOp, operand: &Expr) {
+pub(crate) fn double_negation(checker: &Checker, expr: &Expr, op: UnaryOp, operand: &Expr) {
     if !matches!(op, UnaryOp::Not) {
         return;
     }
@@ -291,5 +296,5 @@ pub(crate) fn double_negation(checker: &mut Checker, expr: &Expr, op: UnaryOp, o
             expr.range(),
         )));
     };
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

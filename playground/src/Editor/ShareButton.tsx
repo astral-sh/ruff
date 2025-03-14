@@ -27,7 +27,7 @@ export default function ShareButton({ onShare }: { onShare?: () => void }) {
   ) : (
     <AstralButton
       type="button"
-      className="relative flex-none leading-6 py-1.5 px-3 shadow-sm disabled:opacity-50"
+      className="relative flex-none leading-6 py-1.5 px-3 shadow-xs disabled:opacity-50"
       disabled={!onShare || copied}
       onClick={
         onShare

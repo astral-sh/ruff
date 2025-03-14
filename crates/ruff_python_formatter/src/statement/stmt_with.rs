@@ -1,6 +1,6 @@
 use ruff_formatter::{format_args, write, FormatContext, FormatError};
-use ruff_python_ast::StmtWith;
-use ruff_python_ast::{AstNode, WithItem};
+use ruff_python_ast::PythonVersion;
+use ruff_python_ast::{StmtWith, WithItem};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -15,7 +15,6 @@ use crate::other::with_item::WithItemLayout;
 use crate::prelude::*;
 use crate::statement::clause::{clause_body, clause_header, ClauseHeader};
 use crate::statement::suite::SuiteKind;
-use crate::PythonVersion;
 
 #[derive(Default)]
 pub struct FormatStmtWith;
@@ -36,7 +35,7 @@ impl FormatNodeRule<StmtWith> for FormatStmtWith {
         //     ...
         // ```
         let comments = f.context().comments().clone();
-        let dangling_comments = comments.dangling(with_stmt.as_any_node_ref());
+        let dangling_comments = comments.dangling(with_stmt);
         let partition_point = dangling_comments.partition_point(|comment| {
             with_stmt
                 .items
@@ -303,7 +302,7 @@ impl<'a> WithItemsLayout<'a> {
             }
         }
 
-        let can_parenthesize = context.options().target_version() >= PythonVersion::Py39
+        let can_parenthesize = context.options().target_version() >= PythonVersion::PY39
             || are_with_items_parenthesized(with, context)?;
 
         // If the target version doesn't support parenthesized context managers and they aren't

@@ -6,8 +6,8 @@ use ruff_diagnostics::Fix;
 use ruff_diagnostics::{Diagnostic, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
-use ruff_python_ast::{Expr, Parameter, ParameterWithDefault};
-use ruff_python_semantic::{Modules, SemanticModel};
+use ruff_python_ast::{Arguments, Expr, ExprCall, ExprSubscript, Parameter, ParameterWithDefault};
+use ruff_python_semantic::{BindingKind, Modules, ScopeKind, SemanticModel};
 use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_text_size::{Ranged, TextSize};
 
@@ -105,7 +105,7 @@ impl Violation for FastApiUnusedPathParameter {
 
 /// FAST003
 pub(crate) fn fastapi_unused_path_parameter(
-    checker: &mut Checker,
+    checker: &Checker,
     function_def: &ast::StmtFunctionDef,
 ) {
     if !checker.semantic().seen_module(Modules::FASTAPI) {
@@ -137,26 +137,40 @@ pub(crate) fn fastapi_unused_path_parameter(
     let path_params = PathParamIterator::new(path.to_str());
 
     // Extract the arguments from the function signature
-    let named_args: Vec<_> = function_def
-        .parameters
-        .args
-        .iter()
-        .chain(&function_def.parameters.kwonlyargs)
-        .map(|ParameterWithDefault { parameter, .. }| {
-            parameter_alias(parameter, checker.semantic())
-                .unwrap_or_else(|| parameter.name.as_str())
-        })
-        .collect();
+    let mut named_args = vec![];
+
+    for parameter_with_default in non_posonly_non_variadic_parameters(function_def) {
+        let ParameterWithDefault { parameter, .. } = parameter_with_default;
+
+        if let Some(alias) = parameter_alias(parameter, checker.semantic()) {
+            named_args.push(alias);
+        } else {
+            named_args.push(parameter.name.as_str());
+        }
+
+        let Some(dependency) =
+            Dependency::from_parameter(parameter_with_default, checker.semantic())
+        else {
+            continue;
+        };
+
+        if let Some(parameter_names) = dependency.parameter_names() {
+            named_args.extend_from_slice(parameter_names);
+        } else {
+            // If we can't determine the dependency, we can't really do anything.
+            return;
+        }
+    }
 
     // Check if any of the path parameters are not in the function signature.
-    let mut diagnostics = vec![];
     for (path_param, range) in path_params {
         // Ignore invalid identifiers (e.g., `user-id`, as opposed to `user_id`)
         if !is_identifier(path_param) {
             continue;
         }
 
-        // If the path parameter is already in the function signature, we don't need to do anything.
+        // If the path parameter is already in the function or the dependency signature,
+        // we don't need to do anything.
         if named_args.contains(&path_param) {
             continue;
         }
@@ -168,7 +182,7 @@ pub(crate) fn fastapi_unused_path_parameter(
             .parameters
             .posonlyargs
             .iter()
-            .any(|arg| arg.parameter.name.as_str() == path_param);
+            .any(|param| param.name() == path_param);
 
         let mut diagnostic = Diagnostic::new(
             FastApiUnusedPathParameter {
@@ -188,10 +202,148 @@ pub(crate) fn fastapi_unused_path_parameter(
                 checker.locator().contents(),
             )));
         }
-        diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
+    }
+}
+
+/// Returns an iterator over the non-positional-only, non-variadic parameters of a function.
+fn non_posonly_non_variadic_parameters(
+    function_def: &ast::StmtFunctionDef,
+) -> impl Iterator<Item = &ParameterWithDefault> {
+    function_def
+        .parameters
+        .args
+        .iter()
+        .chain(&function_def.parameters.kwonlyargs)
+}
+
+#[derive(Debug, is_macro::Is)]
+enum Dependency<'a> {
+    /// Not defined in the same file, or otherwise cannot be determined to be a function.
+    Unknown,
+
+    /// A function defined in the same file, whose parameter names are as given.
+    Function(Vec<&'a str>),
+
+    /// There are multiple `Depends()` calls.
+    ///
+    /// Multiple `Depends` annotations aren't supported by fastapi and the exact behavior is
+    /// [unspecified](https://github.com/astral-sh/ruff/pull/15364#discussion_r1912551710).
+    Multiple,
+}
+
+impl<'a> Dependency<'a> {
+    fn parameter_names(&self) -> Option<&[&'a str]> {
+        match self {
+            Self::Unknown => None,
+            Self::Multiple => None,
+            Self::Function(parameter_names) => Some(parameter_names.as_slice()),
+        }
+    }
+}
+
+impl<'a> Dependency<'a> {
+    /// Return `foo` in the first metadata `Depends(foo)`,
+    /// or that of the default value:
+    ///
+    /// ```python
+    /// def _(
+    ///     a: Annotated[str, Depends(foo)],
+    ///     #                 ^^^^^^^^^^^^
+    ///     a: str = Depends(foo),
+    ///     #        ^^^^^^^^^^^^
+    /// ): ...
+    /// ```
+    fn from_parameter(
+        parameter: &'a ParameterWithDefault,
+        semantic: &SemanticModel<'a>,
+    ) -> Option<Self> {
+        if let Some(dependency) = parameter
+            .default()
+            .and_then(|default| Self::from_default(default, semantic))
+        {
+            return Some(dependency);
+        }
+
+        let ExprSubscript { value, slice, .. } = parameter.annotation()?.as_subscript_expr()?;
+
+        if !semantic.match_typing_expr(value, "Annotated") {
+            return None;
+        }
+
+        let Expr::Tuple(tuple) = slice.as_ref() else {
+            return None;
+        };
+
+        let mut dependencies = tuple.elts.iter().skip(1).filter_map(|metadata_element| {
+            let arguments = depends_arguments(metadata_element, semantic)?;
+
+            Self::from_depends_call(arguments, semantic)
+        });
+
+        let dependency = dependencies.next()?;
+
+        if dependencies.next().is_some() {
+            Some(Self::Multiple)
+        } else {
+            Some(dependency)
+        }
     }
 
-    checker.diagnostics.extend(diagnostics);
+    fn from_default(expr: &'a Expr, semantic: &SemanticModel<'a>) -> Option<Self> {
+        let arguments = depends_arguments(expr, semantic)?;
+
+        Self::from_depends_call(arguments, semantic)
+    }
+
+    fn from_depends_call(arguments: &'a Arguments, semantic: &SemanticModel<'a>) -> Option<Self> {
+        let Some(Expr::Name(name)) = arguments.find_argument_value("dependency", 0) else {
+            return None;
+        };
+
+        let Some(binding) = semantic.only_binding(name).map(|id| semantic.binding(id)) else {
+            return Some(Self::Unknown);
+        };
+
+        let BindingKind::FunctionDefinition(scope_id) = binding.kind else {
+            return Some(Self::Unknown);
+        };
+
+        let scope = &semantic.scopes[scope_id];
+
+        let ScopeKind::Function(function_def) = scope.kind else {
+            return Some(Self::Unknown);
+        };
+
+        let parameter_names = non_posonly_non_variadic_parameters(function_def)
+            .map(|param| param.name().as_str())
+            .collect();
+
+        Some(Self::Function(parameter_names))
+    }
+}
+
+fn depends_arguments<'a>(expr: &'a Expr, semantic: &SemanticModel) -> Option<&'a Arguments> {
+    let Expr::Call(ExprCall {
+        func, arguments, ..
+    }) = expr
+    else {
+        return None;
+    };
+
+    if !is_fastapi_depends(func.as_ref(), semantic) {
+        return None;
+    }
+
+    Some(arguments)
+}
+
+fn is_fastapi_depends(expr: &Expr, semantic: &SemanticModel) -> bool {
+    let Some(qualified_name) = semantic.resolve_qualified_name(expr) else {
+        return false;
+    };
+
+    matches!(qualified_name.segments(), ["fastapi", "Depends"])
 }
 
 /// Extract the expected in-route name for a given parameter, if it has an alias.

@@ -5,6 +5,16 @@ use ruff_db::files::File;
 use ruff_python_ast as ast;
 use salsa;
 
+/// Whether or not this expression should be inferred as a normal expression or
+/// a type expression. For example, in `self.x: <annotation> = <value>`, the
+/// `<annotation>` is inferred as a type expression, while `<value>` is inferred
+/// as a normal expression.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) enum ExpressionKind {
+    Normal,
+    TypeExpression,
+}
+
 /// An independently type-inferable expression.
 ///
 /// Includes constraint expressions (e.g. if tests) and the RHS of an unpacking assignment.
@@ -23,19 +33,20 @@ use salsa;
 #[salsa::tracked]
 pub(crate) struct Expression<'db> {
     /// The file in which the expression occurs.
-    #[id]
     pub(crate) file: File,
 
     /// The scope in which the expression occurs.
-    #[id]
     pub(crate) file_scope: FileScopeId,
 
     /// The expression node.
     #[no_eq]
+    #[tracked]
     #[return_ref]
     pub(crate) node_ref: AstNodeRef<ast::Expr>,
 
-    #[no_eq]
+    /// Should this expression be inferred as a normal expression or a type expression?
+    pub(crate) kind: ExpressionKind,
+
     count: countme::Count<Expression<'static>>,
 }
 

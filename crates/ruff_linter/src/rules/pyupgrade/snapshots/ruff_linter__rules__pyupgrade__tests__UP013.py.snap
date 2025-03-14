@@ -6,7 +6,7 @@ UP013.py:5:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class sy
 4 | # dict literal
 5 | MyType = TypedDict("MyType", {"a": int, "b": str})
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP013
-6 | 
+6 |
 7 | # dict call
   |
   = help: Convert `MyType` to class syntax
@@ -28,7 +28,7 @@ UP013.py:8:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class sy
  7 | # dict call
  8 | MyType = TypedDict("MyType", dict(a=int, b=str))
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP013
- 9 | 
+ 9 |
 10 | # kwargs
    |
    = help: Convert `MyType` to class syntax
@@ -50,7 +50,7 @@ UP013.py:11:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class s
 10 | # kwargs
 11 | MyType = TypedDict("MyType", a=int, b=str)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP013
-12 | 
+12 |
 13 | # Empty TypedDict
    |
    = help: Convert `MyType` to class syntax
@@ -72,7 +72,7 @@ UP013.py:14:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class s
 13 | # Empty TypedDict
 14 | MyType = TypedDict("MyType")
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP013
-15 | 
+15 |
 16 | # Literal values
    |
    = help: Convert `MyType` to class syntax
@@ -114,7 +114,7 @@ UP013.py:18:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class s
 17 | MyType = TypedDict("MyType", {"a": "hello"})
 18 | MyType = TypedDict("MyType", a="hello")
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP013
-19 | 
+19 |
 20 | # NotRequired
    |
    = help: Convert `MyType` to class syntax
@@ -135,7 +135,7 @@ UP013.py:21:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class s
 20 | # NotRequired
 21 | MyType = TypedDict("MyType", {"a": NotRequired[dict]})
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP013
-22 | 
+22 |
 23 | # total
    |
    = help: Convert `MyType` to class syntax
@@ -156,7 +156,7 @@ UP013.py:24:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class s
 23 | # total
 24 | MyType = TypedDict("MyType", {"x": int, "y": int}, total=False)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP013
-25 | 
+25 |
 26 | # using Literal type
    |
    = help: Convert `MyType` to class syntax
@@ -178,7 +178,7 @@ UP013.py:27:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class s
 26 | # using Literal type
 27 | MyType = TypedDict("MyType", {"key": Literal["value"]})
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP013
-28 | 
+28 |
 29 | # using namespace TypedDict
    |
    = help: Convert `MyType` to class syntax
@@ -199,7 +199,7 @@ UP013.py:30:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class s
 29 | # using namespace TypedDict
 30 | MyType = typing.TypedDict("MyType", {"key": int})
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP013
-31 | 
+31 |
 32 | # invalid identifiers (OK)
    |
    = help: Convert `MyType` to class syntax
@@ -220,7 +220,7 @@ UP013.py:40:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class s
 39 | # Empty dict literal
 40 | MyType = TypedDict("MyType", {})
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP013
-41 | 
+41 |
 42 | # Empty dict call
    |
    = help: Convert `MyType` to class syntax
@@ -241,7 +241,7 @@ UP013.py:43:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class s
 42 | # Empty dict call
 43 | MyType = TypedDict("MyType", dict())
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP013
-44 | 
+44 |
 45 | # Unsafe fix if comments are present
    |
    = help: Convert `MyType` to class syntax
@@ -264,6 +264,8 @@ UP013.py:46:1: UP013 [*] Convert `X` from `TypedDict` functional to class syntax
 47 | |     "some_config": int,  # important
 48 | | })
    | |__^ UP013
+49 |
+50 |   # Private names should not be reported (OK)
    |
    = help: Convert `X` to class syntax
 
@@ -276,3 +278,6 @@ UP013.py:46:1: UP013 [*] Convert `X` from `TypedDict` functional to class syntax
 48    |-})
    46 |+class X(TypedDict):
    47 |+    some_config: int
+49 48 | 
+50 49 | # Private names should not be reported (OK)
+51 50 | WithPrivate = TypedDict("WithPrivate", {"__x": int})

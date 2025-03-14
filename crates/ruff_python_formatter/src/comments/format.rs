@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
 use ruff_formatter::{format_args, write, FormatError, FormatOptions, SourceCode};
-use ruff_python_ast::{AnyNodeRef, AstNode, NodeKind, PySourceType};
+use ruff_python_ast::{AnyNodeRef, NodeKind, PySourceType};
 use ruff_python_trivia::{
     is_pragma_comment, lines_after, lines_after_ignoring_trivia, lines_before, CommentLinePosition,
 };
@@ -13,11 +13,11 @@ use crate::prelude::*;
 use crate::statement::suite::should_insert_blank_line_after_class_in_stub_file;
 
 /// Formats the leading comments of a node.
-pub(crate) fn leading_node_comments<T>(node: &T) -> FormatLeadingComments
+pub(crate) fn leading_node_comments<'a, T>(node: T) -> FormatLeadingComments<'a>
 where
-    T: AstNode,
+    T: Into<AnyNodeRef<'a>>,
 {
-    FormatLeadingComments::Node(node.as_any_node_ref())
+    FormatLeadingComments::Node(node.into())
 }
 
 /// Formats the passed comments as leading comments
@@ -85,7 +85,7 @@ pub(crate) struct FormatLeadingAlternateBranchComments<'a> {
 
 impl Format<PyFormatContext<'_>> for FormatLeadingAlternateBranchComments<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
-        if self.last_node.map_or(false, |preceding| {
+        if self.last_node.is_some_and(|preceding| {
             should_insert_blank_line_after_class_in_stub_file(preceding, None, f.context())
         }) {
             write!(f, [empty_line(), leading_comments(self.comments)])?;
@@ -192,11 +192,11 @@ impl Format<PyFormatContext<'_>> for FormatTrailingComments<'_> {
 }
 
 /// Formats the dangling comments of `node`.
-pub(crate) fn dangling_node_comments<T>(node: &T) -> FormatDanglingComments
+pub(crate) fn dangling_node_comments<'a, T>(node: T) -> FormatDanglingComments<'a>
 where
-    T: AstNode,
+    T: Into<AnyNodeRef<'a>>,
 {
-    FormatDanglingComments::Node(node.as_any_node_ref())
+    FormatDanglingComments::Node(node.into())
 }
 
 pub(crate) fn dangling_comments(comments: &[SourceComment]) -> FormatDanglingComments {

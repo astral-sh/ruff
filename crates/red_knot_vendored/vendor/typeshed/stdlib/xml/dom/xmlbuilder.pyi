@@ -1,31 +1,8 @@
-from _typeshed import Incomplete, Unused
+from _typeshed import SupportsRead
 from typing import Any, Literal, NoReturn
-from typing_extensions import TypeAlias
-from urllib.request import OpenerDirector
-from xml.dom.expatbuilder import ExpatBuilder, ExpatBuilderNS
-from xml.dom.minidom import Node
+from xml.dom.minidom import Document, Node, _DOMErrorHandler
 
 __all__ = ["DOMBuilder", "DOMEntityResolver", "DOMInputSource"]
-
-# UNKNOWN TYPES:
-# - `Options.errorHandler`.
-#       The same as `_DOMBuilderErrorHandlerType`?
-#       Maybe `xml.sax.handler.ErrorHandler`?
-# - Return type of DOMBuilder.getFeature().
-#       We could get rid of the `Incomplete` if we knew more
-#       about `Options.errorHandler`.
-
-# ALIASES REPRESENTING MORE UNKNOWN TYPES:
-
-# probably the same as `Options.errorHandler`?
-# Maybe `xml.sax.handler.ErrorHandler`?
-_DOMBuilderErrorHandlerType: TypeAlias = Incomplete | None
-# probably some kind of IO...
-_DOMInputSourceCharacterStreamType: TypeAlias = Incomplete | None
-# probably a string??
-_DOMInputSourceStringDataType: TypeAlias = Incomplete | None
-# probably a string??
-_DOMInputSourceEncodingType: TypeAlias = Incomplete | None
 
 class Options:
     namespaces: int
@@ -45,37 +22,35 @@ class Options:
     charset_overrides_xml_encoding: bool
     infoset: bool
     supported_mediatypes_only: bool
-    errorHandler: Any | None
-    filter: DOMBuilderFilter | None  # a guess, but seems likely
+    errorHandler: _DOMErrorHandler | None
+    filter: DOMBuilderFilter | None
 
 class DOMBuilder:
-    entityResolver: DOMEntityResolver | None  # a guess, but seems likely
-    errorHandler: _DOMBuilderErrorHandlerType
-    filter: DOMBuilderFilter | None  # a guess, but seems likely
+    entityResolver: DOMEntityResolver | None
+    errorHandler: _DOMErrorHandler | None
+    filter: DOMBuilderFilter | None
     ACTION_REPLACE: Literal[1]
     ACTION_APPEND_AS_CHILDREN: Literal[2]
     ACTION_INSERT_AFTER: Literal[3]
     ACTION_INSERT_BEFORE: Literal[4]
+    def __init__(self) -> None: ...
     def setFeature(self, name: str, state: int) -> None: ...
     def supportsFeature(self, name: str) -> bool: ...
-    def canSetFeature(self, name: str, state: int) -> bool: ...
+    def canSetFeature(self, name: str, state: Literal[1, 0]) -> bool: ...
     # getFeature could return any attribute from an instance of `Options`
     def getFeature(self, name: str) -> Any: ...
-    def parseURI(self, uri: str) -> ExpatBuilder | ExpatBuilderNS: ...
-    def parse(self, input: DOMInputSource) -> ExpatBuilder | ExpatBuilderNS: ...
-    # `input` and `cnode` argtypes for `parseWithContext` are unknowable
-    # as the function does nothing with them, and always raises an exception.
-    # But `input` is *probably* `DOMInputSource`?
-    def parseWithContext(self, input: Unused, cnode: Unused, action: Literal[1, 2, 3, 4]) -> NoReturn: ...
+    def parseURI(self, uri: str) -> Document: ...
+    def parse(self, input: DOMInputSource) -> Document: ...
+    def parseWithContext(self, input: DOMInputSource, cnode: Node, action: Literal[1, 2, 3, 4]) -> NoReturn: ...
 
 class DOMEntityResolver:
     def resolveEntity(self, publicId: str | None, systemId: str) -> DOMInputSource: ...
 
 class DOMInputSource:
-    byteStream: OpenerDirector | None
-    characterStream: _DOMInputSourceCharacterStreamType
-    stringData: _DOMInputSourceStringDataType
-    encoding: _DOMInputSourceEncodingType
+    byteStream: SupportsRead[bytes] | None
+    characterStream: SupportsRead[str] | None
+    stringData: str | None
+    encoding: str | None
     publicId: str | None
     systemId: str | None
     baseURI: str | None
@@ -86,18 +61,14 @@ class DOMBuilderFilter:
     FILTER_SKIP: Literal[3]
     FILTER_INTERRUPT: Literal[4]
     whatToShow: int
-    def acceptNode(self, element: Unused) -> Literal[1]: ...
-    def startContainer(self, element: Unused) -> Literal[1]: ...
+    def acceptNode(self, element: Node) -> Literal[1, 2, 3, 4]: ...
+    def startContainer(self, element: Node) -> Literal[1, 2, 3, 4]: ...
 
 class DocumentLS:
     async_: bool
     def abort(self) -> NoReturn: ...
-    # `load()` and `loadXML()` always raise exceptions
-    # so the argtypes of `uri` and `source` are unknowable.
-    # `source` is *probably* `DOMInputSource`?
-    # `uri` is *probably* a str? (see DOMBuilder.parseURI())
-    def load(self, uri: Unused) -> NoReturn: ...
-    def loadXML(self, source: Unused) -> NoReturn: ...
+    def load(self, uri: str) -> NoReturn: ...
+    def loadXML(self, source: str) -> NoReturn: ...
     def saveXML(self, snode: Node | None) -> str: ...
 
 class DOMImplementationLS:

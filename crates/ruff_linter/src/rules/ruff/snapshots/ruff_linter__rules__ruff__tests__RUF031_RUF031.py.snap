@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
-snapshot_kind: text
 ---
 RUF031.py:2:3: RUF031 [*] Avoid parentheses for tuples in subscripts
   |
@@ -177,7 +176,7 @@ RUF031.py:36:3: RUF031 [*] Avoid parentheses for tuples in subscripts
 35 | # https://github.com/astral-sh/ruff/issues/12776
 36 | d[(*foo,bar)]
    |   ^^^^^^^^^^ RUF031
-37 | 
+37 |
 38 | x: dict[str, int]  # tuples inside type annotations should never be altered
    |
    = help: Remove parentheses

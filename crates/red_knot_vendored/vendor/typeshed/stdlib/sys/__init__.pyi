@@ -6,7 +6,7 @@ from collections.abc import AsyncGenerator, Callable, Sequence
 from io import TextIOWrapper
 from types import FrameType, ModuleType, TracebackType
 from typing import Any, Final, Literal, NoReturn, Protocol, TextIO, TypeVar, final, type_check_only
-from typing_extensions import TypeAlias
+from typing_extensions import LiteralString, TypeAlias
 
 _T = TypeVar("_T")
 
@@ -45,7 +45,7 @@ if sys.version_info >= (3, 10):
 path: list[str]
 path_hooks: list[Callable[[str], PathEntryFinderProtocol]]
 path_importer_cache: dict[str, PathEntryFinderProtocol | None]
-platform: str
+platform: LiteralString
 if sys.version_info >= (3, 9):
     platlibdir: str
 prefix: str
@@ -393,6 +393,11 @@ if sys.platform == "win32":
     def getwindowsversion() -> _WinVersion: ...
 
 def intern(string: str, /) -> str: ...
+
+if sys.version_info >= (3, 13):
+    def _is_gil_enabled() -> bool: ...
+    def _clear_internal_caches() -> None: ...
+
 def is_finalizing() -> bool: ...
 def breakpointhook(*args: Any, **kwargs: Any) -> Any: ...
 

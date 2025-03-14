@@ -14,8 +14,7 @@ use std::num::NonZeroUsize;
 use std::ops::Deref;
 
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
-
-use crate::PythonVersion;
+use ruff_python_ast::PythonVersion;
 
 type SitePackagesDiscoveryResult<T> = Result<T, SitePackagesDiscoveryError>;
 
@@ -206,11 +205,11 @@ System site-packages will not be used for module resolution.",
 
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum SitePackagesDiscoveryError {
-    #[error("Invalid --venv-path argument: {0} could not be canonicalized")]
+    #[error("Invalid --python argument: `{0}` could not be canonicalized")]
     VenvDirCanonicalizationError(SystemPathBuf, #[source] io::Error),
-    #[error("Invalid --venv-path argument: {0} does not point to a directory on disk")]
+    #[error("Invalid --python argument: `{0}` does not point to a directory on disk")]
     VenvDirIsNotADirectory(SystemPathBuf),
-    #[error("--venv-path points to a broken venv with no pyvenv.cfg file")]
+    #[error("--python points to a broken venv with no pyvenv.cfg file")]
     NoPyvenvCfgFile(#[source] io::Error),
     #[error("Failed to parse the pyvenv.cfg file at {0} because {1}")]
     PyvenvCfgParseError(SystemPathBuf, PyvenvCfgParseErrorKind),
@@ -546,7 +545,7 @@ mod tests {
                         system_install_sys_prefix.join(&unix_site_packages);
                     (system_home_path, system_exe_path, system_site_packages_path)
                 };
-            memory_fs.write_file(system_exe_path, "").unwrap();
+            memory_fs.write_file_all(system_exe_path, "").unwrap();
             memory_fs
                 .create_directory_all(&system_site_packages_path)
                 .unwrap();
@@ -563,7 +562,7 @@ mod tests {
                     venv_sys_prefix.join(&unix_site_packages),
                 )
             };
-            memory_fs.write_file(&venv_exe, "").unwrap();
+            memory_fs.write_file_all(&venv_exe, "").unwrap();
             memory_fs.create_directory_all(&site_packages_path).unwrap();
 
             let pyvenv_cfg_path = venv_sys_prefix.join("pyvenv.cfg");
@@ -577,7 +576,7 @@ mod tests {
                 pyvenv_cfg_contents.push_str("include-system-site-packages = TRuE\n");
             }
             memory_fs
-                .write_file(pyvenv_cfg_path, &pyvenv_cfg_contents)
+                .write_file_all(pyvenv_cfg_path, &pyvenv_cfg_contents)
                 .unwrap();
 
             venv_sys_prefix
@@ -741,7 +740,7 @@ mod tests {
         let system = TestSystem::default();
         system
             .memory_file_system()
-            .write_file("/.venv", "")
+            .write_file_all("/.venv", "")
             .unwrap();
         assert!(matches!(
             VirtualEnvironment::new("/.venv", &system),
@@ -768,7 +767,7 @@ mod tests {
         let memory_fs = system.memory_file_system();
         let pyvenv_cfg_path = SystemPathBuf::from("/.venv/pyvenv.cfg");
         memory_fs
-            .write_file(&pyvenv_cfg_path, "home = bar = /.venv/bin")
+            .write_file_all(&pyvenv_cfg_path, "home = bar = /.venv/bin")
             .unwrap();
         let venv_result = VirtualEnvironment::new("/.venv", &system);
         assert!(matches!(
@@ -786,7 +785,9 @@ mod tests {
         let system = TestSystem::default();
         let memory_fs = system.memory_file_system();
         let pyvenv_cfg_path = SystemPathBuf::from("/.venv/pyvenv.cfg");
-        memory_fs.write_file(&pyvenv_cfg_path, "home =").unwrap();
+        memory_fs
+            .write_file_all(&pyvenv_cfg_path, "home =")
+            .unwrap();
         let venv_result = VirtualEnvironment::new("/.venv", &system);
         assert!(matches!(
             venv_result,
@@ -804,7 +805,7 @@ mod tests {
         let memory_fs = system.memory_file_system();
         let pyvenv_cfg_path = SystemPathBuf::from("/.venv/pyvenv.cfg");
         memory_fs
-            .write_file(&pyvenv_cfg_path, "= whatever")
+            .write_file_all(&pyvenv_cfg_path, "= whatever")
             .unwrap();
         let venv_result = VirtualEnvironment::new("/.venv", &system);
         assert!(matches!(
@@ -822,7 +823,7 @@ mod tests {
         let system = TestSystem::default();
         let memory_fs = system.memory_file_system();
         let pyvenv_cfg_path = SystemPathBuf::from("/.venv/pyvenv.cfg");
-        memory_fs.write_file(&pyvenv_cfg_path, "").unwrap();
+        memory_fs.write_file_all(&pyvenv_cfg_path, "").unwrap();
         let venv_result = VirtualEnvironment::new("/.venv", &system);
         assert!(matches!(
             venv_result,
@@ -840,7 +841,7 @@ mod tests {
         let memory_fs = system.memory_file_system();
         let pyvenv_cfg_path = SystemPathBuf::from("/.venv/pyvenv.cfg");
         memory_fs
-            .write_file(&pyvenv_cfg_path, "home = foo")
+            .write_file_all(&pyvenv_cfg_path, "home = foo")
             .unwrap();
         let venv_result = VirtualEnvironment::new("/.venv", &system);
         assert!(matches!(

@@ -36,21 +36,26 @@
 //! dominates, but it does dominate the `x = 1 if flag2 else None` binding, so we have to keep
 //! track of that.
 //!
-//! The data structures used here ([`BitSet`] and [`smallvec::SmallVec`]) optimize for keeping all
-//! data inline (avoiding lots of scattered allocations) in small-to-medium cases, and falling back
-//! to heap allocation to be able to scale to arbitrary numbers of live bindings and constraints
-//! when needed.
+//! The data structures use `IndexVec` arenas to store all data compactly and contiguously, while
+//! supporting very cheap clones.
 //!
 //! Tracking live declarations is simpler, since constraints are not involved, but otherwise very
 //! similar to tracking live bindings.
-use crate::semantic_index::use_def::VisibilityConstraints;
 
-use super::bitset::{BitSet, BitSetIterator};
+use itertools::{EitherOrBoth, Itertools};
 use ruff_index::newtype_index;
-use smallvec::SmallVec;
+use smallvec::{smallvec, SmallVec};
+
+use crate::semantic_index::narrowing_constraints::{
+    NarrowingConstraintsBuilder, ScopedNarrowingConstraint, ScopedNarrowingConstraintPredicate,
+};
+use crate::semantic_index::visibility_constraints::{
+    ScopedVisibilityConstraintId, VisibilityConstraintsBuilder,
+};
 
 /// A newtype-index for a definition in a particular scope.
 #[newtype_index]
+#[derive(Ord, PartialOrd)]
 pub(super) struct ScopedDefinitionId;
 
 impl ScopedDefinitionId {
@@ -62,184 +67,248 @@ impl ScopedDefinitionId {
     pub(super) const UNBOUND: ScopedDefinitionId = ScopedDefinitionId::from_u32(0);
 }
 
-/// A newtype-index for a constraint expression in a particular scope.
-#[newtype_index]
-pub(crate) struct ScopedConstraintId;
-
-/// Can reference this * 64 total definitions inline; more will fall back to the heap.
-const INLINE_BINDING_BLOCKS: usize = 3;
-
-/// A [`BitSet`] of [`ScopedDefinitionId`], representing live bindings of a symbol in a scope.
-type Bindings = BitSet<INLINE_BINDING_BLOCKS>;
-type BindingsIterator<'a> = BitSetIterator<'a, INLINE_BINDING_BLOCKS>;
-
-/// Can reference this * 64 total declarations inline; more will fall back to the heap.
-const INLINE_DECLARATION_BLOCKS: usize = 3;
-
-/// A [`BitSet`] of [`ScopedDefinitionId`], representing live declarations of a symbol in a scope.
-type Declarations = BitSet<INLINE_DECLARATION_BLOCKS>;
-type DeclarationsIterator<'a> = BitSetIterator<'a, INLINE_DECLARATION_BLOCKS>;
-
-/// Can reference this * 64 total constraints inline; more will fall back to the heap.
-const INLINE_CONSTRAINT_BLOCKS: usize = 2;
-
-/// Can keep inline this many live bindings per symbol at a given time; more will go to heap.
-const INLINE_BINDINGS_PER_SYMBOL: usize = 4;
-
-/// Which constraints apply to a given binding?
-type Constraints = BitSet<INLINE_CONSTRAINT_BLOCKS>;
-
-type InlineConstraintArray = [Constraints; INLINE_BINDINGS_PER_SYMBOL];
-
-/// One [`BitSet`] of applicable [`ScopedConstraintId`]s per live binding.
-type ConstraintsPerBinding = SmallVec<InlineConstraintArray>;
-
-/// Iterate over all constraints for a single binding.
-type ConstraintsIterator<'a> = std::slice::Iter<'a, Constraints>;
-type ConstraintsIntoIterator = smallvec::IntoIter<InlineConstraintArray>;
-
-/// A newtype-index for a visibility constraint in a particular scope.
-#[newtype_index]
-pub(crate) struct ScopedVisibilityConstraintId;
-
-impl ScopedVisibilityConstraintId {
-    /// A special ID that is used for an "always true" / "always visible" constraint.
-    /// When we create a new [`VisibilityConstraints`] object, this constraint is always
-    /// present at index 0.
-    pub(crate) const ALWAYS_TRUE: ScopedVisibilityConstraintId =
-        ScopedVisibilityConstraintId::from_u32(0);
-}
-
-const INLINE_VISIBILITY_CONSTRAINTS: usize = 4;
-type InlineVisibilityConstraintsArray =
-    [ScopedVisibilityConstraintId; INLINE_VISIBILITY_CONSTRAINTS];
-
-/// One [`ScopedVisibilityConstraintId`] per live declaration.
-type VisibilityConstraintPerDeclaration = SmallVec<InlineVisibilityConstraintsArray>;
-
-/// One [`ScopedVisibilityConstraintId`] per live binding.
-type VisibilityConstraintPerBinding = SmallVec<InlineVisibilityConstraintsArray>;
-
-/// Iterator over the visibility constraints for all live bindings/declarations.
-type VisibilityConstraintsIterator<'a> = std::slice::Iter<'a, ScopedVisibilityConstraintId>;
-
-type VisibilityConstraintsIntoIterator = smallvec::IntoIter<InlineVisibilityConstraintsArray>;
+/// Can keep inline this many live bindings or declarations per symbol at a given time; more will
+/// go to heap.
+const INLINE_DEFINITIONS_PER_SYMBOL: usize = 4;
 
 /// Live declarations for a single symbol at some point in control flow, with their
 /// corresponding visibility constraints.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, salsa::Update)]
 pub(super) struct SymbolDeclarations {
-    /// [`BitSet`]: which declarations (as [`ScopedDefinitionId`]) can reach the current location?
-    pub(crate) live_declarations: Declarations,
-
-    /// For each live declaration, which visibility constraint applies to it?
-    pub(crate) visibility_constraints: VisibilityConstraintPerDeclaration,
+    /// A list of live declarations for this symbol, sorted by their `ScopedDefinitionId`
+    live_declarations: SmallVec<[LiveDeclaration; INLINE_DEFINITIONS_PER_SYMBOL]>,
 }
+
+/// One of the live declarations for a single symbol at some point in control flow.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct LiveDeclaration {
+    pub(super) declaration: ScopedDefinitionId,
+    pub(super) visibility_constraint: ScopedVisibilityConstraintId,
+}
+
+pub(super) type LiveDeclarationsIterator<'a> = std::slice::Iter<'a, LiveDeclaration>;
 
 impl SymbolDeclarations {
     fn undeclared(scope_start_visibility: ScopedVisibilityConstraintId) -> Self {
+        let initial_declaration = LiveDeclaration {
+            declaration: ScopedDefinitionId::UNBOUND,
+            visibility_constraint: scope_start_visibility,
+        };
         Self {
-            live_declarations: Declarations::with(0),
-            visibility_constraints: VisibilityConstraintPerDeclaration::from_iter([
-                scope_start_visibility,
-            ]),
+            live_declarations: smallvec![initial_declaration],
         }
     }
 
     /// Record a newly-encountered declaration for this symbol.
-    fn record_declaration(&mut self, declaration_id: ScopedDefinitionId) {
-        self.live_declarations = Declarations::with(declaration_id.into());
-
-        self.visibility_constraints = VisibilityConstraintPerDeclaration::with_capacity(1);
-        self.visibility_constraints
-            .push(ScopedVisibilityConstraintId::ALWAYS_TRUE);
+    fn record_declaration(&mut self, declaration: ScopedDefinitionId) {
+        // The new declaration replaces all previous live declaration in this path.
+        self.live_declarations.clear();
+        self.live_declarations.push(LiveDeclaration {
+            declaration,
+            visibility_constraint: ScopedVisibilityConstraintId::ALWAYS_TRUE,
+        });
     }
 
     /// Add given visibility constraint to all live declarations.
     pub(super) fn record_visibility_constraint(
         &mut self,
-        visibility_constraints: &mut VisibilityConstraints,
+        visibility_constraints: &mut VisibilityConstraintsBuilder,
         constraint: ScopedVisibilityConstraintId,
     ) {
-        for existing in &mut self.visibility_constraints {
-            *existing = visibility_constraints.add_and_constraint(*existing, constraint);
+        for declaration in &mut self.live_declarations {
+            declaration.visibility_constraint = visibility_constraints
+                .add_and_constraint(declaration.visibility_constraint, constraint);
         }
     }
 
     /// Return an iterator over live declarations for this symbol.
-    pub(super) fn iter(&self) -> DeclarationIdIterator {
-        DeclarationIdIterator {
-            declarations: self.live_declarations.iter(),
-            visibility_constraints: self.visibility_constraints.iter(),
+    pub(super) fn iter(&self) -> LiveDeclarationsIterator<'_> {
+        self.live_declarations.iter()
+    }
+
+    /// Iterate over the IDs of each currently live declaration for this symbol
+    fn iter_declarations(&self) -> impl Iterator<Item = ScopedDefinitionId> + '_ {
+        self.iter().map(|lb| lb.declaration)
+    }
+
+    fn simplify_visibility_constraints(&mut self, other: SymbolDeclarations) {
+        // If the set of live declarations hasn't changed, don't simplify.
+        if self.live_declarations.len() != other.live_declarations.len()
+            || !self.iter_declarations().eq(other.iter_declarations())
+        {
+            return;
+        }
+
+        for (declaration, other_declaration) in self
+            .live_declarations
+            .iter_mut()
+            .zip(other.live_declarations)
+        {
+            declaration.visibility_constraint = other_declaration.visibility_constraint;
+        }
+    }
+
+    fn merge(&mut self, b: Self, visibility_constraints: &mut VisibilityConstraintsBuilder) {
+        let a = std::mem::take(self);
+
+        // Invariant: merge_join_by consumes the two iterators in sorted order, which ensures that
+        // the merged `live_declarations` vec remains sorted. If a definition is found in both `a`
+        // and `b`, we compose the constraints from the two paths in an appropriate way
+        // (intersection for narrowing constraints; ternary OR for visibility constraints). If a
+        // definition is found in only one path, it is used as-is.
+        let a = a.live_declarations.into_iter();
+        let b = b.live_declarations.into_iter();
+        for zipped in a.merge_join_by(b, |a, b| a.declaration.cmp(&b.declaration)) {
+            match zipped {
+                EitherOrBoth::Both(a, b) => {
+                    let visibility_constraint = visibility_constraints
+                        .add_or_constraint(a.visibility_constraint, b.visibility_constraint);
+                    self.live_declarations.push(LiveDeclaration {
+                        declaration: a.declaration,
+                        visibility_constraint,
+                    });
+                }
+
+                EitherOrBoth::Left(declaration) | EitherOrBoth::Right(declaration) => {
+                    self.live_declarations.push(declaration);
+                }
+            }
         }
     }
 }
 
 /// Live bindings for a single symbol at some point in control flow. Each live binding comes
 /// with a set of narrowing constraints and a visibility constraint.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, salsa::Update)]
 pub(super) struct SymbolBindings {
-    /// [`BitSet`]: which bindings (as [`ScopedDefinitionId`]) can reach the current location?
-    live_bindings: Bindings,
-
-    /// For each live binding, which [`ScopedConstraintId`] apply?
-    ///
-    /// This is a [`smallvec::SmallVec`] which should always have one [`BitSet`] of constraints per
-    /// binding in `live_bindings`.
-    constraints: ConstraintsPerBinding,
-
-    /// For each live binding, which visibility constraint applies to it?
-    visibility_constraints: VisibilityConstraintPerBinding,
+    /// A list of live bindings for this symbol, sorted by their `ScopedDefinitionId`
+    live_bindings: SmallVec<[LiveBinding; INLINE_DEFINITIONS_PER_SYMBOL]>,
 }
+
+/// One of the live bindings for a single symbol at some point in control flow.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct LiveBinding {
+    pub(super) binding: ScopedDefinitionId,
+    pub(super) narrowing_constraint: ScopedNarrowingConstraint,
+    pub(super) visibility_constraint: ScopedVisibilityConstraintId,
+}
+
+pub(super) type LiveBindingsIterator<'a> = std::slice::Iter<'a, LiveBinding>;
 
 impl SymbolBindings {
     fn unbound(scope_start_visibility: ScopedVisibilityConstraintId) -> Self {
+        let initial_binding = LiveBinding {
+            binding: ScopedDefinitionId::UNBOUND,
+            narrowing_constraint: ScopedNarrowingConstraint::empty(),
+            visibility_constraint: scope_start_visibility,
+        };
         Self {
-            live_bindings: Bindings::with(ScopedDefinitionId::UNBOUND.as_u32()),
-            constraints: ConstraintsPerBinding::from_iter([Constraints::default()]),
-            visibility_constraints: VisibilityConstraintPerBinding::from_iter([
-                scope_start_visibility,
-            ]),
+            live_bindings: smallvec![initial_binding],
         }
     }
 
     /// Record a newly-encountered binding for this symbol.
-    pub(super) fn record_binding(&mut self, binding_id: ScopedDefinitionId) {
+    pub(super) fn record_binding(
+        &mut self,
+        binding: ScopedDefinitionId,
+        visibility_constraint: ScopedVisibilityConstraintId,
+    ) {
         // The new binding replaces all previous live bindings in this path, and has no
         // constraints.
-        self.live_bindings = Bindings::with(binding_id.into());
-        self.constraints = ConstraintsPerBinding::with_capacity(1);
-        self.constraints.push(Constraints::default());
-
-        self.visibility_constraints = VisibilityConstraintPerBinding::with_capacity(1);
-        self.visibility_constraints
-            .push(ScopedVisibilityConstraintId::ALWAYS_TRUE);
+        self.live_bindings.clear();
+        self.live_bindings.push(LiveBinding {
+            binding,
+            narrowing_constraint: ScopedNarrowingConstraint::empty(),
+            visibility_constraint,
+        });
     }
 
     /// Add given constraint to all live bindings.
-    pub(super) fn record_constraint(&mut self, constraint_id: ScopedConstraintId) {
-        for bitset in &mut self.constraints {
-            bitset.insert(constraint_id.into());
+    pub(super) fn record_narrowing_constraint(
+        &mut self,
+        narrowing_constraints: &mut NarrowingConstraintsBuilder,
+        predicate: ScopedNarrowingConstraintPredicate,
+    ) {
+        for binding in &mut self.live_bindings {
+            binding.narrowing_constraint = narrowing_constraints
+                .add_predicate_to_constraint(binding.narrowing_constraint, predicate);
         }
     }
 
     /// Add given visibility constraint to all live bindings.
     pub(super) fn record_visibility_constraint(
         &mut self,
-        visibility_constraints: &mut VisibilityConstraints,
+        visibility_constraints: &mut VisibilityConstraintsBuilder,
         constraint: ScopedVisibilityConstraintId,
     ) {
-        for existing in &mut self.visibility_constraints {
-            *existing = visibility_constraints.add_and_constraint(*existing, constraint);
+        for binding in &mut self.live_bindings {
+            binding.visibility_constraint = visibility_constraints
+                .add_and_constraint(binding.visibility_constraint, constraint);
         }
     }
 
     /// Iterate over currently live bindings for this symbol
-    pub(super) fn iter(&self) -> BindingIdWithConstraintsIterator {
-        BindingIdWithConstraintsIterator {
-            definitions: self.live_bindings.iter(),
-            constraints: self.constraints.iter(),
-            visibility_constraints: self.visibility_constraints.iter(),
+    pub(super) fn iter(&self) -> LiveBindingsIterator<'_> {
+        self.live_bindings.iter()
+    }
+
+    /// Iterate over the IDs of each currently live binding for this symbol
+    fn iter_bindings(&self) -> impl Iterator<Item = ScopedDefinitionId> + '_ {
+        self.iter().map(|lb| lb.binding)
+    }
+
+    fn simplify_visibility_constraints(&mut self, other: SymbolBindings) {
+        // If the set of live bindings hasn't changed, don't simplify.
+        if self.live_bindings.len() != other.live_bindings.len()
+            || !self.iter_bindings().eq(other.iter_bindings())
+        {
+            return;
+        }
+
+        for (binding, other_binding) in self.live_bindings.iter_mut().zip(other.live_bindings) {
+            binding.visibility_constraint = other_binding.visibility_constraint;
+        }
+    }
+
+    fn merge(
+        &mut self,
+        b: Self,
+        narrowing_constraints: &mut NarrowingConstraintsBuilder,
+        visibility_constraints: &mut VisibilityConstraintsBuilder,
+    ) {
+        let a = std::mem::take(self);
+
+        // Invariant: merge_join_by consumes the two iterators in sorted order, which ensures that
+        // the merged `live_bindings` vec remains sorted. If a definition is found in both `a` and
+        // `b`, we compose the constraints from the two paths in an appropriate way (intersection
+        // for narrowing constraints; ternary OR for visibility constraints). If a definition is
+        // found in only one path, it is used as-is.
+        let a = a.live_bindings.into_iter();
+        let b = b.live_bindings.into_iter();
+        for zipped in a.merge_join_by(b, |a, b| a.binding.cmp(&b.binding)) {
+            match zipped {
+                EitherOrBoth::Both(a, b) => {
+                    // If the same definition is visible through both paths, any constraint
+                    // that applies on only one path is irrelevant to the resulting type from
+                    // unioning the two paths, so we intersect the constraints.
+                    let narrowing_constraint = narrowing_constraints
+                        .intersect_constraints(a.narrowing_constraint, b.narrowing_constraint);
+
+                    // For visibility constraints, we merge them using a ternary OR operation:
+                    let visibility_constraint = visibility_constraints
+                        .add_or_constraint(a.visibility_constraint, b.visibility_constraint);
+
+                    self.live_bindings.push(LiveBinding {
+                        binding: a.binding,
+                        narrowing_constraint,
+                        visibility_constraint,
+                    });
+                }
+
+                EitherOrBoth::Left(binding) | EitherOrBoth::Right(binding) => {
+                    self.live_bindings.push(binding);
+                }
+            }
         }
     }
 }
@@ -260,20 +329,30 @@ impl SymbolState {
     }
 
     /// Record a newly-encountered binding for this symbol.
-    pub(super) fn record_binding(&mut self, binding_id: ScopedDefinitionId) {
+    pub(super) fn record_binding(
+        &mut self,
+        binding_id: ScopedDefinitionId,
+        visibility_constraint: ScopedVisibilityConstraintId,
+    ) {
         debug_assert_ne!(binding_id, ScopedDefinitionId::UNBOUND);
-        self.bindings.record_binding(binding_id);
+        self.bindings
+            .record_binding(binding_id, visibility_constraint);
     }
 
     /// Add given constraint to all live bindings.
-    pub(super) fn record_constraint(&mut self, constraint_id: ScopedConstraintId) {
-        self.bindings.record_constraint(constraint_id);
+    pub(super) fn record_narrowing_constraint(
+        &mut self,
+        narrowing_constraints: &mut NarrowingConstraintsBuilder,
+        constraint: ScopedNarrowingConstraintPredicate,
+    ) {
+        self.bindings
+            .record_narrowing_constraint(narrowing_constraints, constraint);
     }
 
     /// Add given visibility constraint to all live bindings.
     pub(super) fn record_visibility_constraint(
         &mut self,
-        visibility_constraints: &mut VisibilityConstraints,
+        visibility_constraints: &mut VisibilityConstraintsBuilder,
         constraint: ScopedVisibilityConstraintId,
     ) {
         self.bindings
@@ -282,14 +361,14 @@ impl SymbolState {
             .record_visibility_constraint(visibility_constraints, constraint);
     }
 
+    /// Simplifies this snapshot to have the same visibility constraints as a previous point in the
+    /// control flow, but only if the set of live bindings or declarations for this symbol hasn't
+    /// changed.
     pub(super) fn simplify_visibility_constraints(&mut self, snapshot_state: SymbolState) {
-        if self.bindings.live_bindings == snapshot_state.bindings.live_bindings {
-            self.bindings.visibility_constraints = snapshot_state.bindings.visibility_constraints;
-        }
-        if self.declarations.live_declarations == snapshot_state.declarations.live_declarations {
-            self.declarations.visibility_constraints =
-                snapshot_state.declarations.visibility_constraints;
-        }
+        self.bindings
+            .simplify_visibility_constraints(snapshot_state.bindings);
+        self.declarations
+            .simplify_visibility_constraints(snapshot_state.declarations);
     }
 
     /// Record a newly-encountered declaration of this symbol.
@@ -301,203 +380,13 @@ impl SymbolState {
     pub(super) fn merge(
         &mut self,
         b: SymbolState,
-        visibility_constraints: &mut VisibilityConstraints,
+        narrowing_constraints: &mut NarrowingConstraintsBuilder,
+        visibility_constraints: &mut VisibilityConstraintsBuilder,
     ) {
-        let mut a = Self {
-            bindings: SymbolBindings {
-                live_bindings: Bindings::default(),
-                constraints: ConstraintsPerBinding::default(),
-                visibility_constraints: VisibilityConstraintPerBinding::default(),
-            },
-            declarations: SymbolDeclarations {
-                live_declarations: self.declarations.live_declarations.clone(),
-                visibility_constraints: VisibilityConstraintPerDeclaration::default(),
-            },
-        };
-
-        std::mem::swap(&mut a, self);
-
-        let mut a_defs_iter = a.bindings.live_bindings.iter();
-        let mut b_defs_iter = b.bindings.live_bindings.iter();
-        let mut a_constraints_iter = a.bindings.constraints.into_iter();
-        let mut b_constraints_iter = b.bindings.constraints.into_iter();
-        let mut a_vis_constraints_iter = a.bindings.visibility_constraints.into_iter();
-        let mut b_vis_constraints_iter = b.bindings.visibility_constraints.into_iter();
-
-        let mut opt_a_def: Option<u32> = a_defs_iter.next();
-        let mut opt_b_def: Option<u32> = b_defs_iter.next();
-
-        // Iterate through the definitions from `a` and `b`, always processing the lower definition
-        // ID first, and pushing each definition onto the merged `SymbolState` with its
-        // constraints. If a definition is found in both `a` and `b`, push it with the intersection
-        // of the constraints from the two paths; a constraint that applies from only one possible
-        // path is irrelevant.
-
-        // Helper to push `def`, with constraints in `constraints_iter`, onto `self`.
-        let push = |def,
-                    constraints_iter: &mut ConstraintsIntoIterator,
-                    visibility_constraints_iter: &mut VisibilityConstraintsIntoIterator,
-                    merged: &mut Self| {
-            merged.bindings.live_bindings.insert(def);
-            // SAFETY: we only ever create SymbolState using [`SymbolState::undefined`], which adds
-            // one "unbound" definition with corresponding narrowing and visibility constraints, or
-            // using [`SymbolState::record_binding`] or [`SymbolState::record_declaration`], which
-            // similarly add one definition with corresponding constraints. [`SymbolState::merge`]
-            // always pushes one definition and one constraint bitset and one visibility constraint
-            // together (just below), so the number of definitions and the number of constraints can
-            // never get out of sync.
-            // get out of sync.
-            let constraints = constraints_iter
-                .next()
-                .expect("definitions and constraints length mismatch");
-            let visibility_constraints = visibility_constraints_iter
-                .next()
-                .expect("definitions and visibility_constraints length mismatch");
-            merged.bindings.constraints.push(constraints);
-            merged
-                .bindings
-                .visibility_constraints
-                .push(visibility_constraints);
-        };
-
-        loop {
-            match (opt_a_def, opt_b_def) {
-                (Some(a_def), Some(b_def)) => match a_def.cmp(&b_def) {
-                    std::cmp::Ordering::Less => {
-                        // Next definition ID is only in `a`, push it to `self` and advance `a`.
-                        push(
-                            a_def,
-                            &mut a_constraints_iter,
-                            &mut a_vis_constraints_iter,
-                            self,
-                        );
-                        opt_a_def = a_defs_iter.next();
-                    }
-                    std::cmp::Ordering::Greater => {
-                        // Next definition ID is only in `b`, push it to `self` and advance `b`.
-                        push(
-                            b_def,
-                            &mut b_constraints_iter,
-                            &mut b_vis_constraints_iter,
-                            self,
-                        );
-                        opt_b_def = b_defs_iter.next();
-                    }
-                    std::cmp::Ordering::Equal => {
-                        // Next definition is in both; push to `self` and intersect constraints.
-                        push(
-                            a_def,
-                            &mut b_constraints_iter,
-                            &mut b_vis_constraints_iter,
-                            self,
-                        );
-
-                        // SAFETY: see comment in `push` above.
-                        let a_constraints = a_constraints_iter
-                            .next()
-                            .expect("definitions and constraints length mismatch");
-                        let current_constraints = self.bindings.constraints.last_mut().unwrap();
-
-                        // If the same definition is visible through both paths, any constraint
-                        // that applies on only one path is irrelevant to the resulting type from
-                        // unioning the two paths, so we intersect the constraints.
-                        current_constraints.intersect(&a_constraints);
-
-                        // For visibility constraints, we merge them using a ternary OR operation:
-                        let a_vis_constraint = a_vis_constraints_iter
-                            .next()
-                            .expect("visibility_constraints length mismatch");
-                        let current_vis_constraint =
-                            self.bindings.visibility_constraints.last_mut().unwrap();
-                        *current_vis_constraint = visibility_constraints
-                            .add_or_constraint(*current_vis_constraint, a_vis_constraint);
-
-                        opt_a_def = a_defs_iter.next();
-                        opt_b_def = b_defs_iter.next();
-                    }
-                },
-                (Some(a_def), None) => {
-                    // We've exhausted `b`, just push the def from `a` and move on to the next.
-                    push(
-                        a_def,
-                        &mut a_constraints_iter,
-                        &mut a_vis_constraints_iter,
-                        self,
-                    );
-                    opt_a_def = a_defs_iter.next();
-                }
-                (None, Some(b_def)) => {
-                    // We've exhausted `a`, just push the def from `b` and move on to the next.
-                    push(
-                        b_def,
-                        &mut b_constraints_iter,
-                        &mut b_vis_constraints_iter,
-                        self,
-                    );
-                    opt_b_def = b_defs_iter.next();
-                }
-                (None, None) => break,
-            }
-        }
-
-        // Same as above, but for declarations.
-        let mut a_decls_iter = a.declarations.live_declarations.iter();
-        let mut b_decls_iter = b.declarations.live_declarations.iter();
-        let mut a_vis_constraints_iter = a.declarations.visibility_constraints.into_iter();
-        let mut b_vis_constraints_iter = b.declarations.visibility_constraints.into_iter();
-
-        let mut opt_a_decl: Option<u32> = a_decls_iter.next();
-        let mut opt_b_decl: Option<u32> = b_decls_iter.next();
-
-        let push = |decl,
-                    vis_constraints_iter: &mut VisibilityConstraintsIntoIterator,
-                    merged: &mut Self| {
-            merged.declarations.live_declarations.insert(decl);
-            let vis_constraints = vis_constraints_iter
-                .next()
-                .expect("declarations and visibility_constraints length mismatch");
-            merged
-                .declarations
-                .visibility_constraints
-                .push(vis_constraints);
-        };
-
-        loop {
-            match (opt_a_decl, opt_b_decl) {
-                (Some(a_decl), Some(b_decl)) => match a_decl.cmp(&b_decl) {
-                    std::cmp::Ordering::Less => {
-                        push(a_decl, &mut a_vis_constraints_iter, self);
-                        opt_a_decl = a_decls_iter.next();
-                    }
-                    std::cmp::Ordering::Greater => {
-                        push(b_decl, &mut b_vis_constraints_iter, self);
-                        opt_b_decl = b_decls_iter.next();
-                    }
-                    std::cmp::Ordering::Equal => {
-                        push(a_decl, &mut b_vis_constraints_iter, self);
-
-                        let a_vis_constraint = a_vis_constraints_iter
-                            .next()
-                            .expect("declarations and visibility_constraints length mismatch");
-                        let current = self.declarations.visibility_constraints.last_mut().unwrap();
-                        *current =
-                            visibility_constraints.add_or_constraint(*current, a_vis_constraint);
-
-                        opt_a_decl = a_decls_iter.next();
-                        opt_b_decl = b_decls_iter.next();
-                    }
-                },
-                (Some(a_decl), None) => {
-                    push(a_decl, &mut a_vis_constraints_iter, self);
-                    opt_a_decl = a_decls_iter.next();
-                }
-                (None, Some(b_decl)) => {
-                    push(b_decl, &mut b_vis_constraints_iter, self);
-                    opt_b_decl = b_decls_iter.next();
-                }
-                (None, None) => break,
-            }
-        }
+        self.bindings
+            .merge(b.bindings, narrowing_constraints, visibility_constraints);
+        self.declarations
+            .merge(b.declarations, visibility_constraints);
     }
 
     pub(super) fn bindings(&self) -> &SymbolBindings {
@@ -509,121 +398,34 @@ impl SymbolState {
     }
 }
 
-/// A single binding (as [`ScopedDefinitionId`]) with an iterator of its applicable
-/// narrowing constraints ([`ScopedConstraintId`]) and a corresponding visibility
-/// visibility constraint ([`ScopedVisibilityConstraintId`]).
-#[derive(Debug)]
-pub(super) struct BindingIdWithConstraints<'map> {
-    pub(super) definition: ScopedDefinitionId,
-    pub(super) constraint_ids: ConstraintIdIterator<'map>,
-    pub(super) visibility_constraint: ScopedVisibilityConstraintId,
-}
-
-#[derive(Debug)]
-pub(super) struct BindingIdWithConstraintsIterator<'map> {
-    definitions: BindingsIterator<'map>,
-    constraints: ConstraintsIterator<'map>,
-    visibility_constraints: VisibilityConstraintsIterator<'map>,
-}
-
-impl<'map> Iterator for BindingIdWithConstraintsIterator<'map> {
-    type Item = BindingIdWithConstraints<'map>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        match (
-            self.definitions.next(),
-            self.constraints.next(),
-            self.visibility_constraints.next(),
-        ) {
-            (None, None, None) => None,
-            (Some(def), Some(constraints), Some(visibility_constraint_id)) => {
-                Some(BindingIdWithConstraints {
-                    definition: ScopedDefinitionId::from_u32(def),
-                    constraint_ids: ConstraintIdIterator {
-                        wrapped: constraints.iter(),
-                    },
-                    visibility_constraint: *visibility_constraint_id,
-                })
-            }
-            // SAFETY: see above.
-            _ => unreachable!("definitions and constraints length mismatch"),
-        }
-    }
-}
-
-impl std::iter::FusedIterator for BindingIdWithConstraintsIterator<'_> {}
-
-#[derive(Debug)]
-pub(super) struct ConstraintIdIterator<'a> {
-    wrapped: BitSetIterator<'a, INLINE_CONSTRAINT_BLOCKS>,
-}
-
-impl Iterator for ConstraintIdIterator<'_> {
-    type Item = ScopedConstraintId;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.wrapped.next().map(ScopedConstraintId::from_u32)
-    }
-}
-
-impl std::iter::FusedIterator for ConstraintIdIterator<'_> {}
-
-/// A single declaration (as [`ScopedDefinitionId`]) with a corresponding visibility
-/// visibility constraint ([`ScopedVisibilityConstraintId`]).
-#[derive(Debug)]
-pub(super) struct DeclarationIdWithConstraint {
-    pub(super) definition: ScopedDefinitionId,
-    pub(super) visibility_constraint: ScopedVisibilityConstraintId,
-}
-
-pub(super) struct DeclarationIdIterator<'map> {
-    pub(crate) declarations: DeclarationsIterator<'map>,
-    pub(crate) visibility_constraints: VisibilityConstraintsIterator<'map>,
-}
-
-impl Iterator for DeclarationIdIterator<'_> {
-    type Item = DeclarationIdWithConstraint;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        match (self.declarations.next(), self.visibility_constraints.next()) {
-            (None, None) => None,
-            (Some(declaration), Some(&visibility_constraint)) => {
-                Some(DeclarationIdWithConstraint {
-                    definition: ScopedDefinitionId::from_u32(declaration),
-                    visibility_constraint,
-                })
-            }
-            // SAFETY: see above.
-            _ => unreachable!("declarations and visibility_constraints length mismatch"),
-        }
-    }
-}
-
-impl std::iter::FusedIterator for DeclarationIdIterator<'_> {}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    use crate::semantic_index::predicate::ScopedPredicateId;
+
     #[track_caller]
-    fn assert_bindings(symbol: &SymbolState, expected: &[&str]) {
+    fn assert_bindings(
+        narrowing_constraints: &NarrowingConstraintsBuilder,
+        symbol: &SymbolState,
+        expected: &[&str],
+    ) {
         let actual = symbol
             .bindings()
             .iter()
-            .map(|def_id_with_constraints| {
-                let def_id = def_id_with_constraints.definition;
+            .map(|live_binding| {
+                let def_id = live_binding.binding;
                 let def = if def_id == ScopedDefinitionId::UNBOUND {
                     "unbound".into()
                 } else {
                     def_id.as_u32().to_string()
                 };
-                let constraints = def_id_with_constraints
-                    .constraint_ids
-                    .map(ScopedConstraintId::as_u32)
-                    .map(|idx| idx.to_string())
+                let predicates = narrowing_constraints
+                    .iter_predicates(live_binding.narrowing_constraint)
+                    .map(|idx| idx.as_u32().to_string())
                     .collect::<Vec<_>>()
                     .join(", ");
-                format!("{def}<{constraints}>")
+                format!("{def}<{predicates}>")
             })
             .collect::<Vec<_>>();
         assert_eq!(actual, expected);
@@ -635,14 +437,14 @@ mod tests {
             .declarations()
             .iter()
             .map(
-                |DeclarationIdWithConstraint {
-                     definition,
+                |LiveDeclaration {
+                     declaration,
                      visibility_constraint: _,
                  }| {
-                    if definition == ScopedDefinitionId::UNBOUND {
+                    if *declaration == ScopedDefinitionId::UNBOUND {
                         "undeclared".into()
                     } else {
-                        definition.as_u32().to_string()
+                        declaration.as_u32().to_string()
                     }
                 },
             )
@@ -652,73 +454,120 @@ mod tests {
 
     #[test]
     fn unbound() {
+        let narrowing_constraints = NarrowingConstraintsBuilder::default();
         let sym = SymbolState::undefined(ScopedVisibilityConstraintId::ALWAYS_TRUE);
 
-        assert_bindings(&sym, &["unbound<>"]);
+        assert_bindings(&narrowing_constraints, &sym, &["unbound<>"]);
     }
 
     #[test]
     fn with() {
+        let narrowing_constraints = NarrowingConstraintsBuilder::default();
         let mut sym = SymbolState::undefined(ScopedVisibilityConstraintId::ALWAYS_TRUE);
-        sym.record_binding(ScopedDefinitionId::from_u32(1));
+        sym.record_binding(
+            ScopedDefinitionId::from_u32(1),
+            ScopedVisibilityConstraintId::ALWAYS_TRUE,
+        );
 
-        assert_bindings(&sym, &["1<>"]);
+        assert_bindings(&narrowing_constraints, &sym, &["1<>"]);
     }
 
     #[test]
     fn record_constraint() {
+        let mut narrowing_constraints = NarrowingConstraintsBuilder::default();
         let mut sym = SymbolState::undefined(ScopedVisibilityConstraintId::ALWAYS_TRUE);
-        sym.record_binding(ScopedDefinitionId::from_u32(1));
-        sym.record_constraint(ScopedConstraintId::from_u32(0));
+        sym.record_binding(
+            ScopedDefinitionId::from_u32(1),
+            ScopedVisibilityConstraintId::ALWAYS_TRUE,
+        );
+        let predicate = ScopedPredicateId::from_u32(0).into();
+        sym.record_narrowing_constraint(&mut narrowing_constraints, predicate);
 
-        assert_bindings(&sym, &["1<0>"]);
+        assert_bindings(&narrowing_constraints, &sym, &["1<0>"]);
     }
 
     #[test]
     fn merge() {
-        let mut visibility_constraints = VisibilityConstraints::default();
+        let mut narrowing_constraints = NarrowingConstraintsBuilder::default();
+        let mut visibility_constraints = VisibilityConstraintsBuilder::default();
 
         // merging the same definition with the same constraint keeps the constraint
         let mut sym1a = SymbolState::undefined(ScopedVisibilityConstraintId::ALWAYS_TRUE);
-        sym1a.record_binding(ScopedDefinitionId::from_u32(1));
-        sym1a.record_constraint(ScopedConstraintId::from_u32(0));
+        sym1a.record_binding(
+            ScopedDefinitionId::from_u32(1),
+            ScopedVisibilityConstraintId::ALWAYS_TRUE,
+        );
+        let predicate = ScopedPredicateId::from_u32(0).into();
+        sym1a.record_narrowing_constraint(&mut narrowing_constraints, predicate);
 
         let mut sym1b = SymbolState::undefined(ScopedVisibilityConstraintId::ALWAYS_TRUE);
-        sym1b.record_binding(ScopedDefinitionId::from_u32(1));
-        sym1b.record_constraint(ScopedConstraintId::from_u32(0));
+        sym1b.record_binding(
+            ScopedDefinitionId::from_u32(1),
+            ScopedVisibilityConstraintId::ALWAYS_TRUE,
+        );
+        let predicate = ScopedPredicateId::from_u32(0).into();
+        sym1b.record_narrowing_constraint(&mut narrowing_constraints, predicate);
 
-        sym1a.merge(sym1b, &mut visibility_constraints);
+        sym1a.merge(
+            sym1b,
+            &mut narrowing_constraints,
+            &mut visibility_constraints,
+        );
         let mut sym1 = sym1a;
-        assert_bindings(&sym1, &["1<0>"]);
+        assert_bindings(&narrowing_constraints, &sym1, &["1<0>"]);
 
         // merging the same definition with differing constraints drops all constraints
         let mut sym2a = SymbolState::undefined(ScopedVisibilityConstraintId::ALWAYS_TRUE);
-        sym2a.record_binding(ScopedDefinitionId::from_u32(2));
-        sym2a.record_constraint(ScopedConstraintId::from_u32(1));
+        sym2a.record_binding(
+            ScopedDefinitionId::from_u32(2),
+            ScopedVisibilityConstraintId::ALWAYS_TRUE,
+        );
+        let predicate = ScopedPredicateId::from_u32(1).into();
+        sym2a.record_narrowing_constraint(&mut narrowing_constraints, predicate);
 
         let mut sym1b = SymbolState::undefined(ScopedVisibilityConstraintId::ALWAYS_TRUE);
-        sym1b.record_binding(ScopedDefinitionId::from_u32(2));
-        sym1b.record_constraint(ScopedConstraintId::from_u32(2));
+        sym1b.record_binding(
+            ScopedDefinitionId::from_u32(2),
+            ScopedVisibilityConstraintId::ALWAYS_TRUE,
+        );
+        let predicate = ScopedPredicateId::from_u32(2).into();
+        sym1b.record_narrowing_constraint(&mut narrowing_constraints, predicate);
 
-        sym2a.merge(sym1b, &mut visibility_constraints);
+        sym2a.merge(
+            sym1b,
+            &mut narrowing_constraints,
+            &mut visibility_constraints,
+        );
         let sym2 = sym2a;
-        assert_bindings(&sym2, &["2<>"]);
+        assert_bindings(&narrowing_constraints, &sym2, &["2<>"]);
 
         // merging a constrained definition with unbound keeps both
         let mut sym3a = SymbolState::undefined(ScopedVisibilityConstraintId::ALWAYS_TRUE);
-        sym3a.record_binding(ScopedDefinitionId::from_u32(3));
-        sym3a.record_constraint(ScopedConstraintId::from_u32(3));
+        sym3a.record_binding(
+            ScopedDefinitionId::from_u32(3),
+            ScopedVisibilityConstraintId::ALWAYS_TRUE,
+        );
+        let predicate = ScopedPredicateId::from_u32(3).into();
+        sym3a.record_narrowing_constraint(&mut narrowing_constraints, predicate);
 
         let sym2b = SymbolState::undefined(ScopedVisibilityConstraintId::ALWAYS_TRUE);
 
-        sym3a.merge(sym2b, &mut visibility_constraints);
+        sym3a.merge(
+            sym2b,
+            &mut narrowing_constraints,
+            &mut visibility_constraints,
+        );
         let sym3 = sym3a;
-        assert_bindings(&sym3, &["unbound<>", "3<3>"]);
+        assert_bindings(&narrowing_constraints, &sym3, &["unbound<>", "3<3>"]);
 
         // merging different definitions keeps them each with their existing constraints
-        sym1.merge(sym3, &mut visibility_constraints);
+        sym1.merge(
+            sym3,
+            &mut narrowing_constraints,
+            &mut visibility_constraints,
+        );
         let sym = sym1;
-        assert_bindings(&sym, &["unbound<>", "1<0>", "3<3>"]);
+        assert_bindings(&narrowing_constraints, &sym, &["unbound<>", "1<0>", "3<3>"]);
     }
 
     #[test]
@@ -747,27 +596,37 @@ mod tests {
 
     #[test]
     fn record_declaration_merge() {
-        let mut visibility_constraints = VisibilityConstraints::default();
+        let mut narrowing_constraints = NarrowingConstraintsBuilder::default();
+        let mut visibility_constraints = VisibilityConstraintsBuilder::default();
         let mut sym = SymbolState::undefined(ScopedVisibilityConstraintId::ALWAYS_TRUE);
         sym.record_declaration(ScopedDefinitionId::from_u32(1));
 
         let mut sym2 = SymbolState::undefined(ScopedVisibilityConstraintId::ALWAYS_TRUE);
         sym2.record_declaration(ScopedDefinitionId::from_u32(2));
 
-        sym.merge(sym2, &mut visibility_constraints);
+        sym.merge(
+            sym2,
+            &mut narrowing_constraints,
+            &mut visibility_constraints,
+        );
 
         assert_declarations(&sym, &["1", "2"]);
     }
 
     #[test]
     fn record_declaration_merge_partial_undeclared() {
-        let mut visibility_constraints = VisibilityConstraints::default();
+        let mut narrowing_constraints = NarrowingConstraintsBuilder::default();
+        let mut visibility_constraints = VisibilityConstraintsBuilder::default();
         let mut sym = SymbolState::undefined(ScopedVisibilityConstraintId::ALWAYS_TRUE);
         sym.record_declaration(ScopedDefinitionId::from_u32(1));
 
         let sym2 = SymbolState::undefined(ScopedVisibilityConstraintId::ALWAYS_TRUE);
 
-        sym.merge(sym2, &mut visibility_constraints);
+        sym.merge(
+            sym2,
+            &mut narrowing_constraints,
+            &mut visibility_constraints,
+        );
 
         assert_declarations(&sym, &["undeclared", "1"]);
     }

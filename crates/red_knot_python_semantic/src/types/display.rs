@@ -3,13 +3,14 @@
 use std::fmt::{self, Display, Formatter, Write};
 
 use ruff_db::display::FormatterJoinExtension;
-use ruff_python_ast::str::Quote;
+use ruff_python_ast::str::{Quote, TripleQuotes};
 use ruff_python_literal::escape::AsciiEscape;
 
 use crate::types::class_base::ClassBase;
+use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::{
-    ClassLiteralType, InstanceType, IntersectionType, KnownClass, StringLiteralType, Type,
-    UnionType,
+    CallableType, ClassLiteralType, InstanceType, IntersectionType, KnownClass, StringLiteralType,
+    Type, UnionType,
 };
 use crate::Db;
 use rustc_hash::FxHashMap;
@@ -65,9 +66,8 @@ struct DisplayRepresentation<'db> {
 impl Display for DisplayRepresentation<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self.ty {
-            Type::Any => f.write_str("Any"),
+            Type::Dynamic(dynamic) => dynamic.fmt(f),
             Type::Never => f.write_str("Never"),
-            Type::Unknown => f.write_str("Unknown"),
             Type::Instance(InstanceType { class }) => {
                 let representation = match class.known(self.db) {
                     Some(KnownClass::NoneType) => "None",
@@ -76,9 +76,6 @@ impl Display for DisplayRepresentation<'_> {
                 };
                 f.write_str(representation)
             }
-            // `[Type::Todo]`'s display should be explicit that is not a valid display of
-            // any other type
-            Type::Todo(todo) => write!(f, "@Todo{todo}"),
             Type::ModuleLiteral(module) => {
                 write!(f, "<module '{}'>", module.module(self.db).name())
             }
@@ -88,12 +85,31 @@ impl Display for DisplayRepresentation<'_> {
                 // Only show the bare class name here; ClassBase::display would render this as
                 // type[<class 'Foo'>] instead of type[Foo].
                 ClassBase::Class(class) => write!(f, "type[{}]", class.name(self.db)),
-                base @ (ClassBase::Any | ClassBase::Todo(_) | ClassBase::Unknown) => {
-                    write!(f, "type[{}]", base.display(self.db))
-                }
+                ClassBase::Dynamic(dynamic) => write!(f, "type[{dynamic}]"),
             },
             Type::KnownInstance(known_instance) => f.write_str(known_instance.repr(self.db)),
             Type::FunctionLiteral(function) => f.write_str(function.name(self.db)),
+            Type::Callable(CallableType::General(callable)) => {
+                callable.signature(self.db).display(self.db).fmt(f)
+            }
+            Type::Callable(CallableType::BoundMethod(bound_method)) => {
+                write!(
+                    f,
+                    "<bound method `{method}` of `{instance}`>",
+                    method = bound_method.function(self.db).name(self.db),
+                    instance = bound_method.self_instance(self.db).display(self.db)
+                )
+            }
+            Type::Callable(CallableType::MethodWrapperDunderGet(function)) => {
+                write!(
+                    f,
+                    "<method-wrapper `__get__` of `{function}`>",
+                    function = function.name(self.db)
+                )
+            }
+            Type::Callable(CallableType::WrapperDescriptorDunderGet) => {
+                f.write_str("<wrapper-descriptor `__get__` of `function` objects>")
+            }
             Type::Union(union) => union.display(self.db).fmt(f),
             Type::Intersection(intersection) => intersection.display(self.db).fmt(f),
             Type::IntLiteral(n) => n.fmt(f),
@@ -104,7 +120,7 @@ impl Display for DisplayRepresentation<'_> {
                 let escape =
                     AsciiEscape::with_preferred_quote(bytes.value(self.db).as_ref(), Quote::Double);
 
-                escape.bytes_repr().write(f)
+                escape.bytes_repr(TripleQuotes::No).write(f)
             }
             Type::SliceLiteral(slice) => {
                 f.write_str("slice[")?;
@@ -141,6 +157,99 @@ impl Display for DisplayRepresentation<'_> {
             Type::AlwaysTruthy => f.write_str("AlwaysTruthy"),
             Type::AlwaysFalsy => f.write_str("AlwaysFalsy"),
         }
+    }
+}
+
+impl<'db> Signature<'db> {
+    fn display(&'db self, db: &'db dyn Db) -> DisplaySignature<'db> {
+        DisplaySignature {
+            parameters: self.parameters(),
+            return_ty: self.return_ty,
+            db,
+        }
+    }
+}
+
+struct DisplaySignature<'db> {
+    parameters: &'db Parameters<'db>,
+    return_ty: Option<Type<'db>>,
+    db: &'db dyn Db,
+}
+
+impl Display for DisplaySignature<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.write_char('(')?;
+
+        if self.parameters.is_gradual() {
+            // We represent gradual form as `...` in the signature, internally the parameters still
+            // contain `(*args, **kwargs)` parameters.
+            f.write_str("...")?;
+        } else {
+            let mut star_added = false;
+            let mut needs_slash = false;
+            let mut join = f.join(", ");
+
+            for parameter in self.parameters.as_slice() {
+                if !star_added && parameter.is_keyword_only() {
+                    join.entry(&'*');
+                    star_added = true;
+                }
+                if parameter.is_positional_only() {
+                    needs_slash = true;
+                } else if needs_slash {
+                    join.entry(&'/');
+                    needs_slash = false;
+                }
+                join.entry(&parameter.display(self.db));
+            }
+            if needs_slash {
+                join.entry(&'/');
+            }
+            join.finish()?;
+        }
+
+        write!(
+            f,
+            ") -> {}",
+            self.return_ty.unwrap_or(Type::unknown()).display(self.db)
+        )?;
+
+        Ok(())
+    }
+}
+
+impl<'db> Parameter<'db> {
+    fn display(&'db self, db: &'db dyn Db) -> DisplayParameter<'db> {
+        DisplayParameter { param: self, db }
+    }
+}
+
+struct DisplayParameter<'db> {
+    param: &'db Parameter<'db>,
+    db: &'db dyn Db,
+}
+
+impl Display for DisplayParameter<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        if let Some(name) = self.param.display_name() {
+            write!(f, "{name}")?;
+            if let Some(annotated_type) = self.param.annotated_type() {
+                write!(f, ": {}", annotated_type.display(self.db))?;
+            }
+            // Default value can only be specified if `name` is given.
+            if let Some(default_ty) = self.param.default_type() {
+                if self.param.annotated_type().is_some() {
+                    write!(f, " = {}", default_ty.display(self.db))?;
+                } else {
+                    write!(f, "={}", default_ty.display(self.db))?;
+                }
+            }
+        } else if let Some(ty) = self.param.annotated_type() {
+            // This case is specifically for the `Callable` signature where name and default value
+            // cannot be provided.
+            ty.display(self.db).fmt(f)?;
+        }
+        Ok(())
     }
 }
 
@@ -363,8 +472,14 @@ impl Display for DisplayStringLiteralType<'_> {
 
 #[cfg(test)]
 mod tests {
+    use ruff_python_ast::name::Name;
+
     use crate::db::tests::setup_db;
-    use crate::types::{SliceLiteralType, StringLiteralType, Type};
+    use crate::types::{
+        KnownClass, Parameter, ParameterKind, Parameters, Signature, SliceLiteralType,
+        StringLiteralType, Type,
+    };
+    use crate::Db;
 
     #[test]
     fn test_slice_literal_display() {
@@ -429,6 +544,228 @@ mod tests {
                 .display(&db)
                 .to_string(),
             r#"Literal["\""]"#
+        );
+    }
+
+    fn display_signature<'db>(
+        db: &dyn Db,
+        parameters: impl IntoIterator<Item = Parameter<'db>>,
+        return_ty: Option<Type<'db>>,
+    ) -> String {
+        Signature::new(Parameters::new(parameters), return_ty)
+            .display(db)
+            .to_string()
+    }
+
+    #[test]
+    fn signature_display() {
+        let db = setup_db();
+
+        // Empty parameters with no return type.
+        assert_eq!(display_signature(&db, [], None), "() -> Unknown");
+
+        // Empty parameters with a return type.
+        assert_eq!(
+            display_signature(&db, [], Some(Type::none(&db))),
+            "() -> None"
+        );
+
+        // Single parameter type (no name) with a return type.
+        assert_eq!(
+            display_signature(
+                &db,
+                [Parameter::new(
+                    None,
+                    Some(Type::none(&db)),
+                    ParameterKind::PositionalOrKeyword { default_ty: None }
+                )],
+                Some(Type::none(&db))
+            ),
+            "(None) -> None"
+        );
+
+        // Two parameters where one has annotation and the other doesn't.
+        assert_eq!(
+            display_signature(
+                &db,
+                [
+                    Parameter::new(
+                        Some(Name::new_static("x")),
+                        None,
+                        ParameterKind::PositionalOrKeyword {
+                            default_ty: Some(KnownClass::Int.to_instance(&db))
+                        }
+                    ),
+                    Parameter::new(
+                        Some(Name::new_static("y")),
+                        Some(KnownClass::Str.to_instance(&db)),
+                        ParameterKind::PositionalOrKeyword {
+                            default_ty: Some(KnownClass::Str.to_instance(&db))
+                        }
+                    )
+                ],
+                Some(Type::none(&db))
+            ),
+            "(x=int, y: str = str) -> None"
+        );
+
+        // All positional only parameters.
+        assert_eq!(
+            display_signature(
+                &db,
+                [
+                    Parameter::new(
+                        Some(Name::new_static("x")),
+                        None,
+                        ParameterKind::PositionalOnly { default_ty: None }
+                    ),
+                    Parameter::new(
+                        Some(Name::new_static("y")),
+                        None,
+                        ParameterKind::PositionalOnly { default_ty: None }
+                    )
+                ],
+                Some(Type::none(&db))
+            ),
+            "(x, y, /) -> None"
+        );
+
+        // Positional-only parameters mixed with non-positional-only parameters.
+        assert_eq!(
+            display_signature(
+                &db,
+                [
+                    Parameter::new(
+                        Some(Name::new_static("x")),
+                        None,
+                        ParameterKind::PositionalOnly { default_ty: None }
+                    ),
+                    Parameter::new(
+                        Some(Name::new_static("y")),
+                        None,
+                        ParameterKind::PositionalOrKeyword { default_ty: None }
+                    )
+                ],
+                Some(Type::none(&db))
+            ),
+            "(x, /, y) -> None"
+        );
+
+        // All keyword-only parameters.
+        assert_eq!(
+            display_signature(
+                &db,
+                [
+                    Parameter::new(
+                        Some(Name::new_static("x")),
+                        None,
+                        ParameterKind::KeywordOnly { default_ty: None }
+                    ),
+                    Parameter::new(
+                        Some(Name::new_static("y")),
+                        None,
+                        ParameterKind::KeywordOnly { default_ty: None }
+                    )
+                ],
+                Some(Type::none(&db))
+            ),
+            "(*, x, y) -> None"
+        );
+
+        // Keyword-only parameters mixed with non-keyword-only parameters.
+        assert_eq!(
+            display_signature(
+                &db,
+                [
+                    Parameter::new(
+                        Some(Name::new_static("x")),
+                        None,
+                        ParameterKind::PositionalOrKeyword { default_ty: None }
+                    ),
+                    Parameter::new(
+                        Some(Name::new_static("y")),
+                        None,
+                        ParameterKind::KeywordOnly { default_ty: None }
+                    )
+                ],
+                Some(Type::none(&db))
+            ),
+            "(x, *, y) -> None"
+        );
+
+        // A mix of all parameter kinds.
+        assert_eq!(
+            display_signature(
+                &db,
+                [
+                    Parameter::new(
+                        Some(Name::new_static("a")),
+                        None,
+                        ParameterKind::PositionalOnly { default_ty: None },
+                    ),
+                    Parameter::new(
+                        Some(Name::new_static("b")),
+                        Some(KnownClass::Int.to_instance(&db)),
+                        ParameterKind::PositionalOnly { default_ty: None },
+                    ),
+                    Parameter::new(
+                        Some(Name::new_static("c")),
+                        None,
+                        ParameterKind::PositionalOnly {
+                            default_ty: Some(Type::IntLiteral(1)),
+                        },
+                    ),
+                    Parameter::new(
+                        Some(Name::new_static("d")),
+                        Some(KnownClass::Int.to_instance(&db)),
+                        ParameterKind::PositionalOnly {
+                            default_ty: Some(Type::IntLiteral(2)),
+                        },
+                    ),
+                    Parameter::new(
+                        Some(Name::new_static("e")),
+                        None,
+                        ParameterKind::PositionalOrKeyword {
+                            default_ty: Some(Type::IntLiteral(3)),
+                        },
+                    ),
+                    Parameter::new(
+                        Some(Name::new_static("f")),
+                        Some(KnownClass::Int.to_instance(&db)),
+                        ParameterKind::PositionalOrKeyword {
+                            default_ty: Some(Type::IntLiteral(4)),
+                        },
+                    ),
+                    Parameter::new(
+                        Some(Name::new_static("args")),
+                        Some(Type::object(&db)),
+                        ParameterKind::Variadic,
+                    ),
+                    Parameter::new(
+                        Some(Name::new_static("g")),
+                        None,
+                        ParameterKind::KeywordOnly {
+                            default_ty: Some(Type::IntLiteral(5)),
+                        },
+                    ),
+                    Parameter::new(
+                        Some(Name::new_static("h")),
+                        Some(KnownClass::Int.to_instance(&db)),
+                        ParameterKind::KeywordOnly {
+                            default_ty: Some(Type::IntLiteral(6)),
+                        },
+                    ),
+                    Parameter::new(
+                        Some(Name::new_static("kwargs")),
+                        Some(KnownClass::Str.to_instance(&db)),
+                        ParameterKind::KeywordVariadic,
+                    ),
+                ],
+                Some(KnownClass::Bytes.to_instance(&db))
+            ),
+            "(a, b: int, c=Literal[1], d: int = Literal[2], \
+                /, e=Literal[3], f: int = Literal[4], *args: object, \
+                *, g=Literal[5], h: int = Literal[6], **kwargs: str) -> bytes"
         );
     }
 }

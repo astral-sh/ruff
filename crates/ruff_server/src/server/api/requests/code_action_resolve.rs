@@ -50,6 +50,21 @@ impl super::BackgroundDocumentRequestHandler for CodeActionResolve {
             .with_failure_code(ErrorCode::InvalidParams);
         };
 
+        match action_kind {
+            SupportedCodeAction::SourceFixAll | SupportedCodeAction::SourceOrganizeImports
+                if snapshot.is_notebook_cell() =>
+            {
+                // This should never occur because we ignore generating these code actions for a
+                // notebook cell in the `textDocument/codeAction` request handler.
+                return Err(anyhow::anyhow!(
+                    "Code action resolver cannot resolve {:?} for a notebook cell",
+                    action_kind.to_kind().as_str()
+                ))
+                .with_failure_code(ErrorCode::InvalidParams);
+            }
+            _ => {}
+        }
+
         action.edit = match action_kind {
             SupportedCodeAction::SourceFixAll | SupportedCodeAction::NotebookSourceFixAll => Some(
                 resolve_edit_for_fix_all(
@@ -93,7 +108,7 @@ pub(super) fn fix_all_edit(
     query: &DocumentQuery,
     encoding: PositionEncoding,
 ) -> crate::Result<Fixes> {
-    crate::fix::fix_all(query, query.settings().linter(), encoding)
+    crate::fix::fix_all(query, &query.settings().linter, encoding)
 }
 
 pub(super) fn resolve_edit_for_organize_imports(
@@ -110,7 +125,7 @@ pub(super) fn organize_imports_edit(
     query: &DocumentQuery,
     encoding: PositionEncoding,
 ) -> crate::Result<Fixes> {
-    let mut linter_settings = query.settings().linter().clone();
+    let mut linter_settings = query.settings().linter.clone();
     linter_settings.rules = [
         Rule::UnsortedImports,       // I001
         Rule::MissingRequiredImport, // I002

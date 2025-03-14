@@ -4,7 +4,6 @@ use itertools::Itertools;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::parenthesize::parenthesized_range;
-use ruff_python_ast::AstNode;
 use ruff_python_ast::{self as ast, Arguments, Expr};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
@@ -67,7 +66,7 @@ impl AlwaysFixableViolation for QuadraticListSummation {
 }
 
 /// RUF017
-pub(crate) fn quadratic_list_summation(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn quadratic_list_summation(checker: &Checker, call: &ast::ExprCall) {
     let ast::ExprCall {
         func,
         arguments,
@@ -90,7 +89,7 @@ pub(crate) fn quadratic_list_summation(checker: &mut Checker, call: &ast::ExprCa
 
     let mut diagnostic = Diagnostic::new(QuadraticListSummation, *range);
     diagnostic.try_set_fix(|| convert_to_reduce(iterable, call, checker));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// Generate a [`Fix`] to convert a `sum()` call to a `functools.reduce()` call.
@@ -110,7 +109,7 @@ fn convert_to_reduce(iterable: &Expr, call: &ast::ExprCall, checker: &Checker) -
     let iterable = checker.locator().slice(
         parenthesized_range(
             iterable.into(),
-            call.arguments.as_any_node_ref(),
+            (&call.arguments).into(),
             checker.comment_ranges(),
             checker.locator().contents(),
         )

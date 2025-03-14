@@ -51,7 +51,7 @@ impl Violation for InvalidIndexReturnType {
 }
 
 /// E0305
-pub(crate) fn invalid_index_return(checker: &mut Checker, function_def: &ast::StmtFunctionDef) {
+pub(crate) fn invalid_index_return(checker: &Checker, function_def: &ast::StmtFunctionDef) {
     if function_def.name.as_str() != "__index__" {
         return;
     }
@@ -74,7 +74,7 @@ pub(crate) fn invalid_index_return(checker: &mut Checker, function_def: &ast::St
 
     // If there are no return statements, add a diagnostic.
     if terminal == Terminal::Implicit {
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             InvalidIndexReturnType,
             function_def.identifier(),
         ));
@@ -94,15 +94,11 @@ pub(crate) fn invalid_index_return(checker: &mut Checker, function_def: &ast::St
                 ResolvedPythonType::Unknown
                     | ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer))
             ) {
-                checker
-                    .diagnostics
-                    .push(Diagnostic::new(InvalidIndexReturnType, value.range()));
+                checker.report_diagnostic(Diagnostic::new(InvalidIndexReturnType, value.range()));
             }
         } else {
             // Disallow implicit `None`.
-            checker
-                .diagnostics
-                .push(Diagnostic::new(InvalidIndexReturnType, stmt.range()));
+            checker.report_diagnostic(Diagnostic::new(InvalidIndexReturnType, stmt.range()));
         }
     }
 }

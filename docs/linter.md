@@ -8,13 +8,15 @@ and more.
 ## `ruff check`
 
 `ruff check` is the primary entrypoint to the Ruff linter. It accepts a list of files or
-directories, and lints all discovered Python files, optionally fixing any fixable errors:
+directories, and lints all discovered Python files, optionally fixing any fixable errors.
+When linting a directory, Ruff searches for Python files recursively in that directory
+and all its subdirectories:
 
 ```console
-$ ruff check                  # Lint all files in the current directory.
-$ ruff check --fix            # Lint all files in the current directory, and fix any fixable errors.
-$ ruff check --watch          # Lint all files in the current directory, and re-lint on change.
-$ ruff check path/to/code/    # Lint all files in `path/to/code` (and any subdirectories).
+$ ruff check                  # Lint files in the current directory.
+$ ruff check --fix            # Lint files in the current directory and fix any fixable errors.
+$ ruff check --watch          # Lint files in the current directory and re-lint on change.
+$ ruff check path/to/code/    # Lint files in `path/to/code`.
 ```
 
 For the full list of supported options, run `ruff check --help`.
@@ -334,6 +336,27 @@ violations on a single line.
 
 Note that Ruff will also respect Flake8's `# flake8: noqa` directive, and will treat it as
 equivalent to `# ruff: noqa`.
+
+### Full suppression comment specification
+
+The full specification is as follows:
+
+- An inline blanket `noqa` comment is given by a case-insensitive match for
+  `#noqa` with optional whitespace after the `#` symbol, followed by either: the
+  end of the comment, the beginning of a new comment (`#`), or whitespace
+  followed by any character other than `:`.
+- An inline rule suppression is given by first finding a case-insensitive match
+  for `#noqa` with optional whitespace after the `#` symbol, optional whitespace
+  after `noqa`, and followed by the symbol `:`. After this we are expected to
+  have a list of rule codes which is given by sequences of uppercase ASCII
+  characters followed by ASCII digits, separated by whitespace or commas. The
+  list ends at the last valid code. We will attempt to interpret rules with a
+  missing delimiter (e.g. `F401F841`), though a warning will be emitted in this
+  case.
+- A file-level exemption comment is given by a case-sensitive match for `#ruff:`
+  or `#flake8:`, with optional whitespace after `#` and before `:`, followed by
+  optional whitespace and a case-insensitive match for `noqa`. After this, the
+  specification is as in the inline case.
 
 ### Detecting unused suppression comments
 

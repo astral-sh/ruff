@@ -88,7 +88,7 @@ def _(x: str | int):
 
 ```py
 def _(x: str | int):
-    # TODO: we could issue a diagnostic here
+    # error: [no-matching-overload] "No overload of class `type` matches arguments"
     if type(object=x) is str:
         reveal_type(x)  # revealed: str | int
 ```
@@ -99,9 +99,9 @@ def _(x: str | int):
 class A: ...
 class B: ...
 
-alias_for_type = type
-
 def _(x: A | B):
+    alias_for_type = type
+
     if alias_for_type(x) is A:
         reveal_type(x)  # revealed: A
 ```

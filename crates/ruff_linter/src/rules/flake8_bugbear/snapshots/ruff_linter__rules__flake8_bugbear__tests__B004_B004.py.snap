@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
-snapshot_kind: text
 ---
 B004.py:3:8: B004 [*] Using `hasattr(x, "__call__")` to test if x is callable is unreliable. Use `callable(x)` for consistent results.
   |
@@ -66,7 +65,7 @@ B004.py:14:8: B004 Using `hasattr(x, "__call__")` to test if x is callable is un
 B004.py:24:8: B004 [*] Using `hasattr(x, "__call__")` to test if x is callable is unreliable. Use `callable(x)` for consistent results.
    |
 22 |         return True
-23 | 
+23 |
 24 |     if hasattr(o, "__call__"):
    |        ^^^^^^^^^^^^^^^^^^^^^^ B004
 25 |         print("STILL a bug!")

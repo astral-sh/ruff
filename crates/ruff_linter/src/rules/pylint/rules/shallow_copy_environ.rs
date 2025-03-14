@@ -13,7 +13,7 @@ use crate::checkers::ast::Checker;
 /// `os.environ` is not a `dict` object, but rather, a proxy object. As such, mutating a shallow
 /// copy of `os.environ` will also mutate the original object.
 ///
-/// See: [#15373] for more information.
+/// See [BPO 15373] for more information.
 ///
 /// ## Example
 /// ```python
@@ -30,11 +30,18 @@ use crate::checkers::ast::Checker;
 /// env = os.environ.copy()
 /// ```
 ///
+/// ## Fix safety
+///
+/// This rule's fix is marked as unsafe because replacing a shallow copy with a deep copy can lead
+/// to unintended side effects. If the program modifies the shallow copy at some point, changing it
+/// to a deep copy may prevent those modifications from affecting the original data, potentially
+/// altering the program's behavior.
+///
 /// ## References
 /// - [Python documentation: `copy` — Shallow and deep copy operations](https://docs.python.org/3/library/copy.html)
 /// - [Python documentation: `os.environ`](https://docs.python.org/3/library/os.html#os.environ)
 ///
-/// [#15373]: https://bugs.python.org/issue15373
+/// [BPO 15373]: https://bugs.python.org/issue15373
 #[derive(ViolationMetadata)]
 pub(crate) struct ShallowCopyEnviron;
 
@@ -50,7 +57,7 @@ impl AlwaysFixableViolation for ShallowCopyEnviron {
 }
 
 /// PLW1507
-pub(crate) fn shallow_copy_environ(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn shallow_copy_environ(checker: &Checker, call: &ast::ExprCall) {
     if !(checker.semantic().seen_module(Modules::OS)
         && checker.semantic().seen_module(Modules::COPY))
     {
@@ -82,9 +89,9 @@ pub(crate) fn shallow_copy_environ(checker: &mut Checker, call: &ast::ExprCall) 
     }
 
     let mut diagnostic = Diagnostic::new(ShallowCopyEnviron, call.range());
-    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
         format!("{}.copy()", checker.locator().slice(arg)),
         call.range(),
     )));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

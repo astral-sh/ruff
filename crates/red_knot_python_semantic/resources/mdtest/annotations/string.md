@@ -116,8 +116,8 @@ MyType = int
 class Aliases:
     MyType = str
 
-    forward: "MyType"
-    not_forward: MyType
+    forward: "MyType" = "value"
+    not_forward: MyType = "value"
 
 reveal_type(Aliases.forward)  # revealed: str
 reveal_type(Aliases.not_forward)  # revealed: str
@@ -172,4 +172,41 @@ o: "1 < 2"
 p: "call()"
 r: "[1, 2]"
 s: "(1, 2)"
+```
+
+## Multi line annotation
+
+Quoted type annotations should be parsed as if surrounded by parentheses.
+
+```py
+def valid(
+    a1: """(
+      int |
+      str
+  )
+  """,
+    a2: """
+     int |
+       str
+  """,
+):
+    reveal_type(a1)  # revealed: int | str
+    reveal_type(a2)  # revealed: int | str
+
+def invalid(
+    # error: [invalid-syntax-in-forward-annotation]
+    a1: """
+  int |
+str)
+""",
+    # error: [invalid-syntax-in-forward-annotation]
+    a2: """
+  int) |
+str
+""",
+    # error: [invalid-syntax-in-forward-annotation]
+    a3: """
+      (int)) """,
+):
+    pass
 ```

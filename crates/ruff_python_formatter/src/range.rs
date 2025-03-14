@@ -6,7 +6,7 @@ use ruff_formatter::{
 };
 use ruff_python_ast::visitor::source_order::{walk_body, SourceOrderVisitor, TraversalSignal};
 use ruff_python_ast::{AnyNodeRef, Stmt, StmtMatch, StmtTry};
-use ruff_python_parser::{parse, AsMode};
+use ruff_python_parser::{parse, ParseOptions};
 use ruff_python_trivia::{
     indentation_at_offset, BackwardsTokenizer, CommentRanges, SimpleToken, SimpleTokenKind,
 };
@@ -73,7 +73,7 @@ pub fn format_range(
 
     assert_valid_char_boundaries(range, source);
 
-    let parsed = parse(source, options.source_type().as_mode())?;
+    let parsed = parse(source, ParseOptions::from(options.source_type()))?;
     let source_code = SourceCode::new(source);
     let comment_ranges = CommentRanges::from(parsed.tokens());
     let comments = Comments::from_ast(parsed.syntax(), source_code, &comment_ranges);

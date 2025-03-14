@@ -163,6 +163,17 @@ fn check_unknown_rule(context: &mut CheckSuppressionsContext) {
                     format_args!("Unknown rule `{rule}`"),
                 );
             }
+
+            GetLintError::PrefixedWithCategory {
+                prefixed,
+                suggestion,
+            } => {
+                context.report_lint(
+                    &UNKNOWN_RULE,
+                    unknown.range,
+                    format_args!("Unknown rule `{prefixed}`. Did you mean `{suggestion}`?"),
+                );
+            }
         };
     }
 }
@@ -314,6 +325,7 @@ impl<'a> CheckSuppressionsContext<'a> {
             range,
             severity,
             file: self.file,
+            secondary_messages: vec![],
         });
     }
 }
@@ -765,8 +777,9 @@ impl<'src> SuppressionParser<'src> {
 
     fn eat_word(&mut self) -> bool {
         if self.cursor.eat_if(char::is_alphabetic) {
+            // Allow `:` for better error recovery when someone uses `lint:code` instead of just `code`.
             self.cursor
-                .eat_while(|c| c.is_alphanumeric() || matches!(c, '_' | '-'));
+                .eat_while(|c| c.is_alphanumeric() || matches!(c, '_' | '-' | ':'));
             true
         } else {
             false

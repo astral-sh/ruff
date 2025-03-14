@@ -104,9 +104,9 @@ class Repository(NamedTuple):
             stdout=PIPE,
         )
         git_sha_stdout, _ = await git_sha_process.communicate()
-        assert (
-            await git_sha_process.wait() == 0
-        ), f"Failed to retrieve commit sha at {checkout_dir}"
+        assert await git_sha_process.wait() == 0, (
+            f"Failed to retrieve commit sha at {checkout_dir}"
+        )
         return git_sha_stdout.decode().strip()
 
 
@@ -449,7 +449,7 @@ async def main(
 
                     if matches is None:
                         # Handle case where there are no regex matches e.g.
-                        # +                 "?application=AIRFLOW&authenticator=TEST_AUTH&role=TEST_ROLE&warehouse=TEST_WAREHOUSE" # noqa: E501
+                        # +                 "?application=AIRFLOW&authenticator=TEST_AUTH&role=TEST_ROLE&warehouse=TEST_WAREHOUSE"
                         # Which was found in local testing
                         continue
 

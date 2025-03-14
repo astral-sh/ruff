@@ -53,10 +53,7 @@ impl AlwaysFixableViolation for RedundantTupleInExceptionHandler {
 }
 
 /// B013
-pub(crate) fn redundant_tuple_in_exception_handler(
-    checker: &mut Checker,
-    handlers: &[ExceptHandler],
-) {
+pub(crate) fn redundant_tuple_in_exception_handler(checker: &Checker, handlers: &[ExceptHandler]) {
     for handler in handlers {
         let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
             type_: Some(type_),
@@ -103,6 +100,6 @@ pub(crate) fn redundant_tuple_in_exception_handler(
             ),
             type_.range(),
         )));
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }

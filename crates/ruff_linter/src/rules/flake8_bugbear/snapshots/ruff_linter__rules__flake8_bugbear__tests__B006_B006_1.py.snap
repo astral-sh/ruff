@@ -1,11 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
-snapshot_kind: text
 ---
 B006_1.py:3:22: B006 [*] Do not use mutable data structures for argument defaults
   |
 1 | # Docstring followed by a newline
-2 | 
+2 |
 3 | def foobar(foor, bar={}):    
   |                      ^^ B006
 4 |     """

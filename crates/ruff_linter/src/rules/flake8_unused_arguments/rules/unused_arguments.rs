@@ -1,4 +1,3 @@
-use regex::Regex;
 use ruff_python_ast as ast;
 use ruff_python_ast::{Parameter, Parameters, Stmt, StmtExpr, StmtFunctionDef, StmtRaise};
 
@@ -246,15 +245,11 @@ impl Argumentable {
 }
 
 /// Check a plain function for unused arguments.
-fn function(
-    argumentable: Argumentable,
-    parameters: &Parameters,
-    scope: &Scope,
-    semantic: &SemanticModel,
-    dummy_variable_rgx: &Regex,
-    ignore_variadic_names: bool,
-    diagnostics: &mut Vec<Diagnostic>,
-) {
+fn function(argumentable: Argumentable, parameters: &Parameters, scope: &Scope, checker: &Checker) {
+    let ignore_variadic_names = checker
+        .settings
+        .flake8_unused_arguments
+        .ignore_variadic_names;
     let args = parameters
         .iter_non_variadic_params()
         .map(|parameter_with_default| &parameter_with_default.parameter)
@@ -272,26 +267,15 @@ fn function(
                 .into_iter()
                 .skip(usize::from(ignore_variadic_names)),
         );
-    call(
-        argumentable,
-        args,
-        scope,
-        semantic,
-        dummy_variable_rgx,
-        diagnostics,
-    );
+    call(argumentable, args, scope, checker);
 }
 
 /// Check a method for unused arguments.
-fn method(
-    argumentable: Argumentable,
-    parameters: &Parameters,
-    scope: &Scope,
-    semantic: &SemanticModel,
-    dummy_variable_rgx: &Regex,
-    ignore_variadic_names: bool,
-    diagnostics: &mut Vec<Diagnostic>,
-) {
+fn method(argumentable: Argumentable, parameters: &Parameters, scope: &Scope, checker: &Checker) {
+    let ignore_variadic_names = checker
+        .settings
+        .flake8_unused_arguments
+        .ignore_variadic_names;
     let args = parameters
         .iter_non_variadic_params()
         .skip(1)
@@ -310,31 +294,24 @@ fn method(
                 .into_iter()
                 .skip(usize::from(ignore_variadic_names)),
         );
-    call(
-        argumentable,
-        args,
-        scope,
-        semantic,
-        dummy_variable_rgx,
-        diagnostics,
-    );
+    call(argumentable, args, scope, checker);
 }
 
 fn call<'a>(
     argumentable: Argumentable,
     parameters: impl Iterator<Item = &'a Parameter>,
     scope: &Scope,
-    semantic: &SemanticModel,
-    dummy_variable_rgx: &Regex,
-    diagnostics: &mut Vec<Diagnostic>,
+    checker: &Checker,
 ) {
-    diagnostics.extend(parameters.filter_map(|arg| {
+    let semantic = checker.semantic();
+    let dummy_variable_rgx = &checker.settings.dummy_variable_rgx;
+    checker.report_diagnostics(parameters.filter_map(|arg| {
         let binding = scope
-            .get(arg.name.as_str())
+            .get(arg.name())
             .map(|binding_id| semantic.binding(binding_id))?;
         if binding.kind.is_argument()
             && binding.is_unused()
-            && !dummy_variable_rgx.is_match(arg.name.as_str())
+            && !dummy_variable_rgx.is_match(arg.name())
         {
             Some(Diagnostic::new(
                 argumentable.check_for(arg.name.to_string()),
@@ -359,7 +336,7 @@ fn call<'a>(
 ///
 /// [`is_stub`]: function_type::is_stub
 /// [`EM101`]: https://docs.astral.sh/ruff/rules/raw-string-in-exception/
-fn is_not_implemented_stub_with_variable(
+pub(crate) fn is_not_implemented_stub_with_variable(
     function_def: &StmtFunctionDef,
     semantic: &SemanticModel,
 ) -> bool {
@@ -404,11 +381,7 @@ fn is_not_implemented_stub_with_variable(
 }
 
 /// ARG001, ARG002, ARG003, ARG004, ARG005
-pub(crate) fn unused_arguments(
-    checker: &Checker,
-    scope: &Scope,
-    diagnostics: &mut Vec<Diagnostic>,
-) {
+pub(crate) fn unused_arguments(checker: &Checker, scope: &Scope) {
     if scope.uses_locals() {
         return;
     }
@@ -440,18 +413,7 @@ pub(crate) fn unused_arguments(
                         && !is_not_implemented_stub_with_variable(function_def, checker.semantic())
                         && !visibility::is_overload(decorator_list, checker.semantic())
                     {
-                        function(
-                            Argumentable::Function,
-                            parameters,
-                            scope,
-                            checker.semantic(),
-                            &checker.settings.dummy_variable_rgx,
-                            checker
-                                .settings
-                                .flake8_unused_arguments
-                                .ignore_variadic_names,
-                            diagnostics,
-                        );
+                        function(Argumentable::Function, parameters, scope, checker);
                     }
                 }
                 function_type::FunctionType::Method => {
@@ -460,24 +422,12 @@ pub(crate) fn unused_arguments(
                         && !is_not_implemented_stub_with_variable(function_def, checker.semantic())
                         && (!visibility::is_magic(name)
                             || visibility::is_init(name)
-                            || visibility::is_new(name)
                             || visibility::is_call(name))
                         && !visibility::is_abstract(decorator_list, checker.semantic())
                         && !visibility::is_override(decorator_list, checker.semantic())
                         && !visibility::is_overload(decorator_list, checker.semantic())
                     {
-                        method(
-                            Argumentable::Method,
-                            parameters,
-                            scope,
-                            checker.semantic(),
-                            &checker.settings.dummy_variable_rgx,
-                            checker
-                                .settings
-                                .flake8_unused_arguments
-                                .ignore_variadic_names,
-                            diagnostics,
-                        );
+                        method(Argumentable::Method, parameters, scope, checker);
                     }
                 }
                 function_type::FunctionType::ClassMethod => {
@@ -486,24 +436,12 @@ pub(crate) fn unused_arguments(
                         && !is_not_implemented_stub_with_variable(function_def, checker.semantic())
                         && (!visibility::is_magic(name)
                             || visibility::is_init(name)
-                            || visibility::is_new(name)
                             || visibility::is_call(name))
                         && !visibility::is_abstract(decorator_list, checker.semantic())
                         && !visibility::is_override(decorator_list, checker.semantic())
                         && !visibility::is_overload(decorator_list, checker.semantic())
                     {
-                        method(
-                            Argumentable::ClassMethod,
-                            parameters,
-                            scope,
-                            checker.semantic(),
-                            &checker.settings.dummy_variable_rgx,
-                            checker
-                                .settings
-                                .flake8_unused_arguments
-                                .ignore_variadic_names,
-                            diagnostics,
-                        );
+                        method(Argumentable::ClassMethod, parameters, scope, checker);
                     }
                 }
                 function_type::FunctionType::StaticMethod => {
@@ -512,24 +450,25 @@ pub(crate) fn unused_arguments(
                         && !is_not_implemented_stub_with_variable(function_def, checker.semantic())
                         && (!visibility::is_magic(name)
                             || visibility::is_init(name)
-                            || visibility::is_new(name)
                             || visibility::is_call(name))
                         && !visibility::is_abstract(decorator_list, checker.semantic())
                         && !visibility::is_override(decorator_list, checker.semantic())
                         && !visibility::is_overload(decorator_list, checker.semantic())
                     {
-                        function(
-                            Argumentable::StaticMethod,
-                            parameters,
-                            scope,
-                            checker.semantic(),
-                            &checker.settings.dummy_variable_rgx,
-                            checker
-                                .settings
-                                .flake8_unused_arguments
-                                .ignore_variadic_names,
-                            diagnostics,
-                        );
+                        function(Argumentable::StaticMethod, parameters, scope, checker);
+                    }
+                }
+                function_type::FunctionType::NewMethod => {
+                    if checker.enabled(Argumentable::StaticMethod.rule_code())
+                        && !function_type::is_stub(function_def, checker.semantic())
+                        && !is_not_implemented_stub_with_variable(function_def, checker.semantic())
+                        && !visibility::is_abstract(decorator_list, checker.semantic())
+                        && !visibility::is_override(decorator_list, checker.semantic())
+                        && !visibility::is_overload(decorator_list, checker.semantic())
+                    {
+                        // we use `method()` here rather than `function()`, as although `__new__` is
+                        // an implicit staticmethod, `__new__` methods must always have at least one parameter
+                        method(Argumentable::StaticMethod, parameters, scope, checker);
                     }
                 }
             }
@@ -537,18 +476,7 @@ pub(crate) fn unused_arguments(
         ScopeKind::Lambda(ast::ExprLambda { parameters, .. }) => {
             if let Some(parameters) = parameters {
                 if checker.enabled(Argumentable::Lambda.rule_code()) {
-                    function(
-                        Argumentable::Lambda,
-                        parameters,
-                        scope,
-                        checker.semantic(),
-                        &checker.settings.dummy_variable_rgx,
-                        checker
-                            .settings
-                            .flake8_unused_arguments
-                            .ignore_variadic_names,
-                        diagnostics,
-                    );
+                    function(Argumentable::Lambda, parameters, scope, checker);
                 }
             }
         }

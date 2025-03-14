@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/docstring_code_examples_dynamic_line_width.py
-snapshot_kind: text
 ---
 ## Input
 ```python
@@ -309,7 +308,7 @@ magic-trailing-comma       = Respect
 docstring-code             = Enabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
-target_version             = Py39
+target_version             = 3.9
 source_type                = Python
 ```
 
@@ -616,7 +615,9 @@ def length_doctest():
         Integer length of the list of numbers.
 
     Example:
-        >>> length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20])
+        >>> length(
+        ...     [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+        ... )
         20
     """
 
@@ -631,7 +632,9 @@ def length_doctest_underindent():
             Integer length of the list of numbers.
 
     Example:
-        >>> length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20])
+        >>> length(
+        ...     [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+        ... )
         20
     """
 
@@ -649,7 +652,9 @@ def length_markdown():
     Example:
 
         ```
-        length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21])
+        length(
+            [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]
+        )
         ```
     """
 
@@ -659,7 +664,9 @@ def length_rst():
     """
     Do cool stuff::
 
-        length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21])
+        length(
+            [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]
+        )
     """
     pass
 
@@ -670,7 +677,9 @@ def length_rst_in_section():
     Examples:
         Do cool stuff::
 
-            length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20])
+            length(
+                [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+            )
     """
     pass
 ```
@@ -695,11 +704,13 @@ def length_rst_in_section():
          """
  
  
-@@ -300,7 +302,28 @@
+@@ -300,9 +302,28 @@
          Integer length of the list of numbers.
  
      Example:
--        >>> length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20])
+-        >>> length(
+-        ...     [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+-        ... )
 +        >>> length([
 +        ...     1,
 +        ...     2,
@@ -725,11 +736,13 @@ def length_rst_in_section():
          20
      """
  
-@@ -315,7 +338,28 @@
+@@ -317,9 +338,28 @@
              Integer length of the list of numbers.
  
      Example:
--        >>> length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20])
+-        >>> length(
+-        ...     [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+-        ... )
 +        >>> length([
 +        ...     1,
 +        ...     2,
@@ -755,11 +768,13 @@ def length_rst_in_section():
          20
      """
  
-@@ -333,7 +377,29 @@
+@@ -337,9 +377,29 @@
      Example:
  
          ```
--        length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21])
+-        length(
+-            [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]
+-        )
 +        length([
 +            1,
 +            2,
@@ -786,11 +801,13 @@ def length_rst_in_section():
          ```
      """
  
-@@ -343,7 +409,29 @@
+@@ -349,9 +409,29 @@
      """
      Do cool stuff::
  
--        length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21])
+-        length(
+-            [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]
+-        )
 +        length([
 +            1,
 +            2,
@@ -817,11 +834,13 @@ def length_rst_in_section():
      """
      pass
  
-@@ -354,6 +442,27 @@
+@@ -362,8 +442,27 @@
      Examples:
          Do cool stuff::
  
--            length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20])
+-            length(
+-                [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+-            )
 +            length([
 +                1,
 +                2,
@@ -860,7 +879,7 @@ magic-trailing-comma       = Respect
 docstring-code             = Enabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
-target_version             = Py39
+target_version             = 3.9
 source_type                = Python
 ```
 
@@ -1157,7 +1176,9 @@ def length_doctest():
       Integer length of the list of numbers.
 
   Example:
-      >>> length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20])
+      >>> length(
+      ...   [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+      ... )
       20
   """
 
@@ -1172,7 +1193,9 @@ def length_doctest_underindent():
           Integer length of the list of numbers.
 
   Example:
-      >>> length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20])
+      >>> length(
+      ...   [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+      ... )
       20
   """
 
@@ -1190,7 +1213,9 @@ def length_markdown():
   Example:
 
       ```
-      length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21])
+      length(
+        [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]
+      )
       ```
   """
 
@@ -1200,7 +1225,9 @@ def length_rst():
   """
   Do cool stuff::
 
-      length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21])
+      length(
+        [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]
+      )
   """
   pass
 
@@ -1211,7 +1238,9 @@ def length_rst_in_section():
   Examples:
       Do cool stuff::
 
-          length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20])
+          length(
+            [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+          )
   """
   pass
 ```
@@ -1221,11 +1250,13 @@ def length_rst_in_section():
 ```diff
 --- Stable
 +++ Preview
-@@ -290,7 +290,28 @@
+@@ -290,9 +290,28 @@
        Integer length of the list of numbers.
  
    Example:
--      >>> length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20])
+-      >>> length(
+-      ...   [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+-      ... )
 +      >>> length([
 +      ...   1,
 +      ...   2,
@@ -1251,11 +1282,13 @@ def length_rst_in_section():
        20
    """
  
-@@ -305,7 +326,28 @@
+@@ -307,9 +326,28 @@
            Integer length of the list of numbers.
  
    Example:
--      >>> length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20])
+-      >>> length(
+-      ...   [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+-      ... )
 +      >>> length([
 +      ...   1,
 +      ...   2,
@@ -1281,11 +1314,13 @@ def length_rst_in_section():
        20
    """
  
-@@ -323,7 +365,29 @@
+@@ -327,9 +365,29 @@
    Example:
  
        ```
--      length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21])
+-      length(
+-        [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]
+-      )
 +      length([
 +        1,
 +        2,
@@ -1312,11 +1347,13 @@ def length_rst_in_section():
        ```
    """
  
-@@ -333,7 +397,29 @@
+@@ -339,9 +397,29 @@
    """
    Do cool stuff::
  
--      length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21])
+-      length(
+-        [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]
+-      )
 +      length([
 +        1,
 +        2,
@@ -1343,11 +1380,13 @@ def length_rst_in_section():
    """
    pass
  
-@@ -344,6 +430,27 @@
+@@ -352,8 +430,27 @@
    Examples:
        Do cool stuff::
  
--          length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20])
+-          length(
+-            [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+-          )
 +          length([
 +            1,
 +            2,
@@ -1386,7 +1425,7 @@ magic-trailing-comma       = Respect
 docstring-code             = Enabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
-target_version             = Py39
+target_version             = 3.9
 source_type                = Python
 ```
 
@@ -1693,7 +1732,9 @@ def length_doctest():
 	    Integer length of the list of numbers.
 
 	Example:
-	    >>> length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20])
+	    >>> length(
+	    ...     [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+	    ... )
 	    20
 	"""
 
@@ -1708,7 +1749,9 @@ def length_doctest_underindent():
 	        Integer length of the list of numbers.
 
 	Example:
-	    >>> length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20])
+	    >>> length(
+	    ...     [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+	    ... )
 	    20
 	"""
 
@@ -1726,7 +1769,9 @@ def length_markdown():
 	Example:
 
 	    ```
-	    length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21])
+	    length(
+	        [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]
+	    )
 	    ```
 	"""
 
@@ -1736,7 +1781,9 @@ def length_rst():
 	"""
 	Do cool stuff::
 
-	    length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21])
+	    length(
+	        [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]
+	    )
 	"""
 	pass
 
@@ -1747,7 +1794,9 @@ def length_rst_in_section():
 	Examples:
 	    Do cool stuff::
 
-	        length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20])
+	        length(
+	            [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+	        )
 	"""
 	pass
 ```
@@ -1772,11 +1821,13 @@ def length_rst_in_section():
  		"""
  
  
-@@ -300,7 +302,28 @@
+@@ -300,9 +302,28 @@
  	    Integer length of the list of numbers.
  
  	Example:
--	    >>> length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20])
+-	    >>> length(
+-	    ...     [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+-	    ... )
 +	    >>> length([
 +	    ...     1,
 +	    ...     2,
@@ -1802,11 +1853,13 @@ def length_rst_in_section():
  	    20
  	"""
  
-@@ -315,7 +338,28 @@
+@@ -317,9 +338,28 @@
  	        Integer length of the list of numbers.
  
  	Example:
--	    >>> length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20])
+-	    >>> length(
+-	    ...     [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+-	    ... )
 +	    >>> length([
 +	    ...     1,
 +	    ...     2,
@@ -1832,11 +1885,13 @@ def length_rst_in_section():
  	    20
  	"""
  
-@@ -333,7 +377,29 @@
+@@ -337,9 +377,29 @@
  	Example:
  
  	    ```
--	    length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21])
+-	    length(
+-	        [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]
+-	    )
 +	    length([
 +	        1,
 +	        2,
@@ -1863,11 +1918,13 @@ def length_rst_in_section():
  	    ```
  	"""
  
-@@ -343,7 +409,29 @@
+@@ -349,9 +409,29 @@
  	"""
  	Do cool stuff::
  
--	    length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21])
+-	    length(
+-	        [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]
+-	    )
 +	    length([
 +	        1,
 +	        2,
@@ -1894,11 +1951,13 @@ def length_rst_in_section():
  	"""
  	pass
  
-@@ -354,6 +442,27 @@
+@@ -362,8 +442,27 @@
  	Examples:
  	    Do cool stuff::
  
--	        length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20])
+-	        length(
+-	            [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+-	        )
 +	        length([
 +	            1,
 +	            2,
@@ -1937,7 +1996,7 @@ magic-trailing-comma       = Respect
 docstring-code             = Enabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
-target_version             = Py39
+target_version             = 3.9
 source_type                = Python
 ```
 
@@ -2822,7 +2881,30 @@ def length_rst_in_section():
 	Examples:
 	    Do cool stuff::
 
-	        length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20])
+	        length(
+	                [
+	                        1,
+	                        2,
+	                        3,
+	                        4,
+	                        5,
+	                        6,
+	                        7,
+	                        8,
+	                        9,
+	                        10,
+	                        11,
+	                        12,
+	                        13,
+	                        14,
+	                        15,
+	                        16,
+	                        17,
+	                        18,
+	                        19,
+	                        20,
+	                ]
+	        )
 	"""
 	pass
 ```
@@ -3063,11 +3145,34 @@ def length_rst_in_section():
  	"""
  	pass
  
-@@ -878,6 +872,27 @@
+@@ -878,29 +872,27 @@
  	Examples:
  	    Do cool stuff::
  
--	        length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20])
+-	        length(
+-	                [
+-	                        1,
+-	                        2,
+-	                        3,
+-	                        4,
+-	                        5,
+-	                        6,
+-	                        7,
+-	                        8,
+-	                        9,
+-	                        10,
+-	                        11,
+-	                        12,
+-	                        13,
+-	                        14,
+-	                        15,
+-	                        16,
+-	                        17,
+-	                        18,
+-	                        19,
+-	                        20,
+-	                ]
+-	        )
 +	        length([
 +	                1,
 +	                2,

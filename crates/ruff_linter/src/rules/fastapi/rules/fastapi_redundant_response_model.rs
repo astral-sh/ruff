@@ -74,10 +74,7 @@ impl AlwaysFixableViolation for FastApiRedundantResponseModel {
 }
 
 /// FAST001
-pub(crate) fn fastapi_redundant_response_model(
-    checker: &mut Checker,
-    function_def: &StmtFunctionDef,
-) {
+pub(crate) fn fastapi_redundant_response_model(checker: &Checker, function_def: &StmtFunctionDef) {
     if !checker.semantic().seen_module(Modules::FASTAPI) {
         return;
     }
@@ -98,7 +95,7 @@ pub(crate) fn fastapi_redundant_response_model(
             )
             .map(Fix::unsafe_edit)
         });
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }
 

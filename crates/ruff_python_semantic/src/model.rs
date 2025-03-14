@@ -265,13 +265,22 @@ impl<'a> SemanticModel<'a> {
         self.shadowed_bindings.get(&binding_id).copied()
     }
 
-    /// Return `true` if `member` is bound as a builtin.
+    /// Return `true` if `member` is bound as a builtin *in the scope we are currently visiting*.
     ///
     /// Note that a "builtin binding" does *not* include explicit lookups via the `builtins`
     /// module, e.g. `import builtins; builtins.open`. It *only* includes the bindings
     /// that are pre-populated in Python's global scope before any imports have taken place.
     pub fn has_builtin_binding(&self, member: &str) -> bool {
-        self.lookup_symbol(member)
+        self.has_builtin_binding_in_scope(member, self.scope_id)
+    }
+
+    /// Return `true` if `member` is bound as a builtin *in a given scope*.
+    ///
+    /// Note that a "builtin binding" does *not* include explicit lookups via the `builtins`
+    /// module, e.g. `import builtins; builtins.open`. It *only* includes the bindings
+    /// that are pre-populated in Python's global scope before any imports have taken place.
+    pub fn has_builtin_binding_in_scope(&self, member: &str, scope: ScopeId) -> bool {
+        self.lookup_symbol_in_scope(member, scope, false)
             .map(|binding_id| &self.bindings[binding_id])
             .is_some_and(|binding| binding.kind.is_builtin())
     }
@@ -335,14 +344,14 @@ impl<'a> SemanticModel<'a> {
     pub fn is_available_in_scope(&self, member: &str, scope_id: ScopeId) -> bool {
         self.lookup_symbol_in_scope(member, scope_id, false)
             .map(|binding_id| &self.bindings[binding_id])
-            .map_or(true, |binding| binding.kind.is_builtin())
+            .is_none_or(|binding| binding.kind.is_builtin())
     }
 
     /// Resolve a `del` reference to `symbol` at `range`.
     pub fn resolve_del(&mut self, symbol: &str, range: TextRange) {
         let is_unbound = self.scopes[self.scope_id]
             .get(symbol)
-            .map_or(true, |binding_id| {
+            .is_none_or(|binding_id| {
                 // Treat the deletion of a name as a reference to that name.
                 self.add_local_reference(binding_id, ExprContext::Del, range);
                 self.bindings[binding_id].is_unbound()
@@ -710,8 +719,17 @@ impl<'a> SemanticModel<'a> {
     ///
     /// References from within an [`ast::Comprehension`] can produce incorrect
     /// results when referring to a [`BindingKind::NamedExprAssignment`].
-    pub fn simulate_runtime_load(&self, name: &ast::ExprName) -> Option<BindingId> {
-        self.simulate_runtime_load_at_location_in_scope(name.id.as_str(), name.range, self.scope_id)
+    pub fn simulate_runtime_load(
+        &self,
+        name: &ast::ExprName,
+        typing_only_bindings_status: TypingOnlyBindingsStatus,
+    ) -> Option<BindingId> {
+        self.simulate_runtime_load_at_location_in_scope(
+            name.id.as_str(),
+            name.range,
+            self.scope_id,
+            typing_only_bindings_status,
+        )
     }
 
     /// Simulates a runtime load of the given symbol.
@@ -743,6 +761,7 @@ impl<'a> SemanticModel<'a> {
         symbol: &str,
         symbol_range: TextRange,
         scope_id: ScopeId,
+        typing_only_bindings_status: TypingOnlyBindingsStatus,
     ) -> Option<BindingId> {
         let mut seen_function = false;
         let mut class_variables_visible = true;
@@ -785,7 +804,9 @@ impl<'a> SemanticModel<'a> {
                     // runtime binding with a source-order inaccurate one
                     for shadowed_id in scope.shadowed_bindings(binding_id) {
                         let binding = &self.bindings[shadowed_id];
-                        if binding.context.is_typing() {
+                        if typing_only_bindings_status.is_disallowed()
+                            && binding.context.is_typing()
+                        {
                             continue;
                         }
                         if let BindingKind::Annotation
@@ -820,7 +841,9 @@ impl<'a> SemanticModel<'a> {
                         _ => binding_id,
                     };
 
-                    if self.bindings[candidate_id].context.is_typing() {
+                    if typing_only_bindings_status.is_disallowed()
+                        && self.bindings[candidate_id].context.is_typing()
+                    {
                         continue;
                     }
 
@@ -988,24 +1011,21 @@ impl<'a> SemanticModel<'a> {
                 let value_name = UnqualifiedName::from_expr(value)?;
                 let (_, tail) = value_name.segments().split_first()?;
 
-                let resolved: QualifiedName = if qualified_name
-                    .segments()
-                    .first()
-                    .map_or(false, |segment| *segment == ".")
-                {
-                    from_relative_import(
-                        self.module.qualified_name()?,
-                        qualified_name.segments(),
-                        tail,
-                    )?
-                } else {
-                    qualified_name
-                        .segments()
-                        .iter()
-                        .chain(tail)
-                        .copied()
-                        .collect()
-                };
+                let resolved: QualifiedName =
+                    if qualified_name.segments().first().copied() == Some(".") {
+                        from_relative_import(
+                            self.module.qualified_name()?,
+                            qualified_name.segments(),
+                            tail,
+                        )?
+                    } else {
+                        qualified_name
+                            .segments()
+                            .iter()
+                            .chain(tail)
+                            .copied()
+                            .collect()
+                    };
                 Some(resolved)
             }
             BindingKind::Builtin => {
@@ -1488,13 +1508,13 @@ impl<'a> SemanticModel<'a> {
             if self
                 .global_scope()
                 .get(name)
-                .map_or(true, |binding_id| self.bindings[binding_id].is_unbound())
+                .is_none_or(|binding_id| self.bindings[binding_id].is_unbound())
             {
                 let id = self.bindings.push(Binding {
                     kind: BindingKind::Assignment,
                     range: *range,
                     references: Vec::new(),
-                    scope: self.scope_id,
+                    scope: ScopeId::global(),
                     source: self.node_id,
                     context: self.execution_context(),
                     exceptions: self.exceptions(),
@@ -2055,6 +2075,32 @@ impl ShadowedBinding {
 
     pub const fn same_scope(&self) -> bool {
         self.same_scope
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TypingOnlyBindingsStatus {
+    Allowed,
+    Disallowed,
+}
+
+impl TypingOnlyBindingsStatus {
+    pub const fn is_allowed(self) -> bool {
+        matches!(self, TypingOnlyBindingsStatus::Allowed)
+    }
+
+    pub const fn is_disallowed(self) -> bool {
+        matches!(self, TypingOnlyBindingsStatus::Disallowed)
+    }
+}
+
+impl From<bool> for TypingOnlyBindingsStatus {
+    fn from(value: bool) -> Self {
+        if value {
+            TypingOnlyBindingsStatus::Allowed
+        } else {
+            TypingOnlyBindingsStatus::Disallowed
+        }
     }
 }
 

@@ -5,17 +5,16 @@ info:
   args:
     - check
     - "--show-settings"
-    - unformatted.py
-snapshot_kind: text
+    - test.py
 ---
 success: true
 exit_code: 0
 ----- stdout -----
-Resolved settings for: "[BASEPATH]/crates/ruff/resources/test/fixtures/unformatted.py"
-Settings path: "[BASEPATH]/pyproject.toml"
+Resolved settings for: "<temp_dir>/test.py"
+Settings path: "<temp_dir>/pyproject.toml"
 
 # General Settings
-cache_dir = "[BASEPATH]/.ruff_cache"
+cache_dir = "<temp_dir>/.ruff_cache"
 fix = false
 fix_only = false
 output_format = full
@@ -50,13 +49,7 @@ file_resolver.exclude = [
 	"site-packages",
 	"venv",
 ]
-file_resolver.extend_exclude = [
-	"crates/red_knot_vendored/vendor/",
-	"crates/ruff/resources/",
-	"crates/ruff_linter/resources/",
-	"crates/ruff_python_formatter/resources/",
-	"crates/ruff_python_parser/resources/",
-]
+file_resolver.extend_exclude = []
 file_resolver.force_exclude = false
 file_resolver.include = [
 	"*.py",
@@ -66,11 +59,11 @@ file_resolver.include = [
 ]
 file_resolver.extend_include = []
 file_resolver.respect_gitignore = true
-file_resolver.project_root = "[BASEPATH]"
+file_resolver.project_root = "<temp_dir>/"
 
 # Linter Settings
 linter.exclude = []
-linter.project_root = "[BASEPATH]"
+linter.project_root = "<temp_dir>/"
 linter.rules.enabled = [
 	multiple-imports-on-one-line (E401),
 	module-import-not-at-top-of-file (E402),
@@ -196,7 +189,8 @@ linter.rules.should_fix = [
 linter.per_file_ignores = {}
 linter.safety_table.forced_safe = []
 linter.safety_table.forced_unsafe = []
-linter.target_version = Py37
+linter.unresolved_target_version = 3.7
+linter.per_file_target_version = {}
 linter.preview = disabled
 linter.explicit_preview_rules = false
 linter.extension = ExtensionMapping({})
@@ -208,11 +202,11 @@ linter.ignore_init_module_imports = true
 linter.logger_objects = []
 linter.namespace_packages = []
 linter.src = [
-	"[BASEPATH]",
-	"[BASEPATH]/src",
+	"<temp_dir>/",
+	"<temp_dir>/src",
 ]
 linter.tab_size = 4
-linter.line_length = 88
+linter.line_length = 100
 linter.task_tags = [
 	TODO,
 	FIXME,
@@ -232,9 +226,12 @@ linter.flake8_bandit.hardcoded_tmp_directory = [
 	/dev/shm,
 ]
 linter.flake8_bandit.check_typed_exception = false
+linter.flake8_bandit.extend_markup_names = []
+linter.flake8_bandit.allowed_markup_calls = []
 linter.flake8_bugbear.extend_immutable_calls = []
-linter.flake8_builtins.builtins_allowed_modules = []
-linter.flake8_builtins.builtins_ignorelist = []
+linter.flake8_builtins.allowed_modules = []
+linter.flake8_builtins.ignorelist = []
+linter.flake8_builtins.strict_checking = false
 linter.flake8_comprehensions.allow_dict_calls_with_keyword_arguments = false
 linter.flake8_copyright.notice_rgx = (?i)Copyright\s+((?:\(C\)|©)\s+)?\d{4}((-|,\s)\d{4})*
 linter.flake8_copyright.author = none
@@ -354,7 +351,7 @@ linter.pep8_naming.ignore_names = [
 ]
 linter.pep8_naming.classmethod_decorators = []
 linter.pep8_naming.staticmethod_decorators = []
-linter.pycodestyle.max_line_length = 88
+linter.pycodestyle.max_line_length = 100
 linter.pycodestyle.max_doc_length = none
 linter.pycodestyle.ignore_overlong_task_comments = false
 linter.pyflakes.extend_generics = []
@@ -374,14 +371,13 @@ linter.pylint.max_public_methods = 20
 linter.pylint.max_locals = 15
 linter.pyupgrade.keep_runtime_typing = false
 linter.ruff.parenthesize_tuple_in_subscript = false
-linter.ruff.extend_markup_names = []
-linter.ruff.allowed_markup_calls = []
 
 # Formatter Settings
 formatter.exclude = []
-formatter.target_version = Py37
+formatter.unresolved_target_version = 3.7
+formatter.per_file_target_version = {}
 formatter.preview = disabled
-formatter.line_width = 88
+formatter.line_width = 100
 formatter.line_ending = auto
 formatter.indent_style = space
 formatter.indent_width = 4
@@ -393,7 +389,7 @@ formatter.docstring_code_line_width = dynamic
 # Analyze Settings
 analyze.exclude = []
 analyze.preview = disabled
-analyze.target_version = Py37
+analyze.target_version = 3.7
 analyze.detect_string_imports = false
 analyze.extension = ExtensionMapping({})
 analyze.include_dependencies = {}

@@ -1,4 +1,4 @@
-use ruff_python_ast::Expr;
+use ruff_python_ast::{Arguments, Expr, ExprCall};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
@@ -16,7 +16,7 @@ use super::helpers;
 /// ## Why is this bad?
 /// It is redundant to use a `list()` call around a list comprehension.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// list([f(x) for x in foo])
 /// ```
@@ -44,12 +44,27 @@ impl AlwaysFixableViolation for UnnecessaryListCall {
 }
 
 /// C411
-pub(crate) fn unnecessary_list_call(
-    checker: &mut Checker,
-    expr: &Expr,
-    func: &Expr,
-    args: &[Expr],
-) {
+pub(crate) fn unnecessary_list_call(checker: &Checker, expr: &Expr, call: &ExprCall) {
+    let ExprCall {
+        func,
+        arguments,
+        range: _,
+    } = call;
+
+    if !arguments.keywords.is_empty() {
+        return;
+    }
+
+    if arguments.args.len() > 1 {
+        return;
+    }
+
+    let Arguments {
+        range: _,
+        args,
+        keywords: _,
+    } = arguments;
+
     let Some(argument) = helpers::first_argument_with_matching_function("list", func, args) else {
         return;
     };
@@ -64,5 +79,5 @@ pub(crate) fn unnecessary_list_call(
         fixes::fix_unnecessary_list_call(expr, checker.locator(), checker.stylist())
             .map(Fix::unsafe_edit)
     });
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

@@ -83,7 +83,7 @@ impl Violation for PostInitDefault {
 }
 
 /// RUF033
-pub(crate) fn post_init_default(checker: &mut Checker, function_def: &ast::StmtFunctionDef) {
+pub(crate) fn post_init_default(checker: &Checker, function_def: &ast::StmtFunctionDef) {
     if &function_def.name != "__post_init__" {
         return;
     }
@@ -104,20 +104,21 @@ pub(crate) fn post_init_default(checker: &mut Checker, function_def: &ast::StmtF
     let mut stopped_fixes = false;
     let mut diagnostics = vec![];
 
-    for ast::ParameterWithDefault {
-        parameter,
-        default,
-        range: _,
-    } in function_def.parameters.iter_non_variadic_params()
-    {
-        let Some(default) = default else {
+    for parameter in function_def.parameters.iter_non_variadic_params() {
+        let Some(default) = parameter.default() else {
             continue;
         };
         let mut diagnostic = Diagnostic::new(PostInitDefault, default.range());
 
         if !stopped_fixes {
             diagnostic.try_set_fix(|| {
-                use_initvar(current_scope, function_def, parameter, default, checker)
+                use_initvar(
+                    current_scope,
+                    function_def,
+                    &parameter.parameter,
+                    default,
+                    checker,
+                )
             });
             // Need to stop fixes as soon as there is a parameter we cannot fix.
             // Otherwise, we risk a syntax error (a parameter without a default
@@ -128,7 +129,7 @@ pub(crate) fn post_init_default(checker: &mut Checker, function_def: &ast::StmtF
         diagnostics.push(diagnostic);
     }
 
-    checker.diagnostics.extend(diagnostics);
+    checker.report_diagnostics(diagnostics);
 }
 
 /// Generate a [`Fix`] to transform a `__post_init__` default argument into a
@@ -169,8 +170,7 @@ fn use_initvar(
         let line_ending = checker.stylist().line_ending().as_str();
 
         if let Some(annotation) = &parameter
-            .annotation
-            .as_deref()
+            .annotation()
             .map(|annotation| locator.slice(annotation))
         {
             format!("{parameter_name}: {initvar_binding}[{annotation}] = {default}{line_ending}")

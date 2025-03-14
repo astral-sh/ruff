@@ -54,7 +54,7 @@ impl Violation for DirectLoggerInstantiation {
 }
 
 /// LOG001
-pub(crate) fn direct_logger_instantiation(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn direct_logger_instantiation(checker: &Checker, call: &ast::ExprCall) {
     if !checker.semantic().seen_module(Modules::LOGGING) {
         return;
     }
@@ -74,6 +74,6 @@ pub(crate) fn direct_logger_instantiation(checker: &mut Checker, call: &ast::Exp
             let reference_edit = Edit::range_replacement(binding, call.func.range());
             Ok(Fix::unsafe_edits(import_edit, [reference_edit]))
         });
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }

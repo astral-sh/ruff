@@ -2,7 +2,7 @@ use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{
-    self as ast, AstNode, Expr, ExprEllipsisLiteral, ExprLambda, Identifier, Parameter,
+    self as ast, Expr, ExprEllipsisLiteral, ExprLambda, Identifier, Parameter,
     ParameterWithDefault, Parameters, Stmt,
 };
 use ruff_python_semantic::SemanticModel;
@@ -56,7 +56,7 @@ impl Violation for LambdaAssignment {
 
 /// E731
 pub(crate) fn lambda_assignment(
-    checker: &mut Checker,
+    checker: &Checker,
     target: &Expr,
     value: &Expr,
     annotation: Option<&Expr>,
@@ -130,7 +130,7 @@ pub(crate) fn lambda_assignment(
         }
     }
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// Extract the argument types and return type from a `Callable` annotation.
@@ -263,7 +263,7 @@ fn replace_trailing_ellipsis_with_original_expr(
 ) -> String {
     let original_expr_range = parenthesized_range(
         (&lambda.body).into(),
-        lambda.as_any_node_ref(),
+        lambda.into(),
         checker.comment_ranges(),
         checker.source(),
     )

@@ -29,7 +29,7 @@ impl Violation for PotentialIndexError {
 }
 
 /// PLE0643
-pub(crate) fn potential_index_error(checker: &mut Checker, value: &Expr, slice: &Expr) {
+pub(crate) fn potential_index_error(checker: &Checker, value: &Expr, slice: &Expr) {
     // Determine the length of the sequence.
     let length = match value {
         Expr::Tuple(ast::ExprTuple { elts, .. }) | Expr::List(ast::ExprList { elts, .. }) => {
@@ -65,9 +65,7 @@ pub(crate) fn potential_index_error(checker: &mut Checker, value: &Expr, slice: 
 
     // Emit a diagnostic if the index is out of bounds. If the index can't be represented as an
     // `i64`, but the length _can_, then the index is definitely out of bounds.
-    if index.map_or(true, |index| index >= length || index < -length) {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(PotentialIndexError, slice.range()));
+    if index.is_none_or(|index| index >= length || index < -length) {
+        checker.report_diagnostic(Diagnostic::new(PotentialIndexError, slice.range()));
     }
 }

@@ -45,7 +45,7 @@ impl AlwaysFixableViolation for WhitespaceAfterDecorator {
 }
 
 /// E204
-pub(crate) fn whitespace_after_decorator(checker: &mut Checker, decorator_list: &[Decorator]) {
+pub(crate) fn whitespace_after_decorator(checker: &Checker, decorator_list: &[Decorator]) {
     for decorator in decorator_list {
         let decorator_text = checker.locator().slice(decorator);
 
@@ -64,7 +64,7 @@ pub(crate) fn whitespace_after_decorator(checker: &mut Checker, decorator_list: 
 
                 let mut diagnostic = Diagnostic::new(WhitespaceAfterDecorator, range);
                 diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(range)));
-                checker.diagnostics.push(diagnostic);
+                checker.report_diagnostic(diagnostic);
             }
         }
     }

@@ -1,11 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
-snapshot_kind: text
 ---
 PYI020.pyi:7:10: PYI020 [*] Quoted annotations should not be included in stubs
   |
 5 | import typing_extensions
-6 | 
+6 |
 7 | def f(x: "int"): ...  # Y020 Quoted annotations should never be used in stubs
   |          ^^^^^ PYI020
 8 | def g(x: list["int"]): ...  # Y020 Quoted annotations should never be used in stubs
@@ -48,7 +47,7 @@ PYI020.pyi:9:26: PYI020 [*] Quoted annotations should not be included in stubs
  8 | def g(x: list["int"]): ...  # Y020 Quoted annotations should never be used in stubs
  9 | _T = TypeVar("_T", bound="int")  # Y020 Quoted annotations should never be used in stubs
    |                          ^^^^^ PYI020
-10 | 
+10 |
 11 | def h(w: Literal["a", "b"], x: typing.Literal["c"], y: typing_extensions.Literal["d"], z: _T) -> _T: ...
    |
    = help: Remove quotes
@@ -66,7 +65,7 @@ PYI020.pyi:9:26: PYI020 [*] Quoted annotations should not be included in stubs
 PYI020.pyi:13:12: PYI020 [*] Quoted annotations should not be included in stubs
    |
 11 | def h(w: Literal["a", "b"], x: typing.Literal["c"], y: typing_extensions.Literal["d"], z: _T) -> _T: ...
-12 | 
+12 |
 13 | def j() -> "int": ...  # Y020 Quoted annotations should never be used in stubs
    |            ^^^^^ PYI020
 14 | Alias: TypeAlias = list["int"]  # Y020 Quoted annotations should never be used in stubs
@@ -88,7 +87,7 @@ PYI020.pyi:14:25: PYI020 [*] Quoted annotations should not be included in stubs
 13 | def j() -> "int": ...  # Y020 Quoted annotations should never be used in stubs
 14 | Alias: TypeAlias = list["int"]  # Y020 Quoted annotations should never be used in stubs
    |                         ^^^^^ PYI020
-15 | 
+15 |
 16 | class Child(list["int"]):  # Y020 Quoted annotations should never be used in stubs
    |
    = help: Remove quotes
@@ -106,7 +105,7 @@ PYI020.pyi:14:25: PYI020 [*] Quoted annotations should not be included in stubs
 PYI020.pyi:16:18: PYI020 [*] Quoted annotations should not be included in stubs
    |
 14 | Alias: TypeAlias = list["int"]  # Y020 Quoted annotations should never be used in stubs
-15 | 
+15 |
 16 | class Child(list["int"]):  # Y020 Quoted annotations should never be used in stubs
    |                  ^^^^^ PYI020
 17 |     """Documented and guaranteed useful."""  # Y021 Docstrings should not be included in stubs
@@ -170,7 +169,7 @@ PYI020.pyi:24:8: PYI020 [*] Quoted annotations should not be included in stubs
 23 | else:
 24 |     f: "bytes"  # Y020 Quoted annotations should never be used in stubs
    |        ^^^^^^^ PYI020
-25 | 
+25 |
 26 | # These two shouldn't trigger Y020 -- empty strings can't be "quoted annotations"
    |
    = help: Remove quotes

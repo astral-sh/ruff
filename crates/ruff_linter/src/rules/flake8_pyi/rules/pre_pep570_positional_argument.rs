@@ -5,7 +5,7 @@ use ruff_python_ast::{self as ast, ParameterWithDefault};
 use ruff_python_semantic::analyze::function_type;
 
 use crate::checkers::ast::Checker;
-use crate::settings::types::PythonVersion;
+use ruff_python_ast::PythonVersion;
 
 /// ## What it does
 /// Checks for the presence of [PEP 484]-style positional-only parameters.
@@ -54,12 +54,9 @@ impl Violation for Pep484StylePositionalOnlyParameter {
 }
 
 /// PYI063
-pub(crate) fn pep_484_positional_parameter(
-    checker: &mut Checker,
-    function_def: &ast::StmtFunctionDef,
-) {
+pub(crate) fn pep_484_positional_parameter(checker: &Checker, function_def: &ast::StmtFunctionDef) {
     // PEP 570 was introduced in Python 3.8.
-    if checker.settings.target_version < PythonVersion::Py38 {
+    if checker.target_version() < PythonVersion::PY38 {
         return;
     }
 
@@ -90,7 +87,7 @@ pub(crate) fn pep_484_positional_parameter(
 
     if let Some(arg) = function_def.parameters.args.get(skip) {
         if is_old_style_positional_only(arg) {
-            checker.diagnostics.push(Diagnostic::new(
+            checker.report_diagnostic(Diagnostic::new(
                 Pep484StylePositionalOnlyParameter,
                 arg.identifier(),
             ));
@@ -100,7 +97,7 @@ pub(crate) fn pep_484_positional_parameter(
 
 /// Returns `true` if the [`ParameterWithDefault`] is an old-style positional-only parameter (i.e.,
 /// its name starts with `__` and does not end with `__`).
-fn is_old_style_positional_only(arg: &ParameterWithDefault) -> bool {
-    let arg_name = &arg.parameter.name;
+fn is_old_style_positional_only(param: &ParameterWithDefault) -> bool {
+    let arg_name = param.name();
     arg_name.starts_with("__") && !arg_name.ends_with("__")
 }

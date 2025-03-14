@@ -1,11 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
-snapshot_kind: text
 ---
 UP017.py:10:11: UP017 [*] Use `datetime.UTC` alias
    |
  8 |     from datetime import timezone
- 9 | 
+ 9 |
 10 |     print(timezone.utc)
    |           ^^^^^^^^^^^^ UP017
    |
@@ -29,7 +28,7 @@ UP017.py:10:11: UP017 [*] Use `datetime.UTC` alias
 UP017.py:16:11: UP017 [*] Use `datetime.UTC` alias
    |
 14 |     from datetime import timezone as tz
-15 | 
+15 |
 16 |     print(tz.utc)
    |           ^^^^^^ UP017
    |
@@ -53,7 +52,7 @@ UP017.py:16:11: UP017 [*] Use `datetime.UTC` alias
 UP017.py:22:11: UP017 [*] Use `datetime.UTC` alias
    |
 20 |     import datetime
-21 | 
+21 |
 22 |     print(datetime.timezone.utc)
    |           ^^^^^^^^^^^^^^^^^^^^^ UP017
    |
@@ -72,7 +71,7 @@ UP017.py:22:11: UP017 [*] Use `datetime.UTC` alias
 UP017.py:28:11: UP017 [*] Use `datetime.UTC` alias
    |
 26 |     import datetime as dt
-27 | 
+27 |
 28 |     print(dt.timezone.utc)
    |           ^^^^^^^^^^^^^^^ UP017
    |

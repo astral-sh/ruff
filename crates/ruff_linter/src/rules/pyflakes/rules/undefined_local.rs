@@ -46,12 +46,7 @@ impl Violation for UndefinedLocal {
 }
 
 /// F823
-pub(crate) fn undefined_local(
-    checker: &Checker,
-    scope_id: ScopeId,
-    scope: &Scope,
-    diagnostics: &mut Vec<Diagnostic>,
-) {
+pub(crate) fn undefined_local(checker: &Checker, scope_id: ScopeId, scope: &Scope) {
     if scope.kind.is_function() {
         for (name, binding_id) in scope.bindings() {
             // If the variable shadows a binding in a parent scope...
@@ -67,7 +62,7 @@ pub(crate) fn undefined_local(
                     }
                 }) {
                     // Then it's probably an error.
-                    diagnostics.push(Diagnostic::new(
+                    checker.report_diagnostic(Diagnostic::new(
                         UndefinedLocal {
                             name: name.to_string(),
                         },

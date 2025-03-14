@@ -57,7 +57,7 @@ impl Violation for StarArgUnpackingAfterKeywordArg {
 
 /// B026
 pub(crate) fn star_arg_unpacking_after_keyword_arg(
-    checker: &mut Checker,
+    checker: &Checker,
     args: &[Expr],
     keywords: &[Keyword],
 ) {
@@ -71,7 +71,7 @@ pub(crate) fn star_arg_unpacking_after_keyword_arg(
         if arg.start() <= keyword.start() {
             continue;
         }
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             StarArgUnpackingAfterKeywordArg,
             arg.range(),
         ));

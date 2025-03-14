@@ -1,13 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/pep8_naming/mod.rs
-snapshot_kind: text
 ---
 N812.py:2:8: N812 Lowercase `stillbad` imported as non-lowercase `stillBad`
   |
 1 | import mod.badallowed as badAllowed
 2 | import mod.stillbad as stillBad
   |        ^^^^^^^^^^^^^^^^^^^^^^^^ N812
-3 | 
+3 |
 4 | from mod import badallowed as BadAllowed
   |
 

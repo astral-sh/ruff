@@ -46,8 +46,7 @@ RUF039_concat.py:12:5: RUF039 [*] First argument to `re.findall()` is not raw st
    |
 10 |       multiline
 11 |       '''
-12 |       """
-   |  _____^
+12 | /     """
 13 | |     concatenation
 14 | |     """
    | |_______^ RUF039
@@ -277,8 +276,7 @@ RUF039_concat.py:52:5: RUF039 [*] First argument to `regex.findall()` is not raw
    |
 50 |       multiline
 51 |       '''
-52 |       """
-   |  _____^
+52 | /     """
 53 | |     concatenation
 54 | |     """
    | |_______^ RUF039

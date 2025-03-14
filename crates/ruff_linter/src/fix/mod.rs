@@ -38,7 +38,7 @@ pub(crate) fn fix_file(
             diagnostic
                 .fix
                 .as_ref()
-                .map_or(false, |fix| fix.applies(required_applicability))
+                .is_some_and(|fix| fix.applies(required_applicability))
         })
         .peekable();
 
@@ -134,6 +134,7 @@ fn cmp_fix(rule1: Rule, rule2: Rule, fix1: &Fix, fix2: &Fix) -> std::cmp::Orderi
     // `< is transitive: a < b and b < c implies a < c. The same must hold for both == and >.`
     // See https://github.com/astral-sh/ruff/issues/12469#issuecomment-2244392085
     match (rule1, rule2) {
+        (Rule::RedefinedWhileUnused, Rule::RedefinedWhileUnused) => std::cmp::Ordering::Equal,
         (Rule::RedefinedWhileUnused, _) => std::cmp::Ordering::Less,
         (_, Rule::RedefinedWhileUnused) => std::cmp::Ordering::Greater,
         _ => std::cmp::Ordering::Equal,

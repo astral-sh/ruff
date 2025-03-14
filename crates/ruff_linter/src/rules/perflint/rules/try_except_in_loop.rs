@@ -5,7 +5,7 @@ use ruff_python_ast::{self as ast, Stmt};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::settings::types::PythonVersion;
+use ruff_python_ast::PythonVersion;
 
 /// ## What it does
 /// Checks for uses of except handling via `try`-`except` within `for` and
@@ -88,8 +88,8 @@ impl Violation for TryExceptInLoop {
 }
 
 /// PERF203
-pub(crate) fn try_except_in_loop(checker: &mut Checker, body: &[Stmt]) {
-    if checker.settings.target_version >= PythonVersion::Py311 {
+pub(crate) fn try_except_in_loop(checker: &Checker, body: &[Stmt]) {
+    if checker.target_version() >= PythonVersion::PY311 {
         return;
     }
 
@@ -107,9 +107,7 @@ pub(crate) fn try_except_in_loop(checker: &mut Checker, body: &[Stmt]) {
         return;
     }
 
-    checker
-        .diagnostics
-        .push(Diagnostic::new(TryExceptInLoop, handler.range()));
+    checker.report_diagnostic(Diagnostic::new(TryExceptInLoop, handler.range()));
 }
 
 /// Returns `true` if a `break` or `continue` statement is present in `body`.

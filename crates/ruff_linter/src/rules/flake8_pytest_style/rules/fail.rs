@@ -55,7 +55,7 @@ impl Violation for PytestFailWithoutMessage {
     }
 }
 
-pub(crate) fn fail_call(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn fail_call(checker: &Checker, call: &ast::ExprCall) {
     if is_pytest_fail(&call.func, checker.semantic()) {
         // Allow either `pytest.fail(reason="...")` (introduced in pytest 7.0) or
         // `pytest.fail(msg="...")` (deprecated in pytest 7.0)
@@ -63,11 +63,9 @@ pub(crate) fn fail_call(checker: &mut Checker, call: &ast::ExprCall) {
             .arguments
             .find_argument_value("reason", 0)
             .or_else(|| call.arguments.find_argument_value("msg", 0))
-            .map_or(true, is_empty_or_null_string)
+            .is_none_or(is_empty_or_null_string)
         {
-            checker
-                .diagnostics
-                .push(Diagnostic::new(PytestFailWithoutMessage, call.func.range()));
+            checker.report_diagnostic(Diagnostic::new(PytestFailWithoutMessage, call.func.range()));
         }
     }
 }

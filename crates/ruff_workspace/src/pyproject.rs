@@ -4,8 +4,9 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use log::debug;
-use pep440_rs::VersionSpecifiers;
+use pep440_rs::{Operator, Version, VersionSpecifiers};
 use serde::{Deserialize, Serialize};
+use strum::IntoEnumIterator;
 
 use ruff_linter::settings::types::PythonVersion;
 
@@ -150,8 +151,7 @@ pub(super) fn load_options<P: AsRef<Path>>(path: P) -> Result<Options> {
         if ruff.target_version.is_none() {
             if let Some(project) = pyproject.project {
                 if let Some(requires_python) = project.requires_python {
-                    ruff.target_version =
-                        PythonVersion::get_minimum_supported_version(&requires_python);
+                    ruff.target_version = get_minimum_supported_version(&requires_python);
                 }
             }
         }
@@ -167,6 +167,38 @@ pub(super) fn load_options<P: AsRef<Path>>(path: P) -> Result<Options> {
     }
 }
 
+/// Infer the minimum supported [`PythonVersion`] from a `requires-python` specifier.
+fn get_minimum_supported_version(requires_version: &VersionSpecifiers) -> Option<PythonVersion> {
+    /// Truncate a version to its major and minor components.
+    fn major_minor(version: &Version) -> Option<Version> {
+        let major = version.release().first()?;
+        let minor = version.release().get(1)?;
+        Some(Version::new([major, minor]))
+    }
+
+    // Extract the minimum supported version from the specifiers.
+    let minimum_version = requires_version
+        .iter()
+        .filter(|specifier| {
+            matches!(
+                specifier.operator(),
+                Operator::Equal
+                    | Operator::EqualStar
+                    | Operator::ExactEqual
+                    | Operator::TildeEqual
+                    | Operator::GreaterThan
+                    | Operator::GreaterThanEqual
+            )
+        })
+        .filter_map(|specifier| major_minor(specifier.version()))
+        .min()?;
+
+    debug!("Detected minimum supported `requires-python` version: {minimum_version}");
+
+    // Find the Python version that matches the minimum supported version.
+    PythonVersion::iter().find(|version| Version::from(*version) == minimum_version)
+}
+
 #[cfg(test)]
 mod tests {
     use std::fs;
@@ -180,7 +212,7 @@ mod tests {
     use ruff_linter::line_width::LineLength;
     use ruff_linter::settings::types::PatternPrefixPair;
 
-    use crate::options::{LintCommonOptions, LintOptions, Options};
+    use crate::options::{Flake8BuiltinsOptions, LintCommonOptions, LintOptions, Options};
     use crate::pyproject::{find_settings_toml, parse_pyproject_toml, Pyproject, Tools};
 
     #[test]
@@ -290,6 +322,55 @@ ignore = ["E501"]
                 })
             })
         );
+
+        let pyproject: Pyproject = toml::from_str(
+            r#"
+[tool.ruff.lint.flake8-builtins]
+builtins-allowed-modules = ["asyncio"]
+builtins-ignorelist = ["argparse", 'typing']
+builtins-strict-checking = true
+allowed-modules = ['sys']
+ignorelist = ["os", 'io']
+strict-checking = false
+"#,
+        )?;
+
+        #[allow(deprecated)]
+        let expected = Flake8BuiltinsOptions {
+            builtins_allowed_modules: Some(vec!["asyncio".to_string()]),
+            allowed_modules: Some(vec!["sys".to_string()]),
+
+            builtins_ignorelist: Some(vec!["argparse".to_string(), "typing".to_string()]),
+            ignorelist: Some(vec!["os".to_string(), "io".to_string()]),
+
+            builtins_strict_checking: Some(true),
+            strict_checking: Some(false),
+        };
+
+        assert_eq!(
+            pyproject.tool,
+            Some(Tools {
+                ruff: Some(Options {
+                    lint: Some(LintOptions {
+                        common: LintCommonOptions {
+                            flake8_builtins: Some(expected.clone()),
+                            ..LintCommonOptions::default()
+                        },
+                        ..LintOptions::default()
+                    }),
+                    ..Options::default()
+                })
+            })
+        );
+
+        let settings = expected.into_settings();
+
+        assert_eq!(settings.allowed_modules, vec!["sys".to_string()]);
+        assert_eq!(
+            settings.ignorelist,
+            vec!["os".to_string(), "io".to_string()]
+        );
+        assert!(!settings.strict_checking);
 
         assert!(toml::from_str::<Pyproject>(
             r"

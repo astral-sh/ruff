@@ -1,4 +1,6 @@
-use super::{ClassBase, ClassLiteralType, Db, KnownClass, Symbol, Type};
+use crate::symbol::SymbolAndQualifiers;
+
+use super::{ClassBase, ClassLiteralType, Db, KnownClass, Type};
 
 /// A type that represents `type[C]`, i.e. the class object `C` and class objects that are subclasses of `C`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update)]
@@ -22,13 +24,11 @@ impl<'db> SubclassOfType<'db> {
     pub(crate) fn from(db: &'db dyn Db, subclass_of: impl Into<ClassBase<'db>>) -> Type<'db> {
         let subclass_of = subclass_of.into();
         match subclass_of {
-            ClassBase::Any | ClassBase::Unknown | ClassBase::Todo(_) => {
-                Type::SubclassOf(Self { subclass_of })
-            }
+            ClassBase::Dynamic(_) => Type::SubclassOf(Self { subclass_of }),
             ClassBase::Class(class) => {
                 if class.is_final(db) {
                     Type::ClassLiteral(ClassLiteralType { class })
-                } else if class.is_known(db, KnownClass::Object) {
+                } else if class.is_object(db) {
                     KnownClass::Type.to_instance(db)
                 } else {
                     Type::SubclassOf(Self { subclass_of })
@@ -40,14 +40,14 @@ impl<'db> SubclassOfType<'db> {
     /// Return a [`Type`] instance representing the type `type[Unknown]`.
     pub(crate) const fn subclass_of_unknown() -> Type<'db> {
         Type::SubclassOf(SubclassOfType {
-            subclass_of: ClassBase::Unknown,
+            subclass_of: ClassBase::unknown(),
         })
     }
 
     /// Return a [`Type`] instance representing the type `type[Any]`.
     pub(crate) const fn subclass_of_any() -> Type<'db> {
         Type::SubclassOf(SubclassOfType {
-            subclass_of: ClassBase::Any,
+            subclass_of: ClassBase::any(),
         })
     }
 
@@ -66,8 +66,12 @@ impl<'db> SubclassOfType<'db> {
         !self.is_dynamic()
     }
 
-    pub(crate) fn member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
-        Type::from(self.subclass_of).member(db, name)
+    pub(crate) fn find_name_in_mro(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+    ) -> Option<SymbolAndQualifiers<'db>> {
+        Type::from(self.subclass_of).find_name_in_mro(db, name)
     }
 
     /// Return `true` if `self` is a subtype of `other`.
@@ -77,8 +81,7 @@ impl<'db> SubclassOfType<'db> {
     pub(crate) fn is_subtype_of(self, db: &'db dyn Db, other: SubclassOfType<'db>) -> bool {
         match (self.subclass_of, other.subclass_of) {
             // Non-fully-static types do not participate in subtyping
-            (ClassBase::Any | ClassBase::Unknown | ClassBase::Todo(_), _)
-            | (_, ClassBase::Any | ClassBase::Unknown | ClassBase::Todo(_)) => false,
+            (ClassBase::Dynamic(_), _) | (_, ClassBase::Dynamic(_)) => false,
 
             // For example, `type[bool]` describes all possible runtime subclasses of the class `bool`,
             // and `type[int]` describes all possible runtime subclasses of the class `int`.
@@ -87,6 +90,13 @@ impl<'db> SubclassOfType<'db> {
                 // N.B. The subclass relation is fully static
                 self_class.is_subclass_of(db, other_class)
             }
+        }
+    }
+
+    pub(crate) fn to_instance(self) -> Type<'db> {
+        match self.subclass_of {
+            ClassBase::Class(class) => Type::instance(class),
+            ClassBase::Dynamic(dynamic_type) => Type::Dynamic(dynamic_type),
         }
     }
 }

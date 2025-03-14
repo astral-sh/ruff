@@ -1,0 +1,497 @@
+---
+source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
+---
+PYI061.py:4:25: PYI061 [*] Use `None` rather than `Literal[None]`
+  |
+4 | def func1(arg1: Literal[None]):
+  |                         ^^^^ PYI061
+5 |     ...
+  |
+  = help: Replace with `None`
+
+ℹ Safe fix
+1 1 | from typing import Literal, Union
+2 2 | 
+3 3 | 
+4   |-def func1(arg1: Literal[None]):
+  4 |+def func1(arg1: None):
+5 5 |     ...
+6 6 | 
+7 7 | 
+
+PYI061.py:8:25: PYI061 [*] Use `None` rather than `Literal[None]`
+  |
+8 | def func2(arg1: Literal[None] | int):
+  |                         ^^^^ PYI061
+9 |     ...
+  |
+  = help: Replace with `None`
+
+ℹ Safe fix
+5 5 |     ...
+6 6 | 
+7 7 | 
+8   |-def func2(arg1: Literal[None] | int):
+  8 |+def func2(arg1: None | int):
+9 9 |     ...
+10 10 | 
+11 11 | 
+
+PYI061.py:12:24: PYI061 [*] Use `None` rather than `Literal[None]`
+   |
+12 | def func3() -> Literal[None]:
+   |                        ^^^^ PYI061
+13 |     ...
+   |
+   = help: Replace with `None`
+
+ℹ Safe fix
+9  9  |     ...
+10 10 | 
+11 11 | 
+12    |-def func3() -> Literal[None]:
+   12 |+def func3() -> None:
+13 13 |     ...
+14 14 | 
+15 15 | 
+
+PYI061.py:16:30: PYI061 [*] Use `Optional[Literal[...]]` rather than `Literal[None, ...]` 
+   |
+16 | def func4(arg1: Literal[int, None, float]):
+   |                              ^^^^ PYI061
+17 |     ...
+   |
+   = help: Replace with `Optional[Literal[...]]`
+
+ℹ Safe fix
+1     |-from typing import Literal, Union
+   1  |+from typing import Literal, Union, Optional
+2  2  | 
+3  3  | 
+4  4  | def func1(arg1: Literal[None]):
+--------------------------------------------------------------------------------
+13 13 |     ...
+14 14 | 
+15 15 | 
+16    |-def func4(arg1: Literal[int, None, float]):
+   16 |+def func4(arg1: Optional[Literal[int, float]]):
+17 17 |     ...
+18 18 | 
+19 19 | 
+
+PYI061.py:20:25: PYI061 [*] Use `None` rather than `Literal[None]`
+   |
+20 | def func5(arg1: Literal[None, None]):
+   |                         ^^^^ PYI061
+21 |     ...
+   |
+   = help: Replace with `None`
+
+ℹ Safe fix
+17 17 |     ...
+18 18 | 
+19 19 | 
+20    |-def func5(arg1: Literal[None, None]):
+   20 |+def func5(arg1: None):
+21 21 |     ...
+22 22 | 
+23 23 | 
+
+PYI061.py:20:31: PYI061 [*] Use `None` rather than `Literal[None]`
+   |
+20 | def func5(arg1: Literal[None, None]):
+   |                               ^^^^ PYI061
+21 |     ...
+   |
+   = help: Replace with `None`
+
+ℹ Safe fix
+17 17 |     ...
+18 18 | 
+19 19 | 
+20    |-def func5(arg1: Literal[None, None]):
+   20 |+def func5(arg1: None):
+21 21 |     ...
+22 22 | 
+23 23 | 
+
+PYI061.py:26:5: PYI061 [*] Use `Optional[Literal[...]]` rather than `Literal[None, ...]` 
+   |
+24 | def func6(arg1: Literal[
+25 |     "hello",
+26 |     None  # Comment 1
+   |     ^^^^ PYI061
+27 |     , "world"
+28 |     ]):
+   |
+   = help: Replace with `Optional[Literal[...]]`
+
+ℹ Unsafe fix
+1     |-from typing import Literal, Union
+   1  |+from typing import Literal, Union, Optional
+2  2  | 
+3  3  | 
+4  4  | def func1(arg1: Literal[None]):
+--------------------------------------------------------------------------------
+21 21 |     ...
+22 22 | 
+23 23 | 
+24    |-def func6(arg1: Literal[
+25    |-    "hello",
+26    |-    None  # Comment 1
+27    |-    , "world"
+28    |-    ]):
+   24 |+def func6(arg1: Optional[Literal["hello", "world"]]):
+29 25 |     ...
+30 26 | 
+31 27 | 
+
+PYI061.py:33:5: PYI061 [*] Use `None` rather than `Literal[None]`
+   |
+32 | def func7(arg1: Literal[
+33 |     None  # Comment 1
+   |     ^^^^ PYI061
+34 |     ]):
+35 |     ...
+   |
+   = help: Replace with `None`
+
+ℹ Unsafe fix
+29 29 |     ...
+30 30 | 
+31 31 | 
+32    |-def func7(arg1: Literal[
+33    |-    None  # Comment 1
+34    |-    ]):
+   32 |+def func7(arg1: None):
+35 33 |     ...
+36 34 | 
+37 35 | 
+
+PYI061.py:38:25: PYI061 Use `None` rather than `Literal[None]`
+   |
+38 | def func8(arg1: Literal[None] | None):
+   |                         ^^^^ PYI061
+39 |     ...
+   |
+   = help: Replace with `None`
+
+PYI061.py:42:31: PYI061 [*] Use `None` rather than `Literal[None]`
+   |
+42 | def func9(arg1: Union[Literal[None], None]):
+   |                               ^^^^ PYI061
+43 |     ...
+   |
+   = help: Replace with `None`
+
+ℹ Safe fix
+39 39 |     ...
+40 40 | 
+41 41 | 
+42    |-def func9(arg1: Union[Literal[None], None]):
+   42 |+def func9(arg1: Union[None, None]):
+43 43 |     ...
+44 44 | 
+45 45 | 
+
+PYI061.py:52:9: PYI061 [*] Use `None` rather than `Literal[None]`
+   |
+51 | # From flake8-pyi
+52 | Literal[None]  # Y061 None inside "Literal[]" expression. Replace with "None"
+   |         ^^^^ PYI061
+53 | Literal[True, None]  # Y061 None inside "Literal[]" expression. Replace with "Literal[True] | None"
+   |
+   = help: Replace with `None`
+
+ℹ Safe fix
+49 49 | 
+50 50 | 
+51 51 | # From flake8-pyi
+52    |-Literal[None]  # Y061 None inside "Literal[]" expression. Replace with "None"
+   52 |+None  # Y061 None inside "Literal[]" expression. Replace with "None"
+53 53 | Literal[True, None]  # Y061 None inside "Literal[]" expression. Replace with "Literal[True] | None"
+54 54 | 
+55 55 | ###
+
+PYI061.py:53:15: PYI061 [*] Use `Optional[Literal[...]]` rather than `Literal[None, ...]` 
+   |
+51 | # From flake8-pyi
+52 | Literal[None]  # Y061 None inside "Literal[]" expression. Replace with "None"
+53 | Literal[True, None]  # Y061 None inside "Literal[]" expression. Replace with "Literal[True] | None"
+   |               ^^^^ PYI061
+54 |
+55 | ###
+   |
+   = help: Replace with `Optional[Literal[...]]`
+
+ℹ Safe fix
+1     |-from typing import Literal, Union
+   1  |+from typing import Literal, Union, Optional
+2  2  | 
+3  3  | 
+4  4  | def func1(arg1: Literal[None]):
+--------------------------------------------------------------------------------
+50 50 | 
+51 51 | # From flake8-pyi
+52 52 | Literal[None]  # Y061 None inside "Literal[]" expression. Replace with "None"
+53    |-Literal[True, None]  # Y061 None inside "Literal[]" expression. Replace with "Literal[True] | None"
+   53 |+Optional[Literal[True]]  # Y061 None inside "Literal[]" expression. Replace with "Literal[True] | None"
+54 54 | 
+55 55 | ###
+56 56 | # The following rules here are slightly subtle,
+
+PYI061.py:62:9: PYI061 [*] Use `None` rather than `Literal[None]`
+   |
+60 | # If Y061 and Y062 both apply, but all the duplicate members are None,
+61 | # only emit Y061...
+62 | Literal[None, None]  # Y061 None inside "Literal[]" expression. Replace with "None"
+   |         ^^^^ PYI061
+63 | Literal[1, None, "foo", None]  # Y061 None inside "Literal[]" expression. Replace with "Literal[1, 'foo'] | None"
+   |
+   = help: Replace with `None`
+
+ℹ Safe fix
+59 59 | 
+60 60 | # If Y061 and Y062 both apply, but all the duplicate members are None,
+61 61 | # only emit Y061...
+62    |-Literal[None, None]  # Y061 None inside "Literal[]" expression. Replace with "None"
+   62 |+None  # Y061 None inside "Literal[]" expression. Replace with "None"
+63 63 | Literal[1, None, "foo", None]  # Y061 None inside "Literal[]" expression. Replace with "Literal[1, 'foo'] | None"
+64 64 | 
+65 65 | # ... but if Y061 and Y062 both apply
+
+PYI061.py:62:15: PYI061 [*] Use `None` rather than `Literal[None]`
+   |
+60 | # If Y061 and Y062 both apply, but all the duplicate members are None,
+61 | # only emit Y061...
+62 | Literal[None, None]  # Y061 None inside "Literal[]" expression. Replace with "None"
+   |               ^^^^ PYI061
+63 | Literal[1, None, "foo", None]  # Y061 None inside "Literal[]" expression. Replace with "Literal[1, 'foo'] | None"
+   |
+   = help: Replace with `None`
+
+ℹ Safe fix
+59 59 | 
+60 60 | # If Y061 and Y062 both apply, but all the duplicate members are None,
+61 61 | # only emit Y061...
+62    |-Literal[None, None]  # Y061 None inside "Literal[]" expression. Replace with "None"
+   62 |+None  # Y061 None inside "Literal[]" expression. Replace with "None"
+63 63 | Literal[1, None, "foo", None]  # Y061 None inside "Literal[]" expression. Replace with "Literal[1, 'foo'] | None"
+64 64 | 
+65 65 | # ... but if Y061 and Y062 both apply
+
+PYI061.py:63:12: PYI061 [*] Use `Optional[Literal[...]]` rather than `Literal[None, ...]` 
+   |
+61 | # only emit Y061...
+62 | Literal[None, None]  # Y061 None inside "Literal[]" expression. Replace with "None"
+63 | Literal[1, None, "foo", None]  # Y061 None inside "Literal[]" expression. Replace with "Literal[1, 'foo'] | None"
+   |            ^^^^ PYI061
+64 |
+65 | # ... but if Y061 and Y062 both apply
+   |
+   = help: Replace with `Optional[Literal[...]]`
+
+ℹ Safe fix
+1     |-from typing import Literal, Union
+   1  |+from typing import Literal, Union, Optional
+2  2  | 
+3  3  | 
+4  4  | def func1(arg1: Literal[None]):
+--------------------------------------------------------------------------------
+60 60 | # If Y061 and Y062 both apply, but all the duplicate members are None,
+61 61 | # only emit Y061...
+62 62 | Literal[None, None]  # Y061 None inside "Literal[]" expression. Replace with "None"
+63    |-Literal[1, None, "foo", None]  # Y061 None inside "Literal[]" expression. Replace with "Literal[1, 'foo'] | None"
+   63 |+Optional[Literal[1, "foo"]]  # Y061 None inside "Literal[]" expression. Replace with "Literal[1, 'foo'] | None"
+64 64 | 
+65 65 | # ... but if Y061 and Y062 both apply
+66 66 | # and there are no None members in the Literal[] slice,
+
+PYI061.py:63:25: PYI061 [*] Use `Optional[Literal[...]]` rather than `Literal[None, ...]` 
+   |
+61 | # only emit Y061...
+62 | Literal[None, None]  # Y061 None inside "Literal[]" expression. Replace with "None"
+63 | Literal[1, None, "foo", None]  # Y061 None inside "Literal[]" expression. Replace with "Literal[1, 'foo'] | None"
+   |                         ^^^^ PYI061
+64 |
+65 | # ... but if Y061 and Y062 both apply
+   |
+   = help: Replace with `Optional[Literal[...]]`
+
+ℹ Safe fix
+1     |-from typing import Literal, Union
+   1  |+from typing import Literal, Union, Optional
+2  2  | 
+3  3  | 
+4  4  | def func1(arg1: Literal[None]):
+--------------------------------------------------------------------------------
+60 60 | # If Y061 and Y062 both apply, but all the duplicate members are None,
+61 61 | # only emit Y061...
+62 62 | Literal[None, None]  # Y061 None inside "Literal[]" expression. Replace with "None"
+63    |-Literal[1, None, "foo", None]  # Y061 None inside "Literal[]" expression. Replace with "Literal[1, 'foo'] | None"
+   63 |+Optional[Literal[1, "foo"]]  # Y061 None inside "Literal[]" expression. Replace with "Literal[1, 'foo'] | None"
+64 64 | 
+65 65 | # ... but if Y061 and Y062 both apply
+66 66 | # and there are no None members in the Literal[] slice,
+
+PYI061.py:68:9: PYI061 [*] Use `Optional[Literal[...]]` rather than `Literal[None, ...]` 
+   |
+66 | # and there are no None members in the Literal[] slice,
+67 | # only emit Y062:
+68 | Literal[None, True, None, True]  # Y062 Duplicate "Literal[]" member "True"
+   |         ^^^^ PYI061
+   |
+   = help: Replace with `Optional[Literal[...]]`
+
+ℹ Safe fix
+1     |-from typing import Literal, Union
+   1  |+from typing import Literal, Union, Optional
+2  2  | 
+3  3  | 
+4  4  | def func1(arg1: Literal[None]):
+--------------------------------------------------------------------------------
+65 65 | # ... but if Y061 and Y062 both apply
+66 66 | # and there are no None members in the Literal[] slice,
+67 67 | # only emit Y062:
+68    |-Literal[None, True, None, True]  # Y062 Duplicate "Literal[]" member "True"
+   68 |+Optional[Literal[True, True]]  # Y062 Duplicate "Literal[]" member "True"
+69 69 | 
+70 70 | 
+71 71 | # Regression tests for https://github.com/astral-sh/ruff/issues/14567
+
+PYI061.py:68:21: PYI061 [*] Use `Optional[Literal[...]]` rather than `Literal[None, ...]` 
+   |
+66 | # and there are no None members in the Literal[] slice,
+67 | # only emit Y062:
+68 | Literal[None, True, None, True]  # Y062 Duplicate "Literal[]" member "True"
+   |                     ^^^^ PYI061
+   |
+   = help: Replace with `Optional[Literal[...]]`
+
+ℹ Safe fix
+1     |-from typing import Literal, Union
+   1  |+from typing import Literal, Union, Optional
+2  2  | 
+3  3  | 
+4  4  | def func1(arg1: Literal[None]):
+--------------------------------------------------------------------------------
+65 65 | # ... but if Y061 and Y062 both apply
+66 66 | # and there are no None members in the Literal[] slice,
+67 67 | # only emit Y062:
+68    |-Literal[None, True, None, True]  # Y062 Duplicate "Literal[]" member "True"
+   68 |+Optional[Literal[True, True]]  # Y062 Duplicate "Literal[]" member "True"
+69 69 | 
+70 70 | 
+71 71 | # Regression tests for https://github.com/astral-sh/ruff/issues/14567
+
+PYI061.py:72:12: PYI061 Use `None` rather than `Literal[None]`
+   |
+71 | # Regression tests for https://github.com/astral-sh/ruff/issues/14567
+72 | x: Literal[None] | None
+   |            ^^^^ PYI061
+73 | y: None | Literal[None]
+74 | z: Union[Literal[None], None]
+   |
+   = help: Replace with `None`
+
+PYI061.py:73:19: PYI061 Use `None` rather than `Literal[None]`
+   |
+71 | # Regression tests for https://github.com/astral-sh/ruff/issues/14567
+72 | x: Literal[None] | None
+73 | y: None | Literal[None]
+   |                   ^^^^ PYI061
+74 | z: Union[Literal[None], None]
+   |
+   = help: Replace with `None`
+
+PYI061.py:74:18: PYI061 [*] Use `None` rather than `Literal[None]`
+   |
+72 | x: Literal[None] | None
+73 | y: None | Literal[None]
+74 | z: Union[Literal[None], None]
+   |                  ^^^^ PYI061
+75 |
+76 | a: int | Literal[None] | None
+   |
+   = help: Replace with `None`
+
+ℹ Safe fix
+71 71 | # Regression tests for https://github.com/astral-sh/ruff/issues/14567
+72 72 | x: Literal[None] | None
+73 73 | y: None | Literal[None]
+74    |-z: Union[Literal[None], None]
+   74 |+z: Union[None, None]
+75 75 | 
+76 76 | a: int | Literal[None] | None
+77 77 | b: None | Literal[None] | None
+
+PYI061.py:76:18: PYI061 Use `None` rather than `Literal[None]`
+   |
+74 | z: Union[Literal[None], None]
+75 |
+76 | a: int | Literal[None] | None
+   |                  ^^^^ PYI061
+77 | b: None | Literal[None] | None
+78 | c: (None | Literal[None]) | None
+   |
+   = help: Replace with `None`
+
+PYI061.py:77:19: PYI061 Use `None` rather than `Literal[None]`
+   |
+76 | a: int | Literal[None] | None
+77 | b: None | Literal[None] | None
+   |                   ^^^^ PYI061
+78 | c: (None | Literal[None]) | None
+79 | d: None | (Literal[None] | None)
+   |
+   = help: Replace with `None`
+
+PYI061.py:78:20: PYI061 Use `None` rather than `Literal[None]`
+   |
+76 | a: int | Literal[None] | None
+77 | b: None | Literal[None] | None
+78 | c: (None | Literal[None]) | None
+   |                    ^^^^ PYI061
+79 | d: None | (Literal[None] | None)
+80 | e: None | ((None | Literal[None]) | None) | None
+   |
+   = help: Replace with `None`
+
+PYI061.py:79:20: PYI061 Use `None` rather than `Literal[None]`
+   |
+77 | b: None | Literal[None] | None
+78 | c: (None | Literal[None]) | None
+79 | d: None | (Literal[None] | None)
+   |                    ^^^^ PYI061
+80 | e: None | ((None | Literal[None]) | None) | None
+81 | f: Literal[None] | Literal[None]
+   |
+   = help: Replace with `None`
+
+PYI061.py:80:28: PYI061 Use `None` rather than `Literal[None]`
+   |
+78 | c: (None | Literal[None]) | None
+79 | d: None | (Literal[None] | None)
+80 | e: None | ((None | Literal[None]) | None) | None
+   |                            ^^^^ PYI061
+81 | f: Literal[None] | Literal[None]
+   |
+   = help: Replace with `None`
+
+PYI061.py:81:12: PYI061 Use `None` rather than `Literal[None]`
+   |
+79 | d: None | (Literal[None] | None)
+80 | e: None | ((None | Literal[None]) | None) | None
+81 | f: Literal[None] | Literal[None]
+   |            ^^^^ PYI061
+   |
+   = help: Replace with `None`
+
+PYI061.py:81:28: PYI061 Use `None` rather than `Literal[None]`
+   |
+79 | d: None | (Literal[None] | None)
+80 | e: None | ((None | Literal[None]) | None) | None
+81 | f: Literal[None] | Literal[None]
+   |                            ^^^^ PYI061
+   |
+   = help: Replace with `None`

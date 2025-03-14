@@ -8,7 +8,6 @@ use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::docstrings::{clean_space, leading_space};
 use ruff_python_ast::identifier::Identifier;
-use ruff_python_ast::ParameterWithDefault;
 use ruff_python_semantic::analyze::visibility::is_staticmethod;
 use ruff_python_trivia::textwrap::dedent;
 use ruff_source_file::NewlineWithTrailingNewline;
@@ -1168,6 +1167,7 @@ impl AlwaysFixableViolation for MissingSectionNameColon {
 /// a blank line, followed by a series of sections, each with a section header
 /// and a section body. Function docstrings often include a section for
 /// function arguments; this rule is concerned with that section only.
+/// Note that this rule only checks docstrings with an arguments (e.g. `Args`) section.
 ///
 /// This rule is enabled when using the `google` convention, and disabled when
 /// using the `pep257` and `numpy` conventions.
@@ -1323,7 +1323,7 @@ impl AlwaysFixableViolation for BlankLinesBetweenHeaderAndContent {
 /// D212, D214, D215, D405, D406, D407, D408, D409, D410, D411, D412, D413,
 /// D414, D416, D417
 pub(crate) fn sections(
-    checker: &mut Checker,
+    checker: &Checker,
     docstring: &Docstring,
     section_contexts: &SectionContexts,
     convention: Option<Convention>,
@@ -1339,7 +1339,7 @@ pub(crate) fn sections(
 }
 
 fn blanks_and_section_underline(
-    checker: &mut Checker,
+    checker: &Checker,
     docstring: &Docstring,
     context: &SectionContext,
     style: SectionStyle,
@@ -1375,7 +1375,7 @@ fn blanks_and_section_underline(
                         blank_lines_end,
                     )));
 
-                    checker.diagnostics.push(diagnostic);
+                    checker.report_diagnostic(diagnostic);
                 }
             }
 
@@ -1394,13 +1394,14 @@ fn blanks_and_section_underline(
                         dashed_line,
                     )));
 
-                    checker.diagnostics.push(diagnostic);
+                    checker.report_diagnostic(diagnostic);
                 }
             }
 
             if checker.enabled(Rule::OverindentedSectionUnderline) {
                 let leading_space = leading_space(&non_blank_line);
-                if leading_space.len() > docstring.indentation.len() {
+                let docstring_indentation = docstring.compute_indentation();
+                if leading_space.len() > docstring_indentation.len() {
                     let mut diagnostic = Diagnostic::new(
                         OverindentedSectionUnderline {
                             name: context.section_name().to_string(),
@@ -1413,14 +1414,14 @@ fn blanks_and_section_underline(
                         blank_lines_end,
                         leading_space.text_len() + TextSize::from(1),
                     );
-                    let contents = clean_space(docstring.indentation);
+                    let contents = clean_space(docstring_indentation);
                     diagnostic.set_fix(Fix::safe_edit(if contents.is_empty() {
                         Edit::range_deletion(range)
                     } else {
                         Edit::range_replacement(contents, range)
                     }));
 
-                    checker.diagnostics.push(diagnostic);
+                    checker.report_diagnostic(diagnostic);
                 }
             }
 
@@ -1440,7 +1441,7 @@ fn blanks_and_section_underline(
 
                     if following_lines.peek().is_none() {
                         if checker.enabled(Rule::EmptyDocstringSection) {
-                            checker.diagnostics.push(Diagnostic::new(
+                            checker.report_diagnostic(Diagnostic::new(
                                 EmptyDocstringSection {
                                     name: context.section_name().to_string(),
                                 },
@@ -1483,7 +1484,7 @@ fn blanks_and_section_underline(
                                     line_after_dashes.start(),
                                     blank_lines_after_dashes_end,
                                 )));
-                                checker.diagnostics.push(diagnostic);
+                                checker.report_diagnostic(diagnostic);
                             }
                         } else {
                             let mut diagnostic = Diagnostic::new(
@@ -1497,13 +1498,13 @@ fn blanks_and_section_underline(
                                 line_after_dashes.start(),
                                 blank_lines_after_dashes_end,
                             )));
-                            checker.diagnostics.push(diagnostic);
+                            checker.report_diagnostic(diagnostic);
                         }
                     }
                 }
             } else {
                 if checker.enabled(Rule::EmptyDocstringSection) {
-                    checker.diagnostics.push(Diagnostic::new(
+                    checker.report_diagnostic(Diagnostic::new(
                         EmptyDocstringSection {
                             name: context.section_name().to_string(),
                         },
@@ -1528,7 +1529,7 @@ fn blanks_and_section_underline(
                         equal_line,
                     )));
 
-                    checker.diagnostics.push(diagnostic);
+                    checker.report_diagnostic(diagnostic);
                 } else {
                     let mut diagnostic = Diagnostic::new(
                         MissingDashedUnderlineAfterSection {
@@ -1541,7 +1542,7 @@ fn blanks_and_section_underline(
                     let content = format!(
                         "{}{}{}",
                         checker.stylist().line_ending().as_str(),
-                        clean_space(docstring.indentation),
+                        clean_space(docstring.compute_indentation()),
                         "-".repeat(context.section_name().len()),
                     );
                     diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
@@ -1549,7 +1550,7 @@ fn blanks_and_section_underline(
                         context.summary_range().end(),
                     )));
 
-                    checker.diagnostics.push(diagnostic);
+                    checker.report_diagnostic(diagnostic);
                 }
             }
             if num_blank_lines_after_header > 0 {
@@ -1589,7 +1590,7 @@ fn blanks_and_section_underline(
                                 context.following_range().start(),
                                 blank_lines_end,
                             )));
-                            checker.diagnostics.push(diagnostic);
+                            checker.report_diagnostic(diagnostic);
                         }
                     } else {
                         let mut diagnostic = Diagnostic::new(
@@ -1603,7 +1604,7 @@ fn blanks_and_section_underline(
                             TextRange::new(context.following_range().start(), blank_lines_end);
                         // Delete any blank lines between the header and content.
                         diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(range)));
-                        checker.diagnostics.push(diagnostic);
+                        checker.report_diagnostic(diagnostic);
                     }
                 }
             }
@@ -1622,7 +1623,7 @@ fn blanks_and_section_underline(
             let content = format!(
                 "{}{}{}",
                 checker.stylist().line_ending().as_str(),
-                clean_space(docstring.indentation),
+                clean_space(docstring.compute_indentation()),
                 "-".repeat(context.section_name().len()),
             );
             diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
@@ -1630,10 +1631,10 @@ fn blanks_and_section_underline(
                 context.summary_range().end(),
             )));
 
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
         if checker.enabled(Rule::EmptyDocstringSection) {
-            checker.diagnostics.push(Diagnostic::new(
+            checker.report_diagnostic(Diagnostic::new(
                 EmptyDocstringSection {
                     name: context.section_name().to_string(),
                 },
@@ -1644,7 +1645,7 @@ fn blanks_and_section_underline(
 }
 
 fn common_section(
-    checker: &mut Checker,
+    checker: &Checker,
     docstring: &Docstring,
     context: &SectionContext,
     next: Option<&SectionContext>,
@@ -1666,13 +1667,14 @@ fn common_section(
                 capitalized_section_name.to_string(),
                 section_range,
             )));
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 
     if checker.enabled(Rule::OverindentedSection) {
         let leading_space = leading_space(context.summary_line());
-        if leading_space.len() > docstring.indentation.len() {
+        let docstring_indentation = docstring.compute_indentation();
+        if leading_space.len() > docstring_indentation.len() {
             let section_range = context.section_name_range();
             let mut diagnostic = Diagnostic::new(
                 OverindentedSection {
@@ -1682,14 +1684,14 @@ fn common_section(
             );
 
             // Replace the existing indentation with whitespace of the appropriate length.
-            let content = clean_space(docstring.indentation);
+            let content = clean_space(docstring_indentation);
             let fix_range = TextRange::at(context.start(), leading_space.text_len());
             diagnostic.set_fix(Fix::safe_edit(if content.is_empty() {
                 Edit::range_deletion(fix_range)
             } else {
                 Edit::range_replacement(content, fix_range)
             }));
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 
@@ -1715,7 +1717,7 @@ fn common_section(
                     line_end.to_string(),
                     next.start(),
                 )));
-                checker.diagnostics.push(diagnostic);
+                checker.report_diagnostic(diagnostic);
             }
         }
     } else {
@@ -1739,7 +1741,7 @@ fn common_section(
                     format!(
                         "{}{}",
                         line_end.repeat(2 - num_blank_lines),
-                        docstring.indentation
+                        docstring.compute_indentation()
                     ),
                     context.end() - del_len,
                     context.end(),
@@ -1753,7 +1755,7 @@ fn common_section(
                     section_range,
                 );
                 diagnostic.set_fix(Fix::safe_edit(edit));
-                checker.diagnostics.push(diagnostic);
+                checker.report_diagnostic(diagnostic);
             }
         }
     }
@@ -1775,14 +1777,14 @@ fn common_section(
                 line_end.to_string(),
                 context.start(),
             )));
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 
     blanks_and_section_underline(checker, docstring, context, style);
 }
 
-fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &FxHashSet<String>) {
+fn missing_args(checker: &Checker, docstring: &Docstring, docstrings_args: &FxHashSet<String>) {
     let Some(function) = docstring.definition.as_function_def() else {
         return;
     };
@@ -1791,11 +1793,7 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
     let mut missing_arg_names: FxHashSet<String> = FxHashSet::default();
 
     // If this is a non-static method, skip `cls` or `self`.
-    for ParameterWithDefault {
-        parameter,
-        default: _,
-        range: _,
-    } in function
+    for parameter in function
         .parameters
         .iter_non_variadic_params()
         .skip(usize::from(
@@ -1803,7 +1801,7 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
                 && !is_staticmethod(&function.decorator_list, checker.semantic()),
         ))
     {
-        let arg_name = parameter.name.as_str();
+        let arg_name = parameter.name().as_str();
         if !arg_name.starts_with('_') && !docstrings_args.contains(arg_name) {
             missing_arg_names.insert(arg_name.to_string());
         }
@@ -1837,7 +1835,7 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
     if !missing_arg_names.is_empty() {
         if let Some(definition) = docstring.definition.name() {
             let names = missing_arg_names.into_iter().sorted().collect();
-            checker.diagnostics.push(Diagnostic::new(
+            checker.report_diagnostic(Diagnostic::new(
                 UndocumentedParam {
                     definition: definition.to_string(),
                     names,
@@ -1874,7 +1872,7 @@ fn args_section(context: &SectionContext) -> FxHashSet<String> {
     // Reformat each section.
     let mut args_sections: Vec<String> = vec![];
     for line in args_content.trim().lines() {
-        if line.chars().next().map_or(true, char::is_whitespace) {
+        if line.chars().next().is_none_or(char::is_whitespace) {
             // This is a continuation of the documentation for the previous parameter,
             // because it starts with whitespace.
             if let Some(last) = args_sections.last_mut() {
@@ -1904,7 +1902,7 @@ fn args_section(context: &SectionContext) -> FxHashSet<String> {
         .collect::<FxHashSet<String>>()
 }
 
-fn parameters_section(checker: &mut Checker, docstring: &Docstring, context: &SectionContext) {
+fn parameters_section(checker: &Checker, docstring: &Docstring, context: &SectionContext) {
     // Collect the list of arguments documented in the docstring.
     let mut docstring_args: FxHashSet<String> = FxHashSet::default();
     let section_level_indent = leading_space(context.summary_line());
@@ -1946,7 +1944,7 @@ fn parameters_section(checker: &mut Checker, docstring: &Docstring, context: &Se
 }
 
 fn numpy_section(
-    checker: &mut Checker,
+    checker: &Checker,
     docstring: &Docstring,
     context: &SectionContext,
     next: Option<&SectionContext>,
@@ -1969,7 +1967,7 @@ fn numpy_section(
                 suffix.text_len(),
             ))));
 
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 
@@ -1981,7 +1979,7 @@ fn numpy_section(
 }
 
 fn google_section(
-    checker: &mut Checker,
+    checker: &Checker,
     docstring: &Docstring,
     context: &SectionContext,
     next: Option<&SectionContext>,
@@ -2003,13 +2001,13 @@ fn google_section(
                 ":".to_string(),
                 TextRange::at(section_name_range.end(), suffix.text_len()),
             )));
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 }
 
 fn parse_numpy_sections(
-    checker: &mut Checker,
+    checker: &Checker,
     docstring: &Docstring,
     section_contexts: &SectionContexts,
 ) {
@@ -2020,7 +2018,7 @@ fn parse_numpy_sections(
 }
 
 fn parse_google_sections(
-    checker: &mut Checker,
+    checker: &Checker,
     docstring: &Docstring,
     section_contexts: &SectionContexts,
 ) {

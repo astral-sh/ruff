@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/expressions/subscript/unclosed_slice_0.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -65,7 +64,7 @@ Module(
 
   |
 1 | x[:
-2 | 
+2 |
 3 | x + y
-  |       Syntax Error: unexpected EOF while parsing
+  |      ^ Syntax Error: unexpected EOF while parsing
   |

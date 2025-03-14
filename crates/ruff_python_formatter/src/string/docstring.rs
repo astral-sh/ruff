@@ -11,6 +11,7 @@ use regex::Regex;
 
 use ruff_formatter::printer::SourceMapGeneration;
 use ruff_python_ast::{str::Quote, AnyStringFlags, StringFlags};
+use ruff_python_parser::ParseOptions;
 use ruff_python_trivia::CommentRanges;
 use {
     ruff_formatter::{write, FormatOptions, IndentStyle, LineWidth, Printed},
@@ -18,10 +19,6 @@ use {
     ruff_text_size::{Ranged, TextLen, TextRange, TextSize},
 };
 
-use crate::preview::{
-    is_docstring_code_block_in_docstring_indent_enabled,
-    is_join_implicit_concatenated_string_enabled,
-};
 use crate::string::StringQuotes;
 use crate::{prelude::*, DocstringCodeLineWidth, FormatModuleError};
 
@@ -171,7 +168,7 @@ pub(crate) fn format(normalized: &NormalizedString, f: &mut PyFormatter) -> Form
     if docstring[first.len()..].trim().is_empty() {
         // For `"""\n"""` or other whitespace between the quotes, black keeps a single whitespace,
         // but `""""""` doesn't get one inserted.
-        if needs_chaperone_space(normalized.flags(), trim_end, f.context())
+        if needs_chaperone_space(normalized.flags(), trim_end)
             || (trim_end.is_empty() && !docstring.is_empty())
         {
             space().fmt(f)?;
@@ -211,7 +208,7 @@ pub(crate) fn format(normalized: &NormalizedString, f: &mut PyFormatter) -> Form
     let trim_end = docstring
         .as_ref()
         .trim_end_matches(|c: char| c.is_whitespace() && c != '\n');
-    if needs_chaperone_space(normalized.flags(), trim_end, f.context()) {
+    if needs_chaperone_space(normalized.flags(), trim_end) {
         space().fmt(f)?;
     }
 
@@ -496,8 +493,6 @@ impl<'src> DocstringLinePrinter<'_, '_, '_, 'src> {
         &mut self,
         kind: &mut CodeExampleKind<'_>,
     ) -> FormatResult<Option<Vec<OutputDocstringLine<'static>>>> {
-        use ruff_python_parser::AsMode;
-
         let line_width = match self.f.options().docstring_code_line_width() {
             DocstringCodeLineWidth::Fixed(width) => width,
             DocstringCodeLineWidth::Dynamic => {
@@ -508,17 +503,15 @@ impl<'src> DocstringLinePrinter<'_, '_, '_, 'src> {
                     .to_ascii_spaces(indent_width)
                     .saturating_add(kind.extra_indent_ascii_spaces());
 
-                if is_docstring_code_block_in_docstring_indent_enabled(self.f.context()) {
-                    // Add the in-docstring indentation
-                    current_indent = current_indent.saturating_add(
-                        u16::try_from(
-                            kind.indent()
-                                .columns()
-                                .saturating_sub(self.stripped_indentation.columns()),
-                        )
-                        .unwrap_or(u16::MAX),
-                    );
-                }
+                // Add the in-docstring indentation
+                current_indent = current_indent.saturating_add(
+                    u16::try_from(
+                        kind.indent()
+                            .columns()
+                            .saturating_sub(self.stripped_indentation.columns()),
+                    )
+                    .unwrap_or(u16::MAX),
+                );
 
                 let width = std::cmp::max(1, global_line_width.saturating_sub(current_indent));
                 LineWidth::try_from(width).expect("width should be capped at a minimum of 1")
@@ -576,7 +569,8 @@ impl<'src> DocstringLinePrinter<'_, '_, '_, 'src> {
                 std::format!(r#""""{}""""#, printed.as_code())
             }
         };
-        let result = ruff_python_parser::parse(&wrapped, self.f.options().source_type().as_mode());
+        let result =
+            ruff_python_parser::parse(&wrapped, ParseOptions::from(self.f.options().source_type()));
         // If the resulting code is not valid, then reset and pass through
         // the docstring lines as-is.
         if result.is_err() {
@@ -1586,10 +1580,8 @@ fn docstring_format_source(
     docstring_quote_style: Quote,
     source: &str,
 ) -> Result<Printed, FormatModuleError> {
-    use ruff_python_parser::AsMode;
-
     let source_type = options.source_type();
-    let parsed = ruff_python_parser::parse(source, source_type.as_mode())?;
+    let parsed = ruff_python_parser::parse(source, ParseOptions::from(source_type))?;
     let comment_ranges = CommentRanges::from(parsed.tokens());
     let source_code = ruff_formatter::SourceCode::new(source);
     let comments = crate::Comments::from_ast(parsed.syntax(), source_code, &comment_ranges);
@@ -1607,17 +1599,11 @@ fn docstring_format_source(
 /// If the last line of the docstring is `content" """` or `content\ """`, we need a chaperone space
 /// that avoids `content""""` and `content\"""`. This does only applies to un-escaped backslashes,
 /// so `content\\ """` doesn't need a space while `content\\\ """` does.
-pub(super) fn needs_chaperone_space(
-    flags: AnyStringFlags,
-    trim_end: &str,
-    context: &PyFormatContext,
-) -> bool {
+pub(super) fn needs_chaperone_space(flags: AnyStringFlags, trim_end: &str) -> bool {
     if trim_end.chars().rev().take_while(|c| *c == '\\').count() % 2 == 1 {
         true
-    } else if is_join_implicit_concatenated_string_enabled(context) {
-        flags.is_triple_quoted() && trim_end.ends_with(flags.quote_style().as_char())
     } else {
-        trim_end.ends_with(flags.quote_style().as_char())
+        flags.is_triple_quoted() && trim_end.ends_with(flags.quote_style().as_char())
     }
 }
 

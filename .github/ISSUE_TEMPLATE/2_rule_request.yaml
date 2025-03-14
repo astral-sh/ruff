@@ -1,0 +1,10 @@
+name: Rule request
+description: Anything related to lint rules (proposing new rules, changes to existing rules, auto-fixes, etc.)
+body:
+  - type: textarea
+    attributes:
+      label: Summary
+      description: |
+        A clear and concise description of the relevant request. If applicable, please describe the current behavior as well.
+    validations:
+      required: true

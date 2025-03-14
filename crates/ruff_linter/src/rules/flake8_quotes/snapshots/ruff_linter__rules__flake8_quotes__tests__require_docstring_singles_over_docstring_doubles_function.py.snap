@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_quotes/mod.rs
-snapshot_kind: text
 ---
 docstring_doubles_function.py:2:5: Q002 [*] Double quote docstring found but single quotes preferred
   |
@@ -23,8 +22,7 @@ docstring_doubles_function.py:2:5: Q002 [*] Double quote docstring found but sin
 docstring_doubles_function.py:8:5: Q002 [*] Double quote docstring found but single quotes preferred
    |
  7 |   def foo2():
- 8 |       """
-   |  _____^
+ 8 | /     """
  9 | |         function without params, multiline docstring
 10 | |     """
    | |_______^ Q002

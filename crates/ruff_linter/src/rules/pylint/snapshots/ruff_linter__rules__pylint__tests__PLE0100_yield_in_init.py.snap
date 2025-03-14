@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
-snapshot_kind: text
 ---
 yield_in_init.py:9:9: PLE0100 `__init__` method is a generator
   |
@@ -16,6 +15,6 @@ yield_in_init.py:14:9: PLE0100 `__init__` method is a generator
 13 |     def __init__(self):
 14 |         yield from self.gen()
    |         ^^^^^^^^^^^^^^^^^^^^^ PLE0100
-15 | 
+15 |
 16 |     def gen(self):
    |

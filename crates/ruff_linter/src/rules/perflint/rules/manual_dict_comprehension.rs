@@ -301,7 +301,7 @@ pub(crate) fn manual_dict_comprehension(checker: &mut Checker, for_stmt: &ast::S
             checker,
         ));
     }
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 fn convert_to_dict_comprehension(

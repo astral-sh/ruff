@@ -1,14 +1,13 @@
 ---
 source: crates/ruff_linter/src/linter.rs
-snapshot_kind: text
 ---
 ipy_escape_command.ipynb:cell 1:5:8: F401 [*] `os` imported but unused
   |
 3 | %matplotlib inline
-4 | 
+4 |
 5 | import os
   |        ^^ F401
-6 | 
+6 |
 7 | _ = math.pi
   |
   = help: Remove unused import: `os`

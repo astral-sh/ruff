@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
-snapshot_kind: text
 ---
 B904.py:10:9: B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
    |
@@ -66,7 +65,7 @@ B904.py:73:13: B904 Within an `except` clause, raise exceptions with `raise ... 
 72 |         case 0:
 73 |             raise RuntimeError("boom!")
    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^ B904
-74 | 
+74 |
 75 | try:
    |
 
@@ -86,7 +85,7 @@ B904.py:81:9: B904 Within an `except*` clause, raise exceptions with `raise ... 
 80 |     else:
 81 |         raise RuntimeError("bang!")
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^ B904
-82 | 
+82 |
 83 | try:
    |
 

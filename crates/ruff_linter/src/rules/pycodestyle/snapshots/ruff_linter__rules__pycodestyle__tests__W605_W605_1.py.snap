@@ -6,7 +6,7 @@ W605_1.py:4:11: W605 [*] Invalid escape sequence: `\.`
 3 | #: W605:1:10
 4 | regex = f'\.png$'
   |           ^^ W605
-5 | 
+5 |
 6 | #: W605:2:1
   |
   = help: Use a raw string literal
@@ -103,7 +103,7 @@ W605_1.py:25:40: W605 [*] Invalid escape sequence: `\_`
 W605_1.py:43:13: W605 [*] Invalid escape sequence: `\_`
    |
 41 | '''  # noqa
-42 | 
+42 |
 43 | regex = f'\\\_'
    |             ^^ W605
 44 | value = f'\{{1}}'
@@ -209,7 +209,7 @@ W605_1.py:48:15: W605 [*] Invalid escape sequence: `\{`
 47 | value = f"{f"\{1}"}"
 48 | value = rf"{f"\{1}"}"
    |               ^^ W605
-49 | 
+49 |
 50 | # Okay
    |
    = help: Use a raw string literal
@@ -270,7 +270,7 @@ W605_1.py:59:12: W605 [*] Invalid escape sequence: `\d`
 58 | f"\n{{}}+-\d+"
 59 | f"\n{{}}�+-\d+"
    |            ^^ W605
-60 | 
+60 |
 61 | # See https://github.com/astral-sh/ruff/issues/11491
    |
    = help: Add backslash to escape sequence
@@ -291,7 +291,7 @@ W605_1.py:65:31: W605 [*] Invalid escape sequence: `\I`
 64 | incomplete = 3
 65 | s = f"TOTAL: {total}\nOK: {ok}\INCOMPLETE: {incomplete}\n"
    |                               ^^ W605
-66 | 
+66 |
 67 | # Debug text (should trigger)
    |
    = help: Add backslash to escape sequence

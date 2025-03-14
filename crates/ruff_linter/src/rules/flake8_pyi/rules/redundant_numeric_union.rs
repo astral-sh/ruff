@@ -81,13 +81,13 @@ impl Violation for RedundantNumericUnion {
 }
 
 /// PYI041
-pub(crate) fn redundant_numeric_union(checker: &mut Checker, parameters: &Parameters) {
+pub(crate) fn redundant_numeric_union(checker: &Checker, parameters: &Parameters) {
     for annotation in parameters.iter().filter_map(AnyParameterRef::annotation) {
         check_annotation(checker, annotation);
     }
 }
 
-fn check_annotation<'a>(checker: &mut Checker, annotation: &'a Expr) {
+fn check_annotation<'a>(checker: &Checker, annotation: &'a Expr) {
     let mut numeric_flags = NumericFlags::empty();
 
     let mut find_numeric_type = |expr: &Expr, _parent: &Expr| {
@@ -133,41 +133,40 @@ fn check_annotation<'a>(checker: &mut Checker, annotation: &'a Expr) {
     traverse_union(&mut remove_numeric_type, checker.semantic(), annotation);
 
     let mut diagnostic = Diagnostic::new(RedundantNumericUnion { redundancy }, annotation.range());
-    if checker.settings.preview.is_enabled() {
-        // Mark [`Fix`] as unsafe when comments are in range.
-        let applicability = if checker.comment_ranges().intersects(annotation.range()) {
-            Applicability::Unsafe
-        } else {
-            Applicability::Safe
-        };
 
-        // Generate the flattened fix once.
-        let fix = if let &[edit_expr] = necessary_nodes.as_slice() {
-            // Generate a [`Fix`] for a single type expression, e.g. `int`.
-            Some(Fix::applicable_edit(
-                Edit::range_replacement(checker.generator().expr(edit_expr), annotation.range()),
+    // Mark [`Fix`] as unsafe when comments are in range.
+    let applicability = if checker.comment_ranges().intersects(annotation.range()) {
+        Applicability::Unsafe
+    } else {
+        Applicability::Safe
+    };
+
+    // Generate the flattened fix once.
+    let fix = if let &[edit_expr] = necessary_nodes.as_slice() {
+        // Generate a [`Fix`] for a single type expression, e.g. `int`.
+        Some(Fix::applicable_edit(
+            Edit::range_replacement(checker.generator().expr(edit_expr), annotation.range()),
+            applicability,
+        ))
+    } else {
+        match union_type {
+            UnionKind::PEP604 => Some(generate_pep604_fix(
+                checker,
+                necessary_nodes,
+                annotation,
                 applicability,
-            ))
-        } else {
-            match union_type {
-                UnionKind::PEP604 => Some(generate_pep604_fix(
-                    checker,
-                    necessary_nodes,
-                    annotation,
-                    applicability,
-                )),
-                UnionKind::TypingUnion => {
-                    generate_union_fix(checker, necessary_nodes, annotation, applicability).ok()
-                }
+            )),
+            UnionKind::TypingUnion => {
+                generate_union_fix(checker, necessary_nodes, annotation, applicability).ok()
             }
-        };
-
-        if let Some(fix) = fix {
-            diagnostic.set_fix(fix);
         }
     };
 
-    checker.diagnostics.push(diagnostic);
+    if let Some(fix) = fix {
+        diagnostic.set_fix(fix);
+    }
+
+    checker.report_diagnostic(diagnostic);
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]

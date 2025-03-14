@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
-snapshot_kind: text
 ---
 B033.py:4:35: B033 [*] Sets should not contain duplicate item `"value1"`
   |
@@ -174,7 +173,7 @@ B033.py:22:28: B033 [*] Sets should not contain duplicate items, but `False` and
 21 | }
 22 | incorrect_set = {False, 1, 0}
    |                            ^ B033
-23 | 
+23 |
 24 | ###
    |
    = help: Remove duplicate item

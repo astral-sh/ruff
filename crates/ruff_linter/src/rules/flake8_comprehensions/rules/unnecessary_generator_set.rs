@@ -2,8 +2,10 @@ use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_python_ast::comparable::ComparableExpr;
+use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::ExprGenerator;
-use ruff_text_size::{Ranged, TextSize};
+use ruff_python_parser::TokenKind;
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_comprehensions::fixes::{pad_end, pad_start};
@@ -23,15 +25,17 @@ use super::helpers;
 /// `set(x for x in foo)`, it's better to use `set(foo)` directly, since it's
 /// even more direct.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// set(f(x) for x in foo)
 /// set(x for x in foo)
+/// set((x for x in foo))
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// {f(x) for x in foo}
+/// set(foo)
 /// set(foo)
 /// ```
 ///
@@ -63,7 +67,7 @@ impl AlwaysFixableViolation for UnnecessaryGeneratorSet {
 }
 
 /// C401 (`set(generator)`)
-pub(crate) fn unnecessary_generator_set(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn unnecessary_generator_set(checker: &Checker, call: &ast::ExprCall) {
     let Some(argument) = helpers::exactly_one_argument_with_matching_function(
         "set",
         &call.func,
@@ -74,7 +78,10 @@ pub(crate) fn unnecessary_generator_set(checker: &mut Checker, call: &ast::ExprC
     };
 
     let ast::Expr::Generator(ExprGenerator {
-        elt, generators, ..
+        elt,
+        generators,
+        parenthesized,
+        ..
     }) = argument
     else {
         return;
@@ -98,7 +105,7 @@ pub(crate) fn unnecessary_generator_set(checker: &mut Checker, call: &ast::ExprC
                     iterator,
                     call.range(),
                 )));
-                checker.diagnostics.push(diagnostic);
+                checker.report_diagnostic(diagnostic);
                 return;
             }
         }
@@ -120,13 +127,43 @@ pub(crate) fn unnecessary_generator_set(checker: &mut Checker, call: &ast::ExprC
         );
 
         // Replace `)` with `}`.
+        // Place `}` at argument's end or at trailing comma if present
+        let after_arg_tokens = checker
+            .tokens()
+            .in_range(TextRange::new(argument.end(), call.end()));
+        let right_brace_loc = after_arg_tokens
+            .iter()
+            .find(|token| token.kind() == TokenKind::Comma)
+            .map_or(call.arguments.end(), Ranged::end)
+            - TextSize::from(1);
         let call_end = Edit::replacement(
             pad_end("}", call.range(), checker.locator(), checker.semantic()),
-            call.arguments.end() - TextSize::from(1),
+            right_brace_loc,
             call.end(),
         );
 
-        Fix::unsafe_edits(call_start, [call_end])
+        // Remove the inner parentheses, if the expression is a generator. The easiest way to do
+        // this reliably is to use the printer.
+        if *parenthesized {
+            // The generator's range will include the innermost parentheses, but it could be
+            // surrounded by additional parentheses.
+            let range = parenthesized_range(
+                argument.into(),
+                (&call.arguments).into(),
+                checker.comment_ranges(),
+                checker.locator().contents(),
+            )
+            .unwrap_or(argument.range());
+
+            // The generator always parenthesizes the expression; trim the parentheses.
+            let generator = checker.generator().expr(argument);
+            let generator = generator[1..generator.len() - 1].to_string();
+
+            let replacement = Edit::range_replacement(generator, range);
+            Fix::unsafe_edits(call_start, [call_end, replacement])
+        } else {
+            Fix::unsafe_edits(call_start, [call_end])
+        }
     };
-    checker.diagnostics.push(diagnostic.with_fix(fix));
+    checker.report_diagnostic(diagnostic.with_fix(fix));
 }

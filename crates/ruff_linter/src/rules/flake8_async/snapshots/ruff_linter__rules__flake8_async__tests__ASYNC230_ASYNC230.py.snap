@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_async/mod.rs
-snapshot_kind: text
 ---
 ASYNC230.py:6:5: ASYNC230 Async functions should not open files with blocking methods like `open`
   |
@@ -16,14 +15,14 @@ ASYNC230.py:7:5: ASYNC230 Async functions should not open files with blocking me
 6 |     open("")  # ASYNC230
 7 |     io.open_code("")  # ASYNC230
   |     ^^^^^^^^^^^^ ASYNC230
-8 | 
+8 |
 9 |     with open(""):  # ASYNC230
   |
 
 ASYNC230.py:9:10: ASYNC230 Async functions should not open files with blocking methods like `open`
    |
  7 |     io.open_code("")  # ASYNC230
- 8 | 
+ 8 |
  9 |     with open(""):  # ASYNC230
    |          ^^^^ ASYNC230
 10 |         ...
@@ -32,7 +31,7 @@ ASYNC230.py:9:10: ASYNC230 Async functions should not open files with blocking m
 ASYNC230.py:12:10: ASYNC230 Async functions should not open files with blocking methods like `open`
    |
 10 |         ...
-11 | 
+11 |
 12 |     with open("") as f:  # ASYNC230
    |          ^^^^ ASYNC230
 13 |         ...
@@ -41,7 +40,7 @@ ASYNC230.py:12:10: ASYNC230 Async functions should not open files with blocking 
 ASYNC230.py:15:17: ASYNC230 Async functions should not open files with blocking methods like `open`
    |
 13 |         ...
-14 | 
+14 |
 15 |     with foo(), open(""):  # ASYNC230
    |                 ^^^^ ASYNC230
 16 |         ...
@@ -50,7 +49,7 @@ ASYNC230.py:15:17: ASYNC230 Async functions should not open files with blocking 
 ASYNC230.py:18:16: ASYNC230 Async functions should not open files with blocking methods like `open`
    |
 16 |         ...
-17 | 
+17 |
 18 |     async with open(""):  # ASYNC230
    |                ^^^^ ASYNC230
 19 |         ...
@@ -96,7 +95,7 @@ ASYNC230.py:53:9: ASYNC230 Async functions should not open files with blocking m
 ASYNC230.py:59:5: ASYNC230 Async functions should not open files with blocking methods like `open`
    |
 57 |     (p1, p2) = (Path("foo"), Path("bar"))
-58 | 
+58 |
 59 |     p1.open()  # ASYNC230
    |     ^^^^^^^ ASYNC230
    |

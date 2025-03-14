@@ -11,7 +11,7 @@ use crate::edit::ToRangeExt;
 use crate::server::api::traits::{BackgroundDocumentRequestHandler, RequestHandler};
 use crate::server::{client::Notifier, Result};
 use crate::session::DocumentSnapshot;
-use red_knot_workspace::db::{Db, RootDatabase};
+use red_knot_project::{Db, ProjectDatabase};
 use ruff_db::diagnostic::Severity;
 use ruff_db::source::{line_index, source_text};
 
@@ -28,7 +28,7 @@ impl BackgroundDocumentRequestHandler for DocumentDiagnosticRequestHandler {
 
     fn run_with_snapshot(
         snapshot: DocumentSnapshot,
-        db: RootDatabase,
+        db: ProjectDatabase,
         _notifier: Notifier,
         _params: DocumentDiagnosticParams,
     ) -> Result<DocumentDiagnosticReportResult> {
@@ -46,7 +46,7 @@ impl BackgroundDocumentRequestHandler for DocumentDiagnosticRequestHandler {
     }
 }
 
-fn compute_diagnostics(snapshot: &DocumentSnapshot, db: &RootDatabase) -> Vec<Diagnostic> {
+fn compute_diagnostics(snapshot: &DocumentSnapshot, db: &ProjectDatabase) -> Vec<Diagnostic> {
     let Some(file) = snapshot.file(db) else {
         tracing::info!(
             "No file found for snapshot for `{}`",
@@ -72,14 +72,16 @@ fn compute_diagnostics(snapshot: &DocumentSnapshot, db: &RootDatabase) -> Vec<Di
 
 fn to_lsp_diagnostic(
     db: &dyn Db,
-    diagnostic: &dyn ruff_db::diagnostic::Diagnostic,
+    diagnostic: &dyn ruff_db::diagnostic::OldDiagnosticTrait,
     encoding: crate::PositionEncoding,
 ) -> Diagnostic {
-    let range = if let Some(range) = diagnostic.range() {
-        let index = line_index(db.upcast(), diagnostic.file());
-        let source = source_text(db.upcast(), diagnostic.file());
+    let range = if let Some(span) = diagnostic.span() {
+        let index = line_index(db.upcast(), span.file());
+        let source = source_text(db.upcast(), span.file());
 
-        range.to_range(&source, &index, encoding)
+        span.range()
+            .map(|range| range.to_range(&source, &index, encoding))
+            .unwrap_or_default()
     } else {
         Range::default()
     };

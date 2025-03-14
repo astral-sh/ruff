@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pep8_naming/mod.rs
-snapshot_kind: text
 ---
 N803.py:1:16: N803 Argument name `A` should be lowercase
   |
@@ -16,3 +15,23 @@ N803.py:6:28: N803 Argument name `A` should be lowercase
   |                            ^ N803
 7 |         return _, a, A
   |
+
+N803.py:22:16: N803 Argument name `A` should be lowercase
+   |
+21 | @override  # Incorrect usage
+22 | def func(_, a, A): ...
+   |                ^ N803
+   |
+
+N803.py:25:21: N803 Argument name `A` should be lowercase
+   |
+25 | func = lambda _, a, A: ...
+   |                     ^ N803
+   |
+
+N803.py:29:42: N803 Argument name `A` should be lowercase
+   |
+28 | class Extended(Class):
+29 |     method = override(lambda self, _, a, A: ...)  # Incorrect usage
+   |                                          ^ N803
+   |

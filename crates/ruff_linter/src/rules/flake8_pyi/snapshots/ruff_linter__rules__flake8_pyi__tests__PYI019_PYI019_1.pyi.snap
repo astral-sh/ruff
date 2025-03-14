@@ -1,0 +1,17 @@
+---
+source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
+---
+PYI019_1.pyi:4:10: PYI019 [*] Use `Self` instead of custom TypeVar `S`
+  |
+3 | class F:
+4 |     def m[S](self: S) -> S: ...
+  |          ^^^^^^^^^^^^^^^^^ PYI019
+  |
+  = help: Replace TypeVar `S` with `Self`
+
+ℹ Safe fix
+1 1 | import typing
+2 2 | 
+3 3 | class F:
+4   |-    def m[S](self: S) -> S: ...
+  4 |+    def m(self) -> typing.Self: ...

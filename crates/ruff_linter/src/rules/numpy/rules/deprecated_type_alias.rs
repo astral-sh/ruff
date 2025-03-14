@@ -19,7 +19,7 @@ use crate::checkers::ast::Checker;
 /// Note, however, that `np.bool` and `np.long` were reintroduced in 2.0 with
 /// different semantics, and are thus omitted from this rule.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// import numpy as np
 ///
@@ -51,7 +51,7 @@ impl Violation for NumpyDeprecatedTypeAlias {
 }
 
 /// NPY001
-pub(crate) fn deprecated_type_alias(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn deprecated_type_alias(checker: &Checker, expr: &Expr) {
     if !checker.semantic().seen_module(Modules::NUMPY) {
         return;
     }
@@ -93,6 +93,6 @@ pub(crate) fn deprecated_type_alias(checker: &mut Checker, expr: &Expr) {
             let binding_edit = Edit::range_replacement(binding, expr.range());
             Ok(Fix::safe_edits(binding_edit, import_edit))
         });
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }

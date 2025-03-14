@@ -4,13 +4,13 @@ use std::ops::Deref;
 use rustc_hash::FxHashSet;
 
 use crate::types::class_base::ClassBase;
-use crate::types::{Class, KnownClass, Type};
+use crate::types::{Class, Type};
 use crate::Db;
 
 /// The inferred method resolution order of a given class.
 ///
 /// See [`Class::iter_mro`] for more details.
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(PartialEq, Eq, Clone, Debug, salsa::Update)]
 pub(super) struct Mro<'db>(Box<[ClassBase<'db>]>);
 
 impl<'db> Mro<'db> {
@@ -34,7 +34,7 @@ impl<'db> Mro<'db> {
     pub(super) fn from_error(db: &'db dyn Db, class: Class<'db>) -> Self {
         Self::from([
             ClassBase::Class(class),
-            ClassBase::Unknown,
+            ClassBase::unknown(),
             ClassBase::object(db),
         ])
     }
@@ -42,7 +42,7 @@ impl<'db> Mro<'db> {
     fn of_class_impl(db: &'db dyn Db, class: Class<'db>) -> Result<Self, MroErrorKind<'db>> {
         let class_bases = class.explicit_bases(db);
 
-        if !class_bases.is_empty() && class.is_cyclically_defined(db) {
+        if !class_bases.is_empty() && class.inheritance_cycle(db).is_some() {
             // We emit errors for cyclically defined classes elsewhere.
             // It's important that we don't even try to infer the MRO for a cyclically defined class,
             // or we'll end up in an infinite loop.
@@ -52,9 +52,7 @@ impl<'db> Mro<'db> {
         match class_bases {
             // `builtins.object` is the special case:
             // the only class in Python that has an MRO with length <2
-            [] if class.is_known(db, KnownClass::Object) => {
-                Ok(Self::from([ClassBase::Class(class)]))
-            }
+            [] if class.is_object(db) => Ok(Self::from([ClassBase::Class(class)])),
 
             // All other classes in Python have an MRO with length >=2.
             // Even if a class has no explicit base classes,
@@ -76,7 +74,7 @@ impl<'db> Mro<'db> {
             // This *could* theoretically be handled by the final branch below,
             // but it's a common case (i.e., worth optimizing for),
             // and the `c3_merge` function requires lots of allocations.
-            [single_base] => ClassBase::try_from_ty(db, *single_base).map_or_else(
+            [single_base] => ClassBase::try_from_type(db, *single_base).map_or_else(
                 || Err(MroErrorKind::InvalidBases(Box::from([(0, *single_base)]))),
                 |single_base| {
                     Ok(std::iter::once(ClassBase::Class(class))
@@ -95,7 +93,7 @@ impl<'db> Mro<'db> {
                 let mut invalid_bases = vec![];
 
                 for (i, base) in multiple_bases.iter().enumerate() {
-                    match ClassBase::try_from_ty(db, *base) {
+                    match ClassBase::try_from_type(db, *base) {
                         Some(valid_base) => valid_bases.push(valid_base),
                         None => invalid_bases.push((i, *base)),
                     }
@@ -238,7 +236,7 @@ impl<'db> Iterator for MroIterator<'db> {
 
 impl std::iter::FusedIterator for MroIterator<'_> {}
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, salsa::Update)]
 pub(super) struct MroError<'db> {
     kind: MroErrorKind<'db>,
     fallback_mro: Mro<'db>,
@@ -258,7 +256,7 @@ impl<'db> MroError<'db> {
 }
 
 /// Possible ways in which attempting to resolve the MRO of a class might fail.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, salsa::Update)]
 pub(super) enum MroErrorKind<'db> {
     /// The class inherits from one or more invalid bases.
     ///

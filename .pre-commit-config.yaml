@@ -4,7 +4,8 @@ exclude: |
   (?x)^(
     .github/workflows/release.yml|
     crates/red_knot_vendored/vendor/.*|
-    crates/red_knot_workspace/resources/.*|
+    crates/red_knot_project/resources/.*|
+    crates/ruff_benchmark/resources/.*|
     crates/ruff_linter/resources/.*|
     crates/ruff_linter/src/rules/.*/snapshots/.*|
     crates/ruff_notebook/resources/.*|
@@ -23,7 +24,7 @@ repos:
       - id: validate-pyproject
 
   - repo: https://github.com/executablebooks/mdformat
-    rev: 0.7.21
+    rev: 0.7.22
     hooks:
       - id: mdformat
         additional_dependencies:
@@ -36,7 +37,7 @@ repos:
           )$
 
   - repo: https://github.com/igorshubovych/markdownlint-cli
-    rev: v0.43.0
+    rev: v0.44.0
     hooks:
       - id: markdownlint-fix
         exclude: |
@@ -56,10 +57,10 @@ repos:
             .*?invalid(_.+)*_syntax\.md
           )$
         additional_dependencies:
-          - black==24.10.0
+          - black==25.1.0
 
   - repo: https://github.com/crate-ci/typos
-    rev: v1.29.4
+    rev: v1.30.0
     hooks:
       - id: typos
 
@@ -73,7 +74,7 @@ repos:
         pass_filenames: false # This makes it a lot faster
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.8.6
+    rev: v0.9.9
     hooks:
       - id: ruff-format
       - id: ruff
@@ -83,7 +84,7 @@ repos:
 
   # Prettier
   - repo: https://github.com/rbubley/mirrors-prettier
-    rev: v3.4.2
+    rev: v3.5.2
     hooks:
       - id: prettier
         types: [yaml]
@@ -91,19 +92,19 @@ repos:
   # zizmor detects security vulnerabilities in GitHub Actions workflows.
   # Additional configuration for the tool is found in `.github/zizmor.yml`
   - repo: https://github.com/woodruffw/zizmor-pre-commit
-    rev: v1.0.0
+    rev: v1.4.1
     hooks:
       - id: zizmor
 
   - repo: https://github.com/python-jsonschema/check-jsonschema
-    rev: 0.30.0
+    rev: 0.31.2
     hooks:
       - id: check-github-workflows
 
   # `actionlint` hook, for verifying correct syntax in GitHub Actions workflows.
   # Some additional configuration for `actionlint` can be found in `.github/actionlint.yaml`.
   - repo: https://github.com/rhysd/actionlint
-    rev: v1.7.6
+    rev: v1.7.7
     hooks:
       - id: actionlint
         stages:

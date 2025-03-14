@@ -37,7 +37,7 @@ use crate::rules::flake8_builtins::helpers::shadows_builtin;
 /// ```
 ///
 /// Builtins can be marked as exceptions to this rule via the
-/// [`lint.flake8-builtins.builtins-ignorelist`] configuration option, or
+/// [`lint.flake8-builtins.ignorelist`] configuration option, or
 /// converted to the appropriate dunder method. Methods decorated with
 /// `@typing.override` or `@typing_extensions.override` are also
 /// ignored.
@@ -55,7 +55,7 @@ use crate::rules::flake8_builtins::helpers::shadows_builtin;
 /// ```
 ///
 /// ## Options
-/// - `lint.flake8-builtins.builtins-ignorelist`
+/// - `lint.flake8-builtins.ignorelist`
 #[derive(ViolationMetadata)]
 pub(crate) struct BuiltinAttributeShadowing {
     kind: Kind,
@@ -84,7 +84,6 @@ pub(crate) fn builtin_attribute_shadowing(
     scope_id: ScopeId,
     scope: &Scope,
     class_def: &ast::StmtClassDef,
-    diagnostics: &mut Vec<Diagnostic>,
 ) {
     for (name, binding_id) in scope.all_bindings() {
         let binding = checker.semantic().binding(binding_id);
@@ -99,8 +98,8 @@ pub(crate) fn builtin_attribute_shadowing(
         if shadows_builtin(
             name,
             checker.source_type,
-            &checker.settings.flake8_builtins.builtins_ignorelist,
-            checker.settings.target_version,
+            &checker.settings.flake8_builtins.ignorelist,
+            checker.target_version(),
         ) {
             // Ignore explicit overrides.
             if class_def.decorator_list.iter().any(|decorator| {
@@ -136,7 +135,7 @@ pub(crate) fn builtin_attribute_shadowing(
                         == Some(scope_id)
                 })
             {
-                diagnostics.push(Diagnostic::new(
+                checker.report_diagnostic(Diagnostic::new(
                     BuiltinAttributeShadowing {
                         kind,
                         name: name.to_string(),

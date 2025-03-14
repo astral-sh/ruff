@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
-snapshot_kind: text
 ---
 PYI044.pyi:2:1: PYI044 `from __future__ import annotations` has no effect in stub files, since type checkers automatically treat stubs as having those semantics
   |
@@ -17,7 +16,7 @@ PYI044.pyi:3:1: PYI044 `from __future__ import annotations` has no effect in stu
 2 | from __future__ import annotations # PYI044.
 3 | from __future__ import annotations, with_statement # PYI044.
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI044
-4 | 
+4 |
 5 | # Good imports.
   |
   = help: Remove `from __future__ import annotations`

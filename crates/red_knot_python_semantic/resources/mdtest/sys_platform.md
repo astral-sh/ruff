@@ -13,7 +13,7 @@ typeshed:
 ```py
 import sys
 
-reveal_type(sys.platform)  # revealed: str
+reveal_type(sys.platform)  # revealed: LiteralString
 ```
 
 ## Explicit selection of `all` platforms
@@ -26,7 +26,7 @@ python-platform = "all"
 ```py
 import sys
 
-reveal_type(sys.platform)  # revealed: str
+reveal_type(sys.platform)  # revealed: LiteralString
 ```
 
 ## Explicit selection of a specific platform
@@ -66,6 +66,6 @@ It is [recommended](https://docs.python.org/3/library/sys.html#sys.platform) to 
 ```py
 import sys
 
-reveal_type(sys.platform.startswith("freebsd"))  # revealed: @Todo(instance attributes)
-reveal_type(sys.platform.startswith("linux"))  # revealed: @Todo(instance attributes)
+reveal_type(sys.platform.startswith("freebsd"))  # revealed: bool
+reveal_type(sys.platform.startswith("linux"))  # revealed: bool
 ```

@@ -144,7 +144,7 @@ fn is_empty_body(body: &[Stmt]) -> bool {
 /// B024
 /// B027
 pub(crate) fn abstract_base_class(
-    checker: &mut Checker,
+    checker: &Checker,
     stmt: &Stmt,
     name: &str,
     arguments: Option<&Arguments>,
@@ -196,7 +196,7 @@ pub(crate) fn abstract_base_class(
             && is_empty_body(body)
             && !is_overload(decorator_list, checker.semantic())
         {
-            checker.diagnostics.push(Diagnostic::new(
+            checker.report_diagnostic(Diagnostic::new(
                 EmptyMethodWithoutAbstractDecorator {
                     name: format!("{name}.{method_name}"),
                 },
@@ -206,7 +206,7 @@ pub(crate) fn abstract_base_class(
     }
     if checker.enabled(Rule::AbstractBaseClassWithoutAbstractMethod) {
         if !has_abstract_method {
-            checker.diagnostics.push(Diagnostic::new(
+            checker.report_diagnostic(Diagnostic::new(
                 AbstractBaseClassWithoutAbstractMethod {
                     name: name.to_string(),
                 },

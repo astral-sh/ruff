@@ -8,11 +8,15 @@ import a.b
 reveal_type(a.b)  # revealed: <module 'a.b'>
 ```
 
-```py path=a/__init__.py
-b = 42
+`a/__init__.py`:
+
+```py
+b: int = 42
 ```
 
-```py path=a/b.py
+`a/b.py`:
+
+```py
 ```
 
 ## Via from/import
@@ -20,14 +24,18 @@ b = 42
 ```py
 from a import b
 
-reveal_type(b)  # revealed: Literal[42]
+reveal_type(b)  # revealed: int
 ```
 
-```py path=a/__init__.py
-b = 42
+`a/__init__.py`:
+
+```py
+b: int = 42
 ```
 
-```py path=a/b.py
+`a/b.py`:
+
+```py
 ```
 
 ## Via both
@@ -40,11 +48,15 @@ reveal_type(b)  # revealed: <module 'a.b'>
 reveal_type(a.b)  # revealed: <module 'a.b'>
 ```
 
-```py path=a/__init__.py
-b = 42
+`a/__init__.py`:
+
+```py
+b: int = 42
 ```
 
-```py path=a/b.py
+`a/b.py`:
+
+```py
 ```
 
 ## Via both (backwards)
@@ -60,16 +72,20 @@ sees the submodule as the value of `b` instead of the integer.
 from a import b
 import a.b
 
-# Python would say `Literal[42]` for `b`
+# Python would say `int` for `b`
 reveal_type(b)  # revealed: <module 'a.b'>
 reveal_type(a.b)  # revealed: <module 'a.b'>
 ```
 
-```py path=a/__init__.py
-b = 42
+`a/__init__.py`:
+
+```py
+b: int = 42
 ```
 
-```py path=a/b.py
+`a/b.py`:
+
+```py
 ```
 
 [from-import]: https://docs.python.org/3/reference/simple_stmts.html#the-import-statement

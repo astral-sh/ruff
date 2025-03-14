@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
-snapshot_kind: text
 ---
 F405.py:5:11: F405 `name` may be undefined, or defined from star imports
   |
@@ -12,7 +11,7 @@ F405.py:5:11: F405 `name` may be undefined, or defined from star imports
 F405.py:11:12: F405 `a` may be undefined, or defined from star imports
    |
  9 |     print(name)
-10 | 
+10 |
 11 | __all__ = ['a']
    |            ^^^ F405
    |

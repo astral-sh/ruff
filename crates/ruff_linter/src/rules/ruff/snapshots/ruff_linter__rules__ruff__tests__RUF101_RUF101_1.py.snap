@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
-snapshot_kind: text
 ---
 RUF101_1.py:5:15: RUF101 [*] `TCH002` is a redirect to `TC002`
   |
@@ -8,7 +7,7 @@ RUF101_1.py:5:15: RUF101 [*] `TCH002` is a redirect to `TC002`
 4 | """
 5 | # ruff: noqa: TCH002
   |               ^^^^^^ RUF101
-6 | 
+6 |
 7 | from __future__ import annotations
   |
   = help: Replace with `TC002`

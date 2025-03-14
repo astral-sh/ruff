@@ -4,13 +4,13 @@ use zip::CompressionMethod;
 
 use red_knot_python_semantic::lint::{LintRegistry, RuleSelection};
 use red_knot_python_semantic::{
-    default_lint_registry, Db, Program, ProgramSettings, PythonPlatform, PythonVersion,
-    SearchPathSettings,
+    default_lint_registry, Db, Program, ProgramSettings, PythonPlatform, SearchPathSettings,
 };
 use ruff_db::files::{File, Files};
 use ruff_db::system::{OsSystem, System, SystemPathBuf};
 use ruff_db::vendored::{VendoredFileSystem, VendoredFileSystemBuilder};
 use ruff_db::{Db as SourceDb, Upcast};
+use ruff_python_ast::PythonVersion;
 
 static EMPTY_VENDORED: std::sync::LazyLock<VendoredFileSystem> = std::sync::LazyLock::new(|| {
     let mut builder = VendoredFileSystemBuilder::new(CompressionMethod::Stored);
@@ -30,27 +30,15 @@ pub struct ModuleDb {
 impl ModuleDb {
     /// Initialize a [`ModuleDb`] from the given source root.
     pub fn from_src_roots(
-        mut src_roots: impl Iterator<Item = SystemPathBuf>,
+        src_roots: Vec<SystemPathBuf>,
         python_version: PythonVersion,
     ) -> Result<Self> {
-        let search_paths = {
-            // Use the first source root.
-            let src_root = src_roots
-                .next()
-                .ok_or_else(|| anyhow::anyhow!("No source roots provided"))?;
-
-            let mut search_paths = SearchPathSettings::new(src_root);
-
-            // Add the remaining source roots as extra paths.
-            search_paths.extra_paths.extend(src_roots);
-
-            search_paths
-        };
+        let search_paths = SearchPathSettings::new(src_roots);
 
         let db = Self::default();
         Program::from_settings(
             &db,
-            &ProgramSettings {
+            ProgramSettings {
                 python_version,
                 python_platform: PythonPlatform::default(),
                 search_paths,
@@ -91,8 +79,8 @@ impl Db for ModuleDb {
         !file.path(self).is_vendored_path()
     }
 
-    fn rule_selection(&self) -> &RuleSelection {
-        &self.rule_selection
+    fn rule_selection(&self) -> Arc<RuleSelection> {
+        self.rule_selection.clone()
     }
 
     fn lint_registry(&self) -> &LintRegistry {

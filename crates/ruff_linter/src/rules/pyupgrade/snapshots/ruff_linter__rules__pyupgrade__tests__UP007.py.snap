@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
-snapshot_kind: text
 ---
 UP007.py:5:10: UP007 [*] Use `X | Y` for type annotations
   |
@@ -295,3 +294,23 @@ UP007.py:83:10: UP007 [*] Use `X | Y` for type annotations
 83    |-def f(x: Union[int, str, bytes]) -> None:
    83 |+def f(x: int | str | bytes) -> None:
 84 84 |     ...
+85 85 | 
+86 86 | 
+
+UP007.py:91:26: UP007 [*] Use `X | Y` for type annotations
+   |
+89 |     ...
+90 |
+91 | def myfunc(param: "tuple[Union[int, 'AClass', None], str]"):
+   |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^ UP007
+92 |     print(param)
+   |
+   = help: Convert to `X | Y`
+
+ℹ Safe fix
+88 88 | class AClass:
+89 89 |     ...
+90 90 | 
+91    |-def myfunc(param: "tuple[Union[int, 'AClass', None], str]"):
+   91 |+def myfunc(param: "tuple[int | 'AClass' | None, str]"):
+92 92 |     print(param)

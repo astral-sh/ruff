@@ -82,6 +82,10 @@ impl Violation for InvalidFirstArgumentNameForMethod {
 /// Checks for class methods that use a name other than `cls` for their
 /// first argument.
 ///
+/// The method `__new__` is exempted from this
+/// check and the corresponding violation is caught by
+/// [`bad-staticmethod-argument`][PLW0211].
+///
 /// ## Why is this bad?
 /// [PEP 8] recommends the use of `cls` as the first argument for all class
 /// methods:
@@ -124,9 +128,12 @@ impl Violation for InvalidFirstArgumentNameForMethod {
 /// - `lint.pep8-naming.extend-ignore-names`
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#function-and-method-arguments
+/// [PLW0211]: https://docs.astral.sh/ruff/rules/bad-staticmethod-argument/
 #[derive(ViolationMetadata)]
 pub(crate) struct InvalidFirstArgumentNameForClassMethod {
     argument_name: String,
+    // Whether the method is `__new__`
+    is_new: bool,
 }
 
 impl Violation for InvalidFirstArgumentNameForClassMethod {
@@ -134,12 +141,19 @@ impl Violation for InvalidFirstArgumentNameForClassMethod {
         ruff_diagnostics::FixAvailability::Sometimes;
 
     #[derive_message_formats]
+    // The first string below is what shows up in the documentation
+    // in the rule table, and it is the more common case.
+    #[allow(clippy::if_not_else)]
     fn message(&self) -> String {
-        "First argument of a class method should be named `cls`".to_string()
+        if !self.is_new {
+            "First argument of a class method should be named `cls`".to_string()
+        } else {
+            "First argument of `__new__` method should be named `cls`".to_string()
+        }
     }
 
     fn fix_title(&self) -> Option<String> {
-        let Self { argument_name } = self;
+        let Self { argument_name, .. } = self;
         Some(format!("Rename `{argument_name}` to `cls`"))
     }
 }
@@ -156,7 +170,11 @@ impl FunctionType {
     fn diagnostic_kind(self, argument_name: String) -> DiagnosticKind {
         match self {
             Self::Method => InvalidFirstArgumentNameForMethod { argument_name }.into(),
-            Self::ClassMethod => InvalidFirstArgumentNameForClassMethod { argument_name }.into(),
+            Self::ClassMethod => InvalidFirstArgumentNameForClassMethod {
+                argument_name,
+                is_new: false,
+            }
+            .into(),
         }
     }
 
@@ -176,11 +194,7 @@ impl FunctionType {
 }
 
 /// N804, N805
-pub(crate) fn invalid_first_argument_name(
-    checker: &Checker,
-    scope: &Scope,
-    diagnostics: &mut Vec<Diagnostic>,
-) {
+pub(crate) fn invalid_first_argument_name(checker: &Checker, scope: &Scope) {
     let ScopeKind::Function(ast::StmtFunctionDef {
         name,
         parameters,
@@ -218,6 +232,10 @@ pub(crate) fn invalid_first_argument_name(
             IsMetaclass::Maybe => return,
         },
         function_type::FunctionType::ClassMethod => FunctionType::ClassMethod,
+        // This violation is caught by `PLW0211` instead
+        function_type::FunctionType::NewMethod => {
+            return;
+        }
     };
     if !checker.enabled(function_type.rule()) {
         return;
@@ -258,7 +276,7 @@ pub(crate) fn invalid_first_argument_name(
             checker.stylist(),
         )
     });
-    diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// Rename the first parameter to `self` or `cls`, if no other parameter has the target name.

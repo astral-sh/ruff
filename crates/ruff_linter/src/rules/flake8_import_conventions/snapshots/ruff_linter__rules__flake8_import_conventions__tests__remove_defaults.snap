@@ -1,11 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_import_conventions/mod.rs
-snapshot_kind: text
 ---
 remove_default.py:3:8: ICN001 `altair` should be imported as `alt`
   |
 1 | import math  # not checked
-2 | 
+2 |
 3 | import altair  # unconventional
   |        ^^^^^^ ICN001
 4 | import matplotlib.pyplot  # unconventional
@@ -39,7 +38,7 @@ remove_default.py:7:8: ICN001 `seaborn` should be imported as `sns`
 6 | import pandas  # unconventional
 7 | import seaborn  # unconventional
   |        ^^^^^^^ ICN001
-8 | 
+8 |
 9 | import altair as altr  # unconventional
   |
   = help: Alias `seaborn` to `sns`
@@ -47,7 +46,7 @@ remove_default.py:7:8: ICN001 `seaborn` should be imported as `sns`
 remove_default.py:9:18: ICN001 `altair` should be imported as `alt`
    |
  7 | import seaborn  # unconventional
- 8 | 
+ 8 |
  9 | import altair as altr  # unconventional
    |                  ^^^^ ICN001
 10 | import matplotlib.pyplot as plot  # unconventional
@@ -81,7 +80,7 @@ remove_default.py:13:19: ICN001 `seaborn` should be imported as `sns`
 12 | import pandas as pdas  # unconventional
 13 | import seaborn as sbrn  # unconventional
    |                   ^^^^ ICN001
-14 | 
+14 |
 15 | import altair as alt  # conventional
    |
    = help: Alias `seaborn` to `sns`

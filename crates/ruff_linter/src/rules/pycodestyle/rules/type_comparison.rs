@@ -60,7 +60,7 @@ impl Violation for TypeComparison {
 }
 
 /// E721
-pub(crate) fn type_comparison(checker: &mut Checker, compare: &ast::ExprCompare) {
+pub(crate) fn type_comparison(checker: &Checker, compare: &ast::ExprCompare) {
     for (left, right) in std::iter::once(&*compare.left)
         .chain(&compare.comparators)
         .tuple_windows()
@@ -76,9 +76,7 @@ pub(crate) fn type_comparison(checker: &mut Checker, compare: &ast::ExprCompare)
             }
 
             // Disallow the comparison.
-            checker
-                .diagnostics
-                .push(Diagnostic::new(TypeComparison, compare.range()));
+            checker.report_diagnostic(Diagnostic::new(TypeComparison, compare.range()));
         }
     }
 }

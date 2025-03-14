@@ -31,6 +31,9 @@ use crate::fix::edits::pad;
 /// This is because `c in "a"` is true both when `c` is `"a"` and when `c` is the empty string,
 /// so the fix can change the behavior of your program in these cases.
 ///
+/// Additionally, if there are comments within the fix's range,
+/// it will also be marked as unsafe.
+///
 /// ## References
 /// - [Python documentation: Comparisons](https://docs.python.org/3/reference/expressions.html#comparisons)
 /// - [Python documentation: Membership test operations](https://docs.python.org/3/reference/expressions.html#membership-test-operations)
@@ -58,7 +61,7 @@ impl Violation for SingleItemMembershipTest {
 
 /// FURB171
 pub(crate) fn single_item_membership_test(
-    checker: &mut Checker,
+    checker: &Checker,
     expr: &Expr,
     left: &Expr,
     ops: &[CmpOp],
@@ -98,15 +101,16 @@ pub(crate) fn single_item_membership_test(
         expr.range(),
     );
 
-    let applicability = if right.is_string_literal_expr() {
-        Applicability::Unsafe
-    } else {
-        Applicability::Safe
-    };
+    let applicability =
+        if right.is_string_literal_expr() || checker.comment_ranges().intersects(expr.range()) {
+            Applicability::Unsafe
+        } else {
+            Applicability::Safe
+        };
 
     let fix = Fix::applicable_edit(edit, applicability);
 
-    checker.diagnostics.push(diagnostic.with_fix(fix));
+    checker.report_diagnostic(diagnostic.with_fix(fix));
 }
 
 /// Return the single item wrapped in `Some` if the expression contains a single

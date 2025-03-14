@@ -55,13 +55,7 @@ impl AlwaysFixableViolation for InDictKeys {
 }
 
 /// SIM118
-fn key_in_dict(
-    checker: &mut Checker,
-    left: &Expr,
-    right: &Expr,
-    operator: CmpOp,
-    parent: AnyNodeRef,
-) {
+fn key_in_dict(checker: &Checker, left: &Expr, right: &Expr, operator: CmpOp, parent: AnyNodeRef) {
     let Expr::Call(ast::ExprCall {
         func,
         arguments: Arguments { args, keywords, .. },
@@ -164,11 +158,11 @@ fn key_in_dict(
             ));
         }
     }
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// SIM118 in a `for` loop.
-pub(crate) fn key_in_dict_for(checker: &mut Checker, for_stmt: &ast::StmtFor) {
+pub(crate) fn key_in_dict_for(checker: &Checker, for_stmt: &ast::StmtFor) {
     key_in_dict(
         checker,
         &for_stmt.target,
@@ -179,7 +173,7 @@ pub(crate) fn key_in_dict_for(checker: &mut Checker, for_stmt: &ast::StmtFor) {
 }
 
 /// SIM118 in a comprehension.
-pub(crate) fn key_in_dict_comprehension(checker: &mut Checker, comprehension: &Comprehension) {
+pub(crate) fn key_in_dict_comprehension(checker: &Checker, comprehension: &Comprehension) {
     key_in_dict(
         checker,
         &comprehension.target,
@@ -190,7 +184,7 @@ pub(crate) fn key_in_dict_comprehension(checker: &mut Checker, comprehension: &C
 }
 
 /// SIM118 in a comparison.
-pub(crate) fn key_in_dict_compare(checker: &mut Checker, compare: &ast::ExprCompare) {
+pub(crate) fn key_in_dict_compare(checker: &Checker, compare: &ast::ExprCompare) {
     let [op] = &*compare.ops else {
         return;
     };

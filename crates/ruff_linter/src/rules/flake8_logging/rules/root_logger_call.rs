@@ -44,7 +44,7 @@ impl Violation for RootLoggerCall {
 }
 
 /// LOG015
-pub(crate) fn root_logger_call(checker: &mut Checker, call: &ExprCall) {
+pub(crate) fn root_logger_call(checker: &Checker, call: &ExprCall) {
     let semantic = checker.semantic();
 
     if !semantic.seen_module(Modules::LOGGING) {
@@ -65,7 +65,7 @@ pub(crate) fn root_logger_call(checker: &mut Checker, call: &ExprCall) {
     };
     let diagnostic = Diagnostic::new(kind, call.range);
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 #[inline]

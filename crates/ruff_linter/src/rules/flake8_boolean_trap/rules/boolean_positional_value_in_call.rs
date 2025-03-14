@@ -51,7 +51,7 @@ impl Violation for BooleanPositionalValueInCall {
     }
 }
 
-pub(crate) fn boolean_positional_value_in_call(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn boolean_positional_value_in_call(checker: &Checker, call: &ast::ExprCall) {
     if allow_boolean_trap(call, checker) {
         return;
     }
@@ -61,8 +61,6 @@ pub(crate) fn boolean_positional_value_in_call(checker: &mut Checker, call: &ast
         .iter()
         .filter(|arg| arg.is_boolean_literal_expr())
     {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(BooleanPositionalValueInCall, arg.range()));
+        checker.report_diagnostic(Diagnostic::new(BooleanPositionalValueInCall, arg.range()));
     }
 }

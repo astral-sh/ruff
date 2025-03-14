@@ -1,11 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_tidy_imports/mod.rs
-snapshot_kind: text
 ---
 application.py:5:1: TID252 Prefer absolute imports over relative imports from parent modules
   |
 3 | import attrs
-4 | 
+4 |
 5 | from ....import unknown
   | ^^^^^^^^^^^^^^^^^^^^^^^ TID252
 6 | from ..protocol import commands, definitions, responses

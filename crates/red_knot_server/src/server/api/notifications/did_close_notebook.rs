@@ -1,7 +1,7 @@
 use lsp_types::notification::DidCloseNotebookDocument;
 use lsp_types::DidCloseNotebookDocumentParams;
 
-use red_knot_workspace::watch::ChangeEvent;
+use red_knot_project::watch::ChangeEvent;
 
 use crate::server::api::traits::{NotificationHandler, SyncNotificationHandler};
 use crate::server::api::LSPResult;
@@ -33,7 +33,7 @@ impl SyncNotificationHandler for DidCloseNotebookHandler {
             .with_failure_code(lsp_server::ErrorCode::InternalError)?;
 
         if let AnySystemPath::SystemVirtual(virtual_path) = path {
-            let db = session.default_workspace_db_mut();
+            let db = session.default_project_db_mut();
             db.apply_changes(vec![ChangeEvent::DeletedVirtual(virtual_path)], None);
         }
 

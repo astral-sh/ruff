@@ -3,7 +3,7 @@ use itertools::{EitherOrBoth, Itertools};
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::whitespace::trailing_lines_end;
-use ruff_python_ast::{PySourceType, Stmt};
+use ruff_python_ast::{PySourceType, PythonVersion, Stmt};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_parser::Tokens;
@@ -88,6 +88,7 @@ pub(crate) fn organize_imports(
     package: Option<PackageRoot<'_>>,
     source_type: PySourceType,
     tokens: &Tokens,
+    target_version: PythonVersion,
 ) -> Option<Diagnostic> {
     let indentation = locator.slice(extract_indentation_range(&block.imports, locator));
     let indentation = leading_indentation(indentation);
@@ -127,22 +128,21 @@ pub(crate) fn organize_imports(
         &settings.src,
         package,
         source_type,
-        settings.target_version,
+        target_version,
         &settings.isort,
         tokens,
     );
 
     // Expand the span the entire range, including leading and trailing space.
-    let range = TextRange::new(locator.line_start(range.start()), trailing_line_end);
-    let actual = locator.slice(range);
+    let fix_range = TextRange::new(locator.line_start(range.start()), trailing_line_end);
+    let actual = locator.slice(fix_range);
     if matches_ignoring_indentation(actual, &expected) {
         return None;
     }
-
     let mut diagnostic = Diagnostic::new(UnsortedImports, range);
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
         indent(&expected, indentation).to_string(),
-        range,
+        fix_range,
     )));
     Some(diagnostic)
 }

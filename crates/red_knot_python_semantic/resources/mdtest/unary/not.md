@@ -28,7 +28,9 @@ reveal_type(not b)  # revealed: Literal[False]
 reveal_type(not warnings)  # revealed: Literal[False]
 ```
 
-```py path=b.py
+`b.py`:
+
+```py
 y = 1
 ```
 
@@ -123,6 +125,8 @@ classes without a `__bool__` method, with or without `__len__`, must be inferred
 truthiness.
 
 ```py
+from typing import Literal
+
 class AlwaysTrue:
     def __bool__(self) -> Literal[True]:
         return True
@@ -136,13 +140,6 @@ class AlwaysFalse:
 
 # revealed: Literal[True]
 reveal_type(not AlwaysFalse())
-
-# We don't get into a cycle if someone sets their `__bool__` method to the `bool` builtin:
-class BoolIsBool:
-    __bool__ = bool
-
-# revealed: bool
-reveal_type(not BoolIsBool())
 
 # At runtime, no `__bool__` and no `__len__` means truthy, but we can't rely on that, because
 # a subclass could add a `__bool__` method.
@@ -186,12 +183,11 @@ class WithBothLenAndBool2:
 # revealed: Literal[False]
 reveal_type(not WithBothLenAndBool2())
 
-# TODO: raise diagnostic when __bool__ method is not valid: [unsupported-operator] "Method __bool__ for type `MethodBoolInvalid` should return `bool`, returned type `int`"
-# https://docs.python.org/3/reference/datamodel.html#object.__bool__
 class MethodBoolInvalid:
     def __bool__(self) -> int:
         return 0
 
+# error: [unsupported-bool-conversion] "Boolean conversion is unsupported for type `MethodBoolInvalid`; the return type of its bool method (`int`) isn't assignable to `bool"
 # revealed: bool
 reveal_type(not MethodBoolInvalid())
 
@@ -206,4 +202,16 @@ class PossiblyUnboundBool:
 
 # revealed: bool
 reveal_type(not PossiblyUnboundBool())
+```
+
+## Object that implements `__bool__` incorrectly
+
+<!-- snapshot-diagnostics -->
+
+```py
+class NotBoolable:
+    __bool__ = 3
+
+# error: [unsupported-bool-conversion]
+not NotBoolable()
 ```

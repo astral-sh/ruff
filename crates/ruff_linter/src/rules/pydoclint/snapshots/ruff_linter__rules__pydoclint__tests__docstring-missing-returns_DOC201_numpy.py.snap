@@ -1,15 +1,13 @@
 ---
 source: crates/ruff_linter/src/rules/pydoclint/mod.rs
-snapshot_kind: text
 ---
 DOC201_numpy.py:3:5: DOC201 `return` is not documented in docstring
    |
  1 |   # DOC201
  2 |   def foo(num: int) -> str:
- 3 |       """
-   |  _____^
+ 3 | /     """
  4 | |     Do something
- 5 | | 
+ 5 | |
  6 | |     Parameters
  7 | |     ----------
  8 | |     num : int
@@ -24,10 +22,9 @@ DOC201_numpy.py:54:9: DOC201 `return` is not documented in docstring
    |
 52 |       # DOC201
 53 |       def bar(self) -> str:
-54 |           """
-   |  _________^
+54 | /         """
 55 | |         Do something
-56 | | 
+56 | |
 57 | |         Parameters
 58 | |         ----------
 59 | |         num : int
@@ -52,9 +49,8 @@ DOC201_numpy.py:152:5: DOC201 `return` is not documented in docstring
     |
 150 |   # DOC201 - non-early return explicit None
 151 |   def foo(x: int) -> int | None:
-152 |       """A very helpful docstring.
-    |  _____^
-153 | | 
+152 | /     """A very helpful docstring.
+153 | |
 154 | |     Parameters
 155 | |     ----------
 156 | |     x : int
@@ -70,9 +66,8 @@ DOC201_numpy.py:167:5: DOC201 `return` is not documented in docstring
     |
 165 |   # DOC201 - non-early return explicit None w/o useful type annotations
 166 |   def foo(x):
-167 |       """A very helpful docstring.
-    |  _____^
-168 | | 
+167 | /     """A very helpful docstring.
+168 | |
 169 | |     Parameters
 170 | |     ----------
 171 | |     x : int
@@ -88,9 +83,8 @@ DOC201_numpy.py:182:5: DOC201 `return` is not documented in docstring
     |
 180 |   # DOC201 - only returns None, but return annotation is not None
 181 |   def foo(s: str) -> str | None:
-182 |       """A very helpful docstring.
-    |  _____^
-183 | | 
+182 | /     """A very helpful docstring.
+183 | |
 184 | |     Parameters
 185 | |     ----------
 186 | |     x : str

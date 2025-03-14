@@ -38,7 +38,7 @@ use crate::Locator;
 /// keyword to a positional argument will change the behavior of the code, even
 /// if the keyword argument was used erroneously.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// defaultdict(default_factory=int)
 /// defaultdict(default_factory=list)
@@ -73,7 +73,7 @@ impl Violation for DefaultFactoryKwarg {
 }
 
 /// RUF026
-pub(crate) fn default_factory_kwarg(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn default_factory_kwarg(checker: &Checker, call: &ast::ExprCall) {
     // If the call isn't a `defaultdict` constructor, return.
     if !checker
         .semantic()
@@ -107,7 +107,7 @@ pub(crate) fn default_factory_kwarg(checker: &mut Checker, call: &ast::ExprCall)
         call.range(),
     );
     diagnostic.try_set_fix(|| convert_to_positional(call, keyword, checker.locator()));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// Returns `true` if a value is definitively not callable (e.g., `1` or `[]`).

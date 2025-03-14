@@ -40,15 +40,15 @@ pub(super) fn try_show_message(
 /// Sends a request to display an error to the client with a formatted message. The error is sent
 /// in a `window/showMessage` notification.
 macro_rules! show_err_msg {
-    ($msg:expr$(, $($arg:tt),*)?) => {
-        crate::message::show_message(::core::format_args!($msg, $($($arg),*)?).to_string(), lsp_types::MessageType::ERROR)
+    ($msg:expr$(, $($arg:tt)*)?) => {
+        crate::message::show_message(::core::format_args!($msg$(, $($arg)*)?).to_string(), lsp_types::MessageType::ERROR)
     };
 }
 
 /// Sends a request to display a warning to the client with a formatted message. The warning is
 /// sent in a `window/showMessage` notification.
 macro_rules! show_warn_msg {
-    ($msg:expr$(, $($arg:tt),*)?) => {
-        crate::message::show_message(::core::format_args!($msg, $($($arg),*)?).to_string(), lsp_types::MessageType::WARNING)
+    ($msg:expr$(, $($arg:tt)*)?) => {
+        crate::message::show_message(::core::format_args!($msg$(, $($arg)*)?).to_string(), lsp_types::MessageType::WARNING)
     };
 }

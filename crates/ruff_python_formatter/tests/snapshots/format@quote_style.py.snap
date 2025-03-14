@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/quote_style.py
-snapshot_kind: text
 ---
 ## Input
 ```python
@@ -69,7 +68,7 @@ magic-trailing-comma       = Respect
 docstring-code             = Disabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
-target_version             = Py39
+target_version             = 3.9
 source_type                = Python
 ```
 
@@ -109,10 +108,10 @@ rb"""rb double triple"""
 rb"""br single triple"""
 rb"""br double triple"""
 
-'single1' 'single2'
-'single1' 'double2'
-'double1' 'single2'
-'double1' 'double2'
+'single1single2'
+'single1double2'
+'double1single2'
+'double1double2'
 
 
 def docstring_single_triple():
@@ -132,28 +131,6 @@ def docstring_single():
 ```
 
 
-#### Preview changes
-```diff
---- Stable
-+++ Preview
-@@ -33,10 +33,10 @@
- rb"""br single triple"""
- rb"""br double triple"""
- 
--'single1' 'single2'
--'single1' 'double2'
--'double1' 'single2'
--'double1' 'double2'
-+'single1single2'
-+'single1double2'
-+'double1single2'
-+'double1double2'
- 
- 
- def docstring_single_triple():
-```
-
-
 ### Output 2
 ```
 indent-style               = space
@@ -165,7 +142,7 @@ magic-trailing-comma       = Respect
 docstring-code             = Disabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
-target_version             = Py39
+target_version             = 3.9
 source_type                = Python
 ```
 
@@ -205,10 +182,10 @@ rb"""rb double triple"""
 rb"""br single triple"""
 rb"""br double triple"""
 
-"single1" "single2"
-"single1" "double2"
-"double1" "single2"
-"double1" "double2"
+"single1single2"
+"single1double2"
+"double1single2"
+"double1double2"
 
 
 def docstring_single_triple():
@@ -228,28 +205,6 @@ def docstring_single():
 ```
 
 
-#### Preview changes
-```diff
---- Stable
-+++ Preview
-@@ -33,10 +33,10 @@
- rb"""br single triple"""
- rb"""br double triple"""
- 
--"single1" "single2"
--"single1" "double2"
--"double1" "single2"
--"double1" "double2"
-+"single1single2"
-+"single1double2"
-+"double1single2"
-+"double1double2"
- 
- 
- def docstring_single_triple():
-```
-
-
 ### Output 3
 ```
 indent-style               = space
@@ -261,7 +216,7 @@ magic-trailing-comma       = Respect
 docstring-code             = Disabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
-target_version             = Py39
+target_version             = 3.9
 source_type                = Python
 ```
 
@@ -301,10 +256,10 @@ rb"""rb double triple"""
 rb'''br single triple'''
 rb"""br double triple"""
 
-'single1' 'single2'
-'single1' "double2"
-"double1" 'single2'
-"double1" "double2"
+'single1single2'
+'single1double2'
+"double1single2"
+"double1double2"
 
 
 def docstring_single_triple():
@@ -321,26 +276,4 @@ def docstring_double():
 
 def docstring_single():
     'single'
-```
-
-
-#### Preview changes
-```diff
---- Stable
-+++ Preview
-@@ -33,10 +33,10 @@
- rb'''br single triple'''
- rb"""br double triple"""
- 
--'single1' 'single2'
--'single1' "double2"
--"double1" 'single2'
--"double1" "double2"
-+'single1single2'
-+'single1double2'
-+"double1single2"
-+"double1double2"
- 
- 
- def docstring_single_triple():
 ```

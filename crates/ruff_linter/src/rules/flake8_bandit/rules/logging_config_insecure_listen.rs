@@ -35,7 +35,7 @@ impl Violation for LoggingConfigInsecureListen {
 }
 
 /// S612
-pub(crate) fn logging_config_insecure_listen(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn logging_config_insecure_listen(checker: &Checker, call: &ast::ExprCall) {
     if !checker.semantic().seen_module(Modules::LOGGING) {
         return;
     }
@@ -51,7 +51,7 @@ pub(crate) fn logging_config_insecure_listen(checker: &mut Checker, call: &ast::
             return;
         }
 
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             LoggingConfigInsecureListen,
             call.func.range(),
         ));

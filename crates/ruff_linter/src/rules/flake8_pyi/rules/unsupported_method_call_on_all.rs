@@ -54,7 +54,7 @@ impl Violation for UnsupportedMethodCallOnAll {
 }
 
 /// PYI056
-pub(crate) fn unsupported_method_call_on_all(checker: &mut Checker, func: &Expr) {
+pub(crate) fn unsupported_method_call_on_all(checker: &Checker, func: &Expr) {
     let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func else {
         return;
     };
@@ -67,7 +67,7 @@ pub(crate) fn unsupported_method_call_on_all(checker: &mut Checker, func: &Expr)
     if !is_unsupported_method(attr.as_str()) {
         return;
     }
-    checker.diagnostics.push(Diagnostic::new(
+    checker.report_diagnostic(Diagnostic::new(
         UnsupportedMethodCallOnAll {
             name: attr.to_string(),
         },

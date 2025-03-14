@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
-snapshot_kind: text
 ---
 combine_import_from.py:1:1: I001 [*] Import block is un-sorted or un-formatted
   |
@@ -9,6 +8,7 @@ combine_import_from.py:1:1: I001 [*] Import block is un-sorted or un-formatted
 3 | | from collections import Collection
 4 | | from collections import ChainMap
 5 | | from collections import MutableSequence, MutableMapping
+  | |_______________________________________________________^ I001
   |
   = help: Organize imports
 

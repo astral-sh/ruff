@@ -17,7 +17,7 @@ use crate::checkers::ast::Checker;
 /// without having to check if the dictionary contains the relevant key,
 /// returning `None` if the key is not present.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// if "key" in dct and dct["key"]:
 ///     ...
@@ -43,7 +43,7 @@ impl AlwaysFixableViolation for UnnecessaryKeyCheck {
 }
 
 /// RUF019
-pub(crate) fn unnecessary_key_check(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn unnecessary_key_check(checker: &Checker, expr: &Expr) {
     if !checker.semantic().in_boolean_test() {
         return;
     }
@@ -127,5 +127,5 @@ pub(crate) fn unnecessary_key_check(checker: &mut Checker, expr: &Expr) {
         ),
         expr.range(),
     )));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

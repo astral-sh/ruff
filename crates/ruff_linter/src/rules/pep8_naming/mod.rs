@@ -20,6 +20,7 @@ mod tests {
     #[test_case(Rule::InvalidClassName, Path::new("N801.py"))]
     #[test_case(Rule::InvalidFunctionName, Path::new("N802.py"))]
     #[test_case(Rule::InvalidArgumentName, Path::new("N803.py"))]
+    #[test_case(Rule::InvalidArgumentName, Path::new("N804.py"))]
     #[test_case(Rule::InvalidFirstArgumentNameForClassMethod, Path::new("N804.py"))]
     #[test_case(Rule::InvalidFirstArgumentNameForMethod, Path::new("N805.py"))]
     #[test_case(Rule::NonLowercaseVariableInFunction, Path::new("N806.py"))]

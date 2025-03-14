@@ -46,7 +46,7 @@ impl AlwaysFixableViolation for LiteralMembership {
 }
 
 /// PLR6201
-pub(crate) fn literal_membership(checker: &mut Checker, compare: &ast::ExprCompare) {
+pub(crate) fn literal_membership(checker: &Checker, compare: &ast::ExprCompare) {
     let [op] = &*compare.ops else {
         return;
     };
@@ -64,6 +64,11 @@ pub(crate) fn literal_membership(checker: &mut Checker, compare: &ast::ExprCompa
         Expr::Tuple(ast::ExprTuple { elts, .. }) => elts,
         _ => return,
     };
+
+    // Skip empty collections (#15729).
+    if elts.is_empty() {
+        return;
+    }
 
     // If `left`, or any of the elements in `right`, are known to _not_ be hashable, return.
     if std::iter::once(compare.left.as_ref())
@@ -105,5 +110,5 @@ pub(crate) fn literal_membership(checker: &mut Checker, compare: &ast::ExprCompa
         right.range(),
     )));
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

@@ -25,13 +25,13 @@ reveal_type(y)  # revealed: Unknown
 def _(n: int):
     a = b"abcde"[n]
     # TODO: Support overloads... Should be `bytes`
-    reveal_type(a)  # revealed: @Todo(return type)
+    reveal_type(a)  # revealed: @Todo(return type of decorated function)
 ```
 
 ## Slices
 
 ```py
-b = b"\x00abc\xff"
+b: bytes = b"\x00abc\xff"
 
 reveal_type(b[0:2])  # revealed: Literal[b"\x00a"]
 reveal_type(b[-3:])  # revealed: Literal[b"bc\xff"]
@@ -44,10 +44,10 @@ b[::0]  # error: [zero-stepsize-in-slice]
 def _(m: int, n: int):
     byte_slice1 = b[m:n]
     # TODO: Support overloads... Should be `bytes`
-    reveal_type(byte_slice1)  # revealed: @Todo(return type)
+    reveal_type(byte_slice1)  # revealed: @Todo(return type of decorated function)
 
 def _(s: bytes) -> bytes:
     byte_slice2 = s[0:5]
     # TODO: Support overloads... Should be `bytes`
-    reveal_type(byte_slice2)  # revealed: @Todo(return type)
+    return reveal_type(byte_slice2)  # revealed: @Todo(return type of decorated function)
 ```

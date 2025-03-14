@@ -1,13 +1,18 @@
 pub use glob::PatternError;
 pub use memory_fs::MemoryFileSystem;
+
+#[cfg(all(feature = "testing", feature = "os"))]
+pub use os::testing::UserConfigDirectoryOverrideGuard;
+
 #[cfg(feature = "os")]
 pub use os::OsSystem;
+
 use ruff_notebook::{Notebook, NotebookError};
 use std::error::Error;
 use std::fmt::Debug;
 use std::path::{Path, PathBuf};
 use std::{fmt, io};
-pub use test::{DbWithTestSystem, TestSystem};
+pub use test::{DbWithTestSystem, DbWithWritableSystem, InMemorySystem, TestSystem};
 use walk_directory::WalkDirectoryBuilder;
 
 use crate::file_revision::FileRevision;
@@ -87,17 +92,22 @@ pub trait System: Debug {
     /// Returns `true` if `path` exists and is a directory.
     fn is_directory(&self, path: &SystemPath) -> bool {
         self.path_metadata(path)
-            .map_or(false, |metadata| metadata.file_type.is_directory())
+            .is_ok_and(|metadata| metadata.file_type.is_directory())
     }
 
     /// Returns `true` if `path` exists and is a file.
     fn is_file(&self, path: &SystemPath) -> bool {
         self.path_metadata(path)
-            .map_or(false, |metadata| metadata.file_type.is_file())
+            .is_ok_and(|metadata| metadata.file_type.is_file())
     }
 
     /// Returns the current working directory
     fn current_directory(&self) -> &SystemPath;
+
+    /// Returns the directory path where user configurations are stored.
+    ///
+    /// Returns `None` if no such convention exists for the system.
+    fn user_config_directory(&self) -> Option<SystemPathBuf>;
 
     /// Iterate over the contents of the directory at `path`.
     ///
@@ -149,6 +159,15 @@ pub trait System: Debug {
     fn as_any(&self) -> &dyn std::any::Any;
 
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any;
+}
+
+/// System trait for non-readonly systems.
+pub trait WritableSystem: System {
+    /// Writes the given content to the file at the given path.
+    fn write_file(&self, path: &SystemPath, content: &str) -> Result<()>;
+
+    /// Creates a directory at `path` as well as any intermediate directories.
+    fn create_directory_all(&self, path: &SystemPath) -> Result<()>;
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

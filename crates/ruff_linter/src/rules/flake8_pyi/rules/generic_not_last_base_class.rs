@@ -64,7 +64,7 @@ impl Violation for GenericNotLastBaseClass {
 }
 
 /// PYI059
-pub(crate) fn generic_not_last_base_class(checker: &mut Checker, class_def: &ast::StmtClassDef) {
+pub(crate) fn generic_not_last_base_class(checker: &Checker, class_def: &ast::StmtClassDef) {
     let Some(bases) = class_def.arguments.as_deref() else {
         return;
     };
@@ -99,7 +99,7 @@ pub(crate) fn generic_not_last_base_class(checker: &mut Checker, class_def: &ast
         diagnostic.try_set_fix(|| generate_fix(generic_base, bases, checker));
     }
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 fn generate_fix(

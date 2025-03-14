@@ -62,6 +62,27 @@ fn syntax_error() {
 }
 
 #[wasm_bindgen_test]
+fn unsupported_syntax_error() {
+    check!(
+        "match 2:\n    case 1: ...",
+        r#"{"preview": true}"#,
+        [ExpandedMessage {
+            code: None,
+            message: "SyntaxError: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)".to_string(),
+            location: SourceLocation {
+                row: OneIndexed::from_zero_indexed(0),
+                column: OneIndexed::from_zero_indexed(0)
+            },
+            end_location: SourceLocation {
+                row: OneIndexed::from_zero_indexed(0),
+                column: OneIndexed::from_zero_indexed(5)
+            },
+            fix: None,
+        }]
+    );
+}
+
+#[wasm_bindgen_test]
 fn partial_config() {
     check!("if (1, 2):\n    pass", r#"{"ignore": ["F"]}"#, []);
 }

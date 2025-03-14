@@ -73,12 +73,12 @@ qux = (foo, bar)
 reveal_type(qux)  # revealed: tuple[Literal["foo"], Literal["bar"]]
 
 # TODO: Infer "LiteralString"
-reveal_type(foo.join(qux))  # revealed: @Todo(Attribute access on `StringLiteral` types)
+reveal_type(foo.join(qux))  # revealed: @Todo(return type of decorated function)
 
 template: LiteralString = "{}, {}"
 reveal_type(template)  # revealed: Literal["{}, {}"]
 # TODO: Infer `LiteralString`
-reveal_type(template.format(foo, bar))  # revealed: @Todo(Attribute access on `StringLiteral` types)
+reveal_type(template.format(foo, bar))  # revealed: @Todo(return type of decorated function)
 ```
 
 ### Assignability
@@ -100,7 +100,7 @@ def _(flag: bool):
     foo_3: LiteralString = "foo" * 1_000_000_000
     bar_3: str = foo_2  # fine
 
-    baz_1: str = str()
+    baz_1: str = repr(object())
     qux_1: LiteralString = baz_1  # error: [invalid-assignment]
 
     baz_2: LiteralString = "baz" * 1_000_000_000

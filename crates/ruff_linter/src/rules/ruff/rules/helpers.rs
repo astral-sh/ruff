@@ -101,16 +101,6 @@ pub(super) enum DataclassKind {
     Attrs(AttrsAutoAttribs),
 }
 
-impl DataclassKind {
-    pub(super) const fn is_stdlib(self) -> bool {
-        matches!(self, DataclassKind::Stdlib)
-    }
-
-    pub(super) const fn is_attrs(self) -> bool {
-        matches!(self, DataclassKind::Attrs(..))
-    }
-}
-
 /// Return the kind of dataclass this class definition is (stdlib or `attrs`),
 /// or `None` if the class is not a dataclass.
 pub(super) fn dataclass_kind<'a>(
@@ -175,7 +165,7 @@ pub(super) fn dataclass_kind<'a>(
 
 /// Returns `true` if the given class has "default copy" semantics.
 ///
-/// For example, Pydantic `BaseModel` and `BaseSettings` subclassses copy attribute defaults on
+/// For example, Pydantic `BaseModel` and `BaseSettings` subclasses copy attribute defaults on
 /// instance creation. As such, the use of mutable default values is safe for such classes.
 pub(super) fn has_default_copy_semantics(
     class_def: &ast::StmtClassDef,
@@ -184,7 +174,16 @@ pub(super) fn has_default_copy_semantics(
     analyze::class::any_qualified_base_class(class_def, semantic, &|qualified_name| {
         matches!(
             qualified_name.segments(),
-            ["pydantic", "BaseModel" | "BaseSettings" | "BaseConfig"]
+            [
+                "pydantic",
+                "BaseModel" | "RootModel" | "BaseSettings" | "BaseConfig"
+            ] | ["pydantic", "generics", "GenericModel"]
+                | [
+                    "pydantic",
+                    "v1",
+                    "BaseModel" | "BaseSettings" | "BaseConfig"
+                ]
+                | ["pydantic", "v1", "generics", "GenericModel"]
                 | ["pydantic_settings", "BaseSettings"]
                 | ["msgspec", "Struct"]
                 | ["sqlmodel", "SQLModel"]

@@ -49,7 +49,7 @@ impl AlwaysFixableViolation for MetaClassABCMeta {
 }
 
 /// FURB180
-pub(crate) fn metaclass_abcmeta(checker: &mut Checker, class_def: &StmtClassDef) {
+pub(crate) fn metaclass_abcmeta(checker: &Checker, class_def: &StmtClassDef) {
     // Identify the `metaclass` keyword.
     let Some((position, keyword)) = class_def.keywords().iter().find_position(|&keyword| {
         keyword
@@ -100,5 +100,5 @@ pub(crate) fn metaclass_abcmeta(checker: &mut Checker, class_def: &StmtClassDef)
         })
     });
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

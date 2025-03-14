@@ -14,7 +14,7 @@ use crate::fix::snippet::SourceCodeSnippet;
 ///
 /// ## Why is this bad?
 /// `if` statements that return `True` for a truthy condition and `False` for
-/// a falsey condition can be replaced with boolean casts.
+/// a falsy condition can be replaced with boolean casts.
 ///
 /// ## Example
 /// Given:
@@ -78,7 +78,7 @@ impl Violation for NeedlessBool {
 }
 
 /// SIM103
-pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
+pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
     let Stmt::If(stmt_if) = stmt else { return };
     let ast::StmtIf {
         test: if_test,
@@ -206,19 +206,45 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
     } else {
         // If the return values are inverted, wrap the condition in a `not`.
         if inverted {
-            if let Expr::UnaryOp(ast::ExprUnaryOp {
-                op: ast::UnaryOp::Not,
-                operand,
-                ..
-            }) = if_test
-            {
-                Some((**operand).clone())
-            } else {
-                Some(Expr::UnaryOp(ast::ExprUnaryOp {
+            match if_test {
+                Expr::UnaryOp(ast::ExprUnaryOp {
+                    op: ast::UnaryOp::Not,
+                    operand,
+                    ..
+                }) => Some((**operand).clone()),
+
+                Expr::Compare(ast::ExprCompare {
+                    ops,
+                    left,
+                    comparators,
+                    ..
+                }) if matches!(
+                    ops.as_ref(),
+                    [ast::CmpOp::Eq
+                        | ast::CmpOp::NotEq
+                        | ast::CmpOp::In
+                        | ast::CmpOp::NotIn
+                        | ast::CmpOp::Is
+                        | ast::CmpOp::IsNot]
+                ) =>
+                {
+                    let ([op], [right]) = (ops.as_ref(), comparators.as_ref()) else {
+                        unreachable!("Single comparison with multiple comparators");
+                    };
+
+                    Some(Expr::Compare(ast::ExprCompare {
+                        ops: Box::new([op.negate()]),
+                        left: left.clone(),
+                        comparators: Box::new([right.clone()]),
+                        range: TextRange::default(),
+                    }))
+                }
+
+                _ => Some(Expr::UnaryOp(ast::ExprUnaryOp {
                     op: ast::UnaryOp::Not,
                     operand: Box::new(if_test.clone()),
                     range: TextRange::default(),
-                }))
+                })),
             }
         } else if if_test.is_compare_expr() {
             // If the condition is a comparison, we can replace it with the condition, since we
@@ -275,7 +301,7 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
             range,
         )));
     }
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

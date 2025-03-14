@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/message/gitlab.rs
 expression: redact_fingerprint(&content)
-snapshot_kind: text
 ---
 [
   {
-    "description": "(F401) `os` imported but unused",
+    "check_name": "F401",
+    "description": "`os` imported but unused",
     "fingerprint": "<redacted>",
     "location": {
       "lines": {
@@ -17,7 +17,8 @@ snapshot_kind: text
     "severity": "major"
   },
   {
-    "description": "(F841) Local variable `x` is assigned to but never used",
+    "check_name": "F841",
+    "description": "Local variable `x` is assigned to but never used",
     "fingerprint": "<redacted>",
     "location": {
       "lines": {
@@ -29,7 +30,8 @@ snapshot_kind: text
     "severity": "major"
   },
   {
-    "description": "(F821) Undefined name `a`",
+    "check_name": "F821",
+    "description": "Undefined name `a`",
     "fingerprint": "<redacted>",
     "location": {
       "lines": {

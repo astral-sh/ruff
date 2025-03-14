@@ -8,7 +8,6 @@ use ruff_python_ast::PySourceType;
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_parser::Tokens;
-use ruff_text_size::Ranged;
 
 use crate::directives::TodoComment;
 use crate::registry::{AsRule, Rule};
@@ -88,12 +87,7 @@ pub(crate) fn check_tokens(
         Rule::InvalidCharacterZeroWidthSpace,
     ]) {
         for token in tokens {
-            pylint::rules::invalid_string_characters(
-                &mut diagnostics,
-                token.kind(),
-                token.range(),
-                locator,
-            );
+            pylint::rules::invalid_string_characters(&mut diagnostics, token, locator);
         }
     }
 
@@ -183,7 +177,11 @@ pub(crate) fn check_tokens(
     }
 
     if settings.rules.enabled(Rule::TooManyNewlinesAtEndOfFile) {
-        pycodestyle::rules::too_many_newlines_at_end_of_file(&mut diagnostics, tokens);
+        pycodestyle::rules::too_many_newlines_at_end_of_file(
+            &mut diagnostics,
+            tokens,
+            cell_offsets,
+        );
     }
 
     diagnostics.retain(|diagnostic| settings.rules.enabled(diagnostic.kind.rule()));

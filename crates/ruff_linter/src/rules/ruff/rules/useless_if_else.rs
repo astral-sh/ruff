@@ -9,20 +9,15 @@ use ruff_python_ast::comparable::ComparableExpr;
 ///
 /// ## Why is this bad?
 /// Useless `if`-`else` conditions add unnecessary complexity to the code without
-/// providing any logical benefit.
-///
-/// Assigning the value directly is clearer and more explicit, and
-/// should be preferred.
+/// providing any logical benefit. Assigning the value directly is clearer.
 ///
 /// ## Example
 /// ```python
-/// # Bad
 /// foo = x if y else x
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// # Good
 /// foo = x
 /// ```
 #[derive(ViolationMetadata)]
@@ -36,7 +31,7 @@ impl Violation for UselessIfElse {
 }
 
 /// RUF034
-pub(crate) fn useless_if_else(checker: &mut Checker, if_expr: &ast::ExprIf) {
+pub(crate) fn useless_if_else(checker: &Checker, if_expr: &ast::ExprIf) {
     let ast::ExprIf {
         body,
         orelse,
@@ -49,7 +44,5 @@ pub(crate) fn useless_if_else(checker: &mut Checker, if_expr: &ast::ExprIf) {
         return;
     }
 
-    checker
-        .diagnostics
-        .push(Diagnostic::new(UselessIfElse, *range));
+    checker.report_diagnostic(Diagnostic::new(UselessIfElse, *range));
 }

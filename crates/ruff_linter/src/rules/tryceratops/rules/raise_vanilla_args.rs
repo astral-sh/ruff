@@ -54,7 +54,7 @@ impl Violation for RaiseVanillaArgs {
 }
 
 /// TRY003
-pub(crate) fn raise_vanilla_args(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn raise_vanilla_args(checker: &Checker, expr: &Expr) {
     let Expr::Call(ast::ExprCall {
         func,
         arguments: Arguments { args, .. },
@@ -78,9 +78,7 @@ pub(crate) fn raise_vanilla_args(checker: &mut Checker, expr: &Expr) {
     }
 
     if contains_message(arg) {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(RaiseVanillaArgs, expr.range()));
+        checker.report_diagnostic(Diagnostic::new(RaiseVanillaArgs, expr.range()));
     }
 }
 

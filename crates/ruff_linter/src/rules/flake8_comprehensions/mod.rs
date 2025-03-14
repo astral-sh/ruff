@@ -22,6 +22,7 @@ mod tests {
     #[test_case(Rule::UnnecessaryComprehensionInCall, Path::new("C419.py"))]
     #[test_case(Rule::UnnecessaryComprehensionInCall, Path::new("C419_2.py"))]
     #[test_case(Rule::UnnecessaryDictComprehensionForIterable, Path::new("C420.py"))]
+    #[test_case(Rule::UnnecessaryDictComprehensionForIterable, Path::new("C420_1.py"))]
     #[test_case(Rule::UnnecessaryDoubleCastOrProcess, Path::new("C414.py"))]
     #[test_case(Rule::UnnecessaryGeneratorDict, Path::new("C402.py"))]
     #[test_case(Rule::UnnecessaryGeneratorList, Path::new("C400.py"))]
@@ -35,6 +36,7 @@ mod tests {
     #[test_case(Rule::UnnecessaryLiteralWithinListCall, Path::new("C410.py"))]
     #[test_case(Rule::UnnecessaryLiteralWithinTupleCall, Path::new("C409.py"))]
     #[test_case(Rule::UnnecessaryMap, Path::new("C417.py"))]
+    #[test_case(Rule::UnnecessaryMap, Path::new("C417_1.py"))]
     #[test_case(Rule::UnnecessarySubscriptReversal, Path::new("C415.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());

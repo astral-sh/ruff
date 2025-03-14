@@ -57,7 +57,7 @@ impl Violation for InvalidGetLoggerArgument {
 }
 
 /// LOG002
-pub(crate) fn invalid_get_logger_argument(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn invalid_get_logger_argument(checker: &Checker, call: &ast::ExprCall) {
     if !checker.semantic().seen_module(Modules::LOGGING) {
         return;
     }
@@ -91,5 +91,5 @@ pub(crate) fn invalid_get_logger_argument(checker: &mut Checker, call: &ast::Exp
             expr.range(),
         )));
     }
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

@@ -41,10 +41,6 @@ codspeed-criterion-compat = { workspace = true, default-features = false, option
 criterion = { workspace = true, default-features = false }
 rayon = { workspace = true }
 rustc-hash = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
-url = { workspace = true }
-ureq = { workspace = true }
 
 [dev-dependencies]
 ruff_db = { workspace = true }
@@ -53,8 +49,7 @@ ruff_python_ast = { workspace = true }
 ruff_python_formatter = { workspace = true }
 ruff_python_parser = { workspace = true }
 ruff_python_trivia = { workspace = true }
-red_knot_python_semantic = { workspace = true }
-red_knot_workspace = { workspace = true }
+red_knot_project = { workspace = true }
 
 [lints]
 workspace = true

@@ -29,47 +29,47 @@ no_sep = None
 '   1   2   3   '.split()
 '1<>2<>3<4'.split('<>')
 
-" a*a a*a a ".split("*", -1)  # [' a', 'a a', 'a a ']
+" a*a a*a a ".split("*", -1)  # [" a", "a a", "a a "]
 "".split()  # []
 """ 	
 """.split()  # []
 "   	".split()  # []
-"/abc/".split() # ['/abc/']
+"/abc/".split() # ["/abc/"]
 ("a,b,c"
 # comment
 .split()
-)  # ['a,b,c']
+)  # ["a,b,c"]
 ("a,b,c"
 # comment1
 .split(",")
-) # ['a', 'b', 'c']
+) # ["a", "b", "c"]
 ("a,"
 # comment
 "b,"
 "c"
 .split(",")
-) # ['a', 'b', 'c']
+) # ["a", "b", "c"]
 
 "hello "\
 	"world".split()
-# ['hello', 'world']
+# ["hello", "world"]
 
 # prefixes and isc
-u"a b".split()  # ['a', 'b']
-r"a \n b".split()  # ['a', '\\n', 'b']
-("a " "b").split()  # ['a', 'b']
-"a " "b".split()  # ['a', 'b']
-u"a " "b".split()  # ['a', 'b']
-"a " u"b".split()  # ['a', 'b']
-u"a " r"\n".split()  # ['a', '\\n']
-r"\n " u"\n".split()  # ['\\n']
-r"\n " "\n".split()  # ['\\n']
-"a " r"\n".split()  # ['a', '\\n']
+u"a b".split()  # [u"a", u"b"]
+r"a \n b".split()  # [r"a", r"\n", r"b"]
+("a " "b").split()  # ["a", "b"]
+"a " "b".split()  # ["a", "b"]
+u"a " "b".split()  # [u"a", u"b"]
+"a " u"b".split()  # ["a", "b"]
+u"a " r"\n".split()  # [u"a", u"\\n"]
+r"\n " u"\n".split()  # [r"\n"]
+r"\n " "\n".split()  # [r"\n"]
+"a " r"\n".split()  # ["a", "\\n"]
 
-"a,b,c".split(',', maxsplit=0) # ['a,b,c']
-"a,b,c".split(',', maxsplit=-1)  # ['a', 'b', 'c']
-"a,b,c".split(',', maxsplit=-2)  # ['a', 'b', 'c']
-"a,b,c".split(',', maxsplit=-0)  # ['a,b,c']
+"a,b,c".split(',', maxsplit=0) # ["a,b,c"]
+"a,b,c".split(',', maxsplit=-1)  # ["a", "b", "c"]
+"a,b,c".split(',', maxsplit=-2)  # ["a", "b", "c"]
+"a,b,c".split(',', maxsplit=-0)  # ["a,b,c"]
 
 # negatives
 
@@ -97,3 +97,12 @@ b"TesT.WwW.ExamplE.CoM".split(b".")
 "hello\nworld".splitlines()
 "hello\nworld".splitlines(keepends=True)
 "hello\nworld".splitlines(keepends=False)
+
+
+# another positive demonstrating quote preservation
+"""
+"itemA"
+'itemB'
+'''itemC'''
+"'itemD'"
+""".split()

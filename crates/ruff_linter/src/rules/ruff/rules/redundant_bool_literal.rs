@@ -81,7 +81,7 @@ impl Violation for RedundantBoolLiteral {
 }
 
 /// RUF038
-pub(crate) fn redundant_bool_literal<'a>(checker: &mut Checker, literal_expr: &'a Expr) {
+pub(crate) fn redundant_bool_literal<'a>(checker: &Checker, literal_expr: &'a Expr) {
     if !checker.semantic().seen_typing() {
         return;
     }
@@ -124,7 +124,7 @@ pub(crate) fn redundant_bool_literal<'a>(checker: &mut Checker, literal_expr: &'
         }
     }
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 bitflags! {

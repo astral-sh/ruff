@@ -3,6 +3,8 @@
 ## Value Literals
 
 ```py
+from typing import Literal
+
 def foo() -> Literal[0, -1, True, False, "", "foo", b"", b"bar", None] | tuple[()]:
     return 0
 
@@ -21,22 +23,22 @@ else:
 if x and not x:
     reveal_type(x)  # revealed: Never
 else:
-    reveal_type(x)  # revealed: Literal[0, "", b"", -1, "foo", b"bar"] | bool | None | tuple[()]
+    reveal_type(x)  # revealed: Literal[0, -1, "", "foo", b"", b"bar"] | bool | None | tuple[()]
 
 if not (x and not x):
-    reveal_type(x)  # revealed: Literal[0, "", b"", -1, "foo", b"bar"] | bool | None | tuple[()]
+    reveal_type(x)  # revealed: Literal[0, -1, "", "foo", b"", b"bar"] | bool | None | tuple[()]
 else:
     reveal_type(x)  # revealed: Never
 
 if x or not x:
-    reveal_type(x)  # revealed: Literal[-1, "foo", b"bar", 0, "", b""] | bool | None | tuple[()]
+    reveal_type(x)  # revealed: Literal[0, -1, "", "foo", b"", b"bar"] | bool | None | tuple[()]
 else:
     reveal_type(x)  # revealed: Never
 
 if not (x or not x):
     reveal_type(x)  # revealed: Never
 else:
-    reveal_type(x)  # revealed: Literal[-1, "foo", b"bar", 0, "", b""] | bool | None | tuple[()]
+    reveal_type(x)  # revealed: Literal[0, -1, "", "foo", b"", b"bar"] | bool | None | tuple[()]
 
 if (isinstance(x, int) or isinstance(x, str)) and x:
     reveal_type(x)  # revealed: Literal[-1, True, "foo"]
@@ -87,10 +89,10 @@ def f(x: A | B):
     if x and not x:
         reveal_type(x)  # revealed: A & ~AlwaysFalsy & ~AlwaysTruthy | B & ~AlwaysFalsy & ~AlwaysTruthy
     else:
-        reveal_type(x)  # revealed: A & ~AlwaysTruthy | B & ~AlwaysTruthy | A & ~AlwaysFalsy | B & ~AlwaysFalsy
+        reveal_type(x)  # revealed: A | B
 
     if x or not x:
-        reveal_type(x)  # revealed: A & ~AlwaysFalsy | B & ~AlwaysFalsy | A & ~AlwaysTruthy | B & ~AlwaysTruthy
+        reveal_type(x)  # revealed: A | B
     else:
         reveal_type(x)  # revealed: A & ~AlwaysTruthy & ~AlwaysFalsy | B & ~AlwaysTruthy & ~AlwaysFalsy
 ```
@@ -123,6 +125,8 @@ always returns a fixed value.
 These types can always be fully narrowed in boolean contexts, as shown below:
 
 ```py
+from typing import Literal
+
 class T:
     def __bool__(self) -> Literal[True]:
         return True
@@ -149,6 +153,8 @@ else:
 ## Narrowing Complex Intersection and Union
 
 ```py
+from typing import Literal
+
 class A: ...
 class B: ...
 
@@ -181,6 +187,8 @@ if isinstance(x, str) and not isinstance(x, B):
 ## Narrowing Multiple Variables
 
 ```py
+from typing import Literal
+
 def f(x: Literal[0, 1], y: Literal["", "hello"]):
     if x and y and not x and not y:
         reveal_type(x)  # revealed: Never
@@ -199,7 +207,7 @@ def f(x: Literal[0, 1], y: Literal["", "hello"]):
         reveal_type(y)  # revealed: Literal["", "hello"]
 ```
 
-## ControlFlow Merging
+## Control Flow Merging
 
 After merging control flows, when we take the union of all constraints applied in each branch, we
 should return to the original state.
@@ -214,26 +222,31 @@ if x and not x:
     reveal_type(y)  # revealed: A & ~AlwaysFalsy & ~AlwaysTruthy
 else:
     y = x
-    reveal_type(y)  # revealed: A & ~AlwaysTruthy | A & ~AlwaysFalsy
+    reveal_type(y)  # revealed: A
 
-# TODO: It should be A. We should improve UnionBuilder or IntersectionBuilder. (issue #15023)
-reveal_type(y)  # revealed: A & ~AlwaysTruthy | A & ~AlwaysFalsy
+reveal_type(y)  # revealed: A
 ```
 
 ## Truthiness of classes
 
 ```py
+from typing import Literal
+
 class MetaAmbiguous(type):
-    def __bool__(self) -> bool: ...
+    def __bool__(self) -> bool:
+        return True
 
 class MetaFalsy(type):
-    def __bool__(self) -> Literal[False]: ...
+    def __bool__(self) -> Literal[False]:
+        return False
 
 class MetaTruthy(type):
-    def __bool__(self) -> Literal[True]: ...
+    def __bool__(self) -> Literal[True]:
+        return True
 
 class MetaDeferred(type):
-    def __bool__(self) -> MetaAmbiguous: ...
+    def __bool__(self) -> MetaAmbiguous:
+        return MetaAmbiguous()
 
 class AmbiguousClass(metaclass=MetaAmbiguous): ...
 class FalsyClass(metaclass=MetaFalsy): ...
@@ -257,7 +270,7 @@ def _(
     if af:
         reveal_type(af)  # revealed: type[AmbiguousClass] & ~AlwaysFalsy
 
-    # TODO: Emit a diagnostic (`d` is not valid in boolean context)
+    # error: [unsupported-bool-conversion] "Boolean conversion is unsupported for type `MetaDeferred`; the return type of its bool method (`MetaAmbiguous`) isn't assignable to `bool"
     if d:
         # TODO: Should be `Unknown`
         reveal_type(d)  # revealed: type[DeferredClass] & ~AlwaysFalsy
@@ -291,20 +304,24 @@ def _(x: bool | str):
     reveal_type(x and A())  # revealed: Literal[False] | str & ~AlwaysTruthy | A
 
 class Falsy:
-    def __bool__(self) -> Literal[False]: ...
+    def __bool__(self) -> Literal[False]:
+        return False
 
 class Truthy:
-    def __bool__(self) -> Literal[True]: ...
+    def __bool__(self) -> Literal[True]:
+        return True
 
 def _(x: Falsy | Truthy):
     reveal_type(x or A())  # revealed: Truthy | A
     reveal_type(x and A())  # revealed: Falsy | A
 
 class MetaFalsy(type):
-    def __bool__(self) -> Literal[False]: ...
+    def __bool__(self) -> Literal[False]:
+        return False
 
 class MetaTruthy(type):
-    def __bool__(self) -> Literal[True]: ...
+    def __bool__(self) -> Literal[True]:
+        return True
 
 class FalsyClass(metaclass=MetaFalsy): ...
 class TruthyClass(metaclass=MetaTruthy): ...
@@ -312,4 +329,21 @@ class TruthyClass(metaclass=MetaTruthy): ...
 def _(x: type[FalsyClass] | type[TruthyClass]):
     reveal_type(x or A())  # revealed: type[TruthyClass] | A
     reveal_type(x and A())  # revealed: type[FalsyClass] | A
+```
+
+## Truthiness narrowing for `LiteralString`
+
+```py
+from typing_extensions import LiteralString
+
+def _(x: LiteralString):
+    if x:
+        reveal_type(x)  # revealed: LiteralString & ~Literal[""]
+    else:
+        reveal_type(x)  # revealed: Literal[""]
+
+    if not x:
+        reveal_type(x)  # revealed: Literal[""]
+    else:
+        reveal_type(x)  # revealed: LiteralString & ~Literal[""]
 ```

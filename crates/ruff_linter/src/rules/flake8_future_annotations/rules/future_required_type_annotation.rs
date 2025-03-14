@@ -84,7 +84,7 @@ impl AlwaysFixableViolation for FutureRequiredTypeAnnotation {
 }
 
 /// FA102
-pub(crate) fn future_required_type_annotation(checker: &mut Checker, expr: &Expr, reason: Reason) {
+pub(crate) fn future_required_type_annotation(checker: &Checker, expr: &Expr, reason: Reason) {
     let mut diagnostic = Diagnostic::new(FutureRequiredTypeAnnotation { reason }, expr.range());
     let required_import = NameImport::ImportFrom(MemberNameImport::member(
         "__future__".to_string(),
@@ -95,5 +95,5 @@ pub(crate) fn future_required_type_annotation(checker: &mut Checker, expr: &Expr
             .importer()
             .add_import(&required_import, TextSize::default()),
     ));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

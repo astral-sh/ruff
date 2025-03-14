@@ -58,7 +58,7 @@ impl Violation for UnnecessaryTypeUnion {
 }
 
 /// PYI055
-pub(crate) fn unnecessary_type_union<'a>(checker: &mut Checker, union: &'a Expr) {
+pub(crate) fn unnecessary_type_union<'a>(checker: &Checker, union: &'a Expr) {
     let semantic = checker.semantic();
 
     // The `|` operator isn't always safe to allow to runtime-evaluated annotations.
@@ -219,7 +219,7 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &mut Checker, union: &'a Expr)
         ));
     }
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/expressions/bool_op/missing_rhs.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -73,6 +72,6 @@ Module(
   |
 1 | x and
   |      ^ Syntax Error: Expected an expression
-2 | 
+2 |
 3 | 1 + 2
   |

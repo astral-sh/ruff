@@ -47,7 +47,7 @@ impl Violation for Debugger {
 }
 
 /// Checks for the presence of a debugger call.
-pub(crate) fn debugger_call(checker: &mut Checker, expr: &Expr, func: &Expr) {
+pub(crate) fn debugger_call(checker: &Checker, expr: &Expr, func: &Expr) {
     if let Some(using_type) =
         checker
             .semantic()
@@ -60,9 +60,7 @@ pub(crate) fn debugger_call(checker: &mut Checker, expr: &Expr, func: &Expr) {
                 }
             })
     {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(Debugger { using_type }, expr.range()));
+        checker.report_diagnostic(Diagnostic::new(Debugger { using_type }, expr.range()));
     }
 }
 
@@ -111,14 +109,15 @@ fn is_debugger_call(qualified_name: &QualifiedName) -> bool {
             | ["builtins" | "", "breakpoint"]
             | ["debugpy", "breakpoint" | "listen" | "wait_for_client"]
             | ["ptvsd", "break_into_debugger" | "wait_for_attach"]
+            | ["sys", "breakpointhook" | "__breakpointhook__"]
     )
 }
 
 fn is_debugger_import(qualified_name: &QualifiedName) -> bool {
     // Constructed by taking every pattern in `is_debugger_call`, removing the last element in
     // each pattern, and de-duplicating the values.
-    // As a special-case, we omit `builtins` to allow `import builtins`, which is far more general
-    // than (e.g.) `import celery.contrib.rdb`.
+    // As special-cases, we omit `builtins` and `sys` to allow `import builtins` and `import sys`
+    // which are far more general than (e.g.) `import celery.contrib.rdb`.
     matches!(
         qualified_name.segments(),
         ["pdb" | "pudb" | "ipdb" | "debugpy" | "ptvsd"]

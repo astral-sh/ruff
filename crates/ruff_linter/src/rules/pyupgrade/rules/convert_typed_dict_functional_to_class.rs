@@ -1,6 +1,5 @@
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::helpers::is_dunder;
 use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, Identifier, Keyword, Stmt};
 use ruff_python_codegen::Generator;
 use ruff_python_semantic::SemanticModel;
@@ -15,11 +14,21 @@ use crate::checkers::ast::Checker;
 /// Checks for `TypedDict` declarations that use functional syntax.
 ///
 /// ## Why is this bad?
-/// `TypedDict` subclasses can be defined either through a functional syntax
+/// `TypedDict` types can be defined either through a functional syntax
 /// (`Foo = TypedDict(...)`) or a class syntax (`class Foo(TypedDict): ...`).
 ///
 /// The class syntax is more readable and generally preferred over the
 /// functional syntax.
+///
+/// Nonetheless, there are some situations in which it is impossible to use
+/// the class-based syntax. This rule will not apply to those cases. Namely,
+/// it is impossible to use the class-based syntax if any `TypedDict` fields are:
+/// - Not valid [python identifiers] (for example, `@x`)
+/// - [Python keywords] such as `in`
+/// - [Private names] such as `__id` that would undergo [name mangling] at runtime
+///   if the class-based syntax was used
+/// - [Dunder names] such as `__int__` that can confuse type checkers if they're used
+///   with the class-based syntax.
 ///
 /// ## Example
 /// ```python
@@ -45,6 +54,12 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: `typing.TypedDict`](https://docs.python.org/3/library/typing.html#typing.TypedDict)
+///
+/// [Private names]: https://docs.python.org/3/tutorial/classes.html#private-variables
+/// [name mangling]: https://docs.python.org/3/reference/expressions.html#private-name-mangling
+/// [python identifiers]: https://docs.python.org/3/reference/lexical_analysis.html#identifiers
+/// [Python keywords]: https://docs.python.org/3/reference/lexical_analysis.html#keywords
+/// [Dunder names]: https://docs.python.org/3/reference/lexical_analysis.html#reserved-classes-of-identifiers
 #[derive(ViolationMetadata)]
 pub(crate) struct ConvertTypedDictFunctionalToClass {
     name: String,
@@ -67,7 +82,7 @@ impl Violation for ConvertTypedDictFunctionalToClass {
 
 /// UP013
 pub(crate) fn convert_typed_dict_functional_to_class(
-    checker: &mut Checker,
+    checker: &Checker,
     stmt: &Stmt,
     targets: &[Expr],
     value: &Expr,
@@ -100,7 +115,7 @@ pub(crate) fn convert_typed_dict_functional_to_class(
             checker.comment_ranges(),
         ));
     }
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// Return the class name, arguments, keywords and base class for a `TypedDict`
@@ -185,7 +200,10 @@ fn fields_from_dict_literal(items: &[ast::DictItem]) -> Option<Vec<Stmt>> {
                     if !is_identifier(field.to_str()) {
                         return None;
                     }
-                    if is_dunder(field.to_str()) {
+                    // Converting TypedDict to class-based syntax is not safe if fields contain
+                    // private or dunder names, because private names will be mangled and dunder
+                    // names can confuse type checkers.
+                    if field.to_str().starts_with("__") {
                         return None;
                     }
                     Some(create_field_assignment_stmt(field.to_str(), value))

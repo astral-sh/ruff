@@ -1,11 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
-snapshot_kind: text
 ---
 invalid_envvar_value.py:3:11: PLE1507 Invalid type for initial `os.getenv` argument; expected `str`
   |
 1 | import os
-2 | 
+2 |
 3 | os.getenv(1)  # [invalid-envvar-value]
   |           ^ PLE1507
 4 | os.getenv("a")
@@ -48,6 +47,6 @@ invalid_envvar_value.py:14:11: PLE1507 Invalid type for initial `os.getenv` argu
 13 | os.getenv("PATH_TEST" if using_clear_path else "PATH_ORIG")
 14 | os.getenv(1 if using_clear_path else "PATH_ORIG")
    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLE1507
-15 | 
+15 |
 16 | AA = "aa"
    |
