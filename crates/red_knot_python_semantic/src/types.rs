@@ -2759,183 +2759,162 @@ impl<'db> Type<'db> {
                     }
                 }
 
-                Type::FunctionLiteral(function_type)
-                    if function_type.is_known(db, KnownFunction::IsEquivalentTo) =>
-                {
-                    if let [ty_a, ty_b] = overload.parameter_types() {
-                        overload.set_return_type(Type::BooleanLiteral(
-                            ty_a.is_equivalent_to(db, *ty_b),
-                        ));
-                    }
-                }
-
-                Type::FunctionLiteral(function_type)
-                    if function_type.is_known(db, KnownFunction::IsSubtypeOf) =>
-                {
-                    if let [ty_a, ty_b] = overload.parameter_types() {
-                        overload
-                            .set_return_type(Type::BooleanLiteral(ty_a.is_subtype_of(db, *ty_b)));
-                    }
-                }
-
-                Type::FunctionLiteral(function_type)
-                    if function_type.is_known(db, KnownFunction::IsAssignableTo) =>
-                {
-                    if let [ty_a, ty_b] = overload.parameter_types() {
-                        overload.set_return_type(Type::BooleanLiteral(
-                            ty_a.is_assignable_to(db, *ty_b),
-                        ));
-                    }
-                }
-
-                Type::FunctionLiteral(function_type)
-                    if function_type.is_known(db, KnownFunction::IsDisjointFrom) =>
-                {
-                    if let [ty_a, ty_b] = overload.parameter_types() {
-                        overload.set_return_type(Type::BooleanLiteral(
-                            ty_a.is_disjoint_from(db, *ty_b),
-                        ));
-                    }
-                }
-
-                Type::FunctionLiteral(function_type)
-                    if function_type.is_known(db, KnownFunction::IsGradualEquivalentTo) =>
-                {
-                    if let [ty_a, ty_b] = overload.parameter_types() {
-                        overload.set_return_type(Type::BooleanLiteral(
-                            ty_a.is_gradual_equivalent_to(db, *ty_b),
-                        ));
-                    }
-                }
-
-                Type::FunctionLiteral(function_type)
-                    if function_type.is_known(db, KnownFunction::IsFullyStatic) =>
-                {
-                    if let [ty] = overload.parameter_types() {
-                        overload.set_return_type(Type::BooleanLiteral(ty.is_fully_static(db)));
-                    }
-                }
-
-                Type::FunctionLiteral(function_type)
-                    if function_type.is_known(db, KnownFunction::IsSingleton) =>
-                {
-                    if let [ty] = overload.parameter_types() {
-                        overload.set_return_type(Type::BooleanLiteral(ty.is_singleton(db)));
-                    }
-                }
-
-                Type::FunctionLiteral(function_type)
-                    if function_type.is_known(db, KnownFunction::IsSingleValued) =>
-                {
-                    if let [ty] = overload.parameter_types() {
-                        overload.set_return_type(Type::BooleanLiteral(ty.is_single_valued(db)));
-                    }
-                }
-
-                Type::FunctionLiteral(function_type)
-                    if function_type.is_known(db, KnownFunction::Len) =>
-                {
-                    if let [first_arg] = overload.parameter_types() {
-                        if let Some(len_ty) = first_arg.len(db) {
-                            overload.set_return_type(len_ty);
+                Type::FunctionLiteral(function_type) => match function_type.known(db) {
+                    Some(KnownFunction::IsEquivalentTo) => {
+                        if let [ty_a, ty_b] = overload.parameter_types() {
+                            overload.set_return_type(Type::BooleanLiteral(
+                                ty_a.is_equivalent_to(db, *ty_b),
+                            ));
                         }
-                    };
-                }
+                    }
 
-                Type::FunctionLiteral(function_type)
-                    if function_type.is_known(db, KnownFunction::Repr) =>
-                {
-                    if let [first_arg] = overload.parameter_types() {
-                        overload.set_return_type(first_arg.repr(db));
-                    };
-                }
-
-                Type::FunctionLiteral(function_type)
-                    if function_type.is_known(db, KnownFunction::Cast) =>
-                {
-                    // TODO: Use `.parameter_types()` exclusively when overloads are supported.
-                    if let Some(casted_ty) = arguments.first_argument() {
-                        if let [_, _] = overload.parameter_types() {
-                            overload.set_return_type(casted_ty);
+                    Some(KnownFunction::IsSubtypeOf) => {
+                        if let [ty_a, ty_b] = overload.parameter_types() {
+                            overload.set_return_type(Type::BooleanLiteral(
+                                ty_a.is_subtype_of(db, *ty_b),
+                            ));
                         }
-                    };
-                }
+                    }
 
-                Type::FunctionLiteral(function_type)
-                    if function_type.is_known(db, KnownFunction::Overload) =>
-                {
-                    overload.set_return_type(todo_type!("overload(..) return type"));
-                }
+                    Some(KnownFunction::IsAssignableTo) => {
+                        if let [ty_a, ty_b] = overload.parameter_types() {
+                            overload.set_return_type(Type::BooleanLiteral(
+                                ty_a.is_assignable_to(db, *ty_b),
+                            ));
+                        }
+                    }
 
-                Type::FunctionLiteral(function_type)
-                    if function_type.is_known(db, KnownFunction::GetattrStatic) =>
-                {
-                    let [instance_ty, attr_name, default] = overload.parameter_types() else {
-                        continue;
-                    };
+                    Some(KnownFunction::IsDisjointFrom) => {
+                        if let [ty_a, ty_b] = overload.parameter_types() {
+                            overload.set_return_type(Type::BooleanLiteral(
+                                ty_a.is_disjoint_from(db, *ty_b),
+                            ));
+                        }
+                    }
 
-                    let Some(attr_name) = attr_name.into_string_literal() else {
-                        continue;
-                    };
+                    Some(KnownFunction::IsGradualEquivalentTo) => {
+                        if let [ty_a, ty_b] = overload.parameter_types() {
+                            overload.set_return_type(Type::BooleanLiteral(
+                                ty_a.is_gradual_equivalent_to(db, *ty_b),
+                            ));
+                        }
+                    }
 
-                    let default = if default.is_unknown() {
-                        Type::Never
-                    } else {
-                        *default
-                    };
+                    Some(KnownFunction::IsFullyStatic) => {
+                        if let [ty] = overload.parameter_types() {
+                            overload.set_return_type(Type::BooleanLiteral(ty.is_fully_static(db)));
+                        }
+                    }
 
-                    let union_with_default = |ty| UnionType::from_elements(db, [ty, default]);
+                    Some(KnownFunction::IsSingleton) => {
+                        if let [ty] = overload.parameter_types() {
+                            overload.set_return_type(Type::BooleanLiteral(ty.is_singleton(db)));
+                        }
+                    }
 
-                    // TODO: we could emit a diagnostic here (if default is not set)
-                    overload.set_return_type(
-                        match instance_ty.static_member(db, attr_name.value(db)) {
-                            Symbol::Type(ty, Boundness::Bound) => {
-                                if instance_ty.is_fully_static(db) {
-                                    ty
-                                } else {
-                                    // Here, we attempt to model the fact that an attribute lookup on
-                                    // a non-fully static type could fail. This is an approximation,
-                                    // as there are gradual types like `tuple[Any]`, on which a lookup
-                                    // of (e.g. of the `index` method) would always succeed.
+                    Some(KnownFunction::IsSingleValued) => {
+                        if let [ty] = overload.parameter_types() {
+                            overload.set_return_type(Type::BooleanLiteral(ty.is_single_valued(db)));
+                        }
+                    }
 
+                    Some(KnownFunction::Len) => {
+                        if let [first_arg] = overload.parameter_types() {
+                            if let Some(len_ty) = first_arg.len(db) {
+                                overload.set_return_type(len_ty);
+                            }
+                        };
+                    }
+
+                    Some(KnownFunction::Repr) => {
+                        if let [first_arg] = overload.parameter_types() {
+                            overload.set_return_type(first_arg.repr(db));
+                        };
+                    }
+
+                    Some(KnownFunction::Cast) => {
+                        // TODO: Use `.parameter_types()` exclusively when overloads are supported.
+                        if let Some(casted_ty) = arguments.first_argument() {
+                            if let [_, _] = overload.parameter_types() {
+                                overload.set_return_type(casted_ty);
+                            }
+                        };
+                    }
+
+                    Some(KnownFunction::Overload) => {
+                        overload.set_return_type(todo_type!("overload(..) return type"));
+                    }
+
+                    Some(KnownFunction::GetattrStatic) => {
+                        let [instance_ty, attr_name, default] = overload.parameter_types() else {
+                            continue;
+                        };
+
+                        let Some(attr_name) = attr_name.into_string_literal() else {
+                            continue;
+                        };
+
+                        let default = if default.is_unknown() {
+                            Type::Never
+                        } else {
+                            *default
+                        };
+
+                        let union_with_default = |ty| UnionType::from_elements(db, [ty, default]);
+
+                        // TODO: we could emit a diagnostic here (if default is not set)
+                        overload.set_return_type(
+                            match instance_ty.static_member(db, attr_name.value(db)) {
+                                Symbol::Type(ty, Boundness::Bound) => {
+                                    if instance_ty.is_fully_static(db) {
+                                        ty
+                                    } else {
+                                        // Here, we attempt to model the fact that an attribute lookup on
+                                        // a non-fully static type could fail. This is an approximation,
+                                        // as there are gradual types like `tuple[Any]`, on which a lookup
+                                        // of (e.g. of the `index` method) would always succeed.
+
+                                        union_with_default(ty)
+                                    }
+                                }
+                                Symbol::Type(ty, Boundness::PossiblyUnbound) => {
                                     union_with_default(ty)
                                 }
-                            }
-                            Symbol::Type(ty, Boundness::PossiblyUnbound) => union_with_default(ty),
-                            Symbol::Unbound => default,
-                        },
-                    );
-                }
-
-                Type::ClassLiteral(ClassLiteralType { class })
-                    if class.is_known(db, KnownClass::Bool) =>
-                {
-                    overload.set_return_type(
-                        arguments
-                            .first_argument()
-                            .map(|arg| arg.bool(db).into_type(db))
-                            .unwrap_or(Type::BooleanLiteral(false)),
-                    );
-                }
-
-                Type::ClassLiteral(ClassLiteralType { class })
-                    if class.is_known(db, KnownClass::Str) && overload_index == 0 =>
-                {
-                    overload.set_return_type(
-                        arguments
-                            .first_argument()
-                            .map(|arg| arg.str(db))
-                            .unwrap_or_else(|| Type::string_literal(db, "")),
-                    );
-                }
-
-                Type::ClassLiteral(ClassLiteralType { class })
-                    if class.is_known(db, KnownClass::Type) && overload_index == 0 =>
-                {
-                    if let Some(arg) = arguments.first_argument() {
-                        overload.set_return_type(arg.to_meta_type(db));
+                                Symbol::Unbound => default,
+                            },
+                        );
                     }
-                }
+
+                    _ => {}
+                },
+
+                Type::ClassLiteral(ClassLiteralType { class }) => match class.known(db) {
+                    Some(KnownClass::Bool) => {
+                        overload.set_return_type(
+                            arguments
+                                .first_argument()
+                                .map(|arg| arg.bool(db).into_type(db))
+                                .unwrap_or(Type::BooleanLiteral(false)),
+                        );
+                    }
+
+                    Some(KnownClass::Str) if overload_index == 0 => {
+                        overload.set_return_type(
+                            arguments
+                                .first_argument()
+                                .map(|arg| arg.str(db))
+                                .unwrap_or_else(|| Type::string_literal(db, "")),
+                        );
+                    }
+
+                    Some(KnownClass::Type) if overload_index == 0 => {
+                        if let Some(arg) = arguments.first_argument() {
+                            overload.set_return_type(arg.to_meta_type(db));
+                        }
+                    }
+
+                    _ => {}
+                },
 
                 // Not a special case
                 _ => {}
