@@ -348,8 +348,11 @@ reveal_type(C().y)  # revealed: Unknown | str
 
 ```py
 class ContextManager:
-    def __enter__(self) -> int | None: ...
-    def __exit__(self, exc_type, exc_value, traceback) -> None: ...
+    def __enter__(self) -> int | None:
+        return 1
+
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
+        pass
 
 class C:
     def __init__(self) -> None:
@@ -365,8 +368,11 @@ reveal_type(c_instance.x)  # revealed: Unknown | int | None
 
 ```py
 class ContextManager:
-    def __enter__(self) -> tuple[int | None, int]: ...
-    def __exit__(self, exc_type, exc_value, traceback) -> None: ...
+    def __enter__(self) -> tuple[int | None, int]:
+        return 1, 2
+
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
+        pass
 
 class C:
     def __init__(self) -> None:
@@ -802,7 +808,7 @@ def _(flag1: bool, flag2: bool):
     reveal_type(C5.attr1)  # revealed: Unknown | Literal["metaclass value", "class value"]
 ```
 
-## Union of attributes
+## Unions of attributes
 
 If the (meta)class is a union type or if the attribute on the (meta) class has a union type, we
 infer those union types accordingly:
@@ -812,77 +818,74 @@ def _(flag: bool):
     if flag:
         class C1:
             x = 1
+            y: int = 1
 
     else:
         class C1:
             x = 2
+            y: int | str = "b"
 
     reveal_type(C1.x)  # revealed: Unknown | Literal[1, 2]
+    reveal_type(C1.y)  # revealed: int | str
+
+    C1.y = 100
+    # error: [invalid-assignment] "Object of type `Literal["problematic"]` is not assignable to attribute `y` on type `Literal[C1, C1]`"
+    C1.y = "problematic"
 
     class C2:
         if flag:
             x = 3
+            y: int = 3
         else:
             x = 4
+            y: int | str = "d"
 
     reveal_type(C2.x)  # revealed: Unknown | Literal[3, 4]
+    reveal_type(C2.y)  # revealed: int | str
+
+    C2.y = 100
+    # error: [invalid-assignment] "Object of type `None` is not assignable to attribute `y` of type `int | str`"
+    C2.y = None
+    # TODO: should be an error, needs more sophisticated union handling in `validate_attribute_assignment`
+    C2.y = "problematic"
 
     if flag:
         class Meta3(type):
             x = 5
+            y: int = 5
 
     else:
         class Meta3(type):
             x = 6
+            y: int | str = "f"
 
     class C3(metaclass=Meta3): ...
     reveal_type(C3.x)  # revealed: Unknown | Literal[5, 6]
+    reveal_type(C3.y)  # revealed: int | str
+
+    C3.y = 100
+    # error: [invalid-assignment] "Object of type `None` is not assignable to attribute `y` of type `int | str`"
+    C3.y = None
+    # TODO: should be an error, needs more sophisticated union handling in `validate_attribute_assignment`
+    C3.y = "problematic"
 
     class Meta4(type):
         if flag:
             x = 7
+            y: int = 7
         else:
             x = 8
+            y: int | str = "h"
 
     class C4(metaclass=Meta4): ...
     reveal_type(C4.x)  # revealed: Unknown | Literal[7, 8]
-```
+    reveal_type(C4.y)  # revealed: int | str
 
-## Inherited class attributes
-
-### Basic
-
-```py
-class A:
-    X = "foo"
-
-class B(A): ...
-class C(B): ...
-
-reveal_type(C.X)  # revealed: Unknown | Literal["foo"]
-```
-
-### Multiple inheritance
-
-```py
-class O: ...
-
-class F(O):
-    X = 56
-
-class E(O):
-    X = 42
-
-class D(O): ...
-class C(D, F): ...
-class B(E, D): ...
-class A(B, C): ...
-
-# revealed: tuple[Literal[A], Literal[B], Literal[E], Literal[C], Literal[D], Literal[F], Literal[O], Literal[object]]
-reveal_type(A.__mro__)
-
-# `E` is earlier in the MRO than `F`, so we should use the type of `E.X`
-reveal_type(A.X)  # revealed: Unknown | Literal[42]
+    C4.y = 100
+    # error: [invalid-assignment] "Object of type `None` is not assignable to attribute `y` of type `int | str`"
+    C4.y = None
+    # TODO: should be an error, needs more sophisticated union handling in `validate_attribute_assignment`
+    C4.y = "problematic"
 ```
 
 ## Unions with possibly unbound paths
@@ -906,8 +909,14 @@ def _(flag1: bool, flag2: bool):
     # error: [possibly-unbound-attribute] "Attribute `x` on type `Literal[C1, C2, C3]` is possibly unbound"
     reveal_type(C.x)  # revealed: Unknown | Literal[1, 3]
 
+    # error: [invalid-assignment] "Object of type `Literal[100]` is not assignable to attribute `x` on type `Literal[C1, C2, C3]`"
+    C.x = 100
+
     # error: [possibly-unbound-attribute] "Attribute `x` on type `C1 | C2 | C3` is possibly unbound"
     reveal_type(C().x)  # revealed: Unknown | Literal[1, 3]
+
+    # error: [invalid-assignment] "Object of type `Literal[100]` is not assignable to attribute `x` on type `C1 | C2 | C3`"
+    C().x = 100
 ```
 
 ### Possibly-unbound within a class
@@ -932,10 +941,16 @@ def _(flag: bool, flag1: bool, flag2: bool):
     # error: [possibly-unbound-attribute] "Attribute `x` on type `Literal[C1, C2, C3]` is possibly unbound"
     reveal_type(C.x)  # revealed: Unknown | Literal[1, 2, 3]
 
+    # error: [possibly-unbound-attribute]
+    C.x = 100
+
     # Note: we might want to consider ignoring possibly-unbound diagnostics for instance attributes eventually,
     # see the "Possibly unbound/undeclared instance attribute" section below.
     # error: [possibly-unbound-attribute] "Attribute `x` on type `C1 | C2 | C3` is possibly unbound"
     reveal_type(C().x)  # revealed: Unknown | Literal[1, 2, 3]
+
+    # error: [possibly-unbound-attribute]
+    C().x = 100
 ```
 
 ### Possibly-unbound within gradual types
@@ -953,6 +968,9 @@ def _(flag: bool):
             x: int
 
     reveal_type(Derived().x)  # revealed: int | Any
+
+    Derived().x = 1
+    Derived().x = "a"
 ```
 
 ### Attribute possibly unbound on a subclass but not on a superclass
@@ -967,8 +985,10 @@ def _(flag: bool):
             x = 2
 
     reveal_type(Bar.x)  # revealed: Unknown | Literal[2, 1]
+    Bar.x = 3
 
     reveal_type(Bar().x)  # revealed: Unknown | Literal[2, 1]
+    Bar().x = 3
 ```
 
 ### Attribute possibly unbound on a subclass and on a superclass
@@ -987,7 +1007,13 @@ def _(flag: bool):
     reveal_type(Bar.x)  # revealed: Unknown | Literal[2, 1]
 
     # error: [possibly-unbound-attribute]
+    Bar.x = 3
+
+    # error: [possibly-unbound-attribute]
     reveal_type(Bar().x)  # revealed: Unknown | Literal[2, 1]
+
+    # error: [possibly-unbound-attribute]
+    Bar().x = 3
 ```
 
 ### Possibly unbound/undeclared instance attribute
@@ -1006,6 +1032,9 @@ def _(flag: bool):
 
     # error: [possibly-unbound-attribute]
     reveal_type(Foo().x)  # revealed: int | Unknown
+
+    # error: [possibly-unbound-attribute]
+    Foo().x = 1
 ```
 
 #### Possibly unbound
@@ -1020,9 +1049,229 @@ def _(flag: bool):
     # Emitting a diagnostic in a case like this is not something we support, and it's unclear
     # if we ever will (or want to)
     reveal_type(Foo().x)  # revealed: Unknown | Literal[1]
+
+    # Same here
+    Foo().x = 2
 ```
 
-### Attribute access on `Any`
+### Unions with all paths unbound
+
+If the symbol is unbound in all elements of the union, we detect that:
+
+```py
+def _(flag: bool):
+    class C1: ...
+    class C2: ...
+    C = C1 if flag else C2
+
+    # error: [unresolved-attribute] "Type `Literal[C1, C2]` has no attribute `x`"
+    reveal_type(C.x)  # revealed: Unknown
+
+    # TODO: This should ideally be a `unresolved-attribute` error. We need better union
+    # handling in `validate_attribute_assignment` for this.
+    # error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to attribute `x` on type `Literal[C1, C2]`"
+    C.x = 1
+```
+
+## Inherited class attributes
+
+### Basic
+
+```py
+class A:
+    X = "foo"
+
+class B(A): ...
+class C(B): ...
+
+reveal_type(C.X)  # revealed: Unknown | Literal["foo"]
+
+C.X = "bar"
+```
+
+### Multiple inheritance
+
+```py
+class O: ...
+
+class F(O):
+    X = 56
+
+class E(O):
+    X = 42
+
+class D(O): ...
+class C(D, F): ...
+class B(E, D): ...
+class A(B, C): ...
+
+# revealed: tuple[Literal[A], Literal[B], Literal[E], Literal[C], Literal[D], Literal[F], Literal[O], Literal[object]]
+reveal_type(A.__mro__)
+
+# `E` is earlier in the MRO than `F`, so we should use the type of `E.X`
+reveal_type(A.X)  # revealed: Unknown | Literal[42]
+
+A.X = 100
+```
+
+## Intersections of attributes
+
+### Attribute only available on one element
+
+```py
+from knot_extensions import Intersection
+
+class A:
+    x: int = 1
+
+class B: ...
+
+def _(a_and_b: Intersection[A, B]):
+    reveal_type(a_and_b.x)  # revealed: int
+
+    a_and_b.x = 2
+
+# Same for class objects
+def _(a_and_b: Intersection[type[A], type[B]]):
+    reveal_type(a_and_b.x)  # revealed: int
+
+    a_and_b.x = 2
+```
+
+### Attribute available on both elements
+
+```py
+from knot_extensions import Intersection
+
+class P: ...
+class Q: ...
+class R(P, Q): ...
+
+class A:
+    x: P = P()
+
+class B:
+    x: Q = Q()
+
+def _(a_and_b: Intersection[A, B]):
+    reveal_type(a_and_b.x)  # revealed: P & Q
+    a_and_b.x = R()
+
+# Same for class objects
+def _(a_and_b: Intersection[type[A], type[B]]):
+    reveal_type(a_and_b.x)  # revealed: P & Q
+    a_and_b.x = R()
+```
+
+### Possible unboundness
+
+```py
+from knot_extensions import Intersection
+
+class P: ...
+class Q: ...
+class R(P, Q): ...
+
+def _(flag: bool):
+    class A1:
+        if flag:
+            x: P = P()
+
+    class B1: ...
+
+    def inner1(a_and_b: Intersection[A1, B1]):
+        # error: [possibly-unbound-attribute]
+        reveal_type(a_and_b.x)  # revealed: P
+
+        # error: [possibly-unbound-attribute]
+        a_and_b.x = R()
+    # Same for class objects
+    def inner1_class(a_and_b: Intersection[type[A1], type[B1]]):
+        # error: [possibly-unbound-attribute]
+        reveal_type(a_and_b.x)  # revealed: P
+
+        # error: [possibly-unbound-attribute]
+        a_and_b.x = R()
+
+    class A2:
+        if flag:
+            x: P = P()
+
+    class B1:
+        x: Q = Q()
+
+    def inner2(a_and_b: Intersection[A2, B1]):
+        reveal_type(a_and_b.x)  # revealed: P & Q
+
+        # TODO: this should not be an error, we need better intersection
+        # handling in `validate_attribute_assignment` for this
+        # error: [possibly-unbound-attribute]
+        a_and_b.x = R()
+    # Same for class objects
+    def inner2_class(a_and_b: Intersection[type[A2], type[B1]]):
+        reveal_type(a_and_b.x)  # revealed: P & Q
+
+    class A3:
+        if flag:
+            x: P = P()
+
+    class B3:
+        if flag:
+            x: Q = Q()
+
+    def inner3(a_and_b: Intersection[A3, B3]):
+        # error: [possibly-unbound-attribute]
+        reveal_type(a_and_b.x)  # revealed: P & Q
+
+        # error: [possibly-unbound-attribute]
+        a_and_b.x = R()
+    # Same for class objects
+    def inner3_class(a_and_b: Intersection[type[A3], type[B3]]):
+        # error: [possibly-unbound-attribute]
+        reveal_type(a_and_b.x)  # revealed: P & Q
+
+        # error: [possibly-unbound-attribute]
+        a_and_b.x = R()
+
+    class A4: ...
+    class B4: ...
+
+    def inner4(a_and_b: Intersection[A4, B4]):
+        # error: [unresolved-attribute]
+        reveal_type(a_and_b.x)  # revealed: Unknown
+
+        # error: [invalid-assignment]
+        a_and_b.x = R()
+    # Same for class objects
+    def inner4_class(a_and_b: Intersection[type[A4], type[B4]]):
+        # error: [unresolved-attribute]
+        reveal_type(a_and_b.x)  # revealed: Unknown
+
+        # error: [invalid-assignment]
+        a_and_b.x = R()
+```
+
+### Intersection of implicit instance attributes
+
+```py
+from knot_extensions import Intersection
+
+class P: ...
+class Q: ...
+
+class A:
+    def __init__(self):
+        self.x: P = P()
+
+class B:
+    def __init__(self):
+        self.x: Q = Q()
+
+def _(a_and_b: Intersection[A, B]):
+    reveal_type(a_and_b.x)  # revealed: P & Q
+```
+
+## Attribute access on `Any`
 
 The union of the set of types that `Any` could materialise to is equivalent to `object`. It follows
 from this that attribute access on `Any` resolves to `Any` if the attribute does not exist on
@@ -1053,18 +1302,96 @@ reveal_type(C.__mro__)  # revealed: tuple[Literal[C], Literal[B], Any, Literal[A
 reveal_type(C.x)  # revealed: Literal[1] & Any
 ```
 
-### Unions with all paths unbound
+## Classes with custom `__getattr__` methods
 
-If the symbol is unbound in all elements of the union, we detect that:
+### Basic
+
+If a type provides a custom `__getattr__` method, we use the return type of that method as the type
+for unknown attributes. Consider the following `CustomGetAttr` class:
 
 ```py
-def _(flag: bool):
-    class C1: ...
-    class C2: ...
-    C = C1 if flag else C2
+from typing import Literal
 
-    # error: [unresolved-attribute] "Type `Literal[C1, C2]` has no attribute `x`"
-    reveal_type(C.x)  # revealed: Unknown
+def flag() -> bool:
+    return True
+
+class GetAttrReturnType: ...
+
+class CustomGetAttr:
+    class_attr: int = 1
+
+    if flag():
+        possibly_unbound: bytes = b"a"
+
+    def __init__(self) -> None:
+        self.instance_attr: str = "a"
+
+    def __getattr__(self, name: str) -> GetAttrReturnType:
+        return GetAttrReturnType()
+```
+
+We can access arbitrary attributes on instances of this class, and the type of the attribute will be
+`GetAttrReturnType`:
+
+```py
+c = CustomGetAttr()
+
+reveal_type(c.whatever)  # revealed: GetAttrReturnType
+```
+
+If an attribute is defined on the class, it takes precedence over the `__getattr__` method:
+
+```py
+reveal_type(c.class_attr)  # revealed: int
+```
+
+If the class attribute is possibly unbound, we union the type of the attribute with the fallback
+type of the `__getattr__` method:
+
+```py
+reveal_type(c.possibly_unbound)  # revealed: bytes | GetAttrReturnType
+```
+
+Instance attributes also take precedence over the `__getattr__` method:
+
+```py
+# Note: we could attempt to union with the fallback type of `__getattr__` here, as we currently do not
+# attempt to determine if instance attributes are always bound or not. Neither mypy nor pyright do this,
+# so it's not a priority.
+reveal_type(c.instance_attr)  # revealed: str
+```
+
+### Type of the `name` parameter
+
+If the `name` parameter of the `__getattr__` method is annotated with a (union of) literal type(s),
+we only consider the attribute access to be valid if the accessed attribute is one of them:
+
+```py
+from typing import Literal
+
+class Date:
+    def __getattr__(self, name: Literal["day", "month", "year"]) -> int:
+        return 0
+
+date = Date()
+
+reveal_type(date.day)  # revealed: int
+reveal_type(date.month)  # revealed: int
+reveal_type(date.year)  # revealed: int
+
+# error: [unresolved-attribute] "Type `Date` has no attribute `century`"
+reveal_type(date.century)  # revealed: Unknown
+```
+
+### `argparse.Namespace`
+
+A standard library example of a class with a custom `__getattr__` method is `argparse.Namespace`:
+
+```py
+import argparse
+
+def _(ns: argparse.Namespace):
+    reveal_type(ns.whatever)  # revealed: Any
 ```
 
 ## Objects of all types have a `__class__` method
@@ -1119,6 +1446,8 @@ reveal_type(Foo.__class__)  # revealed: Literal[type]
 
 ## Module attributes
 
+### Basic
+
 `mod.py`:
 
 ```py
@@ -1153,7 +1482,7 @@ for mod.global_symbol in IntIterable():
     pass
 ```
 
-## Nested attributes
+### Nested module attributes
 
 `outer/__init__.py`:
 

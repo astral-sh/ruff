@@ -84,7 +84,7 @@ fn create_bound_method<'db>(
     Type::Callable(CallableType::BoundMethod(BoundMethodType::new(
         db,
         function.expect_function_literal(),
-        builtins_class.to_instance(db),
+        builtins_class.to_instance(db).unwrap(),
     )))
 }
 
@@ -100,11 +100,16 @@ impl Ty {
             Ty::BooleanLiteral(b) => Type::BooleanLiteral(b),
             Ty::LiteralString => Type::LiteralString,
             Ty::BytesLiteral(s) => Type::bytes_literal(db, s.as_bytes()),
-            Ty::BuiltinInstance(s) => builtins_symbol(db, s).symbol.expect_type().to_instance(db),
+            Ty::BuiltinInstance(s) => builtins_symbol(db, s)
+                .symbol
+                .expect_type()
+                .to_instance(db)
+                .unwrap(),
             Ty::AbcInstance(s) => known_module_symbol(db, KnownModule::Abc, s)
                 .symbol
                 .expect_type()
-                .to_instance(db),
+                .to_instance(db)
+                .unwrap(),
             Ty::AbcClassLiteral(s) => known_module_symbol(db, KnownModule::Abc, s)
                 .symbol
                 .expect_type(),

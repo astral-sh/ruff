@@ -164,7 +164,7 @@ impl<'db> Signature<'db> {
     fn display(&'db self, db: &'db dyn Db) -> DisplaySignature<'db> {
         DisplaySignature {
             parameters: self.parameters(),
-            return_ty: self.return_ty.as_ref(),
+            return_ty: self.return_ty,
             db,
         }
     }
@@ -172,7 +172,7 @@ impl<'db> Signature<'db> {
 
 struct DisplaySignature<'db> {
     parameters: &'db Parameters<'db>,
-    return_ty: Option<&'db Type<'db>>,
+    return_ty: Option<Type<'db>>,
     db: &'db dyn Db,
 }
 
@@ -211,7 +211,7 @@ impl Display for DisplaySignature<'_> {
         write!(
             f,
             ") -> {}",
-            self.return_ty.unwrap_or(&Type::unknown()).display(self.db)
+            self.return_ty.unwrap_or(Type::unknown()).display(self.db)
         )?;
 
         Ok(())

@@ -2659,7 +2659,7 @@ dependencies = [
 
 [[package]]
 name = "ruff"
-version = "0.9.10"
+version = "0.10.0"
 dependencies = [
  "anyhow",
  "argfile",
@@ -2894,7 +2894,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_linter"
-version = "0.9.10"
+version = "0.10.0"
 dependencies = [
  "aho-corasick",
  "anyhow",
@@ -3192,6 +3192,7 @@ dependencies = [
  "thiserror 2.0.12",
  "toml",
  "tracing",
+ "tracing-log",
  "tracing-subscriber",
 ]
 
@@ -3216,7 +3217,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_wasm"
-version = "0.9.10"
+version = "0.10.0"
 dependencies = [
  "console_error_panic_hook",
  "console_log",
@@ -3327,8 +3328,8 @@ checksum = "6ea1a2d0a644769cc99faa24c3ad26b379b786fe7c36fd3c546254801650e6dd"
 
 [[package]]
 name = "salsa"
-version = "0.18.0"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=99be5d9917c3dd88e19735a82ef6bf39ba84bd7e#99be5d9917c3dd88e19735a82ef6bf39ba84bd7e"
+version = "0.19.0"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=095d8b2b8115c3cf8bf31914dd9ea74648bb7cf9#095d8b2b8115c3cf8bf31914dd9ea74648bb7cf9"
 dependencies = [
  "boxcar",
  "compact_str",
@@ -3338,6 +3339,7 @@ dependencies = [
  "hashlink",
  "indexmap",
  "parking_lot",
+ "portable-atomic",
  "rayon",
  "rustc-hash 2.1.1",
  "salsa-macro-rules",
@@ -3348,13 +3350,13 @@ dependencies = [
 
 [[package]]
 name = "salsa-macro-rules"
-version = "0.1.0"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=99be5d9917c3dd88e19735a82ef6bf39ba84bd7e#99be5d9917c3dd88e19735a82ef6bf39ba84bd7e"
+version = "0.19.0"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=095d8b2b8115c3cf8bf31914dd9ea74648bb7cf9#095d8b2b8115c3cf8bf31914dd9ea74648bb7cf9"
 
 [[package]]
 name = "salsa-macros"
-version = "0.18.0"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=99be5d9917c3dd88e19735a82ef6bf39ba84bd7e#99be5d9917c3dd88e19735a82ef6bf39ba84bd7e"
+version = "0.19.0"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=095d8b2b8115c3cf8bf31914dd9ea74648bb7cf9#095d8b2b8115c3cf8bf31914dd9ea74648bb7cf9"
 dependencies = [
  "heck",
  "proc-macro2",

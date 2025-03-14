@@ -162,6 +162,8 @@ class Sub(Base[Sub]): ...
 reveal_type(Sub)  # revealed: Literal[Sub]
 ```
 
+A similar case can work in a non-stub file, if forward references are stringified:
+
 `string_annotation.py`:
 
 ```py
@@ -174,13 +176,24 @@ class Sub(Base["Sub"]): ...
 reveal_type(Sub)  # revealed: Literal[Sub]
 ```
 
+In a non-stub file, without stringified forward references, this raises a `NameError`:
+
 `bare_annotation.py`:
 
 ```py
 class Base[T]: ...
 
 # TODO: error: [unresolved-reference]
+# error: [non-subscriptable]
 class Sub(Base[Sub]): ...
+```
+
+## Another cyclic case
+
+```pyi
+# TODO no error (generics)
+# error: [invalid-base]
+class Derived[T](list[Derived[T]]): ...
 ```
 
 [crtp]: https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern

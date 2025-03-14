@@ -49,5 +49,5 @@ def _(m: int, n: int):
 def _(s: bytes) -> bytes:
     byte_slice2 = s[0:5]
     # TODO: Support overloads... Should be `bytes`
-    reveal_type(byte_slice2)  # revealed: @Todo(return type of decorated function)
+    return reveal_type(byte_slice2)  # revealed: @Todo(return type of decorated function)
 ```

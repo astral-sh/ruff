@@ -397,3 +397,42 @@ def type_of_annotation() -> None:
 # error: "Special form `knot_extensions.TypeOf` expected exactly one type parameter"
 t: TypeOf[int, str, bytes]
 ```
+
+## `CallableTypeFromFunction`
+
+The `CallableTypeFromFunction` special form can be used to extract the type of a function literal as
+a callable type. This can be used to get the externally-visibly signature of the function, which can
+then be used to test various type properties.
+
+It accepts a single type parameter which is expected to be a function literal.
+
+```py
+from knot_extensions import CallableTypeFromFunction
+
+def f1():
+    return
+
+def f2() -> int:
+    return 1
+
+def f3(x: int, y: str) -> None:
+    return
+
+# error: [invalid-type-form] "Special form `knot_extensions.CallableTypeFromFunction` expected exactly one type parameter"
+c1: CallableTypeFromFunction[f1, f2]
+# error: [invalid-type-form] "Expected the first argument to `knot_extensions.CallableTypeFromFunction` to be a function literal, but got `Literal[int]`"
+c2: CallableTypeFromFunction[int]
+```
+
+Using it in annotation to reveal the signature of the function:
+
+```py
+def _(
+    c1: CallableTypeFromFunction[f1],
+    c2: CallableTypeFromFunction[f2],
+    c3: CallableTypeFromFunction[f3],
+) -> None:
+    reveal_type(c1)  # revealed: () -> Unknown
+    reveal_type(c2)  # revealed: () -> int
+    reveal_type(c3)  # revealed: (x: int, y: str) -> None
+```

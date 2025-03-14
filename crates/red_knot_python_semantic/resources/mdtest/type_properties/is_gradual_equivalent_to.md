@@ -62,4 +62,67 @@ static_assert(not is_gradual_equivalent_to(tuple[str, int], tuple[str, int, byte
 static_assert(not is_gradual_equivalent_to(tuple[str, int], tuple[int, str]))
 ```
 
+## Callable
+
+```py
+from knot_extensions import Unknown, CallableTypeFromFunction, is_gradual_equivalent_to, static_assert
+from typing import Any, Callable
+
+static_assert(is_gradual_equivalent_to(Callable[..., int], Callable[..., int]))
+static_assert(is_gradual_equivalent_to(Callable[..., Any], Callable[..., Unknown]))
+static_assert(is_gradual_equivalent_to(Callable[[int, Any], None], Callable[[int, Unknown], None]))
+
+static_assert(not is_gradual_equivalent_to(Callable[[int, Any], None], Callable[[Any, int], None]))
+static_assert(not is_gradual_equivalent_to(Callable[[int, str], None], Callable[[int, str, bytes], None]))
+static_assert(not is_gradual_equivalent_to(Callable[..., None], Callable[[], None]))
+```
+
+A function with no explicit return type should be gradual equivalent to a callable with a return
+type of `Any`.
+
+```py
+def f1():
+    return
+
+static_assert(is_gradual_equivalent_to(CallableTypeFromFunction[f1], Callable[[], Any]))
+```
+
+And, similarly for parameters with no annotations.
+
+```py
+def f2(a, b) -> None:
+    return
+
+static_assert(is_gradual_equivalent_to(CallableTypeFromFunction[f2], Callable[[Any, Any], None]))
+```
+
+Additionally, as per the spec, a function definition that includes both `*args` and `**kwargs`
+parameter that are annotated as `Any` or kept unannotated should be gradual equivalent to a callable
+with `...` as the parameter type.
+
+```py
+def variadic_without_annotation(*args, **kwargs):
+    return
+
+def variadic_with_annotation(*args: Any, **kwargs: Any) -> Any:
+    return
+
+static_assert(is_gradual_equivalent_to(CallableTypeFromFunction[variadic_without_annotation], Callable[..., Any]))
+static_assert(is_gradual_equivalent_to(CallableTypeFromFunction[variadic_with_annotation], Callable[..., Any]))
+```
+
+But, a function with either `*args` or `**kwargs` is not gradual equivalent to a callable with `...`
+as the parameter type.
+
+```py
+def variadic_args(*args):
+    return
+
+def variadic_kwargs(**kwargs):
+    return
+
+static_assert(not is_gradual_equivalent_to(CallableTypeFromFunction[variadic_args], Callable[..., Any]))
+static_assert(not is_gradual_equivalent_to(CallableTypeFromFunction[variadic_kwargs], Callable[..., Any]))
+```
+
 [materializations]: https://typing.readthedocs.io/en/latest/spec/glossary.html#term-materialize

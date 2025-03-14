@@ -16,10 +16,10 @@ mod tests {
     use crate::registry::Rule;
     use crate::rules::{flake8_tidy_imports, pylint};
 
+    use crate::assert_messages;
     use crate::settings::types::PreviewMode;
     use crate::settings::LinterSettings;
     use crate::test::test_path;
-    use crate::{assert_messages, settings};
 
     #[test_case(Rule::SingledispatchMethod, Path::new("singledispatch_method.py"))]
     #[test_case(
@@ -438,33 +438,6 @@ mod tests {
             },
         )?;
         assert_messages!(diagnostics);
-        Ok(())
-    }
-
-    #[test_case(
-        Rule::RepeatedEqualityComparison,
-        Path::new("repeated_equality_comparison.py")
-    )]
-    #[test_case(Rule::InvalidEnvvarDefault, Path::new("invalid_envvar_default.py"))]
-    #[test_case(Rule::BadStrStripCall, Path::new("bad_str_strip_call.py"))]
-    #[test_case(
-        Rule::BadStaticmethodArgument,
-        Path::new("bad_staticmethod_argument.py")
-    )]
-    fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!(
-            "preview__{}_{}",
-            rule_code.noqa_code(),
-            path.to_string_lossy()
-        );
-        let diagnostics = test_path(
-            Path::new("pylint").join(path).as_path(),
-            &settings::LinterSettings {
-                preview: PreviewMode::Enabled,
-                ..settings::LinterSettings::for_rule(rule_code)
-            },
-        )?;
-        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 }
