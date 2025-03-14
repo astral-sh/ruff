@@ -4633,6 +4633,20 @@ impl<'db> TypeInferenceBuilder<'db> {
                 self.infer_binary_expression_type(left, Type::IntLiteral(i64::from(bool_value)), op)
             }
 
+            (Type::Tuple(lhs), Type::Tuple(rhs), ast::Operator::Add) => {
+                // Note: this only works on heterogeneous tuples.
+                let lhs_elements = lhs.elements(self.db());
+                let rhs_elements = rhs.elements(self.db());
+
+                Some(TupleType::from_elements(
+                    self.db(),
+                    lhs_elements
+                        .iter()
+                        .copied()
+                        .chain(rhs_elements.iter().copied()),
+                ))
+            }
+
             // We've handled all of the special cases that we support for literals, so we need to
             // fall back on looking for dunder methods on one of the operand types.
             (
