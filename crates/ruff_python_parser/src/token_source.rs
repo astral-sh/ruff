@@ -3,7 +3,7 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 use crate::error::LexicalError;
 use crate::lexer::{Lexer, LexerCheckpoint};
 use crate::token::{Token, TokenFlags, TokenKind, TokenValue};
-use crate::Mode;
+use crate::{Mode, Tokens};
 
 /// Token source for the parser that skips over any trivia tokens.
 #[derive(Debug)]
@@ -14,7 +14,7 @@ pub(crate) struct TokenSource<'src> {
     /// A vector containing all the tokens emitted by the lexer. This is returned when the parser
     /// is finished consuming all the tokens. Note that unlike the emitted tokens, this vector
     /// holds both the trivia and non-trivia tokens.
-    pub(crate) tokens: Vec<Token>,
+    tokens: Vec<Token>,
 }
 
 impl<'src> TokenSource<'src> {
@@ -164,6 +164,13 @@ impl<'src> TokenSource<'src> {
 
         self.lexer.rewind(lexer_checkpoint);
         self.tokens.truncate(tokens_position);
+    }
+
+    /// Returns a slice of [`Token`] that are within the given `range`.
+    ///
+    /// See [`crate::Tokens::in_range`] for details.
+    pub(crate) fn in_range(&self, range: TextRange) -> &[Token] {
+        Tokens::in_range_impl(&self.tokens, range)
     }
 
     /// Consumes the token source, returning the collected tokens, comment ranges, and any errors
