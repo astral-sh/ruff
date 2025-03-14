@@ -2328,12 +2328,22 @@ impl<'db> Type<'db> {
     /// elements. It's usually best to only worry about "callability" relative to a particular
     /// argument list, via [`try_call`] and [`CallErrorKind::NotCallable`].
     #[salsa::tracked(return_ref)]
-    fn signatures(self, db: &'db dyn Db, callable_ty: Type<'db>) -> Signatures<'db> {
+    fn signatures(
+        self,
+        db: &'db dyn Db,
+        callable_ty: Type<'db>,
+        dunder_call_boundness: Option<Boundness>,
+    ) -> Signatures<'db> {
         match self {
             Type::Callable(CallableType::BoundMethod(bound_method)) => {
                 let signature = bound_method.function(db).signature(db);
-                let mut signature = CallableSignature::new(callable_ty, self, signature.clone());
-                signature.bound_type = Some(bound_method.self_instance(db));
+                let signature = CallableSignature::new(
+                    callable_ty,
+                    self,
+                    dunder_call_boundness,
+                    Some(bound_method.self_instance(db)),
+                    signature.clone(),
+                );
                 Signatures::single(signature)
             }
 
@@ -2355,6 +2365,8 @@ impl<'db> Type<'db> {
                 let signature = CallableSignature::from_overloads(
                     callable_ty,
                     self,
+                    dunder_call_boundness,
+                    None,
                     [
                         Signature::new(
                             Parameters::new([
@@ -2407,6 +2419,8 @@ impl<'db> Type<'db> {
                 let signature = CallableSignature::from_overloads(
                     callable_ty,
                     self,
+                    dunder_call_boundness,
+                    None,
                     [
                         Signature::new(
                             Parameters::new([
@@ -2461,6 +2475,8 @@ impl<'db> Type<'db> {
             Type::FunctionLiteral(function_type) => Signatures::single(CallableSignature::new(
                 callable_ty,
                 self,
+                dunder_call_boundness,
+                None,
                 function_type.signature(db).clone(),
             )),
 
@@ -2474,6 +2490,8 @@ impl<'db> Type<'db> {
                 let signature = CallableSignature::new(
                     callable_ty,
                     self,
+                    dunder_call_boundness,
+                    None,
                     Signature::new(
                         Parameters::new([Parameter::new(
                             Some(Name::new_static("o")),
@@ -2501,6 +2519,8 @@ impl<'db> Type<'db> {
                 let signature = CallableSignature::from_overloads(
                     callable_ty,
                     self,
+                    dunder_call_boundness,
+                    None,
                     [
                         Signature::new(
                             Parameters::new([Parameter::new(
@@ -2550,6 +2570,8 @@ impl<'db> Type<'db> {
                 let signature = CallableSignature::from_overloads(
                     callable_ty,
                     self,
+                    dunder_call_boundness,
+                    None,
                     [
                         Signature::new(
                             Parameters::new([Parameter::new(
@@ -2590,6 +2612,8 @@ impl<'db> Type<'db> {
                 let signature = CallableSignature::new(
                     callable_ty,
                     self,
+                    dunder_call_boundness,
+                    None,
                     Signature::new(Parameters::gradual_form(), self.to_instance(db)),
                 );
                 Signatures::single(signature)
@@ -2597,10 +2621,10 @@ impl<'db> Type<'db> {
 
             Type::SubclassOf(subclass_of_type) => match subclass_of_type.subclass_of() {
                 ClassBase::Dynamic(dynamic_type) => Type::Dynamic(dynamic_type)
-                    .signatures(db, callable_ty)
+                    .signatures(db, callable_ty, dunder_call_boundness)
                     .clone(),
                 ClassBase::Class(class) => Type::class_literal(class)
-                    .signatures(db, callable_ty)
+                    .signatures(db, callable_ty, dunder_call_boundness)
                     .clone(),
             },
 
@@ -2609,35 +2633,46 @@ impl<'db> Type<'db> {
                 // signature of the dunder method, but will pass in the type of the object as the
                 // "callable type". That ensures that we get errors like "`X` is not callable"
                 // instead of "`<type of illegal '__call__'>` is not callable".
-                let Some((signatures, boundness)) =
-                    self.dunder_signature(db, Some(callable_ty), "__call__")
-                else {
-                    return Signatures::not_callable(callable_ty, self);
-                };
-                let mut signatures = signatures.clone();
-                signatures.set_dunder_call_boundness(boundness);
-                signatures
+                match self
+                    .member_lookup_with_policy(
+                        db,
+                        Name::new_static("__call__"),
+                        MemberLookupPolicy::NoInstanceFallback,
+                    )
+                    .symbol
+                {
+                    Symbol::Type(dunder_callable, boundness) => dunder_callable
+                        .signatures(db, callable_ty, Some(boundness))
+                        .clone(),
+                    Symbol::Unbound => {
+                        Signatures::not_callable(callable_ty, self, dunder_call_boundness)
+                    }
+                }
             }
 
             // Dynamic types are callable, and the return type is the same dynamic type. Similarly,
             // `Never` is always callable and returns `Never`.
-            Type::Dynamic(_) | Type::Never => Signatures::single(CallableSignature::dynamic(self)),
+            Type::Dynamic(_) | Type::Never => {
+                Signatures::single(CallableSignature::dynamic(self, dunder_call_boundness))
+            }
 
             // Note that this correctly returns `None` if none of the union elements are callable.
             Type::Union(union) => Signatures::from_union(
                 callable_ty,
                 self,
-                union
-                    .elements(db)
-                    .iter()
-                    .map(|element| element.signatures(db, *element).clone()),
+                union.elements(db).iter().map(|element| {
+                    element
+                        .signatures(db, *element, dunder_call_boundness)
+                        .clone()
+                }),
             ),
 
-            Type::Intersection(_) => {
-                Signatures::single(CallableSignature::todo("Type::Intersection.call()"))
-            }
+            Type::Intersection(_) => Signatures::single(CallableSignature::todo(
+                "Type::Intersection.call()",
+                dunder_call_boundness,
+            )),
 
-            _ => Signatures::not_callable(callable_ty, self),
+            _ => Signatures::not_callable(callable_ty, self, dunder_call_boundness),
         }
     }
 
@@ -2651,7 +2686,7 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         arguments: &CallArguments<'_, 'db>,
     ) -> Result<Bindings<'db>, CallError<'db>> {
-        let signatures = self.signatures(db, self);
+        let signatures = self.signatures(db, self, None);
         let mut bindings = Bindings::bind(db, signatures, arguments).into_result()?;
         for binding in bindings.bindings_mut() {
             // For certain known callables, we have special case logic to determine the return type
@@ -2951,26 +2986,6 @@ impl<'db> Type<'db> {
         Ok(bindings)
     }
 
-    /// Looks up a dunder method on the meta-type of `self` and returns its signature and
-    /// boundness. Returns `None` if the meta-type does not contain the dunder method.
-    fn dunder_signature(
-        self,
-        db: &'db dyn Db,
-        callable_ty: Option<Type<'db>>,
-        name: &str,
-    ) -> Option<(&'db Signatures<'db>, Boundness)> {
-        match self
-            .member_lookup_with_policy(db, name.into(), MemberLookupPolicy::NoInstanceFallback)
-            .symbol
-        {
-            Symbol::Type(dunder_callable, boundness) => {
-                let callable_ty = callable_ty.unwrap_or(dunder_callable);
-                Some((dunder_callable.signatures(db, callable_ty), boundness))
-            }
-            Symbol::Unbound => None,
-        }
-    }
-
     /// Look up a dunder method on the meta-type of `self` and call it.
     ///
     /// Returns an `Err` if the dunder method can't be called,
@@ -2981,14 +2996,20 @@ impl<'db> Type<'db> {
         name: &str,
         arguments: &CallArguments<'_, 'db>,
     ) -> Result<Bindings<'db>, CallDunderError<'db>> {
-        let Some((signature, boundness)) = self.dunder_signature(db, None, name) else {
-            return Err(CallDunderError::MethodNotAvailable);
-        };
-        let bindings = Bindings::bind(db, signature, arguments).into_result()?;
-        if boundness == Boundness::PossiblyUnbound {
-            return Err(CallDunderError::PossiblyUnbound(Box::new(bindings)));
+        match self
+            .member_lookup_with_policy(db, name.into(), MemberLookupPolicy::NoInstanceFallback)
+            .symbol
+        {
+            Symbol::Type(dunder_callable, boundness) => {
+                let signatures = dunder_callable.signatures(db, dunder_callable, None);
+                let bindings = Bindings::bind(db, signatures, arguments).into_result()?;
+                if boundness == Boundness::PossiblyUnbound {
+                    return Err(CallDunderError::PossiblyUnbound(Box::new(bindings)));
+                }
+                Ok(bindings)
+            }
+            Symbol::Unbound => Err(CallDunderError::MethodNotAvailable),
         }
-        Ok(bindings)
     }
 
     /// Returns the element type when iterating over `self`.
