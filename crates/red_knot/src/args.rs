@@ -75,6 +75,10 @@ pub(crate) struct CheckCommand {
     #[clap(flatten)]
     pub(crate) rules: RulesArg,
 
+    /// The format to use for printing diagnostic messages.
+    #[arg(long)]
+    pub(crate) output_format: Option<OutputFormat>,
+
     /// Use exit code 1 if there are any warning-level diagnostics.
     #[arg(long, conflicts_with = "exit_zero", default_missing_value = "true", num_args=0..1)]
     pub(crate) error_on_warning: Option<bool>,
@@ -117,6 +121,9 @@ impl CheckCommand {
                 ..EnvironmentOptions::default()
             }),
             terminal: Some(TerminalOptions {
+                output_format: self
+                    .output_format
+                    .map(|output_format| RangedValue::cli(output_format.into())),
                 error_on_warning: self.error_on_warning,
             }),
             rules,
@@ -209,5 +216,34 @@ impl clap::Args for RulesArg {
 
     fn augment_args_for_update(cmd: clap::Command) -> clap::Command {
         Self::augment_args(cmd)
+    }
+}
+
+/// The diagnostic output format.
+#[derive(Copy, Clone, Hash, Debug, PartialEq, Eq, PartialOrd, Ord, Default, clap::ValueEnum)]
+pub enum OutputFormat {
+    /// Print diagnostics verbosely, with context and helpful hints.
+    ///
+    /// Diagnostic messages may include additional context and
+    /// annotations on the input to help understand the message.
+    #[default]
+    #[value(name = "full")]
+    Full,
+    /// Print diagnostics concisely, one per line.
+    ///
+    /// This will guarantee that each diagnostic is printed on
+    /// a single line. Only the most important or primary aspects
+    /// of the diagnostic are included. Contextual information is
+    /// dropped.
+    #[value(name = "concise")]
+    Concise,
+}
+
+impl From<OutputFormat> for ruff_db::diagnostic::DiagnosticFormat {
+    fn from(format: OutputFormat) -> ruff_db::diagnostic::DiagnosticFormat {
+        match format {
+            OutputFormat::Full => Self::Full,
+            OutputFormat::Concise => Self::Concise,
+        }
     }
 }

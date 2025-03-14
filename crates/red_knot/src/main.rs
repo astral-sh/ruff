@@ -256,6 +256,7 @@ impl MainLoop {
                     revision: check_revision,
                 } => {
                     let display_config = DisplayDiagnosticConfig::default()
+                        .format(db.project().settings(db).terminal().output_format)
                         .color(colored::control::SHOULD_COLORIZE.should_colorize());
 
                     let min_error_severity =
