@@ -17,7 +17,9 @@ use crate::parser::{helpers, FunctionKind, Parser};
 use crate::string::{parse_fstring_literal_element, parse_string_literal, StringType};
 use crate::token::{TokenKind, TokenValue};
 use crate::token_set::TokenSet;
-use crate::{FStringErrorType, Mode, ParseErrorType, UnsupportedSyntaxErrorKind};
+use crate::{
+    FStringErrorType, Mode, ParseErrorType, UnsupportedSyntaxError, UnsupportedSyntaxErrorKind,
+};
 
 use super::{FStringElementsKind, Parenthesized, RecoveryContextKind};
 
@@ -1390,12 +1392,7 @@ impl<'src> Parser<'src> {
                 };
             }
 
-            if let Some(comment_range) = helpers::check_f_string_comments(&self.tokens.tokens) {
-                self.add_unsupported_syntax_error(
-                    UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::Comment),
-                    comment_range,
-                );
-            }
+            self.check_fstring_comments(self.node_range(start));
         }
 
         ast::FString {
@@ -1403,6 +1400,38 @@ impl<'src> Parser<'src> {
             range: self.node_range(start),
             flags: ast::FStringFlags::from(flags),
         }
+    }
+
+    fn check_fstring_comments(&mut self, fstring_range: TextRange) {
+        let tokens = self.tokens.in_range(fstring_range);
+        // stack to check nested f-string status
+        let mut f_strings = Vec::new();
+        let mut errors = Vec::new();
+        for token in tokens.iter().rev() {
+            match token.kind() {
+                TokenKind::FStringEnd => {
+                    f_strings.push(());
+                }
+                TokenKind::FStringStart if f_strings.len() <= 1 => {
+                    // Either at the end of the outermost f-string or encountering some kind of
+                    // invalid f-string
+                    break;
+                }
+                TokenKind::FStringStart => {
+                    f_strings.pop();
+                }
+                TokenKind::Comment if !f_strings.is_empty() => {
+                    errors.push(UnsupportedSyntaxError {
+                        kind: UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::Comment),
+                        range: token.range(),
+                        target_version: self.options.target_version,
+                    });
+                }
+                _ => {}
+            }
+        }
+
+        self.unsupported_syntax_errors.extend(errors);
     }
 
     /// Parses a list of f-string elements.
