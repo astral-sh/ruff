@@ -2,7 +2,7 @@
 
 ## 0.11.0
 
-This is largely a follow-up release to Ruff 0.10.0 because we accidentally didn't include the new `requires-python` inference changes. Ruff 0.11.0 now includes this change as well as the stabilization of `PGH004`'s preview behavior
+This is a follow-up to release 0.10.0. Because of a mistake in the release process, the `requires-python` inference changes were not included in that release. Ruff 0.11.0 now includes this change as well as the stabilization of the preview behavior for `PGH004`.
 
 ### Breaking changes
 
@@ -47,26 +47,8 @@ See also, the "Remapped rules" section which may result in disabled rules.
 
 - **Changes to how the Python version is inferred when a `target-version` is not specified** ([#16319](https://github.com/astral-sh/ruff/pull/16319))
 
-    > Note: Because of a mistake in the release process, the `requires-python` inference changes are not included in this release and instead shipped as part of 0.11.0.
-
-    In previous versions of Ruff, you could specify your Python version with:
-
-    - The `target-version` option in a `ruff.toml` file or the `[tool.ruff]` section of a pyproject.toml file.
-    - The `project.requires-python` field in a `pyproject.toml` file with a `[tool.ruff]` section.
-
-    These options worked well in most cases, and are still recommended for fine control of the Python version. However, because of the way Ruff discovers config files, `pyproject.toml` files without a `[tool.ruff]` section would be ignored, including the `requires-python` setting. Ruff would then use the default Python version (3.9 as of this writing) instead, which is surprising when you've attempted to request another version.
-
-    In v0.10, config discovery has been updated to address this issue:
-
-    - If Ruff finds a `ruff.toml` file without a `target-version`, it will check
-        for a `pyproject.toml` file in the same directory and respect its
-        `requires-python` version, even if it does not contain a `[tool.ruff]`
-        section.
-    - If Ruff finds a user-level configuration, the `requires-python` field of the closest `pyproject.toml` in a parent directory will take precedence.
-    - If there is no config file (`ruff.toml`or `pyproject.toml` with a
-        `[tool.ruff]` section) in the directory of the file being checked, Ruff will
-        search for the closest `pyproject.toml` in the parent directories and use its
-        `requires-python` setting.
+    Because of a mistake in the release process, the `requires-python` inference changes are not included in this release and instead shipped as part of 0.11.0.
+    You can find a description of this change in the 0.11.0 section.
 
 - **Updated `TYPE_CHECKING` behavior** ([#16669](https://github.com/astral-sh/ruff/pull/16669))
 
@@ -125,7 +107,6 @@ The following behaviors have been stabilized:
 
 - [`bad-staticmethod-argument`](https://docs.astral.sh/ruff/rules/bad-staticmethod-argument/) (`PLW0211`) [`invalid-first-argument-name-for-class-method`](https://docs.astral.sh/ruff/rules/invalid-first-argument-name-for-class-method/) (`N804`): `__new__` methods are now no longer flagged by `invalid-first-argument-name-for-class-method` (`N804`) but instead by `bad-staticmethod-argument` (`PLW0211`)
 - [`bad-str-strip-call`](https://docs.astral.sh/ruff/rules/bad-str-strip-call/) (`PLE1310`): The rule now applies to objects which are known to have type `str` or `bytes`.
-- [`blanket-noqa`](https://docs.astral.sh/ruff/rules/blanket-noqa/) (`PGH004`): Also detect blanked file-level noqa comments (and not just line level comments).
 - [`custom-type-var-for-self`](https://docs.astral.sh/ruff/rules/custom-type-var-for-self/) (`PYI019`): More accurate detection of custom `TypeVars` replaceable by `Self`. The range of the diagnostic is now the full function header rather than just the return annotation.
 - [`invalid-argument-name`](https://docs.astral.sh/ruff/rules/invalid-argument-name/) (`N803`): Ignore argument names of functions decorated with `typing.override`
 - [`invalid-envvar-default`](https://docs.astral.sh/ruff/rules/invalid-envvar-default/) (`PLW1508`): Detect default value arguments to `os.environ.get` with invalid type.
