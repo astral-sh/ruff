@@ -5379,7 +5379,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                         return err.fallback_return_type(self.db());
                     }
-                    Err(CallDunderError::Call(CallError(_, bindings))) => {
+                    Err(CallDunderError::CallError(_, bindings)) => {
                         self.context.report_lint(
                             &CALL_NON_CALLABLE,
                             value_node,
