@@ -643,7 +643,7 @@ mod tests {
 
     use crate::diagnostic::{Annotation, DiagnosticId, Severity, Span};
     use crate::files::system_path_to_file;
-    use crate::system::{DbWithTestSystem, SystemPath, WritableSystem};
+    use crate::system::{DbWithWritableSystem, SystemPath};
     use crate::tests::TestDb;
 
     use super::*;
@@ -2025,7 +2025,7 @@ watermelon
         /// Add a file with the given path and contents to this environment.
         fn add(&mut self, path: &str, contents: &str) {
             let path = SystemPath::new(path);
-            self.db.test_system().write_file(path, contents).unwrap();
+            self.db.write_file(path, contents).unwrap();
         }
 
         /// Conveniently create a `Span` that points into a file in this
