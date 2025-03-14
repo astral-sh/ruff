@@ -306,44 +306,25 @@ static_assert(is_assignable_to(Intersection[Unrelated, Not[int]], Not[int]))
 static_assert(is_assignable_to(Intersection[Intersection[str, Not[Literal[""]]], int], Intersection[str, Not[Literal[""]]]))
 static_assert(is_assignable_to(Intersection[Intersection[Any, Not[int]], Not[str]], Intersection[Any, Not[int]]))
 
+# The condition `is_assignable_to(T & U, U)` should still be satisfied after the following transformations:
 # `LiteralString & AlwaysTruthy` -> `LiteralString & ~Literal[""]`
-static_assert(is_assignable_to(Intersection[LiteralString, AlwaysTruthy], AlwaysTruthy))
 static_assert(is_assignable_to(Intersection[LiteralString, Not[Literal[""]]], AlwaysTruthy))
 static_assert(is_assignable_to(Intersection[LiteralString, Not[Literal["", "a"]]], AlwaysTruthy))
-static_assert(not is_assignable_to(Intersection[object, Not[Literal[""]]], AlwaysTruthy))
-static_assert(is_assignable_to(Intersection[LiteralString, Not[Literal[""]]], Intersection[AlwaysTruthy, Not[Literal[1]]]))
-# `LiteralString & ~AlwaysTruthy` -> `LiteralString & Literal[""]`
-static_assert(is_assignable_to(Intersection[LiteralString, Not[AlwaysTruthy]], Not[AlwaysTruthy]))
-static_assert(is_assignable_to(Intersection[LiteralString, Literal[""]], Not[AlwaysTruthy]))
-static_assert(not is_assignable_to(Intersection[LiteralString, Literal["", "a"]], Not[AlwaysTruthy]))
-static_assert(is_assignable_to(Intersection[LiteralString, Not[AlwaysTruthy]], Literal[""]))
-static_assert(is_assignable_to(Intersection[LiteralString, Literal[""]], Literal[""]))
-# `bool & ~AlwaysTruthy`, `bool & ~Literal[True]` -> `bool & Literal[False]`
-static_assert(is_assignable_to(Intersection[bool, Not[AlwaysTruthy]], Literal[False]))
-static_assert(is_assignable_to(Intersection[bool, Not[Literal[True]]], Literal[False]))
-
-# `LiteralString & AlwaysFalsy` -> `LiteralString & Literal[""]`
-static_assert(is_assignable_to(Intersection[LiteralString, AlwaysFalsy], AlwaysFalsy))
-static_assert(is_assignable_to(Intersection[LiteralString, Literal[""]], AlwaysFalsy))
-static_assert(not is_assignable_to(Intersection[LiteralString, Literal["", "a"]], AlwaysFalsy))
-static_assert(is_assignable_to(Intersection[LiteralString, AlwaysFalsy], Literal[""]))
+# `LiteralString & ~AlwaysTruthy` -> `Literal[""]`
+static_assert(is_assignable_to(Literal[""], Not[AlwaysTruthy]))
+static_assert(not is_assignable_to(Literal["", "a"], Not[AlwaysTruthy]))
+# `LiteralString & AlwaysFalsy` -> `Literal[""]`
+static_assert(is_assignable_to(Literal[""], AlwaysFalsy))
+static_assert(not is_assignable_to(Literal["", "a"], AlwaysFalsy))
 # `LiteralString & ~AlwaysFalsy`  -> `LiteralString & ~Literal[""]`
-static_assert(is_assignable_to(Intersection[LiteralString, Not[AlwaysFalsy]], Not[AlwaysFalsy]))
 static_assert(is_assignable_to(Intersection[LiteralString, Not[Literal[""]]], Not[AlwaysFalsy]))
 static_assert(is_assignable_to(Intersection[LiteralString, Not[Literal["", "a"]]], Not[AlwaysFalsy]))
-# `bool & ~AlwaysFalsy`, `bool & ~Literal[False]` -> `bool & Literal[True]`
-static_assert(is_assignable_to(Intersection[bool, Not[AlwaysFalsy]], Literal[True]))
-static_assert(is_assignable_to(Intersection[bool, Not[Literal[False]]], Literal[True]))
-# `bool & ~AlwaysFalsy`, `bool & ~Literal[False]` -> `bool & Literal[True]`
-static_assert(is_assignable_to(Intersection[bool, Not[AlwaysFalsy]], Literal[True]))
-static_assert(is_assignable_to(Intersection[bool, Not[Literal[False]]], Literal[True]))
-
-static_assert(is_assignable_to(Intersection[bool, Literal[False] | AlwaysTruthy], Literal[False] | AlwaysTruthy))
-static_assert(
-    is_assignable_to(
-        Intersection[Intersection[AlwaysFalsy, Not[Literal[False]]], bool], Intersection[AlwaysFalsy, Not[Literal[False]]]
-    )
-)
+# `bool & ~AlwaysTruthy`, `bool & ~Literal[True]` -> `Literal[False]`
+static_assert(is_assignable_to(Literal[False], Not[AlwaysTruthy]))
+static_assert(is_assignable_to(Literal[False], Not[Literal[True]]))
+# `bool & ~AlwaysFalsy`, `bool & ~Literal[False]` -> `Literal[True]`
+static_assert(is_assignable_to(Literal[True], Not[AlwaysFalsy]))
+static_assert(is_assignable_to(Literal[True], Not[Literal[False]]))
 ```
 
 ## General properties

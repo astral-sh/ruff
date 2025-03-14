@@ -270,6 +270,9 @@ pub(super) fn union_elements_ordering<'db>(
         (_, Type::Dynamic(_)) => Ordering::Greater,
 
         (Type::Union(left), Type::Union(right)) => {
+            if left.elements(db).len() != right.elements(db).len() {
+                return left.elements(db).len().cmp(&right.elements(db).len());
+            }
             // Lexicographically compare the elements of the two unions.
             for (left, right) in left.elements(db).iter().zip(right.elements(db)) {
                 let ordering = union_elements_ordering(left, right, db);
@@ -277,21 +280,24 @@ pub(super) fn union_elements_ordering<'db>(
                     return ordering;
                 }
             }
-            left.elements(db).len().cmp(&right.elements(db).len())
+            Ordering::Equal
         }
         (Type::Union(_), _) => Ordering::Less,
         (_, Type::Union(_)) => Ordering::Greater,
 
         (Type::Intersection(left), Type::Intersection(right)) => {
             // Lexicographically compare the elements of the two intersections.
+            if left.positive(db).len() != right.positive(db).len() {
+                return left.positive(db).len().cmp(&right.positive(db).len());
+            }
+            if left.negative(db).len() != right.negative(db).len() {
+                return left.negative(db).len().cmp(&right.negative(db).len());
+            }
             for (left, right) in left.positive(db).iter().zip(right.positive(db)) {
                 let ordering = union_elements_ordering(left, right, db);
                 if ordering != Ordering::Equal {
                     return ordering;
                 }
-            }
-            if left.positive(db).len() != right.positive(db).len() {
-                return left.positive(db).len().cmp(&right.positive(db).len());
             }
             for (left, right) in left.negative(db).iter().zip(right.negative(db)) {
                 let ordering = union_elements_ordering(left, right, db);
@@ -299,7 +305,7 @@ pub(super) fn union_elements_ordering<'db>(
                     return ordering;
                 }
             }
-            left.negative(db).len().cmp(&right.negative(db).len())
+            Ordering::Equal
         }
     }
 }

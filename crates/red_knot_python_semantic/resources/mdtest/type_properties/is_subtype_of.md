@@ -297,36 +297,25 @@ static_assert(is_subtype_of(bool, Literal[True] | AlwaysFalsy))
 static_assert(not is_subtype_of(Literal[True] | AlwaysFalsy, Literal[False] | AlwaysTruthy))
 static_assert(is_subtype_of(LiteralString, Literal[""] | AlwaysTruthy))
 
+# The condition `is_subtype_of(T & U, U)` must still be satisfied after the following transformations:
 # `LiteralString & AlwaysTruthy` -> `LiteralString & ~Literal[""]`
-static_assert(is_subtype_of(Intersection[LiteralString, AlwaysTruthy], AlwaysTruthy))
 static_assert(is_subtype_of(Intersection[LiteralString, Not[Literal[""]]], AlwaysTruthy))
 static_assert(is_subtype_of(Intersection[LiteralString, Not[Literal["", "a"]]], AlwaysTruthy))
-static_assert(not is_subtype_of(Intersection[object, Not[Literal[""]]], AlwaysTruthy))
-# `LiteralString & ~AlwaysTruthy` -> `LiteralString & Literal[""]`
-static_assert(is_subtype_of(Intersection[LiteralString, Not[AlwaysTruthy]], Not[AlwaysTruthy]))
-static_assert(is_subtype_of(Intersection[LiteralString, Literal[""]], Not[AlwaysTruthy]))
-static_assert(not is_subtype_of(Intersection[LiteralString, Literal["", "a"]], Not[AlwaysTruthy]))
-static_assert(is_subtype_of(Intersection[LiteralString, Not[AlwaysTruthy]], Literal[""]))
-# `bool & ~AlwaysTruthy`, `bool & ~Literal[True]` -> `bool & Literal[False]`
-static_assert(is_subtype_of(Intersection[bool, Not[AlwaysTruthy]], Literal[False]))
-static_assert(is_subtype_of(Intersection[bool, Not[Literal[True]]], Literal[False]))
-
-# `LiteralString & AlwaysFalsy` -> `LiteralString & Literal[""]`
-static_assert(is_subtype_of(Intersection[LiteralString, AlwaysFalsy], AlwaysFalsy))
-static_assert(is_subtype_of(Intersection[LiteralString, Literal[""]], AlwaysFalsy))
-static_assert(not is_subtype_of(Intersection[LiteralString, Literal["", "a"]], AlwaysFalsy))
-static_assert(is_subtype_of(Intersection[LiteralString, AlwaysFalsy], Literal[""]))
-static_assert(is_subtype_of(Intersection[LiteralString, Literal[""]], Literal[""]))
-# `LiteralString & ~AlwaysFalsy`  -> `LiteralString & ~Literal[""]`
-static_assert(is_subtype_of(Intersection[LiteralString, Not[AlwaysFalsy]], Not[AlwaysFalsy]))
+# `LiteralString & ~AlwaysTruthy` -> `Literal[""]`
+static_assert(is_subtype_of(Literal[""], Not[AlwaysTruthy]))
+static_assert(not is_subtype_of(Literal["", "a"], Not[AlwaysTruthy]))
+# `LiteralString & AlwaysFalsy` -> `Literal[""]`
+static_assert(is_subtype_of(Literal[""], AlwaysFalsy))
+static_assert(not is_subtype_of(Literal["", "a"], AlwaysFalsy))
+# `LiteralString & ~AlwaysFalsy` -> `LiteralString & ~Literal[""]`
 static_assert(is_subtype_of(Intersection[LiteralString, Not[Literal[""]]], Not[AlwaysFalsy]))
 static_assert(is_subtype_of(Intersection[LiteralString, Not[Literal["", "a"]]], Not[AlwaysFalsy]))
-# `bool & ~AlwaysFalsy`, `bool & ~Literal[False]` -> `bool & Literal[True]`
-static_assert(is_subtype_of(Intersection[bool, Not[AlwaysFalsy]], Literal[True]))
-static_assert(is_subtype_of(Intersection[bool, Not[Literal[False]]], Literal[True]))
-# `bool & ~AlwaysFalsy`, `bool & ~Literal[False]` -> `bool & Literal[True]`
-static_assert(is_subtype_of(Intersection[bool, Not[AlwaysFalsy]], Literal[True]))
-static_assert(is_subtype_of(Intersection[bool, Not[Literal[False]]], Literal[True]))
+# `bool & ~AlwaysTruthy`, `bool & ~Literal[True]` -> `Literal[False]`
+static_assert(is_subtype_of(Literal[False], Not[AlwaysTruthy]))
+static_assert(is_subtype_of(Literal[False], Not[Literal[True]]))
+# `bool & ~AlwaysFalsy`, `bool & ~Literal[False]` -> `Literal[True]`
+static_assert(is_subtype_of(Literal[True], Not[AlwaysFalsy]))
+static_assert(is_subtype_of(Literal[True], Not[Literal[False]]))
 ```
 
 ### Module literals

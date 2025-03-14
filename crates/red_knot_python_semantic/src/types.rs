@@ -587,7 +587,7 @@ impl<'db> Type<'db> {
                         return true;
                     }
                 }
-                // `is_subtype_of(StringLiteral, Literal[""] | AlwaysTruthy)`
+                // `is_subtype_of(LiteralString, Literal[""] | AlwaysTruthy)`
                 else if self.is_subtype_of(db, Type::LiteralString) {
                     if union
                         .elements(db)
@@ -597,6 +597,22 @@ impl<'db> Type<'db> {
                             .elements(db)
                             .iter()
                             .any(|elem| Type::AlwaysTruthy.is_subtype_of(db, *elem))
+                    {
+                        return true;
+                    }
+                }
+                // `is_subtype_of(AlwaysFalsy, Not[LiteralString] | Literal[""])`
+                else if self.is_subtype_of(db, Type::AlwaysFalsy)
+                    || self.is_subtype_of(db, Type::AlwaysTruthy.negate(db))
+                {
+                    if union
+                        .elements(db)
+                        .iter()
+                        .any(|elem| Type::string_literal(db, "").is_subtype_of(db, *elem))
+                        && union
+                            .elements(db)
+                            .iter()
+                            .any(|elem| Type::LiteralString.negate(db).is_subtype_of(db, *elem))
                     {
                         return true;
                     }
@@ -617,45 +633,84 @@ impl<'db> Type<'db> {
 
             (Type::Intersection(self_intersection), Type::Intersection(target_intersection)) => {
                 // Special handlings
-                // `LiteralString & AlwaysTruthy`, `LiteralString & ~AlwaysFalsy` -> `LiteralString & ~Literal[""]`
-                if target_intersection
-                    .positive(db)
-                    .contains(&Type::AlwaysTruthy)
-                    || target_intersection
+                // `is_subtype_of(Not[Literal[False] | AlwaysTruthy], Not[bool])`
+                if self_intersection
+                    .negative(db)
+                    .iter()
+                    .any(|neg_ty| Type::BooleanLiteral(false).is_subtype_of(db, *neg_ty))
+                    && self_intersection
                         .negative(db)
-                        .contains(&Type::AlwaysFalsy)
+                        .iter()
+                        .any(|neg_ty| Type::BooleanLiteral(true).is_subtype_of(db, *neg_ty))
+                    && target.is_equivalent_to(db, KnownClass::Bool.to_instance(db).negate(db))
                 {
+                    return true;
+                }
+                // `LiteralString & AlwaysTruthy`, `LiteralString & ~AlwaysFalsy` -> `LiteralString & ~Literal[""]`
+                // `LiteralString` is `AlwaysTruthy` except for `Literal[""]`
+                else if self_intersection.is_non_empty_literal_string(db) {
+                    let mut target_positive = target_intersection.positive(db).clone();
                     // For example:
                     // `is_assignable_to(Intersection[LiteralString, Not[Literal[""]]], Intersection[AlwaysTruthy, Not[Literal[1]]])`
                     // `not is_subtype_of(Intersection[object, Not[Literal[""]]], Intersection[AlwaysTruthy, Not[Literal[1]]])`
-                    if self_intersection
-                        .positive(db)
-                        .iter()
-                        .any(|pos_ty| pos_ty.is_subtype_of(db, Type::LiteralString))
-                        && self_intersection
+                    // `not is_assignable_to(Intersection[LiteralString, Not[Literal[""]]], Intersection[AlwaysTruthy, tuple])`
+                    if (target_positive.remove(&Type::AlwaysTruthy)
+                        || target_intersection
                             .negative(db)
+                            .contains(&Type::AlwaysFalsy))
+                        && target_positive
                             .iter()
-                            .any(|neg_ty| Type::string_literal(db, "").is_subtype_of(db, *neg_ty))
+                            .all(|pos_ty| Type::LiteralString.is_subtype_of(db, *pos_ty))
                     {
                         return true;
                     }
                 }
                 // `LiteralString & AlwaysFalsy`, `LiteralString & ~AlwaysTruthy` -> `LiteralString & Literal[""]`
-                else if target_intersection
-                    .positive(db)
-                    .contains(&Type::AlwaysFalsy)
-                    || target_intersection
-                        .negative(db)
-                        .contains(&Type::AlwaysTruthy)
-                {
-                    if self_intersection
-                        .positive(db)
-                        .iter()
-                        .any(|pos_ty| pos_ty.is_subtype_of(db, Type::LiteralString))
-                        && self_intersection
-                            .positive(db)
+                else if self_intersection.is_empty_literal_string(db) {
+                    let mut target_positive = target_intersection.positive(db).clone();
+                    if (target_positive.remove(&Type::AlwaysFalsy)
+                        || target_intersection
+                            .negative(db)
+                            .contains(&Type::AlwaysTruthy))
+                        && target_positive
                             .iter()
-                            .any(|neg_ty| Type::string_literal(db, "").is_subtype_of(db, *neg_ty))
+                            .all(|pos_ty| Type::LiteralString.is_subtype_of(db, *pos_ty))
+                    {
+                        return true;
+                    }
+                }
+                // is_subtype_of(~Literal[""] & AlwaysFalsy, ~LiteralString)
+                // is_subtype_of(~Literal[""] & ~AlwaysTruthy, ~LiteralString)
+                // is_subtype_of(~Literal[""] & AlwaysFalsy, ~LiteralString & ~Literal[1])
+                // not is_subtype_of(~Literal[""] & AlwaysFalsy, ~LiteralString & ~Literal[False])
+                else if (self_intersection.negative(db).contains(&Type::AlwaysTruthy)
+                    || self_intersection.positive(db).contains(&Type::AlwaysFalsy))
+                    && self_intersection
+                        .negative(db)
+                        .contains(&Type::string_literal(db, ""))
+                    && target_intersection
+                        .negative(db)
+                        .contains(&Type::LiteralString)
+                    && target_intersection
+                        .negative(db)
+                        .iter()
+                        .all(|neg_ty| !neg_ty.is_subtype_of(db, Type::AlwaysFalsy))
+                {
+                    return true;
+                }
+                // is_subtype_of(~AlwaysTruthy & ~AlwaysFalsy, ~tuple[()] & ~LiteralString)
+                else if self_intersection.negative(db).contains(&Type::AlwaysTruthy)
+                    && self_intersection.negative(db).contains(&Type::AlwaysFalsy)
+                {
+                    let mut target_negative = target_intersection.negative(db).clone();
+                    if target_negative.remove(&Type::LiteralString)
+                        && target_negative.iter().all(|&target_neg_elem| {
+                            self_intersection.negative(db).iter().any(|&self_neg_elem| {
+                                target_neg_elem.is_subtype_of(db, self_neg_elem)
+                            }) || self_intersection.positive(db).iter().any(|&self_pos_elem| {
+                                self_pos_elem.is_disjoint_from(db, target_neg_elem)
+                            })
+                        })
                     {
                         return true;
                     }
@@ -691,29 +746,13 @@ impl<'db> Type<'db> {
                 // For example:
                 // `is_subtype_of(Intersection[LiteralString, Not[Literal[""]]], AlwaysTruthy)`
                 if target.is_equivalent_to(db, Type::AlwaysTruthy) {
-                    if intersection
-                        .positive(db)
-                        .iter()
-                        .any(|pos_ty| pos_ty.is_subtype_of(db, Type::LiteralString))
-                        && intersection
-                            .negative(db)
-                            .iter()
-                            .any(|neg_ty| Type::string_literal(db, "").is_subtype_of(db, *neg_ty))
-                    {
+                    if intersection.is_non_empty_literal_string(db) {
                         return true;
                     }
                 }
                 // `is_subtype_of(Intersection[LiteralString, Literal[""]], AlwaysFalsy)`
                 else if target.is_equivalent_to(db, Type::AlwaysFalsy) {
-                    if intersection
-                        .positive(db)
-                        .iter()
-                        .any(|pos_ty| pos_ty.is_subtype_of(db, Type::LiteralString))
-                        && intersection
-                            .positive(db)
-                            .iter()
-                            .any(|neg_ty| Type::string_literal(db, "").is_subtype_of(db, *neg_ty))
-                    {
+                    if intersection.is_empty_literal_string(db) {
                         return true;
                     }
                 }
@@ -935,6 +974,22 @@ impl<'db> Type<'db> {
                         return true;
                     }
                 }
+                // `is_assignable_to(AlwaysFalsy, Not[LiteralString] | Literal[""])`
+                else if self.is_assignable_to(db, Type::AlwaysFalsy)
+                    || self.is_assignable_to(db, Type::AlwaysTruthy.negate(db))
+                {
+                    if union
+                        .elements(db)
+                        .iter()
+                        .any(|elem| Type::string_literal(db, "").is_assignable_to(db, *elem))
+                        && union
+                            .elements(db)
+                            .iter()
+                            .any(|elem| Type::LiteralString.negate(db).is_assignable_to(db, *elem))
+                    {
+                        return true;
+                    }
+                }
                 union
                     .elements(db)
                     .iter()
@@ -943,42 +998,82 @@ impl<'db> Type<'db> {
 
             (Type::Intersection(self_intersection), Type::Intersection(target_intersection)) => {
                 // Special handlings
-                // `LiteralString & AlwaysTruthy`, `LiteralString & ~AlwaysFalsy` -> `LiteralString & ~Literal[""]`
-                if target_intersection
-                    .positive(db)
-                    .contains(&Type::AlwaysTruthy)
-                    || target_intersection
+                // `is_subtype_of(Not[Literal[False] | AlwaysTruthy], Not[bool])`
+                if self_intersection
+                    .negative(db)
+                    .iter()
+                    .any(|neg_ty| Type::BooleanLiteral(false).is_assignable_to(db, *neg_ty))
+                    && self_intersection
                         .negative(db)
-                        .contains(&Type::AlwaysFalsy)
+                        .iter()
+                        .any(|neg_ty| Type::BooleanLiteral(true).is_assignable_to(db, *neg_ty))
+                    && target.is_equivalent_to(db, KnownClass::Bool.to_instance(db).negate(db))
                 {
+                    return true;
+                }
+                // `LiteralString & AlwaysTruthy`, `LiteralString & ~AlwaysFalsy` -> `LiteralString & ~Literal[""]`
+                // `LiteralString` is `AlwaysTruthy` except for `Literal[""]`
+                else if self_intersection.is_non_empty_literal_string(db) {
+                    let mut target_positive = target_intersection.positive(db).clone();
                     // For example:
                     // `is_assignable_to(Intersection[LiteralString, Not[Literal[""]]], Intersection[AlwaysTruthy, Not[Literal[1]]])`
                     // `not is_assignable_to(Intersection[object, Not[Literal[""]]], Intersection[AlwaysTruthy, Not[Literal[1]]])`
-                    if self_intersection
-                        .positive(db)
-                        .iter()
-                        .any(|pos_ty| pos_ty.is_assignable_to(db, Type::LiteralString))
-                        && self_intersection.negative(db).iter().any(|neg_ty| {
-                            Type::string_literal(db, "").is_assignable_to(db, *neg_ty)
-                        })
+                    // `not is_assignable_to(Intersection[LiteralString, Not[Literal[""]]], Intersection[AlwaysTruthy, tuple])`
+                    if (target_positive.remove(&Type::AlwaysTruthy)
+                        || target_intersection
+                            .negative(db)
+                            .contains(&Type::AlwaysFalsy))
+                        && target_positive
+                            .iter()
+                            .all(|pos_ty| Type::LiteralString.is_assignable_to(db, *pos_ty))
                     {
                         return true;
                     }
                 }
                 // `LiteralString & AlwaysFalsy`, `LiteralString & ~AlwaysTruthy` -> `LiteralString & Literal[""]`
-                else if target_intersection
-                    .positive(db)
-                    .contains(&Type::AlwaysFalsy)
-                    || target_intersection
+                else if self_intersection.is_empty_literal_string(db) {
+                    let mut target_positive = target_intersection.positive(db).clone();
+                    if (target_positive.remove(&Type::AlwaysFalsy)
+                        || target_intersection
+                            .negative(db)
+                            .contains(&Type::AlwaysTruthy))
+                        && target_positive
+                            .iter()
+                            .all(|pos_ty| Type::LiteralString.is_assignable_to(db, *pos_ty))
+                    {
+                        return true;
+                    }
+                }
+                // is_subtype_of(~Literal[""] & ~AlwaysTruthy, ~LiteralString)
+                // is_subtype_of(~Literal[""] & AlwaysFalsy, ~LiteralString & ~Literal[1])
+                // not is_subtype_of(~Literal[""] & AlwaysFalsy, ~LiteralString & ~Literal[False])
+                else if (self_intersection.negative(db).contains(&Type::AlwaysTruthy)
+                    || self_intersection.positive(db).contains(&Type::AlwaysFalsy))
+                    && self_intersection
                         .negative(db)
-                        .contains(&Type::AlwaysTruthy)
-                {
-                    if self_intersection
-                        .positive(db)
+                        .contains(&Type::string_literal(db, ""))
+                    && target_intersection
+                        .negative(db)
+                        .contains(&Type::LiteralString)
+                    && target_intersection
+                        .negative(db)
                         .iter()
-                        .any(|pos_ty| pos_ty.is_assignable_to(db, Type::LiteralString))
-                        && self_intersection.positive(db).iter().any(|neg_ty| {
-                            Type::string_literal(db, "").is_assignable_to(db, *neg_ty)
+                        .all(|neg_ty| !neg_ty.is_assignable_to(db, Type::AlwaysFalsy))
+                {
+                    return true;
+                }
+                // is_subtype_of(~AlwaysTruthy & ~AlwaysFalsy, ~tuple[()] & ~LiteralString)
+                else if self_intersection.negative(db).contains(&Type::AlwaysTruthy)
+                    && self_intersection.negative(db).contains(&Type::AlwaysFalsy)
+                {
+                    let mut target_negative = target_intersection.negative(db).clone();
+                    if target_negative.remove(&Type::LiteralString)
+                        && target_negative.iter().all(|&target_neg_elem| {
+                            self_intersection.negative(db).iter().any(|&self_neg_elem| {
+                                target_neg_elem.is_assignable_to(db, self_neg_elem)
+                            }) || self_intersection.positive(db).iter().any(|&self_pos_elem| {
+                                self_pos_elem.is_disjoint_from(db, target_neg_elem)
+                            })
                         })
                     {
                         return true;
@@ -1018,28 +1113,14 @@ impl<'db> Type<'db> {
                 // For example:
                 // `is_assignable_to(Intersection[LiteralString, Not[Literal[""]]], AlwaysTruthy)`
                 // `not is_assignable_to(Intersection[object, Not[Literal[""]]], AlwaysTruthy)`
-                if target.is_gradual_equivalent_to(db, Type::AlwaysTruthy) {
-                    if intersection
-                        .positive(db)
-                        .iter()
-                        .any(|pos_ty| pos_ty.is_assignable_to(db, Type::LiteralString))
-                        && intersection.negative(db).iter().any(|neg_ty| {
-                            Type::string_literal(db, "").is_assignable_to(db, *neg_ty)
-                        })
-                    {
+                if ty.is_gradual_equivalent_to(db, Type::AlwaysTruthy) {
+                    if intersection.is_non_empty_literal_string(db) {
                         return true;
                     }
                 }
                 // `is_assignable_to(Intersection[LiteralString, Literal[""]], AlwaysFalsy)`
-                else if target.is_gradual_equivalent_to(db, Type::AlwaysFalsy) {
-                    if intersection
-                        .positive(db)
-                        .iter()
-                        .any(|pos_ty| pos_ty.is_assignable_to(db, Type::LiteralString))
-                        && intersection.positive(db).iter().any(|neg_ty| {
-                            Type::string_literal(db, "").is_assignable_to(db, *neg_ty)
-                        })
-                    {
+                else if ty.is_gradual_equivalent_to(db, Type::AlwaysFalsy) {
+                    if intersection.is_empty_literal_string(db) {
                         return true;
                     }
                 }
@@ -1260,6 +1341,25 @@ impl<'db> Type<'db> {
             // Negative elements need a positive element on the other side in order to be disjoint.
             // This is similar to what would happen if we tried to build a new intersection that combines the two
             (Type::Intersection(self_intersection), Type::Intersection(other_intersection)) => {
+                // Special handlings
+                // `is_disjoint_from(~AlwaysTruthy & ..., LiteralString & ~Literal[""])`
+                // `is_disjoint_from(AlwaysFalsy & ..., LiteralString & ~Literal[""])`
+                if self_intersection.positive(db).contains(&Type::AlwaysFalsy)
+                    || self_intersection.negative(db).contains(&Type::AlwaysTruthy)
+                {
+                    if other_intersection.is_non_empty_literal_string(db) {
+                        return true;
+                    }
+                // `is_disjoint_from(LiteralString & ~Literal[""], AlwaysFalsy & ...)`
+                } else if other_intersection.positive(db).contains(&Type::AlwaysFalsy)
+                    || other_intersection
+                        .negative(db)
+                        .contains(&Type::AlwaysTruthy)
+                {
+                    if self_intersection.is_non_empty_literal_string(db) {
+                        return true;
+                    }
+                }
                 self_intersection
                     .positive(db)
                     .iter()
@@ -1272,6 +1372,36 @@ impl<'db> Type<'db> {
 
             (Type::Intersection(intersection), other)
             | (other, Type::Intersection(intersection)) => {
+                // Special handlings
+                // is_disjoint_from(~Literal[True] & ~Literal[False] & ..., bool)
+                // is_disjoint_from(AlwaysTruthy & ~Literal[True] & ..., bool)
+                // is_disjoint_from(AlwaysFalsy & ~Literal[False] & ..., bool)
+                if other.is_equivalent_to(db, KnownClass::Bool.to_instance(db)) {
+                    if (intersection
+                        .positive(db)
+                        .iter()
+                        .any(|&pos_ty| pos_ty.is_subtype_of(db, Type::AlwaysFalsy))
+                        || intersection
+                            .negative(db)
+                            .iter()
+                            .any(|&neg_ty| Type::BooleanLiteral(true).is_subtype_of(db, neg_ty)))
+                        && (intersection
+                            .positive(db)
+                            .iter()
+                            .any(|&pos_ty| pos_ty.is_subtype_of(db, Type::AlwaysTruthy))
+                            || intersection.negative(db).iter().any(|&neg_ty| {
+                                Type::BooleanLiteral(false).is_subtype_of(db, neg_ty)
+                            }))
+                    {
+                        return true;
+                    }
+                }
+                // is_disjoint_from(LiteralString & ~Literal[""], AlwaysFalsy)
+                else if other.is_equivalent_to(db, Type::AlwaysFalsy) {
+                    if intersection.is_non_empty_literal_string(db) {
+                        return true;
+                    }
+                }
                 intersection
                     .positive(db)
                     .iter()
@@ -5613,6 +5743,16 @@ impl<'db> IntersectionType<'db> {
             },
             qualifiers,
         }
+    }
+
+    fn is_empty_literal_string(self, db: &'db dyn Db) -> bool {
+        self.positive(db).contains(&Type::LiteralString)
+            && self.positive(db).contains(&Type::string_literal(db, ""))
+    }
+
+    fn is_non_empty_literal_string(self, db: &'db dyn Db) -> bool {
+        self.positive(db).contains(&Type::LiteralString)
+            && self.negative(db).contains(&Type::string_literal(db, ""))
     }
 }
 
