@@ -29,20 +29,11 @@ pub(crate) struct Signatures<'db> {
 }
 
 impl<'db> Signatures<'db> {
-    pub(crate) fn not_callable(
-        ty: Type<'db>,
-        signature_ty: Type<'db>,
-        dunder_call_boundness: Option<Boundness>,
-    ) -> Self {
+    pub(crate) fn not_callable(ty: Type<'db>, signature_ty: Type<'db>) -> Self {
         Self {
             ty,
             signature_ty,
-            elements: vec![CallableSignature::not_callable(
-                ty,
-                signature_ty,
-                dunder_call_boundness,
-                None,
-            )],
+            elements: vec![CallableSignature::not_callable(ty, signature_ty)],
         }
     }
 
@@ -81,6 +72,12 @@ impl<'db> Signatures<'db> {
     pub(crate) fn iter(&self) -> impl Iterator<Item = &CallableSignature<'db>> {
         self.elements.iter()
     }
+
+    pub(crate) fn set_dunder_call_boundness(&mut self, boundness: Boundness) {
+        for signature in &mut self.elements {
+            signature.dunder_call_boundness = Some(boundness);
+        }
+    }
 }
 
 /// The signature of a single callable. If the callable is overloaded, there is a separate
@@ -105,17 +102,12 @@ pub(crate) struct CallableSignature<'db> {
 }
 
 impl<'db> CallableSignature<'db> {
-    pub(crate) fn not_callable(
-        ty: Type<'db>,
-        signature_ty: Type<'db>,
-        dunder_call_boundness: Option<Boundness>,
-        bound_type: Option<Type<'db>>,
-    ) -> Self {
+    pub(crate) fn not_callable(ty: Type<'db>, signature_ty: Type<'db>) -> Self {
         Self {
             ty,
             signature_ty,
-            dunder_call_boundness,
-            bound_type,
+            dunder_call_boundness: None,
+            bound_type: None,
             overloads: vec![],
         }
     }
@@ -123,58 +115,50 @@ impl<'db> CallableSignature<'db> {
     pub(crate) fn single(
         ty: Type<'db>,
         signature_ty: Type<'db>,
-        dunder_call_boundness: Option<Boundness>,
-        bound_type: Option<Type<'db>>,
         signature: Signature<'db>,
     ) -> Self {
         Self {
             ty,
             signature_ty,
-            dunder_call_boundness,
-            bound_type,
+            dunder_call_boundness: None,
+            bound_type: None,
             overloads: vec![signature],
         }
     }
 
     /// Creates a new `CallableSignature` from a non-empty iterator of [`Signature`]s. Panics if
     /// the iterator is empty.
-    pub(crate) fn from_overloads<I>(
-        ty: Type<'db>,
-        signature_ty: Type<'db>,
-        dunder_call_boundness: Option<Boundness>,
-        bound_type: Option<Type<'db>>,
-        overloads: I,
-    ) -> Self
+    pub(crate) fn from_overloads<I>(ty: Type<'db>, signature_ty: Type<'db>, overloads: I) -> Self
     where
         I: IntoIterator<Item = Signature<'db>>,
     {
         Self {
             ty,
             signature_ty,
-            dunder_call_boundness,
-            bound_type,
+            dunder_call_boundness: None,
+            bound_type: None,
             overloads: overloads.into_iter().collect(),
         }
     }
 
     /// Return a signature for a dynamic callable
-    pub(crate) fn dynamic(ty: Type<'db>, dunder_call_boundness: Option<Boundness>) -> Self {
+    pub(crate) fn dynamic(ty: Type<'db>) -> Self {
         let signature = Signature {
             parameters: Parameters::gradual_form(),
             return_ty: Some(ty),
         };
-        Self::single(ty, ty, dunder_call_boundness, None, signature)
+        Self::single(ty, ty, signature)
     }
 
     /// Return a todo signature: (*args: Todo, **kwargs: Todo) -> Todo
     #[allow(unused_variables)] // 'reason' only unused in debug builds
-    pub(crate) fn todo(reason: &'static str, dunder_call_boundness: Option<Boundness>) -> Self {
+    pub(crate) fn todo(reason: &'static str) -> Self {
         let ty = todo_type!(reason);
         let signature = Signature {
             parameters: Parameters::todo(),
             return_ty: Some(ty),
         };
-        Self::single(ty, ty, dunder_call_boundness, None, signature)
+        Self::single(ty, ty, signature)
     }
 
     /// Returns the [`Signature`] if this is a non-overloaded callable, [None] otherwise.
