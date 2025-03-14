@@ -5,8 +5,8 @@ use std::sync::{Arc, Mutex};
 
 use crate::files::File;
 use crate::system::{
-    DirectoryEntry, GlobError, MemoryFileSystem, Metadata, Result, System, SystemPath,
-    SystemPathBuf, SystemVirtualPath,
+    CaseSensitivity, DirectoryEntry, GlobError, MemoryFileSystem, Metadata, Result, System,
+    SystemPath, SystemPathBuf, SystemVirtualPath,
 };
 use crate::Db;
 
@@ -129,6 +129,14 @@ impl System for TestSystem {
 
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
         self
+    }
+
+    fn path_exists_case_sensitive(&self, path: &SystemPath, prefix: &SystemPath) -> bool {
+        self.system().path_exists_case_sensitive(path, prefix)
+    }
+
+    fn case_sensitivity(&self) -> CaseSensitivity {
+        self.system().case_sensitivity()
     }
 }
 
@@ -348,6 +356,16 @@ impl System for InMemorySystem {
 
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
         self
+    }
+
+    #[inline]
+    fn path_exists_case_sensitive(&self, path: &SystemPath, _prefix: &SystemPath) -> bool {
+        // The memory file system is case-sensitive.
+        self.path_exists(path)
+    }
+
+    fn case_sensitivity(&self) -> CaseSensitivity {
+        CaseSensitivity::CaseSensitive
     }
 }
 
