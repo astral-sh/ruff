@@ -1700,6 +1700,87 @@ fn test_notebook_trailing_semicolon() {
 }
 
 #[test]
+fn syntax_error_in_notebooks() -> Result<()> {
+    let tempdir = TempDir::new()?;
+
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+include = ["*.ipy"]
+"#,
+    )?;
+
+    fs::write(
+        tempdir.path().join("main.ipy"),
+        r#"
+{
+    "cells": [
+     {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+       "id": "S6nTuMqGGqp2"
+      },
+      "outputs": [],
+      "source": [
+       "np.random.seed(RANDOM_STATE)\n",
+       "X = pd.DataFrame(data=X, columns=np.arange(0, X.shape[1]))\n",
+       "X[10] = X[6] + X[7] + np.random.random() * 0.01"
+      ]
+     },
+     {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+       "id": "fTZWxz1zpb9R"
+      },
+      "outputs": [],
+      "source": [
+       "for i in range(iterations):\n",
+       "    # выберите случайный индекс в диапазон от 0 до len(X)-1 включительно при помощи функции random.randint\n",
+       "    j = # ваш код здесь\n"
+      ]
+     }
+    ],
+    "metadata": {
+     "colab": {
+      "provenance": []
+     },
+     "kernelspec": {
+      "display_name": "ml",
+      "language": "python",
+      "name": "python3"
+     },
+     "language_info": {
+      "name": "python",
+      "version": "3.12.9"
+     }
+    },
+    "nbformat": 4,
+    "nbformat_minor": 0
+   }
+"#,
+    )?;
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .current_dir(tempdir.path())
+        .arg("format")
+        .arg("--no-cache")
+        .args(["--config", &ruff_toml.file_name().unwrap().to_string_lossy()])
+        .args(["--extension", "ipy:ipynb"])
+        .arg("."), @r"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    error: Failed to parse main.ipy:2:3:24: Expected an expression
+    ");
+    Ok(())
+}
+
+#[test]
 fn extension() -> Result<()> {
     let tempdir = TempDir::new()?;
 

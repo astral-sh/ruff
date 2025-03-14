@@ -11,7 +11,7 @@ use ruff_python_ast::{
 };
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
-use crate::error::UnparenthesizedNamedExprKind;
+use crate::error::{StarTupleKind, UnparenthesizedNamedExprKind};
 use crate::parser::progress::ParserProgress;
 use crate::parser::{helpers, FunctionKind, Parser};
 use crate::string::{parse_fstring_literal_element, parse_string_literal, StringType};
@@ -633,7 +633,7 @@ impl<'src> Parser<'src> {
     /// If the parser isn't position at a `(` token.
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#calls>
-    fn parse_call_expression(&mut self, func: Expr, start: TextSize) -> ast::ExprCall {
+    pub(super) fn parse_call_expression(&mut self, func: Expr, start: TextSize) -> ast::ExprCall {
         let arguments = self.parse_arguments();
 
         ast::ExprCall {
@@ -702,9 +702,31 @@ impl<'src> Parser<'src> {
                     }
                 }
 
+                let arg_range = parser.node_range(start);
                 if parser.eat(TokenKind::Equal) {
                     seen_keyword_argument = true;
-                    let arg = if let Expr::Name(ident_expr) = parsed_expr.expr {
+                    let arg = if let ParsedExpr {
+                        expr: Expr::Name(ident_expr),
+                        is_parenthesized,
+                    } = parsed_expr
+                    {
+                        // test_ok parenthesized_kwarg_py37
+                        // # parse_options: {"target-version": "3.7"}
+                        // f((a)=1)
+
+                        // test_err parenthesized_kwarg_py38
+                        // # parse_options: {"target-version": "3.8"}
+                        // f((a)=1)
+                        // f((a) = 1)
+                        // f( ( a ) = 1)
+
+                        if is_parenthesized {
+                            parser.add_unsupported_syntax_error(
+                                UnsupportedSyntaxErrorKind::ParenthesizedKeywordArgumentName,
+                                arg_range,
+                            );
+                        }
+
                         ast::Identifier {
                             id: ident_expr.id,
                             range: ident_expr.range,
@@ -830,6 +852,35 @@ impl<'src> Parser<'src> {
         }
 
         self.expect(TokenKind::Rsqb);
+
+        // test_ok star_index_py311
+        // # parse_options: {"target-version": "3.11"}
+        // lst[*index]  # simple index
+        // class Array(Generic[DType, *Shape]): ...  # motivating example from the PEP
+        // lst[a, *b, c]  # different positions
+        // lst[a, b, *c]  # different positions
+        // lst[*a, *b]  # multiple unpacks
+        // array[3:5, *idxs]  # mixed with slices
+
+        // test_err star_index_py310
+        // # parse_options: {"target-version": "3.10"}
+        // lst[*index]  # simple index
+        // class Array(Generic[DType, *Shape]): ...  # motivating example from the PEP
+        // lst[a, *b, c]  # different positions
+        // lst[a, b, *c]  # different positions
+        // lst[*a, *b]  # multiple unpacks
+        // array[3:5, *idxs]  # mixed with slices
+
+        // test_err star_slices
+        // array[*start:*end]
+        if let Expr::Tuple(ast::ExprTuple { elts, .. }) = &slice {
+            for elt in elts.iter().filter(|elt| elt.is_starred_expr()) {
+                self.add_unsupported_syntax_error(
+                    UnsupportedSyntaxErrorKind::StarExpressionInIndex,
+                    elt.range(),
+                );
+            }
+        };
 
         ast::ExprSubscript {
             value: Box::new(value),
@@ -2166,10 +2217,30 @@ impl<'src> Parser<'src> {
         }
 
         let value = self.at_expr().then(|| {
-            Box::new(
-                self.parse_expression_list(ExpressionContext::starred_bitwise_or())
-                    .expr,
-            )
+            let parsed_expr = self.parse_expression_list(ExpressionContext::starred_bitwise_or());
+
+            // test_ok iter_unpack_yield_py37
+            // # parse_options: {"target-version": "3.7"}
+            // rest = (4, 5, 6)
+            // def g(): yield (1, 2, 3, *rest)
+
+            // test_ok iter_unpack_yield_py38
+            // # parse_options: {"target-version": "3.8"}
+            // rest = (4, 5, 6)
+            // def g(): yield 1, 2, 3, *rest
+            // def h(): yield 1, (yield 2, *rest), 3
+
+            // test_err iter_unpack_yield_py37
+            // # parse_options: {"target-version": "3.7"}
+            // rest = (4, 5, 6)
+            // def g(): yield 1, 2, 3, *rest
+            // def h(): yield 1, (yield 2, *rest), 3
+            self.check_tuple_unpacking(
+                &parsed_expr,
+                UnsupportedSyntaxErrorKind::StarTuple(StarTupleKind::Yield),
+            );
+
+            Box::new(parsed_expr.expr)
         });
 
         Expr::Yield(ast::ExprYield {

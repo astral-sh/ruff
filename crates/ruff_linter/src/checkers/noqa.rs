@@ -38,7 +38,8 @@ pub(crate) fn check_noqa(
     let exemption = FileExemption::from(&file_noqa_directives);
 
     // Extract all `noqa` directives.
-    let mut noqa_directives = NoqaDirectives::from_commented_ranges(comment_ranges, path, locator);
+    let mut noqa_directives =
+        NoqaDirectives::from_commented_ranges(comment_ranges, &settings.external, path, locator);
 
     // Indices of diagnostics that were ignored by a `noqa` directive.
     let mut ignored_diagnostics = vec![];
@@ -223,7 +224,6 @@ pub(crate) fn check_noqa(
             &noqa_directives,
             locator,
             &file_noqa_directives,
-            settings.preview,
         );
     }
 

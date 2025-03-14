@@ -283,7 +283,10 @@ impl EmbeddedFile<'_> {
         self.path.as_str()
     }
 
+    /// Returns the full path using unix file-path convention.
     pub(crate) fn full_path(&self, project_root: &SystemPath) -> SystemPathBuf {
+        // Don't use `SystemPath::absolute` here because it's platform dependent
+        // and we want to use unix file-path convention.
         let relative_path = self.relative_path();
         if relative_path.starts_with('/') {
             SystemPathBuf::from(relative_path)
@@ -606,10 +609,13 @@ impl<'s> Parser<'s> {
         }
 
         if let Some(explicit_path) = self.explicit_path {
-            if !lang.is_empty()
+            let expected_extension = if lang == "python" { "py" } else { lang };
+
+            if !expected_extension.is_empty()
                 && lang != "text"
-                && explicit_path.contains('.')
-                && !explicit_path.ends_with(&format!(".{lang}"))
+                && !SystemPath::new(explicit_path)
+                    .extension()
+                    .is_none_or(|extension| extension.eq_ignore_ascii_case(expected_extension))
             {
                 bail!(
                     "File extension of test file path `{explicit_path}` in test `{test_name}` does not match language specified `{lang}` of code block"

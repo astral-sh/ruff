@@ -8,10 +8,12 @@ use crate::types::string_annotation::{
 };
 use crate::types::{ClassLiteralType, KnownInstanceType, Type};
 use crate::{declare_lint, Db};
-use ruff_db::diagnostic::{Diagnostic, DiagnosticId, SecondaryDiagnosticMessage, Severity, Span};
+use ruff_db::diagnostic::{
+    DiagnosticId, OldDiagnosticTrait, OldSecondaryDiagnosticMessage, Severity, Span,
+};
 use ruff_db::files::File;
 use ruff_python_ast::{self as ast, AnyNodeRef};
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 use std::borrow::Cow;
 use std::fmt::Formatter;
@@ -31,6 +33,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INCONSISTENT_MRO);
     registry.register_lint(&INDEX_OUT_OF_BOUNDS);
     registry.register_lint(&INVALID_ARGUMENT_TYPE);
+    registry.register_lint(&INVALID_RETURN_TYPE);
     registry.register_lint(&INVALID_ASSIGNMENT);
     registry.register_lint(&INVALID_BASE);
     registry.register_lint(&INVALID_CONTEXT_MANAGER);
@@ -39,9 +42,11 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_METACLASS);
     registry.register_lint(&INVALID_PARAMETER_DEFAULT);
     registry.register_lint(&INVALID_RAISE);
+    registry.register_lint(&INVALID_TYPE_CHECKING_CONSTANT);
     registry.register_lint(&INVALID_TYPE_FORM);
     registry.register_lint(&INVALID_TYPE_VARIABLE_CONSTRAINTS);
     registry.register_lint(&MISSING_ARGUMENT);
+    registry.register_lint(&NO_MATCHING_OVERLOAD);
     registry.register_lint(&NON_SUBSCRIPTABLE);
     registry.register_lint(&NOT_ITERABLE);
     registry.register_lint(&UNSUPPORTED_BOOL_CONVERSION);
@@ -258,6 +263,25 @@ declare_lint! {
 }
 
 declare_lint! {
+    /// ## What it does
+    /// Detects returned values that can't be assigned to the function's annotated return type.
+    ///
+    /// ## Why is this bad?
+    /// Returning an object of a type incompatible with the annotated return type may cause confusion to the user calling the function.
+    ///
+    /// ## Examples
+    /// ```python
+    /// def func() -> int:
+    ///     return "a"  # error: [invalid-return-type]
+    /// ```
+    pub(crate) static INVALID_RETURN_TYPE = {
+        summary: "detects returned values that can't be assigned to the function's annotated return type",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
     /// TODO #14889
     pub(crate) static INVALID_ASSIGNMENT = {
         summary: "detects invalid assignments",
@@ -414,6 +438,24 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
+    /// Checks for a value other than `False` assigned to the `TYPE_CHECKING` variable, or an
+    /// annotation not assignable from `bool`.
+    ///
+    /// ## Why is this bad?
+    /// The name `TYPE_CHECKING` is reserved for a flag that can be used to provide conditional
+    /// code seen only by the type checker, and not at runtime. Normally this flag is imported from
+    /// `typing` or `typing_extensions`, but it can also be defined locally. If defined locally, it
+    /// must be assigned the value `False` at runtime; the type checker will consider its value to
+    /// be `True`. If annotated, it must be annotated as a type that can accept `bool` values.
+    pub(crate) static INVALID_TYPE_CHECKING_CONSTANT = {
+        summary: "detects invalid TYPE_CHECKING constant assignments",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
     /// Checks for invalid type expressions.
     ///
     /// ## Why is this bad?
@@ -448,6 +490,29 @@ declare_lint! {
     /// ```
     pub(crate) static MISSING_ARGUMENT = {
         summary: "detects missing required arguments in a call",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for calls to an overloaded function that do not match any of the overloads.
+    ///
+    /// ## Why is this bad?
+    /// Failing to provide the correct arguments to one of the overloads will raise a `TypeError`
+    /// at runtime.
+    ///
+    /// ## Examples
+    /// ```python
+    /// @overload
+    /// def func(x: int): ...
+    /// @overload
+    /// def func(x: bool): ...
+    /// func("string")  # error: [no-matching-overload]
+    /// ```
+    pub(crate) static NO_MATCHING_OVERLOAD = {
+        summary: "detects calls that do not match any overload",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
@@ -809,7 +874,7 @@ pub struct TypeCheckDiagnostic {
     pub(crate) range: TextRange,
     pub(crate) severity: Severity,
     pub(crate) file: File,
-    pub(crate) secondary_messages: Vec<SecondaryDiagnosticMessage>,
+    pub(crate) secondary_messages: Vec<OldSecondaryDiagnosticMessage>,
 }
 
 impl TypeCheckDiagnostic {
@@ -826,7 +891,7 @@ impl TypeCheckDiagnostic {
     }
 }
 
-impl Diagnostic for TypeCheckDiagnostic {
+impl OldDiagnosticTrait for TypeCheckDiagnostic {
     fn id(&self) -> DiagnosticId {
         self.id
     }
@@ -839,7 +904,7 @@ impl Diagnostic for TypeCheckDiagnostic {
         Some(Span::from(self.file).with_range(self.range))
     }
 
-    fn secondary_messages(&self) -> &[SecondaryDiagnosticMessage] {
+    fn secondary_messages(&self) -> &[OldSecondaryDiagnosticMessage] {
         &self.secondary_messages
     }
 
@@ -1042,6 +1107,55 @@ pub(super) fn report_invalid_attribute_assignment(
     );
 }
 
+pub(super) fn report_invalid_return_type(
+    context: &InferContext,
+    object_range: impl Ranged,
+    return_type_range: impl Ranged,
+    expected_ty: Type,
+    actual_ty: Type,
+) {
+    let return_type_span = Span::from(context.file()).with_range(return_type_range.range());
+    context.report_lint_with_secondary_messages(
+        &INVALID_RETURN_TYPE,
+        object_range,
+        format_args!(
+            "Object of type `{}` is not assignable to return type `{}`",
+            actual_ty.display(context.db()),
+            expected_ty.display(context.db())
+        ),
+        vec![OldSecondaryDiagnosticMessage::new(
+            return_type_span,
+            format!(
+                "Return type is declared here as `{}`",
+                expected_ty.display(context.db())
+            ),
+        )],
+    );
+}
+
+pub(super) fn report_implicit_return_type(
+    context: &InferContext,
+    range: impl Ranged,
+    expected_ty: Type,
+) {
+    context.report_lint(
+        &INVALID_RETURN_TYPE,
+        range,
+        format_args!(
+            "Function can implicitly return `None`, which is not assignable to return type `{}`",
+            expected_ty.display(context.db())
+        ),
+    );
+}
+
+pub(super) fn report_invalid_type_checking_constant(context: &InferContext, node: AnyNodeRef) {
+    context.report_lint(
+        &INVALID_TYPE_CHECKING_CONSTANT,
+        node,
+        format_args!("The name TYPE_CHECKING is reserved for use as a flag; only False can be assigned to it.",),
+    );
+}
+
 pub(super) fn report_possibly_unresolved_reference(
     context: &InferContext,
     expr_name_node: &ast::ExprName,
@@ -1052,6 +1166,22 @@ pub(super) fn report_possibly_unresolved_reference(
         &POSSIBLY_UNRESOLVED_REFERENCE,
         expr_name_node,
         format_args!("Name `{id}` used when possibly not defined"),
+    );
+}
+
+pub(super) fn report_possibly_unbound_attribute(
+    context: &InferContext,
+    target: &ast::ExprAttribute,
+    attribute: &str,
+    object_ty: Type,
+) {
+    context.report_lint(
+        &POSSIBLY_UNBOUND_ATTRIBUTE,
+        target,
+        format_args!(
+            "Attribute `{attribute}` on type `{}` is possibly unbound",
+            object_ty.display(context.db()),
+        ),
     );
 }
 
@@ -1119,6 +1249,21 @@ pub(crate) fn report_invalid_arguments_to_annotated<'db>(
         format_args!(
             "Special form `{}` expected at least 2 arguments (one type and at least one metadata element)",
             KnownInstanceType::Annotated.repr(db)
+        ),
+    );
+}
+
+pub(crate) fn report_invalid_arguments_to_callable<'db>(
+    db: &'db dyn Db,
+    context: &InferContext<'db>,
+    subscript: &ast::ExprSubscript,
+) {
+    context.report_lint(
+        &INVALID_TYPE_FORM,
+        subscript,
+        format_args!(
+            "Special form `{}` expected exactly two arguments (parameter types and return type)",
+            KnownInstanceType::Callable.repr(db)
         ),
     );
 }

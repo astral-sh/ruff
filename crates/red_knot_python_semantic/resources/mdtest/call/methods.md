@@ -235,24 +235,76 @@ method_wrapper(C(), None)
 method_wrapper(None, C)
 
 # Passing `None` without an `owner` argument is an
-# error: [missing-argument] "No argument provided for required parameter `owner`"
+# error: [no-matching-overload] "No overload of method wrapper `__get__` of function `f` matches arguments"
 method_wrapper(None)
 
 # Passing something that is not assignable to `type` as the `owner` argument is an
-# error: [invalid-argument-type] "Object of type `Literal[1]` cannot be assigned to parameter 2 (`owner`) of method wrapper `__get__` of function `f`; expected type `type`"
+# error: [no-matching-overload] "No overload of method wrapper `__get__` of function `f` matches arguments"
 method_wrapper(None, 1)
 
 # Passing `None` as the `owner` argument when `instance` is `None` is an
-# error: [invalid-argument-type] "Object of type `None` cannot be assigned to parameter 2 (`owner`) of method wrapper `__get__` of function `f`; expected type `type`"
+# error: [no-matching-overload] "No overload of method wrapper `__get__` of function `f` matches arguments"
 method_wrapper(None, None)
 
 # Calling `__get__` without any arguments is an
-# error: [missing-argument] "No argument provided for required parameter `instance`"
+# error: [no-matching-overload] "No overload of method wrapper `__get__` of function `f` matches arguments"
 method_wrapper()
 
 # Calling `__get__` with too many positional arguments is an
-# error: [too-many-positional-arguments] "Too many positional arguments to method wrapper `__get__` of function `f`: expected 2, got 3"
+# error: [no-matching-overload] "No overload of method wrapper `__get__` of function `f` matches arguments"
 method_wrapper(C(), C, "one too many")
+```
+
+## Fallback to metaclass
+
+When a method is accessed on a class object, it is looked up on the metaclass if it is not found on
+the class itself. This also creates a bound method that is bound to the class object itself:
+
+```py
+from __future__ import annotations
+
+class Meta(type):
+    def f(cls, arg: int) -> str:
+        return "a"
+
+class C(metaclass=Meta):
+    pass
+
+reveal_type(C.f)  # revealed: <bound method `f` of `Literal[C]`>
+reveal_type(C.f(1))  # revealed: str
+```
+
+The method `f` can not be accessed from an instance of the class:
+
+```py
+# error: [unresolved-attribute] "Type `C` has no attribute `f`"
+C().f
+```
+
+A metaclass function can be shadowed by a method on the class:
+
+```py
+from typing import Any, Literal
+
+class D(metaclass=Meta):
+    def f(arg: int) -> Literal["a"]:
+        return "a"
+
+reveal_type(D.f(1))  # revealed: Literal["a"]
+```
+
+If the class method is possibly unbound, we union the return types:
+
+```py
+def flag() -> bool:
+    return True
+
+class E(metaclass=Meta):
+    if flag():
+        def f(arg: int) -> Any:
+            return "a"
+
+reveal_type(E.f(1))  # revealed: str | Any
 ```
 
 ## `@classmethod`
@@ -371,10 +423,10 @@ class C:
 # these should all return `str`:
 
 reveal_type(C.f1(1))  # revealed: @Todo(return type of decorated function)
-reveal_type(C().f1(1))  # revealed: @Todo(decorated method)
+reveal_type(C().f1(1))  # revealed: @Todo(return type of decorated function)
 
 reveal_type(C.f2(1))  # revealed: @Todo(return type of decorated function)
-reveal_type(C().f2(1))  # revealed: @Todo(decorated method)
+reveal_type(C().f2(1))  # revealed: @Todo(return type of decorated function)
 ```
 
 [functions and methods]: https://docs.python.org/3/howto/descriptor.html#functions-and-methods

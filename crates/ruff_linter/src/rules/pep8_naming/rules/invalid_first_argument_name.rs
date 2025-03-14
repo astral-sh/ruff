@@ -82,8 +82,8 @@ impl Violation for InvalidFirstArgumentNameForMethod {
 /// Checks for class methods that use a name other than `cls` for their
 /// first argument.
 ///
-/// With [`preview`] enabled, the method `__new__` is exempted from this
-/// check and the corresponding violation is then caught by
+/// The method `__new__` is exempted from this
+/// check and the corresponding violation is caught by
 /// [`bad-staticmethod-argument`][PLW0211].
 ///
 /// ## Why is this bad?
@@ -164,8 +164,6 @@ enum FunctionType {
     Method,
     /// The function is a class method.
     ClassMethod,
-    /// The function is the method `__new__`
-    NewMethod,
 }
 
 impl FunctionType {
@@ -177,11 +175,6 @@ impl FunctionType {
                 is_new: false,
             }
             .into(),
-            Self::NewMethod => InvalidFirstArgumentNameForClassMethod {
-                argument_name,
-                is_new: true,
-            }
-            .into(),
         }
     }
 
@@ -189,7 +182,6 @@ impl FunctionType {
         match self {
             Self::Method => "self",
             Self::ClassMethod => "cls",
-            Self::NewMethod => "cls",
         }
     }
 
@@ -197,7 +189,6 @@ impl FunctionType {
         match self {
             Self::Method => Rule::InvalidFirstArgumentNameForMethod,
             Self::ClassMethod => Rule::InvalidFirstArgumentNameForClassMethod,
-            Self::NewMethod => Rule::InvalidFirstArgumentNameForClassMethod,
         }
     }
 }
@@ -241,11 +232,10 @@ pub(crate) fn invalid_first_argument_name(checker: &Checker, scope: &Scope) {
             IsMetaclass::Maybe => return,
         },
         function_type::FunctionType::ClassMethod => FunctionType::ClassMethod,
-        // In preview, this violation is caught by `PLW0211` instead
-        function_type::FunctionType::NewMethod if checker.settings.preview.is_enabled() => {
+        // This violation is caught by `PLW0211` instead
+        function_type::FunctionType::NewMethod => {
             return;
         }
-        function_type::FunctionType::NewMethod => FunctionType::NewMethod,
     };
     if !checker.enabled(function_type.rule()) {
         return;

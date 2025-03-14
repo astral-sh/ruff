@@ -1,25 +1,50 @@
-use super::{Argument, CallArguments, InferContext, Signature, Type};
+use super::{
+    Argument, CallArguments, CallError, CallOutcome, CallableSignature, InferContext, Signature,
+    Type,
+};
 use crate::db::Db;
 use crate::types::diagnostic::{
-    INVALID_ARGUMENT_TYPE, MISSING_ARGUMENT, PARAMETER_ALREADY_ASSIGNED,
+    INVALID_ARGUMENT_TYPE, MISSING_ARGUMENT, NO_MATCHING_OVERLOAD, PARAMETER_ALREADY_ASSIGNED,
     TOO_MANY_POSITIONAL_ARGUMENTS, UNKNOWN_ARGUMENT,
 };
 use crate::types::signatures::Parameter;
-use crate::types::{todo_type, CallableType, UnionType};
-use ruff_db::diagnostic::{SecondaryDiagnosticMessage, Span};
+use crate::types::{CallableType, UnionType};
+use ruff_db::diagnostic::{OldSecondaryDiagnosticMessage, Span};
 use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
-/// Bind a [`CallArguments`] against a callable [`Signature`].
+/// Bind a [`CallArguments`] against a [`CallableSignature`].
 ///
 /// The returned [`CallBinding`] provides the return type of the call, the bound types for all
 /// parameters, and any errors resulting from binding the call.
 pub(crate) fn bind_call<'db>(
     db: &'db dyn Db,
     arguments: &CallArguments<'_, 'db>,
-    signature: &Signature<'db>,
+    overloads: &CallableSignature<'db>,
     callable_ty: Type<'db>,
 ) -> CallBinding<'db> {
+    // TODO: This checks every overload. In the proposed more detailed call checking spec [1],
+    // arguments are checked for arity first, and are only checked for type assignability against
+    // the matching overloads. Make sure to implement that as part of separating call binding into
+    // two phases.
+    //
+    // [1] https://github.com/python/typing/pull/1839
+    let overloads = overloads
+        .iter()
+        .map(|signature| bind_overload(db, arguments, signature))
+        .collect::<Vec<_>>()
+        .into_boxed_slice();
+    CallBinding {
+        callable_ty,
+        overloads,
+    }
+}
+
+fn bind_overload<'db>(
+    db: &'db dyn Db,
+    arguments: &CallArguments<'_, 'db>,
+    signature: &Signature<'db>,
+) -> OverloadBinding<'db> {
     let parameters = signature.parameters();
     // The type assigned to each parameter at this call site.
     let mut parameter_tys = vec![None; parameters.len()];
@@ -126,8 +151,7 @@ pub(crate) fn bind_call<'db>(
         });
     }
 
-    CallBinding {
-        callable_ty,
+    OverloadBinding {
         return_ty: signature.return_ty.unwrap_or(Type::unknown()),
         parameter_tys: parameter_tys
             .into_iter()
@@ -144,67 +168,77 @@ pub(crate) struct CallableDescriptor<'a> {
     kind: &'a str,
 }
 
+/// Binding information for a call site.
+///
+/// For a successful binding, each argument is mapped to one of the callable's formal parameters.
+/// If the callable has multiple overloads, the first one that matches is used as the overall
+/// binding match.
+///
+/// TODO: Implement the call site evaluation algorithm in the [proposed updated typing
+/// spec][overloads], which is much more subtle than “first match wins”.
+///
+/// If the arguments cannot be matched to formal parameters, we store information about the
+/// specific errors that occurred when trying to match them up. If the callable has multiple
+/// overloads, we store this error information for each overload.
+///
+/// [overloads]: https://github.com/python/typing/pull/1839
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct CallBinding<'db> {
     /// Type of the callable object (function, class...)
     callable_ty: Type<'db>,
 
-    /// Return type of the call.
-    return_ty: Type<'db>,
-
-    /// Bound types for parameters, in parameter source order.
-    parameter_tys: Box<[Type<'db>]>,
-
-    /// Call binding errors, if any.
-    errors: Vec<CallBindingError<'db>>,
+    overloads: Box<[OverloadBinding<'db>]>,
 }
 
 impl<'db> CallBinding<'db> {
-    // TODO remove this constructor and construct always from `bind_call`
-    pub(crate) fn from_return_type(return_ty: Type<'db>) -> Self {
-        Self {
-            callable_ty: todo_type!("CallBinding::from_return_type"),
-            return_ty,
-            parameter_tys: Box::default(),
-            errors: vec![],
+    pub(crate) fn into_outcome(self) -> Result<CallOutcome<'db>, CallError<'db>> {
+        if self.has_binding_errors() {
+            return Err(CallError::BindingError { binding: self });
         }
+        Ok(CallOutcome::Single(self))
     }
 
     pub(crate) fn callable_type(&self) -> Type<'db> {
         self.callable_ty
     }
 
-    pub(crate) fn set_return_type(&mut self, return_ty: Type<'db>) {
-        self.return_ty = return_ty;
+    /// Returns whether there were any errors binding this call site. If the callable has multiple
+    /// overloads, they must _all_ have errors.
+    pub(crate) fn has_binding_errors(&self) -> bool {
+        self.matching_overload().is_none()
     }
 
+    /// Returns the overload that matched for this call binding. Returns `None` if none of the
+    /// overloads matched.
+    pub(crate) fn matching_overload(&self) -> Option<(usize, &OverloadBinding<'db>)> {
+        self.overloads
+            .iter()
+            .enumerate()
+            .find(|(_, overload)| !overload.has_binding_errors())
+    }
+
+    /// Returns the overload that matched for this call binding. Returns `None` if none of the
+    /// overloads matched.
+    pub(crate) fn matching_overload_mut(&mut self) -> Option<(usize, &mut OverloadBinding<'db>)> {
+        self.overloads
+            .iter_mut()
+            .enumerate()
+            .find(|(_, overload)| !overload.has_binding_errors())
+    }
+
+    /// Returns the return type of this call. For a valid call, this is the return type of the
+    /// overload that the arguments matched against. For an invalid call to a non-overloaded
+    /// function, this is the return type of the function. For an invalid call to an overloaded
+    /// function, we return `Type::unknown`, since we cannot make any useful conclusions about
+    /// which overload was intended to be called.
     pub(crate) fn return_type(&self) -> Type<'db> {
-        self.return_ty
-    }
-
-    pub(crate) fn parameter_types(&self) -> &[Type<'db>] {
-        &self.parameter_tys
-    }
-
-    pub(crate) fn one_parameter_type(&self) -> Option<Type<'db>> {
-        match self.parameter_types() {
-            [ty] => Some(*ty),
-            _ => None,
+        if let Some((_, overload)) = self.matching_overload() {
+            return overload.return_type();
         }
-    }
-
-    pub(crate) fn two_parameter_types(&self) -> Option<(Type<'db>, Type<'db>)> {
-        match self.parameter_types() {
-            [first, second] => Some((*first, *second)),
-            _ => None,
+        if let [overload] = self.overloads.as_ref() {
+            return overload.return_type();
         }
-    }
-
-    pub(crate) fn three_parameter_types(&self) -> Option<(Type<'db>, Type<'db>, Type<'db>)> {
-        match self.parameter_types() {
-            [first, second, third] => Some((*first, *second, *third)),
-            _ => None,
-        }
+        Type::unknown()
     }
 
     fn callable_descriptor(&self, db: &'db dyn Db) -> Option<CallableDescriptor> {
@@ -235,15 +269,74 @@ impl<'db> CallBinding<'db> {
         }
     }
 
+    /// Report diagnostics for all of the errors that occurred when trying to match actual
+    /// arguments to formal parameters. If the callable has multiple overloads, we report a single
+    /// diagnostic that we couldn't match any overload.
+    /// TODO: Update this to add subdiagnostics about how we failed to match each overload.
     pub(crate) fn report_diagnostics(&self, context: &InferContext<'db>, node: ast::AnyNodeRef) {
         let callable_descriptor = self.callable_descriptor(context.db());
-        for error in &self.errors {
-            error.report_diagnostic(
+        if self.overloads.len() > 1 {
+            context.report_lint(
+                &NO_MATCHING_OVERLOAD,
+                node,
+                format_args!(
+                    "No overload{} matches arguments",
+                    if let Some(CallableDescriptor { kind, name }) = callable_descriptor {
+                        format!(" of {kind} `{name}`")
+                    } else {
+                        String::new()
+                    }
+                ),
+            );
+            return;
+        }
+
+        for overload in &self.overloads {
+            overload.report_diagnostics(
                 context,
                 node,
                 self.callable_ty,
                 callable_descriptor.as_ref(),
             );
+        }
+    }
+}
+
+/// Binding information for one of the overloads of a callable.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct OverloadBinding<'db> {
+    /// Return type of the call.
+    return_ty: Type<'db>,
+
+    /// Bound types for parameters, in parameter source order.
+    parameter_tys: Box<[Type<'db>]>,
+
+    /// Call binding errors, if any.
+    errors: Vec<CallBindingError<'db>>,
+}
+
+impl<'db> OverloadBinding<'db> {
+    pub(crate) fn set_return_type(&mut self, return_ty: Type<'db>) {
+        self.return_ty = return_ty;
+    }
+
+    pub(crate) fn return_type(&self) -> Type<'db> {
+        self.return_ty
+    }
+
+    pub(crate) fn parameter_types(&self) -> &[Type<'db>] {
+        &self.parameter_tys
+    }
+
+    fn report_diagnostics(
+        &self,
+        context: &InferContext<'db>,
+        node: ast::AnyNodeRef,
+        callable_ty: Type<'db>,
+        callable_descriptor: Option<&CallableDescriptor>,
+    ) {
+        for error in &self.errors {
+            error.report_diagnostic(context, node, callable_ty, callable_descriptor);
         }
     }
 
@@ -388,7 +481,7 @@ impl<'db> CallBindingError<'db> {
                 if let Some(span) =
                     Self::parameter_span_from_index(context.db(), callable_ty, parameter.index)
                 {
-                    messages.push(SecondaryDiagnosticMessage::new(
+                    messages.push(OldSecondaryDiagnosticMessage::new(
                         span,
                         "parameter declared in function definition here",
                     ));

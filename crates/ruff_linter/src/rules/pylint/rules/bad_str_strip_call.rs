@@ -187,12 +187,6 @@ pub(crate) fn bad_str_strip_call(checker: &Checker, call: &ast::ExprCall) {
 
     let value = &**value;
 
-    if checker.settings.preview.is_disabled()
-        && !matches!(value, Expr::StringLiteral(_) | Expr::BytesLiteral(_))
-    {
-        return;
-    }
-
     let Some(value_kind) = ValueKind::from(value, checker.semantic()) else {
         return;
     };

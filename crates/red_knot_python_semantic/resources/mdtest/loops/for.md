@@ -431,7 +431,7 @@ def _(flag: bool):
         # invalid signature because it only accepts a `str`,
         # but the old-style iteration protocol will pass it an `int`
         def __getitem__(self, key: str) -> bytes:
-            return 42
+            return bytes()
 
     # error: [not-iterable]
     for x in Iterable():
@@ -484,7 +484,7 @@ def _(flag1: bool, flag2: bool):
                 return Iterator()
         if flag2:
             def __getitem__(self, key: int) -> bytes:
-                return 42
+                return bytes()
 
     # error: [not-iterable]
     for x in Iterable():
@@ -682,7 +682,7 @@ def _(flag: bool):
                 return "foo"
         else:
             def __getitem__(self, item: str) -> int:
-                return "foo"
+                return 42
 
     # error: [not-iterable]
     for x in Iterable1():
@@ -723,7 +723,7 @@ def _(flag: bool, flag2: bool):
                 return "foo"
         else:
             def __getitem__(self, item: str) -> int:
-                return "foo"
+                return 42
         if flag2:
             def __iter__(self) -> Iterator:
                 return Iterator()
@@ -736,4 +736,14 @@ def _(flag: bool, flag2: bool):
     # error: [not-iterable]
     for y in Iterable2():
         reveal_type(y)  # revealed: bytes | str | int
+```
+
+## Never is iterable
+
+```py
+from typing_extensions import Never
+
+def f(never: Never):
+    for x in never:
+        reveal_type(x)  # revealed: Never
 ```

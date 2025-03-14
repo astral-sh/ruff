@@ -441,7 +441,7 @@ impl<'src> Parser<'src> {
     /// Add an [`UnsupportedSyntaxError`] with the given [`UnsupportedSyntaxErrorKind`] and
     /// [`TextRange`] if its minimum version is less than [`Parser::target_version`].
     fn add_unsupported_syntax_error(&mut self, kind: UnsupportedSyntaxErrorKind, range: TextRange) {
-        if self.options.target_version < kind.minimum_version() {
+        if kind.is_unsupported(self.options.target_version) {
             self.unsupported_syntax_errors.push(UnsupportedSyntaxError {
                 kind,
                 range,

@@ -1167,6 +1167,7 @@ impl AlwaysFixableViolation for MissingSectionNameColon {
 /// a blank line, followed by a series of sections, each with a section header
 /// and a section body. Function docstrings often include a section for
 /// function arguments; this rule is concerned with that section only.
+/// Note that this rule only checks docstrings with an arguments (e.g. `Args`) section.
 ///
 /// This rule is enabled when using the `google` convention, and disabled when
 /// using the `pep257` and `numpy` conventions.

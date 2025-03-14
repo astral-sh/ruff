@@ -1,0 +1,291 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/pos_only_py37.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..136,
+        body: [
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 43..61,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("foo"),
+                        range: 47..50,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 50..56,
+                        posonlyargs: [
+                            ParameterWithDefault {
+                                range: 51..52,
+                                parameter: Parameter {
+                                    range: 51..52,
+                                    name: Identifier {
+                                        id: Name("a"),
+                                        range: 51..52,
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                        ],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 58..61,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 58..61,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 62..86,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("foo"),
+                        range: 66..69,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 69..81,
+                        posonlyargs: [
+                            ParameterWithDefault {
+                                range: 70..71,
+                                parameter: Parameter {
+                                    range: 70..71,
+                                    name: Identifier {
+                                        id: Name("a"),
+                                        range: 70..71,
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                        ],
+                        args: [
+                            ParameterWithDefault {
+                                range: 76..77,
+                                parameter: Parameter {
+                                    range: 76..77,
+                                    name: Identifier {
+                                        id: Name("b"),
+                                        range: 76..77,
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                        ],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 83..86,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 83..86,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 87..115,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("foo"),
+                        range: 91..94,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 94..110,
+                        posonlyargs: [
+                            ParameterWithDefault {
+                                range: 95..96,
+                                parameter: Parameter {
+                                    range: 95..96,
+                                    name: Identifier {
+                                        id: Name("a"),
+                                        range: 95..96,
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                        ],
+                        args: [],
+                        vararg: Some(
+                            Parameter {
+                                range: 98..103,
+                                name: Identifier {
+                                    id: Name("args"),
+                                    range: 99..103,
+                                },
+                                annotation: None,
+                            },
+                        ),
+                        kwonlyargs: [
+                            ParameterWithDefault {
+                                range: 108..109,
+                                parameter: Parameter {
+                                    range: 108..109,
+                                    name: Identifier {
+                                        id: Name("b"),
+                                        range: 108..109,
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                        ],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 112..115,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 112..115,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 116..135,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("foo"),
+                        range: 120..123,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 123..130,
+                        posonlyargs: [],
+                        args: [
+                            ParameterWithDefault {
+                                range: 124..125,
+                                parameter: Parameter {
+                                    range: 124..125,
+                                    name: Identifier {
+                                        id: Name("a"),
+                                        range: 124..125,
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                        ],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 132..135,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 132..135,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | # parse_options: {"target-version": "3.7"}
+2 | def foo(a, /): ...
+3 | def foo(a, /, b, /): ...
+  |                  ^ Syntax Error: Only one '/' separator allowed
+4 | def foo(a, *args, /, b): ...
+5 | def foo(a, //): ...
+  |
+
+
+  |
+2 | def foo(a, /): ...
+3 | def foo(a, /, b, /): ...
+4 | def foo(a, *args, /, b): ...
+  |                   ^ Syntax Error: '/' parameter must appear before '*' parameter
+5 | def foo(a, //): ...
+  |
+
+
+  |
+3 | def foo(a, /, b, /): ...
+4 | def foo(a, *args, /, b): ...
+5 | def foo(a, //): ...
+  |            ^^ Syntax Error: Expected ',', found '//'
+  |
+
+
+## Unsupported Syntax Errors
+
+  |
+1 | # parse_options: {"target-version": "3.7"}
+2 | def foo(a, /): ...
+  |            ^ Syntax Error: Cannot use positional-only parameter separator on Python 3.7 (syntax was added in Python 3.8)
+3 | def foo(a, /, b, /): ...
+4 | def foo(a, *args, /, b): ...
+  |
+
+
+  |
+1 | # parse_options: {"target-version": "3.7"}
+2 | def foo(a, /): ...
+3 | def foo(a, /, b, /): ...
+  |            ^ Syntax Error: Cannot use positional-only parameter separator on Python 3.7 (syntax was added in Python 3.8)
+4 | def foo(a, *args, /, b): ...
+5 | def foo(a, //): ...
+  |
+
+
+  |
+2 | def foo(a, /): ...
+3 | def foo(a, /, b, /): ...
+4 | def foo(a, *args, /, b): ...
+  |                   ^ Syntax Error: Cannot use positional-only parameter separator on Python 3.7 (syntax was added in Python 3.8)
+5 | def foo(a, //): ...
+  |

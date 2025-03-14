@@ -1,5 +1,5 @@
 use super::context::InferContext;
-use super::{Signature, Type};
+use super::{CallableSignature, Signature, Type};
 use crate::types::UnionType;
 use crate::Db;
 
@@ -70,7 +70,7 @@ impl<'db> CallOutcome<'db> {
         match self {
             Self::Single(binding) => binding.return_type(),
             Self::Union(bindings) => {
-                UnionType::from_elements(db, bindings.iter().map(bind::CallBinding::return_type))
+                UnionType::from_elements(db, bindings.iter().map(CallBinding::return_type))
             }
         }
     }

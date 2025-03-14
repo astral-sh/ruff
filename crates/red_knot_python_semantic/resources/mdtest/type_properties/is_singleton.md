@@ -5,7 +5,7 @@ A type is a singleton type iff it has exactly one inhabitant.
 ## Basic
 
 ```py
-from typing_extensions import Literal, Never
+from typing_extensions import Literal, Never, Callable
 from knot_extensions import is_singleton, static_assert
 
 static_assert(is_singleton(None))
@@ -23,6 +23,9 @@ static_assert(not is_singleton(Literal[1, 2]))
 static_assert(not is_singleton(tuple[()]))
 static_assert(not is_singleton(tuple[None]))
 static_assert(not is_singleton(tuple[None, Literal[True]]))
+
+static_assert(not is_singleton(Callable[..., None]))
+static_assert(not is_singleton(Callable[[int, str], None]))
 ```
 
 ## `NoDefault`

@@ -5,7 +5,7 @@ use crate::DEFAULT_LINT_REGISTRY;
 use crate::{Project, ProjectMetadata};
 use red_knot_python_semantic::lint::{LintRegistry, RuleSelection};
 use red_knot_python_semantic::{Db as SemanticDb, Program};
-use ruff_db::diagnostic::Diagnostic;
+use ruff_db::diagnostic::OldDiagnosticTrait;
 use ruff_db::files::{File, Files};
 use ruff_db::system::System;
 use ruff_db::vendored::VendoredFileSystem;
@@ -55,11 +55,11 @@ impl ProjectDatabase {
     }
 
     /// Checks all open files in the project and its dependencies.
-    pub fn check(&self) -> Result<Vec<Box<dyn Diagnostic>>, Cancelled> {
+    pub fn check(&self) -> Result<Vec<Box<dyn OldDiagnosticTrait>>, Cancelled> {
         self.with_db(|db| db.project().check(db))
     }
 
-    pub fn check_file(&self, file: File) -> Result<Vec<Box<dyn Diagnostic>>, Cancelled> {
+    pub fn check_file(&self, file: File) -> Result<Vec<Box<dyn OldDiagnosticTrait>>, Cancelled> {
         let _span = tracing::debug_span!("check_file", file=%file.path(self)).entered();
 
         self.with_db(|db| self.project().check_file(db, file))

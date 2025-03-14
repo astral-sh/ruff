@@ -14,7 +14,7 @@ use crate::rules::flake8_builtins::helpers::shadows_builtin;
 /// as readers may mistake the variable for the builtin and vice versa.
 ///
 /// Builtins can be marked as exceptions to this rule via the
-/// [`lint.flake8-builtins.builtins-ignorelist`] configuration option.
+/// [`lint.flake8-builtins.ignorelist`] configuration option.
 ///
 /// ## Example
 /// ```python
@@ -38,7 +38,7 @@ use crate::rules::flake8_builtins::helpers::shadows_builtin;
 /// ```
 ///
 /// ## Options
-/// - `lint.flake8-builtins.builtins-ignorelist`
+/// - `lint.flake8-builtins.ignorelist`
 /// - `target-version`
 ///
 #[derive(ViolationMetadata)]
@@ -60,7 +60,7 @@ pub(crate) fn builtin_import_shadowing(checker: &Checker, alias: &Alias) {
     if shadows_builtin(
         name.as_str(),
         checker.source_type,
-        &checker.settings.flake8_builtins.builtins_ignorelist,
+        &checker.settings.flake8_builtins.ignorelist,
         checker.target_version(),
     ) {
         checker.report_diagnostic(Diagnostic::new(

@@ -201,8 +201,10 @@ pub(crate) struct AssignmentDefinitionNodeRef<'a> {
 
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct WithItemDefinitionNodeRef<'a> {
-    pub(crate) node: &'a ast::WithItem,
-    pub(crate) target: &'a ast::ExprName,
+    pub(crate) unpack: Option<Unpack<'a>>,
+    pub(crate) context_expr: &'a ast::Expr,
+    pub(crate) name: &'a ast::ExprName,
+    pub(crate) first: bool,
     pub(crate) is_async: bool,
 }
 
@@ -323,12 +325,16 @@ impl<'db> DefinitionNodeRef<'db> {
                 DefinitionKind::Parameter(AstNodeRef::new(parsed, parameter))
             }
             DefinitionNodeRef::WithItem(WithItemDefinitionNodeRef {
-                node,
-                target,
+                unpack,
+                context_expr,
+                name,
+                first,
                 is_async,
             }) => DefinitionKind::WithItem(WithItemDefinitionKind {
-                node: AstNodeRef::new(parsed.clone(), node),
-                target: AstNodeRef::new(parsed, target),
+                target: TargetKind::from(unpack),
+                context_expr: AstNodeRef::new(parsed.clone(), context_expr),
+                name: AstNodeRef::new(parsed, name),
+                first,
                 is_async,
             }),
             DefinitionNodeRef::MatchPattern(MatchPatternDefinitionNodeRef {
@@ -394,10 +400,12 @@ impl<'db> DefinitionNodeRef<'db> {
             Self::VariadicKeywordParameter(node) => node.into(),
             Self::Parameter(node) => node.into(),
             Self::WithItem(WithItemDefinitionNodeRef {
-                node: _,
-                target,
+                unpack: _,
+                context_expr: _,
+                first: _,
                 is_async: _,
-            }) => target.into(),
+                name,
+            }) => name.into(),
             Self::MatchPattern(MatchPatternDefinitionNodeRef { identifier, .. }) => {
                 identifier.into()
             }
@@ -467,7 +475,7 @@ pub enum DefinitionKind<'db> {
     VariadicPositionalParameter(AstNodeRef<ast::Parameter>),
     VariadicKeywordParameter(AstNodeRef<ast::Parameter>),
     Parameter(AstNodeRef<ast::ParameterWithDefault>),
-    WithItem(WithItemDefinitionKind),
+    WithItem(WithItemDefinitionKind<'db>),
     MatchPattern(MatchPatternDefinitionKind),
     ExceptHandler(ExceptHandlerDefinitionKind),
     TypeVar(AstNodeRef<ast::TypeParamTypeVar>),
@@ -506,7 +514,7 @@ impl DefinitionKind<'_> {
             DefinitionKind::VariadicPositionalParameter(parameter) => parameter.name.range(),
             DefinitionKind::VariadicKeywordParameter(parameter) => parameter.name.range(),
             DefinitionKind::Parameter(parameter) => parameter.parameter.name.range(),
-            DefinitionKind::WithItem(with_item) => with_item.target().range(),
+            DefinitionKind::WithItem(with_item) => with_item.name().range(),
             DefinitionKind::MatchPattern(match_pattern) => match_pattern.identifier.range(),
             DefinitionKind::ExceptHandler(handler) => handler.node().range(),
             DefinitionKind::TypeVar(type_var) => type_var.name.range(),
@@ -688,19 +696,29 @@ impl<'db> AssignmentDefinitionKind<'db> {
 }
 
 #[derive(Clone, Debug)]
-pub struct WithItemDefinitionKind {
-    node: AstNodeRef<ast::WithItem>,
-    target: AstNodeRef<ast::ExprName>,
+pub struct WithItemDefinitionKind<'db> {
+    target: TargetKind<'db>,
+    context_expr: AstNodeRef<ast::Expr>,
+    name: AstNodeRef<ast::ExprName>,
+    first: bool,
     is_async: bool,
 }
 
-impl WithItemDefinitionKind {
-    pub(crate) fn node(&self) -> &ast::WithItem {
-        self.node.node()
+impl<'db> WithItemDefinitionKind<'db> {
+    pub(crate) fn context_expr(&self) -> &ast::Expr {
+        self.context_expr.node()
     }
 
-    pub(crate) fn target(&self) -> &ast::ExprName {
-        self.target.node()
+    pub(crate) fn target(&self) -> TargetKind<'db> {
+        self.target
+    }
+
+    pub(crate) fn name(&self) -> &ast::ExprName {
+        self.name.node()
+    }
+
+    pub(crate) const fn is_first(&self) -> bool {
+        self.first
     }
 
     pub(crate) const fn is_async(&self) -> bool {
