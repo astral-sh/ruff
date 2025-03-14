@@ -87,6 +87,7 @@ mod tests {
     #[test_case(Rule::DjangoExtra, Path::new("S610.py"))]
     #[test_case(Rule::DjangoRawSql, Path::new("S611.py"))]
     #[test_case(Rule::TarfileUnsafeMembers, Path::new("S202.py"))]
+    #[test_case(Rule::UnsafeMarkupUse, Path::new("S704.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
@@ -120,6 +121,49 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Rule::UnsafeMarkupUse, Path::new("S704_extend_markup_names.py"))]
+    #[test_case(Rule::UnsafeMarkupUse, Path::new("S704_skip_early_out.py"))]
+    fn extend_allowed_callable(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "extend_allow_callables__{}_{}",
+            rule_code.noqa_code(),
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("flake8_bandit").join(path).as_path(),
+            &LinterSettings {
+                flake8_bandit: super::settings::Settings {
+                    extend_markup_names: vec!["webhelpers.html.literal".to_string()],
+                    ..Default::default()
+                },
+                ..LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::UnsafeMarkupUse, Path::new("S704_whitelisted_markup_calls.py"))]
+    fn whitelisted_markup_calls(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "whitelisted_markup_calls__{}_{}",
+            rule_code.noqa_code(),
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("flake8_bandit").join(path).as_path(),
+            &LinterSettings {
+                flake8_bandit: super::settings::Settings {
+                    allowed_markup_calls: vec!["bleach.clean".to_string()],
+                    ..Default::default()
+                },
+                ..LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
     #[test]
     fn check_hardcoded_tmp_additional_dirs() -> Result<()> {
         let diagnostics = test_path(
@@ -132,7 +176,7 @@ mod tests {
                         "/dev/shm".to_string(),
                         "/foo".to_string(),
                     ],
-                    check_typed_exception: false,
+                    ..Default::default()
                 },
                 ..LinterSettings::for_rule(Rule::HardcodedTempFile)
             },

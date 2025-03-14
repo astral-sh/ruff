@@ -246,11 +246,7 @@ impl<'a> Checker<'a> {
         notebook_index: Option<&'a NotebookIndex>,
         target_version: PythonVersion,
     ) -> Checker<'a> {
-        let mut semantic = SemanticModel::new(&settings.typing_modules, path, module);
-        if settings.preview.is_enabled() {
-            // Set the feature flag to test `TYPE_CHECKING` semantic changes
-            semantic.flags |= SemanticModelFlags::NEW_TYPE_CHECKING_BLOCK_DETECTION;
-        }
+        let semantic = SemanticModel::new(&settings.typing_modules, path, module);
         Self {
             parsed,
             parsed_type_annotation: None,
@@ -293,7 +289,14 @@ impl<'a> Checker<'a> {
         if !self.noqa.is_enabled() {
             return false;
         }
-        noqa::rule_is_ignored(code, offset, self.noqa_line_for, self.locator)
+
+        noqa::rule_is_ignored(
+            code,
+            offset,
+            self.noqa_line_for,
+            self.comment_ranges(),
+            self.locator,
+        )
     }
 
     /// Create a [`Generator`] to generate source code based on the current AST state.

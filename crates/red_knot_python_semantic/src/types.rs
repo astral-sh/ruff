@@ -956,6 +956,11 @@ impl<'db> Type<'db> {
                 first.is_gradual_equivalent_to(db, second)
             }
 
+            (
+                Type::Callable(CallableType::General(first)),
+                Type::Callable(CallableType::General(second)),
+            ) => first.is_gradual_equivalent_to(db, second),
+
             _ => false,
         }
     }
@@ -1552,6 +1557,7 @@ impl<'db> Type<'db> {
     /// of union and intersection types.
     #[salsa::tracked]
     fn class_member(self, db: &'db dyn Db, name: Name) -> SymbolAndQualifiers<'db> {
+        tracing::trace!("class_member: {}.{}", self.display(db), name);
         match self {
             Type::Union(union) => union
                 .map_with_boundness_and_qualifiers(db, |elem| elem.class_member(db, name.clone())),
@@ -1673,6 +1679,12 @@ impl<'db> Type<'db> {
         instance: Type<'db>,
         owner: Type<'db>,
     ) -> Option<(Type<'db>, AttributeKind)> {
+        tracing::trace!(
+            "try_call_dunder_get: {}, {}, {}",
+            self.display(db),
+            instance.display(db),
+            owner.display(db)
+        );
         let descr_get = self.class_member(db, "__get__".into()).symbol;
 
         if let Symbol::Type(descr_get, descr_get_boundness) = descr_get {
@@ -1906,6 +1918,7 @@ impl<'db> Type<'db> {
         name: Name,
         policy: MemberLookupPolicy,
     ) -> SymbolAndQualifiers<'db> {
+        tracing::trace!("member_lookup_with_policy: {}.{}", self.display(db), name);
         if name == "__class__" {
             return Symbol::bound(self.to_meta_type(db)).into();
         }
@@ -4329,6 +4342,17 @@ impl<'db> FunctionType<'db> {
         })
     }
 
+    /// Convert the `FunctionType` into a [`Type::Callable`].
+    ///
+    /// Returns `None` if the function is overloaded. This powers the `CallableTypeFromFunction`
+    /// special form from the `knot_extensions` module.
+    pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        // TODO: Add support for overloaded callables; return `Type`, not `Option<Type>`.
+        Some(Type::Callable(CallableType::General(
+            GeneralCallableType::new(db, self.signature(db).as_single()?.clone()),
+        )))
+    }
+
     /// Typed externally-visible signature for this function.
     ///
     /// This is the signature as seen by external callers, possibly modified by decorators and/or
@@ -4566,6 +4590,48 @@ impl<'db> GeneralCallableType<'db> {
         signature
             .return_ty
             .is_some_and(|return_type| return_type.is_fully_static(db))
+    }
+
+    /// Return `true` if `self` has exactly the same set of possible static materializations as
+    /// `other` (if `self` represents the same set of possible sets of possible runtime objects as
+    /// `other`).
+    pub(crate) fn is_gradual_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+        let self_signature = self.signature(db);
+        let other_signature = other.signature(db);
+
+        if self_signature.parameters().len() != other_signature.parameters().len() {
+            return false;
+        }
+
+        // Check gradual equivalence between the two optional types. In the context of a callable
+        // type, the `None` type represents an `Unknown` type.
+        let are_optional_types_gradually_equivalent =
+            |self_type: Option<Type<'db>>, other_type: Option<Type<'db>>| {
+                self_type
+                    .unwrap_or(Type::unknown())
+                    .is_gradual_equivalent_to(db, other_type.unwrap_or(Type::unknown()))
+            };
+
+        if !are_optional_types_gradually_equivalent(
+            self_signature.return_ty,
+            other_signature.return_ty,
+        ) {
+            return false;
+        }
+
+        // N.B. We don't need to explicitly check for the use of gradual form (`...`) in the
+        // parameters because it is internally represented by adding `*Any` and `**Any` to the
+        // parameter list.
+        self_signature
+            .parameters()
+            .iter()
+            .zip(other_signature.parameters().iter())
+            .all(|(self_param, other_param)| {
+                are_optional_types_gradually_equivalent(
+                    self_param.annotated_type(),
+                    other_param.annotated_type(),
+                )
+            })
     }
 }
 
