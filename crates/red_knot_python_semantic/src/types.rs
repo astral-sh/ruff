@@ -2164,24 +2164,32 @@ impl<'db> Type<'db> {
                     };
 
                     match self.try_call_dunder(db, "__bool__", &CallArguments::none()) {
-                        ref result @ (Ok(ref outcome)
-                        | Err(CallDunderError::PossiblyUnbound(ref outcome))) => {
+                        Ok(outcome) => {
                             let return_type = outcome.return_type(db);
-
-                            // The type has a `__bool__` method, but it doesn't return a boolean.
                             if !return_type.is_assignable_to(db, KnownClass::Bool.to_instance(db)) {
+                                // The type has a `__bool__` method, but it doesn't return a
+                                // boolean.
+                                return Err(BoolError::IncorrectReturnType {
+                                    return_type,
+                                    not_boolable_type: *instance_ty,
+                                });
+                            }
+                            type_to_truthiness(return_type)
+                        }
+
+                        Err(CallDunderError::PossiblyUnbound(outcome)) => {
+                            let return_type = outcome.return_type(db);
+                            if !return_type.is_assignable_to(db, KnownClass::Bool.to_instance(db)) {
+                                // The type has a `__bool__` method, but it doesn't return a
+                                // boolean.
                                 return Err(BoolError::IncorrectReturnType {
                                     return_type: outcome.return_type(db),
                                     not_boolable_type: *instance_ty,
                                 });
                             }
 
-                            if result.is_ok() {
-                                type_to_truthiness(return_type)
-                            } else {
-                                // Don't trust possibly unbound `__bool__` method.
-                                Truthiness::Ambiguous
-                            }
+                            // Don't trust possibly unbound `__bool__` method.
+                            Truthiness::Ambiguous
                         }
 
                         Err(CallDunderError::MethodNotAvailable) => Truthiness::Ambiguous,
@@ -2294,9 +2302,8 @@ impl<'db> Type<'db> {
         }
 
         let return_ty = match self.try_call_dunder(db, "__len__", &CallArguments::none()) {
-            Ok(bindings) | Err(CallDunderError::PossiblyUnbound(bindings)) => {
-                bindings.return_type(db)
-            }
+            Ok(bindings) => bindings.return_type(db),
+            Err(CallDunderError::PossiblyUnbound(bindings)) => bindings.return_type(db),
 
             // TODO: emit a diagnostic
             Err(CallDunderError::MethodNotAvailable) => return None,
@@ -2955,10 +2962,10 @@ impl<'db> Type<'db> {
         };
         let bindings = Bindings::bind(db, &signature, arguments);
         if let Err(err) = bindings.as_result() {
-            return Err(CallDunderError::Call(bindings, err));
+            return Err(CallDunderError::Call(Box::new(bindings), err));
         }
         if boundness == Boundness::PossiblyUnbound {
-            return Err(CallDunderError::PossiblyUnbound(bindings));
+            return Err(CallDunderError::PossiblyUnbound(Box::new(bindings)));
         }
         Ok(bindings)
     }
@@ -3820,7 +3827,7 @@ impl<'db> IterationError<'db> {
 enum IterationErrorKind<'db> {
     /// The object being iterated over has a bound `__iter__` method,
     /// but calling it with the expected arguments results in an error.
-    IterCallError(Bindings<'db>, CallError),
+    IterCallError(Box<Bindings<'db>>, CallError),
 
     /// The object being iterated over has a bound `__iter__` method that can be called
     /// with the expected types, but it returns an object that is not a valid iterator.
@@ -4346,10 +4353,11 @@ impl<'db> FunctionType<'db> {
     ///
     /// Returns `None` if the function is overloaded. This powers the `CallableTypeFromFunction`
     /// special form from the `knot_extensions` module.
-    pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
+    pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> Type<'db> {
         // TODO: Add support for overloaded callables; return `Type`, not `Option<Type>`.
-        Some(Type::Callable(CallableType::General(
-            GeneralCallableType::new(db, self.signature(db).clone()),
+        Type::Callable(CallableType::General(GeneralCallableType::new(
+            db,
+            self.signature(db).clone(),
         )))
     }
 

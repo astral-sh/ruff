@@ -6329,16 +6329,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         );
                         return Type::unknown();
                     };
-                    function_type
-                        .into_callable_type(self.db())
-                        .unwrap_or_else(|| {
-                            self.context.report_lint(
-                                &INVALID_TYPE_FORM,
-                                arguments_slice,
-                                format_args!("Overloaded function literal is not yet supported"),
-                            );
-                            Type::unknown()
-                        })
+                    function_type.into_callable_type(self.db())
                 }
             },
 

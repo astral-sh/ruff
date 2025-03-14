@@ -26,12 +26,12 @@ pub(super) enum CallDunderError<'db> {
     /// The dunder attribute exists but it can't be called with the given arguments.
     ///
     /// This includes non-callable dunder attributes that are possibly unbound.
-    Call(Bindings<'db>, CallError),
+    Call(Box<Bindings<'db>>, CallError),
 
     /// The type has the specified dunder method and it is callable
     /// with the specified arguments without any binding errors
     /// but it is possibly unbound.
-    PossiblyUnbound(Bindings<'db>),
+    PossiblyUnbound(Box<Bindings<'db>>),
 
     /// The dunder method with the specified name is missing.
     MethodNotAvailable,
