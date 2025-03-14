@@ -7,38 +7,38 @@ input_file: crates/ruff_python_parser/resources/inline/err/named_expr_slice_pars
 ```
 Module(
     ModModule {
-        range: 0..131,
+        range: 0..130,
         body: [
             Expr(
                 StmtExpr {
-                    range: 118..130,
+                    range: 117..129,
                     value: Subscript(
                         ExprSubscript {
-                            range: 118..130,
+                            range: 117..129,
                             value: Name(
                                 ExprName {
-                                    range: 118..121,
+                                    range: 117..120,
                                     id: Name("lst"),
                                     ctx: Load,
                                 },
                             ),
                             slice: Slice(
                                 ExprSlice {
-                                    range: 122..129,
+                                    range: 121..128,
                                     lower: Some(
                                         Named(
                                             ExprNamed {
-                                                range: 122..126,
+                                                range: 121..125,
                                                 target: Name(
                                                     ExprName {
-                                                        range: 122..123,
+                                                        range: 121..122,
                                                         id: Name("x"),
                                                         ctx: Store,
                                                     },
                                                 ),
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        range: 125..126,
+                                                        range: 124..125,
                                                         value: Int(
                                                             1,
                                                         ),
@@ -50,11 +50,11 @@ Module(
                                     upper: Some(
                                         UnaryOp(
                                             ExprUnaryOp {
-                                                range: 127..129,
+                                                range: 126..128,
                                                 op: USub,
                                                 operand: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        range: 128..129,
+                                                        range: 127..128,
                                                         value: Int(
                                                             1,
                                                         ),
@@ -78,8 +78,8 @@ Module(
 ## Errors
 
   |
-1 | # parse_options: {"target-version": "3.9"}
-2 | # before 3.10, only emit the parse error, not the unsupported syntax error
+1 | # parse_options: {"target-version": "3.8"}
+2 | # before 3.9, only emit the parse error, not the unsupported syntax error
 3 | lst[x:=1:-1]
   |     ^^^^ Syntax Error: Unparenthesized named expression cannot be used here
   |

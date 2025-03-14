@@ -7,38 +7,38 @@ input_file: crates/ruff_python_parser/resources/inline/err/named_expr_slice.py
 ```
 Module(
     ModModule {
-        range: 0..120,
+        range: 0..119,
         body: [
             Expr(
                 StmtExpr {
-                    range: 81..93,
+                    range: 80..92,
                     value: Subscript(
                         ExprSubscript {
-                            range: 81..93,
+                            range: 80..92,
                             value: Name(
                                 ExprName {
-                                    range: 81..84,
+                                    range: 80..83,
                                     id: Name("lst"),
                                     ctx: Load,
                                 },
                             ),
                             slice: Slice(
                                 ExprSlice {
-                                    range: 85..92,
+                                    range: 84..91,
                                     lower: Some(
                                         Named(
                                             ExprNamed {
-                                                range: 85..89,
+                                                range: 84..88,
                                                 target: Name(
                                                     ExprName {
-                                                        range: 85..86,
+                                                        range: 84..85,
                                                         id: Name("x"),
                                                         ctx: Store,
                                                     },
                                                 ),
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        range: 88..89,
+                                                        range: 87..88,
                                                         value: Int(
                                                             1,
                                                         ),
@@ -50,11 +50,11 @@ Module(
                                     upper: Some(
                                         UnaryOp(
                                             ExprUnaryOp {
-                                                range: 90..92,
+                                                range: 89..91,
                                                 op: USub,
                                                 operand: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        range: 91..92,
+                                                        range: 90..91,
                                                         value: Int(
                                                             1,
                                                         ),
@@ -73,24 +73,24 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 94..101,
+                    range: 93..100,
                     value: Subscript(
                         ExprSubscript {
-                            range: 94..101,
+                            range: 93..100,
                             value: Name(
                                 ExprName {
-                                    range: 94..97,
+                                    range: 93..96,
                                     id: Name("lst"),
                                     ctx: Load,
                                 },
                             ),
                             slice: Slice(
                                 ExprSlice {
-                                    range: 98..101,
+                                    range: 97..100,
                                     lower: Some(
                                         NumberLiteral(
                                             ExprNumberLiteral {
-                                                range: 98..99,
+                                                range: 97..98,
                                                 value: Int(
                                                     1,
                                                 ),
@@ -100,7 +100,7 @@ Module(
                                     upper: Some(
                                         Name(
                                             ExprName {
-                                                range: 100..101,
+                                                range: 99..100,
                                                 id: Name("x"),
                                                 ctx: Load,
                                             },
@@ -116,10 +116,10 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 103..104,
+                    range: 102..103,
                     value: NumberLiteral(
                         ExprNumberLiteral {
-                            range: 103..104,
+                            range: 102..103,
                             value: Int(
                                 1,
                             ),
@@ -129,24 +129,24 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 106..115,
+                    range: 105..114,
                     value: Subscript(
                         ExprSubscript {
-                            range: 106..115,
+                            range: 105..114,
                             value: Name(
                                 ExprName {
-                                    range: 106..109,
+                                    range: 105..108,
                                     id: Name("lst"),
                                     ctx: Load,
                                 },
                             ),
                             slice: Slice(
                                 ExprSlice {
-                                    range: 110..115,
+                                    range: 109..114,
                                     lower: Some(
                                         NumberLiteral(
                                             ExprNumberLiteral {
-                                                range: 110..111,
+                                                range: 109..110,
                                                 value: Int(
                                                     1,
                                                 ),
@@ -156,7 +156,7 @@ Module(
                                     upper: Some(
                                         NumberLiteral(
                                             ExprNumberLiteral {
-                                                range: 112..113,
+                                                range: 111..112,
                                                 value: Int(
                                                     3,
                                                 ),
@@ -166,7 +166,7 @@ Module(
                                     step: Some(
                                         Name(
                                             ExprName {
-                                                range: 114..115,
+                                                range: 113..114,
                                                 id: Name("x"),
                                                 ctx: Load,
                                             },
@@ -181,10 +181,10 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 117..118,
+                    range: 116..117,
                     value: NumberLiteral(
                         ExprNumberLiteral {
-                            range: 117..118,
+                            range: 116..117,
                             value: Int(
                                 1,
                             ),
@@ -199,7 +199,7 @@ Module(
 ## Errors
 
   |
-1 | # even after 3.10, an unparenthesized named expression is not allowed in a slice
+1 | # even after 3.9, an unparenthesized named expression is not allowed in a slice
 2 | lst[x:=1:-1]
   |     ^^^^ Syntax Error: Unparenthesized named expression cannot be used here
 3 | lst[1:x:=1]
@@ -208,7 +208,7 @@ Module(
 
 
   |
-1 | # even after 3.10, an unparenthesized named expression is not allowed in a slice
+1 | # even after 3.9, an unparenthesized named expression is not allowed in a slice
 2 | lst[x:=1:-1]
 3 | lst[1:x:=1]
   |        ^^ Syntax Error: Expected ']', found ':='
@@ -217,7 +217,7 @@ Module(
 
 
   |
-1 | # even after 3.10, an unparenthesized named expression is not allowed in a slice
+1 | # even after 3.9, an unparenthesized named expression is not allowed in a slice
 2 | lst[x:=1:-1]
 3 | lst[1:x:=1]
   |           ^ Syntax Error: Expected a statement
@@ -226,7 +226,7 @@ Module(
 
 
   |
-1 | # even after 3.10, an unparenthesized named expression is not allowed in a slice
+1 | # even after 3.9, an unparenthesized named expression is not allowed in a slice
 2 | lst[x:=1:-1]
 3 | lst[1:x:=1]
   |            ^ Syntax Error: Expected a statement

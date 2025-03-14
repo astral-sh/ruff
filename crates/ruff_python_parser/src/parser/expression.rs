@@ -901,14 +901,14 @@ impl<'src> Parser<'src> {
             TokenSet::new([TokenKind::Comma, TokenKind::Rsqb]).union(NEWLINE_EOF_SET);
 
         // test_err named_expr_slice
-        // # even after 3.10, an unparenthesized named expression is not allowed in a slice
+        // # even after 3.9, an unparenthesized named expression is not allowed in a slice
         // lst[x:=1:-1]
         // lst[1:x:=1]
         // lst[1:3:x:=1]
 
         // test_err named_expr_slice_parse_error
-        // # parse_options: {"target-version": "3.9"}
-        // # before 3.10, only emit the parse error, not the unsupported syntax error
+        // # parse_options: {"target-version": "3.8"}
+        // # before 3.9, only emit the parse error, not the unsupported syntax error
         // lst[x:=1:-1]
 
         let start = self.node_start();
@@ -919,16 +919,16 @@ impl<'src> Parser<'src> {
 
             // This means we're in a subscript.
             if self.at_ts(NEWLINE_EOF_SET.union([TokenKind::Rsqb, TokenKind::Comma].into())) {
-                // test_ok parenthesized_named_expr_index_py39
-                // # parse_options: {"target-version": "3.9"}
+                // test_ok parenthesized_named_expr_index_py38
+                // # parse_options: {"target-version": "3.8"}
                 // lst[(x:=1)]
 
-                // test_ok unparenthesized_named_expr_index_py310
-                // # parse_options: {"target-version": "3.10"}
+                // test_ok unparenthesized_named_expr_index_py39
+                // # parse_options: {"target-version": "3.9"}
                 // lst[x:=1]
 
-                // test_err unparenthesized_named_expr_index_py39
-                // # parse_options: {"target-version": "3.9"}
+                // test_err unparenthesized_named_expr_index_py38
+                // # parse_options: {"target-version": "3.8"}
                 // lst[x:=1]
                 if lower.is_unparenthesized_named_expr() {
                     self.add_unsupported_syntax_error(
@@ -1693,18 +1693,18 @@ impl<'src> Parser<'src> {
                         &key_or_element,
                     );
                 } else if key_or_element.is_unparenthesized_named_expr() {
-                    // test_ok parenthesized_named_expr_py39
-                    // # parse_options: {"target-version": "3.9"}
+                    // test_ok parenthesized_named_expr_py38
+                    // # parse_options: {"target-version": "3.8"}
                     // {(x := 1), 2, 3}
                     // {(last := x) for x in range(3)}
 
-                    // test_ok unparenthesized_named_expr_py310
-                    // # parse_options: {"target-version": "3.10"}
+                    // test_ok unparenthesized_named_expr_py39
+                    // # parse_options: {"target-version": "3.9"}
                     // {x := 1, 2, 3}
                     // {last := x for x in range(3)}
 
-                    // test_err unparenthesized_named_expr_set_comp_py39
-                    // # parse_options: {"target-version": "3.9"}
+                    // test_err unparenthesized_named_expr_set_comp_py38
+                    // # parse_options: {"target-version": "3.8"}
                     // {last := x for x in range(3)}
                     self.add_unsupported_syntax_error(
                         UnsupportedSyntaxErrorKind::UnparenthesizedNamedExpr(
@@ -1905,8 +1905,8 @@ impl<'src> Parser<'src> {
             self.expect(TokenKind::Comma);
         }
 
-        // test_err unparenthesized_named_expr_set_literal_py39
-        // # parse_options: {"target-version": "3.9"}
+        // test_err unparenthesized_named_expr_set_literal_py38
+        // # parse_options: {"target-version": "3.8"}
         // {x := 1, 2, 3}
         // {1, x := 2, 3}
         // {1, 2, x := 3}

@@ -819,7 +819,7 @@ impl UnsupportedSyntaxErrorKind {
             UnsupportedSyntaxErrorKind::Walrus => Change::Added(PythonVersion::PY38),
             UnsupportedSyntaxErrorKind::ExceptStar => Change::Added(PythonVersion::PY311),
             UnsupportedSyntaxErrorKind::UnparenthesizedNamedExpr(_) => {
-                Change::Added(PythonVersion::PY310)
+                Change::Added(PythonVersion::PY39)
             }
             UnsupportedSyntaxErrorKind::StarTuple(_) => Change::Added(PythonVersion::PY38),
             UnsupportedSyntaxErrorKind::RelaxedDecorator => Change::Added(PythonVersion::PY39),
