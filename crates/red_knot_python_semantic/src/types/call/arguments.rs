@@ -32,17 +32,17 @@ impl<'a, 'db> CallArguments<'a, 'db> {
 
     // TODO this should be eliminated in favor of [`bind_call`]
     pub(crate) fn first_argument(&self) -> Option<Type<'db>> {
-        self.0.first().map(Argument::ty)
+        self.0.first().map(Argument::argument_type)
     }
 
     // TODO this should be eliminated in favor of [`bind_call`]
     pub(crate) fn second_argument(&self) -> Option<Type<'db>> {
-        self.0.get(1).map(Argument::ty)
+        self.0.get(1).map(Argument::argument_type)
     }
 
     // TODO this should be eliminated in favor of [`bind_call`]
     pub(crate) fn third_argument(&self) -> Option<Type<'db>> {
-        self.0.get(2).map(Argument::ty)
+        self.0.get(2).map(Argument::argument_type)
     }
 }
 
@@ -65,42 +65,42 @@ impl<'a, 'db> FromIterator<Argument<'a, 'db>> for CallArguments<'a, 'db> {
 pub(crate) struct Argument<'a, 'db> {
     kind: ArgumentKind<'a>,
     /// The inferred type of this argument.
-    ty: Type<'db>,
+    argument_type: Type<'db>,
 }
 
 impl<'a, 'db> Argument<'a, 'db> {
-    pub(crate) fn keyword(name: &'a str, ty: Type<'db>) -> Self {
+    pub(crate) fn keyword(name: &'a str, argument_type: Type<'db>) -> Self {
         Self {
             kind: ArgumentKind::Keyword(name),
-            ty,
+            argument_type,
         }
     }
 
-    pub(crate) fn keywords(ty: Type<'db>) -> Self {
+    pub(crate) fn keywords(argument_type: Type<'db>) -> Self {
         Self {
             kind: ArgumentKind::Keywords,
-            ty,
+            argument_type,
         }
     }
 
-    pub(crate) fn positional(ty: Type<'db>) -> Self {
+    pub(crate) fn positional(argument_type: Type<'db>) -> Self {
         Self {
             kind: ArgumentKind::Positional,
-            ty,
+            argument_type,
         }
     }
 
-    pub(crate) fn synthetic(ty: Type<'db>) -> Self {
+    pub(crate) fn synthetic(argument_type: Type<'db>) -> Self {
         Self {
             kind: ArgumentKind::Synthetic,
-            ty,
+            argument_type,
         }
     }
 
-    pub(crate) fn variadic(ty: Type<'db>) -> Self {
+    pub(crate) fn variadic(argument_type: Type<'db>) -> Self {
         Self {
             kind: ArgumentKind::Variadic,
-            ty,
+            argument_type,
         }
     }
 
@@ -108,8 +108,8 @@ impl<'a, 'db> Argument<'a, 'db> {
         self.kind
     }
 
-    pub(crate) fn ty(&self) -> Type<'db> {
-        self.ty
+    pub(crate) fn argument_type(&self) -> Type<'db> {
+        self.argument_type
     }
 }
 
