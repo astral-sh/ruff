@@ -2323,7 +2323,7 @@ impl<'db> Type<'db> {
     /// Note that all types have a valid [`Signatures`], even if the type is not callable.
     /// Moreover, "callable" can be subtle for a union type, since some union elements might be
     /// callable and some not. A union is callable if every element type is callable — and even
-    /// then, the elements might be inconsisent, such that there's no argument list that's valid
+    /// then, the elements might be inconsistent, such that there's no argument list that's valid
     /// for all elements. It's usually best to only worry about "callability" relative to a
     /// particular argument list, via [`try_call`][Self::try_call] and
     /// [`CallErrorKind::NotCallable`].
