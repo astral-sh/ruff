@@ -68,8 +68,7 @@ PERF403.py:106:9: PERF403 Use a dictionary comprehension instead of a for-loop
     |
 104 |       ):
 105 |           # comment 3
-106 |           result[
-    |  _________^
+106 | /         result[
 107 | |             name  # comment 4
 108 | |         ] = idx  # PERF403
     | |_______________^ PERF403
