@@ -3548,7 +3548,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 for binding in bindings.iter() {
                     let Some(known_function) = binding
                         .signature
-                        .ty
+                        .callable_type
                         .into_function_literal()
                         .and_then(|function_type| function_type.known(self.db()))
                     else {

@@ -21,33 +21,40 @@ use ruff_python_ast::{self as ast, name::Name};
 #[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
 pub(crate) struct Signatures<'db> {
     /// The type that is (hopefully) callable.
-    pub(crate) ty: Type<'db>,
+    pub(crate) callable_type: Type<'db>,
     /// For an object that's callable via a `__call__` method, the type of that method. For an
     /// object that is directly callable, the type of the object.
-    pub(crate) signature_ty: Type<'db>,
+    pub(crate) signature_type: Type<'db>,
     elements: Vec<CallableSignature<'db>>,
 }
 
 impl<'db> Signatures<'db> {
-    pub(crate) fn not_callable(ty: Type<'db>, signature_ty: Type<'db>) -> Self {
+    pub(crate) fn not_callable(callable_type: Type<'db>, signature_type: Type<'db>) -> Self {
         Self {
-            ty,
-            signature_ty,
-            elements: vec![CallableSignature::not_callable(ty, signature_ty)],
+            callable_type,
+            signature_type,
+            elements: vec![CallableSignature::not_callable(
+                callable_type,
+                signature_type,
+            )],
         }
     }
 
     pub(crate) fn single(signature: CallableSignature<'db>) -> Self {
         Self {
-            ty: signature.ty,
-            signature_ty: signature.signature_ty,
+            callable_type: signature.callable_type,
+            signature_type: signature.signature_type,
             elements: vec![signature],
         }
     }
 
     /// Creates a new `Signatures` from an iterator of [`Signature`]s. Panics if the iterator is
     /// empty.
-    pub(crate) fn from_union<I>(ty: Type<'db>, signature_ty: Type<'db>, elements: I) -> Self
+    pub(crate) fn from_union<I>(
+        callable_type: Type<'db>,
+        signature_type: Type<'db>,
+        elements: I,
+    ) -> Self
     where
         I: IntoIterator<Item = &'db Signatures<'db>>,
     {
@@ -56,8 +63,8 @@ impl<'db> Signatures<'db> {
             .flat_map(|s| s.elements.iter().cloned())
             .collect();
         Self {
-            ty,
-            signature_ty,
+            callable_type,
+            signature_type,
             elements,
         }
     }
@@ -85,11 +92,11 @@ impl<'db> Signatures<'db> {
 #[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
 pub(crate) struct CallableSignature<'db> {
     /// The type that is (hopefully) callable.
-    pub(crate) ty: Type<'db>,
+    pub(crate) callable_type: Type<'db>,
 
     /// For an object that's callable via a `__call__` method, the type of that method. For an
     /// object that is directly callable, the type of the object.
-    pub(crate) signature_ty: Type<'db>,
+    pub(crate) signature_type: Type<'db>,
 
     /// If this is a callable object (i.e. called via a `__call__` method), the boundness of
     /// that call method.
@@ -102,10 +109,10 @@ pub(crate) struct CallableSignature<'db> {
 }
 
 impl<'db> CallableSignature<'db> {
-    pub(crate) fn not_callable(ty: Type<'db>, signature_ty: Type<'db>) -> Self {
+    pub(crate) fn not_callable(callable_type: Type<'db>, signature_type: Type<'db>) -> Self {
         Self {
-            ty,
-            signature_ty,
+            callable_type,
+            signature_type,
             dunder_call_boundness: None,
             bound_type: None,
             overloads: vec![],
@@ -113,13 +120,13 @@ impl<'db> CallableSignature<'db> {
     }
 
     pub(crate) fn single(
-        ty: Type<'db>,
-        signature_ty: Type<'db>,
+        callable_type: Type<'db>,
+        signature_type: Type<'db>,
         signature: Signature<'db>,
     ) -> Self {
         Self {
-            ty,
-            signature_ty,
+            callable_type,
+            signature_type,
             dunder_call_boundness: None,
             bound_type: None,
             overloads: vec![signature],
@@ -127,13 +134,17 @@ impl<'db> CallableSignature<'db> {
     }
 
     /// Creates a new `CallableSignature` from a non-empty iterator of [`Signature`]s.
-    pub(crate) fn from_overloads<I>(ty: Type<'db>, signature_ty: Type<'db>, overloads: I) -> Self
+    pub(crate) fn from_overloads<I>(
+        callable_type: Type<'db>,
+        signature_type: Type<'db>,
+        overloads: I,
+    ) -> Self
     where
         I: IntoIterator<Item = Signature<'db>>,
     {
         Self {
-            ty,
-            signature_ty,
+            callable_type,
+            signature_type,
             dunder_call_boundness: None,
             bound_type: None,
             overloads: overloads.into_iter().collect(),
@@ -141,23 +152,23 @@ impl<'db> CallableSignature<'db> {
     }
 
     /// Return a signature for a dynamic callable
-    pub(crate) fn dynamic(ty: Type<'db>) -> Self {
+    pub(crate) fn dynamic(callable_type: Type<'db>) -> Self {
         let signature = Signature {
             parameters: Parameters::gradual_form(),
-            return_ty: Some(ty),
+            return_ty: Some(callable_type),
         };
-        Self::single(ty, ty, signature)
+        Self::single(callable_type, callable_type, signature)
     }
 
     /// Return a todo signature: (*args: Todo, **kwargs: Todo) -> Todo
     #[allow(unused_variables)] // 'reason' only unused in debug builds
     pub(crate) fn todo(reason: &'static str) -> Self {
-        let ty = todo_type!(reason);
+        let callable_type = todo_type!(reason);
         let signature = Signature {
             parameters: Parameters::todo(),
-            return_ty: Some(ty),
+            return_ty: Some(callable_type),
         };
-        Self::single(ty, ty, signature)
+        Self::single(callable_type, callable_type, signature)
     }
 
     /// Returns the [`Signature`] if this is a non-overloaded callable, [None] otherwise.

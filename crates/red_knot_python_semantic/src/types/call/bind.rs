@@ -74,7 +74,7 @@ impl<'db> Bindings<'db> {
     }
 
     pub(crate) fn callable_type(&self) -> Type<'db> {
-        self.signatures.ty
+        self.signatures.callable_type
     }
 
     /// Returns the return type of the call. For successful calls, this is the actual return type.
@@ -177,7 +177,7 @@ impl<'db> Bindings<'db> {
                 node,
                 format_args!(
                     "Object of type `{}` is not callable",
-                    self.signatures.ty.display(context.db())
+                    self.signatures.callable_type.display(context.db())
                 ),
             );
             return;
@@ -361,7 +361,7 @@ impl<'db> CallableBinding<'db> {
                 node,
                 format_args!(
                     "Object of type `{}` is not callable",
-                    self.signature.ty.display(context.db()),
+                    self.signature.callable_type.display(context.db()),
                 ),
             );
             return;
@@ -373,13 +373,14 @@ impl<'db> CallableBinding<'db> {
                 node,
                 format_args!(
                     "Object of type `{}` is not callable (possibly unbound `__call__` method)",
-                    self.signature.ty.display(context.db()),
+                    self.signature.callable_type.display(context.db()),
                 ),
             );
             return;
         }
 
-        let callable_descriptor = CallableDescription::new(context.db(), self.signature.ty);
+        let callable_descriptor =
+            CallableDescription::new(context.db(), self.signature.callable_type);
         if self.overloads().len() > 1 {
             context.report_lint(
                 &NO_MATCHING_OVERLOAD,
@@ -397,12 +398,12 @@ impl<'db> CallableBinding<'db> {
         }
 
         let callable_descriptor =
-            CallableDescription::new(context.db(), self.signature.signature_ty);
+            CallableDescription::new(context.db(), self.signature.signature_type);
         for overload in self.overloads() {
             overload.report_diagnostics(
                 context,
                 node,
-                self.signature.signature_ty,
+                self.signature.signature_type,
                 callable_descriptor.as_ref(),
             );
         }
@@ -586,8 +587,8 @@ pub(crate) struct CallableDescription<'a> {
 }
 
 impl<'db> CallableDescription<'db> {
-    fn new(db: &'db dyn Db, ty: Type<'db>) -> Option<CallableDescription<'db>> {
-        match ty {
+    fn new(db: &'db dyn Db, callable_type: Type<'db>) -> Option<CallableDescription<'db>> {
+        match callable_type {
             Type::FunctionLiteral(function) => Some(CallableDescription {
                 kind: "function",
                 name: function.name(db),
