@@ -110,7 +110,8 @@ given operator:
 
 ```py
 class Container:
-    def __contains__(self, x) -> bool: ...
+    def __contains__(self, x) -> bool:
+        return False
 
 class NonContainer: ...
 
@@ -130,7 +131,8 @@ unsupported for the given operator:
 
 ```py
 class Container:
-    def __contains__(self, x) -> bool: ...
+    def __contains__(self, x) -> bool:
+        return False
 
 class NonContainer: ...
 

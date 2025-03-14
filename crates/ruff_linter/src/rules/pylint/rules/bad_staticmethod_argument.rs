@@ -3,6 +3,7 @@ use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
 use ruff_python_ast::ParameterWithDefault;
 use ruff_python_semantic::analyze::function_type;
+use ruff_python_semantic::analyze::function_type::FunctionType;
 use ruff_python_semantic::Scope;
 use ruff_text_size::Ranged;
 
@@ -10,9 +11,7 @@ use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for static methods that use `self` or `cls` as their first argument.
-///
-/// If [`preview`] mode is enabled, this rule also applies to
-/// `__new__` methods, which are implicitly static.
+/// This rule also applies to `__new__` methods, which are implicitly static.
 ///
 /// ## Why is this bad?
 /// [PEP 8] recommends the use of `self` and `cls` as the first arguments for
@@ -77,9 +76,8 @@ pub(crate) fn bad_staticmethod_argument(checker: &Checker, scope: &Scope) {
     );
 
     match type_ {
-        function_type::FunctionType::StaticMethod => {}
-        function_type::FunctionType::NewMethod if checker.settings.preview.is_enabled() => {}
-        _ => {
+        FunctionType::StaticMethod | FunctionType::NewMethod => {}
+        FunctionType::Function | FunctionType::Method | FunctionType::ClassMethod => {
             return;
         }
     };

@@ -83,10 +83,13 @@ mod tests {
     #[test_case(Rule::InvalidAssertMessageLiteralArgument, Path::new("RUF040.py"))]
     #[test_case(Rule::UnnecessaryNestedLiteral, Path::new("RUF041.py"))]
     #[test_case(Rule::UnnecessaryNestedLiteral, Path::new("RUF041.pyi"))]
+    #[test_case(Rule::UnnecessaryCastToInt, Path::new("RUF046.py"))]
     #[test_case(Rule::NeedlessElse, Path::new("RUF047_if.py"))]
     #[test_case(Rule::NeedlessElse, Path::new("RUF047_for.py"))]
     #[test_case(Rule::NeedlessElse, Path::new("RUF047_while.py"))]
     #[test_case(Rule::NeedlessElse, Path::new("RUF047_try.py"))]
+    #[test_case(Rule::MapIntVersionParsing, Path::new("RUF048.py"))]
+    #[test_case(Rule::MapIntVersionParsing, Path::new("RUF048_1.py"))]
     #[test_case(Rule::IfKeyInDictDel, Path::new("RUF051.py"))]
     #[test_case(Rule::UsedDummyVariable, Path::new("RUF052.py"))]
     #[test_case(Rule::FalsyDictGetFallback, Path::new("RUF056.py"))]
@@ -113,8 +116,6 @@ mod tests {
             &LinterSettings {
                 ruff: super::settings::Settings {
                     parenthesize_tuple_in_subscript: true,
-                    extend_markup_names: vec![],
-                    allowed_markup_calls: vec![],
                 },
                 ..LinterSettings::for_rule(Rule::IncorrectlyParenthesizedTupleInSubscript)
             },
@@ -130,8 +131,6 @@ mod tests {
             &LinterSettings {
                 ruff: super::settings::Settings {
                     parenthesize_tuple_in_subscript: false,
-                    extend_markup_names: vec![],
-                    allowed_markup_calls: vec![],
                 },
                 unresolved_target_version: PythonVersion::PY310,
                 ..LinterSettings::for_rule(Rule::IncorrectlyParenthesizedTupleInSubscript)
@@ -423,15 +422,11 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Rule::UnsafeMarkupUse, Path::new("RUF035.py"))]
-    #[test_case(Rule::MapIntVersionParsing, Path::new("RUF048.py"))]
-    #[test_case(Rule::MapIntVersionParsing, Path::new("RUF048_1.py"))]
     #[test_case(Rule::UnrawRePattern, Path::new("RUF039.py"))]
     #[test_case(Rule::UnrawRePattern, Path::new("RUF039_concat.py"))]
     #[test_case(Rule::UnnecessaryRegularExpression, Path::new("RUF055_0.py"))]
     #[test_case(Rule::UnnecessaryRegularExpression, Path::new("RUF055_1.py"))]
     #[test_case(Rule::UnnecessaryRegularExpression, Path::new("RUF055_2.py"))]
-    #[test_case(Rule::UnnecessaryCastToInt, Path::new("RUF046.py"))]
     #[test_case(Rule::PytestRaisesAmbiguousPattern, Path::new("RUF043.py"))]
     #[test_case(Rule::UnnecessaryRound, Path::new("RUF057.py"))]
     #[test_case(Rule::DataclassEnum, Path::new("RUF049.py"))]
@@ -451,53 +446,6 @@ mod tests {
             &settings::LinterSettings {
                 preview: PreviewMode::Enabled,
                 ..settings::LinterSettings::for_rule(rule_code)
-            },
-        )?;
-        assert_messages!(snapshot, diagnostics);
-        Ok(())
-    }
-
-    #[test_case(Rule::UnsafeMarkupUse, Path::new("RUF035_extend_markup_names.py"))]
-    #[test_case(Rule::UnsafeMarkupUse, Path::new("RUF035_skip_early_out.py"))]
-    fn extend_allowed_callable(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!(
-            "extend_allow_callables__{}_{}",
-            rule_code.noqa_code(),
-            path.to_string_lossy()
-        );
-        let diagnostics = test_path(
-            Path::new("ruff").join(path).as_path(),
-            &LinterSettings {
-                ruff: super::settings::Settings {
-                    parenthesize_tuple_in_subscript: true,
-                    extend_markup_names: vec!["webhelpers.html.literal".to_string()],
-                    allowed_markup_calls: vec![],
-                },
-                preview: PreviewMode::Enabled,
-                ..LinterSettings::for_rule(rule_code)
-            },
-        )?;
-        assert_messages!(snapshot, diagnostics);
-        Ok(())
-    }
-
-    #[test_case(Rule::UnsafeMarkupUse, Path::new("RUF035_whitelisted_markup_calls.py"))]
-    fn whitelisted_markup_calls(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!(
-            "whitelisted_markup_calls__{}_{}",
-            rule_code.noqa_code(),
-            path.to_string_lossy()
-        );
-        let diagnostics = test_path(
-            Path::new("ruff").join(path).as_path(),
-            &LinterSettings {
-                ruff: super::settings::Settings {
-                    parenthesize_tuple_in_subscript: true,
-                    extend_markup_names: vec![],
-                    allowed_markup_calls: vec!["bleach.clean".to_string()],
-                },
-                preview: PreviewMode::Enabled,
-                ..LinterSettings::for_rule(rule_code)
             },
         )?;
         assert_messages!(snapshot, diagnostics);

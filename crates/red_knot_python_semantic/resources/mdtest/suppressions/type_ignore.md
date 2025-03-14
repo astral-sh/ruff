@@ -38,16 +38,15 @@ For example, the `type: ignore` comment in this example suppresses the error of 
 `"test"` and adding `"other"` to the result of the cast.
 
 ```py
-# fmt: off
 from typing import cast
 
 y = (
-    cast(int, "test" +
-            # TODO: Remove the expected error after implementing `invalid-operator` for binary expressions
-            # error: [unused-ignore-comment]
-            2 # type: ignore
+    # error: [unsupported-operator]
+    cast(
+        int,
+        2 + "test",  # type: ignore
     )
-    + "other"  # TODO: expected-error[invalid-operator]
+    + "other"
 )
 ```
 

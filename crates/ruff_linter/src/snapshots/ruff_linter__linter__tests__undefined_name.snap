@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/linter.rs
-snapshot_kind: text
 ---
 undefined_name.ipynb:cell 3:1:7: F821 Undefined name `undefined`
   |

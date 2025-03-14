@@ -8,8 +8,8 @@ use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId, SymbolTable};
 use crate::semantic_index::symbol_table;
 use crate::types::infer::infer_same_file_expression_type;
 use crate::types::{
-    infer_expression_types, IntersectionBuilder, KnownClass, SubclassOfType, Truthiness, Type,
-    UnionBuilder,
+    infer_expression_types, ClassLiteralType, IntersectionBuilder, KnownClass, SubclassOfType,
+    Truthiness, Type, UnionBuilder,
 };
 use crate::Db;
 use itertools::Itertools;
@@ -379,7 +379,11 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                             keywords,
                             range: _,
                         },
-                }) if rhs_ty.is_class_literal() && keywords.is_empty() => {
+                }) if keywords.is_empty() => {
+                    let Type::ClassLiteral(ClassLiteralType { class: rhs_class }) = rhs_ty else {
+                        continue;
+                    };
+
                     let [ast::Expr::Name(ast::ExprName { id, .. })] = &**args else {
                         continue;
                     };
@@ -394,10 +398,10 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                         continue;
                     }
 
-                    let callable_ty =
+                    let callable_type =
                         inference.expression_type(callable.scoped_expression_id(self.db, scope));
 
-                    if callable_ty
+                    if callable_type
                         .into_class_literal()
                         .is_some_and(|c| c.class().is_known(self.db, KnownClass::Type))
                     {
@@ -405,7 +409,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                             .symbols()
                             .symbol_id_by_name(id)
                             .expect("Should always have a symbol for every Name node");
-                        constraints.insert(symbol, rhs_ty.to_instance(self.db));
+                        constraints.insert(symbol, Type::instance(rhs_class));
                     }
                 }
                 _ => {}
@@ -494,17 +498,16 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         subject: Expression<'db>,
         cls: Expression<'db>,
     ) -> Option<NarrowingConstraints<'db>> {
-        if let Some(ast::ExprName { id, .. }) = subject.node_ref(self.db).as_name_expr() {
-            // SAFETY: we should always have a symbol for every Name node.
-            let symbol = self.symbols().symbol_id_by_name(id).unwrap();
-            let ty = infer_same_file_expression_type(self.db, cls).to_instance(self.db);
+        let ast::ExprName { id, .. } = subject.node_ref(self.db).as_name_expr()?;
+        let symbol = self
+            .symbols()
+            .symbol_id_by_name(id)
+            .expect("We should always have a symbol for every `Name` node");
+        let ty = infer_same_file_expression_type(self.db, cls).to_instance(self.db)?;
 
-            let mut constraints = NarrowingConstraints::default();
-            constraints.insert(symbol, ty);
-            Some(constraints)
-        } else {
-            None
-        }
+        let mut constraints = NarrowingConstraints::default();
+        constraints.insert(symbol, ty);
+        Some(constraints)
     }
 
     fn evaluate_bool_op(

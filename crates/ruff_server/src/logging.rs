@@ -64,6 +64,8 @@ pub(crate) fn init_logging(log_level: LogLevel, log_file: Option<&std::path::Pat
 
     tracing::subscriber::set_global_default(subscriber)
         .expect("should be able to set global default subscriber");
+
+    tracing_log::LogTracer::init().unwrap();
 }
 
 /// The log level for the server as provided by the client during initialization.

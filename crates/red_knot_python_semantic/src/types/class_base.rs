@@ -103,6 +103,7 @@ impl<'db> ClassBase<'db> {
                 | KnownInstanceType::Not
                 | KnownInstanceType::Intersection
                 | KnownInstanceType::TypeOf
+                | KnownInstanceType::CallableTypeFromFunction
                 | KnownInstanceType::AlwaysTruthy
                 | KnownInstanceType::AlwaysFalsy => None,
                 KnownInstanceType::Unknown => Some(Self::unknown()),
@@ -144,6 +145,7 @@ impl<'db> ClassBase<'db> {
                 KnownInstanceType::Callable => {
                     Self::try_from_type(db, todo_type!("Support for Callable as a base class"))
                 }
+                KnownInstanceType::Protocol => Some(ClassBase::Dynamic(DynamicType::TodoProtocol)),
             },
         }
     }
