@@ -2699,7 +2699,7 @@ impl<'db> Type<'db> {
     ) -> Result<Bindings<'db>, CallError<'db>> {
         let signatures = self.signatures(db, self, None);
         let mut bindings = Bindings::bind(db, signatures, arguments).into_result(db)?;
-        for binding in bindings.bindings_mut() {
+        for binding in bindings.iter_mut() {
             // For certain known callables, we have special case logic to determine the return type
             // in a way that isn't directly expressible in the type system. Each special case
             // listed here should have a corresponding clause above in `signatures`.

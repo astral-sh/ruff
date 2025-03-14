@@ -123,7 +123,7 @@ impl<'db> Bindings<'db> {
         let mut all_ok = true;
         let mut any_binding_error = false;
         let mut all_not_callable = true;
-        for binding in self.bindings() {
+        for binding in self.iter() {
             let result = binding.as_result(db);
             all_ok &= result.is_ok();
             any_binding_error |= matches!(result, Err(CallErrorKind::BindingError));
@@ -144,17 +144,17 @@ impl<'db> Bindings<'db> {
         }
     }
 
-    pub(crate) fn bindings(&self) -> &[CallableBinding<'db>] {
+    pub(crate) fn iter(&self) -> impl Iterator<Item = &CallableBinding<'db>> + '_ {
         match &self.inner {
-            BindingsInner::Single(binding) => std::slice::from_ref(binding),
-            BindingsInner::Union(bindings) => bindings,
+            BindingsInner::Single(binding) => std::slice::from_ref(binding).iter(),
+            BindingsInner::Union(bindings) => bindings.iter(),
         }
     }
 
-    pub(crate) fn bindings_mut(&mut self) -> &mut [CallableBinding<'db>] {
+    pub(crate) fn iter_mut(&mut self) -> impl Iterator<Item = &mut CallableBinding<'db>> + '_ {
         match &mut self.inner {
-            BindingsInner::Single(binding) => std::slice::from_mut(binding),
-            BindingsInner::Union(bindings) => bindings,
+            BindingsInner::Single(binding) => std::slice::from_mut(binding).iter_mut(),
+            BindingsInner::Union(bindings) => bindings.iter_mut(),
         }
     }
 
@@ -166,7 +166,7 @@ impl<'db> Bindings<'db> {
     pub(crate) fn report_diagnostics(&self, context: &InferContext<'db>, node: ast::AnyNodeRef) {
         // If all union elements are not callable, report that the union as a whole is not
         // callable.
-        if self.bindings().iter().all(|b| !b.is_callable()) {
+        if self.iter().all(|b| !b.is_callable()) {
             context.report_lint(
                 &CALL_NON_CALLABLE,
                 node,
@@ -181,11 +181,7 @@ impl<'db> Bindings<'db> {
         // TODO: We currently only report errors for the first union element. Ideally, we'd report
         // an error saying that the union type can't be called, followed by subdiagnostics
         // explaining why.
-        if let Some(first) = self
-            .bindings()
-            .iter()
-            .find(|b| b.as_result(context.db()).is_err())
-        {
+        if let Some(first) = self.iter().find(|b| b.as_result(context.db()).is_err()) {
             first.report_diagnostics(context, node);
         }
     }

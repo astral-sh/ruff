@@ -3545,7 +3545,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let call_arguments = self.infer_arguments(arguments, parameter_expectations);
         match function_type.try_call(self.db(), &call_arguments) {
             Ok(bindings) => {
-                for binding in bindings.bindings() {
+                for binding in bindings.iter() {
                     let Some(known_function) = binding
                         .signature
                         .ty(self.db())
