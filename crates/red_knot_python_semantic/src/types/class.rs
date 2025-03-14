@@ -11,8 +11,8 @@ use crate::{
         Boundness, LookupError, LookupResult, Symbol, SymbolAndQualifiers,
     },
     types::{
-        definition_expression_type, CallArguments, CallError, DynamicType, MetaclassCandidate,
-        TupleType, UnionBuilder, UnionType,
+        definition_expression_type, CallArguments, CallError, CallErrorKind, DynamicType,
+        MetaclassCandidate, TupleType, UnionBuilder, UnionType,
     },
     Db, KnownModule, Program,
 };
@@ -281,19 +281,20 @@ impl<'db> Class<'db> {
             // TODO: Other keyword arguments?
             let arguments = CallArguments::positional([name, bases, namespace]);
 
-            let bindings = metaclass.call(db, &arguments);
-            let return_ty_result = match bindings.as_result() {
-                Ok(()) => Ok(bindings.return_type(db)),
+            let return_ty_result = match metaclass.try_call(db, &arguments) {
+                Ok(bindings) => Ok(bindings.return_type(db)),
 
-                Err(CallError::NotCallable) => Err(MetaclassError {
+                Err(CallError(CallErrorKind::NotCallable, bindings)) => Err(MetaclassError {
                     kind: MetaclassErrorKind::NotCallable(bindings.ty),
                 }),
 
                 // TODO we should also check for binding errors that would indicate the metaclass
                 // does not accept the right arguments
-                Err(CallError::BindingError) => Ok(bindings.return_type(db)),
+                Err(CallError(CallErrorKind::BindingError, bindings)) => {
+                    Ok(bindings.return_type(db))
+                }
 
-                Err(CallError::PossiblyNotCallable) => Err(MetaclassError {
+                Err(CallError(CallErrorKind::PossiblyNotCallable, _)) => Err(MetaclassError {
                     kind: MetaclassErrorKind::PartlyNotCallable(metaclass),
                 }),
             };

@@ -6,8 +6,8 @@
 use std::borrow::Cow;
 
 use super::{
-    Argument, CallArguments, CallError, CallableSignature, InferContext, Signature, Signatures,
-    Type,
+    Argument, CallArguments, CallError, CallErrorKind, CallableSignature, InferContext, Signature,
+    Signatures, Type,
 };
 use crate::db::Db;
 use crate::symbol::Boundness;
@@ -100,7 +100,7 @@ impl<'db> Bindings<'db> {
 
     /// Returns whether all bindings were successful, or an error describing why some bindings were
     /// unsuccessful.
-    pub(crate) fn as_result(&self) -> Result<(), CallError> {
+    pub(crate) fn into_result(self) -> Result<Self, CallError<'db>> {
         // In order of precedence:
         //
         // - If every union element is Ok, then the union is too.
@@ -122,18 +122,21 @@ impl<'db> Bindings<'db> {
         for binding in self.bindings() {
             let result = binding.as_result();
             all_ok &= result.is_ok();
-            any_binding_error |= matches!(result, Err(CallError::BindingError));
-            all_not_callable &= matches!(result, Err(CallError::NotCallable));
+            any_binding_error |= matches!(result, Err(CallErrorKind::BindingError));
+            all_not_callable &= matches!(result, Err(CallErrorKind::NotCallable));
         }
 
         if all_ok {
-            Ok(())
+            Ok(self)
         } else if any_binding_error {
-            Err(CallError::BindingError)
+            Err(CallError(CallErrorKind::BindingError, Box::new(self)))
         } else if all_not_callable {
-            Err(CallError::NotCallable)
+            Err(CallError(CallErrorKind::NotCallable, Box::new(self)))
         } else {
-            Err(CallError::PossiblyNotCallable)
+            Err(CallError(
+                CallErrorKind::PossiblyNotCallable,
+                Box::new(self),
+            ))
         }
     }
 
@@ -282,17 +285,17 @@ impl<'db> CallableBinding<'db> {
         }
     }
 
-    fn as_result(&self) -> Result<(), CallError> {
+    fn as_result(&self) -> Result<(), CallErrorKind> {
         if matches!(self.inner, CallableBindingInner::NotCallable) {
-            return Err(CallError::NotCallable);
+            return Err(CallErrorKind::NotCallable);
         }
 
         if self.has_binding_errors() {
-            return Err(CallError::BindingError);
+            return Err(CallErrorKind::BindingError);
         }
 
         if self.dunder_is_possibly_unbound() {
-            return Err(CallError::PossiblyNotCallable);
+            return Err(CallErrorKind::PossiblyNotCallable);
         }
 
         Ok(())
@@ -562,9 +565,9 @@ impl<'db> Binding<'db> {
         }
     }
 
-    fn as_result(&self) -> Result<(), CallError> {
+    fn as_result(&self) -> Result<(), CallErrorKind> {
         if !self.errors.is_empty() {
-            return Err(CallError::BindingError);
+            return Err(CallErrorKind::BindingError);
         }
         Ok(())
     }

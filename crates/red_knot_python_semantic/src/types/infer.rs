@@ -61,7 +61,7 @@ use crate::symbol::{
     module_type_implicit_global_symbol, symbol, symbol_from_bindings, symbol_from_declarations,
     typing_extensions_symbol, Boundness, LookupError,
 };
-use crate::types::call::{Argument, CallArguments};
+use crate::types::call::{Argument, CallArguments, CallError};
 use crate::types::diagnostic::{
     report_implicit_return_type, report_invalid_arguments_to_annotated,
     report_invalid_arguments_to_callable, report_invalid_assignment,
@@ -2415,22 +2415,24 @@ impl<'db> TypeInferenceBuilder<'db> {
                     .class_member(self.db(), op.in_place_dunder())
                     .symbol
                 {
-                    let bindings = class_member.call(
+                    let augmented_return_ty = match class_member.try_call(
                         self.db(),
                         &CallArguments::positional([target_type, value_type]),
-                    );
-                    if bindings.as_result().is_err() {
-                        self.context.report_lint(
-                            &UNSUPPORTED_OPERATOR,
-                            assignment,
-                            format_args!(
-                                "Operator `{op}=` is unsupported between objects of type `{}` and `{}`",
-                                target_type.display(self.db()),
-                                value_type.display(self.db())
-                            ),
-                        );
+                    ) {
+                        Ok(bindings) => bindings.return_type(self.db()),
+                        Err(CallError(_, bindings)) => {
+                            self.context.report_lint(
+                                &UNSUPPORTED_OPERATOR,
+                                assignment,
+                                format_args!(
+                                    "Operator `{op}=` is unsupported between objects of type `{}` and `{}`",
+                                    target_type.display(self.db()),
+                                    value_type.display(self.db())
+                                ),
+                            );
+                            bindings.return_type(self.db())
+                        }
                     };
-                    let augmented_return_ty = bindings.return_type(self.db());
 
                     return match boundness {
                         Boundness::Bound => augmented_return_ty,
@@ -3541,10 +3543,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             .unwrap_or_default();
 
         let call_arguments = self.infer_arguments(arguments, parameter_expectations);
-        let bindings = function_type.call(self.db(), &call_arguments);
-
-        match bindings.as_result() {
-            Ok(()) => {
+        match function_type.try_call(self.db(), &call_arguments) {
+            Ok(bindings) => {
                 for binding in bindings.bindings() {
                     let Some(known_function) = binding
                         .ty
@@ -3651,13 +3651,14 @@ impl<'db> TypeInferenceBuilder<'db> {
                         _ => {}
                     }
                 }
+                bindings.return_type(self.db())
             }
-            Err(_) => {
+
+            Err(CallError(_, bindings)) => {
                 bindings.report_diagnostics(&self.context, call_expression.into());
+                bindings.return_type(self.db())
             }
         }
-
-        bindings.return_type(self.db())
     }
 
     fn infer_starred_expression(&mut self, starred: &ast::ExprStarred) -> Type<'db> {
@@ -5088,11 +5089,13 @@ impl<'db> TypeInferenceBuilder<'db> {
         let compare_result_opt = match contains_dunder {
             Symbol::Type(contains_dunder, Boundness::Bound) => {
                 // If `__contains__` is available, it is used directly for the membership test.
-                let bindings = contains_dunder.call(
-                    db,
-                    &CallArguments::positional([Type::Instance(right), Type::Instance(left)]),
-                );
-                bindings.as_result().map(|()| bindings.return_type(db)).ok()
+                contains_dunder
+                    .try_call(
+                        db,
+                        &CallArguments::positional([Type::Instance(right), Type::Instance(left)]),
+                    )
+                    .map(|bindings| bindings.return_type(db))
+                    .ok()
             }
             _ => {
                 // iteration-based membership test
@@ -5375,7 +5378,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                         return err.fallback_return_type(self.db());
                     }
-                    Err(CallDunderError::Call(bindings, _)) => {
+                    Err(CallDunderError::Call(CallError(_, bindings))) => {
                         self.context.report_lint(
                             &CALL_NON_CALLABLE,
                             value_node,
@@ -5420,20 +5423,24 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 );
                             }
 
-                            let bindings = ty
-                                .call(self.db(), &CallArguments::positional([value_ty, slice_ty]));
-                            if bindings.as_result().is_err() {
-                                self.context.report_lint(
-                                    &CALL_NON_CALLABLE,
-                                    value_node,
-                                    format_args!(
-                                        "Method `__class_getitem__` of type `{}` is not callable on object of type `{}`",
-                                        bindings.ty.display(self.db()),
-                                        value_ty.display(self.db()),
-                                    ),
-                                );
+                            match ty.try_call(
+                                self.db(),
+                                &CallArguments::positional([value_ty, slice_ty]),
+                            ) {
+                                Ok(bindings) => return bindings.return_type(self.db()),
+                                Err(CallError(_, bindings)) => {
+                                    self.context.report_lint(
+                                        &CALL_NON_CALLABLE,
+                                        value_node,
+                                        format_args!(
+                                            "Method `__class_getitem__` of type `{}` is not callable on object of type `{}`",
+                                            bindings.ty.display(self.db()),
+                                            value_ty.display(self.db()),
+                                        ),
+                                    );
+                                    return bindings.return_type(self.db());
+                                }
                             }
-                            return bindings.return_type(self.db());
                         }
                     }
 
