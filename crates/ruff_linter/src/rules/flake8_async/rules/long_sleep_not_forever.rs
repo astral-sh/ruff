@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{Expr, ExprCall, ExprNumberLiteral, Number};
+use ruff_python_ast::{Expr, ExprCall, ExprNumberLiteral, Int, Number};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
@@ -76,24 +76,9 @@ pub(crate) fn long_sleep_not_forever(checker: &Checker, call: &ExprCall) {
     };
 
     // TODO(ekohilas): Replace with Duration::from_days(1).as_secs(); when available.
-    let one_day_in_secs = 60 * 60 * 24;
-    match value {
-        Number::Int(int_value) => {
-            let Some(int_value) = int_value.as_u64() else {
-                return;
-            };
-            if int_value <= one_day_in_secs {
-                return;
-            }
-        }
-        Number::Float(float_value) =>
-        {
-            #[allow(clippy::cast_precision_loss)]
-            if *float_value <= one_day_in_secs as f64 {
-                return;
-            }
-        }
-        Number::Complex { .. } => return,
+    let one_day_in_secs: u32 = 60 * 60 * 24;
+    if value <= &Number::Int(Int::from(one_day_in_secs)) {
+        return;
     }
 
     let Some(qualified_name) = checker

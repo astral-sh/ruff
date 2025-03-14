@@ -1891,7 +1891,7 @@ impl From<FStringFlags> for AnyStringFlags {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, is_macro::Is)]
+#[derive(Clone, Debug, PartialOrd, PartialEq, is_macro::Is)]
 pub enum Number {
     Int(int::Int),
     Float(f64),
