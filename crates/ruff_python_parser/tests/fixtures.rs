@@ -13,7 +13,6 @@ use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 #[test]
 fn valid_syntax() {
     insta::glob!("../resources", "valid/**/*.py", test_valid_syntax);
-    // insta::glob!("../resources", "valid/expressions/bool_op.py", test_valid_syntax); // remove
 }
 
 #[test]

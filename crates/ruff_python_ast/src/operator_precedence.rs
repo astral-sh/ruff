@@ -186,10 +186,9 @@ impl From<BoolOp> for OperatorPrecedence {
 
 impl From<UnaryOp> for OperatorPrecedence {
     fn from(unary_op: UnaryOp) -> Self {
-        match unary_op{
+        match unary_op {
             UnaryOp::UAdd | UnaryOp::USub | UnaryOp::Invert => Self::PosNegBitNot,
             UnaryOp::Not => Self::Not,
         }
     }
 }
-

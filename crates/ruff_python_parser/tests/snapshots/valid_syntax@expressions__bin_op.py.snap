@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/valid/expressions/bin_op.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -767,19 +766,19 @@ Module(
                     value: BinOp(
                         ExprBinOp {
                             range: 270..306,
-                            left: NumberLiteral(
-                                ExprNumberLiteral {
-                                    range: 270..271,
-                                    value: Int(
-                                        1,
-                                    ),
-                                },
-                            ),
-                            op: BitOr,
-                            right: BinOp(
+                            left: BinOp(
                                 ExprBinOp {
-                                    range: 274..306,
-                                    left: BinOp(
+                                    range: 270..279,
+                                    left: NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 270..271,
+                                            value: Int(
+                                                1,
+                                            ),
+                                        },
+                                    ),
+                                    op: BitOr,
+                                    right: BinOp(
                                         ExprBinOp {
                                             range: 274..279,
                                             left: NumberLiteral(
@@ -801,67 +800,44 @@ Module(
                                             ),
                                         },
                                     ),
-                                    op: BitXor,
-                                    right: BinOp(
+                                },
+                            ),
+                            op: BitXor,
+                            right: BinOp(
+                                ExprBinOp {
+                                    range: 282..306,
+                                    left: BinOp(
                                         ExprBinOp {
-                                            range: 282..306,
+                                            range: 282..301,
                                             left: BinOp(
                                                 ExprBinOp {
-                                                    range: 282..301,
-                                                    left: BinOp(
-                                                        ExprBinOp {
-                                                            range: 282..291,
-                                                            left: NumberLiteral(
-                                                                ExprNumberLiteral {
-                                                                    range: 282..283,
-                                                                    value: Int(
-                                                                        4,
-                                                                    ),
-                                                                },
-                                                            ),
-                                                            op: Add,
-                                                            right: BinOp(
-                                                                ExprBinOp {
-                                                                    range: 286..291,
-                                                                    left: NumberLiteral(
-                                                                        ExprNumberLiteral {
-                                                                            range: 286..287,
-                                                                            value: Int(
-                                                                                5,
-                                                                            ),
-                                                                        },
-                                                                    ),
-                                                                    op: MatMult,
-                                                                    right: NumberLiteral(
-                                                                        ExprNumberLiteral {
-                                                                            range: 290..291,
-                                                                            value: Int(
-                                                                                6,
-                                                                            ),
-                                                                        },
-                                                                    ),
-                                                                },
+                                                    range: 282..291,
+                                                    left: NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            range: 282..283,
+                                                            value: Int(
+                                                                4,
                                                             ),
                                                         },
                                                     ),
-                                                    op: LShift,
+                                                    op: Add,
                                                     right: BinOp(
                                                         ExprBinOp {
-                                                            range: 295..301,
+                                                            range: 286..291,
                                                             left: NumberLiteral(
                                                                 ExprNumberLiteral {
-                                                                    range: 295..296,
+                                                                    range: 286..287,
                                                                     value: Int(
-                                                                        7,
+                                                                        5,
                                                                     ),
                                                                 },
                                                             ),
-                                                            op: FloorDiv,
+                                                            op: MatMult,
                                                             right: NumberLiteral(
                                                                 ExprNumberLiteral {
-                                                                    range: 300..301,
+                                                                    range: 290..291,
                                                                     value: Int(
-                                                                        8,
+                                                                        6,
                                                                     ),
                                                                 },
                                                             ),
@@ -869,14 +845,37 @@ Module(
                                                     ),
                                                 },
                                             ),
-                                            op: RShift,
-                                            right: NumberLiteral(
-                                                ExprNumberLiteral {
-                                                    range: 305..306,
-                                                    value: Int(
-                                                        9,
+                                            op: LShift,
+                                            right: BinOp(
+                                                ExprBinOp {
+                                                    range: 295..301,
+                                                    left: NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            range: 295..296,
+                                                            value: Int(
+                                                                7,
+                                                            ),
+                                                        },
+                                                    ),
+                                                    op: FloorDiv,
+                                                    right: NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            range: 300..301,
+                                                            value: Int(
+                                                                8,
+                                                            ),
+                                                        },
                                                     ),
                                                 },
+                                            ),
+                                        },
+                                    ),
+                                    op: RShift,
+                                    right: NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 305..306,
+                                            value: Int(
+                                                9,
                                             ),
                                         },
                                     ),

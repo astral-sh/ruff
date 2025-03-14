@@ -272,13 +272,6 @@ impl<'src> Parser<'src> {
 
             let new_precedence = operator.precedence();
 
-            // NOTE TO SELF (todo: delete this comment before merging):
-            // At this point in the code, if we ever compare a BitXor to a BitOr, the result will
-            // be wrong (when we're using ast's OperatorPrecedence) bc of ast has BitXorOr and
-            // OldOperatorPrecedence has BitOr *and* BitXor
-            //
-            // So we need to change this logic to work if there's a single BitXorOr variant of
-            // OperatorPrecedence. I think that might fix the problem!
             let stop_at_current_operator = if new_precedence.is_right_associative() {
                 new_precedence < left_precedence
             } else {
@@ -2603,59 +2596,6 @@ impl Ranged for ParsedExpr {
     }
 }
 
-/*
-/// Represents the precedence levels for various operators and expressions of Python.
-/// Variants at the top have lower precedence and variants at the bottom have
-/// higher precedence.
-///
-/// Note: Some expressions like if-else, named expression (`:=`), lambda, subscription,
-/// slicing, call and attribute reference expressions, that are mentioned in the link
-/// below are better handled in other parts of the parser.
-///
-/// See: <https://docs.python.org/3/reference/expressions.html#operator-precedence>
-#[derive(Debug, Ord, Eq, PartialEq, PartialOrd, Copy, Clone)]
-pub(super) enum OldOperatorPrecedence {
-    /// The initial precedence when parsing an expression.
-    Initial,
-    /// Precedence of boolean `or` operator.
-    Or,
-    /// Precedence of boolean `and` operator.
-    And,
-    /// Precedence of boolean `not` unary operator.
-    Not,
-    /// Precedence of comparisons operators (`<`, `<=`, `>`, `>=`, `!=`, `==`),
-    /// memberships tests (`in`, `not in`) and identity tests (`is` `is not`).
-    ComparisonsMembershipIdentity,
-    /// Precedence of `Bitwise OR` (`|`) operator.
-    BitOr,
-    /// Precedence of `Bitwise XOR` (`^`) operator.
-    BitXor,
-    /// Precedence of `Bitwise AND` (`&`) operator.
-    BitAnd,
-    /// Precedence of left and right shift operators (`<<`, `>>`).
-    LeftRightShift,
-    /// Precedence of addition (`+`) and subtraction (`-`) operators.
-    AddSub,
-    /// Precedence of multiplication (`*`), matrix multiplication (`@`), division (`/`), floor
-    /// division (`//`) and remainder operators (`%`).
-    MulDivRemain,
-    /// Precedence of positive (`+`), negative (`-`), `Bitwise NOT` (`~`) unary operators.
-    PosNegBitNot,
-    /// Precedence of exponentiation operator (`**`).
-    Exponent,
-    /// Precedence of `await` expression.
-    Await,
-}
-
-impl OldOperatorPrecedence {
-    /// Returns `true` if the precedence is right-associative i.e., the operations are evaluated
-    /// from right to left.
-    fn is_right_associative(self) -> bool {
-        matches!(self, OldOperatorPrecedence::Exponent)
-    }
-}
-*/
-
 #[derive(Debug)]
 enum BinaryLikeOperator {
     Boolean(BoolOp),
@@ -2686,47 +2626,6 @@ impl BinaryLikeOperator {
         }
     }
 }
-
-/*
-impl From<BoolOp> for OldOperatorPrecedence {
-    #[inline]
-    fn from(op: BoolOp) -> Self {
-        match op {
-            BoolOp::And => OldOperatorPrecedence::And,
-            BoolOp::Or => OldOperatorPrecedence::Or,
-        }
-    }
-}
-
-impl From<UnaryOp> for OldOperatorPrecedence {
-    #[inline]
-    fn from(op: UnaryOp) -> Self {
-        match op {
-            UnaryOp::Not => OldOperatorPrecedence::Not,
-            _ => OldOperatorPrecedence::PosNegBitNot,
-        }
-    }
-}
-
-impl From<Operator> for OldOperatorPrecedence {
-    #[inline]
-    fn from(op: Operator) -> Self {
-        match op {
-            Operator::Add | Operator::Sub => OldOperatorPrecedence::AddSub,
-            Operator::Mult
-            | Operator::Div
-            | Operator::FloorDiv
-            | Operator::Mod
-            | Operator::MatMult => OldOperatorPrecedence::MulDivRemain,
-            Operator::BitAnd => OldOperatorPrecedence::BitAnd,
-            Operator::BitOr => OldOperatorPrecedence::BitOr,
-            Operator::BitXor => OldOperatorPrecedence::BitXor,
-            Operator::LShift | Operator::RShift => OldOperatorPrecedence::LeftRightShift,
-            Operator::Pow => OldOperatorPrecedence::Exponent,
-        }
-    }
-}
-*/
 
 /// Represents the precedence used for parsing the value part of a starred expression.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
