@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/perflint/mod.rs
-snapshot_kind: text
 ---
 PERF403.py:5:9: PERF403 Use a dictionary comprehension instead of a for-loop
   |
@@ -9,6 +8,7 @@ PERF403.py:5:9: PERF403 Use a dictionary comprehension instead of a for-loop
 5 |         result[idx] = name  # PERF403
   |         ^^^^^^^^^^^^^^^^^^ PERF403
   |
+  = help: Replace for loop with dict comprehension
 
 PERF403.py:13:13: PERF403 Use a dictionary comprehension instead of a for-loop
    |
@@ -17,43 +17,70 @@ PERF403.py:13:13: PERF403 Use a dictionary comprehension instead of a for-loop
 13 |             result[idx] = name  # PERF403
    |             ^^^^^^^^^^^^^^^^^^ PERF403
    |
+   = help: Replace for loop with dict comprehension
 
-PERF403.py:31:13: PERF403 Use a dictionary comprehension instead of a for-loop
+PERF403.py:33:13: PERF403 Use a dictionary comprehension instead of a for-loop
    |
-29 |     for idx, name in enumerate(fruit):
-30 |         if idx % 2:
-31 |             result[idx] = name  # PERF403
+31 |     for idx, name in enumerate(fruit):
+32 |         if idx % 2:
+33 |             result[idx] = name  # PERF403
    |             ^^^^^^^^^^^^^^^^^^ PERF403
    |
+   = help: Replace for loop with dict comprehension
 
-PERF403.py:61:13: PERF403 Use a dictionary comprehension instead of a for-loop
+PERF403.py:63:13: PERF403 Use `dict.update` instead of a for-loop
    |
-59 |     for idx, name in enumerate(fruit):
-60 |         if idx % 2:
-61 |             result[idx] = name  # PERF403
+61 |     for idx, name in enumerate(fruit):
+62 |         if idx % 2:
+63 |             result[idx] = name  # PERF403
    |             ^^^^^^^^^^^^^^^^^^ PERF403
    |
+   = help: Replace for loop with `dict.update`
 
-PERF403.py:76:9: PERF403 Use a dictionary comprehension instead of a for-loop
+PERF403.py:78:9: PERF403 Use a dictionary comprehension instead of a for-loop
    |
-74 |     result = {}
-75 |     for name in fruit:
-76 |         result[name] = name  # PERF403
+76 |     result = {}
+77 |     for name in fruit:
+78 |         result[name] = name  # PERF403
    |         ^^^^^^^^^^^^^^^^^^^ PERF403
    |
+   = help: Replace for loop with dict comprehension
 
-PERF403.py:83:9: PERF403 Use a dictionary comprehension instead of a for-loop
+PERF403.py:85:9: PERF403 Use a dictionary comprehension instead of a for-loop
    |
-81 |     result = {}
-82 |     for idx, name in enumerate(fruit):
-83 |         result[name] = idx  # PERF403
+83 |     result = {}
+84 |     for idx, name in enumerate(fruit):
+85 |         result[name] = idx  # PERF403
    |         ^^^^^^^^^^^^^^^^^^ PERF403
    |
+   = help: Replace for loop with dict comprehension
 
-PERF403.py:91:9: PERF403 Use a dictionary comprehension instead of a for-loop
+PERF403.py:94:9: PERF403 Use `dict.update` instead of a for-loop
    |
-89 |     result = SneakyDict()
-90 |     for idx, name in enumerate(fruit):
-91 |         result[name] = idx  # PERF403
+92 |     result = SneakyDict()
+93 |     for idx, name in enumerate(fruit):
+94 |         result[name] = idx  # PERF403
    |         ^^^^^^^^^^^^^^^^^^ PERF403
    |
+   = help: Replace for loop with `dict.update`
+
+PERF403.py:106:9: PERF403 Use a dictionary comprehension instead of a for-loop
+    |
+104 |       ):
+105 |           # comment 3
+106 |           result[
+    |  _________^
+107 | |             name  # comment 4
+108 | |         ] = idx  # PERF403
+    | |_______________^ PERF403
+    |
+    = help: Replace for loop with dict comprehension
+
+PERF403.py:115:9: PERF403 Use a dictionary comprehension instead of a for-loop
+    |
+113 |     a = 1; result = {}; b = 2
+114 |     for idx, name in enumerate(fruit):
+115 |         result[name] = idx  # PERF403
+    |         ^^^^^^^^^^^^^^^^^^ PERF403
+    |
+    = help: Replace for loop with dict comprehension

@@ -1,0 +1,204 @@
+---
+source: crates/ruff_linter/src/rules/perflint/mod.rs
+---
+PERF403.py:5:9: PERF403 [*] Use a dictionary comprehension instead of a for-loop
+  |
+3 |     result = {}
+4 |     for idx, name in enumerate(fruit):
+5 |         result[idx] = name  # PERF403
+  |         ^^^^^^^^^^^^^^^^^^ PERF403
+  |
+  = help: Replace for loop with dict comprehension
+
+ℹ Unsafe fix
+1 1 | def foo():
+2 2 |     fruit = ["apple", "pear", "orange"]
+3   |-    result = {}
+4   |-    for idx, name in enumerate(fruit):
+5   |-        result[idx] = name  # PERF403
+  3 |+    result = {idx: name for idx, name in enumerate(fruit)}  # PERF403
+6 4 | 
+7 5 | 
+8 6 | def foo():
+
+PERF403.py:13:13: PERF403 [*] Use a dictionary comprehension instead of a for-loop
+   |
+11 |     for idx, name in enumerate(fruit):
+12 |         if idx % 2:
+13 |             result[idx] = name  # PERF403
+   |             ^^^^^^^^^^^^^^^^^^ PERF403
+   |
+   = help: Replace for loop with dict comprehension
+
+ℹ Unsafe fix
+7  7  | 
+8  8  | def foo():
+9  9  |     fruit = ["apple", "pear", "orange"]
+10    |-    result = {}
+11    |-    for idx, name in enumerate(fruit):
+12    |-        if idx % 2:
+13    |-            result[idx] = name  # PERF403
+   10 |+    result = {idx: name for idx, name in enumerate(fruit) if idx % 2}  # PERF403
+14 11 | 
+15 12 | 
+16 13 | def foo():
+
+PERF403.py:33:13: PERF403 [*] Use a dictionary comprehension instead of a for-loop
+   |
+31 |     for idx, name in enumerate(fruit):
+32 |         if idx % 2:
+33 |             result[idx] = name  # PERF403
+   |             ^^^^^^^^^^^^^^^^^^ PERF403
+   |
+   = help: Replace for loop with dict comprehension
+
+ℹ Unsafe fix
+26 26 | 
+27 27 | 
+28 28 | def foo():
+29    |-    result = {}
+30 29 |     fruit = ["apple", "pear", "orange"]
+31    |-    for idx, name in enumerate(fruit):
+32    |-        if idx % 2:
+33    |-            result[idx] = name  # PERF403
+   30 |+    result = {idx: name for idx, name in enumerate(fruit) if idx % 2}  # PERF403
+34 31 | 
+35 32 | 
+36 33 | def foo():
+
+PERF403.py:63:13: PERF403 [*] Use `dict.update` instead of a for-loop
+   |
+61 |     for idx, name in enumerate(fruit):
+62 |         if idx % 2:
+63 |             result[idx] = name  # PERF403
+   |             ^^^^^^^^^^^^^^^^^^ PERF403
+   |
+   = help: Replace for loop with `dict.update`
+
+ℹ Unsafe fix
+58 58 | def foo():
+59 59 |     result = {1: "banana"}
+60 60 |     fruit = ["apple", "pear", "orange"]
+61    |-    for idx, name in enumerate(fruit):
+62    |-        if idx % 2:
+63    |-            result[idx] = name  # PERF403
+   61 |+    result.update({idx: name for idx, name in enumerate(fruit) if idx % 2})  # PERF403
+64 62 | 
+65 63 | 
+66 64 | def foo():
+
+PERF403.py:78:9: PERF403 [*] Use a dictionary comprehension instead of a for-loop
+   |
+76 |     result = {}
+77 |     for name in fruit:
+78 |         result[name] = name  # PERF403
+   |         ^^^^^^^^^^^^^^^^^^^ PERF403
+   |
+   = help: Replace for loop with dict comprehension
+
+ℹ Unsafe fix
+73 73 | 
+74 74 | def foo():
+75 75 |     fruit = ["apple", "pear", "orange"]
+76    |-    result = {}
+77    |-    for name in fruit:
+78    |-        result[name] = name  # PERF403
+   76 |+    result = {name: name for name in fruit}  # PERF403
+79 77 | 
+80 78 | 
+81 79 | def foo():
+
+PERF403.py:85:9: PERF403 [*] Use a dictionary comprehension instead of a for-loop
+   |
+83 |     result = {}
+84 |     for idx, name in enumerate(fruit):
+85 |         result[name] = idx  # PERF403
+   |         ^^^^^^^^^^^^^^^^^^ PERF403
+   |
+   = help: Replace for loop with dict comprehension
+
+ℹ Unsafe fix
+80 80 | 
+81 81 | def foo():
+82 82 |     fruit = ["apple", "pear", "orange"]
+83    |-    result = {}
+84    |-    for idx, name in enumerate(fruit):
+85    |-        result[name] = idx  # PERF403
+   83 |+    result = {name: idx for idx, name in enumerate(fruit)}  # PERF403
+86 84 | 
+87 85 | 
+88 86 | def foo():
+
+PERF403.py:94:9: PERF403 [*] Use `dict.update` instead of a for-loop
+   |
+92 |     result = SneakyDict()
+93 |     for idx, name in enumerate(fruit):
+94 |         result[name] = idx  # PERF403
+   |         ^^^^^^^^^^^^^^^^^^ PERF403
+   |
+   = help: Replace for loop with `dict.update`
+
+ℹ Unsafe fix
+90 90 | 
+91 91 |     fruit = ["apple", "pear", "orange"]
+92 92 |     result = SneakyDict()
+93    |-    for idx, name in enumerate(fruit):
+94    |-        result[name] = idx  # PERF403
+   93 |+    result.update({name: idx for idx, name in enumerate(fruit)})  # PERF403
+95 94 | 
+96 95 | 
+97 96 | def foo():
+
+PERF403.py:106:9: PERF403 [*] Use a dictionary comprehension instead of a for-loop
+    |
+104 |       ):
+105 |           # comment 3
+106 |           result[
+    |  _________^
+107 | |             name  # comment 4
+108 | |         ] = idx  # PERF403
+    | |_______________^ PERF403
+    |
+    = help: Replace for loop with dict comprehension
+
+ℹ Unsafe fix
+96  96  | 
+97  97  | def foo():
+98  98  |     fruit = ["apple", "pear", "orange"]
+99      |-    result: dict[str, int] = {
+100     |-        # comment 1
+101     |-    }
+102     |-    for idx, name in enumerate(
+    99  |+    # comment 3
+    100 |+    # comment 4
+    101 |+    # comment 1
+    102 |+    result: dict[str, int] = {name: idx for idx, name in enumerate(
+103 103 |         fruit  # comment 2
+104     |-    ):
+105     |-        # comment 3
+106     |-        result[
+107     |-            name  # comment 4
+108     |-        ] = idx  # PERF403
+    104 |+    )}  # PERF403
+109 105 | 
+110 106 | 
+111 107 | def foo():
+
+PERF403.py:115:9: PERF403 [*] Use a dictionary comprehension instead of a for-loop
+    |
+113 |     a = 1; result = {}; b = 2
+114 |     for idx, name in enumerate(fruit):
+115 |         result[name] = idx  # PERF403
+    |         ^^^^^^^^^^^^^^^^^^ PERF403
+    |
+    = help: Replace for loop with dict comprehension
+
+ℹ Unsafe fix
+110 110 | 
+111 111 | def foo():
+112 112 |     fruit = ["apple", "pear", "orange"]
+113     |-    a = 1; result = {}; b = 2
+114     |-    for idx, name in enumerate(fruit):
+115     |-        result[name] = idx  # PERF403
+    113 |+    a = 1; b = 2
+    114 |+    result = {name: idx for idx, name in enumerate(fruit)}  # PERF403
