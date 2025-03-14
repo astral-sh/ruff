@@ -27,7 +27,7 @@ use ruff_text_size::Ranged;
 /// It's guaranteed that the wrapped bindings have no errors.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Bindings<'db> {
-    pub(crate) ty: Type<'db>,
+    pub(crate) signatures: Signatures<'db>,
     inner: BindingsInner<'db>,
 }
 
@@ -48,29 +48,33 @@ impl<'db> Bindings<'db> {
     /// overload (if any).
     pub(crate) fn bind(
         db: &'db dyn Db,
-        signatures: &Signatures<'db>,
+        signatures: Signatures<'db>,
         arguments: &CallArguments<'_, 'db>,
     ) -> Self {
-        if let Some(signature) = signatures.as_single() {
+        if let Some(signature) = signatures.as_single(db) {
             return Bindings {
-                ty: signatures.ty,
+                signatures,
                 inner: BindingsInner::Single(CallableBinding::bind(db, signature, arguments)),
             };
         }
 
         let bindings = signatures
-            .iter()
+            .iter(db)
             .map(|signature| CallableBinding::bind(db, signature, arguments))
             .collect::<Vec<_>>()
             .into_boxed_slice();
         Bindings {
-            ty: signatures.ty,
+            signatures,
             inner: BindingsInner::Union(bindings),
         }
     }
 
     pub(crate) fn is_single(&self) -> bool {
         matches!(&self.inner, BindingsInner::Single(_))
+    }
+
+    pub(crate) fn callable_type(&self, db: &'db dyn Db) -> Type<'db> {
+        self.signatures.ty(db)
     }
 
     /// Returns the return type of the call. For successful calls, this is the actual return type.
@@ -159,7 +163,12 @@ impl<'db> Bindings<'db> {
     /// report a single diagnostic if we couldn't match any union element or overload.
     /// TODO: Update this to add subdiagnostics about how we failed to match each union element and
     /// overload.
-    pub(crate) fn report_diagnostics(&self, context: &InferContext<'db>, node: ast::AnyNodeRef) {
+    pub(crate) fn report_diagnostics(
+        &self,
+        db: &'db dyn Db,
+        context: &InferContext<'db>,
+        node: ast::AnyNodeRef,
+    ) {
         // If all union elements are not callable, report that the union as a whole is not
         // callable.
         if self.bindings().iter().all(|b| !b.is_callable()) {
@@ -168,7 +177,7 @@ impl<'db> Bindings<'db> {
                 node,
                 format_args!(
                     "Object of type `{}` is not callable",
-                    self.ty.display(context.db())
+                    self.signatures.ty(db).display(context.db())
                 ),
             );
             return;
@@ -220,32 +229,32 @@ impl<'db> CallableBinding<'db> {
     /// all parameters, and any errors resulting from binding the call.
     fn bind(
         db: &'db dyn Db,
-        signature: &CallableSignature<'db>,
+        signature: CallableSignature<'db>,
         arguments: &CallArguments<'_, 'db>,
     ) -> Self {
-        if !signature.is_callable() {
+        if !signature.is_callable(db) {
             return CallableBinding {
-                ty: signature.ty,
-                signature_ty: signature.signature_ty,
-                dunder_call_boundness: signature.dunder_call_boundness,
+                ty: signature.ty(db),
+                signature_ty: signature.signature_ty(db),
+                dunder_call_boundness: signature.dunder_call_boundness(db),
                 inner: CallableBindingInner::NotCallable,
             };
         }
 
         // If this callable is a bound method, prepend the self instance onto the arguments list
         // before checking.
-        let arguments = if let Some(bound_type) = signature.bound_type {
+        let arguments = if let Some(bound_type) = signature.bound_type(db) {
             Cow::Owned(arguments.with_self(bound_type))
         } else {
             Cow::Borrowed(arguments)
         };
 
-        if let Some(single) = signature.as_single() {
+        if let Some(single) = signature.as_single(db) {
             let binding = Binding::bind(db, single, arguments.as_ref());
             return CallableBinding {
-                ty: signature.ty,
-                signature_ty: signature.signature_ty,
-                dunder_call_boundness: signature.dunder_call_boundness,
+                ty: signature.ty(db),
+                signature_ty: signature.signature_ty(db),
+                dunder_call_boundness: signature.dunder_call_boundness(db),
                 inner: CallableBindingInner::Single(binding),
             };
         }
@@ -257,14 +266,14 @@ impl<'db> CallableBinding<'db> {
         //
         // [1] https://github.com/python/typing/pull/1839
         let overloads = signature
-            .iter()
+            .iter(db)
             .map(|signature| Binding::bind(db, signature, arguments.as_ref()))
             .collect::<Vec<_>>()
             .into_boxed_slice();
         CallableBinding {
-            ty: signature.ty,
-            signature_ty: signature.signature_ty,
-            dunder_call_boundness: signature.dunder_call_boundness,
+            ty: signature.ty(db),
+            signature_ty: signature.signature_ty(db),
+            dunder_call_boundness: signature.dunder_call_boundness(db),
             inner: CallableBindingInner::Overloaded(overloads),
         }
     }

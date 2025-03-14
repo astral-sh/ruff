@@ -3655,7 +3655,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
 
             Err(CallError(_, bindings)) => {
-                bindings.report_diagnostics(&self.context, call_expression.into());
+                bindings.report_diagnostics(self.db(), &self.context, call_expression.into());
                 bindings.return_type(self.db())
             }
         }
@@ -5384,7 +5384,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             value_node,
                             format_args!(
                                 "Method `__getitem__` of type `{}` is not callable on object of type `{}`",
-                                bindings.ty.display(self.db()),
+                                bindings.callable_type(self.db()).display(self.db()),
                                 value_ty.display(self.db()),
                             ),
                         );
@@ -5434,7 +5434,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                         value_node,
                                         format_args!(
                                             "Method `__class_getitem__` of type `{}` is not callable on object of type `{}`",
-                                            bindings.ty.display(self.db()),
+                                            bindings.callable_type(self.db()).display(self.db()),
                                             value_ty.display(self.db()),
                                         ),
                                     );

@@ -18,98 +18,110 @@ use crate::Db;
 use ruff_python_ast::{self as ast, name::Name};
 
 /// The signature of a possible union of callables.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
+#[salsa::tracked]
 pub(crate) struct Signatures<'db> {
     /// The type that is (hopefully) callable.
     pub(crate) ty: Type<'db>,
     /// For an object that's callable via a `__call__` method, the type of that method. For an
     /// object that is directly callable, the type of the object.
     pub(crate) signature_ty: Type<'db>,
+    #[return_ref]
     inner: SignaturesInner<'db>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
-enum SignaturesInner<'db> {
+pub(crate) enum SignaturesInner<'db> {
     Single(CallableSignature<'db>),
     Union(Box<[CallableSignature<'db>]>),
 }
 
 impl<'db> Signatures<'db> {
     pub(crate) fn not_callable(
+        db: &'db dyn Db,
         ty: Type<'db>,
         signature_ty: Type<'db>,
         dunder_call_boundness: Option<Boundness>,
     ) -> Self {
-        Self {
+        Self::new(
+            db,
             ty,
-            signature_ty: ty,
-            inner: SignaturesInner::Single(CallableSignature::not_callable(
+            ty,
+            SignaturesInner::Single(CallableSignature::not_callable(
+                db,
                 ty,
                 signature_ty,
                 dunder_call_boundness,
                 None,
             )),
-        }
+        )
     }
 
-    pub(crate) fn single(signature: CallableSignature<'db>) -> Self {
-        Self {
-            ty: signature.ty,
-            signature_ty: signature.signature_ty,
-            inner: SignaturesInner::Single(signature),
-        }
+    pub(crate) fn single(db: &'db dyn Db, signature: CallableSignature<'db>) -> Self {
+        Self::new(
+            db,
+            signature.ty(db),
+            signature.signature_ty(db),
+            SignaturesInner::Single(signature),
+        )
     }
 
     /// Creates a new `Signatures` from an iterator of [`Signature`]s. Panics if the iterator is
     /// empty.
-    pub(crate) fn from_union<I>(ty: Type<'db>, signature_ty: Type<'db>, elements: I) -> Self
+    pub(crate) fn from_union<I>(
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        signature_ty: Type<'db>,
+        elements: I,
+    ) -> Self
     where
         I: IntoIterator,
         I::IntoIter: Iterator<Item = Signatures<'db>>,
     {
         let mut signatures = Vec::new();
         for element in elements {
-            match element.inner {
-                SignaturesInner::Single(signature) => signatures.push(signature),
-                SignaturesInner::Union(union) => signatures.extend(union),
+            match element.inner(db) {
+                SignaturesInner::Single(signature) => signatures.push(*signature),
+                SignaturesInner::Union(union) => signatures.extend(union.into_iter().copied()),
             }
         }
         if signatures.len() == 1 {
             let first_signature = signatures
                 .pop()
                 .expect("signatures should have one element");
-            return Self {
+            return Self::new(
+                db,
                 ty,
                 signature_ty,
-                inner: SignaturesInner::Single(first_signature),
-            };
+                SignaturesInner::Single(first_signature),
+            );
         }
 
-        Self {
+        Self::new(
+            db,
             ty,
             signature_ty,
-            inner: SignaturesInner::Union(signatures.into()),
-        }
+            SignaturesInner::Union(signatures.into()),
+        )
     }
 
-    pub(crate) fn as_single(&self) -> Option<&CallableSignature<'db>> {
-        match &self.inner {
-            SignaturesInner::Single(signature) => Some(signature),
+    pub(crate) fn as_single(self, db: &'db dyn Db) -> Option<CallableSignature<'db>> {
+        match self.inner(db) {
+            SignaturesInner::Single(signature) => Some(*signature),
             SignaturesInner::Union(_) => None,
         }
     }
 
-    pub(crate) fn iter(&self) -> std::slice::Iter<CallableSignature<'db>> {
-        match &self.inner {
-            SignaturesInner::Single(signature) => std::slice::from_ref(signature).iter(),
-            SignaturesInner::Union(signatures) => signatures.iter(),
+    pub(crate) fn iter(self, db: &'db dyn Db) -> impl Iterator<Item = CallableSignature<'db>> {
+        match self.inner(db) {
+            SignaturesInner::Single(signature) => std::slice::from_ref(signature).iter().copied(),
+            SignaturesInner::Union(signatures) => signatures.iter().copied(),
         }
     }
 }
 
 /// The signature of a single callable. If the callable is overloaded, there is a separate
 /// [`Signature`] for each overload.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
+#[salsa::tracked]
 pub(crate) struct CallableSignature<'db> {
     /// The type that is (hopefully) callable.
     pub(crate) ty: Type<'db>,
@@ -125,11 +137,12 @@ pub(crate) struct CallableSignature<'db> {
     /// The type of the bound `self` or `cls` parameter if this signature is for a bound method.
     pub(crate) bound_type: Option<Type<'db>>,
 
+    #[return_ref]
     inner: CallableSignatureInner<'db>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
-enum CallableSignatureInner<'db> {
+pub(crate) enum CallableSignatureInner<'db> {
     /// The type being called is not callable
     NotCallable,
     Single(Signature<'db>),
@@ -138,39 +151,44 @@ enum CallableSignatureInner<'db> {
 
 impl<'db> CallableSignature<'db> {
     pub(crate) fn not_callable(
+        db: &'db dyn Db,
         ty: Type<'db>,
         signature_ty: Type<'db>,
         dunder_call_boundness: Option<Boundness>,
         bound_type: Option<Type<'db>>,
     ) -> Self {
-        Self {
+        Self::new(
+            db,
             ty,
             signature_ty,
             dunder_call_boundness,
             bound_type,
-            inner: CallableSignatureInner::NotCallable,
-        }
+            CallableSignatureInner::NotCallable,
+        )
     }
 
-    pub(crate) fn new(
+    pub(crate) fn single(
+        db: &'db dyn Db,
         ty: Type<'db>,
         signature_ty: Type<'db>,
         dunder_call_boundness: Option<Boundness>,
         bound_type: Option<Type<'db>>,
         signature: Signature<'db>,
     ) -> Self {
-        Self {
+        Self::new(
+            db,
             ty,
             signature_ty,
             dunder_call_boundness,
             bound_type,
-            inner: CallableSignatureInner::Single(signature),
-        }
+            CallableSignatureInner::Single(signature),
+        )
     }
 
     /// Creates a new `CallableSignature` from a non-empty iterator of [`Signature`]s. Panics if
     /// the iterator is empty.
     pub(crate) fn from_overloads<I>(
+        db: &'db dyn Db,
         ty: Type<'db>,
         signature_ty: Type<'db>,
         dunder_call_boundness: Option<Boundness>,
@@ -184,56 +202,80 @@ impl<'db> CallableSignature<'db> {
         let mut iter = overloads.into_iter();
         let first_overload = iter.next().expect("overloads should not be empty");
         let Some(second_overload) = iter.next() else {
-            return Self {
+            return Self::new(
+                db,
                 ty,
                 signature_ty,
                 dunder_call_boundness,
                 bound_type,
-                inner: CallableSignatureInner::Single(first_overload),
-            };
+                CallableSignatureInner::Single(first_overload),
+            );
         };
         let mut overloads = vec![first_overload, second_overload];
         overloads.extend(iter);
-        Self {
+        Self::new(
+            db,
             ty,
             signature_ty,
             dunder_call_boundness,
             bound_type,
-            inner: CallableSignatureInner::Overloaded(overloads.into()),
-        }
+            CallableSignatureInner::Overloaded(overloads.into()),
+        )
     }
 
     /// Return a signature for a dynamic callable
-    pub(crate) fn dynamic(ty: Type<'db>, dunder_call_boundness: Option<Boundness>) -> Self {
+    pub(crate) fn dynamic(
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        dunder_call_boundness: Option<Boundness>,
+    ) -> Self {
         let signature = Signature {
             parameters: Parameters::gradual_form(),
             return_ty: Some(ty),
         };
-        Self::new(ty, ty, dunder_call_boundness, None, signature)
+        Self::new(
+            db,
+            ty,
+            ty,
+            dunder_call_boundness,
+            None,
+            CallableSignatureInner::Single(signature),
+        )
     }
 
     /// Return a todo signature: (*args: Todo, **kwargs: Todo) -> Todo
     #[allow(unused_variables)] // 'reason' only unused in debug builds
-    pub(crate) fn todo(reason: &'static str, dunder_call_boundness: Option<Boundness>) -> Self {
+    pub(crate) fn todo(
+        db: &'db dyn Db,
+        reason: &'static str,
+        dunder_call_boundness: Option<Boundness>,
+    ) -> Self {
         let ty = todo_type!(reason);
         let signature = Signature {
             parameters: Parameters::todo(),
             return_ty: Some(ty),
         };
-        Self::new(ty, ty, dunder_call_boundness, None, signature)
+        Self::new(
+            db,
+            ty,
+            ty,
+            dunder_call_boundness,
+            None,
+            CallableSignatureInner::Single(signature),
+        )
     }
 
     /// Returns the [`Signature`] if this is a non-overloaded callable, [None] otherwise.
-    pub(crate) fn as_single(&self) -> Option<&Signature<'db>> {
-        match &self.inner {
+    pub(crate) fn as_single(&self, db: &'db dyn Db) -> Option<&Signature<'db>> {
+        match self.inner(db) {
             CallableSignatureInner::NotCallable => None,
             CallableSignatureInner::Single(signature) => Some(signature),
             CallableSignatureInner::Overloaded(_) => None,
         }
     }
 
-    pub(crate) fn iter(&self) -> std::slice::Iter<Signature<'db>> {
-        match &self.inner {
+    pub(crate) fn iter(&self, db: &'db dyn Db) -> std::slice::Iter<Signature<'db>> {
+        match self.inner(db) {
             CallableSignatureInner::NotCallable => [].iter(),
             CallableSignatureInner::Single(signature) => std::slice::from_ref(signature).iter(),
             CallableSignatureInner::Overloaded(signatures) => signatures.iter(),
@@ -241,8 +283,8 @@ impl<'db> CallableSignature<'db> {
     }
 
     /// Returns whether this signature is callable.
-    pub(crate) fn is_callable(&self) -> bool {
-        !matches!(&self.inner, CallableSignatureInner::NotCallable)
+    pub(crate) fn is_callable(self, db: &'db dyn Db) -> bool {
+        !matches!(self.inner(db), CallableSignatureInner::NotCallable)
     }
 }
 
