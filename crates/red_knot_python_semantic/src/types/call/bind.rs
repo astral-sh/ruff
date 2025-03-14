@@ -104,7 +104,7 @@ impl<'db> Bindings<'db> {
 
     /// Returns whether all bindings were successful, or an error describing why some bindings were
     /// unsuccessful.
-    pub(crate) fn into_result(self) -> Result<Self, CallError<'db>> {
+    pub(crate) fn into_result(self, db: &'db dyn Db) -> Result<Self, CallError<'db>> {
         // In order of precedence:
         //
         // - If every union element is Ok, then the union is too.
@@ -124,7 +124,7 @@ impl<'db> Bindings<'db> {
         let mut any_binding_error = false;
         let mut all_not_callable = true;
         for binding in self.bindings() {
-            let result = binding.as_result();
+            let result = binding.as_result(db);
             all_ok &= result.is_ok();
             any_binding_error |= matches!(result, Err(CallErrorKind::BindingError));
             all_not_callable &= matches!(result, Err(CallErrorKind::NotCallable));
@@ -163,12 +163,7 @@ impl<'db> Bindings<'db> {
     /// report a single diagnostic if we couldn't match any union element or overload.
     /// TODO: Update this to add subdiagnostics about how we failed to match each union element and
     /// overload.
-    pub(crate) fn report_diagnostics(
-        &self,
-        db: &'db dyn Db,
-        context: &InferContext<'db>,
-        node: ast::AnyNodeRef,
-    ) {
+    pub(crate) fn report_diagnostics(&self, context: &InferContext<'db>, node: ast::AnyNodeRef) {
         // If all union elements are not callable, report that the union as a whole is not
         // callable.
         if self.bindings().iter().all(|b| !b.is_callable()) {
@@ -177,7 +172,7 @@ impl<'db> Bindings<'db> {
                 node,
                 format_args!(
                     "Object of type `{}` is not callable",
-                    self.signatures.ty(db).display(context.db())
+                    self.signatures.ty(context.db()).display(context.db())
                 ),
             );
             return;
@@ -186,7 +181,11 @@ impl<'db> Bindings<'db> {
         // TODO: We currently only report errors for the first union element. Ideally, we'd report
         // an error saying that the union type can't be called, followed by subdiagnostics
         // explaining why.
-        if let Some(first) = self.bindings().iter().find(|b| b.as_result().is_err()) {
+        if let Some(first) = self
+            .bindings()
+            .iter()
+            .find(|b| b.as_result(context.db()).is_err())
+        {
             first.report_diagnostics(context, node);
         }
     }
@@ -209,9 +208,7 @@ impl<'db> Bindings<'db> {
 /// [overloads]: https://github.com/python/typing/pull/1839
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct CallableBinding<'db> {
-    pub(crate) ty: Type<'db>,
-    pub(crate) signature_ty: Type<'db>,
-    pub(crate) dunder_call_boundness: Option<Boundness>,
+    pub(crate) signature: CallableSignature<'db>,
     inner: CallableBindingInner<'db>,
 }
 
@@ -234,9 +231,7 @@ impl<'db> CallableBinding<'db> {
     ) -> Self {
         if !signature.is_callable(db) {
             return CallableBinding {
-                ty: signature.ty(db),
-                signature_ty: signature.signature_ty(db),
-                dunder_call_boundness: signature.dunder_call_boundness(db),
+                signature,
                 inner: CallableBindingInner::NotCallable,
             };
         }
@@ -252,9 +247,7 @@ impl<'db> CallableBinding<'db> {
         if let Some(single) = signature.as_single(db) {
             let binding = Binding::bind(db, single, arguments.as_ref());
             return CallableBinding {
-                ty: signature.ty(db),
-                signature_ty: signature.signature_ty(db),
-                dunder_call_boundness: signature.dunder_call_boundness(db),
+                signature,
                 inner: CallableBindingInner::Single(binding),
             };
         }
@@ -271,9 +264,7 @@ impl<'db> CallableBinding<'db> {
             .collect::<Vec<_>>()
             .into_boxed_slice();
         CallableBinding {
-            ty: signature.ty(db),
-            signature_ty: signature.signature_ty(db),
-            dunder_call_boundness: signature.dunder_call_boundness(db),
+            signature,
             inner: CallableBindingInner::Overloaded(overloads),
         }
     }
@@ -294,7 +285,7 @@ impl<'db> CallableBinding<'db> {
         }
     }
 
-    fn as_result(&self) -> Result<(), CallErrorKind> {
+    fn as_result(&self, db: &'db dyn Db) -> Result<(), CallErrorKind> {
         if matches!(self.inner, CallableBindingInner::NotCallable) {
             return Err(CallErrorKind::NotCallable);
         }
@@ -303,7 +294,7 @@ impl<'db> CallableBinding<'db> {
             return Err(CallErrorKind::BindingError);
         }
 
-        if self.dunder_is_possibly_unbound() {
+        if self.dunder_is_possibly_unbound(db) {
             return Err(CallErrorKind::PossiblyNotCallable);
         }
 
@@ -322,8 +313,11 @@ impl<'db> CallableBinding<'db> {
 
     /// Returns whether this binding is for an object that is callable via a `__call__` method that
     /// is possibly unbound.
-    pub(crate) fn dunder_is_possibly_unbound(&self) -> bool {
-        matches!(self.dunder_call_boundness, Some(Boundness::PossiblyUnbound))
+    pub(crate) fn dunder_is_possibly_unbound(&self, db: &'db dyn Db) -> bool {
+        matches!(
+            self.signature.dunder_call_boundness(db),
+            Some(Boundness::PossiblyUnbound)
+        )
     }
 
     /// Returns the overload that matched for this call binding. Returns `None` if none of the
@@ -366,25 +360,26 @@ impl<'db> CallableBinding<'db> {
                 node,
                 format_args!(
                     "Object of type `{}` is not callable",
-                    self.ty.display(context.db()),
+                    self.signature.ty(context.db()).display(context.db()),
                 ),
             );
             return;
         }
 
-        if self.dunder_is_possibly_unbound() {
+        if self.dunder_is_possibly_unbound(context.db()) {
             context.report_lint(
                 &CALL_NON_CALLABLE,
                 node,
                 format_args!(
                     "Object of type `{}` is not callable (possibly unbound `__call__` method)",
-                    self.ty.display(context.db()),
+                    self.signature.ty(context.db()).display(context.db()),
                 ),
             );
             return;
         }
 
-        let callable_descriptor = CallableDescriptor::new(context.db(), self.ty);
+        let callable_descriptor =
+            CallableDescriptor::new(context.db(), self.signature.ty(context.db()));
         if self.overloads().len() > 1 {
             context.report_lint(
                 &NO_MATCHING_OVERLOAD,
@@ -401,12 +396,13 @@ impl<'db> CallableBinding<'db> {
             return;
         }
 
-        let callable_descriptor = CallableDescriptor::new(context.db(), self.signature_ty);
+        let callable_descriptor =
+            CallableDescriptor::new(context.db(), self.signature.signature_ty(context.db()));
         for overload in self.overloads() {
             overload.report_diagnostics(
                 context,
                 node,
-                self.signature_ty,
+                self.signature.signature_ty(context.db()),
                 callable_descriptor.as_ref(),
             );
         }

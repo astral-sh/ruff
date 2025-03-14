@@ -2698,7 +2698,7 @@ impl<'db> Type<'db> {
         arguments: &CallArguments<'_, 'db>,
     ) -> Result<Bindings<'db>, CallError<'db>> {
         let signatures = self.signatures(db, self, None);
-        let mut bindings = Bindings::bind(db, signatures, arguments).into_result()?;
+        let mut bindings = Bindings::bind(db, signatures, arguments).into_result(db)?;
         for binding in bindings.bindings_mut() {
             // For certain known callables, we have special case logic to determine the return type
             // in a way that isn't directly expressible in the type system. Each special case
@@ -3013,7 +3013,7 @@ impl<'db> Type<'db> {
         {
             Symbol::Type(dunder_callable, boundness) => {
                 let signatures = dunder_callable.signatures(db, dunder_callable, None);
-                let bindings = Bindings::bind(db, signatures, arguments).into_result()?;
+                let bindings = Bindings::bind(db, signatures, arguments).into_result(db)?;
                 if boundness == Boundness::PossiblyUnbound {
                     return Err(CallDunderError::PossiblyUnbound(Box::new(bindings)));
                 }

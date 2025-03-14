@@ -3547,7 +3547,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             Ok(bindings) => {
                 for binding in bindings.bindings() {
                     let Some(known_function) = binding
-                        .ty
+                        .signature
+                        .ty(self.db())
                         .into_function_literal()
                         .and_then(|function_type| function_type.known(self.db()))
                     else {
@@ -3655,7 +3656,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
 
             Err(CallError(_, bindings)) => {
-                bindings.report_diagnostics(self.db(), &self.context, call_expression.into());
+                bindings.report_diagnostics(&self.context, call_expression.into());
                 bindings.return_type(self.db())
             }
         }
