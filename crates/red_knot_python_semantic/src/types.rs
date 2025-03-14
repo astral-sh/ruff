@@ -2327,6 +2327,7 @@ impl<'db> Type<'db> {
     /// for all elements. It's usually best to only worry about "callability" relative to a
     /// particular argument list, via [`try_call`][Self::try_call] and
     /// [`CallErrorKind::NotCallable`].
+    #[salsa::tracked(return_ref)]
     fn signatures(
         self,
         db: &'db dyn Db,
@@ -2337,14 +2338,13 @@ impl<'db> Type<'db> {
             Type::Callable(CallableType::BoundMethod(bound_method)) => {
                 let signature = bound_method.function(db).signature(db);
                 let signature = CallableSignature::single(
-                    db,
                     callable_ty,
                     self,
                     dunder_call_boundness,
                     Some(bound_method.self_instance(db)),
                     signature.clone(),
                 );
-                Signatures::single(db, signature)
+                Signatures::single(signature)
             }
 
             Type::Callable(CallableType::MethodWrapperDunderGet(_)) => {
@@ -2363,7 +2363,6 @@ impl<'db> Type<'db> {
 
                 let not_none = Type::none(db).negate(db);
                 let signature = CallableSignature::from_overloads(
-                    db,
                     callable_ty,
                     self,
                     dunder_call_boundness,
@@ -2406,7 +2405,7 @@ impl<'db> Type<'db> {
                         ),
                     ],
                 );
-                Signatures::single(db, signature)
+                Signatures::single(signature)
             }
 
             Type::Callable(CallableType::WrapperDescriptorDunderGet) => {
@@ -2418,7 +2417,6 @@ impl<'db> Type<'db> {
                 // removed.
                 let not_none = Type::none(db).negate(db);
                 let signature = CallableSignature::from_overloads(
-                    db,
                     callable_ty,
                     self,
                     dunder_call_boundness,
@@ -2471,20 +2469,16 @@ impl<'db> Type<'db> {
                         ),
                     ],
                 );
-                Signatures::single(db, signature)
+                Signatures::single(signature)
             }
 
-            Type::FunctionLiteral(function_type) => Signatures::single(
-                db,
-                CallableSignature::single(
-                    db,
-                    callable_ty,
-                    self,
-                    dunder_call_boundness,
-                    None,
-                    function_type.signature(db).clone(),
-                ),
-            ),
+            Type::FunctionLiteral(function_type) => Signatures::single(CallableSignature::single(
+                callable_ty,
+                self,
+                dunder_call_boundness,
+                None,
+                function_type.signature(db).clone(),
+            )),
 
             Type::ClassLiteral(ClassLiteralType { class })
                 if class.is_known(db, KnownClass::Bool) =>
@@ -2494,7 +2488,6 @@ impl<'db> Type<'db> {
                 //     def __new__(cls, o: object = ..., /) -> Self: ...
                 // ```
                 let signature = CallableSignature::single(
-                    db,
                     callable_ty,
                     self,
                     dunder_call_boundness,
@@ -2510,7 +2503,7 @@ impl<'db> Type<'db> {
                         Some(KnownClass::Bool.to_instance(db)),
                     ),
                 );
-                Signatures::single(db, signature)
+                Signatures::single(signature)
             }
 
             Type::ClassLiteral(ClassLiteralType { class })
@@ -2524,7 +2517,6 @@ impl<'db> Type<'db> {
                 //     def __new__(cls, object: ReadableBuffer, encoding: str = ..., errors: str = ...) -> Self: ...
                 // ```
                 let signature = CallableSignature::from_overloads(
-                    db,
                     callable_ty,
                     self,
                     dunder_call_boundness,
@@ -2562,7 +2554,7 @@ impl<'db> Type<'db> {
                         ),
                     ],
                 );
-                Signatures::single(db, signature)
+                Signatures::single(signature)
             }
 
             Type::ClassLiteral(ClassLiteralType { class })
@@ -2576,7 +2568,6 @@ impl<'db> Type<'db> {
                 //     def __init__(self, name: str, bases: tuple[type, ...], dict: dict[str, Any], /, **kwds: Any) -> None: ...
                 // ```
                 let signature = CallableSignature::from_overloads(
-                    db,
                     callable_ty,
                     self,
                     dunder_call_boundness,
@@ -2612,30 +2603,29 @@ impl<'db> Type<'db> {
                         ),
                     ],
                 );
-                Signatures::single(db, signature)
+                Signatures::single(signature)
             }
 
             // TODO annotated return type on `__new__` or metaclass `__call__`
             // TODO check call vs signatures of `__new__` and/or `__init__`
             Type::ClassLiteral(ClassLiteralType { .. }) => {
                 let signature = CallableSignature::single(
-                    db,
                     callable_ty,
                     self,
                     dunder_call_boundness,
                     None,
                     Signature::new(Parameters::gradual_form(), self.to_instance(db)),
                 );
-                Signatures::single(db, signature)
+                Signatures::single(signature)
             }
 
             Type::SubclassOf(subclass_of_type) => match subclass_of_type.subclass_of() {
-                ClassBase::Dynamic(dynamic_type) => {
-                    Type::Dynamic(dynamic_type).signatures(db, callable_ty, dunder_call_boundness)
-                }
-                ClassBase::Class(class) => {
-                    Type::class_literal(class).signatures(db, callable_ty, dunder_call_boundness)
-                }
+                ClassBase::Dynamic(dynamic_type) => Type::Dynamic(dynamic_type)
+                    .signatures(db, callable_ty, dunder_call_boundness)
+                    .clone(),
+                ClassBase::Class(class) => Type::class_literal(class)
+                    .signatures(db, callable_ty, dunder_call_boundness)
+                    .clone(),
             },
 
             Type::Instance(_) => {
@@ -2651,25 +2641,23 @@ impl<'db> Type<'db> {
                     )
                     .symbol
                 {
-                    Symbol::Type(dunder_callable, boundness) => {
-                        dunder_callable.signatures(db, callable_ty, Some(boundness))
-                    }
+                    Symbol::Type(dunder_callable, boundness) => dunder_callable
+                        .signatures(db, callable_ty, Some(boundness))
+                        .clone(),
                     Symbol::Unbound => {
-                        Signatures::not_callable(db, callable_ty, self, dunder_call_boundness)
+                        Signatures::not_callable(callable_ty, self, dunder_call_boundness)
                     }
                 }
             }
 
             // Dynamic types are callable, and the return type is the same dynamic type. Similarly,
             // `Never` is always callable and returns `Never`.
-            Type::Dynamic(_) | Type::Never => Signatures::single(
-                db,
-                CallableSignature::dynamic(db, self, dunder_call_boundness),
-            ),
+            Type::Dynamic(_) | Type::Never => {
+                Signatures::single(CallableSignature::dynamic(self, dunder_call_boundness))
+            }
 
             // Note that this correctly returns `None` if none of the union elements are callable.
             Type::Union(union) => Signatures::from_union(
-                db,
                 callable_ty,
                 self,
                 union
@@ -2678,12 +2666,12 @@ impl<'db> Type<'db> {
                     .map(|element| element.signatures(db, *element, dunder_call_boundness)),
             ),
 
-            Type::Intersection(_) => Signatures::single(
-                db,
-                CallableSignature::todo(db, "Type::Intersection.call()", dunder_call_boundness),
-            ),
+            Type::Intersection(_) => Signatures::single(CallableSignature::todo(
+                "Type::Intersection.call()",
+                dunder_call_boundness,
+            )),
 
-            _ => Signatures::not_callable(db, callable_ty, self, dunder_call_boundness),
+            _ => Signatures::not_callable(callable_ty, self, dunder_call_boundness),
         }
     }
 
@@ -2698,7 +2686,7 @@ impl<'db> Type<'db> {
         arguments: &CallArguments<'_, 'db>,
     ) -> Result<Bindings<'db>, CallError<'db>> {
         let signatures = self.signatures(db, self, None);
-        let mut bindings = Bindings::bind(db, signatures, arguments).into_result(db)?;
+        let mut bindings = Bindings::bind(db, signatures, arguments).into_result()?;
         for binding in bindings.iter_mut() {
             // For certain known callables, we have special case logic to determine the return type
             // in a way that isn't directly expressible in the type system. Each special case
@@ -3013,7 +3001,7 @@ impl<'db> Type<'db> {
         {
             Symbol::Type(dunder_callable, boundness) => {
                 let signatures = dunder_callable.signatures(db, dunder_callable, None);
-                let bindings = Bindings::bind(db, signatures, arguments).into_result(db)?;
+                let bindings = Bindings::bind(db, signatures, arguments).into_result()?;
                 if boundness == Boundness::PossiblyUnbound {
                     return Err(CallDunderError::PossiblyUnbound(Box::new(bindings)));
                 }
@@ -3977,7 +3965,7 @@ impl<'db> IterationErrorKind<'db> {
                         because its `__iter__` attribute has type `{dunder_iter_type}`, \
                         which is not callable",
                     iterable_type = iterable_type.display(db),
-                    dunder_iter_type = bindings.callable_type(db).display(db),
+                    dunder_iter_type = bindings.callable_type().display(db),
                 )),
                 CallErrorKind::PossiblyNotCallable if bindings.is_single() => {
                     report_not_iterable(format_args!(
@@ -3985,7 +3973,7 @@ impl<'db> IterationErrorKind<'db> {
                             because its `__iter__` attribute (with type `{dunder_iter_type}`) \
                             may not be callable",
                         iterable_type = iterable_type.display(db),
-                        dunder_iter_type = bindings.callable_type(db).display(db),
+                        dunder_iter_type = bindings.callable_type().display(db),
                     ));
                 }
                 CallErrorKind::PossiblyNotCallable => {
@@ -3994,7 +3982,7 @@ impl<'db> IterationErrorKind<'db> {
                             because its `__iter__` attribute (with type `{dunder_iter_type}`) \
                             may not be callable",
                         iterable_type = iterable_type.display(db),
-                        dunder_iter_type = bindings.callable_type(db).display(db),
+                        dunder_iter_type = bindings.callable_type().display(db),
                     ));
                 }
                 CallErrorKind::BindingError if bindings.is_single() => report_not_iterable(format_args!(
@@ -4008,7 +3996,7 @@ impl<'db> IterationErrorKind<'db> {
                         because its `__iter__` method (with type `{dunder_iter_type}`) \
                         may have an invalid signature (expected `def __iter__(self): ...`)",
                     iterable_type = iterable_type.display(db),
-                    dunder_iter_type = bindings.callable_type(db).display(db),
+                    dunder_iter_type = bindings.callable_type().display(db),
                 )),
             }
 
@@ -4083,7 +4071,7 @@ impl<'db> IterationErrorKind<'db> {
                             and its `__getitem__` attribute has type `{dunder_getitem_type}`, \
                             which is not callable",
                         iterable_type = iterable_type.display(db),
-                        dunder_getitem_type = bindings.callable_type(db).display(db),
+                        dunder_getitem_type = bindings.callable_type().display(db),
                     )),
                     CallErrorKind::PossiblyNotCallable if bindings.is_single() => report_not_iterable(format_args!(
                         "Object of type `{iterable_type}` may not be iterable \
@@ -4098,7 +4086,7 @@ impl<'db> IterationErrorKind<'db> {
                                 and its `__getitem__` attribute (with type `{dunder_getitem_type}`) \
                                 may not be callable",
                             iterable_type = iterable_type.display(db),
-                            dunder_getitem_type = bindings.callable_type(db).display(db),
+                            dunder_getitem_type = bindings.callable_type().display(db),
                         ));
                     }
                     CallErrorKind::BindingError if bindings.is_single() => report_not_iterable(format_args!(
@@ -4118,7 +4106,7 @@ impl<'db> IterationErrorKind<'db> {
                             (expected a signature at least as permissive as \
                             `def __getitem__(self, key: int): ...`)",
                         iterable_type = iterable_type.display(db),
-                        dunder_getitem_type = bindings.callable_type(db).display(db),
+                        dunder_getitem_type = bindings.callable_type().display(db),
                     )),
                 }
             }
@@ -4141,7 +4129,7 @@ impl<'db> IterationErrorKind<'db> {
                             its `__getitem__` attribute has type `{dunder_getitem_type}`, \
                             which is not callable",
                         iterable_type = iterable_type.display(db),
-                        dunder_getitem_type = bindings.callable_type(db).display(db),
+                        dunder_getitem_type = bindings.callable_type().display(db),
                     )),
                     CallErrorKind::PossiblyNotCallable if bindings.is_single() => report_not_iterable(format_args!(
                         "Object of type `{iterable_type}` may not be iterable \
@@ -4155,7 +4143,7 @@ impl<'db> IterationErrorKind<'db> {
                                 because it has no `__iter__` method and its `__getitem__` attribute \
                                 (with type `{dunder_getitem_type}`) may not be callable",
                             iterable_type = iterable_type.display(db),
-                            dunder_getitem_type = bindings.callable_type(db).display(db),
+                            dunder_getitem_type = bindings.callable_type().display(db),
                         ));
                     }
                     CallErrorKind::BindingError if bindings.is_single() => report_not_iterable(format_args!(
@@ -4175,7 +4163,7 @@ impl<'db> IterationErrorKind<'db> {
                             (expected a signature at least as permissive as \
                             `def __getitem__(self, key: int): ...`)",
                         iterable_type = iterable_type.display(db),
-                        dunder_getitem_type = bindings.callable_type(db).display(db),
+                        dunder_getitem_type = bindings.callable_type().display(db),
                     )),
                 }
             }

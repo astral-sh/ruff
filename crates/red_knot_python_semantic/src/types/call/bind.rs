@@ -27,7 +27,7 @@ use ruff_text_size::Ranged;
 /// It's guaranteed that the wrapped bindings have no errors.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Bindings<'db> {
-    pub(crate) signatures: Signatures<'db>,
+    pub(crate) signatures: &'db Signatures<'db>,
     inner: BindingsInner<'db>,
 }
 
@@ -48,10 +48,10 @@ impl<'db> Bindings<'db> {
     /// overload (if any).
     pub(crate) fn bind(
         db: &'db dyn Db,
-        signatures: Signatures<'db>,
+        signatures: &'db Signatures<'db>,
         arguments: &CallArguments<'_, 'db>,
     ) -> Self {
-        if let Some(signature) = signatures.as_single(db) {
+        if let Some(signature) = signatures.as_single() {
             return Bindings {
                 signatures,
                 inner: BindingsInner::Single(CallableBinding::bind(db, signature, arguments)),
@@ -59,7 +59,7 @@ impl<'db> Bindings<'db> {
         }
 
         let bindings = signatures
-            .iter(db)
+            .iter()
             .map(|signature| CallableBinding::bind(db, signature, arguments))
             .collect::<Vec<_>>()
             .into_boxed_slice();
@@ -73,8 +73,8 @@ impl<'db> Bindings<'db> {
         matches!(&self.inner, BindingsInner::Single(_))
     }
 
-    pub(crate) fn callable_type(&self, db: &'db dyn Db) -> Type<'db> {
-        self.signatures.ty(db)
+    pub(crate) fn callable_type(&self) -> Type<'db> {
+        self.signatures.ty
     }
 
     /// Returns the return type of the call. For successful calls, this is the actual return type.
@@ -104,7 +104,7 @@ impl<'db> Bindings<'db> {
 
     /// Returns whether all bindings were successful, or an error describing why some bindings were
     /// unsuccessful.
-    pub(crate) fn into_result(self, db: &'db dyn Db) -> Result<Self, CallError<'db>> {
+    pub(crate) fn into_result(self) -> Result<Self, CallError<'db>> {
         // In order of precedence:
         //
         // - If every union element is Ok, then the union is too.
@@ -124,7 +124,7 @@ impl<'db> Bindings<'db> {
         let mut any_binding_error = false;
         let mut all_not_callable = true;
         for binding in self.iter() {
-            let result = binding.as_result(db);
+            let result = binding.as_result();
             all_ok &= result.is_ok();
             any_binding_error |= matches!(result, Err(CallErrorKind::BindingError));
             all_not_callable &= matches!(result, Err(CallErrorKind::NotCallable));
@@ -172,7 +172,7 @@ impl<'db> Bindings<'db> {
                 node,
                 format_args!(
                     "Object of type `{}` is not callable",
-                    self.signatures.ty(context.db()).display(context.db())
+                    self.signatures.ty.display(context.db())
                 ),
             );
             return;
@@ -181,7 +181,7 @@ impl<'db> Bindings<'db> {
         // TODO: We currently only report errors for the first union element. Ideally, we'd report
         // an error saying that the union type can't be called, followed by subdiagnostics
         // explaining why.
-        if let Some(first) = self.iter().find(|b| b.as_result(context.db()).is_err()) {
+        if let Some(first) = self.iter().find(|b| b.as_result().is_err()) {
             first.report_diagnostics(context, node);
         }
     }
@@ -204,7 +204,7 @@ impl<'db> Bindings<'db> {
 /// [overloads]: https://github.com/python/typing/pull/1839
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct CallableBinding<'db> {
-    pub(crate) signature: CallableSignature<'db>,
+    pub(crate) signature: &'db CallableSignature<'db>,
     inner: CallableBindingInner<'db>,
 }
 
@@ -222,10 +222,10 @@ impl<'db> CallableBinding<'db> {
     /// all parameters, and any errors resulting from binding the call.
     fn bind(
         db: &'db dyn Db,
-        signature: CallableSignature<'db>,
+        signature: &'db CallableSignature<'db>,
         arguments: &CallArguments<'_, 'db>,
     ) -> Self {
-        if !signature.is_callable(db) {
+        if !signature.is_callable() {
             return CallableBinding {
                 signature,
                 inner: CallableBindingInner::NotCallable,
@@ -234,13 +234,13 @@ impl<'db> CallableBinding<'db> {
 
         // If this callable is a bound method, prepend the self instance onto the arguments list
         // before checking.
-        let arguments = if let Some(bound_type) = signature.bound_type(db) {
+        let arguments = if let Some(bound_type) = signature.bound_type {
             Cow::Owned(arguments.with_self(bound_type))
         } else {
             Cow::Borrowed(arguments)
         };
 
-        if let Some(single) = signature.as_single(db) {
+        if let Some(single) = signature.as_single() {
             let binding = Binding::bind(db, single, arguments.as_ref());
             return CallableBinding {
                 signature,
@@ -255,7 +255,7 @@ impl<'db> CallableBinding<'db> {
         //
         // [1] https://github.com/python/typing/pull/1839
         let overloads = signature
-            .iter(db)
+            .iter()
             .map(|signature| Binding::bind(db, signature, arguments.as_ref()))
             .collect::<Vec<_>>()
             .into_boxed_slice();
@@ -281,7 +281,7 @@ impl<'db> CallableBinding<'db> {
         }
     }
 
-    fn as_result(&self, db: &'db dyn Db) -> Result<(), CallErrorKind> {
+    fn as_result(&self) -> Result<(), CallErrorKind> {
         if matches!(self.inner, CallableBindingInner::NotCallable) {
             return Err(CallErrorKind::NotCallable);
         }
@@ -290,7 +290,7 @@ impl<'db> CallableBinding<'db> {
             return Err(CallErrorKind::BindingError);
         }
 
-        if self.dunder_is_possibly_unbound(db) {
+        if self.dunder_is_possibly_unbound() {
             return Err(CallErrorKind::PossiblyNotCallable);
         }
 
@@ -309,9 +309,9 @@ impl<'db> CallableBinding<'db> {
 
     /// Returns whether this binding is for an object that is callable via a `__call__` method that
     /// is possibly unbound.
-    pub(crate) fn dunder_is_possibly_unbound(&self, db: &'db dyn Db) -> bool {
+    pub(crate) fn dunder_is_possibly_unbound(&self) -> bool {
         matches!(
-            self.signature.dunder_call_boundness(db),
+            self.signature.dunder_call_boundness,
             Some(Boundness::PossiblyUnbound)
         )
     }
@@ -356,26 +356,25 @@ impl<'db> CallableBinding<'db> {
                 node,
                 format_args!(
                     "Object of type `{}` is not callable",
-                    self.signature.ty(context.db()).display(context.db()),
+                    self.signature.ty.display(context.db()),
                 ),
             );
             return;
         }
 
-        if self.dunder_is_possibly_unbound(context.db()) {
+        if self.dunder_is_possibly_unbound() {
             context.report_lint(
                 &CALL_NON_CALLABLE,
                 node,
                 format_args!(
                     "Object of type `{}` is not callable (possibly unbound `__call__` method)",
-                    self.signature.ty(context.db()).display(context.db()),
+                    self.signature.ty.display(context.db()),
                 ),
             );
             return;
         }
 
-        let callable_descriptor =
-            CallableDescriptor::new(context.db(), self.signature.ty(context.db()));
+        let callable_descriptor = CallableDescriptor::new(context.db(), self.signature.ty);
         if self.overloads().len() > 1 {
             context.report_lint(
                 &NO_MATCHING_OVERLOAD,
@@ -393,12 +392,12 @@ impl<'db> CallableBinding<'db> {
         }
 
         let callable_descriptor =
-            CallableDescriptor::new(context.db(), self.signature.signature_ty(context.db()));
+            CallableDescriptor::new(context.db(), self.signature.signature_ty);
         for overload in self.overloads() {
             overload.report_diagnostics(
                 context,
                 node,
-                self.signature.signature_ty(context.db()),
+                self.signature.signature_ty,
                 callable_descriptor.as_ref(),
             );
         }
