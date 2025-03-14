@@ -1,6 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{self as ast, Expr, OperatorPrecedence, Stmt};
+
+use ruff_python_ast::{self as ast, Expr, ExprBinOp, Operator, OperatorPrecedence, Stmt};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
@@ -132,18 +133,56 @@ pub(crate) fn unnecessary_dunder_call(checker: &Checker, call: &ast::ExprCall) {
                 let value_slice = checker.locator().slice(value.as_ref());
                 let arg_slice = checker.locator().slice(arg);
 
-                if OperatorPrecedence::from_expr(arg) > precedence {
+                let value_slice_needs_parentheses = needs_parentheses(value_slice);
+                let arg_slice_needs_parentheses = needs_parentheses(arg_slice);
+                let replacement_needs_wrapping_parentheses = matches!(
+                    checker.semantic().current_expression_parent(),
+                    Some(&Expr::BinOp(ExprBinOp {
+                        op: Operator::Sub,
+                        ..
+                    }))
+                );
+
+                // no fix when argument is a starred expression
+                if arg_slice.starts_with('*') {
+                    fixed = None;
+                } else if OperatorPrecedence::from_expr(arg) > precedence {
                     // if it's something that can reasonably be removed from parentheses,
                     // we'll do that.
-                    fixed = Some((
-                        format!("{value_slice} {replacement} {arg_slice}"),
-                        precedence,
-                    ));
+                    fixed = match (
+                        value_slice_needs_parentheses,
+                        arg_slice_needs_parentheses,
+                        replacement_needs_wrapping_parentheses,
+                    ) {
+                        (true, false, false) => Some((
+                            format!("({value_slice}) {replacement} {arg_slice}"),
+                            precedence,
+                        )),
+                        (false, true, false) => Some((
+                            format!("{value_slice} {replacement} ({arg_slice})"),
+                            precedence,
+                        )),
+                        (false, false, true) => Some((
+                            format!("({value_slice} {replacement} {arg_slice})"),
+                            precedence,
+                        )),
+                        _ => Some((
+                            format!("{value_slice} {replacement} {arg_slice}"),
+                            precedence,
+                        )),
+                    };
                 } else {
-                    fixed = Some((
-                        format!("{value_slice} {replacement} ({arg_slice})"),
-                        precedence,
-                    ));
+                    fixed = if needs_parentheses(value_slice) {
+                        Some((
+                            format!("({value_slice}) {replacement} ({arg_slice})"),
+                            precedence,
+                        ))
+                    } else {
+                        Some((
+                            format!("{value_slice} {replacement} ({arg_slice})"),
+                            precedence,
+                        ))
+                    };
                 }
 
                 title = Some(message.to_string());
@@ -155,10 +194,17 @@ pub(crate) fn unnecessary_dunder_call(checker: &Checker, call: &ast::ExprCall) {
                 if OperatorPrecedence::from_expr(arg) > precedence {
                     // if it's something that can reasonably be removed from parentheses,
                     // we'll do that.
-                    fixed = Some((
-                        format!("{arg_slice} {replacement} {value_slice}"),
-                        precedence,
-                    ));
+                    if needs_parentheses(value_slice) {
+                        fixed = Some((
+                            format!("{arg_slice} {replacement} ({value_slice})"),
+                            precedence,
+                        ));
+                    } else {
+                        fixed = Some((
+                            format!("{arg_slice} {replacement} {value_slice}"),
+                            precedence,
+                        ));
+                    }
                 } else {
                     fixed = Some((
                         format!("({arg_slice}) {replacement} {value_slice}"),
@@ -211,6 +257,16 @@ pub(crate) fn unnecessary_dunder_call(checker: &Checker, call: &ast::ExprCall) {
     };
 
     checker.report_diagnostic(diagnostic);
+}
+
+/// Return `True` if we need to add parentheses
+fn needs_parentheses(value: &str) -> bool {
+    value.contains("not")
+        || value.contains("and")
+        || value.contains("or")
+        || value.contains("if")
+        || value.contains("for")
+        || value.contains(":=")
 }
 
 /// Return `true` if this is a dunder method that is allowed to be called explicitly.
