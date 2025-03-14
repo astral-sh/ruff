@@ -212,9 +212,10 @@ impl<'db> CallableSignature<'db> {
 
     /// Returns the [`Signature`] if this is a non-overloaded callable, [None] otherwise.
     pub(crate) fn as_single(&self) -> Option<&Signature<'db>> {
-        match self {
-            CallableSignature::Single(signature) => Some(signature),
-            CallableSignature::Overloaded(_) => None,
+        match &self.inner {
+            CallableSignatureInner::NotCallable => None,
+            CallableSignatureInner::Single(signature) => Some(signature),
+            CallableSignatureInner::Overloaded(_) => None,
         }
     }
 
@@ -229,14 +230,6 @@ impl<'db> CallableSignature<'db> {
     /// Returns whether this signature is callable.
     pub(crate) fn is_callable(&self) -> bool {
         !matches!(&self.inner, CallableSignatureInner::NotCallable)
-    }
-
-    pub(crate) fn as_single(&self) -> Option<&Signature<'db>> {
-        match &self.inner {
-            CallableSignatureInner::NotCallable => None,
-            CallableSignatureInner::Single(signature) => Some(signature),
-            CallableSignatureInner::Overloaded(_) => None,
-        }
     }
 }
 

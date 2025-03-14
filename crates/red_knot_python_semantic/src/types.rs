@@ -4349,7 +4349,7 @@ impl<'db> FunctionType<'db> {
     pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
         // TODO: Add support for overloaded callables; return `Type`, not `Option<Type>`.
         Some(Type::Callable(CallableType::General(
-            GeneralCallableType::new(db, self.signature(db).as_single()?.clone()),
+            GeneralCallableType::new(db, self.signature(db).clone()),
         )))
     }
 
