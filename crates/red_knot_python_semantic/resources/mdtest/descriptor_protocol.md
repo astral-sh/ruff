@@ -529,6 +529,7 @@ c.name = "new"
 # error: [invalid-assignment]
 c.name = None
 
+# TODO: this should be an error, but with a proper error message
 # error: [invalid-assignment] "Implicit shadowing of function `name`; annotate to make it explicit if this is intentional"
 c.name = 42
 ```
