@@ -287,6 +287,7 @@ pub struct TerminalOptions {
     /// Defaults to `full`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub output_format: Option<RangedValue<DiagnosticFormat>>,
+
     /// Use exit code 1 if there are any warning-level diagnostics.
     ///
     /// Defaults to `false`.

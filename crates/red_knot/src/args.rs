@@ -79,6 +79,10 @@ pub(crate) struct CheckCommand {
     #[arg(long)]
     pub(crate) output_format: Option<OutputFormat>,
 
+    /// Control when colored output is used.
+    #[arg(long)]
+    pub(crate) color: Option<TerminalColor>,
+
     /// Use exit code 1 if there are any warning-level diagnostics.
     #[arg(long, conflicts_with = "exit_zero", default_missing_value = "true", num_args=0..1)]
     pub(crate) error_on_warning: Option<bool>,
@@ -246,4 +250,18 @@ impl From<OutputFormat> for ruff_db::diagnostic::DiagnosticFormat {
             OutputFormat::Concise => Self::Concise,
         }
     }
+}
+
+/// Control when colored output is used.
+#[derive(Copy, Clone, Hash, Debug, PartialEq, Eq, PartialOrd, Ord, Default, clap::ValueEnum)]
+pub(crate) enum TerminalColor {
+    /// Automatically detect if color support is available on the terminal.
+    #[default]
+    Auto,
+
+    /// Always display colors
+    Always,
+
+    /// Never display colors.
+    Never,
 }
