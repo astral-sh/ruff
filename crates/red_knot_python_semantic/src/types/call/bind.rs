@@ -69,7 +69,7 @@ impl<'db> Bindings<'db> {
         }
     }
 
-    pub(crate) fn is_single(&self) -> bool {
+    pub(crate) const fn is_single(&self) -> bool {
         matches!(&self.inner, BindingsInner::Single(_))
     }
 
@@ -297,7 +297,7 @@ impl<'db> CallableBinding<'db> {
         Ok(())
     }
 
-    fn is_callable(&self) -> bool {
+    const fn is_callable(&self) -> bool {
         !matches!(&self.inner, CallableBindingInner::NotCallable)
     }
 
@@ -309,7 +309,7 @@ impl<'db> CallableBinding<'db> {
 
     /// Returns whether this binding is for an object that is callable via a `__call__` method that
     /// is possibly unbound.
-    pub(crate) fn dunder_is_possibly_unbound(&self) -> bool {
+    pub(crate) const fn dunder_is_possibly_unbound(&self) -> bool {
         matches!(
             self.signature.dunder_call_boundness,
             Some(Boundness::PossiblyUnbound)
