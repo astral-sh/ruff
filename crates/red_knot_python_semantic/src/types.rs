@@ -3425,10 +3425,28 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         name: &str,
+        argument_types: CallArgumentTypes<'_, 'db>,
+    ) -> Result<Bindings<'db>, CallDunderError<'db>> {
+        self.try_call_dunder_with_policy(db, name, argument_types, MemberLookupPolicy::empty())
+    }
+
+    /// Same as `try_call_dunder`, but allows specifying a policy for the member lookup. In
+    /// particular, this allows to specify `MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK` to avoid
+    /// looking up dunder methods on `object`, which is needed for functions like `__init__`,
+    /// `__new__`, or `__setattr__`.
+    fn try_call_dunder_with_policy(
+        self,
+        db: &'db dyn Db,
+        name: &str,
         mut argument_types: CallArgumentTypes<'_, 'db>,
+        policy: MemberLookupPolicy,
     ) -> Result<Bindings<'db>, CallDunderError<'db>> {
         match self
-            .member_lookup_with_policy(db, name.into(), MemberLookupPolicy::NO_INSTANCE_FALLBACK)
+            .member_lookup_with_policy(
+                db,
+                name.into(),
+                MemberLookupPolicy::NO_INSTANCE_FALLBACK | policy,
+            )
             .symbol
         {
             Symbol::Type(dunder_callable, boundness) => {

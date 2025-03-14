@@ -82,7 +82,9 @@ use crate::types::{
     Truthiness, TupleType, Type, TypeAliasType, TypeAndQualifiers, TypeArrayDisplay,
     TypeQualifiers, TypeVarBoundOrConstraints, TypeVarInstance, UnionBuilder, UnionType,
 };
-use crate::types::{CallableType, FunctionDecorators, Signature};
+use crate::types::{
+    CallableType, FunctionDecorators, MemberLookupPolicy, Signature, StringLiteralType,
+};
 use crate::unpack::{Unpack, UnpackPosition};
 use crate::util::subscript::{PyIndex, PySlice};
 use crate::Db;
@@ -2480,19 +2482,51 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                             ensure_assignable_to(instance_attr_ty)
                         } else {
-                            if emit_diagnostics {
-                                self.context.report_lint(
-                                    &UNRESOLVED_ATTRIBUTE,
-                                    target,
-                                    format_args!(
-                                        "Unresolved attribute `{}` on type `{}`.",
-                                        attribute,
-                                        object_ty.display(db)
-                                    ),
-                                );
-                            }
+                            let result = object_ty.try_call_dunder_with_policy(
+                                db,
+                                "__setattr__",
+                                CallArgumentTypes::positional([
+                                    Type::StringLiteral(StringLiteralType::new(
+                                        db,
+                                        Box::from(attribute),
+                                    )),
+                                    value_ty,
+                                ]),
+                                MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+                            );
 
-                            false
+                            match result {
+                                Ok(_) | Err(CallDunderError::PossiblyUnbound(_)) => true,
+                                Err(CallDunderError::CallError(..)) => {
+                                    if emit_diagnostics {
+                                        self.context.report_lint(
+                                        &UNRESOLVED_ATTRIBUTE,
+                                        target,
+                                        format_args!(
+                                            "Can not assign object of `{}` to attribute `{attribute}` on type `{}` with custom `__setattr__` method.",
+                                            value_ty.display(db),
+                                            object_ty.display(db)
+                                        ),
+                                    );
+                                    }
+                                    false
+                                }
+                                Err(CallDunderError::MethodNotAvailable) => {
+                                    if emit_diagnostics {
+                                        self.context.report_lint(
+                                            &UNRESOLVED_ATTRIBUTE,
+                                            target,
+                                            format_args!(
+                                                "Unresolved attribute `{}` on type `{}`.",
+                                                attribute,
+                                                object_ty.display(db)
+                                            ),
+                                        );
+                                    }
+
+                                    false
+                                }
+                            }
                         }
                     }
                 }
