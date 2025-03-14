@@ -2320,13 +2320,13 @@ impl<'db> Type<'db> {
 
     /// Returns the call signatures of a type.
     ///
-    /// Note that all types have a valid [`Signatures`], even if the type is not callable. If you
-    /// need to determine if a type is callable, use [`Signatures::is_callable`]. Though note that
-    /// "callable" can be subtle for a union type, since some union elements might be callable and
-    /// some not. A union is callable if every element type is callable — and even then, the
-    /// elements might be inconsisent, such that there's no argument list that's valid for all
-    /// elements. It's usually best to only worry about "callability" relative to a particular
-    /// argument list, via [`try_call`] and [`CallErrorKind::NotCallable`].
+    /// Note that all types have a valid [`Signatures`], even if the type is not callable.
+    /// Moreover, "callable" can be subtle for a union type, since some union elements might be
+    /// callable and some not. A union is callable if every element type is callable — and even
+    /// then, the elements might be inconsisent, such that there's no argument list that's valid
+    /// for all elements. It's usually best to only worry about "callability" relative to a
+    /// particular argument list, via [`try_call`][Self::try_call] and
+    /// [`CallErrorKind::NotCallable`].
     fn signatures(
         self,
         db: &'db dyn Db,

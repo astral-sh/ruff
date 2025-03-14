@@ -7,7 +7,7 @@ mod bind;
 pub(super) use arguments::{Argument, CallArguments};
 pub(super) use bind::Bindings;
 
-/// Wraps a [`CallBindings`] for an unsuccessful call with information about why the call was
+/// Wraps a [`Bindings`] for an unsuccessful call with information about why the call was
 /// unsuccessful.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct CallError<'db>(pub(super) CallErrorKind, pub(super) Box<Bindings<'db>>);
