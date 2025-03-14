@@ -1,0 +1,48 @@
+---
+source: crates/red_knot_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: attribute_assignment.md - Attribute assignment - Unknown attributes
+mdtest path: crates/red_knot_python_semantic/resources/mdtest/diagnostics/attribute_assignment.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | class C: ...
+2 | 
+3 | C.non_existent = 1  # error: [unresolved-attribute]
+4 | 
+5 | instance = C()
+6 | instance.non_existent = 1  # error: [unresolved-attribute]
+```
+
+# Diagnostics
+
+```
+error: lint:unresolved-attribute
+ --> /src/mdtest_snippet.py:3:1
+  |
+1 | class C: ...
+2 |
+3 | C.non_existent = 1  # error: [unresolved-attribute]
+  | ^^^^^^^^^^^^^^ Unresolved attribute `non_existent` on type `Literal[C]`.
+4 |
+5 | instance = C()
+  |
+
+```
+
+```
+error: lint:unresolved-attribute
+ --> /src/mdtest_snippet.py:6:1
+  |
+5 | instance = C()
+6 | instance.non_existent = 1  # error: [unresolved-attribute]
+  | ^^^^^^^^^^^^^^^^^^^^^ Unresolved attribute `non_existent` on type `C`.
+  |
+
+```

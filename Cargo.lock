@@ -2659,7 +2659,7 @@ dependencies = [
 
 [[package]]
 name = "ruff"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "anyhow",
  "argfile",
@@ -2894,7 +2894,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_linter"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "aho-corasick",
  "anyhow",
@@ -3192,6 +3192,7 @@ dependencies = [
  "thiserror 2.0.12",
  "toml",
  "tracing",
+ "tracing-log",
  "tracing-subscriber",
 ]
 
@@ -3216,7 +3217,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_wasm"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "console_error_panic_hook",
  "console_log",

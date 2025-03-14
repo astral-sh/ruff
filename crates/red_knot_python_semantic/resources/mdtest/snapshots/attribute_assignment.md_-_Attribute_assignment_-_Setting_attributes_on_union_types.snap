@@ -1,0 +1,50 @@
+---
+source: crates/red_knot_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: attribute_assignment.md - Attribute assignment - Setting attributes on union types
+mdtest path: crates/red_knot_python_semantic/resources/mdtest/diagnostics/attribute_assignment.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | def _(flag: bool) -> None:
+ 2 |     if flag:
+ 3 |         class C1:
+ 4 |             attr: int = 0
+ 5 | 
+ 6 |     else:
+ 7 |         class C1:
+ 8 |             attr: str = ""
+ 9 | 
+10 |     # TODO: The error message here could be improved to explain why the assignment fails.
+11 |     C1.attr = 1  # error: [invalid-assignment]
+12 | 
+13 |     class C2:
+14 |         if flag:
+15 |             attr: int = 0
+16 |         else:
+17 |             attr: str = ""
+18 | 
+19 |     # TODO: This should be an error
+20 |     C2.attr = 1
+```
+
+# Diagnostics
+
+```
+error: lint:invalid-assignment
+  --> /src/mdtest_snippet.py:11:5
+   |
+10 |     # TODO: The error message here could be improved to explain why the assignment fails.
+11 |     C1.attr = 1  # error: [invalid-assignment]
+   |     ^^^^^^^ Object of type `Literal[1]` is not assignable to attribute `attr` on type `Literal[C1, C1]`
+12 |
+13 |     class C2:
+   |
+
+```

@@ -1169,6 +1169,22 @@ pub(super) fn report_possibly_unresolved_reference(
     );
 }
 
+pub(super) fn report_possibly_unbound_attribute(
+    context: &InferContext,
+    target: &ast::ExprAttribute,
+    attribute: &str,
+    object_ty: Type,
+) {
+    context.report_lint(
+        &POSSIBLY_UNBOUND_ATTRIBUTE,
+        target,
+        format_args!(
+            "Attribute `{attribute}` on type `{}` is possibly unbound",
+            object_ty.display(context.db()),
+        ),
+    );
+}
+
 pub(super) fn report_unresolved_reference(context: &InferContext, expr_name_node: &ast::ExprName) {
     let ast::ExprName { id, .. } = expr_name_node;
 

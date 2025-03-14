@@ -153,7 +153,11 @@ pub fn run(
         }));
     }
 
-    set_up_logging(global_options.log_level())?;
+    // Don't set up logging for the server command, as it has its own logging setup
+    // and setting the global logger can only be done once.
+    if !matches!(command, Command::Server { .. }) {
+        set_up_logging(global_options.log_level())?;
+    }
 
     match command {
         Command::Version { output_format } => {

@@ -63,6 +63,10 @@ impl ModulePath {
         self.relative_path.pop()
     }
 
+    pub(super) fn search_path(&self) -> &SearchPath {
+        &self.search_path
+    }
+
     #[must_use]
     pub(super) fn is_directory(&self, resolver: &ResolverContext) -> bool {
         let ModulePath {
