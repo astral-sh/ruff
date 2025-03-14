@@ -126,8 +126,7 @@ impl<'db> CallableSignature<'db> {
         }
     }
 
-    /// Creates a new `CallableSignature` from a non-empty iterator of [`Signature`]s. Panics if
-    /// the iterator is empty.
+    /// Creates a new `CallableSignature` from a non-empty iterator of [`Signature`]s.
     pub(crate) fn from_overloads<I>(ty: Type<'db>, signature_ty: Type<'db>, overloads: I) -> Self
     where
         I: IntoIterator<Item = Signature<'db>>,
