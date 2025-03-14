@@ -4579,7 +4579,7 @@ impl<'db> GeneralCallableType<'db> {
         if signature.parameters().iter().any(|parameter| {
             parameter
                 .annotated_type()
-                .is_some_and(|annotated_type| !annotated_type.is_fully_static(db))
+                .is_none_or(|annotated_type| !annotated_type.is_fully_static(db))
         }) {
             return false;
         }
