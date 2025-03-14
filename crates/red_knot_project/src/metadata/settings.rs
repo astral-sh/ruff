@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use red_knot_python_semantic::lint::RuleSelection;
+use ruff_db::diagnostic::DiagnosticFormat;
 
 /// The resolved [`super::Options`] for the project.
 ///
@@ -49,5 +50,6 @@ impl Settings {
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct TerminalSettings {
+    pub output_format: DiagnosticFormat,
     pub error_on_warning: bool,
 }

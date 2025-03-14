@@ -11,7 +11,7 @@ use ruff_python_ast::{
 };
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
-use crate::error::{FStringKind, StarTupleKind};
+use crate::error::{FStringKind, StarTupleKind, UnparenthesizedNamedExprKind};
 use crate::parser::progress::ParserProgress;
 use crate::parser::{helpers, FunctionKind, Parser};
 use crate::string::{parse_fstring_literal_element, parse_string_literal, StringType};
@@ -855,6 +855,35 @@ impl<'src> Parser<'src> {
 
         self.expect(TokenKind::Rsqb);
 
+        // test_ok star_index_py311
+        // # parse_options: {"target-version": "3.11"}
+        // lst[*index]  # simple index
+        // class Array(Generic[DType, *Shape]): ...  # motivating example from the PEP
+        // lst[a, *b, c]  # different positions
+        // lst[a, b, *c]  # different positions
+        // lst[*a, *b]  # multiple unpacks
+        // array[3:5, *idxs]  # mixed with slices
+
+        // test_err star_index_py310
+        // # parse_options: {"target-version": "3.10"}
+        // lst[*index]  # simple index
+        // class Array(Generic[DType, *Shape]): ...  # motivating example from the PEP
+        // lst[a, *b, c]  # different positions
+        // lst[a, b, *c]  # different positions
+        // lst[*a, *b]  # multiple unpacks
+        // array[3:5, *idxs]  # mixed with slices
+
+        // test_err star_slices
+        // array[*start:*end]
+        if let Expr::Tuple(ast::ExprTuple { elts, .. }) = &slice {
+            for elt in elts.iter().filter(|elt| elt.is_starred_expr()) {
+                self.add_unsupported_syntax_error(
+                    UnsupportedSyntaxErrorKind::StarExpressionInIndex,
+                    elt.range(),
+                );
+            }
+        };
+
         ast::ExprSubscript {
             value: Box::new(value),
             slice: Box::new(slice),
@@ -873,15 +902,48 @@ impl<'src> Parser<'src> {
         const STEP_END_SET: TokenSet =
             TokenSet::new([TokenKind::Comma, TokenKind::Rsqb]).union(NEWLINE_EOF_SET);
 
+        // test_err named_expr_slice
+        // # even after 3.9, an unparenthesized named expression is not allowed in a slice
+        // lst[x:=1:-1]
+        // lst[1:x:=1]
+        // lst[1:3:x:=1]
+
+        // test_err named_expr_slice_parse_error
+        // # parse_options: {"target-version": "3.8"}
+        // # before 3.9, only emit the parse error, not the unsupported syntax error
+        // lst[x:=1:-1]
+
         let start = self.node_start();
 
         let lower = if self.at_expr() {
             let lower =
                 self.parse_named_expression_or_higher(ExpressionContext::starred_conditional());
+
+            // This means we're in a subscript.
             if self.at_ts(NEWLINE_EOF_SET.union([TokenKind::Rsqb, TokenKind::Comma].into())) {
+                // test_ok parenthesized_named_expr_index_py38
+                // # parse_options: {"target-version": "3.8"}
+                // lst[(x:=1)]
+
+                // test_ok unparenthesized_named_expr_index_py39
+                // # parse_options: {"target-version": "3.9"}
+                // lst[x:=1]
+
+                // test_err unparenthesized_named_expr_index_py38
+                // # parse_options: {"target-version": "3.8"}
+                // lst[x:=1]
+                if lower.is_unparenthesized_named_expr() {
+                    self.add_unsupported_syntax_error(
+                        UnsupportedSyntaxErrorKind::UnparenthesizedNamedExpr(
+                            UnparenthesizedNamedExprKind::SequenceIndex,
+                        ),
+                        lower.range(),
+                    );
+                }
                 return lower.expr;
             }
 
+            // Now we know we're in a slice.
             if !lower.is_parenthesized {
                 match lower.expr {
                     Expr::Starred(_) => {
@@ -1708,6 +1770,26 @@ impl<'src> Parser<'src> {
                         ParseErrorType::IterableUnpackingInComprehension,
                         &key_or_element,
                     );
+                } else if key_or_element.is_unparenthesized_named_expr() {
+                    // test_ok parenthesized_named_expr_py38
+                    // # parse_options: {"target-version": "3.8"}
+                    // {(x := 1), 2, 3}
+                    // {(last := x) for x in range(3)}
+
+                    // test_ok unparenthesized_named_expr_py39
+                    // # parse_options: {"target-version": "3.9"}
+                    // {x := 1, 2, 3}
+                    // {last := x for x in range(3)}
+
+                    // test_err unparenthesized_named_expr_set_comp_py38
+                    // # parse_options: {"target-version": "3.8"}
+                    // {last := x for x in range(3)}
+                    self.add_unsupported_syntax_error(
+                        UnsupportedSyntaxErrorKind::UnparenthesizedNamedExpr(
+                            UnparenthesizedNamedExprKind::SetComprehension,
+                        ),
+                        key_or_element.range(),
+                    );
                 }
 
                 Expr::SetComp(self.parse_set_comprehension_expression(key_or_element.expr, start))
@@ -1746,7 +1828,7 @@ impl<'src> Parser<'src> {
                     ))
                 }
             }
-            _ => Expr::Set(self.parse_set_expression(key_or_element.expr, start)),
+            _ => Expr::Set(self.parse_set_expression(key_or_element, start)),
         }
     }
 
@@ -1896,19 +1978,42 @@ impl<'src> Parser<'src> {
     /// Parses a set expression.
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#set-displays>
-    fn parse_set_expression(&mut self, first_element: Expr, start: TextSize) -> ast::ExprSet {
+    fn parse_set_expression(&mut self, first_element: ParsedExpr, start: TextSize) -> ast::ExprSet {
         if !self.at_sequence_end() {
             self.expect(TokenKind::Comma);
         }
 
-        let mut elts = vec![first_element];
+        // test_err unparenthesized_named_expr_set_literal_py38
+        // # parse_options: {"target-version": "3.8"}
+        // {x := 1, 2, 3}
+        // {1, x := 2, 3}
+        // {1, 2, x := 3}
+
+        if first_element.is_unparenthesized_named_expr() {
+            self.add_unsupported_syntax_error(
+                UnsupportedSyntaxErrorKind::UnparenthesizedNamedExpr(
+                    UnparenthesizedNamedExprKind::SetLiteral,
+                ),
+                first_element.range(),
+            );
+        }
+
+        let mut elts = vec![first_element.expr];
 
         self.parse_comma_separated_list(RecoveryContextKind::SetElements, |parser| {
-            elts.push(
-                parser
-                    .parse_named_expression_or_higher(ExpressionContext::starred_bitwise_or())
-                    .expr,
-            );
+            let parsed_expr =
+                parser.parse_named_expression_or_higher(ExpressionContext::starred_bitwise_or());
+
+            if parsed_expr.is_unparenthesized_named_expr() {
+                parser.add_unsupported_syntax_error(
+                    UnsupportedSyntaxErrorKind::UnparenthesizedNamedExpr(
+                        UnparenthesizedNamedExprKind::SetLiteral,
+                    ),
+                    parsed_expr.range(),
+                );
+            }
+
+            elts.push(parsed_expr.expr);
         });
 
         self.expect(TokenKind::Rbrace);
@@ -2458,6 +2563,11 @@ impl ParsedExpr {
     #[inline]
     pub(super) const fn is_unparenthesized_starred_expr(&self) -> bool {
         !self.is_parenthesized && self.expr.is_starred_expr()
+    }
+
+    #[inline]
+    pub(super) const fn is_unparenthesized_named_expr(&self) -> bool {
+        !self.is_parenthesized && self.expr.is_named_expr()
     }
 }
 
