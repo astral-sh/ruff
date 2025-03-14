@@ -370,7 +370,7 @@ impl<'db> Binding<'db> {
             }
         };
         for (argument_index, argument) in arguments.iter().enumerate() {
-            let argument_ty = argument.ty();
+            let argument_ty = argument.argument_type();
             let (index, parameter, positional) = match argument.kind() {
                 ArgumentKind::Positional | ArgumentKind::Synthetic => {
                     if matches!(argument.kind(), ArgumentKind::Synthetic) {
