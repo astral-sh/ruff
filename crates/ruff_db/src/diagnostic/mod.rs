@@ -518,6 +518,10 @@ impl Severity {
 /// Configuration for rendering diagnostics.
 #[derive(Clone, Debug, Default)]
 pub struct DisplayDiagnosticConfig {
+    /// The format to use for diagnostic rendering.
+    ///
+    /// This uses the "full" format by default.
+    format: DiagnosticFormat,
     /// Whether to enable colors or not.
     ///
     /// Disabled by default.
@@ -525,8 +529,38 @@ pub struct DisplayDiagnosticConfig {
 }
 
 impl DisplayDiagnosticConfig {
+    /// Whether to enable concise diagnostic output or not.
+    pub fn format(self, format: DiagnosticFormat) -> DisplayDiagnosticConfig {
+        DisplayDiagnosticConfig { format, ..self }
+    }
+
     /// Whether to enable colors or not.
     pub fn color(self, yes: bool) -> DisplayDiagnosticConfig {
-        DisplayDiagnosticConfig { color: yes }
+        DisplayDiagnosticConfig { color: yes, ..self }
     }
+}
+
+/// The diagnostic output format.
+#[derive(Copy, Clone, Debug, Default, Eq, Hash, PartialEq, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "kebab-case"))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub enum DiagnosticFormat {
+    /// The default full mode will print "pretty" diagnostics.
+    ///
+    /// That is, color will be used when printing to a `tty`.
+    /// Moreover, diagnostic messages may include additional
+    /// context and annotations on the input to help understand
+    /// the message.
+    #[default]
+    Full,
+    /// Print diagnostics in a concise mode.
+    ///
+    /// This will guarantee that each diagnostic is printed on
+    /// a single line. Only the most important or primary aspects
+    /// of the diagnostic are included. Contextual information is
+    /// dropped.
+    ///
+    /// This may use color when printing to a `tty`.
+    Concise,
 }
