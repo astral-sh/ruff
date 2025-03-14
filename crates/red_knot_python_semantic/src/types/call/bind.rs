@@ -87,14 +87,19 @@ impl<'db> Bindings<'db> {
                 // The return types from successfully bound elements should come first, then the
                 // fallback return types for any bindings with errors.
                 let mut builder = UnionBuilder::new(db);
+                let mut any_errors = false;
                 for binding in bindings {
-                    if !binding.has_binding_errors() {
+                    if binding.has_binding_errors() {
+                        any_errors = true;
+                    } else {
                         builder = builder.add(binding.return_type());
                     }
                 }
-                for binding in bindings {
-                    if binding.has_binding_errors() {
-                        builder = builder.add(binding.return_type());
+                if any_errors {
+                    for binding in bindings {
+                        if binding.has_binding_errors() {
+                            builder = builder.add(binding.return_type());
+                        }
                     }
                 }
                 builder.build()
