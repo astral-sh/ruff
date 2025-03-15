@@ -29,7 +29,7 @@ use ruff_text_size::Ranged;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Bindings<'db> {
     pub(crate) callable_type: Type<'db>,
-    /// By using SmallVec, we avoid an extra heap allocation for the common case of a non-union
+    /// By using `SmallVec`, we avoid an extra heap allocation for the common case of a non-union
     /// type.
     elements: SmallVec<[CallableBinding<'db>; 1]>,
 }
@@ -178,7 +178,7 @@ pub(crate) struct CallableBinding<'db> {
 
     /// The bindings of each overload of this callable. Will be empty if the type is not callable.
     ///
-    /// By using SmallVec, we avoid an extra heap allocation for the common case of a
+    /// By using `SmallVec`, we avoid an extra heap allocation for the common case of a
     /// non-overloaded callable.
     overloads: SmallVec<[Binding<'db>; 1]>,
 }

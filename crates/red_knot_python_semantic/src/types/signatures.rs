@@ -26,7 +26,7 @@ pub(crate) struct Signatures<'db> {
     /// The type we'll use for error messages referring to details of the called signature. For calls to functions this
     /// will be the same as `callable_type`; for other callable instances it may be a `__call__` method.
     pub(crate) signature_type: Type<'db>,
-    /// By using SmallVec, we avoid an extra heap allocation for the common case of a non-union
+    /// By using `SmallVec`, we avoid an extra heap allocation for the common case of a non-union
     /// type.
     elements: SmallVec<[CallableSignature<'db>; 1]>,
 }
@@ -113,7 +113,7 @@ pub(crate) struct CallableSignature<'db> {
     /// The signatures of each overload of this callable. Will be empty if the type is not
     /// callable.
     ///
-    /// By using SmallVec, we avoid an extra heap allocation for the common case of a
+    /// By using `SmallVec`, we avoid an extra heap allocation for the common case of a
     /// non-overloaded callable.
     overloads: SmallVec<[Signature<'db>; 1]>,
 }
