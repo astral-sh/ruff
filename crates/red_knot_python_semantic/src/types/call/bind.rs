@@ -44,34 +44,12 @@ impl<'db> Bindings<'db> {
         db: &'db dyn Db,
         signatures: &Signatures<'db>,
         arguments: &CallArguments<'_, 'db>,
-    ) -> Self {
-        let elements = signatures
+    ) -> Result<Self, CallError<'db>> {
+        let elements: SmallVec<[CallableBinding<'db>; 1]> = signatures
             .into_iter()
             .map(|signature| CallableBinding::bind(db, signature, arguments))
             .collect();
-        Bindings {
-            callable_type: signatures.callable_type,
-            elements,
-        }
-    }
 
-    pub(crate) fn is_single(&self) -> bool {
-        self.elements.len() == 1
-    }
-
-    /// Returns the return type of the call. For successful calls, this is the actual return type.
-    /// For calls with binding errors, this is a type that best approximates the return type. For
-    /// types that are not callable, returns `Type::Unknown`.
-    pub(crate) fn return_type(&self, db: &'db dyn Db) -> Type<'db> {
-        if let [binding] = self.elements.as_slice() {
-            return binding.return_type();
-        }
-        UnionType::from_elements(db, self.into_iter().map(CallableBinding::return_type))
-    }
-
-    /// Returns whether all bindings were successful, or an error describing why some bindings were
-    /// unsuccessful.
-    pub(crate) fn into_result(self) -> Result<Self, CallError<'db>> {
         // In order of precedence:
         //
         // - If every union element is Ok, then the union is too.
@@ -90,25 +68,44 @@ impl<'db> Bindings<'db> {
         let mut all_ok = true;
         let mut any_binding_error = false;
         let mut all_not_callable = true;
-        for binding in &self {
+        for binding in &elements {
             let result = binding.as_result();
             all_ok &= result.is_ok();
             any_binding_error |= matches!(result, Err(CallErrorKind::BindingError));
             all_not_callable &= matches!(result, Err(CallErrorKind::NotCallable));
         }
 
+        let bindings = Bindings {
+            callable_type: signatures.callable_type,
+            elements,
+        };
+
         if all_ok {
-            Ok(self)
+            Ok(bindings)
         } else if any_binding_error {
-            Err(CallError(CallErrorKind::BindingError, Box::new(self)))
+            Err(CallError(CallErrorKind::BindingError, Box::new(bindings)))
         } else if all_not_callable {
-            Err(CallError(CallErrorKind::NotCallable, Box::new(self)))
+            Err(CallError(CallErrorKind::NotCallable, Box::new(bindings)))
         } else {
             Err(CallError(
                 CallErrorKind::PossiblyNotCallable,
-                Box::new(self),
+                Box::new(bindings),
             ))
         }
+    }
+
+    pub(crate) fn is_single(&self) -> bool {
+        self.elements.len() == 1
+    }
+
+    /// Returns the return type of the call. For successful calls, this is the actual return type.
+    /// For calls with binding errors, this is a type that best approximates the return type. For
+    /// types that are not callable, returns `Type::Unknown`.
+    pub(crate) fn return_type(&self, db: &'db dyn Db) -> Type<'db> {
+        if let [binding] = self.elements.as_slice() {
+            return binding.return_type();
+        }
+        UnionType::from_elements(db, self.into_iter().map(CallableBinding::return_type))
     }
 
     /// Report diagnostics for all of the errors that occurred when trying to match actual
