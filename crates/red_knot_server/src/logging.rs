@@ -102,7 +102,7 @@ impl<S> tracing_subscriber::layer::Filter<S> for LogLevelFilter {
         let filter = if meta.target().starts_with("red_knot") {
             self.filter.trace_level()
         } else {
-            tracing::Level::INFO
+            tracing::Level::WARN
         };
 
         meta.level() <= &filter

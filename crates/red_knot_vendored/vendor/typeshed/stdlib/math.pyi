@@ -1,6 +1,7 @@
 import sys
+from _typeshed import SupportsMul, SupportsRMul
 from collections.abc import Iterable
-from typing import Final, Protocol, SupportsFloat, SupportsIndex, TypeVar, overload
+from typing import Any, Final, Literal, Protocol, SupportsFloat, SupportsIndex, TypeVar, overload
 from typing_extensions import TypeAlias
 
 _T = TypeVar("_T")
@@ -99,10 +100,29 @@ elif sys.version_info >= (3, 9):
 
 def perm(n: SupportsIndex, k: SupportsIndex | None = None, /) -> int: ...
 def pow(x: _SupportsFloatOrIndex, y: _SupportsFloatOrIndex, /) -> float: ...
+
+_PositiveInteger: TypeAlias = Literal[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25]
+_NegativeInteger: TypeAlias = Literal[-1, -2, -3, -4, -5, -6, -7, -8, -9, -10, -11, -12, -13, -14, -15, -16, -17, -18, -19, -20]
+_LiteralInteger = _PositiveInteger | _NegativeInteger | Literal[0]  # noqa: Y026  # TODO: Use TypeAlias once mypy bugs are fixed
+
+_MultiplicableT1 = TypeVar("_MultiplicableT1", bound=SupportsMul[Any, Any])
+_MultiplicableT2 = TypeVar("_MultiplicableT2", bound=SupportsMul[Any, Any])
+
+class _SupportsProdWithNoDefaultGiven(SupportsMul[Any, Any], SupportsRMul[int, Any], Protocol): ...
+
+_SupportsProdNoDefaultT = TypeVar("_SupportsProdNoDefaultT", bound=_SupportsProdWithNoDefaultGiven)
+
+# This stub is based on the type stub for `builtins.sum`.
+# Like `builtins.sum`, it cannot be precisely represented in a type stub
+# without introducing many false positives.
+# For more details on its limitations and false positives, see #13572.
+# Instead, just like `builtins.sum`, we explicitly handle several useful cases.
 @overload
-def prod(iterable: Iterable[SupportsIndex], /, *, start: SupportsIndex = 1) -> int: ...  # type: ignore[overload-overlap]
+def prod(iterable: Iterable[bool | _LiteralInteger], /, *, start: int = 1) -> int: ...  # type: ignore[overload-overlap]
 @overload
-def prod(iterable: Iterable[_SupportsFloatOrIndex], /, *, start: _SupportsFloatOrIndex = 1) -> float: ...
+def prod(iterable: Iterable[_SupportsProdNoDefaultT], /) -> _SupportsProdNoDefaultT | Literal[1]: ...
+@overload
+def prod(iterable: Iterable[_MultiplicableT1], /, *, start: _MultiplicableT2) -> _MultiplicableT1 | _MultiplicableT2: ...
 def radians(x: _SupportsFloatOrIndex, /) -> float: ...
 def remainder(x: _SupportsFloatOrIndex, y: _SupportsFloatOrIndex, /) -> float: ...
 def sin(x: _SupportsFloatOrIndex, /) -> float: ...
