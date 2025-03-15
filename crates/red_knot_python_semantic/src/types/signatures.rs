@@ -28,14 +28,11 @@ pub(crate) struct Signatures<'db> {
 }
 
 impl<'db> Signatures<'db> {
-    pub(crate) fn not_callable(callable_type: Type<'db>, signature_type: Type<'db>) -> Self {
+    pub(crate) fn not_callable(signature_type: Type<'db>) -> Self {
         Self {
-            callable_type,
+            callable_type: signature_type,
             signature_type,
-            elements: vec![CallableSignature::not_callable(
-                callable_type,
-                signature_type,
-            )],
+            elements: vec![CallableSignature::not_callable(signature_type)],
         }
     }
 
@@ -49,11 +46,7 @@ impl<'db> Signatures<'db> {
 
     /// Creates a new `Signatures` from an iterator of [`Signature`]s. Panics if the iterator is
     /// empty.
-    pub(crate) fn from_union<I>(
-        callable_type: Type<'db>,
-        signature_type: Type<'db>,
-        elements: I,
-    ) -> Self
+    pub(crate) fn from_union<I>(signature_type: Type<'db>, elements: I) -> Self
     where
         I: IntoIterator<Item = &'db Signatures<'db>>,
     {
@@ -63,7 +56,7 @@ impl<'db> Signatures<'db> {
             .collect();
         assert!(!elements.is_empty());
         Self {
-            callable_type,
+            callable_type: signature_type,
             signature_type,
             elements,
         }
@@ -78,6 +71,15 @@ impl<'db> Signatures<'db> {
 
     pub(crate) fn iter(&self) -> impl Iterator<Item = &CallableSignature<'db>> {
         self.elements.iter()
+    }
+
+    pub(crate) fn replace_callable_type(&mut self, before: Type<'db>, after: Type<'db>) {
+        if self.callable_type == before {
+            self.callable_type = after;
+        }
+        for signature in &mut self.elements {
+            signature.replace_callable_type(before, after);
+        }
     }
 
     pub(crate) fn set_dunder_call_is_possibly_unbound(&mut self) {
@@ -112,9 +114,9 @@ pub(crate) struct CallableSignature<'db> {
 }
 
 impl<'db> CallableSignature<'db> {
-    pub(crate) fn not_callable(callable_type: Type<'db>, signature_type: Type<'db>) -> Self {
+    pub(crate) fn not_callable(signature_type: Type<'db>) -> Self {
         Self {
-            callable_type,
+            callable_type: signature_type,
             signature_type,
             dunder_call_is_possibly_unbound: false,
             bound_type: None,
@@ -122,13 +124,9 @@ impl<'db> CallableSignature<'db> {
         }
     }
 
-    pub(crate) fn single(
-        callable_type: Type<'db>,
-        signature_type: Type<'db>,
-        signature: Signature<'db>,
-    ) -> Self {
+    pub(crate) fn single(signature_type: Type<'db>, signature: Signature<'db>) -> Self {
         Self {
-            callable_type,
+            callable_type: signature_type,
             signature_type,
             dunder_call_is_possibly_unbound: false,
             bound_type: None,
@@ -138,16 +136,12 @@ impl<'db> CallableSignature<'db> {
 
     /// Creates a new `CallableSignature` from an iterator of [`Signature`]s. Returns a
     /// non-callable signature if the iterator is empty.
-    pub(crate) fn from_overloads<I>(
-        callable_type: Type<'db>,
-        signature_type: Type<'db>,
-        overloads: I,
-    ) -> Self
+    pub(crate) fn from_overloads<I>(signature_type: Type<'db>, overloads: I) -> Self
     where
         I: IntoIterator<Item = Signature<'db>>,
     {
         Self {
-            callable_type,
+            callable_type: signature_type,
             signature_type,
             dunder_call_is_possibly_unbound: false,
             bound_type: None,
@@ -156,23 +150,29 @@ impl<'db> CallableSignature<'db> {
     }
 
     /// Return a signature for a dynamic callable
-    pub(crate) fn dynamic(callable_type: Type<'db>) -> Self {
+    pub(crate) fn dynamic(signature_type: Type<'db>) -> Self {
         let signature = Signature {
             parameters: Parameters::gradual_form(),
-            return_ty: Some(callable_type),
+            return_ty: Some(signature_type),
         };
-        Self::single(callable_type, callable_type, signature)
+        Self::single(signature_type, signature)
     }
 
     /// Return a todo signature: (*args: Todo, **kwargs: Todo) -> Todo
     #[allow(unused_variables)] // 'reason' only unused in debug builds
     pub(crate) fn todo(reason: &'static str) -> Self {
-        let callable_type = todo_type!(reason);
+        let signature_type = todo_type!(reason);
         let signature = Signature {
             parameters: Parameters::todo(),
-            return_ty: Some(callable_type),
+            return_ty: Some(signature_type),
         };
-        Self::single(callable_type, callable_type, signature)
+        Self::single(signature_type, signature)
+    }
+
+    fn replace_callable_type(&mut self, before: Type<'db>, after: Type<'db>) {
+        if self.callable_type == before {
+            self.callable_type = after;
+        }
     }
 
     /// Returns the [`Signature`] if this is a non-overloaded callable, [None] otherwise.
