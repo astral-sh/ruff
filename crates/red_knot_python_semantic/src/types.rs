@@ -2454,132 +2454,128 @@ impl<'db> Type<'db> {
                 function_type.signature(db).clone(),
             )),
 
-            Type::ClassLiteral(ClassLiteralType { class })
-                if class.is_known(db, KnownClass::Bool) =>
-            {
-                // ```py
-                // class bool(int):
-                //     def __new__(cls, o: object = ..., /) -> Self: ...
-                // ```
-                let signature = CallableSignature::single(
-                    self,
-                    Signature::new(
-                        Parameters::new([Parameter::new(
-                            Some(Name::new_static("o")),
-                            Some(Type::any()),
-                            ParameterKind::PositionalOnly {
-                                default_ty: Some(Type::BooleanLiteral(false)),
-                            },
-                        )]),
-                        Some(KnownClass::Bool.to_instance(db)),
-                    ),
-                );
-                Signatures::single(signature)
-            }
-
-            Type::ClassLiteral(ClassLiteralType { class })
-                if class.is_known(db, KnownClass::Str) =>
-            {
-                // ```py
-                // class str(Sequence[str]):
-                //     @overload
-                //     def __new__(cls, object: object = ...) -> Self: ...
-                //     @overload
-                //     def __new__(cls, object: ReadableBuffer, encoding: str = ..., errors: str = ...) -> Self: ...
-                // ```
-                let signature = CallableSignature::from_overloads(
-                    self,
-                    [
+            Type::ClassLiteral(ClassLiteralType { class }) => match class.known(db) {
+                Some(KnownClass::Bool) => {
+                    // ```py
+                    // class bool(int):
+                    //     def __new__(cls, o: object = ..., /) -> Self: ...
+                    // ```
+                    let signature = CallableSignature::single(
+                        self,
                         Signature::new(
                             Parameters::new([Parameter::new(
                                 Some(Name::new_static("o")),
                                 Some(Type::any()),
                                 ParameterKind::PositionalOnly {
-                                    default_ty: Some(Type::string_literal(db, "")),
+                                    default_ty: Some(Type::BooleanLiteral(false)),
                                 },
                             )]),
-                            Some(KnownClass::Str.to_instance(db)),
+                            Some(KnownClass::Bool.to_instance(db)),
                         ),
-                        Signature::new(
-                            Parameters::new([
-                                Parameter::new(
-                                    Some(Name::new_static("o")),
-                                    Some(Type::any()), // TODO: ReadableBuffer
-                                    ParameterKind::PositionalOnly { default_ty: None },
-                                ),
-                                Parameter::new(
-                                    Some(Name::new_static("encoding")),
-                                    Some(KnownClass::Str.to_instance(db)),
-                                    ParameterKind::PositionalOnly { default_ty: None },
-                                ),
-                                Parameter::new(
-                                    Some(Name::new_static("errors")),
-                                    Some(KnownClass::Str.to_instance(db)),
-                                    ParameterKind::PositionalOnly { default_ty: None },
-                                ),
-                            ]),
-                            Some(KnownClass::Str.to_instance(db)),
-                        ),
-                    ],
-                );
-                Signatures::single(signature)
-            }
+                    );
+                    Signatures::single(signature)
+                }
 
-            Type::ClassLiteral(ClassLiteralType { class })
-                if class.is_known(db, KnownClass::Type) =>
-            {
-                // ```py
-                // class type:
-                //     @overload
-                //     def __init__(self, o: object, /) -> None: ...
-                //     @overload
-                //     def __init__(self, name: str, bases: tuple[type, ...], dict: dict[str, Any], /, **kwds: Any) -> None: ...
-                // ```
-                let signature = CallableSignature::from_overloads(
-                    self,
-                    [
-                        Signature::new(
-                            Parameters::new([Parameter::new(
-                                Some(Name::new_static("o")),
-                                Some(Type::any()),
-                                ParameterKind::PositionalOnly { default_ty: None },
-                            )]),
-                            Some(KnownClass::Type.to_instance(db)),
-                        ),
-                        Signature::new(
-                            Parameters::new([
-                                Parameter::new(
+                Some(KnownClass::Str) => {
+                    // ```py
+                    // class str(Sequence[str]):
+                    //     @overload
+                    //     def __new__(cls, object: object = ...) -> Self: ...
+                    //     @overload
+                    //     def __new__(cls, object: ReadableBuffer, encoding: str = ..., errors: str = ...) -> Self: ...
+                    // ```
+                    let signature = CallableSignature::from_overloads(
+                        self,
+                        [
+                            Signature::new(
+                                Parameters::new([Parameter::new(
                                     Some(Name::new_static("o")),
                                     Some(Type::any()),
-                                    ParameterKind::PositionalOnly { default_ty: None },
-                                ),
-                                Parameter::new(
-                                    Some(Name::new_static("bases")),
-                                    Some(Type::any()),
-                                    ParameterKind::PositionalOnly { default_ty: None },
-                                ),
-                                Parameter::new(
-                                    Some(Name::new_static("dict")),
-                                    Some(Type::any()),
-                                    ParameterKind::PositionalOnly { default_ty: None },
-                                ),
-                            ]),
-                            Some(KnownClass::Type.to_instance(db)),
-                        ),
-                    ],
-                );
-                Signatures::single(signature)
-            }
+                                    ParameterKind::PositionalOnly {
+                                        default_ty: Some(Type::string_literal(db, "")),
+                                    },
+                                )]),
+                                Some(KnownClass::Str.to_instance(db)),
+                            ),
+                            Signature::new(
+                                Parameters::new([
+                                    Parameter::new(
+                                        Some(Name::new_static("o")),
+                                        Some(Type::any()), // TODO: ReadableBuffer
+                                        ParameterKind::PositionalOnly { default_ty: None },
+                                    ),
+                                    Parameter::new(
+                                        Some(Name::new_static("encoding")),
+                                        Some(KnownClass::Str.to_instance(db)),
+                                        ParameterKind::PositionalOnly { default_ty: None },
+                                    ),
+                                    Parameter::new(
+                                        Some(Name::new_static("errors")),
+                                        Some(KnownClass::Str.to_instance(db)),
+                                        ParameterKind::PositionalOnly { default_ty: None },
+                                    ),
+                                ]),
+                                Some(KnownClass::Str.to_instance(db)),
+                            ),
+                        ],
+                    );
+                    Signatures::single(signature)
+                }
 
-            // TODO annotated return type on `__new__` or metaclass `__call__`
-            // TODO check call vs signatures of `__new__` and/or `__init__`
-            Type::ClassLiteral(ClassLiteralType { .. }) => {
-                let signature = CallableSignature::single(
-                    self,
-                    Signature::new(Parameters::gradual_form(), self.to_instance(db)),
-                );
-                Signatures::single(signature)
-            }
+                Some(KnownClass::Type) => {
+                    // ```py
+                    // class type:
+                    //     @overload
+                    //     def __init__(self, o: object, /) -> None: ...
+                    //     @overload
+                    //     def __init__(self, name: str, bases: tuple[type, ...], dict: dict[str, Any], /, **kwds: Any) -> None: ...
+                    // ```
+                    let signature = CallableSignature::from_overloads(
+                        self,
+                        [
+                            Signature::new(
+                                Parameters::new([Parameter::new(
+                                    Some(Name::new_static("o")),
+                                    Some(Type::any()),
+                                    ParameterKind::PositionalOnly { default_ty: None },
+                                )]),
+                                Some(KnownClass::Type.to_instance(db)),
+                            ),
+                            Signature::new(
+                                Parameters::new([
+                                    Parameter::new(
+                                        Some(Name::new_static("o")),
+                                        Some(Type::any()),
+                                        ParameterKind::PositionalOnly { default_ty: None },
+                                    ),
+                                    Parameter::new(
+                                        Some(Name::new_static("bases")),
+                                        Some(Type::any()),
+                                        ParameterKind::PositionalOnly { default_ty: None },
+                                    ),
+                                    Parameter::new(
+                                        Some(Name::new_static("dict")),
+                                        Some(Type::any()),
+                                        ParameterKind::PositionalOnly { default_ty: None },
+                                    ),
+                                ]),
+                                Some(KnownClass::Type.to_instance(db)),
+                            ),
+                        ],
+                    );
+                    Signatures::single(signature)
+                }
+
+                // TODO annotated return type on `__new__` or metaclass `__call__`
+                // TODO check call vs signatures of `__new__` and/or `__init__`
+                _ => {
+                    let signature = CallableSignature::single(
+                        self,
+                        Signature::new(Parameters::gradual_form(), self.to_instance(db)),
+                    );
+                    Signatures::single(signature)
+                }
+            },
 
             Type::SubclassOf(subclass_of_type) => match subclass_of_type.subclass_of() {
                 ClassBase::Dynamic(dynamic_type) => Type::Dynamic(dynamic_type).signatures(db),
