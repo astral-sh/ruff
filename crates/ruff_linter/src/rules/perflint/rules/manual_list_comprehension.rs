@@ -1,16 +1,15 @@
 use ruff_python_ast::{self as ast, Arguments, Expr};
 
-use crate::checkers::ast::Checker;
+use crate::{checkers::ast::Checker, rules::perflint::helpers::statement_deletion_range};
 use anyhow::{anyhow, Result};
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 
+use crate::rules::perflint::helpers::comment_strings_in_range;
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_semantic::{analyze::typing::is_list, Binding};
-use ruff_python_trivia::{BackwardsTokenizer, PythonWhitespace, SimpleTokenKind, SimpleTokenizer};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
-
 /// ## What it does
 /// Checks for `for` loops that can be replaced by a list comprehension.
 ///
@@ -397,22 +396,26 @@ fn convert_to_list_extend(
     let elt_str = locator.slice(to_append);
     let generator_str = format!("{elt_str} {for_type} {target_str} in {for_iter_str}{if_str}");
 
-    let comment_strings_in_range = |range| {
-        checker
-            .comment_ranges()
-            .comments_in_range(range)
-            .iter()
-            // Ignore comments inside of the append or iterator, since these are preserved
-            .filter(|comment| {
-                !to_append.range().contains_range(**comment)
-                    && !for_stmt.iter.range().contains_range(**comment)
-            })
-            .map(|range| locator.slice(range).trim_whitespace_start())
-            .collect()
-    };
+    // let comment_strings_in_range = |range| {
+    //     checker
+    //         .comment_ranges()
+    //         .comments_in_range(range)
+    //         .iter()
+    //         // Ignore comments inside of the append or iterator, since these are preserved
+    //         .filter(|comment| {
+    //             !to_append.range().contains_range(**comment)
+    //                 && !for_stmt.iter.range().contains_range(**comment)
+    //         })
+    //         .map(|range| locator.slice(range).trim_whitespace_start())
+    //         .collect()
+    // };
 
     let variable_name = locator.slice(binding);
-    let for_loop_inline_comments: Vec<&str> = comment_strings_in_range(for_stmt.range);
+    let for_loop_inline_comments = comment_strings_in_range(
+        checker,
+        for_stmt.range,
+        &[to_append.range(), for_stmt.iter.range()],
+    );
 
     let newline = checker.stylist().line_ending().as_str();
 
@@ -457,64 +460,11 @@ fn convert_to_list_extend(
                 .ok_or(anyhow!(
                     "Binding must have a statement to convert into a list comprehension"
                 ))?;
-            // If the binding has multiple statements on its line, the fix would be substantially more complicated
-            let (semicolon_before, after_semicolon) = {
-                // determine whether there's a semicolon either before or after the binding statement.
-                // Since it's a binding statement, we can just check whether there's a semicolon immediately
-                // after the whitespace in front of or behind it
-                let mut after_tokenizer =
-                    SimpleTokenizer::starts_at(binding_stmt_range.end(), locator.contents())
-                        .skip_trivia();
 
-                let after_semicolon = if after_tokenizer
-                    .next()
-                    .is_some_and(|token| token.kind() == SimpleTokenKind::Semi)
-                {
-                    after_tokenizer.next()
-                } else {
-                    None
-                };
-
-                let semicolon_before = BackwardsTokenizer::up_to(
-                    binding_stmt_range.start(),
-                    locator.contents(),
-                    checker.comment_ranges(),
-                )
-                .skip_trivia()
-                .next()
-                .filter(|token| token.kind() == SimpleTokenKind::Semi);
-
-                (semicolon_before, after_semicolon)
-            };
             // If there are multiple binding statements in one line, we don't want to accidentally delete them
             // Instead, we just delete the binding statement and leave any comments where they are
             let (binding_stmt_deletion_range, binding_is_multiple_stmts) =
-                match (semicolon_before, after_semicolon) {
-                    // ```python
-                    // a = []
-                    // ```
-                    (None, None) => (locator.full_lines_range(binding_stmt_range), false),
-
-                    // ```python
-                    // a = 1; b = []
-                    //      ^^^^^^^^
-                    // a = 1; b = []; c = 3
-                    //      ^^^^^^^^
-                    // ```
-                    (Some(semicolon_before), Some(_) | None) => (
-                        TextRange::new(semicolon_before.start(), binding_stmt_range.end()),
-                        true,
-                    ),
-
-                    // ```python
-                    // a = []; b = 3
-                    // ^^^^^^^
-                    // ```
-                    (None, Some(after_semicolon)) => (
-                        TextRange::new(binding_stmt_range.start(), after_semicolon.start()),
-                        true,
-                    ),
-                };
+                statement_deletion_range(checker, binding_stmt_range);
 
             let annotations = match binding_stmt.and_then(|stmt| stmt.as_ann_assign_stmt()) {
                 Some(assign) => format!(": {}", locator.slice(assign.annotation.range())),
@@ -523,7 +473,11 @@ fn convert_to_list_extend(
 
             let mut comments_to_move = for_loop_inline_comments;
             if !binding_is_multiple_stmts {
-                comments_to_move.extend(comment_strings_in_range(binding_stmt_deletion_range));
+                comments_to_move.extend(comment_strings_in_range(
+                    checker,
+                    binding_stmt_deletion_range,
+                    &[],
+                ));
             }
 
             let indentation = if comments_to_move.is_empty() {

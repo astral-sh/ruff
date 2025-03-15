@@ -35,6 +35,9 @@ pub(crate) fn deferred_for_loops(checker: &mut Checker) {
             if checker.enabled(Rule::DictIndexMissingItems) {
                 pylint::rules::dict_index_missing_items(checker, stmt_for);
             }
+            if checker.enabled(Rule::ManualDictComprehension) {
+                perflint::rules::manual_dict_comprehension(checker, stmt_for);
+            }
             if checker.enabled(Rule::ManualListComprehension) {
                 perflint::rules::manual_list_comprehension(checker, stmt_for);
             }
