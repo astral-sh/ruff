@@ -228,7 +228,7 @@ impl<'db> Signature<'db> {
     pub(super) fn from_function(
         db: &'db dyn Db,
         definition: Definition<'db>,
-        function_node: &'db ast::StmtFunctionDef,
+        function_node: &ast::StmtFunctionDef,
     ) -> Self {
         let return_ty = function_node.returns.as_ref().map(|returns| {
             if function_node.is_async {
@@ -366,7 +366,7 @@ impl<'db> Parameters<'db> {
     fn from_parameters(
         db: &'db dyn Db,
         definition: Definition<'db>,
-        parameters: &'db ast::Parameters,
+        parameters: &ast::Parameters,
     ) -> Self {
         let ast::Parameters {
             posonlyargs,
@@ -530,7 +530,7 @@ impl<'db> Parameter<'db> {
     fn from_node_and_kind(
         db: &'db dyn Db,
         definition: Definition<'db>,
-        parameter: &'db ast::Parameter,
+        parameter: &ast::Parameter,
         kind: ParameterKind<'db>,
     ) -> Self {
         Self {
