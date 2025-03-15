@@ -58,7 +58,7 @@ impl<'db> Bindings<'db> {
         }
 
         let bindings = signatures
-            .iter()
+            .into_iter()
             .map(|signature| CallableBinding::bind(db, signature, arguments))
             .collect();
         Bindings {
@@ -104,7 +104,7 @@ impl<'db> Bindings<'db> {
         let mut all_ok = true;
         let mut any_binding_error = false;
         let mut all_not_callable = true;
-        for binding in self.iter() {
+        for binding in &self {
             let result = binding.as_result();
             all_ok &= result.is_ok();
             any_binding_error |= matches!(result, Err(CallErrorKind::BindingError));
@@ -125,20 +125,6 @@ impl<'db> Bindings<'db> {
         }
     }
 
-    pub(crate) fn iter(&self) -> impl Iterator<Item = &CallableBinding<'db>> + '_ {
-        match &self.inner {
-            BindingsInner::Single(binding) => std::slice::from_ref(binding).iter(),
-            BindingsInner::Union(bindings) => bindings.iter(),
-        }
-    }
-
-    pub(crate) fn iter_mut(&mut self) -> impl Iterator<Item = &mut CallableBinding<'db>> + '_ {
-        match &mut self.inner {
-            BindingsInner::Single(binding) => std::slice::from_mut(binding).iter_mut(),
-            BindingsInner::Union(bindings) => bindings.iter_mut(),
-        }
-    }
-
     /// Report diagnostics for all of the errors that occurred when trying to match actual
     /// arguments to formal parameters. If the callable is a union, or has multiple overloads, we
     /// report a single diagnostic if we couldn't match any union element or overload.
@@ -147,7 +133,7 @@ impl<'db> Bindings<'db> {
     pub(crate) fn report_diagnostics(&self, context: &InferContext<'db>, node: ast::AnyNodeRef) {
         // If all union elements are not callable, report that the union as a whole is not
         // callable.
-        if self.iter().all(|b| !b.is_callable()) {
+        if self.into_iter().all(|b| !b.is_callable()) {
             context.report_lint(
                 &CALL_NON_CALLABLE,
                 node,
@@ -162,8 +148,32 @@ impl<'db> Bindings<'db> {
         // TODO: We currently only report errors for the first union element. Ideally, we'd report
         // an error saying that the union type can't be called, followed by subdiagnostics
         // explaining why.
-        if let Some(first) = self.iter().find(|b| b.as_result().is_err()) {
+        if let Some(first) = self.into_iter().find(|b| b.as_result().is_err()) {
             first.report_diagnostics(context, node);
+        }
+    }
+}
+
+impl<'a, 'db> IntoIterator for &'a Bindings<'db> {
+    type Item = &'a CallableBinding<'db>;
+    type IntoIter = std::slice::Iter<'a, CallableBinding<'db>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        match &self.inner {
+            BindingsInner::Single(binding) => std::slice::from_ref(binding).iter(),
+            BindingsInner::Union(bindings) => bindings.iter(),
+        }
+    }
+}
+
+impl<'a, 'db> IntoIterator for &'a mut Bindings<'db> {
+    type Item = &'a mut CallableBinding<'db>;
+    type IntoIter = std::slice::IterMut<'a, CallableBinding<'db>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        match &mut self.inner {
+            BindingsInner::Single(binding) => std::slice::from_mut(binding).iter_mut(),
+            BindingsInner::Union(bindings) => bindings.iter_mut(),
         }
     }
 }
@@ -242,7 +252,7 @@ impl<'db> CallableBinding<'db> {
         //
         // [1] https://github.com/python/typing/pull/1839
         let overloads = signature
-            .iter()
+            .into_iter()
             .map(|signature| Binding::bind(db, signature, arguments.as_ref()))
             .collect();
         CallableBinding {

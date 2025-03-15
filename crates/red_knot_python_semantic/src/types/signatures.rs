@@ -69,10 +69,6 @@ impl<'db> Signatures<'db> {
         }
     }
 
-    pub(crate) fn iter(&self) -> impl Iterator<Item = &CallableSignature<'db>> {
-        self.elements.iter()
-    }
-
     pub(crate) fn replace_callable_type(&mut self, before: Type<'db>, after: Type<'db>) {
         if self.callable_type == before {
             self.callable_type = after;
@@ -86,6 +82,15 @@ impl<'db> Signatures<'db> {
         for signature in &mut self.elements {
             signature.dunder_call_is_possibly_unbound = true;
         }
+    }
+}
+
+impl<'a, 'db> IntoIterator for &'a Signatures<'db> {
+    type Item = &'a CallableSignature<'db>;
+    type IntoIter = std::slice::Iter<'a, CallableSignature<'db>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.elements.iter()
     }
 }
 
@@ -188,13 +193,18 @@ impl<'db> CallableSignature<'db> {
         }
     }
 
-    pub(crate) fn iter(&self) -> impl Iterator<Item = &Signature<'db>> {
-        self.overloads.iter()
-    }
-
     /// Returns whether this signature is callable.
     pub(crate) fn is_callable(&self) -> bool {
         !self.overloads.is_empty()
+    }
+}
+
+impl<'a, 'db> IntoIterator for &'a CallableSignature<'db> {
+    type Item = &'a Signature<'db>;
+    type IntoIter = std::slice::Iter<'a, Signature<'db>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.overloads.iter()
     }
 }
 

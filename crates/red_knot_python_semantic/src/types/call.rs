@@ -10,11 +10,11 @@ pub(super) use bind::Bindings;
 /// Wraps a [`Bindings`] for an unsuccessful call with information about why the call was
 /// unsuccessful.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct CallError<'db>(pub(super) CallErrorKind, pub(super) Box<Bindings<'db>>);
+pub(crate) struct CallError<'db>(pub(crate) CallErrorKind, pub(crate) Box<Bindings<'db>>);
 
 /// The reason why calling a type failed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum CallErrorKind {
+pub(crate) enum CallErrorKind {
     /// The type is not callable. For a union type, _none_ of the union elements are callable.
     NotCallable,
 
