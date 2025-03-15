@@ -138,8 +138,16 @@ fn detect_insecure_hashlib_calls(
             // `hashlib.new` accepts mixed lowercase and uppercase names for hash
             // functions.
             if matches!(
-                hash_func_name.to_ascii_lowercase().as_str(),
-                "md4" | "md5" | "sha" | "sha1"
+                hash_func_name.to_ascii_lowercase().trim(),
+                "md4"
+                    | "md5"
+                    | "sha"
+                    | "sha1"
+                    | "sha-1"
+                    | "ssl3-md5"
+                    | "ssl3-sha1"
+                    | "1.3.14.3.2.26"
+                    | "1.2.840.113549.2.5"
             ) {
                 checker.report_diagnostic(Diagnostic::new(
                     HashlibInsecureHashFunction {
