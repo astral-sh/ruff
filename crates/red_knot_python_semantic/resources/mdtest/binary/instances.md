@@ -363,7 +363,7 @@ reveal_type(X() + Y())  # revealed: int
 
 ```py
 class NotBoolable:
-    __bool__ = 3
+    __bool__: int = 3
 
 a = NotBoolable()
 

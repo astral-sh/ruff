@@ -48,7 +48,7 @@ def _(target: int):
 
 ```py
 class NotBoolable:
-    __bool__ = 3
+    __bool__: int = 3
 
 def _(target: int, flag: NotBoolable):
     y = 1

@@ -13,7 +13,7 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/comparison/instanc
 
 ```
  1 | class NotBoolable:
- 2 |     __bool__ = 3
+ 2 |     __bool__: int = 3
  3 | 
  4 | class Comparable:
  5 |     def __lt__(self, item) -> NotBoolable:
