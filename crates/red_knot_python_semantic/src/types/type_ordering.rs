@@ -11,8 +11,10 @@ use super::{
 /// in an [`crate::types::IntersectionType`] or a [`crate::types::UnionType`] in order for them
 /// to be compared for equivalence.
 ///
-/// Two unions with equal sets of elements will only compare equal if they have their element sets
-/// ordered the same way.
+/// Two intersections are compared lexicographically.
+/// Two unions are never compared in this function because DNF does not permit nested unions.
+///
+/// Element types must already be sorted.
 ///
 /// ## Why not just implement [`Ord`] on [`Type`]?
 ///
@@ -20,7 +22,11 @@ use super::{
 /// create here is not user-facing. However, it doesn't really "make sense" for `Type` to implement
 /// [`Ord`] in terms of the semantics. There are many different ways in which you could plausibly
 /// sort a list of types; this is only one (somewhat arbitrary, at times) possible ordering.
-pub(super) fn union_elements_ordering<'db>(left: &Type<'db>, right: &Type<'db>) -> Ordering {
+pub(super) fn union_or_intersection_elements_ordering<'db>(
+    left: &Type<'db>,
+    right: &Type<'db>,
+    db: &'db dyn crate::Db,
+) -> Ordering {
     if left == right {
         return Ordering::Equal;
     }
@@ -264,11 +270,38 @@ pub(super) fn union_elements_ordering<'db>(left: &Type<'db>, right: &Type<'db>) 
         (Type::Dynamic(_), _) => Ordering::Less,
         (_, Type::Dynamic(_)) => Ordering::Greater,
 
-        (Type::Union(left), Type::Union(right)) => left.cmp(right),
+        (Type::Union(_), Type::Union(_)) => {
+            unreachable!("our type representation does not permit nested unions");
+        }
         (Type::Union(_), _) => Ordering::Less,
         (_, Type::Union(_)) => Ordering::Greater,
 
-        (Type::Intersection(left), Type::Intersection(right)) => left.cmp(right),
+        (Type::Intersection(left), Type::Intersection(right)) => {
+            // Lexicographically compare the elements of the two intersections.
+            let left_positive = left.positive(db);
+            let right_positive = right.positive(db);
+            if left_positive.len() != right_positive.len() {
+                return left_positive.len().cmp(&right_positive.len());
+            }
+            let left_negative = left.negative(db);
+            let right_negative = right.negative(db);
+            if left_negative.len() != right_negative.len() {
+                return left_negative.len().cmp(&right_negative.len());
+            }
+            for (left, right) in left_positive.iter().zip(right_positive) {
+                let ordering = union_or_intersection_elements_ordering(left, right, db);
+                if ordering != Ordering::Equal {
+                    return ordering;
+                }
+            }
+            for (left, right) in left_negative.iter().zip(right_negative) {
+                let ordering = union_or_intersection_elements_ordering(left, right, db);
+                if ordering != Ordering::Equal {
+                    return ordering;
+                }
+            }
+            Ordering::Equal
+        }
     }
 }
 
