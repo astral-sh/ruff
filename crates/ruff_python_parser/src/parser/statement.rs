@@ -2066,8 +2066,49 @@ impl<'src> Parser<'src> {
             return vec![];
         }
 
+        let open_paren_range = self.current_token_range();
+
         if self.at(TokenKind::Lpar) {
             if let Some(items) = self.try_parse_parenthesized_with_items() {
+                // test_ok tuple_context_manager_py38
+                // # parse_options: {"target-version": "3.8"}
+                // with (
+                //   foo,
+                //   bar,
+                //   baz,
+                // ) as tup: ...
+
+                // test_err tuple_context_manager_py38
+                // # parse_options: {"target-version": "3.8"}
+                // # these cases are _syntactically_ valid before Python 3.9 because the `with` item
+                // # is parsed as a tuple, but this will always cause a runtime error, so we flag it
+                // # anyway
+                // with (foo, bar): ...
+                // with (
+                //   open('foo.txt')) as foo: ...
+                // with (
+                //   foo,
+                //   bar,
+                //   baz,
+                // ): ...
+                // with (foo,): ...
+
+                // test_ok parenthesized_context_manager_py39
+                // # parse_options: {"target-version": "3.9"}
+                // with (foo as x, bar as y): ...
+                // with (foo, bar as y): ...
+                // with (foo as x, bar): ...
+
+                // test_err parenthesized_context_manager_py38
+                // # parse_options: {"target-version": "3.8"}
+                // with (foo as x, bar as y): ...
+                // with (foo, bar as y): ...
+                // with (foo as x, bar): ...
+                self.add_unsupported_syntax_error(
+                    UnsupportedSyntaxErrorKind::ParenthesizedContextManager,
+                    open_paren_range,
+                );
+
                 self.expect(TokenKind::Rpar);
                 items
             } else {
