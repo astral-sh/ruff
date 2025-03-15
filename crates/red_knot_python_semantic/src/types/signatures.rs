@@ -106,6 +106,8 @@ pub(crate) struct CallableSignature<'db> {
     /// The type of the bound `self` or `cls` parameter if this signature is for a bound method.
     pub(crate) bound_type: Option<Type<'db>>,
 
+    /// The signatures of each overload of this callable. Will be empty if the type is not
+    /// callable.
     overloads: Vec<Signature<'db>>,
 }
 
