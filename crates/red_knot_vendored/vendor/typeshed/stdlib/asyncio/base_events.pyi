@@ -8,6 +8,7 @@ from asyncio.protocols import BaseProtocol
 from asyncio.tasks import Task
 from asyncio.transports import BaseTransport, DatagramTransport, ReadTransport, SubprocessTransport, Transport, WriteTransport
 from collections.abc import Callable, Iterable, Sequence
+from concurrent.futures import Executor, ThreadPoolExecutor
 from contextvars import Context
 from socket import AddressFamily, SocketKind, _Address, _RetAddress, socket
 from typing import IO, Any, Literal, TypeVar, overload
@@ -96,8 +97,8 @@ class BaseEventLoop(AbstractEventLoop):
     def call_soon_threadsafe(
         self, callback: Callable[[Unpack[_Ts]], object], *args: Unpack[_Ts], context: Context | None = None
     ) -> Handle: ...
-    def run_in_executor(self, executor: Any, func: Callable[[Unpack[_Ts]], _T], *args: Unpack[_Ts]) -> Future[_T]: ...
-    def set_default_executor(self, executor: Any) -> None: ...
+    def run_in_executor(self, executor: Executor | None, func: Callable[[Unpack[_Ts]], _T], *args: Unpack[_Ts]) -> Future[_T]: ...
+    def set_default_executor(self, executor: ThreadPoolExecutor) -> None: ...  # type: ignore[override]
     # Network I/O methods returning Futures.
     async def getaddrinfo(
         self,

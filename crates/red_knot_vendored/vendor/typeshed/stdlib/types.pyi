@@ -18,7 +18,7 @@ from importlib.machinery import ModuleSpec
 
 # pytype crashes if types.MappingProxyType inherits from collections.abc.Mapping instead of typing.Mapping
 from typing import Any, ClassVar, Literal, Mapping, TypeVar, final, overload  # noqa: Y022
-from typing_extensions import ParamSpec, Self, TypeVarTuple, deprecated
+from typing_extensions import ParamSpec, Self, TypeAliasType, TypeVarTuple, deprecated
 
 __all__ = [
     "FunctionType",
@@ -615,8 +615,27 @@ def prepare_class(
 if sys.version_info >= (3, 12):
     def get_original_bases(cls: type, /) -> tuple[Any, ...]: ...
 
-# Actually a different type, but `property` is special and we want that too.
-DynamicClassAttribute = property
+# Does not actually inherit from property, but saying it does makes sure that
+# pyright handles this class correctly.
+class DynamicClassAttribute(property):
+    fget: Callable[[Any], Any] | None
+    fset: Callable[[Any, Any], object] | None  # type: ignore[assignment]
+    fdel: Callable[[Any], object] | None  # type: ignore[assignment]
+    overwrite_doc: bool
+    __isabstractmethod__: bool
+    def __init__(
+        self,
+        fget: Callable[[Any], Any] | None = None,
+        fset: Callable[[Any, Any], object] | None = None,
+        fdel: Callable[[Any], object] | None = None,
+        doc: str | None = None,
+    ) -> None: ...
+    def __get__(self, instance: Any, ownerclass: type | None = None) -> Any: ...
+    def __set__(self, instance: Any, value: Any) -> None: ...
+    def __delete__(self, instance: Any) -> None: ...
+    def getter(self, fget: Callable[[Any], Any]) -> DynamicClassAttribute: ...
+    def setter(self, fset: Callable[[Any, Any], object]) -> DynamicClassAttribute: ...
+    def deleter(self, fdel: Callable[[Any], object]) -> DynamicClassAttribute: ...
 
 _Fn = TypeVar("_Fn", bound=Callable[..., object])
 _R = TypeVar("_R")
@@ -631,7 +650,7 @@ def coroutine(func: _Fn) -> _Fn: ...
 if sys.version_info >= (3, 9):
     class GenericAlias:
         @property
-        def __origin__(self) -> type: ...
+        def __origin__(self) -> type | TypeAliasType: ...
         @property
         def __args__(self) -> tuple[Any, ...]: ...
         @property

@@ -1,3 +1,5 @@
+# ruff: noqa: PLR5501 # This condition is so big, it's clearer to keep to platform condition in two blocks
+# Can't NOQA on a specific line: https://github.com/plinss/flake8-noqa/issues/22
 import sys
 from collections.abc import Awaitable, Coroutine, Generator
 from typing import Any, TypeVar

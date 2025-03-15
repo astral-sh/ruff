@@ -143,8 +143,8 @@ if sys.version_info >= (3, 11):
 _P = ParamSpec("_P")
 _T = TypeVar("_T")
 _F = TypeVar("_F", bound=Callable[..., Any])
-_T_cont = TypeVar("_T_cont", contravariant=True)
-_V_cont = TypeVar("_V_cont", contravariant=True)
+_T_contra = TypeVar("_T_contra", contravariant=True)
+_V_contra = TypeVar("_V_contra", contravariant=True)
 
 #
 # Types and members
@@ -228,11 +228,11 @@ def isasyncgenfunction(obj: Callable[_P, Any]) -> TypeGuard[Callable[_P, AsyncGe
 @overload
 def isasyncgenfunction(obj: object) -> TypeGuard[Callable[..., AsyncGeneratorType[Any, Any]]]: ...
 
-class _SupportsSet(Protocol[_T_cont, _V_cont]):
-    def __set__(self, instance: _T_cont, value: _V_cont, /) -> None: ...
+class _SupportsSet(Protocol[_T_contra, _V_contra]):
+    def __set__(self, instance: _T_contra, value: _V_contra, /) -> None: ...
 
-class _SupportsDelete(Protocol[_T_cont]):
-    def __delete__(self, instance: _T_cont, /) -> None: ...
+class _SupportsDelete(Protocol[_T_contra]):
+    def __delete__(self, instance: _T_contra, /) -> None: ...
 
 def isasyncgen(object: object) -> TypeIs[AsyncGeneratorType[Any, Any]]: ...
 def istraceback(object: object) -> TypeIs[TracebackType]: ...
