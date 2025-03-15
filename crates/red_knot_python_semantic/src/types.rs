@@ -4326,7 +4326,7 @@ impl<'db> FunctionType<'db> {
     /// Returns `None` if the function is overloaded. This powers the `CallableTypeFromFunction`
     /// special form from the `knot_extensions` module.
     pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> Type<'db> {
-        // TODO: Add support for overloaded callables; return `Type`, not `Option<Type>`.
+        // TODO: Add support for overloaded callables
         Type::Callable(CallableType::General(GeneralCallableType::new(
             db,
             self.signature(db).clone(),
