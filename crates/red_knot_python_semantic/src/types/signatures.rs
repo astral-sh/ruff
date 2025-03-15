@@ -95,8 +95,9 @@ pub(crate) struct CallableSignature<'db> {
     /// The type that is (hopefully) callable.
     pub(crate) callable_type: Type<'db>,
 
-    /// For an object that's callable via a `__call__` method, the type of that method. For an
-    /// object that is directly callable, the type of the object.
+    /// The type we'll use for error messages referring to details of the called signature. For
+    /// calls to functions this will be the same as `callable_type`; for other callable instances
+    /// it may be a `__call__` method.
     pub(crate) signature_type: Type<'db>,
 
     /// If this is a callable object (i.e. called via a `__call__` method), the boundness of
@@ -136,7 +137,8 @@ impl<'db> CallableSignature<'db> {
         }
     }
 
-    /// Creates a new `CallableSignature` from a non-empty iterator of [`Signature`]s.
+    /// Creates a new `CallableSignature` from an iterator of [`Signature`]s. Returns a
+    /// non-callable signature if the iterator is empty.
     pub(crate) fn from_overloads<I>(
         callable_type: Type<'db>,
         signature_type: Type<'db>,
