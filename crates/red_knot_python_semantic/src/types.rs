@@ -2582,10 +2582,8 @@ impl<'db> Type<'db> {
             }
 
             Type::SubclassOf(subclass_of_type) => match subclass_of_type.subclass_of() {
-                ClassBase::Dynamic(dynamic_type) => {
-                    Type::Dynamic(dynamic_type).signatures(db).clone()
-                }
-                ClassBase::Class(class) => Type::class_literal(class).signatures(db).clone(),
+                ClassBase::Dynamic(dynamic_type) => Type::Dynamic(dynamic_type).signatures(db),
+                ClassBase::Class(class) => Type::class_literal(class).signatures(db),
             },
 
             Type::Instance(_) => {
@@ -2947,7 +2945,7 @@ impl<'db> Type<'db> {
                 }
                 Ok(bindings)
             }
-            Symbol::Unbound => return Err(CallDunderError::MethodNotAvailable),
+            Symbol::Unbound => Err(CallDunderError::MethodNotAvailable),
         }
     }
 
