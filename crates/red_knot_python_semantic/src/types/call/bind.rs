@@ -349,7 +349,7 @@ impl<'db> CallableBinding<'db> {
             return;
         }
 
-        let callable_descriptor =
+        let callable_description =
             CallableDescription::new(context.db(), self.signature.callable_type);
         if self.overloads().len() > 1 {
             context.report_lint(
@@ -357,7 +357,7 @@ impl<'db> CallableBinding<'db> {
                 node,
                 format_args!(
                     "No overload{} matches arguments",
-                    if let Some(CallableDescription { kind, name }) = callable_descriptor {
+                    if let Some(CallableDescription { kind, name }) = callable_description {
                         format!(" of {kind} `{name}`")
                     } else {
                         String::new()
@@ -367,14 +367,14 @@ impl<'db> CallableBinding<'db> {
             return;
         }
 
-        let callable_descriptor =
+        let callable_description =
             CallableDescription::new(context.db(), self.signature.signature_type);
         for overload in self.overloads() {
             overload.report_diagnostics(
                 context,
                 node,
                 self.signature.signature_type,
-                callable_descriptor.as_ref(),
+                callable_description.as_ref(),
             );
         }
     }
@@ -534,10 +534,10 @@ impl<'db> Binding<'db> {
         context: &InferContext<'db>,
         node: ast::AnyNodeRef,
         callable_ty: Type<'db>,
-        callable_descriptor: Option<&CallableDescription>,
+        callable_description: Option<&CallableDescription>,
     ) {
         for error in &self.errors {
-            error.report_diagnostic(context, node, callable_ty, callable_descriptor);
+            error.report_diagnostic(context, node, callable_ty, callable_description);
         }
     }
 
@@ -709,7 +709,7 @@ impl<'db> BindingError<'db> {
         context: &InferContext<'db>,
         node: ast::AnyNodeRef,
         callable_ty: Type<'db>,
-        callable_descriptor: Option<&CallableDescription>,
+        callable_description: Option<&CallableDescription>,
     ) {
         match self {
             Self::InvalidArgumentType {
@@ -736,7 +736,7 @@ impl<'db> BindingError<'db> {
                     format_args!(
                         "Object of type `{provided_ty_display}` cannot be assigned to \
                         parameter {parameter}{}; expected type `{expected_ty_display}`",
-                        if let Some(CallableDescription { kind, name }) = callable_descriptor {
+                        if let Some(CallableDescription { kind, name }) = callable_description {
                             format!(" of {kind} `{name}`")
                         } else {
                             String::new()
@@ -757,7 +757,7 @@ impl<'db> BindingError<'db> {
                     format_args!(
                         "Too many positional arguments{}: expected \
                         {expected_positional_count}, got {provided_positional_count}",
-                        if let Some(CallableDescription { kind, name }) = callable_descriptor {
+                        if let Some(CallableDescription { kind, name }) = callable_description {
                             format!(" to {kind} `{name}`")
                         } else {
                             String::new()
@@ -773,7 +773,7 @@ impl<'db> BindingError<'db> {
                     node,
                     format_args!(
                         "No argument{s} provided for required parameter{s} {parameters}{}",
-                        if let Some(CallableDescription { kind, name }) = callable_descriptor {
+                        if let Some(CallableDescription { kind, name }) = callable_description {
                             format!(" of {kind} `{name}`")
                         } else {
                             String::new()
@@ -791,7 +791,7 @@ impl<'db> BindingError<'db> {
                     Self::get_node(node, *argument_index),
                     format_args!(
                         "Argument `{argument_name}` does not match any known parameter{}",
-                        if let Some(CallableDescription { kind, name }) = callable_descriptor {
+                        if let Some(CallableDescription { kind, name }) = callable_description {
                             format!(" of {kind} `{name}`")
                         } else {
                             String::new()
@@ -809,7 +809,7 @@ impl<'db> BindingError<'db> {
                     Self::get_node(node, *argument_index),
                     format_args!(
                         "Multiple values provided for parameter {parameter}{}",
-                        if let Some(CallableDescription { kind, name }) = callable_descriptor {
+                        if let Some(CallableDescription { kind, name }) = callable_description {
                             format!(" of {kind} `{name}`")
                         } else {
                             String::new()
