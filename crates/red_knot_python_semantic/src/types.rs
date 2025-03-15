@@ -2325,8 +2325,8 @@ impl<'db> Type<'db> {
         match self {
             Type::Callable(CallableType::BoundMethod(bound_method)) => {
                 let signature = bound_method.function(db).signature(db);
-                let mut signature = CallableSignature::single(self, signature.clone());
-                signature.bound_type = Some(bound_method.self_instance(db));
+                let signature = CallableSignature::single(self, signature.clone())
+                    .with_bound_type(bound_method.self_instance(db));
                 Signatures::single(signature)
             }
 
