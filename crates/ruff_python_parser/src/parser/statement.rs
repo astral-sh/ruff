@@ -2705,17 +2705,45 @@ impl<'src> Parser<'src> {
                 // # parse_options: { "target-version": "3.7" }
                 // @(x := lambda x: x)(foo)
                 // def bar(): ...
-                let allowed_decorator = match &parsed_expr.expr {
+
+                // test_err decorator_dict_literal_py38
+                // # parse_options: { "target-version": "3.8" }
+                // @{3: 3}
+                // def bar(): ...
+
+                // test_err decorator_float_literal_py38
+                // # parse_options: { "target-version": "3.8" }
+                // @3.14
+                // def bar(): ...
+
+                // test_ok decorator_await_expression_py39
+                // # parse_options: { "target-version": "3.9" }
+                // async def foo():
+                //     @await bar
+                //     def baz(): ...
+
+                // test_err decorator_await_expression_py38
+                // # parse_options: { "target-version": "3.8" }
+                // async def foo():
+                //     @await bar
+                //     def baz(): ...
+
+                // test_err decorator_non_toplevel_call_expression_py38
+                // # parse_options: { "target-version": "3.8" }
+                // @foo().bar()
+                // def baz(): ...
+
+                let relaxed_decorator_error = match &parsed_expr.expr {
                     Expr::Call(expr_call) => {
-                        helpers::is_name_or_attribute_expression(&expr_call.func)
+                        helpers::detect_invalid_pre_py39_decorator_node(&expr_call.func)
                     }
-                    expr => helpers::is_name_or_attribute_expression(expr),
+                    expr => helpers::detect_invalid_pre_py39_decorator_node(expr),
                 };
 
-                if !allowed_decorator {
+                if let Some((error, range)) = relaxed_decorator_error {
                     self.add_unsupported_syntax_error(
-                        UnsupportedSyntaxErrorKind::RelaxedDecorator,
-                        parsed_expr.range(),
+                        UnsupportedSyntaxErrorKind::RelaxedDecorator(error),
+                        range,
                     );
                 }
             }
