@@ -276,8 +276,9 @@ static_assert(is_subtype_of(Never, AlwaysFalsy))
 ### `AlwaysTruthy` and `AlwaysFalsy`
 
 ```py
-from knot_extensions import AlwaysTruthy, AlwaysFalsy, is_subtype_of, static_assert
+from knot_extensions import AlwaysTruthy, AlwaysFalsy, Intersection, Not, is_subtype_of, static_assert
 from typing import Literal
+from typing_extensions import LiteralString
 
 static_assert(is_subtype_of(Literal[1], AlwaysTruthy))
 static_assert(is_subtype_of(Literal[0], AlwaysFalsy))
@@ -290,6 +291,31 @@ static_assert(not is_subtype_of(Literal[0], AlwaysTruthy))
 
 static_assert(not is_subtype_of(str, AlwaysTruthy))
 static_assert(not is_subtype_of(str, AlwaysFalsy))
+
+static_assert(is_subtype_of(bool, Literal[False] | AlwaysTruthy))
+static_assert(is_subtype_of(bool, Literal[True] | AlwaysFalsy))
+static_assert(not is_subtype_of(Literal[True] | AlwaysFalsy, Literal[False] | AlwaysTruthy))
+static_assert(is_subtype_of(LiteralString, Literal[""] | AlwaysTruthy))
+
+# The condition `is_subtype_of(T & U, U)` must still be satisfied after the following transformations:
+# `LiteralString & AlwaysTruthy` -> `LiteralString & ~Literal[""]`
+static_assert(is_subtype_of(Intersection[LiteralString, Not[Literal[""]]], AlwaysTruthy))
+static_assert(is_subtype_of(Intersection[LiteralString, Not[Literal["", "a"]]], AlwaysTruthy))
+# `LiteralString & ~AlwaysTruthy` -> `Literal[""]`
+static_assert(is_subtype_of(Literal[""], Not[AlwaysTruthy]))
+static_assert(not is_subtype_of(Literal["", "a"], Not[AlwaysTruthy]))
+# `LiteralString & AlwaysFalsy` -> `Literal[""]`
+static_assert(is_subtype_of(Literal[""], AlwaysFalsy))
+static_assert(not is_subtype_of(Literal["", "a"], AlwaysFalsy))
+# `LiteralString & ~AlwaysFalsy` -> `LiteralString & ~Literal[""]`
+static_assert(is_subtype_of(Intersection[LiteralString, Not[Literal[""]]], Not[AlwaysFalsy]))
+static_assert(is_subtype_of(Intersection[LiteralString, Not[Literal["", "a"]]], Not[AlwaysFalsy]))
+# `bool & ~AlwaysTruthy`, `bool & ~Literal[True]` -> `Literal[False]`
+static_assert(is_subtype_of(Literal[False], Not[AlwaysTruthy]))
+static_assert(is_subtype_of(Literal[False], Not[Literal[True]]))
+# `bool & ~AlwaysFalsy`, `bool & ~Literal[False]` -> `Literal[True]`
+static_assert(is_subtype_of(Literal[True], Not[AlwaysFalsy]))
+static_assert(is_subtype_of(Literal[True], Not[Literal[False]]))
 ```
 
 ### Module literals

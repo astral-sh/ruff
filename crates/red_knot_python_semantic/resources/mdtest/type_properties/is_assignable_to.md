@@ -206,8 +206,8 @@ static_assert(not is_assignable_to(tuple[Any, Literal[2]], tuple[int, str]))
 ## Union types
 
 ```py
-from knot_extensions import static_assert, is_assignable_to, Unknown
-from typing import Literal, Any
+from knot_extensions import AlwaysTruthy, AlwaysFalsy, static_assert, is_assignable_to, Unknown
+from typing_extensions import Literal, Any, LiteralString
 
 static_assert(is_assignable_to(int, int | str))
 static_assert(is_assignable_to(str, int | str))
@@ -227,13 +227,18 @@ static_assert(not is_assignable_to(int | None, str | None))
 static_assert(not is_assignable_to(Literal[1] | None, int))
 static_assert(not is_assignable_to(Literal[1] | None, str | None))
 static_assert(not is_assignable_to(Any | int | str, int))
+
+static_assert(is_assignable_to(bool, Literal[False] | AlwaysTruthy))
+static_assert(is_assignable_to(bool, Literal[True] | AlwaysFalsy))
+static_assert(not is_assignable_to(Literal[True] | AlwaysFalsy, Literal[False] | AlwaysTruthy))
+static_assert(is_assignable_to(LiteralString, Literal[""] | AlwaysTruthy))
 ```
 
 ## Intersection types
 
 ```py
-from knot_extensions import static_assert, is_assignable_to, Intersection, Not
-from typing_extensions import Any, Literal
+from knot_extensions import static_assert, is_assignable_to, Intersection, Not, AlwaysTruthy, AlwaysFalsy
+from typing_extensions import Any, Literal, final, LiteralString
 
 class Parent: ...
 class Child1(Parent): ...
@@ -296,6 +301,30 @@ static_assert(is_assignable_to(Intersection[Any, Unrelated], Intersection[Any, P
 static_assert(is_assignable_to(Intersection[Any, Parent, Unrelated], Intersection[Any, Parent, Unrelated]))
 static_assert(is_assignable_to(Intersection[Unrelated, Any], Intersection[Unrelated, Not[Any]]))
 static_assert(is_assignable_to(Intersection[Literal[1], Any], Intersection[Unrelated, Not[Any]]))
+
+static_assert(is_assignable_to(Intersection[Unrelated, Not[int]], Not[int]))
+static_assert(is_assignable_to(Intersection[Intersection[str, Not[Literal[""]]], int], Intersection[str, Not[Literal[""]]]))
+static_assert(is_assignable_to(Intersection[Intersection[Any, Not[int]], Not[str]], Intersection[Any, Not[int]]))
+
+# The condition `is_assignable_to(T & U, U)` should still be satisfied after the following transformations:
+# `LiteralString & AlwaysTruthy` -> `LiteralString & ~Literal[""]`
+static_assert(is_assignable_to(Intersection[LiteralString, Not[Literal[""]]], AlwaysTruthy))
+static_assert(is_assignable_to(Intersection[LiteralString, Not[Literal["", "a"]]], AlwaysTruthy))
+# `LiteralString & ~AlwaysTruthy` -> `Literal[""]`
+static_assert(is_assignable_to(Literal[""], Not[AlwaysTruthy]))
+static_assert(not is_assignable_to(Literal["", "a"], Not[AlwaysTruthy]))
+# `LiteralString & AlwaysFalsy` -> `Literal[""]`
+static_assert(is_assignable_to(Literal[""], AlwaysFalsy))
+static_assert(not is_assignable_to(Literal["", "a"], AlwaysFalsy))
+# `LiteralString & ~AlwaysFalsy`  -> `LiteralString & ~Literal[""]`
+static_assert(is_assignable_to(Intersection[LiteralString, Not[Literal[""]]], Not[AlwaysFalsy]))
+static_assert(is_assignable_to(Intersection[LiteralString, Not[Literal["", "a"]]], Not[AlwaysFalsy]))
+# `bool & ~AlwaysTruthy`, `bool & ~Literal[True]` -> `Literal[False]`
+static_assert(is_assignable_to(Literal[False], Not[AlwaysTruthy]))
+static_assert(is_assignable_to(Literal[False], Not[Literal[True]]))
+# `bool & ~AlwaysFalsy`, `bool & ~Literal[False]` -> `Literal[True]`
+static_assert(is_assignable_to(Literal[True], Not[AlwaysFalsy]))
+static_assert(is_assignable_to(Literal[True], Not[Literal[False]]))
 ```
 
 ## General properties

@@ -118,4 +118,26 @@ class R: ...
 static_assert(is_equivalent_to(Intersection[tuple[P | Q], R], Intersection[tuple[Q | P], R]))
 ```
 
+## Transformation by intersection
+
+```py
+from knot_extensions import Intersection, Not, AlwaysTruthy, AlwaysFalsy, static_assert, is_equivalent_to
+from typing_extensions import Literal, LiteralString
+
+# `LiteralString & AlwaysTruthy` -> `LiteralString & ~Literal[""]`
+static_assert(is_equivalent_to(Intersection[LiteralString, AlwaysTruthy], Intersection[LiteralString, Not[Literal[""]]]))
+# `LiteralString & ~AlwaysTruthy` -> `Literal[""]`
+static_assert(is_equivalent_to(Intersection[LiteralString, Not[AlwaysTruthy]], Literal[""]))
+# `LiteralString & AlwaysFalsy` -> `Literal[""]`
+static_assert(is_equivalent_to(Intersection[LiteralString, AlwaysFalsy], Literal[""]))
+# `LiteralString & ~AlwaysFalsy`  -> `LiteralString & ~Literal[""]`
+static_assert(is_equivalent_to(Intersection[LiteralString, Not[AlwaysFalsy]], Intersection[LiteralString, Not[Literal[""]]]))
+# `bool & ~AlwaysFalsy`, `bool & ~Literal[False]` -> `bool & Literal[True]`
+static_assert(is_equivalent_to(Intersection[bool, Not[AlwaysFalsy]], Literal[True]))
+static_assert(is_equivalent_to(Intersection[bool, Not[Literal[False]]], Literal[True]))
+# `bool & ~AlwaysTruthy`, `bool & ~Literal[True]` -> `bool & Literal[False]`
+static_assert(is_equivalent_to(Intersection[bool, Not[AlwaysTruthy]], Literal[False]))
+static_assert(is_equivalent_to(Intersection[bool, Not[Literal[True]]], Literal[False]))
+```
+
 [the equivalence relation]: https://typing.readthedocs.io/en/latest/spec/glossary.html#term-equivalent

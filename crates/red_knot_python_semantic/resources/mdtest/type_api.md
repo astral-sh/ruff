@@ -111,7 +111,11 @@ from typing_extensions import Literal
 from knot_extensions import AlwaysFalsy, AlwaysTruthy, is_subtype_of, static_assert
 
 static_assert(is_subtype_of(Literal[True], AlwaysTruthy))
+static_assert(is_subtype_of(Literal["a"], AlwaysTruthy))
+static_assert(is_subtype_of(Literal[1], AlwaysTruthy))
 static_assert(is_subtype_of(Literal[False], AlwaysFalsy))
+static_assert(is_subtype_of(Literal[""], AlwaysFalsy))
+static_assert(is_subtype_of(Literal[0], AlwaysFalsy))
 
 static_assert(not is_subtype_of(int, AlwaysFalsy))
 static_assert(not is_subtype_of(str, AlwaysFalsy))
