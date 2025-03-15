@@ -2599,10 +2599,11 @@ impl<'db> Type<'db> {
             },
 
             Type::Instance(_) => {
-                // Note that for objects that are callable via a `__call__` method, we will get the
-                // signature of the dunder method, but will pass in the type of the object as the
-                // "callable type". That ensures that we get errors like "`X` is not callable"
-                // instead of "`<type of illegal '__call__'>` is not callable".
+                // Note that for objects that have a (possibly not callable!) `__call__` attribute,
+                // we will get the signature of the `__call__` attribute, but will pass in the type
+                // of the original object as the "callable type". That ensures that we get errors
+                // like "`X` is not callable" instead of "`<type of illegal '__call__'>` is not
+                // callable".
                 let Some((signatures, boundness)) =
                     self.dunder_signature(db, Some(callable_ty), "__call__")
                 else {
@@ -2636,10 +2637,11 @@ impl<'db> Type<'db> {
     }
 
     /// Calls `self`. Returns a [`CallError`] if `self` is (always or possibly) not callable, or if
-    /// the arguments are not compatible with the formal parameters. You get back a [`Bindings`]
-    /// for both successful and unsuccessful calls. It contains information about which formal
-    /// parameters each argument was matched to, and about any errors matching arguments and
-    /// parameters.
+    /// the arguments are not compatible with the formal parameters.
+    ///
+    /// You get back a [`Bindings`] for both successful and unsuccessful calls.
+    /// It contains information about which formal parameters each argument was matched to,
+    /// and about any errors matching arguments and parameters.
     fn try_call(
         self,
         db: &'db dyn Db,
@@ -2648,7 +2650,7 @@ impl<'db> Type<'db> {
         let signatures = self.signatures(db, self);
         let mut bindings = Bindings::bind(db, signatures, arguments).into_result()?;
         for binding in bindings.iter_mut() {
-            // For certain known callables, we have special case logic to determine the return type
+            // For certain known callables, we have special-case logic to determine the return type
             // in a way that isn't directly expressible in the type system. Each special case
             // listed here should have a corresponding clause above in `signatures`.
             let Some((overload_index, overload)) = binding.matching_overload_mut() else {

@@ -61,8 +61,7 @@ impl<'db> Bindings<'db> {
         let bindings = signatures
             .iter()
             .map(|signature| CallableBinding::bind(db, signature, arguments))
-            .collect::<Vec<_>>()
-            .into_boxed_slice();
+            .collect();
         Bindings {
             signatures,
             inner: BindingsInner::Union(bindings),
@@ -84,25 +83,7 @@ impl<'db> Bindings<'db> {
         match &self.inner {
             BindingsInner::Single(binding) => binding.return_type(),
             BindingsInner::Union(bindings) => {
-                // The return types from successfully bound elements should come first, then the
-                // fallback return types for any bindings with errors.
-                let mut builder = UnionBuilder::new(db);
-                let mut any_errors = false;
-                for binding in bindings {
-                    if binding.has_binding_errors() {
-                        any_errors = true;
-                    } else {
-                        builder = builder.add(binding.return_type());
-                    }
-                }
-                if any_errors {
-                    for binding in bindings {
-                        if binding.has_binding_errors() {
-                            builder = builder.add(binding.return_type());
-                        }
-                    }
-                }
-                builder.build()
+                UnionType::from_elements(db, bindings.iter().map(|b| b.return_type()))
             }
         }
     }
@@ -262,8 +243,7 @@ impl<'db> CallableBinding<'db> {
         let overloads = signature
             .iter()
             .map(|signature| Binding::bind(db, signature, arguments.as_ref()))
-            .collect::<Vec<_>>()
-            .into_boxed_slice();
+            .collect();
         CallableBinding {
             signature,
             inner: CallableBindingInner::Overloaded(overloads),

@@ -22,8 +22,8 @@ use ruff_python_ast::{self as ast, name::Name};
 pub(crate) struct Signatures<'db> {
     /// The type that is (hopefully) callable.
     pub(crate) callable_type: Type<'db>,
-    /// For an object that's callable via a `__call__` method, the type of that method. For an
-    /// object that is directly callable, the type of the object.
+    /// The type we'll use for error messages referring to details of the called signature. For calls to functions this
+    /// will be the same as `callable_type`; for other callable instances it may be a `__call__` method.
     pub(crate) signature_type: Type<'db>,
     elements: Vec<CallableSignature<'db>>,
 }
