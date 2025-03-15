@@ -5,6 +5,8 @@
 
 use std::borrow::Cow;
 
+use smallvec::SmallVec;
+
 use super::{
     Argument, CallArguments, CallError, CallErrorKind, CallableSignature, InferContext, Signature,
     Signatures, Type,
@@ -27,16 +29,9 @@ use ruff_text_size::Ranged;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Bindings<'db> {
     pub(crate) callable_type: Type<'db>,
-    inner: BindingsInner<'db>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum BindingsInner<'db> {
-    /// The call resolves to exactly one binding.
-    Single(CallableBinding<'db>),
-
-    /// The call resolves to multiple bindings.
-    Union(Box<[CallableBinding<'db>]>),
+    /// By using SmallVec, we avoid an extra heap allocation for the common case of a non-union
+    /// type.
+    elements: SmallVec<[CallableBinding<'db>; 1]>,
 }
 
 impl<'db> Bindings<'db> {
@@ -50,37 +45,28 @@ impl<'db> Bindings<'db> {
         signatures: &Signatures<'db>,
         arguments: &CallArguments<'_, 'db>,
     ) -> Self {
-        if let Some(signature) = signatures.as_single() {
-            return Bindings {
-                callable_type: signatures.callable_type,
-                inner: BindingsInner::Single(CallableBinding::bind(db, signature, arguments)),
-            };
-        }
-
-        let bindings = signatures
+        let elements = signatures
             .into_iter()
             .map(|signature| CallableBinding::bind(db, signature, arguments))
             .collect();
         Bindings {
             callable_type: signatures.callable_type,
-            inner: BindingsInner::Union(bindings),
+            elements,
         }
     }
 
-    pub(crate) const fn is_single(&self) -> bool {
-        matches!(&self.inner, BindingsInner::Single(_))
+    pub(crate) fn is_single(&self) -> bool {
+        self.elements.len() == 1
     }
 
     /// Returns the return type of the call. For successful calls, this is the actual return type.
     /// For calls with binding errors, this is a type that best approximates the return type. For
     /// types that are not callable, returns `Type::Unknown`.
     pub(crate) fn return_type(&self, db: &'db dyn Db) -> Type<'db> {
-        match &self.inner {
-            BindingsInner::Single(binding) => binding.return_type(),
-            BindingsInner::Union(bindings) => {
-                UnionType::from_elements(db, bindings.iter().map(CallableBinding::return_type))
-            }
+        if let [binding] = self.elements.as_slice() {
+            return binding.return_type();
         }
+        UnionType::from_elements(db, self.into_iter().map(CallableBinding::return_type))
     }
 
     /// Returns whether all bindings were successful, or an error describing why some bindings were
@@ -159,10 +145,7 @@ impl<'a, 'db> IntoIterator for &'a Bindings<'db> {
     type IntoIter = std::slice::Iter<'a, CallableBinding<'db>>;
 
     fn into_iter(self) -> Self::IntoIter {
-        match &self.inner {
-            BindingsInner::Single(binding) => std::slice::from_ref(binding).iter(),
-            BindingsInner::Union(bindings) => bindings.iter(),
-        }
+        self.elements.iter()
     }
 }
 
@@ -171,10 +154,7 @@ impl<'a, 'db> IntoIterator for &'a mut Bindings<'db> {
     type IntoIter = std::slice::IterMut<'a, CallableBinding<'db>>;
 
     fn into_iter(self) -> Self::IntoIter {
-        match &mut self.inner {
-            BindingsInner::Single(binding) => std::slice::from_mut(binding).iter_mut(),
-            BindingsInner::Union(bindings) => bindings.iter_mut(),
-        }
+        self.elements.iter_mut()
     }
 }
 
@@ -198,14 +178,12 @@ pub(crate) struct CallableBinding<'db> {
     pub(crate) callable_type: Type<'db>,
     pub(crate) signature_type: Type<'db>,
     pub(crate) dunder_call_is_possibly_unbound: bool,
-    inner: CallableBindingInner<'db>,
-}
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum CallableBindingInner<'db> {
-    NotCallable,
-    Single(Binding<'db>),
-    Overloaded(Box<[Binding<'db>]>),
+    /// The bindings of each overload of this callable. Will be empty if the type is not callable.
+    ///
+    /// By using SmallVec, we avoid an extra heap allocation for the common case of a
+    /// non-overloaded callable.
+    overloads: SmallVec<[Binding<'db>; 1]>,
 }
 
 impl<'db> CallableBinding<'db> {
@@ -218,15 +196,6 @@ impl<'db> CallableBinding<'db> {
         signature: &CallableSignature<'db>,
         arguments: &CallArguments<'_, 'db>,
     ) -> Self {
-        if !signature.is_callable() {
-            return CallableBinding {
-                callable_type: signature.callable_type,
-                signature_type: signature.signature_type,
-                dunder_call_is_possibly_unbound: signature.dunder_call_is_possibly_unbound,
-                inner: CallableBindingInner::NotCallable,
-            };
-        }
-
         // If this callable is a bound method, prepend the self instance onto the arguments list
         // before checking.
         let arguments = if let Some(bound_type) = signature.bound_type {
@@ -234,16 +203,6 @@ impl<'db> CallableBinding<'db> {
         } else {
             Cow::Borrowed(arguments)
         };
-
-        if let Some(single) = signature.as_single() {
-            let binding = Binding::bind(db, single, arguments.as_ref());
-            return CallableBinding {
-                callable_type: signature.callable_type,
-                signature_type: signature.signature_type,
-                dunder_call_is_possibly_unbound: signature.dunder_call_is_possibly_unbound,
-                inner: CallableBindingInner::Single(binding),
-            };
-        }
 
         // TODO: This checks every overload. In the proposed more detailed call checking spec [1],
         // arguments are checked for arity first, and are only checked for type assignability against
@@ -259,28 +218,12 @@ impl<'db> CallableBinding<'db> {
             callable_type: signature.callable_type,
             signature_type: signature.signature_type,
             dunder_call_is_possibly_unbound: signature.dunder_call_is_possibly_unbound,
-            inner: CallableBindingInner::Overloaded(overloads),
-        }
-    }
-
-    fn overloads(&self) -> &[Binding<'db>] {
-        match &self.inner {
-            CallableBindingInner::NotCallable => &[],
-            CallableBindingInner::Single(binding) => std::slice::from_ref(binding),
-            CallableBindingInner::Overloaded(bindings) => bindings,
-        }
-    }
-
-    fn overloads_mut(&mut self) -> &mut [Binding<'db>] {
-        match &mut self.inner {
-            CallableBindingInner::NotCallable => &mut [],
-            CallableBindingInner::Single(binding) => std::slice::from_mut(binding),
-            CallableBindingInner::Overloaded(bindings) => bindings,
+            overloads,
         }
     }
 
     fn as_result(&self) -> Result<(), CallErrorKind> {
-        if matches!(self.inner, CallableBindingInner::NotCallable) {
+        if !self.is_callable() {
             return Err(CallErrorKind::NotCallable);
         }
 
@@ -295,8 +238,8 @@ impl<'db> CallableBinding<'db> {
         Ok(())
     }
 
-    const fn is_callable(&self) -> bool {
-        !matches!(&self.inner, CallableBindingInner::NotCallable)
+    fn is_callable(&self) -> bool {
+        !self.overloads.is_empty()
     }
 
     /// Returns whether there were any errors binding this call site. If the callable has multiple
@@ -308,7 +251,7 @@ impl<'db> CallableBinding<'db> {
     /// Returns the overload that matched for this call binding. Returns `None` if none of the
     /// overloads matched.
     pub(crate) fn matching_overload(&self) -> Option<(usize, &Binding<'db>)> {
-        self.overloads()
+        self.overloads
             .iter()
             .enumerate()
             .find(|(_, overload)| overload.as_result().is_ok())
@@ -317,7 +260,7 @@ impl<'db> CallableBinding<'db> {
     /// Returns the overload that matched for this call binding. Returns `None` if none of the
     /// overloads matched.
     pub(crate) fn matching_overload_mut(&mut self) -> Option<(usize, &mut Binding<'db>)> {
-        self.overloads_mut()
+        self.overloads
             .iter_mut()
             .enumerate()
             .find(|(_, overload)| overload.as_result().is_ok())
@@ -332,7 +275,7 @@ impl<'db> CallableBinding<'db> {
         if let Some((_, overload)) = self.matching_overload() {
             return overload.return_type();
         }
-        if let [overload] = self.overloads() {
+        if let [overload] = self.overloads.as_slice() {
             return overload.return_type();
         }
         Type::unknown()
@@ -364,7 +307,7 @@ impl<'db> CallableBinding<'db> {
         }
 
         let callable_description = CallableDescription::new(context.db(), self.callable_type);
-        if self.overloads().len() > 1 {
+        if self.overloads.len() > 1 {
             context.report_lint(
                 &NO_MATCHING_OVERLOAD,
                 node,
@@ -381,7 +324,7 @@ impl<'db> CallableBinding<'db> {
         }
 
         let callable_description = CallableDescription::new(context.db(), self.signature_type);
-        for overload in self.overloads() {
+        for overload in &self.overloads {
             overload.report_diagnostics(
                 context,
                 node,

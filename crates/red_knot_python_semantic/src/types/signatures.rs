@@ -10,6 +10,8 @@
 //! argument types and return types. For each callable type in the union, the call expression's
 //! arguments must match _at least one_ overload.
 
+use smallvec::{smallvec, SmallVec};
+
 use super::{definition_expression_type, DynamicType, Type};
 use crate::semantic_index::definition::Definition;
 use crate::types::todo_type;
@@ -24,7 +26,9 @@ pub(crate) struct Signatures<'db> {
     /// The type we'll use for error messages referring to details of the called signature. For calls to functions this
     /// will be the same as `callable_type`; for other callable instances it may be a `__call__` method.
     pub(crate) signature_type: Type<'db>,
-    elements: Vec<CallableSignature<'db>>,
+    /// By using SmallVec, we avoid an extra heap allocation for the common case of a non-union
+    /// type.
+    elements: SmallVec<[CallableSignature<'db>; 1]>,
 }
 
 impl<'db> Signatures<'db> {
@@ -32,7 +36,7 @@ impl<'db> Signatures<'db> {
         Self {
             callable_type: signature_type,
             signature_type,
-            elements: vec![CallableSignature::not_callable(signature_type)],
+            elements: smallvec![CallableSignature::not_callable(signature_type)],
         }
     }
 
@@ -40,7 +44,7 @@ impl<'db> Signatures<'db> {
         Self {
             callable_type: signature.callable_type,
             signature_type: signature.signature_type,
-            elements: vec![signature],
+            elements: smallvec![signature],
         }
     }
 
@@ -50,7 +54,7 @@ impl<'db> Signatures<'db> {
     where
         I: IntoIterator<Item = Signatures<'db>>,
     {
-        let elements: Vec<_> = elements
+        let elements: SmallVec<_> = elements
             .into_iter()
             .flat_map(|s| s.elements.into_iter())
             .collect();
@@ -59,13 +63,6 @@ impl<'db> Signatures<'db> {
             callable_type: signature_type,
             signature_type,
             elements,
-        }
-    }
-
-    pub(crate) fn as_single(&self) -> Option<&CallableSignature<'db>> {
-        match self.elements.as_slice() {
-            [signature] => Some(signature),
-            _ => None,
         }
     }
 
@@ -115,7 +112,10 @@ pub(crate) struct CallableSignature<'db> {
 
     /// The signatures of each overload of this callable. Will be empty if the type is not
     /// callable.
-    overloads: Vec<Signature<'db>>,
+    ///
+    /// By using SmallVec, we avoid an extra heap allocation for the common case of a
+    /// non-overloaded callable.
+    overloads: SmallVec<[Signature<'db>; 1]>,
 }
 
 impl<'db> CallableSignature<'db> {
@@ -125,7 +125,7 @@ impl<'db> CallableSignature<'db> {
             signature_type,
             dunder_call_is_possibly_unbound: false,
             bound_type: None,
-            overloads: vec![],
+            overloads: smallvec![],
         }
     }
 
@@ -135,7 +135,7 @@ impl<'db> CallableSignature<'db> {
             signature_type,
             dunder_call_is_possibly_unbound: false,
             bound_type: None,
-            overloads: vec![signature],
+            overloads: smallvec![signature],
         }
     }
 
@@ -183,19 +183,6 @@ impl<'db> CallableSignature<'db> {
         if self.callable_type == before {
             self.callable_type = after;
         }
-    }
-
-    /// Returns the [`Signature`] if this is a non-overloaded callable, [None] otherwise.
-    pub(crate) fn as_single(&self) -> Option<&Signature<'db>> {
-        match self.overloads.as_slice() {
-            [signature] => Some(signature),
-            _ => None,
-        }
-    }
-
-    /// Returns whether this signature is callable.
-    pub(crate) fn is_callable(&self) -> bool {
-        !self.overloads.is_empty()
     }
 }
 
