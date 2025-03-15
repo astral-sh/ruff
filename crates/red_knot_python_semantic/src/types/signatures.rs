@@ -48,11 +48,11 @@ impl<'db> Signatures<'db> {
     /// empty.
     pub(crate) fn from_union<I>(signature_type: Type<'db>, elements: I) -> Self
     where
-        I: IntoIterator<Item = &'db Signatures<'db>>,
+        I: IntoIterator<Item = Signatures<'db>>,
     {
         let elements: Vec<_> = elements
             .into_iter()
-            .flat_map(|s| s.elements.iter().cloned())
+            .flat_map(|s| s.elements.into_iter())
             .collect();
         assert!(!elements.is_empty());
         Self {

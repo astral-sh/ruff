@@ -3863,7 +3863,6 @@ impl<'db> TypeInferenceBuilder<'db> {
             Ok(bindings) => {
                 for binding in bindings.iter() {
                     let Some(known_function) = binding
-                        .signature
                         .callable_type
                         .into_function_literal()
                         .and_then(|function_type| function_type.known(self.db()))
@@ -5654,7 +5653,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             value_node,
                             format_args!(
                                 "Method `__getitem__` of type `{}` is not callable on object of type `{}`",
-                                bindings.callable_type().display(self.db()),
+                                bindings.callable_type.display(self.db()),
                                 value_ty.display(self.db()),
                             ),
                         );
@@ -5704,7 +5703,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                         value_node,
                                         format_args!(
                                             "Method `__class_getitem__` of type `{}` is not callable on object of type `{}`",
-                                            bindings.callable_type().display(self.db()),
+                                            bindings.callable_type.display(self.db()),
                                             value_ty.display(self.db()),
                                         ),
                                     );

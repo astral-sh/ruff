@@ -285,7 +285,7 @@ impl<'db> Class<'db> {
                 Ok(bindings) => Ok(bindings.return_type(db)),
 
                 Err(CallError(CallErrorKind::NotCallable, bindings)) => Err(MetaclassError {
-                    kind: MetaclassErrorKind::NotCallable(bindings.callable_type()),
+                    kind: MetaclassErrorKind::NotCallable(bindings.callable_type),
                 }),
 
                 // TODO we should also check for binding errors that would indicate the metaclass

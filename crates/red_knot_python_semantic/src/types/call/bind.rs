@@ -26,7 +26,7 @@ use ruff_text_size::Ranged;
 /// It's guaranteed that the wrapped bindings have no errors.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Bindings<'db> {
-    pub(crate) signatures: &'db Signatures<'db>,
+    pub(crate) callable_type: Type<'db>,
     inner: BindingsInner<'db>,
 }
 
@@ -47,12 +47,12 @@ impl<'db> Bindings<'db> {
     /// overload (if any).
     pub(crate) fn bind(
         db: &'db dyn Db,
-        signatures: &'db Signatures<'db>,
+        signatures: &Signatures<'db>,
         arguments: &CallArguments<'_, 'db>,
     ) -> Self {
         if let Some(signature) = signatures.as_single() {
             return Bindings {
-                signatures,
+                callable_type: signatures.callable_type,
                 inner: BindingsInner::Single(CallableBinding::bind(db, signature, arguments)),
             };
         }
@@ -62,17 +62,13 @@ impl<'db> Bindings<'db> {
             .map(|signature| CallableBinding::bind(db, signature, arguments))
             .collect();
         Bindings {
-            signatures,
+            callable_type: signatures.callable_type,
             inner: BindingsInner::Union(bindings),
         }
     }
 
     pub(crate) const fn is_single(&self) -> bool {
         matches!(&self.inner, BindingsInner::Single(_))
-    }
-
-    pub(crate) fn callable_type(&self) -> Type<'db> {
-        self.signatures.callable_type
     }
 
     /// Returns the return type of the call. For successful calls, this is the actual return type.
@@ -157,7 +153,7 @@ impl<'db> Bindings<'db> {
                 node,
                 format_args!(
                     "Object of type `{}` is not callable",
-                    self.signatures.callable_type.display(context.db())
+                    self.callable_type.display(context.db())
                 ),
             );
             return;
@@ -189,7 +185,9 @@ impl<'db> Bindings<'db> {
 /// [overloads]: https://github.com/python/typing/pull/1839
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct CallableBinding<'db> {
-    pub(crate) signature: &'db CallableSignature<'db>,
+    pub(crate) callable_type: Type<'db>,
+    pub(crate) signature_type: Type<'db>,
+    pub(crate) dunder_call_is_possibly_unbound: bool,
     inner: CallableBindingInner<'db>,
 }
 
@@ -207,12 +205,14 @@ impl<'db> CallableBinding<'db> {
     /// all parameters, and any errors resulting from binding the call.
     fn bind(
         db: &'db dyn Db,
-        signature: &'db CallableSignature<'db>,
+        signature: &CallableSignature<'db>,
         arguments: &CallArguments<'_, 'db>,
     ) -> Self {
         if !signature.is_callable() {
             return CallableBinding {
-                signature,
+                callable_type: signature.callable_type,
+                signature_type: signature.signature_type,
+                dunder_call_is_possibly_unbound: signature.dunder_call_is_possibly_unbound,
                 inner: CallableBindingInner::NotCallable,
             };
         }
@@ -228,7 +228,9 @@ impl<'db> CallableBinding<'db> {
         if let Some(single) = signature.as_single() {
             let binding = Binding::bind(db, single, arguments.as_ref());
             return CallableBinding {
-                signature,
+                callable_type: signature.callable_type,
+                signature_type: signature.signature_type,
+                dunder_call_is_possibly_unbound: signature.dunder_call_is_possibly_unbound,
                 inner: CallableBindingInner::Single(binding),
             };
         }
@@ -244,7 +246,9 @@ impl<'db> CallableBinding<'db> {
             .map(|signature| Binding::bind(db, signature, arguments.as_ref()))
             .collect();
         CallableBinding {
-            signature,
+            callable_type: signature.callable_type,
+            signature_type: signature.signature_type,
+            dunder_call_is_possibly_unbound: signature.dunder_call_is_possibly_unbound,
             inner: CallableBindingInner::Overloaded(overloads),
         }
     }
@@ -274,7 +278,7 @@ impl<'db> CallableBinding<'db> {
             return Err(CallErrorKind::BindingError);
         }
 
-        if self.signature.dunder_call_is_possibly_unbound {
+        if self.dunder_call_is_possibly_unbound {
             return Err(CallErrorKind::PossiblyNotCallable);
         }
 
@@ -331,26 +335,25 @@ impl<'db> CallableBinding<'db> {
                 node,
                 format_args!(
                     "Object of type `{}` is not callable",
-                    self.signature.callable_type.display(context.db()),
+                    self.callable_type.display(context.db()),
                 ),
             );
             return;
         }
 
-        if self.signature.dunder_call_is_possibly_unbound {
+        if self.dunder_call_is_possibly_unbound {
             context.report_lint(
                 &CALL_NON_CALLABLE,
                 node,
                 format_args!(
                     "Object of type `{}` is not callable (possibly unbound `__call__` method)",
-                    self.signature.callable_type.display(context.db()),
+                    self.callable_type.display(context.db()),
                 ),
             );
             return;
         }
 
-        let callable_description =
-            CallableDescription::new(context.db(), self.signature.callable_type);
+        let callable_description = CallableDescription::new(context.db(), self.callable_type);
         if self.overloads().len() > 1 {
             context.report_lint(
                 &NO_MATCHING_OVERLOAD,
@@ -367,13 +370,12 @@ impl<'db> CallableBinding<'db> {
             return;
         }
 
-        let callable_description =
-            CallableDescription::new(context.db(), self.signature.signature_type);
+        let callable_description = CallableDescription::new(context.db(), self.signature_type);
         for overload in self.overloads() {
             overload.report_diagnostics(
                 context,
                 node,
-                self.signature.signature_type,
+                self.signature_type,
                 callable_description.as_ref(),
             );
         }
