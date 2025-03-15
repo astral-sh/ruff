@@ -1339,7 +1339,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             .iter_non_variadic_params()
             .filter_map(|param| param.default.as_deref())
         {
-            self.infer_expression(default);
+            self.infer_standalone_expression(default);
         }
 
         // If there are type params, parameters and returns are evaluated in that scope, that is, in
@@ -1464,7 +1464,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = parameter_with_default;
         let default_ty = default
             .as_ref()
-            .map(|default| self.file_expression_type(default));
+            .map(|default| infer_expression_type(self.db(), self.index.expression(&**default)));
         if let Some(annotation) = parameter.annotation.as_ref() {
             let declared_ty = self.file_expression_type(annotation);
             let declared_and_inferred_ty = if let Some(default_ty) = default_ty {
@@ -3762,8 +3762,14 @@ impl<'db> TypeInferenceBuilder<'db> {
         let ast::ExprLambda {
             range: _,
             parameters,
-            body: _,
+            body,
         } = lambda_expression;
+
+        let mut default_type = |parameter: &ast::ParameterWithDefault| {
+            parameter
+                .default()
+                .map(|default| self.infer_standalone_expression(default))
+        };
 
         let parameters = if let Some(parameters) = parameters {
             let positional_only = parameters
@@ -3774,9 +3780,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         Some(parameter.name().id.clone()),
                         None,
                         ParameterKind::PositionalOnly {
-                            default_ty: parameter
-                                .default()
-                                .map(|default| self.infer_expression(default)),
+                            default_ty: default_type(parameter),
                         },
                     )
                 })
@@ -3789,9 +3793,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         Some(parameter.name().id.clone()),
                         None,
                         ParameterKind::PositionalOrKeyword {
-                            default_ty: parameter
-                                .default()
-                                .map(|default| self.infer_expression(default)),
+                            default_ty: default_type(parameter),
                         },
                     )
                 })
@@ -3811,9 +3813,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         Some(parameter.name().id.clone()),
                         None,
                         ParameterKind::KeywordOnly {
-                            default_ty: parameter
-                                .default()
-                                .map(|default| self.infer_expression(default)),
+                            default_ty: default_type(parameter),
                         },
                     )
                 })
@@ -3840,7 +3840,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         Type::Callable(CallableType::General(GeneralCallableType::new(
             self.db(),
-            Signature::new(parameters, Some(todo_type!("lambda return type"))),
+            Signature::new(parameters, Some(self.file_expression_type(body))),
         )))
     }
 
