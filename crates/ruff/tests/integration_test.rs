@@ -950,15 +950,40 @@ fn rule_invalid_rule_name() {
 #[test]
 fn show_statistics() {
     let mut cmd = RuffCheck::default()
-        .args(["--select", "F401", "--statistics"])
+        .args(["--select", "C416", "--statistics"])
         .build();
     assert_cmd_snapshot!(cmd
-        .pass_stdin("import sys\nimport os\n\nprint(os.getuid())\n"), @r"
+                         .pass_stdin(r#"
+def mvce(keys, values):
+    return {key: value for key, value in zip(keys, values)}
+"#), @r"
     success: false
     exit_code: 1
     ----- stdout -----
-    1	F401	[*] unused-import
-    [*] fixable with `ruff check --fix`
+    1	C416	unnecessary-comprehension
+    Found 1 error.
+    No fixes available (1 hidden fix can be enabled with the `--unsafe-fixes` option).
+
+    ----- stderr -----
+    ");
+}
+
+#[test]
+fn show_statistics_unsafe_fixes() {
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "C416", "--statistics", "--unsafe-fixes"])
+        .build();
+    assert_cmd_snapshot!(cmd
+                         .pass_stdin(r#"
+def mvce(keys, values):
+    return {key: value for key, value in zip(keys, values)}
+"#), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    1	C416	[*] unnecessary-comprehension
+    Found 1 error.
+    [*] 1 fixable with the --fix option.
 
     ----- stderr -----
     ");
@@ -969,21 +994,57 @@ fn show_statistics_json() {
     let mut cmd = RuffCheck::default()
         .args([
             "--select",
-            "F401",
+            "C416",
             "--statistics",
             "--output-format",
             "json",
         ])
         .build();
     assert_cmd_snapshot!(cmd
-        .pass_stdin("import sys\nimport os\n\nprint(os.getuid())\n"), @r#"
+        .pass_stdin(r#"
+def mvce(keys, values):
+    return {key: value for key, value in zip(keys, values)}
+"#), @r#"
     success: false
     exit_code: 1
     ----- stdout -----
     [
       {
-        "code": "F401",
-        "name": "unused-import",
+        "code": "C416",
+        "name": "unnecessary-comprehension",
+        "count": 1,
+        "fixable": false
+      }
+    ]
+
+    ----- stderr -----
+    "#);
+}
+
+#[test]
+fn show_statistics_json_unsafe_fixes() {
+    let mut cmd = RuffCheck::default()
+        .args([
+            "--select",
+            "C416",
+            "--statistics",
+            "--unsafe-fixes",
+            "--output-format",
+            "json",
+        ])
+        .build();
+    assert_cmd_snapshot!(cmd
+        .pass_stdin(r#"
+def mvce(keys, values):
+    return {key: value for key, value in zip(keys, values)}
+"#), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    [
+      {
+        "code": "C416",
+        "name": "unnecessary-comprehension",
         "count": 1,
         "fixable": true
       }
