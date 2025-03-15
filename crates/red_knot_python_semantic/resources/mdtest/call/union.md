@@ -40,7 +40,7 @@ def _(flag: bool):
         def f() -> int:
             return 1
     x = f()  # error: [call-non-callable] "Object of type `Literal[1]` is not callable"
-    reveal_type(x)  # revealed: int | Unknown
+    reveal_type(x)  # revealed: Unknown | int
 ```
 
 ## Multiple non-callable elements in a union
@@ -58,7 +58,7 @@ def _(flag: bool, flag2: bool):
             return 1
     # TODO we should mention all non-callable elements of the union
     # error: [call-non-callable] "Object of type `Literal[1]` is not callable"
-    # revealed: int | Unknown
+    # revealed: Unknown | int
     reveal_type(f())
 ```
 
