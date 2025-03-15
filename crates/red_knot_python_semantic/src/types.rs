@@ -3170,12 +3170,9 @@ impl<'db> Type<'db> {
                 Ok(ty)
             }
             Type::SubclassOf(_)
-            | Type::BooleanLiteral(_)
-            | Type::BytesLiteral(_)
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy
             | Type::SliceLiteral(_)
-            | Type::IntLiteral(_)
             | Type::LiteralString
             | Type::ModuleLiteral(_)
             | Type::StringLiteral(_)
@@ -3260,6 +3257,24 @@ impl<'db> Type<'db> {
             Type::KnownInstance(KnownInstanceType::Final) => Err(InvalidTypeExpressionError {
                 invalid_expressions: smallvec::smallvec![
                     InvalidTypeExpression::FinalInTypeExpression
+                ],
+                fallback_type: Type::unknown(),
+            }),
+            Type::BooleanLiteral(_) => Err(InvalidTypeExpressionError {
+                invalid_expressions: smallvec::smallvec![
+                    InvalidTypeExpression::BooleanLiteralInTypeExpression
+                ],
+                fallback_type: Type::unknown(),
+            }),
+            Type::IntLiteral(_) => Err(InvalidTypeExpressionError {
+                invalid_expressions: smallvec::smallvec![
+                    InvalidTypeExpression::NumberLiteralInTypeExpression
+                ],
+                fallback_type: Type::unknown(),
+            }),
+            Type::BytesLiteral(_) => Err(InvalidTypeExpressionError {
+                invalid_expressions: smallvec::smallvec![
+                    InvalidTypeExpression::BytesLiteralInTypeExpression
                 ],
                 fallback_type: Type::unknown(),
             }),
@@ -3555,6 +3570,12 @@ enum InvalidTypeExpression<'db> {
     ClassVarInTypeExpression,
     /// The `Final` type qualifier was used in a type expression
     FinalInTypeExpression,
+    /// Bytes Literal is not allowed in type expressions
+    BytesLiteralInTypeExpression,
+    /// Number Literal is not allowed in type expressions
+    NumberLiteralInTypeExpression,
+    /// Boolean Literal is not allowed in type expressions
+    BooleanLiteralInTypeExpression,
     /// Some types are always invalid in type expressions
     InvalidType(Type<'db>),
 }
@@ -3580,6 +3601,15 @@ impl<'db> InvalidTypeExpression<'db> {
                     ),
                     InvalidTypeExpression::FinalInTypeExpression => f.write_str(
                         "Type qualifier `typing.Final` is not allowed in type expressions (only in annotation expressions)"
+                    ),
+                    InvalidTypeExpression::BytesLiteralInTypeExpression => f.write_str(
+                        "Bytes Literal is not allowed in type expressions"
+                    ),
+                    InvalidTypeExpression::NumberLiteralInTypeExpression => f.write_str(
+                        "Number Literal is not allowed in type expressions"
+                    ),
+                    InvalidTypeExpression::BooleanLiteralInTypeExpression => f.write_str(
+                        "Boolean Literal is not allowed in type expressions"
                     ),
                     InvalidTypeExpression::InvalidType(ty) => write!(
                         f,
