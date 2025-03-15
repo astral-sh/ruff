@@ -134,3 +134,103 @@ pub(crate) fn banned_relative_import(
         None
     }
 }
+
+/// ## What it does
+/// Requires relative imports for siblings
+///
+/// ## Why is this bad?
+/// Absolute imports, or relative imports from siblings, are recommended by [PEP 8]:
+///
+/// > Absolute imports are recommended, as they are usually more readable and tend to be better behaved...
+/// > ```python
+/// > import mypkg.sibling
+/// > from mypkg import sibling
+/// > from mypkg.sibling import example
+/// > ```
+/// > However, explicit relative imports are an acceptable alternative to absolute imports,
+/// > especially when dealing with complex package layouts where using absolute imports would be
+/// > unnecessarily verbose:
+/// > ```python
+/// > from . import sibling
+/// > from .sibling import example
+/// > ```
+///
+///
+/// ## Options
+/// - `lint.flake8-tidy-imports.relative-sibling-imports`
+///
+/// ## Example
+/// ```python
+/// from mypkg import foo
+/// ```
+///
+/// Use instead:
+/// ```python
+/// from . import foo
+/// ```
+///
+/// [PEP 8]: https://peps.python.org/pep-0008/#imports
+#[derive(ViolationMetadata)]
+pub(crate) struct RelativeSiblingImports;
+
+impl Violation for RelativeSiblingImports {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Always;
+
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        "Relative imports for sibling modules are required".to_string()
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        Some("Replace absolute sibling imports with relative imports".to_string())
+    }
+}
+
+fn fix_relative_sibling_import(
+    stmt: &Stmt,
+    module: Option<&str>,
+    pkg: &str,
+    generator: Generator,
+) -> Fix {
+    let Stmt::ImportFrom(ast::StmtImportFrom { names, .. }) = stmt else {
+        panic!("Expected Stmt::ImportFrom");
+    };
+    let prefix = format!("{pkg}.");
+    let new_module = module
+        .unwrap()
+        .strip_prefix(prefix.as_str())
+        .map(String::from);
+    let node = ast::StmtImportFrom {
+        module: new_module.map(|name| Identifier::new(name, TextRange::default())),
+        names: names.clone(),
+        level: 1,
+        range: TextRange::default(),
+    };
+    let content = generator.stmt(&node.into());
+
+    Fix::safe_edit(Edit::range_replacement(content, stmt.range()))
+}
+
+/// TID254
+pub(crate) fn relative_sibling_imports(
+    checker: &Checker,
+    stmt: &Stmt,
+    level: u32,
+    module: Option<&str>,
+    module_path: Option<&[String]>,
+) -> Option<Diagnostic> {
+    if let Some(mods) = &module_path {
+        let pkg = mods[..mods.len() - 1].join(".");
+        if level == 0 && module.unwrap().starts_with(pkg.as_str()) {
+            let mut diagnostic = Diagnostic::new(RelativeSiblingImports {}, stmt.range());
+            diagnostic.set_fix(fix_relative_sibling_import(
+                stmt,
+                module,
+                pkg.as_str(),
+                checker.generator(),
+            ));
+            return Some(diagnostic);
+        }
+    }
+    None
+}

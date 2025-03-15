@@ -1446,6 +1446,13 @@
           "items": {
             "type": "string"
           }
+        },
+        "relative-sibling-imports": {
+          "description": "Whether to require sibling imports to be relative imports. To be used with `ban-relative-imports = \"parents\"`.",
+          "type": [
+            "boolean",
+            "null"
+          ]
         }
       },
       "additionalProperties": false
@@ -4215,6 +4222,7 @@
         "TID251",
         "TID252",
         "TID253",
+        "TID254",
         "TRY",
         "TRY0",
         "TRY00",
