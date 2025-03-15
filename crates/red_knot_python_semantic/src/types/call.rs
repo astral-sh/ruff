@@ -9,6 +9,8 @@ pub(super) use bind::Bindings;
 
 /// Wraps a [`Bindings`] for an unsuccessful call with information about why the call was
 /// unsuccessful.
+///
+/// The bindings are boxed so that we do not pass around large `Err` variants on the stack.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct CallError<'db>(pub(crate) CallErrorKind, pub(crate) Box<Bindings<'db>>);
 
