@@ -58,10 +58,11 @@ impl<'db> Signatures<'db> {
     where
         I: IntoIterator<Item = &'db Signatures<'db>>,
     {
-        let elements = elements
+        let elements: Vec<_> = elements
             .into_iter()
             .flat_map(|s| s.elements.iter().cloned())
             .collect();
+        assert!(!elements.is_empty());
         Self {
             callable_type,
             signature_type,
