@@ -1394,6 +1394,27 @@ def _(ns: argparse.Namespace):
     reveal_type(ns.whatever)  # revealed: Any
 ```
 
+## Classes with custom `__setattr__` methods
+
+### Basic
+
+If a type provides a custom `__setattr__` method, we use the parameter type of that method as the
+type to validate attribute assignments. Consider the following `CustomSetAttr` class:
+
+```py
+class CustomSetAttr:
+    def __setattr__(self, name: str, value: int) -> None:
+        pass
+```
+
+We can set arbitrary attributes on instances of this class:
+
+```py
+c = CustomSetAttr()
+
+c.whatever = 42
+```
+
 ## Objects of all types have a `__class__` method
 
 The type of `x.__class__` is the same as `x`'s meta-type. `x.__class__` is always the same value as
