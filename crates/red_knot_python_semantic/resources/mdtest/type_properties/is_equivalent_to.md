@@ -118,4 +118,51 @@ class R: ...
 static_assert(is_equivalent_to(Intersection[tuple[P | Q], R], Intersection[tuple[Q | P], R]))
 ```
 
+## Callable
+
+```py
+from typing import Callable
+from knot_extensions import CallableTypeFromFunction, is_equivalent_to, static_assert
+
+def c1() -> None: ...
+
+static_assert(is_equivalent_to(CallableTypeFromFunction[c1], Callable[[], None]))
+```
+
+Two callable types with the same signature but different parameter names are not equivalent.
+
+```py
+def f1(a: int) -> int:
+    return 1
+
+def f2(b: int) -> int:
+    return 1
+
+static_assert(not is_equivalent_to(CallableTypeFromFunction[f1], CallableTypeFromFunction[f2]))
+```
+
+Neither when only one of the callable types has parameter names.
+
+```py
+static_assert(not is_equivalent_to(CallableTypeFromFunction[f1], Callable[[int], int]))
+```
+
+If the default values of the same parameters are different, the types are not equivalent.
+
+```py
+def f3(a: int = 1) -> int:
+    return 1
+
+def f4(a: int = 2) -> int:
+    return 1
+
+static_assert(not is_equivalent_to(CallableTypeFromFunction[f3], CallableTypeFromFunction[f4]))
+```
+
+Neither when only one of the callable types has default values.
+
+```py
+static_assert(not is_equivalent_to(CallableTypeFromFunction[f1], CallableTypeFromFunction[f3]))
+```
+
 [the equivalence relation]: https://typing.readthedocs.io/en/latest/spec/glossary.html#term-equivalent
