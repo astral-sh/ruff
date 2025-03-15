@@ -452,6 +452,14 @@ pub enum StarTupleKind {
     Yield,
 }
 
+/// The type of PEP 701 f-string error for [`UnsupportedSyntaxErrorKind::Pep701FString`].
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
+pub enum FStringKind {
+    Backslash,
+    Comment,
+    NestedQuote,
+}
+
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum UnparenthesizedNamedExprKind {
     SequenceIndex,
@@ -661,6 +669,34 @@ pub enum UnsupportedSyntaxErrorKind {
     TypeAliasStatement,
     TypeParamDefault,
 
+    /// Represents the use of a [PEP 701] f-string before Python 3.12.
+    ///
+    /// ## Examples
+    ///
+    /// As described in the PEP, each of these cases were invalid before Python 3.12:
+    ///
+    /// ```python
+    /// # nested quotes
+    /// f'Magic wand: { bag['wand'] }'
+    ///
+    /// # escape characters
+    /// f"{'\n'.join(a)}"
+    ///
+    /// # comments
+    /// f'''A complex trick: {
+    ///     bag['bag']  # recursive bags!
+    /// }'''
+    ///
+    /// # arbitrary nesting
+    /// f"{f"{f"{f"{f"{f"{1+1}"}"}"}"}"}"
+    /// ```
+    ///
+    /// These restrictions were lifted in Python 3.12, meaning that all of these examples are now
+    /// valid.
+    ///
+    /// [PEP 701]: https://peps.python.org/pep-0701/
+    Pep701FString(FStringKind),
+
     /// Represents the use of a [PEP 646] star expression in an index.
     ///
     /// ## Examples
@@ -777,6 +813,15 @@ impl Display for UnsupportedSyntaxError {
             UnsupportedSyntaxErrorKind::TypeParamDefault => {
                 "Cannot set default type for a type parameter"
             }
+            UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::Backslash) => {
+                "Cannot use an escape sequence (backslash) in f-strings"
+            }
+            UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::Comment) => {
+                "Cannot use comments in f-strings"
+            }
+            UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::NestedQuote) => {
+                "Cannot reuse outer quote character in f-strings"
+            }
             UnsupportedSyntaxErrorKind::StarExpressionInIndex => {
                 "Cannot use star expression in index"
             }
@@ -832,6 +877,7 @@ impl UnsupportedSyntaxErrorKind {
             UnsupportedSyntaxErrorKind::TypeParameterList => Change::Added(PythonVersion::PY312),
             UnsupportedSyntaxErrorKind::TypeAliasStatement => Change::Added(PythonVersion::PY312),
             UnsupportedSyntaxErrorKind::TypeParamDefault => Change::Added(PythonVersion::PY313),
+            UnsupportedSyntaxErrorKind::Pep701FString(_) => Change::Added(PythonVersion::PY312),
             UnsupportedSyntaxErrorKind::StarExpressionInIndex => {
                 Change::Added(PythonVersion::PY311)
             }
