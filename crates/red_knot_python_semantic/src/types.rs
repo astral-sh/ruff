@@ -9,7 +9,7 @@ use ruff_db::files::File;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ruff_text_size::{Ranged, TextRange};
-use type_ordering::union_elements_ordering;
+use type_ordering::union_or_intersection_elements_ordering;
 
 pub(crate) use self::builder::{IntersectionBuilder, UnionBuilder};
 pub(crate) use self::diagnostic::register_lints;
@@ -4947,7 +4947,7 @@ impl<'db> UnionType<'db> {
             .iter()
             .map(|element| element.with_sorted_unions(db))
             .collect();
-        new_elements.sort_unstable_by(union_elements_ordering);
+        new_elements.sort_unstable_by(|l, r| union_or_intersection_elements_ordering(l, r, db));
         UnionType::new(db, new_elements.into_boxed_slice())
     }
 
@@ -5051,7 +5051,7 @@ impl<'db> IntersectionType<'db> {
                 .map(|ty| ty.with_sorted_unions(db))
                 .collect();
 
-            elements.sort_unstable_by(union_elements_ordering);
+            elements.sort_unstable_by(|l, r| union_or_intersection_elements_ordering(l, r, db));
             elements
         }
 
