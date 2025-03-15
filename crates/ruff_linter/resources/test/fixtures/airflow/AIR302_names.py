@@ -44,6 +44,7 @@ from airflow.hooks.base_hook import BaseHook
 from airflow.lineage.hook import DatasetLineageInfo
 from airflow.listeners.spec.dataset import on_dataset_changed, on_dataset_created
 from airflow.metrics.validators import AllowListValidator, BlockListValidator
+from airflow.models.baseoperator import chain, chain_linear, cross_downstream
 from airflow.operators import dummy_operator
 from airflow.operators.branch_operator import BaseBranchOperator
 from airflow.operators.dagrun_operator import TriggerDagRunLink, TriggerDagRunOperator
