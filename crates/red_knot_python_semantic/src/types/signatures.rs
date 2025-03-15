@@ -12,7 +12,6 @@
 
 use super::{definition_expression_type, DynamicType, Type};
 use crate::semantic_index::definition::Definition;
-use crate::symbol::Boundness;
 use crate::types::todo_type;
 use crate::Db;
 use ruff_python_ast::{self as ast, name::Name};
@@ -81,9 +80,9 @@ impl<'db> Signatures<'db> {
         self.elements.iter()
     }
 
-    pub(crate) fn set_dunder_call_boundness(&mut self, boundness: Boundness) {
+    pub(crate) fn set_dunder_call_is_possibly_unbound(&mut self) {
         for signature in &mut self.elements {
-            signature.dunder_call_boundness = Some(boundness);
+            signature.dunder_call_is_possibly_unbound = true;
         }
     }
 }
@@ -102,7 +101,7 @@ pub(crate) struct CallableSignature<'db> {
 
     /// If this is a callable object (i.e. called via a `__call__` method), the boundness of
     /// that call method.
-    pub(crate) dunder_call_boundness: Option<Boundness>,
+    pub(crate) dunder_call_is_possibly_unbound: bool,
 
     /// The type of the bound `self` or `cls` parameter if this signature is for a bound method.
     pub(crate) bound_type: Option<Type<'db>>,
@@ -117,7 +116,7 @@ impl<'db> CallableSignature<'db> {
         Self {
             callable_type,
             signature_type,
-            dunder_call_boundness: None,
+            dunder_call_is_possibly_unbound: false,
             bound_type: None,
             overloads: vec![],
         }
@@ -131,7 +130,7 @@ impl<'db> CallableSignature<'db> {
         Self {
             callable_type,
             signature_type,
-            dunder_call_boundness: None,
+            dunder_call_is_possibly_unbound: false,
             bound_type: None,
             overloads: vec![signature],
         }
@@ -150,7 +149,7 @@ impl<'db> CallableSignature<'db> {
         Self {
             callable_type,
             signature_type,
-            dunder_call_boundness: None,
+            dunder_call_is_possibly_unbound: false,
             bound_type: None,
             overloads: overloads.into_iter().collect(),
         }

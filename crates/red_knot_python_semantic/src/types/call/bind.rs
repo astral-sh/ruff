@@ -10,7 +10,6 @@ use super::{
     Signatures, Type,
 };
 use crate::db::Db;
-use crate::symbol::Boundness;
 use crate::types::diagnostic::{
     CALL_NON_CALLABLE, INVALID_ARGUMENT_TYPE, MISSING_ARGUMENT, NO_MATCHING_OVERLOAD,
     PARAMETER_ALREADY_ASSIGNED, TOO_MANY_POSITIONAL_ARGUMENTS, UNKNOWN_ARGUMENT,
@@ -275,7 +274,7 @@ impl<'db> CallableBinding<'db> {
             return Err(CallErrorKind::BindingError);
         }
 
-        if self.dunder_is_possibly_unbound() {
+        if self.signature.dunder_call_is_possibly_unbound {
             return Err(CallErrorKind::PossiblyNotCallable);
         }
 
@@ -290,15 +289,6 @@ impl<'db> CallableBinding<'db> {
     /// overloads, they must _all_ have errors.
     pub(crate) fn has_binding_errors(&self) -> bool {
         self.matching_overload().is_none()
-    }
-
-    /// Returns whether this binding is for an object that is callable via a `__call__` method that
-    /// is possibly unbound.
-    pub(crate) const fn dunder_is_possibly_unbound(&self) -> bool {
-        matches!(
-            self.signature.dunder_call_boundness,
-            Some(Boundness::PossiblyUnbound)
-        )
     }
 
     /// Returns the overload that matched for this call binding. Returns `None` if none of the
@@ -347,7 +337,7 @@ impl<'db> CallableBinding<'db> {
             return;
         }
 
-        if self.dunder_is_possibly_unbound() {
+        if self.signature.dunder_call_is_possibly_unbound {
             context.report_lint(
                 &CALL_NON_CALLABLE,
                 node,

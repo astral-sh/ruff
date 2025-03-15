@@ -2610,7 +2610,9 @@ impl<'db> Type<'db> {
                     return Signatures::not_callable(callable_ty, self);
                 };
                 let mut signatures = signatures.clone();
-                signatures.set_dunder_call_boundness(boundness);
+                if boundness == Boundness::PossiblyUnbound {
+                    signatures.set_dunder_call_is_possibly_unbound();
+                }
                 signatures
             }
 
