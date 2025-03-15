@@ -15,7 +15,7 @@ use crate::types::diagnostic::{
     PARAMETER_ALREADY_ASSIGNED, TOO_MANY_POSITIONAL_ARGUMENTS, UNKNOWN_ARGUMENT,
 };
 use crate::types::signatures::Parameter;
-use crate::types::{CallableType, UnionBuilder, UnionType};
+use crate::types::{CallableType, UnionType};
 use ruff_db::diagnostic::{OldSecondaryDiagnosticMessage, Span};
 use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
@@ -78,7 +78,7 @@ impl<'db> Bindings<'db> {
         match &self.inner {
             BindingsInner::Single(binding) => binding.return_type(),
             BindingsInner::Union(bindings) => {
-                UnionType::from_elements(db, bindings.iter().map(|b| b.return_type()))
+                UnionType::from_elements(db, bindings.iter().map(CallableBinding::return_type))
             }
         }
     }
