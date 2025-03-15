@@ -2650,11 +2650,12 @@ impl<'db> Type<'db> {
             // For certain known callables, we have special-case logic to determine the return type
             // in a way that isn't directly expressible in the type system. Each special case
             // listed here should have a corresponding clause above in `signatures`.
+            let binding_type = binding.callable_type;
             let Some((overload_index, overload)) = binding.matching_overload_mut() else {
                 continue;
             };
 
-            match self {
+            match binding_type {
                 Type::Callable(CallableType::MethodWrapperDunderGet(function)) => {
                     if function.has_known_class_decorator(db, KnownClass::Classmethod)
                         && function.decorators(db).len() == 1

@@ -148,3 +148,16 @@ def _(flag: bool):
     x = f(3)
     reveal_type(x)  # revealed: Unknown
 ```
+
+## Union including a special-cased function
+
+```py
+def _(flag: bool):
+    if flag:
+        f = str
+    else:
+        f = repr
+    reveal_type(str("string"))  # revealed: Literal["string"]
+    reveal_type(repr("string"))  # revealed: Literal["'string'"]
+    reveal_type(f("string"))  # revealed: Literal["string", "'string'"]
+```
