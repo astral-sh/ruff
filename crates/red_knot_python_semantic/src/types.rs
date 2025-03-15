@@ -2669,17 +2669,13 @@ impl<'db> Type<'db> {
                                 BoundMethodType::new(db, function, instance.to_meta_type(db)),
                             )));
                         }
-                    } else {
-                        if let Some(first) = arguments.first_argument() {
-                            if first.is_none(db) {
-                                overload.set_return_type(Type::FunctionLiteral(function));
-                            } else {
-                                overload.set_return_type(Type::Callable(
-                                    CallableType::BoundMethod(BoundMethodType::new(
-                                        db, function, first,
-                                    )),
-                                ));
-                            }
+                    } else if let Some(first) = arguments.first_argument() {
+                        if first.is_none(db) {
+                            overload.set_return_type(Type::FunctionLiteral(function));
+                        } else {
+                            overload.set_return_type(Type::Callable(CallableType::BoundMethod(
+                                BoundMethodType::new(db, function, first),
+                            )));
                         }
                     }
                 }
