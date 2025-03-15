@@ -15,14 +15,18 @@ pub(super) struct CallError<'db>(pub(super) CallErrorKind, pub(super) Box<Bindin
 /// The reason why calling a type failed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum CallErrorKind {
-    /// The type is not callable.
+    /// The type is not callable. For a union type, _none_ of the union elements are callable.
     NotCallable,
 
-    /// The type is callable but not with the given arguments.
+    /// The type is not callable with the given arguments.
+    ///
+    /// `BindingError` takes precedence over `PossiblyNotCallable`: for a union type, there might
+    /// be some union elements that are not callable at all, but the call arguments are not
+    /// compatible with at least one of the callable elements.
     BindingError,
 
-    /// The type is possibly not callable, but there are no binding errors in the situations where
-    /// it is callable.
+    /// Not all of the elements of a union type are callable, but the call arguments are compatible
+    /// with all of the callable elements.
     PossiblyNotCallable,
 }
 
