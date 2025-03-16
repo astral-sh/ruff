@@ -47,8 +47,8 @@ def _(c: Callable[42, str]):
 Or, when one of the parameter type is invalid in the list:
 
 ```py
-# error: [invalid-type-form] "Number Literal is not allowed in type expressions"
-# error: [invalid-type-form] "Boolean Literal is not allowed in type expressions"
+# error: [invalid-type-form] "Int literals are not allowed in type expressions"
+# error: [invalid-type-form] "Boolean literals are not allowed in type expressions"
 def _(c: Callable[[int, 42, str, False], None]):
     # revealed: (int, Unknown, str, Unknown, /) -> None
     reveal_type(c)
