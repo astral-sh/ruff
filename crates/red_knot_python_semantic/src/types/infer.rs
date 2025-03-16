@@ -6133,7 +6133,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 self.context.report_lint(
                     &INVALID_TYPE_FORM,
                     expression,
-                    format_args!("Number Literal is not allowed in type expressionsss"),
+                    format_args!("Number Literal is not allowed in type expressions"),
                 );
                 Type::unknown()
             }

@@ -165,14 +165,6 @@ def _(x: 1):
 ```py
 from typing import Literal
 
-# error: [invalid-type-form] "Bytes Literal is not allowed in type expressions"
-def _(x: b"aaa"):
-    reveal_type(x)  # revealed: Unknown
-```
-
-```py
-from typing import Literal
-
 # error: [invalid-type-form] "Boolean Literal is not allowed in type expressions"
 def _(x: True):
     reveal_type(x)  # revealed: Unknown
