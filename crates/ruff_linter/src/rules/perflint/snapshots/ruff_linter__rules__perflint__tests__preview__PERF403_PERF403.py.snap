@@ -129,25 +129,26 @@ PERF403.py:85:9: PERF403 [*] Use a dictionary comprehension instead of a for-loo
 87 85 | 
 88 86 | def foo():
 
-PERF403.py:94:9: PERF403 [*] Use `dict.update` instead of a for-loop
+PERF403.py:94:9: PERF403 [*] Use a dictionary comprehension instead of a for-loop
    |
 92 |     result = SneakyDict()
 93 |     for idx, name in enumerate(fruit):
 94 |         result[name] = idx  # PERF403
    |         ^^^^^^^^^^^^^^^^^^ PERF403
    |
-   = help: Replace for loop with `dict.update`
+   = help: Replace for loop with dict comprehension
 
 ℹ Unsafe fix
+89 89 |     from builtins import dict as SneakyDict
 90 90 | 
 91 91 |     fruit = ["apple", "pear", "orange"]
-92 92 |     result = SneakyDict()
+92    |-    result = SneakyDict()
 93    |-    for idx, name in enumerate(fruit):
 94    |-        result[name] = idx  # PERF403
-   93 |+    result.update({name: idx for idx, name in enumerate(fruit)})  # PERF403
-95 94 | 
-96 95 | 
-97 96 | def foo():
+   92 |+    result = {name: idx for idx, name in enumerate(fruit)}  # PERF403
+95 93 | 
+96 94 | 
+97 95 | def foo():
 
 PERF403.py:106:9: PERF403 [*] Use a dictionary comprehension instead of a for-loop
     |

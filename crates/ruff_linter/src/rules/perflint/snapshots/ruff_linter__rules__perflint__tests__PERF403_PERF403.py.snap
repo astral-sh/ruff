@@ -55,14 +55,14 @@ PERF403.py:85:9: PERF403 Use a dictionary comprehension instead of a for-loop
    |
    = help: Replace for loop with dict comprehension
 
-PERF403.py:94:9: PERF403 Use `dict.update` instead of a for-loop
+PERF403.py:94:9: PERF403 Use a dictionary comprehension instead of a for-loop
    |
 92 |     result = SneakyDict()
 93 |     for idx, name in enumerate(fruit):
 94 |         result[name] = idx  # PERF403
    |         ^^^^^^^^^^^^^^^^^^ PERF403
    |
-   = help: Replace for loop with `dict.update`
+   = help: Replace for loop with dict comprehension
 
 PERF403.py:106:9: PERF403 Use a dictionary comprehension instead of a for-loop
     |
