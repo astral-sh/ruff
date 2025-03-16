@@ -178,7 +178,11 @@ pub(crate) fn verbose_decimal_constructor(checker: &Checker, call: &ast::ExprCal
             let mut replacement = checker.locator().slice(float).to_string();
             // `Decimal(float("-nan")) == Decimal("nan")`
             if trimmed.eq_ignore_ascii_case("-nan") {
-                replacement.remove(replacement.find('-').unwrap());
+                // Here we do not attempt to remove just the '-' character.
+                // It may have been encoded (e.g. as '\N{hyphen-minus}')
+                // in the original source slice, and the added complexity
+                // does not make sense for this edge case.
+                replacement = "\"nan\"".to_string();
             }
             let mut diagnostic = Diagnostic::new(
                 VerboseDecimalConstructor {
