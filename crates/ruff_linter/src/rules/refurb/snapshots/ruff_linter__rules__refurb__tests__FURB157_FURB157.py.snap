@@ -498,6 +498,7 @@ FURB157.py:68:9: FURB157 [*] Verbose expression in `Decimal` constructor
    68 |+Decimal("nan")
 69 69 | Decimal(float("\x20\N{character tabulation}\N{hyphen-minus}nan"))
 70 70 | Decimal(float("   -" "nan"))
+71 71 | Decimal(float("-nAn"))
 
 FURB157.py:69:9: FURB157 [*] Verbose expression in `Decimal` constructor
    |
@@ -506,6 +507,7 @@ FURB157.py:69:9: FURB157 [*] Verbose expression in `Decimal` constructor
 69 | Decimal(float("\x20\N{character tabulation}\N{hyphen-minus}nan"))
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB157
 70 | Decimal(float("   -" "nan"))
+71 | Decimal(float("-nAn"))
    |
    = help: Replace with `"nan"`
 
@@ -516,6 +518,7 @@ FURB157.py:69:9: FURB157 [*] Verbose expression in `Decimal` constructor
 69    |-Decimal(float("\x20\N{character tabulation}\N{hyphen-minus}nan"))
    69 |+Decimal("nan")
 70 70 | Decimal(float("   -" "nan"))
+71 71 | Decimal(float("-nAn"))
 
 FURB157.py:70:9: FURB157 [*] Verbose expression in `Decimal` constructor
    |
@@ -523,6 +526,7 @@ FURB157.py:70:9: FURB157 [*] Verbose expression in `Decimal` constructor
 69 | Decimal(float("\x20\N{character tabulation}\N{hyphen-minus}nan"))
 70 | Decimal(float("   -" "nan"))
    |         ^^^^^^^^^^^^^^^^^^^ FURB157
+71 | Decimal(float("-nAn"))
    |
    = help: Replace with `"nan"`
 
@@ -532,3 +536,20 @@ FURB157.py:70:9: FURB157 [*] Verbose expression in `Decimal` constructor
 69 69 | Decimal(float("\x20\N{character tabulation}\N{hyphen-minus}nan"))
 70    |-Decimal(float("   -" "nan"))
    70 |+Decimal("nan")
+71 71 | Decimal(float("-nAn"))
+
+FURB157.py:71:9: FURB157 [*] Verbose expression in `Decimal` constructor
+   |
+69 | Decimal(float("\x20\N{character tabulation}\N{hyphen-minus}nan"))
+70 | Decimal(float("   -" "nan"))
+71 | Decimal(float("-nAn"))
+   |         ^^^^^^^^^^^^^ FURB157
+   |
+   = help: Replace with `"nan"`
+
+ℹ Safe fix
+68 68 | Decimal(float("\N{space}\N{hyPHen-MINus}nan"))
+69 69 | Decimal(float("\x20\N{character tabulation}\N{hyphen-minus}nan"))
+70 70 | Decimal(float("   -" "nan"))
+71    |-Decimal(float("-nAn"))
+   71 |+Decimal("nan")
