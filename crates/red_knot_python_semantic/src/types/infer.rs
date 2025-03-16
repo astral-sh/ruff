@@ -6146,7 +6146,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             }) => report_invalid_type_expression(format_args!(
                 "Complex literals are not allowed in type expressions"
             )),
-            ast::Expr::BooleanLiteral(_literal) => report_invalid_type_expression(format_args!(
+            ast::Expr::BooleanLiteral(_) => report_invalid_type_expression(format_args!(
                 "Boolean literals are not allowed in type expressions"
             )),
 
