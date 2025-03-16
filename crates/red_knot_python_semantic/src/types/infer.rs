@@ -6088,6 +6088,13 @@ impl<'db> TypeInferenceBuilder<'db> {
     /// Infer the type of a type expression without storing the result.
     fn infer_type_expression_no_store(&mut self, expression: &ast::Expr) -> Type<'db> {
         // https://typing.readthedocs.io/en/latest/spec/annotations.html#grammar-token-expression-grammar-type_expression
+
+        let report_invalid_type_expression = |message: std::fmt::Arguments| {
+            self.context
+                .report_lint(&INVALID_TYPE_FORM, expression, message);
+            Type::unknown()
+        };
+
         match expression {
             ast::Expr::Name(name) => match name.ctx {
                 ast::ExprContext::Load => self
@@ -6118,55 +6125,30 @@ impl<'db> TypeInferenceBuilder<'db> {
                 todo_type!("ellipsis literal in type expression")
             }
 
-            ast::Expr::BytesLiteral(_literal) => {
-                self.context.report_lint(
-                    &INVALID_TYPE_FORM,
-                    expression,
-                    format_args!("Bytes literal is not allowed in type expressions"),
-                );
-                Type::unknown()
-            }
+            ast::Expr::BytesLiteral(_literal) => report_invalid_type_expression(format_args!(
+                "Bytes literals are not allowed in type expressions"
+            )),
             ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
                 value: ast::Number::Int(_),
                 ..
-            }) => {
-                self.context.report_lint(
-                    &INVALID_TYPE_FORM,
-                    expression,
-                    format_args!("Int literal is not allowed in type expressions"),
-                );
-                Type::unknown()
-            }
+            }) => report_invalid_type_expression(format_args!(
+                "Int literals are not allowed in type expressions"
+            )),
             ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
                 value: ast::Number::Float(_),
                 ..
-            }) => {
-                self.context.report_lint(
-                    &INVALID_TYPE_FORM,
-                    expression,
-                    format_args!("Float literal is not allowed in type expressions"),
-                );
-                Type::unknown()
-            }
+            }) => report_invalid_type_expression(format_args!(
+                "Float literals are not allowed in type expressions"
+            )),
             ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
                 value: ast::Number::Complex { .. },
                 ..
-            }) => {
-                self.context.report_lint(
-                    &INVALID_TYPE_FORM,
-                    expression,
-                    format_args!("Complex literal is not allowed in type expressions"),
-                );
-                Type::unknown()
-            }
-            ast::Expr::BooleanLiteral(_literal) => {
-                self.context.report_lint(
-                    &INVALID_TYPE_FORM,
-                    expression,
-                    format_args!("Boolean literal is not allowed in type expressions"),
-                );
-                Type::unknown()
-            }
+            }) => report_invalid_type_expression(format_args!(
+                "Complex literals are not allowed in type expressions"
+            )),
+            ast::Expr::BooleanLiteral(_literal) => report_invalid_type_expression(format_args!(
+                "Boolean literals are not allowed in type expressions"
+            )),
 
             ast::Expr::Subscript(subscript) => {
                 let ast::ExprSubscript {

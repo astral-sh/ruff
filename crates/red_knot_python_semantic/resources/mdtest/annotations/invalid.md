@@ -44,80 +44,19 @@ def _(
         reveal_type(r)  # revealed: Unknown
 ```
 
-## Int Literal
+## Invalid AST nodes
 
 ```py
-# error: [invalid-type-form] "Int literal is not allowed in type expressions"
-def _(x: 1):
-    reveal_type(x)  # revealed: Unknown
-```
-
-```py
-y = 1
-
-# error: [invalid-type-form] "Variable of type `Literal[1]` is not allowed in a type expression"
-def _(x: y):
-    reveal_type(x)  # revealed: Unknown
-```
-
-## Float Literal
-
-```py
-# error: [invalid-type-form] "Float literal is not allowed in type expressions"
-def _(x: 1.1):
-    reveal_type(x)  # revealed: Unknown
-```
-
-```py
-y = 1.1
-
-def _(x: y):
-    reveal_type(x)  # revealed: @Todo(Invalid or unsupported `Instance` in `Type::to_type_expression`)
-```
-
-## Complex Literal
-
-```py
-# error: [invalid-type-form] "Complex literal is not allowed in type expressions"
-def _(x: 1.1j):
-    reveal_type(x)  # revealed: Unknown
-```
-
-```py
-y = 1.1j
-
-def _(x: y):
-    reveal_type(x)  # revealed: @Todo(Invalid or unsupported `Instance` in `Type::to_type_expression`)
-```
-
-## Bytes Literal
-
-```py
-# error: [invalid-type-form] "Bytes literal is not allowed in type expressions"
-def _(x: int | b"a"):
-    reveal_type(x)  # revealed: int | Unknown
-```
-
-```py
-y = b"a"
-
-# error: [invalid-type-form] "Variable of type `Literal[b"a"]` is not allowed in a type expression"
-def _(x: y):
-    reveal_type(x)  # revealed: Unknown
-```
-
-## Boolean Literal
-
-```py
-# error: [invalid-type-form] "Boolean literal is not allowed in type expressions"
-def _(x: True):
-    reveal_type(x)  # revealed: Unknown
-```
-
-```py
-y = True
-
-# error: [invalid-type-form] "Variable of type `Literal[True]` is not allowed in a type expression"
-def _(x: y):
-    reveal_type(x)  # revealed: Unknown
+def _(
+    a: 1,  # error: [invalid-type-form] "Int literals are not allowed in type expressions"
+    b: 2.3,  # error: [invalid-type-form] "Float literals are not allowed in type expressions"
+    c: 4j,  # error: [invalid-type-form] "Complex literals are not allowed in type expressions"
+    d: True,  # error: [invalid-type-form] "Boolean literals are not allowed in type expressions"
+    e: int | b"foo",  # error: [invalid-type-form] "Bytes literals are not allowed in type expressions"
+):
+    reveal_type(a)  # revealed: Unknown
+    reveal_type(b)  # revealed: Unknown
+    reveal_type(c)  # revealed: Unknown
+    reveal_type(d)  # revealed: Unknown
+    reveal_type(e)  # revealed: int | Unknown
 ```
