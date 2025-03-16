@@ -1,0 +1,52 @@
+---
+source: crates/red_knot_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: attribute_assignment.md - Attribute assignment - Pure instance attributes
+mdtest path: crates/red_knot_python_semantic/resources/mdtest/diagnostics/attribute_assignment.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | class C:
+2 |     def __init__(self):
+3 |         self.attr: int = 0
+4 | 
+5 | instance = C()
+6 | instance.attr = 1  # fine
+7 | instance.attr = "wrong"  # error: [invalid-assignment]
+8 | 
+9 | C.attr = 1  # error: [invalid-attribute-access]
+```
+
+# Diagnostics
+
+```
+error: lint:invalid-assignment
+ --> /src/mdtest_snippet.py:7:1
+  |
+5 | instance = C()
+6 | instance.attr = 1  # fine
+7 | instance.attr = "wrong"  # error: [invalid-assignment]
+  | ^^^^^^^^^^^^^ Object of type `Literal["wrong"]` is not assignable to attribute `attr` of type `int`
+8 |
+9 | C.attr = 1  # error: [invalid-attribute-access]
+  |
+
+```
+
+```
+error: lint:invalid-attribute-access
+ --> /src/mdtest_snippet.py:9:1
+  |
+7 | instance.attr = "wrong"  # error: [invalid-assignment]
+8 |
+9 | C.attr = 1  # error: [invalid-attribute-access]
+  | ^^^^^^ Cannot assign to instance attribute `attr` from the class object `Literal[C]`
+  |
+
+```

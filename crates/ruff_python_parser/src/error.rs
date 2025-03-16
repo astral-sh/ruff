@@ -453,10 +453,54 @@ pub enum StarTupleKind {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
+pub enum UnparenthesizedNamedExprKind {
+    SequenceIndex,
+    SetLiteral,
+    SetComprehension,
+}
+
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum UnsupportedSyntaxErrorKind {
     Match,
     Walrus,
     ExceptStar,
+    /// Represents the use of an unparenthesized named expression (`:=`) in a set literal, set
+    /// comprehension, or sequence index before Python 3.10.
+    ///
+    /// ## Examples
+    ///
+    /// These are allowed on Python 3.10:
+    ///
+    /// ```python
+    /// {x := 1, 2, 3}                 # set literal
+    /// {last := x for x in range(3)}  # set comprehension
+    /// lst[x := 1]                    # sequence index
+    /// ```
+    ///
+    /// But on Python 3.9 the named expression needs to be parenthesized:
+    ///
+    /// ```python
+    /// {(x := 1), 2, 3}                 # set literal
+    /// {(last := x) for x in range(3)}  # set comprehension
+    /// lst[(x := 1)]                    # sequence index
+    /// ```
+    ///
+    /// However, unparenthesized named expressions are never allowed in slices:
+    ///
+    /// ```python
+    /// lst[x:=1:-1]      # syntax error
+    /// lst[1:x:=1]       # syntax error
+    /// lst[1:3:x:=1]     # syntax error
+    ///
+    /// lst[(x:=1):-1]    # ok
+    /// lst[1:(x:=1)]     # ok
+    /// lst[1:3:(x:=1)]   # ok
+    /// ```
+    ///
+    /// ## References
+    ///
+    /// - [Python 3.10 Other Language Changes](https://docs.python.org/3/whatsnew/3.10.html#other-language-changes)
+    UnparenthesizedNamedExpr(UnparenthesizedNamedExprKind),
 
     /// Represents the use of a parenthesized keyword argument name after Python 3.8.
     ///
@@ -617,6 +661,61 @@ pub enum UnsupportedSyntaxErrorKind {
     TypeAliasStatement,
     TypeParamDefault,
 
+    /// Represents the use of a [PEP 646] star expression in an index.
+    ///
+    /// ## Examples
+    ///
+    /// Before Python 3.11, star expressions were not allowed in index/subscript operations (within
+    /// square brackets). This restriction was lifted in [PEP 646] to allow for star-unpacking of
+    /// `typing.TypeVarTuple`s, also added in Python 3.11. As such, this is the primary motivating
+    /// example from the PEP:
+    ///
+    /// ```python
+    /// from typing import TypeVar, TypeVarTuple
+    ///
+    /// DType = TypeVar('DType')
+    /// Shape = TypeVarTuple('Shape')
+    ///
+    /// class Array(Generic[DType, *Shape]): ...
+    /// ```
+    ///
+    /// But it applies to simple indexing as well:
+    ///
+    /// ```python
+    /// vector[*x]
+    /// array[a, *b]
+    /// ```
+    ///
+    /// [PEP 646]: https://peps.python.org/pep-0646/#change-1-star-expressions-in-indexes
+    StarExpressionInIndex,
+
+    /// Represents the use of a [PEP 646] star annotations in a function definition.
+    ///
+    /// ## Examples
+    ///
+    /// Before Python 3.11, star annotations were not allowed in function definitions. This
+    /// restriction was lifted in [PEP 646] to allow type annotations for `typing.TypeVarTuple`,
+    /// also added in Python 3.11:
+    ///
+    /// ```python
+    /// from typing import TypeVarTuple
+    ///
+    /// Ts = TypeVarTuple('Ts')
+    ///
+    /// def foo(*args: *Ts): ...
+    /// ```
+    ///
+    /// Unlike [`UnsupportedSyntaxErrorKind::StarExpressionInIndex`], this does not include any
+    /// other annotation positions:
+    ///
+    /// ```python
+    /// x: *Ts                # Syntax error
+    /// def foo(x: *Ts): ...  # Syntax error
+    /// ```
+    ///
+    /// [PEP 646]: https://peps.python.org/pep-0646/#change-2-args-as-a-typevartuple
+    StarAnnotation,
+
     /// Represents the use of tuple unpacking in a `for` statement iterator clause before Python
     /// 3.9.
     ///
@@ -651,6 +750,15 @@ impl Display for UnsupportedSyntaxError {
             UnsupportedSyntaxErrorKind::Match => "Cannot use `match` statement",
             UnsupportedSyntaxErrorKind::Walrus => "Cannot use named assignment expression (`:=`)",
             UnsupportedSyntaxErrorKind::ExceptStar => "Cannot use `except*`",
+            UnsupportedSyntaxErrorKind::UnparenthesizedNamedExpr(
+                UnparenthesizedNamedExprKind::SequenceIndex,
+            ) => "Cannot use unparenthesized assignment expression in a sequence index",
+            UnsupportedSyntaxErrorKind::UnparenthesizedNamedExpr(
+                UnparenthesizedNamedExprKind::SetLiteral,
+            ) => "Cannot use unparenthesized assignment expression as an element in a set literal",
+            UnsupportedSyntaxErrorKind::UnparenthesizedNamedExpr(
+                UnparenthesizedNamedExprKind::SetComprehension,
+            ) => "Cannot use unparenthesized assignment expression as an element in a set comprehension",
             UnsupportedSyntaxErrorKind::ParenthesizedKeywordArgumentName => {
                 "Cannot use parenthesized keyword argument name"
             }
@@ -669,6 +777,10 @@ impl Display for UnsupportedSyntaxError {
             UnsupportedSyntaxErrorKind::TypeParamDefault => {
                 "Cannot set default type for a type parameter"
             }
+            UnsupportedSyntaxErrorKind::StarExpressionInIndex => {
+                "Cannot use star expression in index"
+            }
+            UnsupportedSyntaxErrorKind::StarAnnotation => "Cannot use star annotation",
             UnsupportedSyntaxErrorKind::UnparenthesizedUnpackInFor => {
                 "Cannot use iterable unpacking in `for` statements"
             }
@@ -706,6 +818,9 @@ impl UnsupportedSyntaxErrorKind {
             UnsupportedSyntaxErrorKind::Match => Change::Added(PythonVersion::PY310),
             UnsupportedSyntaxErrorKind::Walrus => Change::Added(PythonVersion::PY38),
             UnsupportedSyntaxErrorKind::ExceptStar => Change::Added(PythonVersion::PY311),
+            UnsupportedSyntaxErrorKind::UnparenthesizedNamedExpr(_) => {
+                Change::Added(PythonVersion::PY39)
+            }
             UnsupportedSyntaxErrorKind::StarTuple(_) => Change::Added(PythonVersion::PY38),
             UnsupportedSyntaxErrorKind::RelaxedDecorator => Change::Added(PythonVersion::PY39),
             UnsupportedSyntaxErrorKind::PositionalOnlyParameter => {
@@ -717,6 +832,10 @@ impl UnsupportedSyntaxErrorKind {
             UnsupportedSyntaxErrorKind::TypeParameterList => Change::Added(PythonVersion::PY312),
             UnsupportedSyntaxErrorKind::TypeAliasStatement => Change::Added(PythonVersion::PY312),
             UnsupportedSyntaxErrorKind::TypeParamDefault => Change::Added(PythonVersion::PY313),
+            UnsupportedSyntaxErrorKind::StarExpressionInIndex => {
+                Change::Added(PythonVersion::PY311)
+            }
+            UnsupportedSyntaxErrorKind::StarAnnotation => Change::Added(PythonVersion::PY311),
             UnsupportedSyntaxErrorKind::UnparenthesizedUnpackInFor => {
                 Change::Added(PythonVersion::PY39)
             }

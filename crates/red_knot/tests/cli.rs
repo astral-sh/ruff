@@ -967,6 +967,30 @@ fn check_non_existing_path() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[test]
+fn concise_diagnostics() -> anyhow::Result<()> {
+    let case = TestCase::with_file(
+        "test.py",
+        r#"
+        print(x)     # [unresolved-reference]
+        print(4[1])  # [non-subscriptable]
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(case.command().arg("--output-format=concise"), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    warning[lint:unresolved-reference] <temp_dir>/test.py:2:7: Name `x` used when not defined
+    error[lint:non-subscriptable] <temp_dir>/test.py:3:7: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
+    Found 2 diagnostics
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
 struct TestCase {
     _temp_dir: TempDir,
     _settings_scope: SettingsBindDropGuard,

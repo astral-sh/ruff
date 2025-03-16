@@ -65,13 +65,14 @@ use crate::types::call::{Argument, CallArguments, UnionCallError};
 use crate::types::diagnostic::{
     report_implicit_return_type, report_invalid_arguments_to_annotated,
     report_invalid_arguments_to_callable, report_invalid_assignment,
-    report_invalid_attribute_assignment, report_invalid_return_type, report_unresolved_module,
-    TypeCheckDiagnostics, CALL_NON_CALLABLE, CALL_POSSIBLY_UNBOUND_METHOD,
-    CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS, CYCLIC_CLASS_DEFINITION, DIVISION_BY_ZERO,
-    DUPLICATE_BASE, INCONSISTENT_MRO, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE, INVALID_DECLARATION,
-    INVALID_PARAMETER_DEFAULT, INVALID_TYPE_FORM, INVALID_TYPE_VARIABLE_CONSTRAINTS,
-    POSSIBLY_UNBOUND_ATTRIBUTE, POSSIBLY_UNBOUND_IMPORT, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE,
-    UNRESOLVED_IMPORT, UNSUPPORTED_OPERATOR,
+    report_invalid_attribute_assignment, report_invalid_return_type,
+    report_possibly_unbound_attribute, report_unresolved_module, TypeCheckDiagnostics,
+    CALL_NON_CALLABLE, CALL_POSSIBLY_UNBOUND_METHOD, CONFLICTING_DECLARATIONS,
+    CONFLICTING_METACLASS, CYCLIC_CLASS_DEFINITION, DIVISION_BY_ZERO, DUPLICATE_BASE,
+    INCONSISTENT_MRO, INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE,
+    INVALID_DECLARATION, INVALID_PARAMETER_DEFAULT, INVALID_TYPE_FORM,
+    INVALID_TYPE_VARIABLE_CONSTRAINTS, POSSIBLY_UNBOUND_IMPORT, UNDEFINED_REVEAL,
+    UNRESOLVED_ATTRIBUTE, UNRESOLVED_IMPORT, UNSUPPORTED_OPERATOR,
 };
 use crate::types::mro::MroErrorKind;
 use crate::types::unpacker::{UnpackResult, Unpacker};
@@ -2168,6 +2169,353 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.infer_target_impl(target, assigned_ty);
     }
 
+    /// Make sure that the attribute assignment `obj.attribute = value` is valid.
+    ///
+    /// `target` is the node for the left-hand side, `object_ty` is the type of `obj`, `attribute` is
+    /// the name of the attribute being assigned, and `value_ty` is the type of the right-hand side of
+    /// the assignment. If the assignment is invalid, emit diagnostics.
+    fn validate_attribute_assignment(
+        &mut self,
+        target: &ast::ExprAttribute,
+        object_ty: Type<'db>,
+        attribute: &str,
+        value_ty: Type<'db>,
+        emit_diagnostics: bool,
+    ) -> bool {
+        let db = self.db();
+
+        let ensure_assignable_to = |attr_ty| -> bool {
+            let assignable = value_ty.is_assignable_to(db, attr_ty);
+            if !assignable && emit_diagnostics {
+                report_invalid_attribute_assignment(
+                    &self.context,
+                    target.into(),
+                    attr_ty,
+                    value_ty,
+                    attribute,
+                );
+            }
+            assignable
+        };
+
+        match object_ty {
+            Type::Union(union) => {
+                if union.elements(self.db()).iter().all(|elem| {
+                    self.validate_attribute_assignment(target, *elem, attribute, value_ty, false)
+                }) {
+                    true
+                } else {
+                    // TODO: This is not a very helpful error message, as it does not include the underlying reason
+                    // why the assignment is invalid. This would be a good use case for nested diagnostics.
+                    if emit_diagnostics {
+                        self.context.report_lint(&INVALID_ASSIGNMENT, target, format_args!(
+                            "Object of type `{}` is not assignable to attribute `{attribute}` on type `{}`",
+                            value_ty.display(self.db()),
+                            object_ty.display(self.db()),
+                        ));
+                    }
+
+                    false
+                }
+            }
+
+            Type::Intersection(intersection) => {
+                // TODO: Handle negative intersection elements
+                if intersection.positive(db).iter().any(|elem| {
+                    self.validate_attribute_assignment(target, *elem, attribute, value_ty, false)
+                }) {
+                    true
+                } else {
+                    if emit_diagnostics {
+                        // TODO: same here, see above
+                        self.context.report_lint(&INVALID_ASSIGNMENT, target, format_args!(
+                            "Object of type `{}` is not assignable to attribute `{attribute}` on type `{}`",
+                            value_ty.display(self.db()),
+                            object_ty.display(self.db()),
+                        ));
+                    }
+                    false
+                }
+            }
+
+            Type::Dynamic(..) | Type::Never => true,
+
+            Type::Instance(..)
+            | Type::BooleanLiteral(..)
+            | Type::IntLiteral(..)
+            | Type::StringLiteral(..)
+            | Type::BytesLiteral(..)
+            | Type::LiteralString
+            | Type::SliceLiteral(..)
+            | Type::Tuple(..)
+            | Type::KnownInstance(..)
+            | Type::FunctionLiteral(..)
+            | Type::Callable(..)
+            | Type::AlwaysTruthy
+            | Type::AlwaysFalsy => match object_ty.class_member(db, attribute.into()) {
+                meta_attr @ SymbolAndQualifiers { .. } if meta_attr.is_class_var() => {
+                    if emit_diagnostics {
+                        self.context.report_lint(
+                                &INVALID_ATTRIBUTE_ACCESS,
+                                target,
+                                format_args!(
+                                    "Cannot assign to ClassVar `{attribute}` from an instance of type `{ty}`",
+                                    ty = object_ty.display(self.db()),
+                                ),
+                            );
+                    }
+                    false
+                }
+                SymbolAndQualifiers {
+                    symbol: Symbol::Type(meta_attr_ty, meta_attr_boundness),
+                    qualifiers: _,
+                } => {
+                    let assignable_to_meta_attr = if let Symbol::Type(meta_dunder_set, _) =
+                        meta_attr_ty.class_member(db, "__set__".into()).symbol
+                    {
+                        let successful_call = meta_dunder_set
+                            .try_call(
+                                db,
+                                &CallArguments::positional([meta_attr_ty, object_ty, value_ty]),
+                            )
+                            .is_ok();
+
+                        if !successful_call && emit_diagnostics {
+                            // TODO: Here, it would be nice to emit an additional diagnostic that explains why the call failed
+                            self.context.report_lint(
+                                &INVALID_ASSIGNMENT,
+                                target,
+                                format_args!(
+                                    "Invalid assignment to data descriptor attribute `{attribute}` on type `{}` with custom `__set__` method",
+                                    object_ty.display(db)
+                                ),
+                            );
+                        }
+
+                        successful_call
+                    } else {
+                        ensure_assignable_to(meta_attr_ty)
+                    };
+
+                    let assignable_to_instance_attribute =
+                        if meta_attr_boundness == Boundness::PossiblyUnbound {
+                            let (assignable, boundness) =
+                                if let Symbol::Type(instance_attr_ty, instance_attr_boundness) =
+                                    object_ty.instance_member(db, attribute).symbol
+                                {
+                                    (
+                                        ensure_assignable_to(instance_attr_ty),
+                                        instance_attr_boundness,
+                                    )
+                                } else {
+                                    (true, Boundness::PossiblyUnbound)
+                                };
+
+                            if boundness == Boundness::PossiblyUnbound {
+                                report_possibly_unbound_attribute(
+                                    &self.context,
+                                    target,
+                                    attribute,
+                                    object_ty,
+                                );
+                            }
+
+                            assignable
+                        } else {
+                            true
+                        };
+
+                    assignable_to_meta_attr && assignable_to_instance_attribute
+                }
+
+                SymbolAndQualifiers {
+                    symbol: Symbol::Unbound,
+                    ..
+                } => {
+                    if let Symbol::Type(instance_attr_ty, instance_attr_boundness) =
+                        object_ty.instance_member(db, attribute).symbol
+                    {
+                        if instance_attr_boundness == Boundness::PossiblyUnbound {
+                            report_possibly_unbound_attribute(
+                                &self.context,
+                                target,
+                                attribute,
+                                object_ty,
+                            );
+                        }
+
+                        ensure_assignable_to(instance_attr_ty)
+                    } else {
+                        if emit_diagnostics {
+                            self.context.report_lint(
+                                &UNRESOLVED_ATTRIBUTE,
+                                target,
+                                format_args!(
+                                    "Unresolved attribute `{}` on type `{}`.",
+                                    attribute,
+                                    object_ty.display(db)
+                                ),
+                            );
+                        }
+
+                        false
+                    }
+                }
+            },
+
+            Type::ClassLiteral(..) | Type::SubclassOf(..) => {
+                match object_ty.class_member(db, attribute.into()) {
+                    SymbolAndQualifiers {
+                        symbol: Symbol::Type(meta_attr_ty, meta_attr_boundness),
+                        qualifiers: _,
+                    } => {
+                        let assignable_to_meta_attr = if let Symbol::Type(meta_dunder_set, _) =
+                            meta_attr_ty.class_member(db, "__set__".into()).symbol
+                        {
+                            let successful_call = meta_dunder_set
+                                .try_call(
+                                    db,
+                                    &CallArguments::positional([meta_attr_ty, object_ty, value_ty]),
+                                )
+                                .is_ok();
+
+                            if !successful_call && emit_diagnostics {
+                                // TODO: Here, it would be nice to emit an additional diagnostic that explains why the call failed
+                                self.context.report_lint(
+                                    &INVALID_ASSIGNMENT,
+                                    target,
+                                    format_args!(
+                                        "Invalid assignment to data descriptor attribute `{attribute}` on type `{}` with custom `__set__` method",
+                                        object_ty.display(db)
+                                    ),
+                                );
+                            }
+
+                            successful_call
+                        } else {
+                            ensure_assignable_to(meta_attr_ty)
+                        };
+
+                        let assignable_to_class_attr = if meta_attr_boundness
+                            == Boundness::PossiblyUnbound
+                        {
+                            let (assignable, boundness) = if let Symbol::Type(
+                                class_attr_ty,
+                                class_attr_boundness,
+                            ) = object_ty
+                                .find_name_in_mro(db, attribute)
+                                .expect("called on Type::ClassLiteral or Type::SubclassOf")
+                                .symbol
+                            {
+                                (ensure_assignable_to(class_attr_ty), class_attr_boundness)
+                            } else {
+                                (true, Boundness::PossiblyUnbound)
+                            };
+
+                            if boundness == Boundness::PossiblyUnbound {
+                                report_possibly_unbound_attribute(
+                                    &self.context,
+                                    target,
+                                    attribute,
+                                    object_ty,
+                                );
+                            }
+
+                            assignable
+                        } else {
+                            true
+                        };
+
+                        assignable_to_meta_attr && assignable_to_class_attr
+                    }
+                    SymbolAndQualifiers {
+                        symbol: Symbol::Unbound,
+                        ..
+                    } => {
+                        if let Symbol::Type(class_attr_ty, class_attr_boundness) = object_ty
+                            .find_name_in_mro(db, attribute)
+                            .expect("called on Type::ClassLiteral or Type::SubclassOf")
+                            .symbol
+                        {
+                            if class_attr_boundness == Boundness::PossiblyUnbound {
+                                report_possibly_unbound_attribute(
+                                    &self.context,
+                                    target,
+                                    attribute,
+                                    object_ty,
+                                );
+                            }
+
+                            ensure_assignable_to(class_attr_ty)
+                        } else {
+                            let attribute_is_bound_on_instance =
+                                object_ty.to_instance(self.db()).is_some_and(|instance| {
+                                    !instance
+                                        .instance_member(self.db(), attribute)
+                                        .symbol
+                                        .is_unbound()
+                                });
+
+                            // Attribute is declared or bound on instance. Forbid access from the class object
+                            if emit_diagnostics {
+                                if attribute_is_bound_on_instance {
+                                    self.context.report_lint(
+                                    &INVALID_ATTRIBUTE_ACCESS,
+                                    target,
+                                    format_args!(
+                                        "Cannot assign to instance attribute `{attribute}` from the class object `{ty}`",
+                                        ty = object_ty.display(self.db()),
+                                ));
+                                } else {
+                                    self.context.report_lint(
+                                        &UNRESOLVED_ATTRIBUTE,
+                                        target,
+                                        format_args!(
+                                            "Unresolved attribute `{}` on type `{}`.",
+                                            attribute,
+                                            object_ty.display(db)
+                                        ),
+                                    );
+                                }
+                            }
+
+                            false
+                        }
+                    }
+                }
+            }
+
+            Type::ModuleLiteral(module) => {
+                if let Symbol::Type(attr_ty, _) = module.static_member(db, attribute) {
+                    let assignable = value_ty.is_assignable_to(db, attr_ty);
+                    if !assignable {
+                        report_invalid_attribute_assignment(
+                            &self.context,
+                            target.into(),
+                            attr_ty,
+                            value_ty,
+                            attribute,
+                        );
+                    }
+
+                    false
+                } else {
+                    self.context.report_lint(
+                        &UNRESOLVED_ATTRIBUTE,
+                        target,
+                        format_args!(
+                            "Unresolved attribute `{}` on type `{}`.",
+                            attribute,
+                            object_ty.display(db)
+                        ),
+                    );
+
+                    false
+                }
+            }
+        }
+    }
+
     fn infer_target_impl(&mut self, target: &ast::Expr, assigned_ty: Option<Type<'db>>) {
         match target {
             ast::Expr::Name(name) => self.infer_definition(name),
@@ -2185,25 +2533,25 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
             }
             ast::Expr::Attribute(
-                lhs_expr @ ast::ExprAttribute {
+                attr_expr @ ast::ExprAttribute {
+                    value: object,
                     ctx: ExprContext::Store,
                     attr,
                     ..
                 },
             ) => {
-                let attribute_expr_ty = self.infer_attribute_expression(lhs_expr);
-                self.store_expression_type(target, attribute_expr_ty);
+                self.store_expression_type(target, Type::Never);
+
+                let object_ty = self.infer_expression(object);
 
                 if let Some(assigned_ty) = assigned_ty {
-                    if !assigned_ty.is_assignable_to(self.db(), attribute_expr_ty) {
-                        report_invalid_attribute_assignment(
-                            &self.context,
-                            target.into(),
-                            attribute_expr_ty,
-                            assigned_ty,
-                            attr.as_str(),
-                        );
-                    }
+                    self.validate_attribute_assignment(
+                        attr_expr,
+                        object_ty,
+                        attr.id(),
+                        assigned_ty,
+                        true,
+                    );
                 }
             }
             _ => {
@@ -2404,86 +2752,53 @@ impl<'db> TypeInferenceBuilder<'db> {
         // If the target defines, e.g., `__iadd__`, infer the augmented assignment as a call to that
         // dunder.
         let op = assignment.op;
-        match target_type {
-            Type::Union(union) => {
-                return union.map(self.db(), |&target_type| {
-                    self.infer_augmented_op(assignment, target_type, value_type)
+        let db = self.db();
+
+        let report_unsupported_augmented_op = |ctx: &mut InferContext| {
+            ctx.report_lint(
+                &UNSUPPORTED_OPERATOR,
+                assignment,
+                format_args!(
+                    "Operator `{op}=` is unsupported between objects of type `{}` and `{}`",
+                    target_type.display(db),
+                    value_type.display(db)
+                ),
+            );
+        };
+
+        // Fall back to non-augmented binary operator inference.
+        let mut binary_return_ty = || {
+            self.infer_binary_expression_type(target_type, value_type, op)
+                .unwrap_or_else(|| {
+                    report_unsupported_augmented_op(&mut self.context);
+                    Type::unknown()
                 })
-            }
-            Type::Instance(instance) => {
-                if let Symbol::Type(class_member, boundness) = instance
-                    .class()
-                    .class_member(self.db(), op.in_place_dunder())
-                    .symbol
-                {
-                    let call = class_member.try_call(
-                        self.db(),
-                        &CallArguments::positional([target_type, value_type]),
-                    );
-                    let augmented_return_ty = match call {
-                        Ok(t) => t.return_type(self.db()),
-                        Err(e) => {
-                            self.context.report_lint(
-                                &UNSUPPORTED_OPERATOR,
-                                assignment,
-                                format_args!(
-                                    "Operator `{op}=` is unsupported between objects of type `{}` and `{}`",
-                                    target_type.display(self.db()),
-                                    value_type.display(self.db())
-                                ),
-                            );
-                            e.fallback_return_type(self.db())
-                        }
-                    };
+        };
 
-                    return match boundness {
-                        Boundness::Bound => augmented_return_ty,
-                        Boundness::PossiblyUnbound => {
-                            let left_ty = target_type;
-                            let right_ty = value_type;
+        match target_type {
+            Type::Union(union) => union.map(db, |&elem_type| {
+                self.infer_augmented_op(assignment, elem_type, value_type)
+            }),
+            _ => {
+                let call = target_type.try_call_dunder(
+                    db,
+                    op.in_place_dunder(),
+                    &CallArguments::positional([value_type]),
+                );
 
-                            let binary_return_ty = self.infer_binary_expression_type(left_ty, right_ty, op)
-                                .unwrap_or_else(|| {
-                                    self.context.report_lint(
-                                        &UNSUPPORTED_OPERATOR,
-                                        assignment,
-                                        format_args!(
-                                            "Operator `{op}=` is unsupported between objects of type `{}` and `{}`",
-                                            left_ty.display(self.db()),
-                                            right_ty.display(self.db())
-                                        ),
-                                    );
-                                    Type::unknown()
-                                });
-
-                            UnionType::from_elements(
-                                self.db(),
-                                [augmented_return_ty, binary_return_ty],
-                            )
-                        }
-                    };
+                match call {
+                    Ok(outcome) => outcome.return_type(db),
+                    Err(CallDunderError::MethodNotAvailable) => binary_return_ty(),
+                    Err(CallDunderError::PossiblyUnbound(outcome)) => {
+                        UnionType::from_elements(db, [outcome.return_type(db), binary_return_ty()])
+                    }
+                    Err(CallDunderError::Call(call_error)) => {
+                        report_unsupported_augmented_op(&mut self.context);
+                        call_error.fallback_return_type(db)
+                    }
                 }
             }
-            _ => {}
         }
-
-        // By default, fall back to non-augmented binary operator inference.
-        let left_ty = target_type;
-        let right_ty = value_type;
-
-        self.infer_binary_expression_type(left_ty, right_ty, op)
-            .unwrap_or_else(|| {
-                self.context.report_lint(
-                    &UNSUPPORTED_OPERATOR,
-                    assignment,
-                    format_args!(
-                        "Operator `{op}=` is unsupported between objects of type `{}` and `{}`",
-                        left_ty.display(self.db()),
-                        right_ty.display(self.db())
-                    ),
-                );
-                Type::unknown()
-            })
     }
 
     fn infer_augment_assignment_definition(
@@ -3988,15 +4303,13 @@ impl<'db> TypeInferenceBuilder<'db> {
                     Type::unknown().into()
                 }
                 LookupError::PossiblyUnbound(type_when_bound) => {
-                    self.context.report_lint(
-                        &POSSIBLY_UNBOUND_ATTRIBUTE,
+                    report_possibly_unbound_attribute(
+                        &self.context,
                         attribute,
-                        format_args!(
-                            "Attribute `{}` on type `{}` is possibly unbound",
-                            attr.id,
-                            value_type.display(db),
-                        ),
+                        &attr.id,
+                        value_type,
                     );
+
                     type_when_bound
                 }
             }).inner_type()
@@ -4005,73 +4318,14 @@ impl<'db> TypeInferenceBuilder<'db> {
     fn infer_attribute_expression(&mut self, attribute: &ast::ExprAttribute) -> Type<'db> {
         let ast::ExprAttribute {
             value,
-            attr,
+            attr: _,
             range: _,
             ctx,
         } = attribute;
 
         match ctx {
             ExprContext::Load => self.infer_attribute_load(attribute),
-            ExprContext::Store => {
-                let value_ty = self.infer_expression(value);
-
-                let symbol = match value_ty {
-                    Type::Instance(_) => {
-                        let instance_member = value_ty.member(self.db(), &attr.id);
-                        if instance_member.is_class_var() {
-                            self.context.report_lint(
-                                &INVALID_ATTRIBUTE_ACCESS,
-                                attribute,
-                                format_args!(
-                                    "Cannot assign to ClassVar `{attr}` from an instance of type `{ty}`",
-                                    ty = value_ty.display(self.db()),
-                                ),
-                            );
-                        }
-
-                        instance_member.symbol
-                    }
-                    Type::ClassLiteral(_) | Type::SubclassOf(_) => {
-                        let class_member = value_ty.member(self.db(), &attr.id).symbol;
-
-                        if class_member.is_unbound() {
-                            let class = match value_ty {
-                                Type::ClassLiteral(class) => Some(class.class()),
-                                Type::SubclassOf(subclass_of @ SubclassOfType { .. }) => {
-                                    match subclass_of.subclass_of() {
-                                        ClassBase::Class(class) => Some(class),
-                                        ClassBase::Dynamic(_) => unreachable!("Attribute lookup on a dynamic `SubclassOf` type should always return a bound symbol"),
-                                    }
-                                }
-                                _ => None,
-                            };
-                            if let Some(class) = class {
-                                let instance_member = class.instance_member(self.db(), attr).symbol;
-
-                                // Attribute is declared or bound on instance. Forbid access from the class object
-                                if !instance_member.is_unbound() {
-                                    self.context.report_lint(
-                                        &INVALID_ATTRIBUTE_ACCESS,
-                                        attribute,
-                                        format_args!(
-                                            "Cannot assign to instance attribute `{attr}` from the class object `{ty}`",
-                                            ty = value_ty.display(self.db()),
-                                    ));
-                                }
-                            }
-                        }
-
-                        class_member
-                    }
-                    _ => value_ty.member(self.db(), &attr.id).symbol,
-                };
-
-                // TODO: The unbound-case might also yield a diagnostic, but we can not activate
-                // this yet until we understand implicit instance attributes (those that are not
-                // defined in the class body), as there would be too many false positives.
-                symbol.ignore_possibly_unbound().unwrap_or(Type::unknown())
-            }
-            ExprContext::Del => {
+            ExprContext::Store | ExprContext::Del => {
                 self.infer_expression(value);
                 Type::Never
             }
@@ -4344,6 +4598,20 @@ impl<'db> TypeInferenceBuilder<'db> {
             ),
             (left, Type::BooleanLiteral(bool_value), op) => {
                 self.infer_binary_expression_type(left, Type::IntLiteral(i64::from(bool_value)), op)
+            }
+
+            (Type::Tuple(lhs), Type::Tuple(rhs), ast::Operator::Add) => {
+                // Note: this only works on heterogeneous tuples.
+                let lhs_elements = lhs.elements(self.db());
+                let rhs_elements = rhs.elements(self.db());
+
+                Some(TupleType::from_elements(
+                    self.db(),
+                    lhs_elements
+                        .iter()
+                        .copied()
+                        .chain(rhs_elements.iter().copied()),
+                ))
             }
 
             // We've handled all of the special cases that we support for literals, so we need to

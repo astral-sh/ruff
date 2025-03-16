@@ -1,0 +1,40 @@
+---
+source: crates/red_knot_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: attribute_assignment.md - Attribute assignment - Data descriptors - Invalid argument type
+mdtest path: crates/red_knot_python_semantic/resources/mdtest/diagnostics/attribute_assignment.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | class Descriptor:
+ 2 |     def __set__(self, instance: object, value: int) -> None:
+ 3 |         pass
+ 4 | 
+ 5 | class C:
+ 6 |     attr: Descriptor = Descriptor()
+ 7 | 
+ 8 | instance = C()
+ 9 | instance.attr = 1  # fine
+10 | 
+11 | # TODO: ideally, we would mention why this is an invalid assignment (wrong argument type for `value` parameter)
+12 | instance.attr = "wrong"  # error: [invalid-assignment]
+```
+
+# Diagnostics
+
+```
+error: lint:invalid-assignment
+  --> /src/mdtest_snippet.py:12:1
+   |
+11 | # TODO: ideally, we would mention why this is an invalid assignment (wrong argument type for `value` parameter)
+12 | instance.attr = "wrong"  # error: [invalid-assignment]
+   | ^^^^^^^^^^^^^ Invalid assignment to data descriptor attribute `attr` on type `C` with custom `__set__` method
+   |
+
+```

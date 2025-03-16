@@ -1,0 +1,420 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/star_index_py310.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..293,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 44..55,
+                    value: Subscript(
+                        ExprSubscript {
+                            range: 44..55,
+                            value: Name(
+                                ExprName {
+                                    range: 44..47,
+                                    id: Name("lst"),
+                                    ctx: Load,
+                                },
+                            ),
+                            slice: Tuple(
+                                ExprTuple {
+                                    range: 48..54,
+                                    elts: [
+                                        Starred(
+                                            ExprStarred {
+                                                range: 48..54,
+                                                value: Name(
+                                                    ExprName {
+                                                        range: 49..54,
+                                                        id: Name("index"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ],
+                                    ctx: Load,
+                                    parenthesized: false,
+                                },
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            ClassDef(
+                StmtClassDef {
+                    range: 72..112,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("Array"),
+                        range: 78..83,
+                    },
+                    type_params: None,
+                    arguments: Some(
+                        Arguments {
+                            range: 83..107,
+                            args: [
+                                Subscript(
+                                    ExprSubscript {
+                                        range: 84..106,
+                                        value: Name(
+                                            ExprName {
+                                                range: 84..91,
+                                                id: Name("Generic"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        slice: Tuple(
+                                            ExprTuple {
+                                                range: 92..105,
+                                                elts: [
+                                                    Name(
+                                                        ExprName {
+                                                            range: 92..97,
+                                                            id: Name("DType"),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    Starred(
+                                                        ExprStarred {
+                                                            range: 99..105,
+                                                            value: Name(
+                                                                ExprName {
+                                                                    range: 100..105,
+                                                                    id: Name("Shape"),
+                                                                    ctx: Load,
+                                                                },
+                                                            ),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                ],
+                                                ctx: Load,
+                                                parenthesized: false,
+                                            },
+                                        ),
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                            keywords: [],
+                        },
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 109..112,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 109..112,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 148..161,
+                    value: Subscript(
+                        ExprSubscript {
+                            range: 148..161,
+                            value: Name(
+                                ExprName {
+                                    range: 148..151,
+                                    id: Name("lst"),
+                                    ctx: Load,
+                                },
+                            ),
+                            slice: Tuple(
+                                ExprTuple {
+                                    range: 152..160,
+                                    elts: [
+                                        Name(
+                                            ExprName {
+                                                range: 152..153,
+                                                id: Name("a"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        Starred(
+                                            ExprStarred {
+                                                range: 155..157,
+                                                value: Name(
+                                                    ExprName {
+                                                        range: 156..157,
+                                                        id: Name("b"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        Name(
+                                            ExprName {
+                                                range: 159..160,
+                                                id: Name("c"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ],
+                                    ctx: Load,
+                                    parenthesized: false,
+                                },
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 185..198,
+                    value: Subscript(
+                        ExprSubscript {
+                            range: 185..198,
+                            value: Name(
+                                ExprName {
+                                    range: 185..188,
+                                    id: Name("lst"),
+                                    ctx: Load,
+                                },
+                            ),
+                            slice: Tuple(
+                                ExprTuple {
+                                    range: 189..197,
+                                    elts: [
+                                        Name(
+                                            ExprName {
+                                                range: 189..190,
+                                                id: Name("a"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        Name(
+                                            ExprName {
+                                                range: 192..193,
+                                                id: Name("b"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        Starred(
+                                            ExprStarred {
+                                                range: 195..197,
+                                                value: Name(
+                                                    ExprName {
+                                                        range: 196..197,
+                                                        id: Name("c"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ],
+                                    ctx: Load,
+                                    parenthesized: false,
+                                },
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 222..233,
+                    value: Subscript(
+                        ExprSubscript {
+                            range: 222..233,
+                            value: Name(
+                                ExprName {
+                                    range: 222..225,
+                                    id: Name("lst"),
+                                    ctx: Load,
+                                },
+                            ),
+                            slice: Tuple(
+                                ExprTuple {
+                                    range: 226..232,
+                                    elts: [
+                                        Starred(
+                                            ExprStarred {
+                                                range: 226..228,
+                                                value: Name(
+                                                    ExprName {
+                                                        range: 227..228,
+                                                        id: Name("a"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        Starred(
+                                            ExprStarred {
+                                                range: 230..232,
+                                                value: Name(
+                                                    ExprName {
+                                                        range: 231..232,
+                                                        id: Name("b"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ],
+                                    ctx: Load,
+                                    parenthesized: false,
+                                },
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 254..271,
+                    value: Subscript(
+                        ExprSubscript {
+                            range: 254..271,
+                            value: Name(
+                                ExprName {
+                                    range: 254..259,
+                                    id: Name("array"),
+                                    ctx: Load,
+                                },
+                            ),
+                            slice: Tuple(
+                                ExprTuple {
+                                    range: 260..270,
+                                    elts: [
+                                        Slice(
+                                            ExprSlice {
+                                                range: 260..263,
+                                                lower: Some(
+                                                    NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            range: 260..261,
+                                                            value: Int(
+                                                                3,
+                                                            ),
+                                                        },
+                                                    ),
+                                                ),
+                                                upper: Some(
+                                                    NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            range: 262..263,
+                                                            value: Int(
+                                                                5,
+                                                            ),
+                                                        },
+                                                    ),
+                                                ),
+                                                step: None,
+                                            },
+                                        ),
+                                        Starred(
+                                            ExprStarred {
+                                                range: 265..270,
+                                                value: Name(
+                                                    ExprName {
+                                                        range: 266..270,
+                                                        id: Name("idxs"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ],
+                                    ctx: Load,
+                                    parenthesized: false,
+                                },
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Unsupported Syntax Errors
+
+  |
+1 | # parse_options: {"target-version": "3.10"}
+2 | lst[*index]  # simple index
+  |     ^^^^^^ Syntax Error: Cannot use star expression in index on Python 3.10 (syntax was added in Python 3.11)
+3 | class Array(Generic[DType, *Shape]): ...  # motivating example from the PEP
+4 | lst[a, *b, c]  # different positions
+  |
+
+
+  |
+1 | # parse_options: {"target-version": "3.10"}
+2 | lst[*index]  # simple index
+3 | class Array(Generic[DType, *Shape]): ...  # motivating example from the PEP
+  |                            ^^^^^^ Syntax Error: Cannot use star expression in index on Python 3.10 (syntax was added in Python 3.11)
+4 | lst[a, *b, c]  # different positions
+5 | lst[a, b, *c]  # different positions
+  |
+
+
+  |
+2 | lst[*index]  # simple index
+3 | class Array(Generic[DType, *Shape]): ...  # motivating example from the PEP
+4 | lst[a, *b, c]  # different positions
+  |        ^^ Syntax Error: Cannot use star expression in index on Python 3.10 (syntax was added in Python 3.11)
+5 | lst[a, b, *c]  # different positions
+6 | lst[*a, *b]  # multiple unpacks
+  |
+
+
+  |
+3 | class Array(Generic[DType, *Shape]): ...  # motivating example from the PEP
+4 | lst[a, *b, c]  # different positions
+5 | lst[a, b, *c]  # different positions
+  |           ^^ Syntax Error: Cannot use star expression in index on Python 3.10 (syntax was added in Python 3.11)
+6 | lst[*a, *b]  # multiple unpacks
+7 | array[3:5, *idxs]  # mixed with slices
+  |
+
+
+  |
+4 | lst[a, *b, c]  # different positions
+5 | lst[a, b, *c]  # different positions
+6 | lst[*a, *b]  # multiple unpacks
+  |     ^^ Syntax Error: Cannot use star expression in index on Python 3.10 (syntax was added in Python 3.11)
+7 | array[3:5, *idxs]  # mixed with slices
+  |
+
+
+  |
+4 | lst[a, *b, c]  # different positions
+5 | lst[a, b, *c]  # different positions
+6 | lst[*a, *b]  # multiple unpacks
+  |         ^^ Syntax Error: Cannot use star expression in index on Python 3.10 (syntax was added in Python 3.11)
+7 | array[3:5, *idxs]  # mixed with slices
+  |
+
+
+  |
+5 | lst[a, b, *c]  # different positions
+6 | lst[*a, *b]  # multiple unpacks
+7 | array[3:5, *idxs]  # mixed with slices
+  |            ^^^^^ Syntax Error: Cannot use star expression in index on Python 3.10 (syntax was added in Python 3.11)
+  |
