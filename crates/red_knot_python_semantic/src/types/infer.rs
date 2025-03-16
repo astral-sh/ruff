@@ -6125,7 +6125,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 todo_type!("ellipsis literal in type expression")
             }
 
-            ast::Expr::BytesLiteral(_literal) => report_invalid_type_expression(format_args!(
+            ast::Expr::BytesLiteral(_) => report_invalid_type_expression(format_args!(
                 "Bytes literals are not allowed in type expressions"
             )),
             ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
