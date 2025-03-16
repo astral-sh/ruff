@@ -234,13 +234,23 @@ pub(crate) fn manual_dict_comprehension(checker: &mut Checker, for_stmt: &ast::S
         ast::Stmt::Assign(assign) => Some(&assign.value),
         _ => None,
     });
+
     // If the variable is an empty dict literal, then we might be able to replace it with a full dict comprehension.
     // otherwise, it has to be replaced with a `dict.update`
-    let binding_is_empty_dict =
-        binding_value.is_some_and(|binding_value| match binding_value.as_dict_expr() {
-            Some(dict_expr) => dict_expr.is_empty(),
-            None => false,
-        });
+    let binding_is_empty_dict = binding_value.is_some_and(|binding_value| match binding_value {
+        // value = {}
+        Expr::Dict(dict_expr) => dict_expr.is_empty(),
+        // value = dict()
+        Expr::Call(call) => {
+            checker
+                .semantic()
+                .resolve_builtin_symbol(&call.func)
+                .is_some_and(|name| name == "dict")
+                && call.arguments.is_empty()
+        }
+        _ => false,
+    });
+
     let assignment_in_same_statement = {
         binding.source.is_some_and(|binding_source| {
             let for_loop_parent = checker.semantic().current_statement_parent_id();

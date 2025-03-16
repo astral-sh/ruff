@@ -263,12 +263,23 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
         ast::Stmt::Assign(assign) => Some(&assign.value),
         _ => None,
     });
+
     // If the variable is an empty list literal, then we might be able to replace it with a full list comprehension
-    // otherwise, it has to be replaced with a `list.extend`
+    // otherwise, it has to be replaced with a `list.extend`.
     let binding_is_empty_list =
-        list_binding_value.is_some_and(|binding_value| match binding_value.as_list_expr() {
-            Some(list_expr) => list_expr.elts.is_empty(),
-            None => false,
+        list_binding_value.is_some_and(|binding_value| match binding_value {
+            // `value = []`
+            Expr::List(list_expr) => list_expr.is_empty(),
+            // `value = list()`
+            // This is probably be linted against, but turning it into a list comprehension will also remove it
+            Expr::Call(call) => {
+                checker
+                    .semantic()
+                    .resolve_builtin_symbol(&call.func)
+                    .is_some_and(|name| name == "list")
+                    && call.arguments.is_empty()
+            }
+            _ => false,
         });
 
     // If the for loop does not have the same parent element as the binding, then it cannot always be
@@ -395,20 +406,6 @@ fn convert_to_list_extend(
     let target_str = locator.slice(for_stmt.target.range());
     let elt_str = locator.slice(to_append);
     let generator_str = format!("{elt_str} {for_type} {target_str} in {for_iter_str}{if_str}");
-
-    // let comment_strings_in_range = |range| {
-    //     checker
-    //         .comment_ranges()
-    //         .comments_in_range(range)
-    //         .iter()
-    //         // Ignore comments inside of the append or iterator, since these are preserved
-    //         .filter(|comment| {
-    //             !to_append.range().contains_range(**comment)
-    //                 && !for_stmt.iter.range().contains_range(**comment)
-    //         })
-    //         .map(|range| locator.slice(range).trim_whitespace_start())
-    //         .collect()
-    // };
 
     let variable_name = locator.slice(binding);
     let for_loop_inline_comments = comment_strings_in_range(
