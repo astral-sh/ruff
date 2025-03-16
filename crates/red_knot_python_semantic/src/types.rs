@@ -3294,9 +3294,20 @@ impl<'db> Type<'db> {
             Type::KnownInstance(_) => Ok(todo_type!(
                 "Invalid or unsupported `KnownInstanceType` in `Type::to_type_expression`"
             )),
-            Type::Instance(_) => Ok(todo_type!(
-                "Invalid or unsupported `Instance` in `Type::to_type_expression`"
-            )),
+            Type::Instance(instance_type) => {
+                if instance_type.class.is_known(db, KnownClass::Float) {
+                    Err(InvalidTypeExpressionError {
+                        invalid_expressions: smallvec::smallvec![
+                            InvalidTypeExpression::NumberLiteralInTypeExpression
+                        ],
+                        fallback_type: Type::unknown(),
+                    })
+                } else {
+                    Ok(todo_type!(
+                        "Invalid or unsupported `Instance` in `Type::to_type_expression`"
+                    ))
+                }
+            }
             Type::Intersection(_) => Ok(todo_type!("Type::Intersection.in_type_expression")),
         }
     }
