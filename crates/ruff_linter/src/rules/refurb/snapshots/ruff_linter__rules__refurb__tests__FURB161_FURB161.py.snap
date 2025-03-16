@@ -145,7 +145,7 @@ FURB161.py:12:9: FURB161 [*] Use of `bin(ten()).count('1')`
    12 |+count = ten().bit_count()  # FURB161
 13 13 | count = bin((10)).count("1")  # FURB161
 14 14 | count = bin("10" "15").count("1")  # FURB161
-15 15 | count = bin(*[123]).count("1")  # FURB161
+15 15 | 
 
 FURB161.py:13:9: FURB161 [*] Use of `bin(10).count('1')`
    |
@@ -154,7 +154,6 @@ FURB161.py:13:9: FURB161 [*] Use of `bin(10).count('1')`
 13 | count = bin((10)).count("1")  # FURB161
    |         ^^^^^^^^^^^^^^^^^^^^ FURB161
 14 | count = bin("10" "15").count("1")  # FURB161
-15 | count = bin(*[123]).count("1")  # FURB161
    |
    = help: Replace with `(10).bit_count()`
 
@@ -165,8 +164,8 @@ FURB161.py:13:9: FURB161 [*] Use of `bin(10).count('1')`
 13    |-count = bin((10)).count("1")  # FURB161
    13 |+count = (10).bit_count()  # FURB161
 14 14 | count = bin("10" "15").count("1")  # FURB161
-15 15 | count = bin(*[123]).count("1")  # FURB161
-16 16 | 
+15 15 | 
+16 16 | count = x.bit_count()  # OK
 
 FURB161.py:14:9: FURB161 [*] Use of `bin("10" "15").count('1')`
    |
@@ -174,7 +173,8 @@ FURB161.py:14:9: FURB161 [*] Use of `bin("10" "15").count('1')`
 13 | count = bin((10)).count("1")  # FURB161
 14 | count = bin("10" "15").count("1")  # FURB161
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^ FURB161
-15 | count = bin(*[123]).count("1")  # FURB161
+15 |
+16 | count = x.bit_count()  # OK
    |
    = help: Replace with `("10" "15").bit_count()`
 
@@ -184,27 +184,6 @@ FURB161.py:14:9: FURB161 [*] Use of `bin("10" "15").count('1')`
 13 13 | count = bin((10)).count("1")  # FURB161
 14    |-count = bin("10" "15").count("1")  # FURB161
    14 |+count = ("10" "15").bit_count()  # FURB161
-15 15 | count = bin(*[123]).count("1")  # FURB161
-16 16 | 
-17 17 | count = x.bit_count()  # OK
-
-FURB161.py:15:9: FURB161 [*] Use of `bin(123).count('1')`
-   |
-13 | count = bin((10)).count("1")  # FURB161
-14 | count = bin("10" "15").count("1")  # FURB161
-15 | count = bin(*[123]).count("1")  # FURB161
-   |         ^^^^^^^^^^^^^^^^^^^^^^ FURB161
-16 |
-17 | count = x.bit_count()  # OK
-   |
-   = help: Replace with `(123).bit_count()`
-
-ℹ Safe fix
-12 12 | count = bin(ten()).count("1")  # FURB161
-13 13 | count = bin((10)).count("1")  # FURB161
-14 14 | count = bin("10" "15").count("1")  # FURB161
-15    |-count = bin(*[123]).count("1")  # FURB161
-   15 |+count = (123).bit_count()  # FURB161
-16 16 | 
-17 17 | count = x.bit_count()  # OK
-18 18 | count = (10).bit_count()  # OK
+15 15 | 
+16 16 | count = x.bit_count()  # OK
+17 17 | count = (10).bit_count()  # OK
