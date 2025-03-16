@@ -154,27 +154,3 @@ from typing import Literal
 def _(x: Literal):
     reveal_type(x)  # revealed: Unknown
 ```
-
-```py
-from typing import Literal
-
-# error: [invalid-type-form] "Number Literal is not allowed in type expressions"
-def _(x: 1):
-    reveal_type(x)  # revealed: Unknown
-```
-
-```py
-from typing import Literal
-
-# error: [invalid-type-form] "Bytes Literal is not allowed in type expressions"
-def _(x: int | b"a"):
-    reveal_type(x)  # revealed: int | Unknown
-```
-
-```py
-from typing import Literal
-
-# error: [invalid-type-form] "Boolean Literal is not allowed in type expressions"
-def _(x: True):
-    reveal_type(x)  # revealed: Unknown
-```

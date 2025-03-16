@@ -43,3 +43,33 @@ def _(
         reveal_type(q)  # revealed: Unknown
         reveal_type(r)  # revealed: Unknown
 ```
+
+## Number Literal
+
+```py
+# error: [invalid-type-form] "Number Literal is not allowed in type expressions"
+def _(x: 1):
+    reveal_type(x)  # revealed: Unknown
+```
+
+```py
+# error: [invalid-type-form] "Number Literal is not allowed in type expressions"
+def _(x: 1.1):
+    reveal_type(x)  # revealed: Unknown
+```
+
+## Bytes Literal
+
+```py
+# error: [invalid-type-form] "Bytes Literal is not allowed in type expressions"
+def _(x: int | b"a"):
+    reveal_type(x)  # revealed: int | Unknown
+```
+
+## Boolean Literal
+
+```py
+# error: [invalid-type-form] "Boolean Literal is not allowed in type expressions"
+def _(x: True):
+    reveal_type(x)  # revealed: Unknown
+```
