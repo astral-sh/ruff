@@ -6122,15 +6122,40 @@ impl<'db> TypeInferenceBuilder<'db> {
                 self.context.report_lint(
                     &INVALID_TYPE_FORM,
                     expression,
-                    format_args!("Bytes Literal is not allowed in type expressions"),
+                    format_args!("Bytes literal is not allowed in type expressions"),
                 );
                 Type::unknown()
             }
-            ast::Expr::NumberLiteral(_literal) => {
+            ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
+                value: ast::Number::Int(_),
+                ..
+            }) => {
                 self.context.report_lint(
                     &INVALID_TYPE_FORM,
                     expression,
-                    format_args!("Number Literal is not allowed in type expressions"),
+                    format_args!("Int literal is not allowed in type expressions"),
+                );
+                Type::unknown()
+            }
+            ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
+                value: ast::Number::Float(_),
+                ..
+            }) => {
+                self.context.report_lint(
+                    &INVALID_TYPE_FORM,
+                    expression,
+                    format_args!("Float literal is not allowed in type expressions"),
+                );
+                Type::unknown()
+            }
+            ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
+                value: ast::Number::Complex { .. },
+                ..
+            }) => {
+                self.context.report_lint(
+                    &INVALID_TYPE_FORM,
+                    expression,
+                    format_args!("Complex literal is not allowed in type expressions"),
                 );
                 Type::unknown()
             }
@@ -6138,7 +6163,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 self.context.report_lint(
                     &INVALID_TYPE_FORM,
                     expression,
-                    format_args!("Boolean Literal is not allowed in type expressions"),
+                    format_args!("Boolean literal is not allowed in type expressions"),
                 );
                 Type::unknown()
             }

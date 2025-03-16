@@ -3279,20 +3279,9 @@ impl<'db> Type<'db> {
             Type::KnownInstance(_) => Ok(todo_type!(
                 "Invalid or unsupported `KnownInstanceType` in `Type::to_type_expression`"
             )),
-            Type::Instance(instance_type) => {
-                if instance_type.class.is_known(db, KnownClass::Float) {
-                    Err(InvalidTypeExpressionError {
-                        invalid_expressions: smallvec::smallvec![
-                            InvalidTypeExpression::NumberLiteralInTypeExpression
-                        ],
-                        fallback_type: Type::unknown(),
-                    })
-                } else {
-                    Ok(todo_type!(
-                        "Invalid or unsupported `Instance` in `Type::to_type_expression`"
-                    ))
-                }
-            }
+            Type::Instance(_) => Ok(todo_type!(
+                "Invalid or unsupported `Instance` in `Type::to_type_expression`"
+            )),
             Type::Intersection(_) => Ok(todo_type!("Type::Intersection.in_type_expression")),
         }
     }
@@ -3566,8 +3555,6 @@ enum InvalidTypeExpression<'db> {
     ClassVarInTypeExpression,
     /// The `Final` type qualifier was used in a type expression
     FinalInTypeExpression,
-    /// Number Literal is not allowed in type expressions
-    NumberLiteralInTypeExpression,
     /// Some types are always invalid in type expressions
     InvalidType(Type<'db>),
 }
@@ -3593,9 +3580,6 @@ impl<'db> InvalidTypeExpression<'db> {
                     ),
                     InvalidTypeExpression::FinalInTypeExpression => f.write_str(
                         "Type qualifier `typing.Final` is not allowed in type expressions (only in annotation expressions)"
-                    ),
-                    InvalidTypeExpression::NumberLiteralInTypeExpression => f.write_str(
-                        "Number Literal is not allowed in type expressions"
                     ),
                     InvalidTypeExpression::InvalidType(ty) => write!(
                         f,
