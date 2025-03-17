@@ -12,10 +12,9 @@ use super::{
 /// in an [`crate::types::IntersectionType`] or a [`crate::types::UnionType`] in order for them
 /// to be compared for equivalence.
 ///
-/// Two intersections are compared lexicographically.
-/// Two unions are never compared in this function because DNF does not permit nested unions.
-///
-/// Element types must already be sorted.
+/// Two intersections are compared lexicographically. Element types in the intersection must
+/// already be sorted. Two unions are never compared in this function because DNF does not permit
+/// nested unions.
 ///
 /// ## Why not just implement [`Ord`] on [`Type`]?
 ///
@@ -90,7 +89,11 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::Callable(CallableType::General(_)), _) => Ordering::Less,
         (_, Type::Callable(CallableType::General(_))) => Ordering::Greater,
 
-        (Type::Tuple(left), Type::Tuple(right)) => left.cmp(right),
+        (Type::Tuple(left), Type::Tuple(right)) => {
+            debug_assert_eq!(*left, left.with_sorted_unions_and_intersections(db));
+            debug_assert_eq!(*right, right.with_sorted_unions_and_intersections(db));
+            left.cmp(right)
+        }
         (Type::Tuple(_), _) => Ordering::Less,
         (_, Type::Tuple(_)) => Ordering::Greater,
 
@@ -271,13 +274,14 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::Dynamic(_), _) => Ordering::Less,
         (_, Type::Dynamic(_)) => Ordering::Greater,
 
-        (Type::Union(_), Type::Union(_)) => {
+        (Type::Union(_), _) | (_, Type::Union(_)) => {
             unreachable!("our type representation does not permit nested unions");
         }
-        (Type::Union(_), _) => Ordering::Less,
-        (_, Type::Union(_)) => Ordering::Greater,
 
         (Type::Intersection(left), Type::Intersection(right)) => {
+            debug_assert_eq!(*left, left.to_sorted_intersection(db));
+            debug_assert_eq!(*right, right.to_sorted_intersection(db));
+
             // Lexicographically compare the elements of the two intersections.
             let left_positive = left.positive(db);
             let right_positive = right.positive(db);
