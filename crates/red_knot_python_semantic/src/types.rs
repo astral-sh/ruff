@@ -4029,7 +4029,7 @@ impl<'db> IterationErrorKind<'db> {
                 CallDunderError::CallError(CallErrorKind::BindingError, bindings) => report_not_iterable(format_args!(
                     "Object of type `{iterable_type}` may not be iterable \
                         because it may not have an `__iter__` method \
-                        and its `__getitem__` method (with type `{dunder_getitem_type}`)
+                        and its `__getitem__` method (with type `{dunder_getitem_type}`) \
                         may have an incorrect signature for the old-style iteration protocol \
                         (expected a signature at least as permissive as \
                         `def __getitem__(self, key: int): ...`)",
