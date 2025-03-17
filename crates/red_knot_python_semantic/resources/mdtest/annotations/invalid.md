@@ -43,3 +43,21 @@ def _(
         reveal_type(q)  # revealed: Unknown
         reveal_type(r)  # revealed: Unknown
 ```
+
+## Invalid AST nodes
+
+```py
+def _(
+    a: 1,  # error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
+    b: 2.3,  # error: [invalid-type-form] "Float literals are not allowed in type expressions"
+    c: 4j,  # error: [invalid-type-form] "Complex literals are not allowed in type expressions"
+    d: True,  # error: [invalid-type-form] "Boolean literals are not allowed in this context in a type expression"
+    # error: [invalid-type-form] "Bytes literals are not allowed in this context in a type expression"
+    e: int | b"foo",
+):
+    reveal_type(a)  # revealed: Unknown
+    reveal_type(b)  # revealed: Unknown
+    reveal_type(c)  # revealed: Unknown
+    reveal_type(d)  # revealed: Unknown
+    reveal_type(e)  # revealed: int | Unknown
+```
