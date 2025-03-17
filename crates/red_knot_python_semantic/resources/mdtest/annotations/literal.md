@@ -127,7 +127,7 @@ Literal: _SpecialForm
 ```py
 from other import Literal
 
-# error: [invalid-type-form] "Int literals are not allowed in type expressions"
+# error: [invalid-type-form] "Int literals are not allowed in type expressions outside `typing.Literal[]` slices"
 a1: Literal[26]
 
 def f():

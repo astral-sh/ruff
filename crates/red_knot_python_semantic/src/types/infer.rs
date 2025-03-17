@@ -6126,13 +6126,13 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
 
             ast::Expr::BytesLiteral(_) => report_invalid_type_expression(format_args!(
-                "Bytes literals are not allowed in type expressions"
+                "Bytes literals are not allowed in type expressions outside `typing.Literal[]` slices"
             )),
             ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
                 value: ast::Number::Int(_),
                 ..
             }) => report_invalid_type_expression(format_args!(
-                "Int literals are not allowed in type expressions"
+                "Int literals are not allowed in type expressions outside `typing.Literal[]` slices"
             )),
             ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
                 value: ast::Number::Float(_),
@@ -6147,7 +6147,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 "Complex literals are not allowed in type expressions"
             )),
             ast::Expr::BooleanLiteral(_) => report_invalid_type_expression(format_args!(
-                "Boolean literals are not allowed in type expressions"
+                "Boolean literals are not allowed in type expressions outside `typing.Literal[]` slices"
             )),
 
             ast::Expr::Subscript(subscript) => {
