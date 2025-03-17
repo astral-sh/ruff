@@ -1,10 +1,10 @@
 name: CI
 
-permissions: {}
+permissions: { }
 
 on:
   push:
-    branches: [main]
+    branches: [ main ]
   pull_request:
   workflow_dispatch:
 
@@ -26,76 +26,74 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       # Flag that is raised when any code that affects parser is changed
-      parser: ${{ steps.changed.outputs.parser_any_changed }}
+      parser: "true"
       # Flag that is raised when any code that affects linter is changed
-      linter: ${{ steps.changed.outputs.linter_any_changed }}
+      linter: "true"
       # Flag that is raised when any code that affects formatter is changed
-      formatter: ${{ steps.changed.outputs.formatter_any_changed }}
+      formatter: "true"
       # Flag that is raised when any code is changed
       # This is superset of the linter and formatter
-      code: ${{ steps.changed.outputs.code_any_changed }}
+      code: "true"
       # Flag that is raised when any code that affects the fuzzer is changed
-      fuzz: ${{ steps.changed.outputs.fuzz_any_changed }}
+      fuzz: "true"
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
           persist-credentials: false
 
-      - uses: tj-actions/changed-files@v45
-        id: changed
-        with:
-          files_yaml: |
-            parser:
-              - Cargo.toml
-              - Cargo.lock
-              - crates/ruff_python_trivia/**
-              - crates/ruff_source_file/**
-              - crates/ruff_text_size/**
-              - crates/ruff_python_ast/**
-              - crates/ruff_python_parser/**
-              - python/py-fuzzer/**
-              - .github/workflows/ci.yaml
-
-            linter:
-              - Cargo.toml
-              - Cargo.lock
-              - crates/**
-              - "!crates/red_knot*/**"
-              - "!crates/ruff_python_formatter/**"
-              - "!crates/ruff_formatter/**"
-              - "!crates/ruff_dev/**"
-              - scripts/*
-              - python/**
-              - .github/workflows/ci.yaml
-
-            formatter:
-              - Cargo.toml
-              - Cargo.lock
-              - crates/ruff_python_formatter/**
-              - crates/ruff_formatter/**
-              - crates/ruff_python_trivia/**
-              - crates/ruff_python_ast/**
-              - crates/ruff_source_file/**
-              - crates/ruff_python_index/**
-              - crates/ruff_text_size/**
-              - crates/ruff_python_parser/**
-              - crates/ruff_dev/**
-              - scripts/*
-              - python/**
-              - .github/workflows/ci.yaml
-
-            fuzz:
-              - fuzz/Cargo.toml
-              - fuzz/Cargo.lock
-              - fuzz/fuzz_targets/**
-
-            code:
-              - "**/*"
-              - "!**/*.md"
-              - "crates/red_knot_python_semantic/resources/mdtest/**/*.md"
-              - "!docs/**"
-              - "!assets/**"
+  # TODO: Replace with plain git command?
+  #          files_yaml: |
+  #            parser:
+  #              - Cargo.toml
+  #              - Cargo.lock
+  #              - crates/ruff_python_trivia/**
+  #              - crates/ruff_source_file/**
+  #              - crates/ruff_text_size/**
+  #              - crates/ruff_python_ast/**
+  #              - crates/ruff_python_parser/**
+  #              - python/py-fuzzer/**
+  #              - .github/workflows/ci.yaml
+  #
+  #            linter:
+  #              - Cargo.toml
+  #              - Cargo.lock
+  #              - crates/**
+  #              - "!crates/red_knot*/**"
+  #              - "!crates/ruff_python_formatter/**"
+  #              - "!crates/ruff_formatter/**"
+  #              - "!crates/ruff_dev/**"
+  #              - scripts/*
+  #              - python/**
+  #              - .github/workflows/ci.yaml
+  #
+  #            formatter:
+  #              - Cargo.toml
+  #              - Cargo.lock
+  #              - crates/ruff_python_formatter/**
+  #              - crates/ruff_formatter/**
+  #              - crates/ruff_python_trivia/**
+  #              - crates/ruff_python_ast/**
+  #              - crates/ruff_source_file/**
+  #              - crates/ruff_python_index/**
+  #              - crates/ruff_text_size/**
+  #              - crates/ruff_python_parser/**
+  #              - crates/ruff_dev/**
+  #              - scripts/*
+  #              - python/**
+  #              - .github/workflows/ci.yaml
+  #
+  #            fuzz:
+  #              - fuzz/Cargo.toml
+  #              - fuzz/Cargo.lock
+  #              - fuzz/fuzz_targets/**
+  #
+  #            code:
+  #              - "**/*"
+  #              - "!**/*.md"
+  #              - "crates/red_knot_python_semantic/resources/mdtest/**/*.md"
+  #              - "!docs/**"
+  #              - "!assets/**"
 
   cargo-fmt:
     name: "cargo fmt"
