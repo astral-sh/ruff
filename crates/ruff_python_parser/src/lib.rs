@@ -529,11 +529,7 @@ impl Tokens {
     ///
     /// If either the start or end offset of the given range is within a token range.
     pub fn in_range(&self, range: TextRange) -> &[Token] {
-        Self::in_range_impl(self, range)
-    }
-
-    fn in_range_impl(tokens: &[Token], range: TextRange) -> &[Token] {
-        let tokens_after_start = Self::after_impl(tokens, range.start());
+        let tokens_after_start = self.after(range.start());
 
         match tokens_after_start.binary_search_by_key(&range.end(), Ranged::end) {
             Ok(idx) => {
@@ -571,17 +567,13 @@ impl Tokens {
     ///
     /// If the given offset is inside a token range.
     pub fn after(&self, offset: TextSize) -> &[Token] {
-        Self::after_impl(self, offset)
-    }
-
-    fn after_impl(tokens: &[Token], offset: TextSize) -> &[Token] {
-        match tokens.binary_search_by(|token| token.start().cmp(&offset)) {
-            Ok(idx) => &tokens[idx..],
+        match self.binary_search_by(|token| token.start().cmp(&offset)) {
+            Ok(idx) => &self[idx..],
             Err(idx) => {
                 // We can't use `saturating_sub` here because a file could contain a BOM header, in
                 // which case the token starts at offset 3 for UTF-8 encoded file content.
                 if idx > 0 {
-                    if let Some(prev) = tokens.get(idx - 1) {
+                    if let Some(prev) = self.get(idx - 1) {
                         // If it's equal to the end offset, then it's at a token boundary which is
                         // valid. If it's greater than the end offset, then it's in the gap between
                         // the tokens which is valid as well.
@@ -594,7 +586,7 @@ impl Tokens {
                     }
                 }
 
-                &tokens[idx..]
+                &self[idx..]
             }
         }
     }

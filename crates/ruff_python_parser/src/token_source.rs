@@ -3,7 +3,7 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 use crate::error::LexicalError;
 use crate::lexer::{Lexer, LexerCheckpoint};
 use crate::token::{Token, TokenFlags, TokenKind, TokenValue};
-use crate::{Mode, Tokens};
+use crate::Mode;
 
 /// Token source for the parser that skips over any trivia tokens.
 #[derive(Debug)]
@@ -167,10 +167,18 @@ impl<'src> TokenSource<'src> {
     }
 
     /// Returns a slice of [`Token`] that are within the given `range`.
-    ///
-    /// See [`crate::Tokens::in_range`] for details.
     pub(crate) fn in_range(&self, range: TextRange) -> &[Token] {
-        Tokens::in_range_impl(&self.tokens, range)
+        let start = self
+            .tokens
+            .iter()
+            .rposition(|tok| tok.start() == range.start());
+        let end = self.tokens.iter().rposition(|tok| tok.end() == range.end());
+
+        let (Some(start), Some(end)) = (start, end) else {
+            return &self.tokens;
+        };
+
+        &self.tokens[start..=end]
     }
 
     /// Consumes the token source, returning the collected tokens, comment ranges, and any errors
