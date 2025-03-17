@@ -21,3 +21,4 @@
 /crates/red_knot* @carljm @MichaReiser @AlexWaygood @sharkdp @dcreager
 /crates/ruff_db/ @carljm @MichaReiser @AlexWaygood @sharkdp @dcreager
 /scripts/knot_benchmark/ @carljm @MichaReiser @AlexWaygood @sharkdp @dcreager
+/crates/red_knot_python_semantic @carljm @AlexWaygood @sharkdp @dcreager
