@@ -3,7 +3,7 @@ import Header from "./Header";
 import { persist, persistLocal, restore, stringify } from "./settings";
 import { useTheme } from "./theme";
 import { default as Editor, Source } from "./Editor";
-import initRuff, { Workspace } from "../pkg";
+import initRuff, { Workspace } from "ruff_wasm";
 import { loader } from "@monaco-editor/react";
 import { setupMonaco } from "./setupMonaco";
 import { DEFAULT_PYTHON_SOURCE } from "../constants";

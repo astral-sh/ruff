@@ -1,4 +1,4 @@
-import { Diagnostic } from "../pkg";
+import { Diagnostic } from "ruff_wasm";
 import classNames from "classnames";
 import { Theme } from "./theme";
 import { useMemo } from "react";
