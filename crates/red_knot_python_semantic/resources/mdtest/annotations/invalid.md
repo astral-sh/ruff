@@ -56,7 +56,8 @@ def _(
     e: int | b"foo",
     f: 1 and 2,  # error: [invalid-type-form] "Boolean operations like `and` and `or` are not allowed in type expressions"
     g: 1 or 2,  # error: [invalid-type-form] "Boolean operations like `and` and `or` are not allowed in type expressions"
-    h: (foo := 1),  # error: [invalid-type-form] "Named expressions like `foo =: 1` are not allowed in type expressions"
+    h: (foo := 1),  # error: [invalid-type-form] "Named expressions like `foo := 1` are not allowed in type expressions"
+    i: not 1,  # error: [invalid-type-form] "Unary operations like `not` are not allowed in type expressions"
 ):
     reveal_type(a)  # revealed: Unknown
     reveal_type(b)  # revealed: Unknown
@@ -66,4 +67,5 @@ def _(
     reveal_type(f)  # revealed: Unknown
     reveal_type(g)  # revealed: Unknown
     reveal_type(h)  # revealed: Unknown
+    reveal_type(i)  # revealed: Unknown
 ```

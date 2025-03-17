@@ -6178,7 +6178,10 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
             ast::Expr::UnaryOp(unary) => {
                 self.infer_unary_expression(unary);
-                Type::unknown()
+                self.report_invalid_type_expression(
+                    expression,
+                    format_args!("Unary operations like `not` are not allowed in type expressions"),
+                )
             }
             ast::Expr::Lambda(lambda_expression) => {
                 self.infer_lambda_expression(lambda_expression);
