@@ -1431,10 +1431,7 @@ impl<'src> Parser<'src> {
 
         let range = self.node_range(start);
 
-        // the inner variant here doesn't matter, just checking if PEP 701 f-strings are supported
-        if UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::NestedQuote)
-            .is_unsupported(self.options.target_version)
-        {
+        if !self.options.target_version.supports_pep_701() {
             let quote_bytes = flags.quote_str().as_bytes();
             let quote_len = flags.quote_len();
             for expr in elements.expressions() {
