@@ -73,7 +73,7 @@ info: revealed-type
 31 |     for x in Iterable1():
 32 |         # TODO: `bytes | str` might be better
 33 |         reveal_type(x)  # revealed: bytes | str | Unknown
-   |         -------------- info: Revealed type is `bytes | str | Unknown`
+   |         ^^^^^^^^^^^^^^ Revealed type is `bytes | str | Unknown`
 34 |
 35 |     # error: [not-iterable]
    |
@@ -99,7 +99,7 @@ info: revealed-type
 35 |     # error: [not-iterable]
 36 |     for y in Iterable2():
 37 |         reveal_type(y)  # revealed: bytes | str | int
-   |         -------------- info: Revealed type is `bytes | str | int`
+   |         ^^^^^^^^^^^^^^ Revealed type is `bytes | str | int`
    |
 
 ```

@@ -69,7 +69,7 @@ info: revealed-type
 27 |     # error: [not-iterable]
 28 |     for x in Iterable1():
 29 |         reveal_type(x)  # revealed: int | str
-   |         -------------- info: Revealed type is `int | str`
+   |         ^^^^^^^^^^^^^^ Revealed type is `int | str`
 30 |
 31 |     # error: [not-iterable]
    |
@@ -96,7 +96,7 @@ info: revealed-type
 32 |     for y in Iterable2():
 33 |         # TODO: `int` would probably be better here:
 34 |         reveal_type(y)  # revealed: int | Unknown
-   |         -------------- info: Revealed type is `int | Unknown`
+   |         ^^^^^^^^^^^^^^ Revealed type is `int | Unknown`
    |
 
 ```

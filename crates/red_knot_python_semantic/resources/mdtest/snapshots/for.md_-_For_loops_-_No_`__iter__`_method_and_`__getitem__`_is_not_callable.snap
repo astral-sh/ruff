@@ -43,7 +43,7 @@ info: revealed-type
 6 | # error: [not-iterable]
 7 | for x in Bad():
 8 |     reveal_type(x)  # revealed: Unknown
-  |     -------------- info: Revealed type is `Unknown`
+  |     ^^^^^^^^^^^^^^ Revealed type is `Unknown`
   |
 
 ```
