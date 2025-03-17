@@ -104,8 +104,6 @@ impl SyntaxChecker {
 
 #[cfg(test)]
 mod tests {
-    #![allow(unused)] // TODO(brent)
-
     use std::path::Path;
 
     use insta::assert_debug_snapshot;
@@ -124,5 +122,11 @@ mod tests {
             checker.enter_stmt(stmt);
         }
         checker.errors
+    }
+
+    #[test]
+    fn rebound_comprehension_iteration_variable() {
+        let contents = "[(a := 0) for a in range(0)]";
+        assert_debug_snapshot!(test_snippet(contents, PythonVersion::default()), @"");
     }
 }
