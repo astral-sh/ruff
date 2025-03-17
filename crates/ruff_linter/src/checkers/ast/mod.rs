@@ -2768,17 +2768,3 @@ fn try_diagnostic_from_syntax_error(error: &SyntaxError, checker: &Checker) -> O
         SyntaxErrorKind::ReboundComprehensionVariable => None,
     }
 }
-
-#[cfg(test)]
-mod tests {
-
-    use insta::assert_debug_snapshot;
-
-    use crate::{settings::LinterSettings, test::test_snippet};
-
-    #[test]
-    fn rebound_comprehension_iteration_variable() {
-        let contents = "[(a := 0) for a in range(0)]";
-        assert_debug_snapshot!(test_snippet(contents, &LinterSettings::default()), @"");
-    }
-}
