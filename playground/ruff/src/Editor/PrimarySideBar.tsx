@@ -1,4 +1,4 @@
-import { FileIcon, SettingsIcon } from "./Icons";
+import { Icons } from "shared";
 import SideBar, { SideBarEntry } from "./SideBar";
 
 type Tool = "Settings" | "Source";
@@ -20,7 +20,7 @@ export default function PrimarySideBar({
         onClick={() => onSelectTool("Source")}
         selected={selected === "Source"}
       >
-        <FileIcon />
+        <Icons.File />
       </SideBarEntry>
 
       <SideBarEntry
@@ -29,7 +29,7 @@ export default function PrimarySideBar({
         onClick={() => onSelectTool("Settings")}
         selected={selected === "Settings"}
       >
-        <SettingsIcon />
+        <Icons.Settings />
       </SideBarEntry>
     </SideBar>
   );

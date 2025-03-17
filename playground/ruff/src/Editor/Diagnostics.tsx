@@ -1,6 +1,6 @@
 import { Diagnostic } from "ruff_wasm";
 import classNames from "classnames";
-import { Theme } from "./theme";
+import { Theme } from "shared";
 import { useMemo } from "react";
 
 interface Props {

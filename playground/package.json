@@ -11,14 +11,15 @@
     "tsc": "tsc"
   },
   "workspaces": [
-    "ruff"
+    "ruff",
+    "shared"
   ],
   "prettier": {
     "trailingComma": "all"
   },
   "devDependencies": {
     "@eslint/js": "^9.21.0",
-    "@tailwindcss/postcss": "^4.0.9",
+    "@tailwindcss/vite": "^4.0.14",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react-swc": "^3.0.0",

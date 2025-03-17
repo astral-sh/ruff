@@ -7,9 +7,13 @@ import {
 } from "react";
 import { Panel, PanelGroup } from "react-resizable-panels";
 import { Diagnostic, Workspace } from "ruff_wasm";
-import { ErrorMessage } from "./ErrorMessage";
+import {
+  ErrorMessage,
+  Theme,
+  HorizontalResizeHandle,
+  VerticalResizeHandle,
+} from "shared";
 import PrimarySideBar from "./PrimarySideBar";
-import { HorizontalResizeHandle, VerticalResizeHandle } from "./ResizeHandle";
 import SecondaryPanel, {
   SecondaryPanelResult,
   SecondaryTool,
@@ -17,7 +21,6 @@ import SecondaryPanel, {
 import SecondarySideBar from "./SecondarySideBar";
 import SettingsEditor from "./SettingsEditor";
 import SourceEditor from "./SourceEditor";
-import { Theme } from "./theme";
 import Diagnostics from "./Diagnostics";
 import { editor } from "monaco-editor";
 import IStandaloneCodeEditor = editor.IStandaloneCodeEditor;

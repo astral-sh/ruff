@@ -3,7 +3,7 @@
  */
 
 import { useCallback } from "react";
-import { Theme } from "./theme";
+import { Theme } from "shared";
 import MonacoEditor from "@monaco-editor/react";
 import { editor } from "monaco-editor";
 import IStandaloneCodeEditor = editor.IStandaloneCodeEditor;

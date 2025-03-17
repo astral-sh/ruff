@@ -3,7 +3,7 @@
  */
 
 import { Monaco } from "@monaco-editor/react";
-import schema from "../../../../ruff.schema.json";
+import schema from "../../../ruff.schema.json";
 
 export const WHITE = "#ffffff";
 export const RADIATE = "#d7ff64";
