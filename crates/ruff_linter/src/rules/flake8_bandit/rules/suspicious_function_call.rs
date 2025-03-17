@@ -357,6 +357,7 @@ impl Violation for SuspiciousEvalUsage {
 /// ```python
 /// from django.utils.safestring import mark_safe
 ///
+///
 /// def render_username(username):
 ///     return mark_safe(f"<i>{username}</i>")  # Dangerous if username is user-provided.
 /// ```
@@ -364,6 +365,7 @@ impl Violation for SuspiciousEvalUsage {
 /// Use instead:
 /// ```python
 /// from django.utils.html import format_html
+///
 ///
 /// def render_username(username):
 ///     return django.utils.html.format_html("<i>{}</i>", username)  # username is escaped.
