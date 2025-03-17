@@ -16,6 +16,7 @@ impl FormatNodeRule<ExprBoolOp> for FormatExprBoolOp {
     }
 }
 
+// Some random new comment
 impl NeedsParentheses for ExprBoolOp {
     fn needs_parentheses(
         &self,
