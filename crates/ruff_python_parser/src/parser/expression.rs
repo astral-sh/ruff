@@ -1427,6 +1427,7 @@ impl<'src> Parser<'src> {
         // f"{f'''{"nested"} inner'''} outer" # nested (triple) quotes
         // f"test {a \
         //     } more"                        # line continuation
+        // f"""{f"""{x}"""}"""                # mark the whole triple quote
 
         let range = self.node_range(start);
 
@@ -1435,6 +1436,7 @@ impl<'src> Parser<'src> {
             .is_unsupported(self.options.target_version)
         {
             let quote_str = flags.quote_str();
+            let quote_len = flags.quote_len();
             for expr in elements.expressions() {
                 if let Some(slash_index) = self.source[expr.range].find('\\') {
                     let Ok(slash_index) = TextSize::try_from(slash_index) else {
@@ -1452,7 +1454,7 @@ impl<'src> Parser<'src> {
                     };
                     self.add_unsupported_syntax_error(
                         UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::NestedQuote),
-                        TextRange::at(expr.range.start() + quote_index, TextSize::from(1)),
+                        TextRange::at(expr.range.start() + quote_index, quote_len),
                     );
                 };
             }

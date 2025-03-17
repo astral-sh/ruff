@@ -7,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/inline/err/pep701_f_string_py311
 ```
 Module(
     ModModule {
-        range: 0..403,
+        range: 0..468,
         body: [
             Expr(
                 StmtExpr {
@@ -578,6 +578,76 @@ Module(
                     ),
                 },
             ),
+            Expr(
+                StmtExpr {
+                    range: 403..422,
+                    value: FString(
+                        ExprFString {
+                            range: 403..422,
+                            value: FStringValue {
+                                inner: Single(
+                                    FString(
+                                        FString {
+                                            range: 403..422,
+                                            elements: [
+                                                Expression(
+                                                    FStringExpressionElement {
+                                                        range: 407..419,
+                                                        expression: FString(
+                                                            ExprFString {
+                                                                range: 408..418,
+                                                                value: FStringValue {
+                                                                    inner: Single(
+                                                                        FString(
+                                                                            FString {
+                                                                                range: 408..418,
+                                                                                elements: [
+                                                                                    Expression(
+                                                                                        FStringExpressionElement {
+                                                                                            range: 412..415,
+                                                                                            expression: Name(
+                                                                                                ExprName {
+                                                                                                    range: 413..414,
+                                                                                                    id: Name("x"),
+                                                                                                    ctx: Load,
+                                                                                                },
+                                                                                            ),
+                                                                                            debug_text: None,
+                                                                                            conversion: None,
+                                                                                            format_spec: None,
+                                                                                        },
+                                                                                    ),
+                                                                                ],
+                                                                                flags: FStringFlags {
+                                                                                    quote_style: Double,
+                                                                                    prefix: Regular,
+                                                                                    triple_quoted: true,
+                                                                                },
+                                                                            },
+                                                                        ),
+                                                                    ),
+                                                                },
+                                                            },
+                                                        ),
+                                                        debug_text: None,
+                                                        conversion: None,
+                                                        format_spec: None,
+                                                    },
+                                                ),
+                                            ],
+                                            flags: FStringFlags {
+                                                quote_style: Double,
+                                                prefix: Regular,
+                                                triple_quoted: true,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
         ],
     },
 )
@@ -679,4 +749,13 @@ Module(
  9 | f"test {a \
    |           ^ Syntax Error: Cannot use an escape sequence (backslash) in f-strings on Python 3.11 (syntax was added in Python 3.12)
 10 |     } more"                        # line continuation
+11 | f"""{f"""{x}"""}"""                # mark the whole triple quote
+   |
+
+
+   |
+ 9 | f"test {a \
+10 |     } more"                        # line continuation
+11 | f"""{f"""{x}"""}"""                # mark the whole triple quote
+   |       ^^^ Syntax Error: Cannot reuse outer quote character in f-strings on Python 3.11 (syntax was added in Python 3.12)
    |
