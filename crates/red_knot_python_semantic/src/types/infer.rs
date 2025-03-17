@@ -111,9 +111,7 @@ use super::{CallDunderError, ParameterExpectation, ParameterExpectations};
 #[salsa::tracked(return_ref, cycle_fn=scope_cycle_recover, cycle_initial=scope_cycle_initial)]
 pub(crate) fn infer_scope_types<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> TypeInference<'db> {
     let file = scope.file(db);
-    let _span =
-        tracing::trace_span!("infer_scope_types", scope=?scope.as_id(), file=%file.path(db))
-            .entered();
+    let _span = tracing::trace_span!("infer_scope_types", scope=?scope.as_id(), ?file).entered();
 
     // Using the index here is fine because the code below depends on the AST anyway.
     // The isolation of the query is by the return inferred types.
@@ -146,7 +144,7 @@ pub(crate) fn infer_definition_types<'db>(
     let _span = tracing::trace_span!(
         "infer_definition_types",
         range = ?definition.kind(db).target_range(),
-        file = %file.path(db)
+        ?file
     )
     .entered();
 
@@ -185,7 +183,7 @@ pub(crate) fn infer_deferred_types<'db>(
         "infer_deferred_types",
         definition = ?definition.as_id(),
         range = ?definition.kind(db).target_range(),
-        file = %file.path(db)
+        ?file
     )
     .entered();
 
@@ -221,7 +219,7 @@ pub(crate) fn infer_expression_types<'db>(
         "infer_expression_types",
         expression = ?expression.as_id(),
         range = ?expression.node_ref(db).range(),
-        file = %file.path(db)
+        ?file
     )
     .entered();
 
@@ -302,8 +300,7 @@ fn single_expression_cycle_initial<'db>(
 pub(super) fn infer_unpack_types<'db>(db: &'db dyn Db, unpack: Unpack<'db>) -> UnpackResult<'db> {
     let file = unpack.file(db);
     let _span =
-        tracing::trace_span!("infer_unpack_types", range=?unpack.range(db), file=%file.path(db))
-            .entered();
+        tracing::trace_span!("infer_unpack_types", range=?unpack.range(db), ?file).entered();
 
     let mut unpacker = Unpacker::new(db, unpack.scope(db));
     unpacker.unpack(unpack.target(db), unpack.value(db));

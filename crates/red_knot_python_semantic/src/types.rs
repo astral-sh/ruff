@@ -62,7 +62,7 @@ mod property_tests;
 
 #[salsa::tracked(return_ref)]
 pub fn check_types(db: &dyn Db, file: File) -> TypeCheckDiagnostics {
-    let _span = tracing::trace_span!("check_types", file=?file.path(db)).entered();
+    let _span = tracing::trace_span!("check_types", ?file).entered();
 
     tracing::debug!("Checking file '{path}'", path = file.path(db));
 
@@ -3605,7 +3605,7 @@ impl<'db> InvalidTypeExpression<'db> {
 /// This must be a tracked struct, not an interned one, because typevar equivalence is by identity,
 /// not by value. Two typevars that have the same name, bound/constraints, and default, are still
 /// different typevars: if used in the same scope, they may be bound to different types.
-#[salsa::tracked]
+#[salsa::tracked(debug)]
 pub struct TypeVarInstance<'db> {
     /// The name of this TypeVar (e.g. `T`)
     #[return_ref]
@@ -4308,7 +4308,7 @@ impl From<bool> for Truthiness {
     }
 }
 
-#[salsa::interned]
+#[salsa::interned(debug)]
 pub struct FunctionType<'db> {
     /// name of the function at definition
     #[return_ref]
@@ -4538,7 +4538,7 @@ impl KnownFunction {
 /// on an instance of a class. For example, the expression `Path("a.txt").touch` creates
 /// a bound method object that represents the `Path.touch` method which is bound to the
 /// instance `Path("a.txt")`.
-#[salsa::tracked]
+#[salsa::tracked(debug)]
 pub struct BoundMethodType<'db> {
     /// The function that is being bound. Corresponds to the `__func__` attribute on a
     /// bound method object
@@ -4550,7 +4550,7 @@ pub struct BoundMethodType<'db> {
 
 /// This type represents a general callable type that are used to represent `typing.Callable`
 /// and `lambda` expressions.
-#[salsa::interned]
+#[salsa::interned(debug)]
 pub struct GeneralCallableType<'db> {
     #[return_ref]
     signature: Signature<'db>,
@@ -4734,7 +4734,7 @@ enum ParameterExpectation {
     TypeExpression,
 }
 
-#[salsa::interned]
+#[salsa::interned(debug)]
 pub struct ModuleLiteralType<'db> {
     /// The file in which this module was imported.
     ///
@@ -4783,7 +4783,7 @@ impl<'db> ModuleLiteralType<'db> {
     }
 }
 
-#[salsa::interned]
+#[salsa::interned(debug)]
 pub struct TypeAliasType<'db> {
     #[return_ref]
     pub name: ast::name::Name,
@@ -4811,7 +4811,7 @@ pub(super) struct MetaclassCandidate<'db> {
     explicit_metaclass_of: Class<'db>,
 }
 
-#[salsa::interned]
+#[salsa::interned(debug)]
 pub struct UnionType<'db> {
     /// The union type includes values in any of these types.
     #[return_ref]
@@ -5022,7 +5022,7 @@ impl<'db> UnionType<'db> {
     }
 }
 
-#[salsa::interned]
+#[salsa::interned(debug)]
 pub struct IntersectionType<'db> {
     /// The intersection type includes only values in all of these types.
     #[return_ref]
@@ -5253,7 +5253,7 @@ impl<'db> IntersectionType<'db> {
     }
 }
 
-#[salsa::interned]
+#[salsa::interned(debug)]
 pub struct StringLiteralType<'db> {
     #[return_ref]
     value: Box<str>,
@@ -5266,7 +5266,7 @@ impl<'db> StringLiteralType<'db> {
     }
 }
 
-#[salsa::interned]
+#[salsa::interned(debug)]
 pub struct BytesLiteralType<'db> {
     #[return_ref]
     value: Box<[u8]>,
@@ -5278,7 +5278,7 @@ impl<'db> BytesLiteralType<'db> {
     }
 }
 
-#[salsa::interned]
+#[salsa::interned(debug)]
 pub struct SliceLiteralType<'db> {
     start: Option<i32>,
     stop: Option<i32>,
@@ -5290,7 +5290,7 @@ impl SliceLiteralType<'_> {
         (self.start(db), self.stop(db), self.step(db))
     }
 }
-#[salsa::interned]
+#[salsa::interned(debug)]
 pub struct TupleType<'db> {
     #[return_ref]
     elements: Box<[Type<'db>]>,

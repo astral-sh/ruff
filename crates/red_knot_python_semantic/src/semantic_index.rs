@@ -45,7 +45,7 @@ type SymbolMap = hashbrown::HashMap<ScopedSymbolId, (), FxBuildHasher>;
 /// Prefer using [`symbol_table`] when working with symbols from a single scope.
 #[salsa::tracked(return_ref, no_eq)]
 pub(crate) fn semantic_index(db: &dyn Db, file: File) -> SemanticIndex<'_> {
-    let _span = tracing::trace_span!("semantic_index", file = %file.path(db)).entered();
+    let _span = tracing::trace_span!("semantic_index", ?file).entered();
 
     let parsed = parsed_module(db.upcast(), file);
 
@@ -60,8 +60,7 @@ pub(crate) fn semantic_index(db: &dyn Db, file: File) -> SemanticIndex<'_> {
 #[salsa::tracked]
 pub(crate) fn symbol_table<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<SymbolTable> {
     let file = scope.file(db);
-    let _span =
-        tracing::trace_span!("symbol_table", scope=?scope.as_id(), file=%file.path(db)).entered();
+    let _span = tracing::trace_span!("symbol_table", scope=?scope.as_id(), ?file).entered();
     let index = semantic_index(db, file);
 
     index.symbol_table(scope.file_scope_id(db))
@@ -91,8 +90,7 @@ pub(crate) fn imported_modules<'db>(db: &'db dyn Db, file: File) -> Arc<FxHashSe
 #[salsa::tracked]
 pub(crate) fn use_def_map<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<UseDefMap<'db>> {
     let file = scope.file(db);
-    let _span =
-        tracing::trace_span!("use_def_map", scope=?scope.as_id(), file=%file.path(db)).entered();
+    let _span = tracing::trace_span!("use_def_map", scope=?scope.as_id(), ?file).entered();
     let index = semantic_index(db, file);
 
     index.use_def_map(scope.file_scope_id(db))
@@ -120,7 +118,7 @@ pub(crate) fn attribute_assignments<'db>(
 /// Returns the module global scope of `file`.
 #[salsa::tracked]
 pub(crate) fn global_scope(db: &dyn Db, file: File) -> ScopeId<'_> {
-    let _span = tracing::trace_span!("global_scope", file = %file.path(db)).entered();
+    let _span = tracing::trace_span!("global_scope", ?file).entered();
 
     FileScopeId::global().to_scope_id(db, file)
 }
