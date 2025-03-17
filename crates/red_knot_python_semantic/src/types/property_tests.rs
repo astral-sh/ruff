@@ -420,6 +420,12 @@ mod stable {
         forall types s, t. s.is_subtype_of(db, t) && t.is_subtype_of(db, s) => s.is_equivalent_to(db, t)
     );
 
+    // If `S <: T`, then `~T <: ~S`.
+    type_property_test!(
+        negation_reverses_subtype_order, db,
+        forall types s, t. s.is_subtype_of(db, t) => t.negate(db).is_subtype_of(db, s.negate(db))
+    );
+
     // `T` is not disjoint from itself, unless `T` is `Never`.
     type_property_test!(
         disjoint_from_is_irreflexive, db,
@@ -544,12 +550,6 @@ mod flaky {
     type_property_test!(
         negation_is_disjoint, db,
         forall types t. t.is_fully_static(db) => t.negate(db).is_disjoint_from(db, t)
-    );
-
-    // If `S <: T`, then `~T <: ~S`.
-    type_property_test!(
-        negation_reverses_subtype_order, db,
-        forall types s, t. s.is_subtype_of(db, t) => t.negate(db).is_subtype_of(db, s.negate(db))
     );
 
     // For two fully static types, their intersection must be a subtype of each type in the pair.

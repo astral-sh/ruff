@@ -100,7 +100,7 @@ impl From<FileSymbolId> for ScopedSymbolId {
 pub struct ScopedSymbolId;
 
 /// A cross-module identifier of a scope that can be used as a salsa query parameter.
-#[salsa::tracked]
+#[salsa::tracked(debug)]
 pub struct ScopeId<'db> {
     pub file: File,
 

@@ -1,0 +1,13 @@
+# parse_options: {"target-version": "3.8"}
+# these cases are _syntactically_ valid before Python 3.9 because the `with` item
+# is parsed as a tuple, but this will always cause a runtime error, so we flag it
+# anyway
+with (foo, bar): ...
+with (
+  open('foo.txt')) as foo: ...
+with (
+  foo,
+  bar,
+  baz,
+): ...
+with (foo,): ...

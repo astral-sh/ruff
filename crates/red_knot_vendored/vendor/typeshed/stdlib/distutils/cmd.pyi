@@ -30,7 +30,7 @@ _CommandT = TypeVar("_CommandT", bound=Command)
 _Ts = TypeVarTuple("_Ts")
 
 class Command:
-    dry_run: Literal[0, 1]  # Exposed from __getattr_. Same as Distribution.dry_run
+    dry_run: bool | Literal[0, 1]  # Exposed from __getattr_. Same as Distribution.dry_run
     distribution: Distribution
     # Any to work around variance issues
     sub_commands: ClassVar[list[tuple[str, Callable[[Any], bool] | None]]]
