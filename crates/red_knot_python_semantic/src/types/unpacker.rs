@@ -60,7 +60,7 @@ impl<'db> Unpacker<'db> {
                 err.fallback_element_type(self.db())
             }),
             UnpackValue::ContextManager(_) => value_ty.try_enter(self.db()).unwrap_or_else(|err| {
-                err.report_diagnostic(&self.context, value.as_any_node_ref(self.db()));
+                err.report_diagnostic(&self.context, value_ty, value.as_any_node_ref(self.db()));
                 err.fallback_enter_type(self.db())
             }),
         };

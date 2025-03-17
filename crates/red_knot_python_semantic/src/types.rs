@@ -3072,24 +3072,19 @@ impl<'db> Type<'db> {
         );
 
         // TODO: Make use of Protocols when we support it (the manager be assignable to `contextlib.AbstractContextManager`).
-        let result = match (enter, exit) {
+        match (enter, exit) {
             (Ok(enter), Ok(_)) => Ok(enter.return_type(db)),
-            (Ok(enter), Err(exit_error)) => Err(ContextManagerErrorKind::Exit {
+            (Ok(enter), Err(exit_error)) => Err(ContextManagerError::Exit {
                 enter_return_type: enter.return_type(db),
                 exit_error,
             }),
             // TODO: Use the `exit_ty` to determine if any raised exception is suppressed.
-            (Err(enter_error), Ok(_)) => Err(ContextManagerErrorKind::Enter(enter_error)),
-            (Err(enter_error), Err(exit_error)) => Err(ContextManagerErrorKind::EnterAndExit {
+            (Err(enter_error), Ok(_)) => Err(ContextManagerError::Enter(enter_error)),
+            (Err(enter_error), Err(exit_error)) => Err(ContextManagerError::EnterAndExit {
                 enter_error,
                 exit_error,
             }),
-        };
-
-        result.map_err(|error_kind| ContextManagerError {
-            context_manager_type: self,
-            error_kind,
-        })
+        }
     }
 
     #[must_use]
@@ -3634,56 +3629,33 @@ pub enum TypeVarBoundOrConstraints<'db> {
 
 /// Error returned if a type is not (or may not be) a context manager.
 #[derive(Debug)]
-struct ContextManagerError<'db> {
-    /// The type of the object that the analysed code attempted to use as a context manager.
-    context_manager_type: Type<'db>,
-
-    /// The precise kind of error encountered when trying to use the type as a context manager.
-    error_kind: ContextManagerErrorKind<'db>,
-}
-
-impl<'db> ContextManagerError<'db> {
-    fn enter_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
-        self.error_kind.enter_type(db)
-    }
-
-    fn fallback_enter_type(&self, db: &'db dyn Db) -> Type<'db> {
-        self.enter_type(db).unwrap_or(Type::unknown())
-    }
-
-    /// Reports the diagnostic for this error
-    fn report_diagnostic(
-        &self,
-        context: &InferContext<'db>,
-        context_manager_node: ast::AnyNodeRef,
-    ) {
-        self.error_kind
-            .report_diagnostic(context, self.context_manager_type, context_manager_node);
-    }
-}
-
-#[derive(Debug)]
-enum ContextManagerErrorKind<'db> {
+enum ContextManagerError<'db> {
+    Enter(CallDunderError<'db>),
     Exit {
         enter_return_type: Type<'db>,
         exit_error: CallDunderError<'db>,
     },
-    Enter(CallDunderError<'db>),
     EnterAndExit {
         enter_error: CallDunderError<'db>,
         exit_error: CallDunderError<'db>,
     },
 }
 
-impl<'db> ContextManagerErrorKind<'db> {
+impl<'db> ContextManagerError<'db> {
+    fn fallback_enter_type(&self, db: &'db dyn Db) -> Type<'db> {
+        self.enter_type(db).unwrap_or(Type::unknown())
+    }
+
+    /// Returns the `__enter__` return type if it is known,
+    /// or `None` if the type never has a callable `__enter__` attribute
     fn enter_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
         match self {
-            ContextManagerErrorKind::Exit {
+            Self::Exit {
                 enter_return_type,
                 exit_error: _,
             } => Some(*enter_return_type),
-            ContextManagerErrorKind::Enter(enter_error)
-            | ContextManagerErrorKind::EnterAndExit {
+            Self::Enter(enter_error)
+            | Self::EnterAndExit {
                 enter_error,
                 exit_error: _,
             } => match enter_error {
@@ -3700,7 +3672,7 @@ impl<'db> ContextManagerErrorKind<'db> {
     fn report_diagnostic(
         &self,
         context: &InferContext<'db>,
-        context_expression_ty: Type<'db>,
+        context_expression_type: Type<'db>,
         context_expression_node: ast::AnyNodeRef,
     ) {
         let format_call_dunder_error = |call_dunder_error: &CallDunderError<'db>, name: &str| {
@@ -3743,23 +3715,24 @@ impl<'db> ContextManagerErrorKind<'db> {
         let db = context.db();
 
         let formatted_errors = match self {
-            ContextManagerErrorKind::Exit {
+            Self::Exit {
                 enter_return_type: _,
                 exit_error,
             } => format_call_dunder_error(exit_error, "__exit__"),
-            ContextManagerErrorKind::Enter(enter_error) => {
-                format_call_dunder_error(enter_error, "__enter__")
-            }
-            ContextManagerErrorKind::EnterAndExit {
+            Self::Enter(enter_error) => format_call_dunder_error(enter_error, "__enter__"),
+            Self::EnterAndExit {
                 enter_error,
                 exit_error,
             } => format_call_dunder_errors(enter_error, "__enter__", exit_error, "__exit__"),
         };
 
-        context.report_lint(&INVALID_CONTEXT_MANAGER, context_expression_node,
-            format_args!("Object of type `{context_expression}` cannot be used with `with` because {formatted_errors}",
-context_expression = context_expression_ty.display(db)
-        ),
+        context.report_lint(
+            &INVALID_CONTEXT_MANAGER,
+            context_expression_node,
+            format_args!(
+                "Object of type `{context_expression}` cannot be used with `with` because {formatted_errors}",
+                context_expression = context_expression_type.display(db)
+            ),
         );
     }
 }

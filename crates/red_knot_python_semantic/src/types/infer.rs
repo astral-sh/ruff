@@ -1806,7 +1806,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     fn infer_context_expression(
         &mut self,
         context_expression: &ast::Expr,
-        context_expression_ty: Type<'db>,
+        context_expression_type: Type<'db>,
         is_async: bool,
     ) -> Type<'db> {
         // TODO: Handle async with statements (they use `aenter` and `aexit`)
@@ -1814,10 +1814,14 @@ impl<'db> TypeInferenceBuilder<'db> {
             return todo_type!("async `with` statement");
         }
 
-        context_expression_ty
+        context_expression_type
             .try_enter(self.db())
             .unwrap_or_else(|err| {
-                err.report_diagnostic(&self.context, context_expression.into());
+                err.report_diagnostic(
+                    &self.context,
+                    context_expression_type,
+                    context_expression.into(),
+                );
                 err.fallback_enter_type(self.db())
             })
     }
