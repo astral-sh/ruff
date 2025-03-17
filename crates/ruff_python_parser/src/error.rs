@@ -601,7 +601,7 @@ pub enum UnsupportedSyntaxErrorKind {
     /// [PEP 614]: https://peps.python.org/pep-0614/
     /// [`dotted_name`]: https://docs.python.org/3.8/reference/compound_stmts.html#grammar-token-dotted-name
     /// [decorator grammar]: https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-decorator
-    RelaxedDecorator,
+    RelaxedDecorator(RelaxedDecoratorError),
 
     /// Represents the use of a [PEP 570] positional-only parameter before Python 3.8.
     ///
@@ -768,7 +768,28 @@ impl Display for UnsupportedSyntaxError {
             UnsupportedSyntaxErrorKind::StarTuple(StarTupleKind::Yield) => {
                 "Cannot use iterable unpacking in yield expressions"
             }
-            UnsupportedSyntaxErrorKind::RelaxedDecorator => "Unsupported expression in decorators",
+            UnsupportedSyntaxErrorKind::RelaxedDecorator(relaxed_decorator_error) => {
+                return match relaxed_decorator_error {
+                    RelaxedDecoratorError::CallExpression => {
+                        write!(
+                            f,
+                            "Cannot use a call expression in a decorator on Python {} \
+                            unless it is the top-level expression or it occurs \
+                            in the argument list of a top-level call expression \
+                            (relaxed decorator syntax was {changed})",
+                            self.target_version,
+                            changed = self.kind.changed_version(),
+                        )
+                    }
+                    RelaxedDecoratorError::Other(description) => write!(
+                        f,
+                        "Cannot use {description} outside function call arguments in a decorator on Python {} \
+                        (syntax was {changed})",
+                        self.target_version,
+                        changed = self.kind.changed_version(),
+                    ),
+                }
+            }
             UnsupportedSyntaxErrorKind::PositionalOnlyParameter => {
                 "Cannot use positional-only parameter separator"
             }
@@ -793,6 +814,12 @@ impl Display for UnsupportedSyntaxError {
             changed = self.kind.changed_version(),
         )
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum RelaxedDecoratorError {
+    CallExpression,
+    Other(&'static str),
 }
 
 /// Represents the kind of change in Python syntax between versions.
@@ -822,7 +849,9 @@ impl UnsupportedSyntaxErrorKind {
                 Change::Added(PythonVersion::PY39)
             }
             UnsupportedSyntaxErrorKind::StarTuple(_) => Change::Added(PythonVersion::PY38),
-            UnsupportedSyntaxErrorKind::RelaxedDecorator => Change::Added(PythonVersion::PY39),
+            UnsupportedSyntaxErrorKind::RelaxedDecorator { .. } => {
+                Change::Added(PythonVersion::PY39)
+            }
             UnsupportedSyntaxErrorKind::PositionalOnlyParameter => {
                 Change::Added(PythonVersion::PY38)
             }
