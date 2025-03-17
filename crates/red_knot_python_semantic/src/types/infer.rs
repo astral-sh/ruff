@@ -61,7 +61,7 @@ use crate::symbol::{
     module_type_implicit_global_symbol, symbol, symbol_from_bindings, symbol_from_declarations,
     typing_extensions_symbol, Boundness, LookupError,
 };
-use crate::types::call::{Argument, CallArguments, UnionCallError};
+use crate::types::call::{Argument, CallArguments, CallError};
 use crate::types::diagnostic::{
     report_implicit_return_type, report_invalid_arguments_to_annotated,
     report_invalid_arguments_to_callable, report_invalid_assignment,
@@ -89,7 +89,6 @@ use crate::unpack::Unpack;
 use crate::util::subscript::{PyIndex, PySlice};
 use crate::Db;
 
-use super::call::CallError;
 use super::class_base::ClassBase;
 use super::context::{InNoTypeCheck, InferContext, WithDiagnostics};
 use super::diagnostic::{
@@ -2789,9 +2788,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                     Err(CallDunderError::PossiblyUnbound(outcome)) => {
                         UnionType::from_elements(db, [outcome.return_type(db), binary_return_ty()])
                     }
-                    Err(CallDunderError::Call(call_error)) => {
+                    Err(CallDunderError::CallError(_, bindings)) => {
                         report_unsupported_augmented_op(&mut self.context);
-                        call_error.fallback_return_type(db)
+                        bindings.return_type(db)
                     }
                 }
             }
@@ -3857,13 +3856,11 @@ impl<'db> TypeInferenceBuilder<'db> {
             .unwrap_or_default();
 
         let call_arguments = self.infer_arguments(arguments, parameter_expectations);
-        let call = function_type.try_call(self.db(), &call_arguments);
-
-        match call {
-            Ok(outcome) => {
-                for binding in outcome.bindings() {
+        match function_type.try_call(self.db(), &call_arguments) {
+            Ok(bindings) => {
+                for binding in &bindings {
                     let Some(known_function) = binding
-                        .callable_type()
+                        .callable_type
                         .into_function_literal()
                         .and_then(|function_type| function_type.known(self.db()))
                     else {
@@ -3967,61 +3964,12 @@ impl<'db> TypeInferenceBuilder<'db> {
                         _ => {}
                     }
                 }
-
-                outcome.return_type(self.db())
+                bindings.return_type(self.db())
             }
-            Err(err) => {
-                // TODO: We currently only report the first error. Ideally, we'd report
-                //  an error saying that the union type can't be called, followed by a sub
-                //  diagnostic explaining why.
-                fn report_call_error(
-                    context: &InferContext,
-                    err: CallError,
-                    call_expression: &ast::ExprCall,
-                ) {
-                    match err {
-                        CallError::NotCallable { not_callable_type } => {
-                            context.report_lint(
-                                &CALL_NON_CALLABLE,
-                                call_expression,
-                                format_args!(
-                                    "Object of type `{}` is not callable",
-                                    not_callable_type.display(context.db())
-                                ),
-                            );
-                        }
 
-                        CallError::Union(UnionCallError { errors, .. }) => {
-                            if let Some(first) = IntoIterator::into_iter(errors).next() {
-                                report_call_error(context, first, call_expression);
-                            } else {
-                                debug_assert!(
-                                    false,
-                                    "Expected `CalLError::Union` to at least have one error"
-                                );
-                            }
-                        }
-
-                        CallError::PossiblyUnboundDunderCall { called_type, .. } => {
-                            context.report_lint(
-                                &CALL_NON_CALLABLE,
-                                call_expression,
-                                format_args!(
-                                    "Object of type `{}` is not callable (possibly unbound `__call__` method)",
-                                    called_type.display(context.db())
-                                ),
-                            );
-                        }
-                        CallError::BindingError { binding, .. } => {
-                            binding.report_diagnostics(context, call_expression.into());
-                        }
-                    }
-                }
-
-                let return_type = err.fallback_return_type(self.db());
-                report_call_error(&self.context, err, call_expression);
-
-                return_type
+            Err(CallError(_, bindings)) => {
+                bindings.report_diagnostics(&self.context, call_expression.into());
+                bindings.return_type(self.db())
             }
         }
     }
@@ -4669,7 +4617,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     let reflected_dunder = op.reflected_dunder();
                     let rhs_reflected = right_class.member(self.db(), reflected_dunder).symbol;
                     // TODO: if `rhs_reflected` is possibly unbound, we should union the two possible
-                    // CallOutcomes together
+                    // Bindings together
                     if !rhs_reflected.is_unbound()
                         && rhs_reflected != left_class.member(self.db(), reflected_dunder).symbol
                     {
@@ -5412,7 +5360,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         db,
                         &CallArguments::positional([Type::Instance(right), Type::Instance(left)]),
                     )
-                    .map(|outcome| outcome.return_type(db))
+                    .map(|bindings| bindings.return_type(db))
                     .ok()
             }
             _ => {
@@ -5696,18 +5644,18 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                         return err.fallback_return_type(self.db());
                     }
-                    Err(CallDunderError::Call(err)) => {
+                    Err(CallDunderError::CallError(_, bindings)) => {
                         self.context.report_lint(
-                                &CALL_NON_CALLABLE,
-                                value_node,
-                                format_args!(
-                                    "Method `__getitem__` of type `{}` is not callable on object of type `{}`",
-                                    err.called_type().display(self.db()),
-                                    value_ty.display(self.db()),
-                                ),
-                            );
+                            &CALL_NON_CALLABLE,
+                            value_node,
+                            format_args!(
+                                "Method `__getitem__` of type `{}` is not callable on object of type `{}`",
+                                bindings.callable_type.display(self.db()),
+                                value_ty.display(self.db()),
+                            ),
+                        );
 
-                        return err.fallback_return_type(self.db());
+                        return bindings.return_type(self.db());
                     }
                     Err(CallDunderError::MethodNotAvailable) => {
                         // try `__class_getitem__`
@@ -5741,21 +5689,24 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 );
                             }
 
-                            return ty
-                                .try_call(self.db(), &CallArguments::positional([value_ty, slice_ty]))
-                                .map(|outcome| outcome.return_type(self.db()))
-                                .unwrap_or_else(|err| {
+                            match ty.try_call(
+                                self.db(),
+                                &CallArguments::positional([value_ty, slice_ty]),
+                            ) {
+                                Ok(bindings) => return bindings.return_type(self.db()),
+                                Err(CallError(_, bindings)) => {
                                     self.context.report_lint(
                                         &CALL_NON_CALLABLE,
                                         value_node,
                                         format_args!(
                                             "Method `__class_getitem__` of type `{}` is not callable on object of type `{}`",
-                                            err.called_type().display(self.db()),
+                                            bindings.callable_type.display(self.db()),
                                             value_ty.display(self.db()),
                                         ),
                                     );
-                                    err.fallback_return_type(self.db())
-                                });
+                                    return bindings.return_type(self.db());
+                                }
+                            }
                         }
                     }
 
@@ -6686,16 +6637,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         );
                         return Type::unknown();
                     };
-                    function_type
-                        .into_callable_type(self.db())
-                        .unwrap_or_else(|| {
-                            self.context.report_lint(
-                                &INVALID_TYPE_FORM,
-                                arguments_slice,
-                                format_args!("Overloaded function literal is not yet supported"),
-                            );
-                            Type::unknown()
-                        })
+                    function_type.into_callable_type(self.db())
                 }
             },
 

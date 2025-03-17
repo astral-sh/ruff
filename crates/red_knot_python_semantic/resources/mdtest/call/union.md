@@ -40,7 +40,7 @@ def _(flag: bool):
         def f() -> int:
             return 1
     x = f()  # error: [call-non-callable] "Object of type `Literal[1]` is not callable"
-    reveal_type(x)  # revealed: int | Unknown
+    reveal_type(x)  # revealed: Unknown | int
 ```
 
 ## Multiple non-callable elements in a union
@@ -58,7 +58,7 @@ def _(flag: bool, flag2: bool):
             return 1
     # TODO we should mention all non-callable elements of the union
     # error: [call-non-callable] "Object of type `Literal[1]` is not callable"
-    # revealed: int | Unknown
+    # revealed: Unknown | int
     reveal_type(f())
 ```
 
@@ -147,4 +147,17 @@ def _(flag: bool):
     # error: [too-many-positional-arguments] "Too many positional arguments to function `f1`: expected 0, got 1"
     x = f(3)
     reveal_type(x)  # revealed: Unknown
+```
+
+## Union including a special-cased function
+
+```py
+def _(flag: bool):
+    if flag:
+        f = str
+    else:
+        f = repr
+    reveal_type(str("string"))  # revealed: Literal["string"]
+    reveal_type(repr("string"))  # revealed: Literal["'string'"]
+    reveal_type(f("string"))  # revealed: Literal["string", "'string'"]
 ```
