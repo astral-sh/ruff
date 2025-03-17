@@ -9,7 +9,7 @@ use ruff_db::files::File;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ruff_text_size::{Ranged, TextRange};
-use type_ordering::union_elements_ordering;
+use type_ordering::union_or_intersection_elements_ordering;
 
 pub(crate) use self::builder::{IntersectionBuilder, UnionBuilder};
 pub(crate) use self::diagnostic::register_lints;
@@ -494,13 +494,13 @@ impl<'db> Type<'db> {
     /// Return a normalized version of `self` in which all unions and intersections are sorted
     /// according to a canonical order, no matter how "deeply" a union/intersection may be nested.
     #[must_use]
-    pub fn with_sorted_unions(self, db: &'db dyn Db) -> Self {
+    pub fn with_sorted_unions_and_intersections(self, db: &'db dyn Db) -> Self {
         match self {
             Type::Union(union) => Type::Union(union.to_sorted_union(db)),
             Type::Intersection(intersection) => {
                 Type::Intersection(intersection.to_sorted_intersection(db))
             }
-            Type::Tuple(tuple) => Type::Tuple(tuple.with_sorted_unions(db)),
+            Type::Tuple(tuple) => Type::Tuple(tuple.with_sorted_unions_and_intersections(db)),
             Type::LiteralString
             | Type::Instance(_)
             | Type::AlwaysFalsy
@@ -4945,9 +4945,9 @@ impl<'db> UnionType<'db> {
         let mut new_elements: Vec<Type<'db>> = self
             .elements(db)
             .iter()
-            .map(|element| element.with_sorted_unions(db))
+            .map(|element| element.with_sorted_unions_and_intersections(db))
             .collect();
-        new_elements.sort_unstable_by(union_elements_ordering);
+        new_elements.sort_unstable_by(|l, r| union_or_intersection_elements_ordering(db, l, r));
         UnionType::new(db, new_elements.into_boxed_slice())
     }
 
@@ -5048,10 +5048,10 @@ impl<'db> IntersectionType<'db> {
         ) -> FxOrderSet<Type<'db>> {
             let mut elements: FxOrderSet<Type<'db>> = elements
                 .iter()
-                .map(|ty| ty.with_sorted_unions(db))
+                .map(|ty| ty.with_sorted_unions_and_intersections(db))
                 .collect();
 
-            elements.sort_unstable_by(union_elements_ordering);
+            elements.sort_unstable_by(|l, r| union_or_intersection_elements_ordering(db, l, r));
             elements
         }
 
@@ -5317,11 +5317,11 @@ impl<'db> TupleType<'db> {
     /// Return a normalized version of `self` in which all unions and intersections are sorted
     /// according to a canonical order, no matter how "deeply" a union/intersection may be nested.
     #[must_use]
-    pub fn with_sorted_unions(self, db: &'db dyn Db) -> Self {
+    pub fn with_sorted_unions_and_intersections(self, db: &'db dyn Db) -> Self {
         let elements: Box<[Type<'db>]> = self
             .elements(db)
             .iter()
-            .map(|ty| ty.with_sorted_unions(db))
+            .map(|ty| ty.with_sorted_unions_and_intersections(db))
             .collect();
         TupleType::new(db, elements)
     }
