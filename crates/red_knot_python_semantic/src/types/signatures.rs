@@ -308,12 +308,12 @@ impl<'db> Parameters<'db> {
             value: vec![
                 Parameter {
                     name: Some(Name::new_static("args")),
-                    annotated_ty: Some(todo_type!("todo signature *args")),
+                    annotated_type: Some(todo_type!("todo signature *args")),
                     kind: ParameterKind::Variadic,
                 },
                 Parameter {
                     name: Some(Name::new_static("kwargs")),
-                    annotated_ty: Some(todo_type!("todo signature **kwargs")),
+                    annotated_type: Some(todo_type!("todo signature **kwargs")),
                     kind: ParameterKind::KeywordVariadic,
                 },
             ],
@@ -331,12 +331,12 @@ impl<'db> Parameters<'db> {
             value: vec![
                 Parameter {
                     name: None,
-                    annotated_ty: Some(Type::Dynamic(DynamicType::Any)),
+                    annotated_type: Some(Type::Dynamic(DynamicType::Any)),
                     kind: ParameterKind::Variadic,
                 },
                 Parameter {
                     name: None,
-                    annotated_ty: Some(Type::Dynamic(DynamicType::Any)),
+                    annotated_type: Some(Type::Dynamic(DynamicType::Any)),
                     kind: ParameterKind::KeywordVariadic,
                 },
             ],
@@ -355,12 +355,12 @@ impl<'db> Parameters<'db> {
             value: vec![
                 Parameter {
                     name: None,
-                    annotated_ty: Some(Type::Dynamic(DynamicType::Unknown)),
+                    annotated_type: Some(Type::Dynamic(DynamicType::Unknown)),
                     kind: ParameterKind::Variadic,
                 },
                 Parameter {
                     name: None,
-                    annotated_ty: Some(Type::Dynamic(DynamicType::Unknown)),
+                    annotated_type: Some(Type::Dynamic(DynamicType::Unknown)),
                     kind: ParameterKind::KeywordVariadic,
                 },
             ],
@@ -514,7 +514,7 @@ pub(crate) struct Parameter<'db> {
     name: Option<Name>,
 
     /// Annotated type of the parameter.
-    annotated_ty: Option<Type<'db>>,
+    annotated_type: Option<Type<'db>>,
 
     kind: ParameterKind<'db>,
 }
@@ -522,12 +522,12 @@ pub(crate) struct Parameter<'db> {
 impl<'db> Parameter<'db> {
     pub(crate) fn new(
         name: Option<Name>,
-        annotated_ty: Option<Type<'db>>,
+        annotated_type: Option<Type<'db>>,
         kind: ParameterKind<'db>,
     ) -> Self {
         Self {
             name,
-            annotated_ty,
+            annotated_type,
             kind,
         }
     }
@@ -540,7 +540,7 @@ impl<'db> Parameter<'db> {
     ) -> Self {
         Self {
             name: Some(parameter.name.id.clone()),
-            annotated_ty: parameter
+            annotated_type: parameter
                 .annotation()
                 .map(|annotation| definition_expression_type(db, definition, annotation)),
             kind,
@@ -582,7 +582,7 @@ impl<'db> Parameter<'db> {
 
     /// Annotated type of the parameter, if annotated.
     pub(crate) fn annotated_type(&self) -> Option<Type<'db>> {
-        self.annotated_ty
+        self.annotated_type
     }
 
     /// Name of the parameter (if it has one).
@@ -684,64 +684,64 @@ mod tests {
             &[
                 Parameter {
                     name: Some(Name::new_static("a")),
-                    annotated_ty: None,
+                    annotated_type: None,
                     kind: ParameterKind::PositionalOnly { default_ty: None },
                 },
                 Parameter {
                     name: Some(Name::new_static("b")),
-                    annotated_ty: Some(KnownClass::Int.to_instance(&db)),
+                    annotated_type: Some(KnownClass::Int.to_instance(&db)),
                     kind: ParameterKind::PositionalOnly { default_ty: None },
                 },
                 Parameter {
                     name: Some(Name::new_static("c")),
-                    annotated_ty: None,
+                    annotated_type: None,
                     kind: ParameterKind::PositionalOnly {
                         default_ty: Some(Type::IntLiteral(1)),
                     },
                 },
                 Parameter {
                     name: Some(Name::new_static("d")),
-                    annotated_ty: Some(KnownClass::Int.to_instance(&db)),
+                    annotated_type: Some(KnownClass::Int.to_instance(&db)),
                     kind: ParameterKind::PositionalOnly {
                         default_ty: Some(Type::IntLiteral(2)),
                     },
                 },
                 Parameter {
                     name: Some(Name::new_static("e")),
-                    annotated_ty: None,
+                    annotated_type: None,
                     kind: ParameterKind::PositionalOrKeyword {
                         default_ty: Some(Type::IntLiteral(3)),
                     },
                 },
                 Parameter {
                     name: Some(Name::new_static("f")),
-                    annotated_ty: Some(Type::IntLiteral(4)),
+                    annotated_type: Some(Type::IntLiteral(4)),
                     kind: ParameterKind::PositionalOrKeyword {
                         default_ty: Some(Type::IntLiteral(4)),
                     },
                 },
                 Parameter {
                     name: Some(Name::new_static("args")),
-                    annotated_ty: Some(Type::object(&db)),
+                    annotated_type: Some(Type::object(&db)),
                     kind: ParameterKind::Variadic,
                 },
                 Parameter {
                     name: Some(Name::new_static("g")),
-                    annotated_ty: None,
+                    annotated_type: None,
                     kind: ParameterKind::KeywordOnly {
                         default_ty: Some(Type::IntLiteral(5)),
                     },
                 },
                 Parameter {
                     name: Some(Name::new_static("h")),
-                    annotated_ty: Some(Type::IntLiteral(6)),
+                    annotated_type: Some(Type::IntLiteral(6)),
                     kind: ParameterKind::KeywordOnly {
                         default_ty: Some(Type::IntLiteral(6)),
                     },
                 },
                 Parameter {
                     name: Some(Name::new_static("kwargs")),
-                    annotated_ty: Some(KnownClass::Str.to_instance(&db)),
+                    annotated_type: Some(KnownClass::Str.to_instance(&db)),
                     kind: ParameterKind::KeywordVariadic,
                 },
             ],
@@ -771,7 +771,7 @@ mod tests {
 
         let [Parameter {
             name: Some(name),
-            annotated_ty,
+            annotated_type,
             kind: ParameterKind::PositionalOrKeyword { .. },
         }] = &sig.parameters.value[..]
         else {
@@ -779,7 +779,7 @@ mod tests {
         };
         assert_eq!(name, "a");
         // Parameter resolution not deferred; we should see A not B
-        assert_eq!(annotated_ty.unwrap().display(&db).to_string(), "A");
+        assert_eq!(annotated_type.unwrap().display(&db).to_string(), "A");
     }
 
     #[test]
@@ -805,7 +805,7 @@ mod tests {
 
         let [Parameter {
             name: Some(name),
-            annotated_ty,
+            annotated_type,
             kind: ParameterKind::PositionalOrKeyword { .. },
         }] = &sig.parameters.value[..]
         else {
@@ -813,7 +813,7 @@ mod tests {
         };
         assert_eq!(name, "a");
         // Parameter resolution deferred; we should see B
-        assert_eq!(annotated_ty.unwrap().display(&db).to_string(), "B");
+        assert_eq!(annotated_type.unwrap().display(&db).to_string(), "B");
     }
 
     #[test]
@@ -839,11 +839,11 @@ mod tests {
 
         let [Parameter {
             name: Some(a_name),
-            annotated_ty: a_annotated_ty,
+            annotated_type: a_annotated_ty,
             kind: ParameterKind::PositionalOrKeyword { .. },
         }, Parameter {
             name: Some(b_name),
-            annotated_ty: b_annotated_ty,
+            annotated_type: b_annotated_ty,
             kind: ParameterKind::PositionalOrKeyword { .. },
         }] = &sig.parameters.value[..]
         else {
@@ -882,11 +882,11 @@ mod tests {
 
         let [Parameter {
             name: Some(a_name),
-            annotated_ty: a_annotated_ty,
+            annotated_type: a_annotated_ty,
             kind: ParameterKind::PositionalOrKeyword { .. },
         }, Parameter {
             name: Some(b_name),
-            annotated_ty: b_annotated_ty,
+            annotated_type: b_annotated_ty,
             kind: ParameterKind::PositionalOrKeyword { .. },
         }] = &sig.parameters.value[..]
         else {

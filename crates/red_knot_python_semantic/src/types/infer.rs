@@ -1517,7 +1517,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     ) {
         if let Some(annotation) = parameter.annotation() {
             let _annotated_ty = self.file_expression_type(annotation);
-            // TODO `tuple[annotated_ty, ...]`
+            // TODO `tuple[annotated_type, ...]`
             let ty = KnownClass::Tuple.to_instance(self.db());
             self.add_declaration_with_binding(
                 parameter.into(),
@@ -1548,7 +1548,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     ) {
         if let Some(annotation) = parameter.annotation() {
             let _annotated_ty = self.file_expression_type(annotation);
-            // TODO `dict[str, annotated_ty]`
+            // TODO `dict[str, annotated_type]`
             let ty = KnownClass::Dict.to_instance(self.db());
             self.add_declaration_with_binding(
                 parameter.into(),
