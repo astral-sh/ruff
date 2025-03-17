@@ -75,8 +75,15 @@ impl<'a, 'db> FromIterator<Argument<'a, 'db>> for CallArguments<'a, 'db> {
 #[derive(Clone, Debug)]
 pub(crate) struct Argument<'a, 'db> {
     kind: ArgumentKind<'a>,
-    /// The inferred type of this argument.
+
+    /// The inferred type of this argument. Will be `Type::Unknown` if we haven't inferred a type
+    /// for this argument yet.
+    #[allow(clippy::struct_field_names)]
     argument_type: Cell<Type<'db>>,
+
+    /// The inferred type of this argument when/if it is used as a `TypeForm`. Will be
+    /// `Type::Unknown` if we haven't inferred a type-form type for this argument yet.
+    type_form_type: Cell<Type<'db>>,
 }
 
 impl<'a, 'db> Argument<'a, 'db> {
@@ -84,6 +91,7 @@ impl<'a, 'db> Argument<'a, 'db> {
         Self {
             kind: ArgumentKind::Keyword(name),
             argument_type: Cell::new(Type::unknown()),
+            type_form_type: Cell::new(Type::unknown()),
         }
     }
 
@@ -91,6 +99,7 @@ impl<'a, 'db> Argument<'a, 'db> {
         Self {
             kind: ArgumentKind::Keywords,
             argument_type: Cell::new(Type::unknown()),
+            type_form_type: Cell::new(Type::unknown()),
         }
     }
 
@@ -98,6 +107,7 @@ impl<'a, 'db> Argument<'a, 'db> {
         Self {
             kind: ArgumentKind::Positional,
             argument_type: Cell::new(Type::unknown()),
+            type_form_type: Cell::new(Type::unknown()),
         }
     }
 
@@ -105,6 +115,7 @@ impl<'a, 'db> Argument<'a, 'db> {
         Self {
             kind: ArgumentKind::Synthetic,
             argument_type: Cell::new(Type::unknown()),
+            type_form_type: Cell::new(Type::unknown()),
         }
     }
 
@@ -112,6 +123,7 @@ impl<'a, 'db> Argument<'a, 'db> {
         Self {
             kind: ArgumentKind::Variadic,
             argument_type: Cell::new(Type::unknown()),
+            type_form_type: Cell::new(Type::unknown()),
         }
     }
 
@@ -124,12 +136,20 @@ impl<'a, 'db> Argument<'a, 'db> {
         self.argument_type.set(argument_type);
     }
 
+    pub(crate) fn set_type_form_type(&self, type_form_type: Type<'db>) {
+        self.type_form_type.set(type_form_type);
+    }
+
     pub(crate) fn kind(&self) -> ArgumentKind<'a> {
         self.kind
     }
 
     pub(crate) fn argument_type(&self) -> Type<'db> {
         self.argument_type.get()
+    }
+
+    pub(crate) fn type_form_type(&self) -> Type<'db> {
+        self.type_form_type.get()
     }
 }
 
