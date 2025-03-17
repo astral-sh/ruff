@@ -3255,10 +3255,11 @@ impl<'db> TypeInferenceBuilder<'db> {
                         }) => {
                             let ty = infer_argument_type(self, value);
                             self.store_expression_type(arg, ty);
-                            Argument::variadic(ty)
+                            Argument::variadic().with_argument_type(ty)
                         }
                         // TODO diagnostic if after a keyword argument
-                        _ => Argument::positional(infer_argument_type(self, arg)),
+                        _ => Argument::positional()
+                            .with_argument_type(infer_argument_type(self, arg)),
                     },
                     ast::ArgOrKeyword::Keyword(ast::Keyword {
                         arg,
@@ -3267,10 +3268,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                     }) => {
                         let ty = infer_argument_type(self, value);
                         if let Some(arg) = arg {
-                            Argument::keyword(&arg.id, ty)
+                            Argument::keyword(&arg.id).with_argument_type(ty)
                         } else {
                             // TODO diagnostic if not last
-                            Argument::keywords(ty)
+                            Argument::keywords().with_argument_type(ty)
                         }
                     }
                 }

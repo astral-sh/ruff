@@ -14,14 +14,14 @@ impl<'a, 'db> CallArguments<'a, 'db> {
     pub(crate) fn positional(positional_tys: impl IntoIterator<Item = Type<'db>>) -> Self {
         positional_tys
             .into_iter()
-            .map(Argument::positional)
+            .map(|ty| Argument::positional().with_argument_type(ty))
             .collect()
     }
 
     /// Prepend an extra positional argument.
     pub(crate) fn with_self(&self, self_ty: Type<'db>) -> Self {
         let mut arguments = Vec::with_capacity(self.0.len() + 1);
-        arguments.push(Argument::synthetic(self_ty));
+        arguments.push(Argument::synthetic().with_argument_type(self_ty));
         arguments.extend_from_slice(&self.0);
         Self(arguments)
     }
@@ -69,39 +69,44 @@ pub(crate) struct Argument<'a, 'db> {
 }
 
 impl<'a, 'db> Argument<'a, 'db> {
-    pub(crate) fn keyword(name: &'a str, argument_type: Type<'db>) -> Self {
+    pub(crate) fn keyword(name: &'a str) -> Self {
         Self {
             kind: ArgumentKind::Keyword(name),
-            argument_type,
+            argument_type: Type::unknown(),
         }
     }
 
-    pub(crate) fn keywords(argument_type: Type<'db>) -> Self {
+    pub(crate) fn keywords() -> Self {
         Self {
             kind: ArgumentKind::Keywords,
-            argument_type,
+            argument_type: Type::unknown(),
         }
     }
 
-    pub(crate) fn positional(argument_type: Type<'db>) -> Self {
+    pub(crate) fn positional() -> Self {
         Self {
             kind: ArgumentKind::Positional,
-            argument_type,
+            argument_type: Type::unknown(),
         }
     }
 
-    pub(crate) fn synthetic(argument_type: Type<'db>) -> Self {
+    pub(crate) fn synthetic() -> Self {
         Self {
             kind: ArgumentKind::Synthetic,
-            argument_type,
+            argument_type: Type::unknown(),
         }
     }
 
-    pub(crate) fn variadic(argument_type: Type<'db>) -> Self {
+    pub(crate) fn variadic() -> Self {
         Self {
             kind: ArgumentKind::Variadic,
-            argument_type,
+            argument_type: Type::unknown(),
         }
+    }
+
+    pub(crate) fn with_argument_type(mut self, argument_type: Type<'db>) -> Self {
+        self.argument_type = argument_type;
+        self
     }
 
     pub(crate) fn kind(&self) -> ArgumentKind<'a> {
