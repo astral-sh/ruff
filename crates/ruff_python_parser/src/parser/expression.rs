@@ -1428,6 +1428,7 @@ impl<'src> Parser<'src> {
         // f"test {a \
         //     } more"                        # line continuation
         // f"""{f"""{x}"""}"""                # mark the whole triple quote
+        // f"{'\n'.join(['\t', '\v', '\r'])}"  # multiple escape sequences, multiple errors
 
         let range = self.node_range(start);
 

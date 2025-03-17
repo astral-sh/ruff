@@ -7,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/inline/err/pep701_f_string_py311
 ```
 Module(
     ModModule {
-        range: 0..468,
+        range: 0..549,
         body: [
             Expr(
                 StmtExpr {
@@ -648,6 +648,141 @@ Module(
                     ),
                 },
             ),
+            Expr(
+                StmtExpr {
+                    range: 468..502,
+                    value: FString(
+                        ExprFString {
+                            range: 468..502,
+                            value: FStringValue {
+                                inner: Single(
+                                    FString(
+                                        FString {
+                                            range: 468..502,
+                                            elements: [
+                                                Expression(
+                                                    FStringExpressionElement {
+                                                        range: 470..501,
+                                                        expression: Call(
+                                                            ExprCall {
+                                                                range: 471..500,
+                                                                func: Attribute(
+                                                                    ExprAttribute {
+                                                                        range: 471..480,
+                                                                        value: StringLiteral(
+                                                                            ExprStringLiteral {
+                                                                                range: 471..475,
+                                                                                value: StringLiteralValue {
+                                                                                    inner: Single(
+                                                                                        StringLiteral {
+                                                                                            range: 471..475,
+                                                                                            value: "\n",
+                                                                                            flags: StringLiteralFlags {
+                                                                                                quote_style: Single,
+                                                                                                prefix: Empty,
+                                                                                                triple_quoted: false,
+                                                                                            },
+                                                                                        },
+                                                                                    ),
+                                                                                },
+                                                                            },
+                                                                        ),
+                                                                        attr: Identifier {
+                                                                            id: Name("join"),
+                                                                            range: 476..480,
+                                                                        },
+                                                                        ctx: Load,
+                                                                    },
+                                                                ),
+                                                                arguments: Arguments {
+                                                                    range: 480..500,
+                                                                    args: [
+                                                                        List(
+                                                                            ExprList {
+                                                                                range: 481..499,
+                                                                                elts: [
+                                                                                    StringLiteral(
+                                                                                        ExprStringLiteral {
+                                                                                            range: 482..486,
+                                                                                            value: StringLiteralValue {
+                                                                                                inner: Single(
+                                                                                                    StringLiteral {
+                                                                                                        range: 482..486,
+                                                                                                        value: "\t",
+                                                                                                        flags: StringLiteralFlags {
+                                                                                                            quote_style: Single,
+                                                                                                            prefix: Empty,
+                                                                                                            triple_quoted: false,
+                                                                                                        },
+                                                                                                    },
+                                                                                                ),
+                                                                                            },
+                                                                                        },
+                                                                                    ),
+                                                                                    StringLiteral(
+                                                                                        ExprStringLiteral {
+                                                                                            range: 488..492,
+                                                                                            value: StringLiteralValue {
+                                                                                                inner: Single(
+                                                                                                    StringLiteral {
+                                                                                                        range: 488..492,
+                                                                                                        value: "\u{b}",
+                                                                                                        flags: StringLiteralFlags {
+                                                                                                            quote_style: Single,
+                                                                                                            prefix: Empty,
+                                                                                                            triple_quoted: false,
+                                                                                                        },
+                                                                                                    },
+                                                                                                ),
+                                                                                            },
+                                                                                        },
+                                                                                    ),
+                                                                                    StringLiteral(
+                                                                                        ExprStringLiteral {
+                                                                                            range: 494..498,
+                                                                                            value: StringLiteralValue {
+                                                                                                inner: Single(
+                                                                                                    StringLiteral {
+                                                                                                        range: 494..498,
+                                                                                                        value: "\r",
+                                                                                                        flags: StringLiteralFlags {
+                                                                                                            quote_style: Single,
+                                                                                                            prefix: Empty,
+                                                                                                            triple_quoted: false,
+                                                                                                        },
+                                                                                                    },
+                                                                                                ),
+                                                                                            },
+                                                                                        },
+                                                                                    ),
+                                                                                ],
+                                                                                ctx: Load,
+                                                                            },
+                                                                        ),
+                                                                    ],
+                                                                    keywords: [],
+                                                                },
+                                                            },
+                                                        ),
+                                                        debug_text: None,
+                                                        conversion: None,
+                                                        format_spec: None,
+                                                    },
+                                                ),
+                                            ],
+                                            flags: FStringFlags {
+                                                quote_style: Double,
+                                                prefix: Regular,
+                                                triple_quoted: false,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
         ],
     },
 )
@@ -758,4 +893,37 @@ Module(
 10 |     } more"                        # line continuation
 11 | f"""{f"""{x}"""}"""                # mark the whole triple quote
    |       ^^^ Syntax Error: Cannot reuse outer quote character in f-strings on Python 3.11 (syntax was added in Python 3.12)
+12 | f"{'\n'.join(['\t', '\v', '\r'])}"  # multiple escape sequences, multiple errors
+   |
+
+
+   |
+10 |     } more"                        # line continuation
+11 | f"""{f"""{x}"""}"""                # mark the whole triple quote
+12 | f"{'\n'.join(['\t', '\v', '\r'])}"  # multiple escape sequences, multiple errors
+   |     ^ Syntax Error: Cannot use an escape sequence (backslash) in f-strings on Python 3.11 (syntax was added in Python 3.12)
+   |
+
+
+   |
+10 |     } more"                        # line continuation
+11 | f"""{f"""{x}"""}"""                # mark the whole triple quote
+12 | f"{'\n'.join(['\t', '\v', '\r'])}"  # multiple escape sequences, multiple errors
+   |                ^ Syntax Error: Cannot use an escape sequence (backslash) in f-strings on Python 3.11 (syntax was added in Python 3.12)
+   |
+
+
+   |
+10 |     } more"                        # line continuation
+11 | f"""{f"""{x}"""}"""                # mark the whole triple quote
+12 | f"{'\n'.join(['\t', '\v', '\r'])}"  # multiple escape sequences, multiple errors
+   |                      ^ Syntax Error: Cannot use an escape sequence (backslash) in f-strings on Python 3.11 (syntax was added in Python 3.12)
+   |
+
+
+   |
+10 |     } more"                        # line continuation
+11 | f"""{f"""{x}"""}"""                # mark the whole triple quote
+12 | f"{'\n'.join(['\t', '\v', '\r'])}"  # multiple escape sequences, multiple errors
+   |                            ^ Syntax Error: Cannot use an escape sequence (backslash) in f-strings on Python 3.11 (syntax was added in Python 3.12)
    |
