@@ -48,11 +48,11 @@ def _(
 
 ```py
 def _(
-    a: 1,  # error: [invalid-type-form] "Int literals are not allowed in type expressions outside `typing.Literal[]` slices"
+    a: 1,  # error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
     b: 2.3,  # error: [invalid-type-form] "Float literals are not allowed in type expressions"
     c: 4j,  # error: [invalid-type-form] "Complex literals are not allowed in type expressions"
-    d: True,  # error: [invalid-type-form] "Boolean literals are not allowed in type expressions outside `typing.Literal[]` slices"
-    # error: [invalid-type-form] "Bytes literals are not allowed in type expressions outside `typing.Literal[]` slices"
+    d: True,  # error: [invalid-type-form] "Boolean literals are not allowed in this context in a type expression"
+    # error: [invalid-type-form] "Bytes literals are not allowed in this context in a type expression"
     e: int | b"foo",
 ):
     reveal_type(a)  # revealed: Unknown

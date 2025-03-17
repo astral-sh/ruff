@@ -6125,29 +6125,39 @@ impl<'db> TypeInferenceBuilder<'db> {
                 todo_type!("ellipsis literal in type expression")
             }
 
+            // TODO: add a subdiagnostic linking to type-expression grammar
+            // and stating that it is only valid in `typing.Literal[]` or `typing.Annotated[]`
             ast::Expr::BytesLiteral(_) => report_invalid_type_expression(format_args!(
-                "Bytes literals are not allowed in type expressions outside `typing.Literal[]` slices"
+                "Bytes literals are not allowed in this context in a type expression"
             )),
+
+            // TODO: add a subdiagnostic linking to type-expression grammar
+            // and stating that it is only valid in `typing.Literal[]` or `typing.Annotated[]`
             ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
                 value: ast::Number::Int(_),
                 ..
             }) => report_invalid_type_expression(format_args!(
-                "Int literals are not allowed in type expressions outside `typing.Literal[]` slices"
+                "Int literals are not allowed in this context in a type expression"
             )),
+
             ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
                 value: ast::Number::Float(_),
                 ..
             }) => report_invalid_type_expression(format_args!(
                 "Float literals are not allowed in type expressions"
             )),
+
             ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
                 value: ast::Number::Complex { .. },
                 ..
             }) => report_invalid_type_expression(format_args!(
                 "Complex literals are not allowed in type expressions"
             )),
+
+            // TODO: add a subdiagnostic linking to type-expression grammar
+            // and stating that it is only valid in `typing.Literal[]` or `typing.Annotated[]`
             ast::Expr::BooleanLiteral(_) => report_invalid_type_expression(format_args!(
-                "Boolean literals are not allowed in type expressions outside `typing.Literal[]` slices"
+                "Boolean literals are not allowed in this context in a type expression"
             )),
 
             ast::Expr::Subscript(subscript) => {
