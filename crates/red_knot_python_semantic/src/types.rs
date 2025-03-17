@@ -4947,7 +4947,7 @@ impl<'db> UnionType<'db> {
             .iter()
             .map(|element| element.with_sorted_unions(db))
             .collect();
-        new_elements.sort_unstable_by(|l, r| union_or_intersection_elements_ordering(l, r, db));
+        new_elements.sort_unstable_by(|l, r| union_or_intersection_elements_ordering(db, l, r));
         UnionType::new(db, new_elements.into_boxed_slice())
     }
 
@@ -5051,7 +5051,7 @@ impl<'db> IntersectionType<'db> {
                 .map(|ty| ty.with_sorted_unions(db))
                 .collect();
 
-            elements.sort_unstable_by(|l, r| union_or_intersection_elements_ordering(l, r, db));
+            elements.sort_unstable_by(|l, r| union_or_intersection_elements_ordering(db, l, r));
             elements
         }
 

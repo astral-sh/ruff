@@ -1,5 +1,6 @@
 use std::cmp::Ordering;
 
+use crate::db::Db;
 use crate::types::CallableType;
 
 use super::{
@@ -23,9 +24,9 @@ use super::{
 /// [`Ord`] in terms of the semantics. There are many different ways in which you could plausibly
 /// sort a list of types; this is only one (somewhat arbitrary, at times) possible ordering.
 pub(super) fn union_or_intersection_elements_ordering<'db>(
+    db: &'db dyn Db,
     left: &Type<'db>,
     right: &Type<'db>,
-    db: &'db dyn crate::Db,
 ) -> Ordering {
     if left == right {
         return Ordering::Equal;
@@ -289,13 +290,13 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
                 return left_negative.len().cmp(&right_negative.len());
             }
             for (left, right) in left_positive.iter().zip(right_positive) {
-                let ordering = union_or_intersection_elements_ordering(left, right, db);
+                let ordering = union_or_intersection_elements_ordering(db, left, right);
                 if ordering != Ordering::Equal {
                     return ordering;
                 }
             }
             for (left, right) in left_negative.iter().zip(right_negative) {
-                let ordering = union_or_intersection_elements_ordering(left, right, db);
+                let ordering = union_or_intersection_elements_ordering(db, left, right);
                 if ordering != Ordering::Equal {
                     return ordering;
                 }
