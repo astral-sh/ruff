@@ -281,7 +281,7 @@ impl<'db> Class<'db> {
             // TODO: Other keyword arguments?
             let arguments = CallArguments::positional([name, bases, namespace]);
 
-            let return_ty_result = match metaclass.try_call(db, &arguments) {
+            let return_ty_result = match metaclass.try_call(db, arguments) {
                 Ok(bindings) => Ok(bindings.return_type(db)),
 
                 Err(CallError(CallErrorKind::NotCallable, bindings)) => Err(MetaclassError {

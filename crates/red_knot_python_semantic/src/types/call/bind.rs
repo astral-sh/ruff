@@ -3,7 +3,7 @@
 //! [signatures][crate::types::signatures], we have to handle the fact that the callable might be a
 //! union of types, each of which might contain multiple overloads.
 
-use std::borrow::Cow;
+use std::rc::Rc;
 
 use smallvec::SmallVec;
 
@@ -26,15 +26,15 @@ use ruff_text_size::Ranged;
 /// compatible with _all_ of the types in the union for the call to be valid.
 ///
 /// It's guaranteed that the wrapped bindings have no errors.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct Bindings<'db> {
+#[derive(Debug, Clone)]
+pub(crate) struct Bindings<'call, 'db> {
     signatures: Signatures<'db>,
     /// By using `SmallVec`, we avoid an extra heap allocation for the common case of a non-union
     /// type.
-    elements: SmallVec<[CallableBinding<'db>; 1]>,
+    elements: SmallVec<[CallableBinding<'call, 'db>; 1]>,
 }
 
-impl<'db> Bindings<'db> {
+impl<'call, 'db> Bindings<'call, 'db> {
     /// Binds the arguments of a call site against a signature.
     ///
     /// The returned bindings provide the return type of the call, the bound types for all
@@ -43,11 +43,11 @@ impl<'db> Bindings<'db> {
     pub(crate) fn bind(
         db: &'db dyn Db,
         signatures: Signatures<'db>,
-        arguments: &CallArguments<'_, 'db>,
-    ) -> Result<Self, CallError<'db>> {
-        let elements: SmallVec<[CallableBinding<'db>; 1]> = signatures
+        arguments: &Rc<CallArguments<'call, 'db>>,
+    ) -> Result<Self, CallError<'call, 'db>> {
+        let elements: SmallVec<[CallableBinding<'call, 'db>; 1]> = signatures
             .iter()
-            .map(|signature| CallableBinding::bind(db, signature, arguments))
+            .map(|signature| CallableBinding::bind(db, signature, arguments.clone()))
             .collect();
 
         // In order of precedence:
@@ -141,18 +141,18 @@ impl<'db> Bindings<'db> {
     }
 }
 
-impl<'a, 'db> IntoIterator for &'a Bindings<'db> {
-    type Item = &'a CallableBinding<'db>;
-    type IntoIter = std::slice::Iter<'a, CallableBinding<'db>>;
+impl<'a, 'call, 'db> IntoIterator for &'a Bindings<'call, 'db> {
+    type Item = &'a CallableBinding<'call, 'db>;
+    type IntoIter = std::slice::Iter<'a, CallableBinding<'call, 'db>>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.elements.iter()
     }
 }
 
-impl<'a, 'db> IntoIterator for &'a mut Bindings<'db> {
-    type Item = &'a mut CallableBinding<'db>;
-    type IntoIter = std::slice::IterMut<'a, CallableBinding<'db>>;
+impl<'a, 'call, 'db> IntoIterator for &'a mut Bindings<'call, 'db> {
+    type Item = &'a mut CallableBinding<'call, 'db>;
+    type IntoIter = std::slice::IterMut<'a, CallableBinding<'call, 'db>>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.elements.iter_mut()
@@ -174,11 +174,12 @@ impl<'a, 'db> IntoIterator for &'a mut Bindings<'db> {
 /// overloads, we store this error information for each overload.
 ///
 /// [overloads]: https://github.com/python/typing/pull/1839
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct CallableBinding<'db> {
+#[derive(Debug, Clone)]
+pub(crate) struct CallableBinding<'call, 'db> {
     pub(crate) callable_type: Type<'db>,
     pub(crate) signature_type: Type<'db>,
     pub(crate) dunder_call_is_possibly_unbound: bool,
+    _arguments: Rc<CallArguments<'call, 'db>>,
 
     /// The bindings of each overload of this callable. Will be empty if the type is not callable.
     ///
@@ -187,7 +188,7 @@ pub(crate) struct CallableBinding<'db> {
     overloads: SmallVec<[Binding<'db>; 1]>,
 }
 
-impl<'db> CallableBinding<'db> {
+impl<'call, 'db> CallableBinding<'call, 'db> {
     /// Bind a [`CallArguments`] against a [`CallableSignature`].
     ///
     /// The returned [`CallableBinding`] provides the return type of the call, the bound types for
@@ -195,15 +196,14 @@ impl<'db> CallableBinding<'db> {
     fn bind(
         db: &'db dyn Db,
         signature: &CallableSignature<'db>,
-        arguments: &CallArguments<'_, 'db>,
+        mut arguments: Rc<CallArguments<'call, 'db>>,
     ) -> Self {
         // If this callable is a bound method, prepend the self instance onto the arguments list
         // before checking.
-        let arguments = if let Some(bound_type) = signature.bound_type {
-            Cow::Owned(arguments.with_self(bound_type))
-        } else {
-            Cow::Borrowed(arguments)
-        };
+        if let Some(bound_type) = signature.bound_type {
+            let with_self = arguments.with_self(bound_type);
+            *Rc::make_mut(&mut arguments) = with_self;
+        }
 
         // TODO: This checks every overload. In the proposed more detailed call checking spec [1],
         // arguments are checked for arity first, and are only checked for type assignability against
@@ -219,6 +219,7 @@ impl<'db> CallableBinding<'db> {
             callable_type: signature.callable_type,
             signature_type: signature.signature_type,
             dunder_call_is_possibly_unbound: signature.dunder_call_is_possibly_unbound,
+            _arguments: arguments,
             overloads,
         }
     }
@@ -337,7 +338,7 @@ impl<'db> CallableBinding<'db> {
 }
 
 /// Binding information for one of the overloads of a callable.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub(crate) struct Binding<'db> {
     /// Return type of the call.
     return_ty: Type<'db>,

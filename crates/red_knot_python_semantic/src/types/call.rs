@@ -11,8 +11,11 @@ pub(super) use bind::Bindings;
 /// unsuccessful.
 ///
 /// The bindings are boxed so that we do not pass around large `Err` variants on the stack.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct CallError<'db>(pub(crate) CallErrorKind, pub(crate) Box<Bindings<'db>>);
+#[derive(Debug, Clone)]
+pub(crate) struct CallError<'call, 'db>(
+    pub(crate) CallErrorKind,
+    pub(crate) Box<Bindings<'call, 'db>>,
+);
 
 /// The reason why calling a type failed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -32,23 +35,23 @@ pub(crate) enum CallErrorKind {
     PossiblyNotCallable,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) enum CallDunderError<'db> {
+#[derive(Debug, Clone)]
+pub(super) enum CallDunderError<'call, 'db> {
     /// The dunder attribute exists but it can't be called with the given arguments.
     ///
     /// This includes non-callable dunder attributes that are possibly unbound.
-    CallError(CallErrorKind, Box<Bindings<'db>>),
+    CallError(CallErrorKind, Box<Bindings<'call, 'db>>),
 
     /// The type has the specified dunder method and it is callable
     /// with the specified arguments without any binding errors
     /// but it is possibly unbound.
-    PossiblyUnbound(Box<Bindings<'db>>),
+    PossiblyUnbound(Box<Bindings<'call, 'db>>),
 
     /// The dunder method with the specified name is missing.
     MethodNotAvailable,
 }
 
-impl<'db> CallDunderError<'db> {
+impl<'db> CallDunderError<'_, 'db> {
     pub(super) fn return_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
         match self {
             Self::MethodNotAvailable | Self::CallError(CallErrorKind::NotCallable, _) => None,
@@ -62,8 +65,8 @@ impl<'db> CallDunderError<'db> {
     }
 }
 
-impl<'db> From<CallError<'db>> for CallDunderError<'db> {
-    fn from(CallError(kind, bindings): CallError<'db>) -> Self {
+impl<'call, 'db> From<CallError<'call, 'db>> for CallDunderError<'call, 'db> {
+    fn from(CallError(kind, bindings): CallError<'call, 'db>) -> Self {
         Self::CallError(kind, bindings)
     }
 }
