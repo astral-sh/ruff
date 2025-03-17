@@ -369,7 +369,7 @@ impl<'db> Parameters<'db> {
             kwarg,
             range: _,
         } = parameters;
-        let default_ty = |param: &ast::ParameterWithDefault| {
+        let default_type = |param: &ast::ParameterWithDefault| {
             param
                 .default()
                 .map(|default| definition_expression_type(db, definition, default))
@@ -380,7 +380,7 @@ impl<'db> Parameters<'db> {
                 definition,
                 &arg.parameter,
                 ParameterKind::PositionalOnly {
-                    default_ty: default_ty(arg),
+                    default_type: default_type(arg),
                 },
             )
         });
@@ -390,7 +390,7 @@ impl<'db> Parameters<'db> {
                 definition,
                 &arg.parameter,
                 ParameterKind::PositionalOrKeyword {
-                    default_ty: default_ty(arg),
+                    default_type: default_type(arg),
                 },
             )
         });
@@ -403,7 +403,7 @@ impl<'db> Parameters<'db> {
                 definition,
                 &arg.parameter,
                 ParameterKind::KeywordOnly {
-                    default_ty: default_ty(arg),
+                    default_type: default_type(arg),
                 },
             )
         });
@@ -512,7 +512,7 @@ impl<'db> Parameter<'db> {
         Self {
             name: None,
             annotated_type: None,
-            kind: ParameterKind::PositionalOnly { default_ty: None },
+            kind: ParameterKind::PositionalOnly { default_type: None },
         }
     }
 
@@ -520,7 +520,7 @@ impl<'db> Parameter<'db> {
         Self {
             name: None,
             annotated_type: None,
-            kind: ParameterKind::PositionalOrKeyword { default_ty: None },
+            kind: ParameterKind::PositionalOrKeyword { default_type: None },
         }
     }
 
@@ -536,7 +536,7 @@ impl<'db> Parameter<'db> {
         Self {
             name: None,
             annotated_type: None,
-            kind: ParameterKind::KeywordOnly { default_ty: None },
+            kind: ParameterKind::KeywordOnly { default_type: None },
         }
     }
 
@@ -562,11 +562,11 @@ impl<'db> Parameter<'db> {
         self
     }
 
-    pub(crate) fn with_default_type(mut self, default_type: Type<'db>) -> Self {
+    pub(crate) fn with_default_type(mut self, default: Type<'db>) -> Self {
         match &mut self.kind {
-            ParameterKind::PositionalOnly { default_ty }
-            | ParameterKind::PositionalOrKeyword { default_ty }
-            | ParameterKind::KeywordOnly { default_ty } => *default_ty = Some(default_type),
+            ParameterKind::PositionalOnly { default_type }
+            | ParameterKind::PositionalOrKeyword { default_type }
+            | ParameterKind::KeywordOnly { default_type } => *default_type = Some(default),
             ParameterKind::Variadic | ParameterKind::KeywordVariadic => {
                 panic!("cannot set default value for variadic parameter")
             }
@@ -644,11 +644,10 @@ impl<'db> Parameter<'db> {
     /// Default-value type of the parameter, if any.
     pub(crate) fn default_type(&self) -> Option<Type<'db>> {
         match self.kind {
-            ParameterKind::PositionalOnly { default_ty } => default_ty,
-            ParameterKind::PositionalOrKeyword { default_ty } => default_ty,
-            ParameterKind::Variadic => None,
-            ParameterKind::KeywordOnly { default_ty } => default_ty,
-            ParameterKind::KeywordVariadic => None,
+            ParameterKind::PositionalOnly { default_type }
+            | ParameterKind::PositionalOrKeyword { default_type }
+            | ParameterKind::KeywordOnly { default_type } => default_type,
+            ParameterKind::Variadic | ParameterKind::KeywordVariadic => None,
         }
     }
 }
@@ -656,13 +655,13 @@ impl<'db> Parameter<'db> {
 #[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
 pub(crate) enum ParameterKind<'db> {
     /// Positional-only parameter, e.g. `def f(x, /): ...`
-    PositionalOnly { default_ty: Option<Type<'db>> },
+    PositionalOnly { default_type: Option<Type<'db>> },
     /// Positional-or-keyword parameter, e.g. `def f(x): ...`
-    PositionalOrKeyword { default_ty: Option<Type<'db>> },
+    PositionalOrKeyword { default_type: Option<Type<'db>> },
     /// Variadic parameter, e.g. `def f(*args): ...`
     Variadic,
     /// Keyword-only parameter, e.g. `def f(*, x): ...`
-    KeywordOnly { default_ty: Option<Type<'db>> },
+    KeywordOnly { default_type: Option<Type<'db>> },
     /// Variadic keywords parameter, e.g. `def f(**kwargs): ...`
     KeywordVariadic,
 }
