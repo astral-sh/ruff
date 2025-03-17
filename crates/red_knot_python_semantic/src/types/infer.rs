@@ -6185,71 +6185,122 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
             ast::Expr::Lambda(lambda_expression) => {
                 self.infer_lambda_expression(lambda_expression);
-                Type::unknown()
+                self.report_invalid_type_expression(
+                    expression,
+                    format_args!("Lambda expressions are not allowed in type expressions"),
+                )
             }
             ast::Expr::If(if_expression) => {
                 self.infer_if_expression(if_expression);
-                Type::unknown()
+                self.report_invalid_type_expression(
+                    expression,
+                    format_args!("If statements are not allowed in type expressions"),
+                )
             }
             ast::Expr::Dict(dict) => {
                 self.infer_dict_expression(dict);
-                Type::unknown()
+                self.report_invalid_type_expression(
+                    expression,
+                    format_args!("Dictionaries are not allowed in type expressions"),
+                )
             }
             ast::Expr::Set(set) => {
                 self.infer_set_expression(set);
-                Type::unknown()
-            }
-            ast::Expr::ListComp(listcomp) => {
-                self.infer_list_comprehension_expression(listcomp);
-                Type::unknown()
-            }
-            ast::Expr::SetComp(setcomp) => {
-                self.infer_set_comprehension_expression(setcomp);
-                Type::unknown()
-            }
-            ast::Expr::DictComp(dictcomp) => {
-                self.infer_dict_comprehension_expression(dictcomp);
-                Type::unknown()
-            }
-            ast::Expr::Generator(generator) => {
-                self.infer_generator_expression(generator);
-                Type::unknown()
-            }
-            ast::Expr::Await(await_expression) => {
-                self.infer_await_expression(await_expression);
-                Type::unknown()
-            }
-            ast::Expr::Yield(yield_expression) => {
-                self.infer_yield_expression(yield_expression);
-                Type::unknown()
-            }
-            ast::Expr::YieldFrom(yield_from) => {
-                self.infer_yield_from_expression(yield_from);
-                Type::unknown()
-            }
-            ast::Expr::Compare(compare) => {
-                self.infer_compare_expression(compare);
-                Type::unknown()
-            }
-            ast::Expr::Call(call_expr) => {
-                self.infer_call_expression(call_expr);
-                Type::unknown()
-            }
-            ast::Expr::FString(fstring) => {
-                self.infer_fstring_expression(fstring);
-                Type::unknown()
+                self.report_invalid_type_expression(
+                    expression,
+                    format_args!("Sets are not allowed in type expressions"),
+                )
             }
             ast::Expr::List(list) => {
                 self.infer_list_expression(list);
-                Type::unknown()
+                self.report_invalid_type_expression(
+                    expression,
+                    format_args!("Lists are not allowed in type expressions"),
+                )
             }
             ast::Expr::Tuple(tuple) => {
                 self.infer_tuple_expression(tuple);
-                Type::unknown()
+                self.report_invalid_type_expression(
+                    expression,
+                    format_args!("Tuples are not allowed in type expressions"),
+                )
+            }
+            ast::Expr::DictComp(dictcomp) => {
+                self.infer_dict_comprehension_expression(dictcomp);
+                self.report_invalid_type_expression(
+                    expression,
+                    format_args!("Dictionary comprehensions are not allowed in type expressions"),
+                )
+            }
+            ast::Expr::ListComp(listcomp) => {
+                self.infer_list_comprehension_expression(listcomp);
+                self.report_invalid_type_expression(
+                    expression,
+                    format_args!("List comprehensions are not allowed in type expressions"),
+                )
+            }
+            ast::Expr::SetComp(setcomp) => {
+                self.infer_set_comprehension_expression(setcomp);
+                self.report_invalid_type_expression(
+                    expression,
+                    format_args!("Set comprehensions are not allowed in type expressions"),
+                )
+            }
+            ast::Expr::Generator(generator) => {
+                self.infer_generator_expression(generator);
+                self.report_invalid_type_expression(
+                    expression,
+                    format_args!("Generator expressions are not allowed in type expressions"),
+                )
+            }
+            ast::Expr::Await(await_expression) => {
+                self.infer_await_expression(await_expression);
+                self.report_invalid_type_expression(
+                    expression,
+                    format_args!("Await expressions are not allowed in type expressions"),
+                )
+            }
+            ast::Expr::Yield(yield_expression) => {
+                self.infer_yield_expression(yield_expression);
+                self.report_invalid_type_expression(
+                    expression,
+                    format_args!("Yield expressions are not allowed in type expressions"),
+                )
+            }
+            ast::Expr::YieldFrom(yield_from) => {
+                self.infer_yield_from_expression(yield_from);
+                self.report_invalid_type_expression(
+                    expression,
+                    format_args!("Yield from expressions are not allowed in type expressions"),
+                )
+            }
+            ast::Expr::Compare(compare) => {
+                self.infer_compare_expression(compare);
+                self.report_invalid_type_expression(
+                    expression,
+                    format_args!("Compare expressions are not allowed in type expressions"),
+                )
+            }
+            ast::Expr::Call(call_expr) => {
+                self.infer_call_expression(call_expr);
+                self.report_invalid_type_expression(
+                    expression,
+                    format_args!("Function calls are not allowed in type expressions"),
+                )
+            }
+            ast::Expr::FString(fstring) => {
+                self.infer_fstring_expression(fstring);
+                self.report_invalid_type_expression(
+                    expression,
+                    format_args!("F-string expressions are not allowed in type expressions"),
+                )
             }
             ast::Expr::Slice(slice) => {
                 self.infer_slice_expression(slice);
-                Type::unknown()
+                self.report_invalid_type_expression(
+                    expression,
+                    format_args!("Slices are not allowed in type expressions"),
+                )
             }
             ast::Expr::IpyEscapeCommand(_) => todo!("Implement Ipy escape command support"),
         }

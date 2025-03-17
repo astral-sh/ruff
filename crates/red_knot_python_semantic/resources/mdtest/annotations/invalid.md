@@ -47,17 +47,27 @@ def _(
 ## Invalid AST nodes
 
 ```py
+def bar() -> None:
+    return None
+
 def _(
     a: 1,  # error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
     b: 2.3,  # error: [invalid-type-form] "Float literals are not allowed in type expressions"
     c: 4j,  # error: [invalid-type-form] "Complex literals are not allowed in type expressions"
     d: True,  # error: [invalid-type-form] "Boolean literals are not allowed in this context in a type expression"
-    # error: [invalid-type-form] "Bytes literals are not allowed in this context in a type expression"
-    e: int | b"foo",
+    e: int | b"foo",  # error: [invalid-type-form] "Bytes literals are not allowed in this context in a type expression"
     f: 1 and 2,  # error: [invalid-type-form] "Boolean operations like `and` and `or` are not allowed in type expressions"
     g: 1 or 2,  # error: [invalid-type-form] "Boolean operations like `and` and `or` are not allowed in type expressions"
     h: (foo := 1),  # error: [invalid-type-form] "Named expressions like `foo := 1` are not allowed in type expressions"
     i: not 1,  # error: [invalid-type-form] "Unary operations like `not` are not allowed in type expressions"
+    j: lambda: 1,  # error: [invalid-type-form] "Lambda expressions are not allowed in type expressions"
+    k: 1 if True else 2,  # error: [invalid-type-form] "If statements are not allowed in type expressions"
+    l: await 1,  # error: [invalid-type-form] "Await expressions are not allowed in type expressions"
+    m: (yield 1),  # error: [invalid-type-form] "Yield expressions are not allowed in type expressions"
+    n: (yield from [1]),  # error: [invalid-type-form] "Yield from expressions are not allowed in type expressions"
+    o: 1 < 2,  # error: [invalid-type-form] "Compare expressions are not allowed in type expressions"
+    p: bar(),  # error: [invalid-type-form] "Function calls are not allowed in type expressions"
+    q: int | f"foo",  # error: [invalid-type-form] "F-string expressions are not allowed in type expressions"
 ):
     reveal_type(a)  # revealed: Unknown
     reveal_type(b)  # revealed: Unknown
@@ -68,4 +78,31 @@ def _(
     reveal_type(g)  # revealed: Unknown
     reveal_type(h)  # revealed: Unknown
     reveal_type(i)  # revealed: Unknown
+    reveal_type(j)  # revealed: Unknown
+    reveal_type(k)  # revealed: Unknown
+    reveal_type(p)  # revealed: Unknown
+    reveal_type(q)  # revealed: int | Unknown
+```
+
+## Invalid Collection based AST nodes
+
+```py
+def _(
+    a: {1: 2},  # error: [invalid-type-form] "Dictionaries are not allowed in type expressions"
+    b: {1, 2},  # error: [invalid-type-form] "Sets are not allowed in type expressions"
+    c: [1, 2],  # error: [invalid-type-form] "Lists are not allowed in type expressions"
+    d: (1, 2),  # error: [invalid-type-form] "Tuples are not allowed in type expressions"
+    e: {k: v for k, v in [(1, 2)]},  # error: [invalid-type-form] "Dictionary comprehensions are not allowed in type expressions"
+    f: [k for k in [1, 2]],  # error: [invalid-type-form] "List comprehensions are not allowed in type expressions"
+    g: {k for k in [1, 2]},  # error: [invalid-type-form] "Set comprehensions are not allowed in type expressions"
+    h: (k for k in [1, 2]),  # error: [invalid-type-form] "Generator expressions are not allowed in type expressions"
+):
+    reveal_type(a)  # revealed: Unknown
+    reveal_type(b)  # revealed: Unknown
+    reveal_type(c)  # revealed: Unknown
+    reveal_type(d)  # revealed: Unknown
+    reveal_type(e)  # revealed: Unknown
+    reveal_type(f)  # revealed: Unknown
+    reveal_type(g)  # revealed: Unknown
+    reveal_type(h)  # revealed: Unknown
 ```
