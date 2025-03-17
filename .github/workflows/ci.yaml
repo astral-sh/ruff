@@ -36,6 +36,9 @@ jobs:
       code: ${{ steps.check_code.outputs.changed }}
       # Flag that is raised when any code that affects the fuzzer is changed
       fuzz: ${{ steps.check_fuzzer.outputs.changed }}
+
+      # Flag that is set to "true" when code related to the playground changes.
+      playground: ${{ steps.check_playground.outputs.changed }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
         with:
@@ -82,6 +85,15 @@ jobs:
         id: check_code
         run: |
           if git diff --quiet ${{ github.event.pull_request.base.sha || 'origin/main' }}...HEAD -- ':**/*' ':!**/*.md' ':crates/red_knot_python_semantic/resources/mdtest/**/*.md' ':!docs/**' ':!assets/**' ':.github/workflows/ci.yaml'; then
+              echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+              echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check if there was any playground related change
+        id: check_playground
+        run: |
+          if git diff --quiet ${{ github.event.pull_request.base.sha || 'origin/main' }}...HEAD -- ':playground/**'; then
               echo "changed=false" >> "$GITHUB_OUTPUT"
           else
               echo "changed=true" >> "$GITHUB_OUTPUT"
@@ -700,6 +712,40 @@ jobs:
           ruff version
 
           just test
+
+  check-playground:
+    name: "check playground"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs:
+      - determine_changes
+    if: ${{ (needs.determine_changes.outputs.playground == 'true') }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        with:
+          persist-credentials: false
+      - name: "Install Rust toolchain"
+        run: rustup target add wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@f0deed1e0edfc6a9be95417288c0e1099b1eeec3 # v2
+      - uses: actions/setup-node@cdca7365b2dadb8aad0a33bc7601856ffabcc48e # v4
+        with:
+          node-version: 22
+          cache: "npm"
+          cache-dependency-path: playground/package-lock.json
+      - uses: jetli/wasm-bindgen-action@20b33e20595891ab1a0ed73145d8a21fc96e7c29 # v0.2.0
+      - name: "Install Node dependencies"
+        run: npm ci
+        working-directory: playground
+      - name: "Build Ruff playground"
+        run: npm run dev:build --workspace ruff-playground
+        working-directory: playground
+        # Requires a build for ruff_wasm to exist
+      - name: "Run TypeScript checks"
+        run: npm run check
+        working-directory: playground
+      - name: "Check formatting"
+        run: npm run fmt:check
+        working-directory: playground
 
   benchmarks:
     runs-on: ubuntu-24.04

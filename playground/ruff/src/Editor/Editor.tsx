@@ -6,7 +6,7 @@ import {
   useState,
 } from "react";
 import { Panel, PanelGroup } from "react-resizable-panels";
-import { Diagnostic, Workspace } from "../pkg";
+import { Diagnostic, Workspace } from "ruff_wasm";
 import { ErrorMessage } from "./ErrorMessage";
 import PrimarySideBar from "./PrimarySideBar";
 import { HorizontalResizeHandle, VerticalResizeHandle } from "./ResizeHandle";
