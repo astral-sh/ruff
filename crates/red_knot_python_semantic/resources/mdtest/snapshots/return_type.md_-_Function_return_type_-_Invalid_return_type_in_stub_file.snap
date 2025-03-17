@@ -40,10 +40,11 @@ error: lint:invalid-return-type
 4 |
 5 | # error: [invalid-return-type]
   |
- ::: /src/mdtest_snippet.pyi:1:12
+info
+ --> /src/mdtest_snippet.pyi:1:12
   |
 1 | def f() -> int:
-  |            --- info: Return type is declared here as `int`
+  |            --- Return type is declared here as `int`
 2 |     # error: [invalid-return-type]
 3 |     return ...
   |

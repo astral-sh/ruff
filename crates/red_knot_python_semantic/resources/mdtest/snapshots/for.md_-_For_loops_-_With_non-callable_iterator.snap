@@ -51,7 +51,7 @@ warning: lint:possibly-unresolved-reference
 14 |     # revealed: Unknown
 15 |     # error: [possibly-unresolved-reference]
 16 |     reveal_type(x)
-   |                 - Name `x` used when possibly not defined
+   |                 ^ Name `x` used when possibly not defined
    |
 
 ```
@@ -63,7 +63,7 @@ info: revealed-type
 14 |     # revealed: Unknown
 15 |     # error: [possibly-unresolved-reference]
 16 |     reveal_type(x)
-   |     -------------- info: Revealed type is `Unknown`
+   |     ^^^^^^^^^^^^^^ Revealed type is `Unknown`
    |
 
 ```
