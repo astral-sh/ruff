@@ -80,7 +80,7 @@ pub(crate) struct CheckCommand {
     pub(crate) output_format: Option<OutputFormat>,
 
     /// Control when colored output is used.
-    #[arg(long)]
+    #[arg(long, value_name = "WHEN")]
     pub(crate) color: Option<TerminalColor>,
 
     /// Use exit code 1 if there are any warning-level diagnostics.
@@ -255,11 +255,11 @@ impl From<OutputFormat> for ruff_db::diagnostic::DiagnosticFormat {
 /// Control when colored output is used.
 #[derive(Copy, Clone, Hash, Debug, PartialEq, Eq, PartialOrd, Ord, Default, clap::ValueEnum)]
 pub(crate) enum TerminalColor {
-    /// Automatically detect if color support is available on the terminal.
+    /// Display colors if the output goes to an interactive terminal.
     #[default]
     Auto,
 
-    /// Always display colors
+    /// Always display colors.
     Always,
 
     /// Never display colors.
