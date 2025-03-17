@@ -1,0 +1,174 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/class_type_params_py311.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..113,
+        body: [
+            ClassDef(
+                StmtClassDef {
+                    range: 44..95,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("Foo"),
+                        range: 50..53,
+                    },
+                    type_params: Some(
+                        TypeParams {
+                            range: 53..90,
+                            type_params: [
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        range: 54..69,
+                                        name: Identifier {
+                                            id: Name("S"),
+                                            range: 54..55,
+                                        },
+                                        bound: Some(
+                                            Tuple(
+                                                ExprTuple {
+                                                    range: 57..69,
+                                                    elts: [
+                                                        Name(
+                                                            ExprName {
+                                                                range: 58..61,
+                                                                id: Name("str"),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                        Name(
+                                                            ExprName {
+                                                                range: 63..68,
+                                                                id: Name("bytes"),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                    ],
+                                                    ctx: Load,
+                                                    parenthesized: true,
+                                                },
+                                            ),
+                                        ),
+                                        default: None,
+                                    },
+                                ),
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        range: 71..79,
+                                        name: Identifier {
+                                            id: Name("T"),
+                                            range: 71..72,
+                                        },
+                                        bound: Some(
+                                            Name(
+                                                ExprName {
+                                                    range: 74..79,
+                                                    id: Name("float"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ),
+                                        default: None,
+                                    },
+                                ),
+                                TypeVarTuple(
+                                    TypeParamTypeVarTuple {
+                                        range: 81..84,
+                                        name: Identifier {
+                                            id: Name("Ts"),
+                                            range: 82..84,
+                                        },
+                                        default: None,
+                                    },
+                                ),
+                                ParamSpec(
+                                    TypeParamParamSpec {
+                                        range: 86..89,
+                                        name: Identifier {
+                                            id: Name("P"),
+                                            range: 88..89,
+                                        },
+                                        default: None,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    arguments: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 92..95,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 92..95,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            ClassDef(
+                StmtClassDef {
+                    range: 96..112,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("Foo"),
+                        range: 102..105,
+                    },
+                    type_params: Some(
+                        TypeParams {
+                            range: 105..107,
+                            type_params: [],
+                        },
+                    ),
+                    arguments: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 109..112,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 109..112,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | # parse_options: {"target-version": "3.11"}
+2 | class Foo[S: (str, bytes), T: float, *Ts, **P]: ...
+3 | class Foo[]: ...
+  |           ^ Syntax Error: Type parameter list cannot be empty
+  |
+
+
+## Unsupported Syntax Errors
+
+  |
+1 | # parse_options: {"target-version": "3.11"}
+2 | class Foo[S: (str, bytes), T: float, *Ts, **P]: ...
+  |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Syntax Error: Cannot use type parameter lists on Python 3.11 (syntax was added in Python 3.12)
+3 | class Foo[]: ...
+  |
+
+
+  |
+1 | # parse_options: {"target-version": "3.11"}
+2 | class Foo[S: (str, bytes), T: float, *Ts, **P]: ...
+3 | class Foo[]: ...
+  |          ^^ Syntax Error: Cannot use type parameter lists on Python 3.11 (syntax was added in Python 3.12)
+  |

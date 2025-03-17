@@ -17,6 +17,11 @@ Example invocations of the script using `uv`:
   using a random selection of seeds, and only print a summary at the end
   (the `shuf` command is Unix-specific):
   `uvx --from ./python/py-fuzzer fuzz --bin ruff $(shuf -i 0-1000000 -n 10000) --quiet
+
+If you make local modifications to this script, you'll need to run the above
+with `--reinstall` to get your changes reflected in the uv-cached installed
+package. Alternatively, if iterating quickly on changes, you can add
+`--with-editable ./python/py-fuzzer`.
 """
 
 from __future__ import annotations
@@ -48,7 +53,7 @@ def redknot_contains_bug(code: str, *, red_knot_executable: Path) -> bool:
         Path(tempdir, "pyproject.toml").write_text('[project]\n\tname = "fuzz-input"')
         Path(tempdir, "input.py").write_text(code)
         completed_process = subprocess.run(
-            [red_knot_executable, "--current-directory", tempdir],
+            [red_knot_executable, "check", "--project", tempdir],
             capture_output=True,
             text=True,
         )
@@ -58,7 +63,16 @@ def redknot_contains_bug(code: str, *, red_knot_executable: Path) -> bool:
 def ruff_contains_bug(code: str, *, ruff_executable: Path) -> bool:
     """Return `True` if the code triggers a parser error."""
     completed_process = subprocess.run(
-        [ruff_executable, "check", "--config", "lint.select=[]", "--no-cache", "-"],
+        [
+            ruff_executable,
+            "check",
+            "--config",
+            "lint.select=[]",
+            "--no-cache",
+            "--target-version",
+            "py313",
+            "-",
+        ],
         capture_output=True,
         text=True,
         input=code,

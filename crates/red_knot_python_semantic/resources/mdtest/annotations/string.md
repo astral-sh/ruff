@@ -116,8 +116,8 @@ MyType = int
 class Aliases:
     MyType = str
 
-    forward: "MyType"
-    not_forward: MyType
+    forward: "MyType" = "value"
+    not_forward: MyType = "value"
 
 reveal_type(Aliases.forward)  # revealed: str
 reveal_type(Aliases.not_forward)  # revealed: str

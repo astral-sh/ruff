@@ -2,14 +2,15 @@ use crate::config::Log;
 use crate::parser::{BacktickOffsets, EmbeddedFileSourceMap};
 use camino::Utf8Path;
 use colored::Colorize;
+use config::SystemKind;
 use parser as test_parser;
 use red_knot_python_semantic::types::check_types;
-use red_knot_python_semantic::{Program, ProgramSettings, SearchPathSettings, SitePackages};
-use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig, ParseDiagnostic};
-use ruff_db::files::{system_path_to_file, File, Files};
+use red_knot_python_semantic::{Program, ProgramSettings, PythonPath, SearchPathSettings};
+use ruff_db::diagnostic::{DisplayDiagnosticConfig, OldDiagnosticTrait, OldParseDiagnostic};
+use ruff_db::files::{system_path_to_file, File};
 use ruff_db::panic::catch_unwind;
 use ruff_db::parsed::parsed_module;
-use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
+use ruff_db::system::{DbWithWritableSystem as _, SystemPath, SystemPathBuf};
 use ruff_db::testing::{setup_logging, setup_logging_with_filter};
 use ruff_source_file::{LineIndex, OneIndexed};
 use std::fmt::Write;
@@ -42,7 +43,7 @@ pub fn run(
         }
     };
 
-    let mut db = db::Db::setup(SystemPathBuf::from("/src"));
+    let mut db = db::Db::setup();
 
     let filter = std::env::var(MDTEST_TEST_FILTER).ok();
     let mut any_failures = false;
@@ -55,10 +56,6 @@ pub fn run(
             Log::Bool(enabled) => enabled.then(setup_logging),
             Log::Filter(filter) => setup_logging_with_filter(filter),
         });
-
-        // Remove all files so that the db is in a "fresh" state.
-        db.memory_file_system().remove_all();
-        Files::sync_all(&mut db);
 
         if let Err(failures) = run_test(&mut db, relative_fixture_path, snapshot_path, &test) {
             any_failures = true;
@@ -82,13 +79,13 @@ pub fn run(
                 }
             }
 
+            let escaped_test_name = test.name().replace('\'', "\\'");
+
             println!(
-                "\nTo rerun this specific test, set the environment variable: {MDTEST_TEST_FILTER}=\"{}\"",
-                test.name()
+                "\nTo rerun this specific test, set the environment variable: {MDTEST_TEST_FILTER}='{escaped_test_name}'",
             );
             println!(
-                "{MDTEST_TEST_FILTER}=\"{}\" cargo test -p red_knot_python_semantic --test mdtest -- {test_name}",
-                test.name()
+                "{MDTEST_TEST_FILTER}='{escaped_test_name}' cargo test -p red_knot_python_semantic --test mdtest -- {test_name}",
             );
         }
     }
@@ -104,9 +101,32 @@ fn run_test(
     snapshot_path: &Utf8Path,
     test: &parser::MarkdownTest,
 ) -> Result<(), Failures> {
-    let project_root = db.project_root().to_path_buf();
-    let src_path = SystemPathBuf::from("/src");
-    let custom_typeshed_path = test.configuration().typeshed().map(SystemPathBuf::from);
+    // Initialize the system and remove all files and directories to reset the system to a clean state.
+    match test.configuration().system.unwrap_or_default() {
+        SystemKind::InMemory => {
+            db.use_in_memory_system();
+        }
+        SystemKind::Os => {
+            let dir = tempfile::TempDir::new().expect("Creating a temporary directory to succeed");
+            let root_path = dir
+                .path()
+                .canonicalize()
+                .expect("Canonicalizing to succeed");
+            let root_path = SystemPathBuf::from_path_buf(root_path)
+                .expect("Temp directory to be a valid UTF8 path")
+                .simplified()
+                .to_path_buf();
+
+            db.use_os_system_with_temp_dir(root_path, dir);
+        }
+    }
+
+    let project_root = SystemPathBuf::from("/src");
+    db.create_directory_all(&project_root)
+        .expect("Creating the project root to succeed");
+
+    let src_path = project_root.clone();
+    let custom_typeshed_path = test.configuration().typeshed();
     let mut typeshed_files = vec![];
     let mut has_custom_versions_file = false;
 
@@ -118,13 +138,13 @@ fn run_test(
             }
 
             assert!(
-                matches!(embedded.lang, "py" | "pyi" | "text"),
-                "Supported file types are: py, pyi, text"
+                matches!(embedded.lang, "py" | "pyi" | "python" | "text"),
+                "Supported file types are: py (or python), pyi, text, and ignore"
             );
 
             let full_path = embedded.full_path(&project_root);
 
-            if let Some(ref typeshed_path) = custom_typeshed_path {
+            if let Some(typeshed_path) = custom_typeshed_path {
                 if let Ok(relative_path) = full_path.strip_prefix(typeshed_path.join("stdlib")) {
                     if relative_path.as_str() == "VERSIONS" {
                         has_custom_versions_file = true;
@@ -151,7 +171,7 @@ fn run_test(
         .collect();
 
     // Create a custom typeshed `VERSIONS` file if none was provided.
-    if let Some(ref typeshed_path) = custom_typeshed_path {
+    if let Some(typeshed_path) = custom_typeshed_path {
         if !has_custom_versions_file {
             let versions_file = typeshed_path.join("stdlib/VERSIONS");
             let contents = typeshed_files
@@ -170,21 +190,26 @@ fn run_test(
         }
     }
 
-    Program::get(db)
-        .update_from_settings(
-            db,
-            ProgramSettings {
-                python_version: test.configuration().python_version().unwrap_or_default(),
-                python_platform: test.configuration().python_platform().unwrap_or_default(),
-                search_paths: SearchPathSettings {
-                    src_roots: vec![src_path],
-                    extra_paths: vec![],
-                    custom_typeshed: custom_typeshed_path,
-                    site_packages: SitePackages::Known(vec![]),
-                },
-            },
-        )
-        .expect("Failed to update Program settings in TestDb");
+    let settings = ProgramSettings {
+        python_version: test.configuration().python_version().unwrap_or_default(),
+        python_platform: test.configuration().python_platform().unwrap_or_default(),
+        search_paths: SearchPathSettings {
+            src_roots: vec![src_path],
+            extra_paths: test
+                .configuration()
+                .extra_paths()
+                .unwrap_or_default()
+                .to_vec(),
+            custom_typeshed: custom_typeshed_path.map(SystemPath::to_path_buf),
+            python_path: PythonPath::KnownSitePackages(vec![]),
+        },
+    };
+
+    match Program::try_get(db) {
+        Some(program) => program.update_from_settings(db, settings),
+        None => Program::from_settings(db, settings).map(|_| ()),
+    }
+    .expect("Failed to update Program settings in TestDb");
 
     // When snapshot testing is enabled, this is populated with
     // all diagnostics. Otherwise it remains empty.
@@ -200,8 +225,8 @@ fn run_test(
                 .iter()
                 .cloned()
                 .map(|error| {
-                    let diagnostic: Box<dyn Diagnostic> =
-                        Box::new(ParseDiagnostic::new(test_file.file, error));
+                    let diagnostic: Box<dyn OldDiagnosticTrait> =
+                        Box::new(OldParseDiagnostic::new(test_file.file, error));
                     diagnostic
                 })
                 .collect();
@@ -234,7 +259,7 @@ fn run_test(
                 }
             };
             diagnostics.extend(type_diagnostics.into_iter().map(|diagnostic| {
-                let diagnostic: Box<dyn Diagnostic> = Box::new((*diagnostic).clone());
+                let diagnostic: Box<dyn OldDiagnosticTrait> = Box::new((*diagnostic).clone());
                 diagnostic
             }));
 
@@ -253,10 +278,15 @@ fn run_test(
         })
         .collect();
 
-    if !snapshot_diagnostics.is_empty() {
+    if snapshot_diagnostics.is_empty() && test.should_snapshot_diagnostics() {
+        panic!(
+            "Test `{}` requested snapshotting diagnostics but it didn't produce any.",
+            test.name()
+        );
+    } else if !snapshot_diagnostics.is_empty() {
         let snapshot =
             create_diagnostic_snapshot(db, relative_fixture_path, test, snapshot_diagnostics);
-        let name = test.name().replace(' ', "_");
+        let name = test.name().replace(' ', "_").replace(':', "__");
         insta::with_settings!(
             {
                 snapshot_path => snapshot_path,
@@ -294,7 +324,7 @@ struct TestFile {
     backtick_offsets: Vec<BacktickOffsets>,
 }
 
-fn create_diagnostic_snapshot<D: Diagnostic>(
+fn create_diagnostic_snapshot<D: OldDiagnosticTrait>(
     db: &mut db::Db,
     relative_fixture_path: &Utf8Path,
     test: &parser::MarkdownTest,

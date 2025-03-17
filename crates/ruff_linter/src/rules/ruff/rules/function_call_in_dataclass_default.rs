@@ -29,7 +29,7 @@ use crate::rules::ruff::rules::helpers::{
 /// Attributes whose default arguments are `NewType` calls
 /// where the original type is immutable are ignored.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// from dataclasses import dataclass
 ///

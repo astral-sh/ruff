@@ -13,6 +13,10 @@ use super::helpers::is_empty_or_null_string;
 /// ## What it does
 /// Checks for `pytest.warns` context managers with multiple statements.
 ///
+/// This rule allows `pytest.warns` bodies to contain `for`
+/// loops with empty bodies (e.g., `pass` or `...` statements), to test
+/// iterator behavior.
+///
 /// ## Why is this bad?
 /// When `pytest.warns` is used as a context manager and contains multiple
 /// statements, it can lead to the test passing when it should instead fail.
@@ -20,9 +24,6 @@ use super::helpers::is_empty_or_null_string;
 /// A `pytest.warns` context manager should only contain a single
 /// simple statement that triggers the expected warning.
 ///
-/// In [preview], this rule allows `pytest.warns` bodies to contain `for`
-/// loops with empty bodies (e.g., `pass` or `...` statements), to test
-/// iterator behavior.
 ///
 /// ## Example
 /// ```python
@@ -48,8 +49,6 @@ use super::helpers::is_empty_or_null_string;
 ///
 /// ## References
 /// - [`pytest` documentation: `pytest.warns`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-warns)
-///
-/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 pub(crate) struct PytestWarnsWithMultipleStatements;
 
@@ -187,7 +186,7 @@ pub(crate) fn warns_call(checker: &Checker, call: &ast::ExprCall) {
                 if call
                     .arguments
                     .find_keyword("match")
-                    .map_or(true, |k| is_empty_or_null_string(&k.value))
+                    .is_none_or(|k| is_empty_or_null_string(&k.value))
                 {
                     warning_needs_match(checker, warning);
                 }
@@ -206,14 +205,12 @@ pub(crate) fn complex_warns(checker: &Checker, stmt: &Stmt, items: &[WithItem], 
     // Check body for `pytest.warns` context manager
     if warns_called {
         let is_too_complex = if let [stmt] = body {
-            let in_preview = checker.settings.preview.is_enabled();
-
             match stmt {
                 Stmt::With(ast::StmtWith { body, .. }) => is_non_trivial_with_body(body),
                 // Allow function and class definitions to test decorators.
                 Stmt::ClassDef(_) | Stmt::FunctionDef(_) => false,
                 // Allow empty `for` loops to test iterators.
-                Stmt::For(ast::StmtFor { body, .. }) if in_preview => match &body[..] {
+                Stmt::For(ast::StmtFor { body, .. }) => match &body[..] {
                     [Stmt::Pass(_)] => false,
                     [Stmt::Expr(ast::StmtExpr { value, .. })] => !value.is_ellipsis_literal_expr(),
                     _ => true,

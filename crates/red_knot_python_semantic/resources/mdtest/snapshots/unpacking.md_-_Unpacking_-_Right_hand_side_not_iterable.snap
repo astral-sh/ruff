@@ -22,7 +22,7 @@ error: lint:not-iterable
  --> /src/mdtest_snippet.py:1:8
   |
 1 | a, b = 1  # error: [not-iterable]
-  |        ^ Object of type `Literal[1]` is not iterable
+  |        ^ Object of type `Literal[1]` is not iterable because it doesn't have an `__iter__` method or a `__getitem__` method
   |
 
 ```

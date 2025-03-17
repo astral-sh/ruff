@@ -183,12 +183,11 @@ class WithBothLenAndBool2:
 # revealed: Literal[False]
 reveal_type(not WithBothLenAndBool2())
 
-# TODO: raise diagnostic when __bool__ method is not valid: [unsupported-operator] "Method __bool__ for type `MethodBoolInvalid` should return `bool`, returned type `int`"
-# https://docs.python.org/3/reference/datamodel.html#object.__bool__
 class MethodBoolInvalid:
     def __bool__(self) -> int:
         return 0
 
+# error: [unsupported-bool-conversion] "Boolean conversion is unsupported for type `MethodBoolInvalid`; the return type of its bool method (`int`) isn't assignable to `bool"
 # revealed: bool
 reveal_type(not MethodBoolInvalid())
 
@@ -203,4 +202,16 @@ class PossiblyUnboundBool:
 
 # revealed: bool
 reveal_type(not PossiblyUnboundBool())
+```
+
+## Object that implements `__bool__` incorrectly
+
+<!-- snapshot-diagnostics -->
+
+```py
+class NotBoolable:
+    __bool__ = 3
+
+# error: [unsupported-bool-conversion]
+not NotBoolable()
 ```

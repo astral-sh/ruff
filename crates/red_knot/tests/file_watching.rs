@@ -1,5 +1,4 @@
-#![allow(clippy::disallowed_names)]
-
+use std::collections::HashSet;
 use std::io::Write;
 use std::time::{Duration, Instant};
 
@@ -9,13 +8,14 @@ use red_knot_project::metadata::pyproject::{PyProject, Tool};
 use red_knot_project::metadata::value::{RangedValue, RelativePathBuf};
 use red_knot_project::watch::{directory_watcher, ChangeEvent, ProjectWatcher};
 use red_knot_project::{Db, ProjectDatabase, ProjectMetadata};
-use red_knot_python_semantic::{resolve_module, ModuleName, PythonPlatform, PythonVersion};
+use red_knot_python_semantic::{resolve_module, ModuleName, PythonPlatform};
 use ruff_db::files::{system_path_to_file, File, FileError};
 use ruff_db::source::source_text;
 use ruff_db::system::{
     OsSystem, System, SystemPath, SystemPathBuf, UserConfigDirectoryOverrideGuard,
 };
-use ruff_db::Upcast;
+use ruff_db::{Db as _, Upcast};
+use ruff_python_ast::PythonVersion;
 
 struct TestCase {
     db: ProjectDatabase,
@@ -192,11 +192,29 @@ impl TestCase {
         Ok(())
     }
 
-    fn collect_project_files(&self) -> Vec<File> {
-        let files = self.db().project().files(self.db());
-        let mut collected: Vec<_> = files.into_iter().collect();
-        collected.sort_unstable_by_key(|file| file.path(self.db()).as_system_path().unwrap());
-        collected
+    #[track_caller]
+    fn assert_indexed_project_files(&self, expected: impl IntoIterator<Item = File>) {
+        let mut expected: HashSet<_> = expected.into_iter().collect();
+
+        let actual = self.db().project().files(self.db());
+        for file in &actual {
+            assert!(
+                expected.remove(&file),
+                "Indexed project files contains '{}' which was not expected.",
+                file.path(self.db())
+            );
+        }
+
+        if !expected.is_empty() {
+            let paths: Vec<_> = expected
+                .iter()
+                .map(|file| file.path(self.db()).as_str())
+                .collect();
+            panic!(
+                "Indexed project files are missing the following files: {:?}",
+                paths.join(", ")
+            );
+        }
     }
 
     fn system_file(&self, path: impl AsRef<SystemPath>) -> Result<File, FileError> {
@@ -221,13 +239,15 @@ where
     }
 }
 
-trait SetupFiles {
-    fn setup(self, context: &SetupContext) -> anyhow::Result<()>;
+trait Setup {
+    fn setup(self, context: &mut SetupContext) -> anyhow::Result<()>;
 }
 
 struct SetupContext<'a> {
     system: &'a OsSystem,
     root_path: &'a SystemPath,
+    options: Option<Options>,
+    included_paths: Option<Vec<SystemPathBuf>>,
 }
 
 impl<'a> SetupContext<'a> {
@@ -250,55 +270,77 @@ impl<'a> SetupContext<'a> {
     fn join_root_path(&self, relative: impl AsRef<SystemPath>) -> SystemPathBuf {
         self.root_path().join(relative)
     }
+
+    fn write_project_file(
+        &self,
+        relative_path: impl AsRef<SystemPath>,
+        content: &str,
+    ) -> anyhow::Result<()> {
+        let relative_path = relative_path.as_ref();
+        let absolute_path = self.join_project_path(relative_path);
+        Self::write_file_impl(absolute_path, content)
+    }
+
+    fn write_file(
+        &self,
+        relative_path: impl AsRef<SystemPath>,
+        content: &str,
+    ) -> anyhow::Result<()> {
+        let relative_path = relative_path.as_ref();
+        let absolute_path = self.join_root_path(relative_path);
+        Self::write_file_impl(absolute_path, content)
+    }
+
+    fn write_file_impl(path: impl AsRef<SystemPath>, content: &str) -> anyhow::Result<()> {
+        let path = path.as_ref();
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)
+                .with_context(|| format!("Failed to create parent directory for file `{path}`"))?;
+        }
+
+        let mut file = std::fs::File::create(path.as_std_path())
+            .with_context(|| format!("Failed to open file `{path}`"))?;
+        file.write_all(content.as_bytes())
+            .with_context(|| format!("Failed to write to file `{path}`"))?;
+        file.sync_data()?;
+
+        Ok(())
+    }
+
+    fn set_options(&mut self, options: Options) {
+        self.options = Some(options);
+    }
+
+    fn set_included_paths(&mut self, paths: Vec<SystemPathBuf>) {
+        self.included_paths = Some(paths);
+    }
 }
 
-impl<const N: usize, P> SetupFiles for [(P, &'static str); N]
+impl<const N: usize, P> Setup for [(P, &'static str); N]
 where
     P: AsRef<SystemPath>,
 {
-    fn setup(self, context: &SetupContext) -> anyhow::Result<()> {
+    fn setup(self, context: &mut SetupContext) -> anyhow::Result<()> {
         for (relative_path, content) in self {
-            let relative_path = relative_path.as_ref();
-            let absolute_path = context.join_project_path(relative_path);
-            if let Some(parent) = absolute_path.parent() {
-                std::fs::create_dir_all(parent).with_context(|| {
-                    format!("Failed to create parent directory for file `{relative_path}`")
-                })?;
-            }
-
-            let mut file = std::fs::File::create(absolute_path.as_std_path())
-                .with_context(|| format!("Failed to open file `{relative_path}`"))?;
-            file.write_all(content.as_bytes())
-                .with_context(|| format!("Failed to write to file `{relative_path}`"))?;
-            file.sync_data()?;
+            context.write_project_file(relative_path, content)?;
         }
 
         Ok(())
     }
 }
 
-impl<F> SetupFiles for F
+impl<F> Setup for F
 where
-    F: FnOnce(&SetupContext) -> anyhow::Result<()>,
+    F: FnOnce(&mut SetupContext) -> anyhow::Result<()>,
 {
-    fn setup(self, context: &SetupContext) -> anyhow::Result<()> {
+    fn setup(self, context: &mut SetupContext) -> anyhow::Result<()> {
         self(context)
     }
 }
 
 fn setup<F>(setup_files: F) -> anyhow::Result<TestCase>
 where
-    F: SetupFiles,
-{
-    setup_with_options(setup_files, |_context| None)
-}
-
-fn setup_with_options<F>(
-    setup_files: F,
-    create_options: impl FnOnce(&SetupContext) -> Option<Options>,
-) -> anyhow::Result<TestCase>
-where
-    F: SetupFiles,
+    F: Setup,
 {
     let temp_dir = tempfile::tempdir()?;
 
@@ -324,16 +366,18 @@ where
         .with_context(|| format!("Failed to create project directory `{project_path}`"))?;
 
     let system = OsSystem::new(&project_path);
-    let setup_context = SetupContext {
+    let mut setup_context = SetupContext {
         system: &system,
         root_path: &root_path,
+        options: None,
+        included_paths: None,
     };
 
     setup_files
-        .setup(&setup_context)
+        .setup(&mut setup_context)
         .context("Failed to setup test files")?;
 
-    if let Some(options) = create_options(&setup_context) {
+    if let Some(options) = setup_context.options {
         std::fs::write(
             project_path.join("pyproject.toml").as_std_path(),
             toml::to_string(&PyProject {
@@ -346,6 +390,8 @@ where
         )
         .context("Failed to write configuration")?;
     }
+
+    let included_paths = setup_context.included_paths;
 
     let mut project = ProjectMetadata::discover(&project_path, &system)?;
     project.apply_configuration_files(&system)?;
@@ -362,7 +408,11 @@ where
             .with_context(|| format!("Failed to create search path `{path}`"))?;
     }
 
-    let db = ProjectDatabase::new(project, system)?;
+    let mut db = ProjectDatabase::new(project, system)?;
+
+    if let Some(included_paths) = included_paths {
+        db.project().set_included_paths(&mut db, included_paths);
+    }
 
     let (sender, receiver) = crossbeam::channel::unbounded();
     let watcher = directory_watcher(move |events| sender.send(events).unwrap())
@@ -424,7 +474,7 @@ fn new_file() -> anyhow::Result<()> {
     let foo_path = case.project_path("foo.py");
 
     assert_eq!(case.system_file(&foo_path), Err(FileError::NotFound));
-    assert_eq!(&case.collect_project_files(), &[bar_file]);
+    case.assert_indexed_project_files([bar_file]);
 
     std::fs::write(foo_path.as_std_path(), "print('Hello')")?;
 
@@ -434,7 +484,7 @@ fn new_file() -> anyhow::Result<()> {
 
     let foo = case.system_file(&foo_path).expect("foo.py to exist.");
 
-    assert_eq!(&case.collect_project_files(), &[bar_file, foo]);
+    case.assert_indexed_project_files([bar_file, foo]);
 
     Ok(())
 }
@@ -447,7 +497,7 @@ fn new_ignored_file() -> anyhow::Result<()> {
     let foo_path = case.project_path("foo.py");
 
     assert_eq!(case.system_file(&foo_path), Err(FileError::NotFound));
-    assert_eq!(&case.collect_project_files(), &[bar_file]);
+    case.assert_indexed_project_files([bar_file]);
 
     std::fs::write(foo_path.as_std_path(), "print('Hello')")?;
 
@@ -456,7 +506,132 @@ fn new_ignored_file() -> anyhow::Result<()> {
     case.apply_changes(changes);
 
     assert!(case.system_file(&foo_path).is_ok());
-    assert_eq!(&case.collect_project_files(), &[bar_file]);
+    case.assert_indexed_project_files([bar_file]);
+
+    Ok(())
+}
+
+#[test]
+fn new_non_project_file() -> anyhow::Result<()> {
+    let mut case = setup(|context: &mut SetupContext| {
+        context.write_project_file("bar.py", "")?;
+        context.set_options(Options {
+            environment: Some(EnvironmentOptions {
+                extra_paths: Some(vec![RelativePathBuf::cli(
+                    context.join_root_path("site_packages"),
+                )]),
+                ..EnvironmentOptions::default()
+            }),
+            ..Options::default()
+        });
+
+        Ok(())
+    })?;
+
+    let bar_path = case.project_path("bar.py");
+    let bar_file = case.system_file(&bar_path).unwrap();
+
+    case.assert_indexed_project_files([bar_file]);
+
+    // Add a file to site packages
+    let black_path = case.root_path().join("site_packages/black.py");
+    std::fs::write(black_path.as_std_path(), "print('Hello')")?;
+
+    let changes = case.stop_watch(event_for_file("black.py"));
+
+    case.apply_changes(changes);
+
+    assert!(case.system_file(&black_path).is_ok());
+
+    // The file should not have been added to the project files
+    case.assert_indexed_project_files([bar_file]);
+
+    Ok(())
+}
+
+#[test]
+fn new_files_with_explicit_included_paths() -> anyhow::Result<()> {
+    let mut case = setup(|context: &mut SetupContext| {
+        context.write_project_file("src/main.py", "")?;
+        context.write_project_file("src/sub/__init__.py", "")?;
+        context.write_project_file("src/test.py", "")?;
+        context.set_included_paths(vec![
+            context.join_project_path("src/main.py"),
+            context.join_project_path("src/sub"),
+        ]);
+        Ok(())
+    })?;
+
+    let main_path = case.project_path("src/main.py");
+    let main_file = case.system_file(&main_path).unwrap();
+
+    let sub_init_path = case.project_path("src/sub/__init__.py");
+    let sub_init = case.system_file(&sub_init_path).unwrap();
+
+    case.assert_indexed_project_files([main_file, sub_init]);
+
+    // Write a new file to `sub` which is an included path
+    let sub_a_path = case.project_path("src/sub/a.py");
+    std::fs::write(sub_a_path.as_std_path(), "print('Hello')")?;
+
+    // and write a second file in the root directory -- this should not be included
+    let test2_path = case.project_path("src/test2.py");
+    std::fs::write(test2_path.as_std_path(), "print('Hello')")?;
+
+    let changes = case.stop_watch(event_for_file("test2.py"));
+
+    case.apply_changes(changes);
+
+    let sub_a_file = case.system_file(&sub_a_path).expect("sub/a.py to exist");
+
+    case.assert_indexed_project_files([main_file, sub_init, sub_a_file]);
+
+    Ok(())
+}
+
+#[test]
+fn new_file_in_included_out_of_project_directory() -> anyhow::Result<()> {
+    let mut case = setup(|context: &mut SetupContext| {
+        context.write_project_file("src/main.py", "")?;
+        context.write_project_file("script.py", "")?;
+        context.write_file("outside_project/a.py", "")?;
+
+        context.set_included_paths(vec![
+            context.join_root_path("outside_project"),
+            context.join_project_path("src"),
+        ]);
+        Ok(())
+    })?;
+
+    let main_path = case.project_path("src/main.py");
+    let main_file = case.system_file(&main_path).unwrap();
+
+    let outside_a_path = case.root_path().join("outside_project/a.py");
+    let outside_a = case.system_file(&outside_a_path).unwrap();
+
+    case.assert_indexed_project_files([outside_a, main_file]);
+
+    // Write a new file to `src` which should be watched
+    let src_a = case.project_path("src/a.py");
+    std::fs::write(src_a.as_std_path(), "print('Hello')")?;
+
+    // and write a second file to `outside_project` which should be watched too
+    let outside_b_path = case.root_path().join("outside_project/b.py");
+    std::fs::write(outside_b_path.as_std_path(), "print('Hello')")?;
+
+    // and a third file in the project's root that should not be included
+    let script2_path = case.project_path("script2.py");
+    std::fs::write(script2_path.as_std_path(), "print('Hello')")?;
+
+    let changes = case.stop_watch(event_for_file("script2.py"));
+
+    case.apply_changes(changes);
+
+    let src_a_file = case.system_file(&src_a).unwrap();
+    let outside_b_file = case.system_file(&outside_b_path).unwrap();
+
+    // The file should not have been added to the project files
+    case.assert_indexed_project_files([main_file, outside_a, outside_b_file, src_a_file]);
 
     Ok(())
 }
@@ -469,7 +644,7 @@ fn changed_file() -> anyhow::Result<()> {
 
     let foo = case.system_file(&foo_path)?;
     assert_eq!(source_text(case.db(), foo).as_str(), foo_source);
-    assert_eq!(&case.collect_project_files(), &[foo]);
+    case.assert_indexed_project_files([foo]);
 
     update_file(&foo_path, "print('Version 2')")?;
 
@@ -480,7 +655,7 @@ fn changed_file() -> anyhow::Result<()> {
     case.apply_changes(changes);
 
     assert_eq!(source_text(case.db(), foo).as_str(), "print('Version 2')");
-    assert_eq!(&case.collect_project_files(), &[foo]);
+    case.assert_indexed_project_files([foo]);
 
     Ok(())
 }
@@ -494,7 +669,7 @@ fn deleted_file() -> anyhow::Result<()> {
     let foo = case.system_file(&foo_path)?;
 
     assert!(foo.exists(case.db()));
-    assert_eq!(&case.collect_project_files(), &[foo]);
+    case.assert_indexed_project_files([foo]);
 
     std::fs::remove_file(foo_path.as_std_path())?;
 
@@ -503,7 +678,7 @@ fn deleted_file() -> anyhow::Result<()> {
     case.apply_changes(changes);
 
     assert!(!foo.exists(case.db()));
-    assert_eq!(&case.collect_project_files(), &[] as &[File]);
+    case.assert_indexed_project_files([]);
 
     Ok(())
 }
@@ -523,7 +698,7 @@ fn move_file_to_trash() -> anyhow::Result<()> {
     let foo = case.system_file(&foo_path)?;
 
     assert!(foo.exists(case.db()));
-    assert_eq!(&case.collect_project_files(), &[foo]);
+    case.assert_indexed_project_files([foo]);
 
     std::fs::rename(
         foo_path.as_std_path(),
@@ -535,7 +710,7 @@ fn move_file_to_trash() -> anyhow::Result<()> {
     case.apply_changes(changes);
 
     assert!(!foo.exists(case.db()));
-    assert_eq!(&case.collect_project_files(), &[] as &[File]);
+    case.assert_indexed_project_files([]);
 
     Ok(())
 }
@@ -553,7 +728,7 @@ fn move_file_to_project() -> anyhow::Result<()> {
     let foo_in_project = case.project_path("foo.py");
 
     assert!(case.system_file(&foo_path).is_ok());
-    assert_eq!(&case.collect_project_files(), &[bar]);
+    case.assert_indexed_project_files([bar]);
 
     std::fs::rename(foo_path.as_std_path(), foo_in_project.as_std_path())?;
 
@@ -564,7 +739,7 @@ fn move_file_to_project() -> anyhow::Result<()> {
     let foo_in_project = case.system_file(&foo_in_project)?;
 
     assert!(foo_in_project.exists(case.db()));
-    assert_eq!(&case.collect_project_files(), &[bar, foo_in_project]);
+    case.assert_indexed_project_files([bar, foo_in_project]);
 
     Ok(())
 }
@@ -578,7 +753,7 @@ fn rename_file() -> anyhow::Result<()> {
 
     let foo = case.system_file(&foo_path)?;
 
-    assert_eq!(case.collect_project_files(), [foo]);
+    case.assert_indexed_project_files([foo]);
 
     std::fs::rename(foo_path.as_std_path(), bar_path.as_std_path())?;
 
@@ -591,7 +766,7 @@ fn rename_file() -> anyhow::Result<()> {
     let bar = case.system_file(&bar_path)?;
 
     assert!(bar.exists(case.db()));
-    assert_eq!(case.collect_project_files(), [bar]);
+    case.assert_indexed_project_files([bar]);
 
     Ok(())
 }
@@ -617,7 +792,7 @@ fn directory_moved_to_project() -> anyhow::Result<()> {
     );
 
     assert_eq!(sub_a_module, None);
-    assert_eq!(case.collect_project_files(), &[bar]);
+    case.assert_indexed_project_files([bar]);
 
     let sub_new_path = case.project_path("sub");
     std::fs::rename(sub_original_path.as_std_path(), sub_new_path.as_std_path())
@@ -641,7 +816,7 @@ fn directory_moved_to_project() -> anyhow::Result<()> {
     )
     .is_some());
 
-    assert_eq!(case.collect_project_files(), &[bar, init_file, a_file]);
+    case.assert_indexed_project_files([bar, init_file, a_file]);
 
     Ok(())
 }
@@ -669,7 +844,7 @@ fn directory_moved_to_trash() -> anyhow::Result<()> {
         .system_file(sub_path.join("a.py"))
         .expect("a.py to exist");
 
-    assert_eq!(case.collect_project_files(), &[bar, init_file, a_file]);
+    case.assert_indexed_project_files([bar, init_file, a_file]);
 
     std::fs::create_dir(case.root_path().join(".trash").as_std_path())?;
     let trashed_sub = case.root_path().join(".trash/sub");
@@ -690,7 +865,7 @@ fn directory_moved_to_trash() -> anyhow::Result<()> {
     assert!(!init_file.exists(case.db()));
     assert!(!a_file.exists(case.db()));
 
-    assert_eq!(case.collect_project_files(), &[bar]);
+    case.assert_indexed_project_files([bar]);
 
     Ok(())
 }
@@ -724,7 +899,7 @@ fn directory_renamed() -> anyhow::Result<()> {
         .system_file(sub_path.join("a.py"))
         .expect("a.py to exist");
 
-    assert_eq!(case.collect_project_files(), &[bar, sub_init, sub_a]);
+    case.assert_indexed_project_files([bar, sub_init, sub_a]);
 
     let foo_baz = case.project_path("foo/baz");
 
@@ -766,10 +941,7 @@ fn directory_renamed() -> anyhow::Result<()> {
     assert!(foo_baz_init.exists(case.db()));
     assert!(foo_baz_a.exists(case.db()));
 
-    assert_eq!(
-        case.collect_project_files(),
-        &[bar, foo_baz_init, foo_baz_a]
-    );
+    case.assert_indexed_project_files([bar, foo_baz_init, foo_baz_a]);
 
     Ok(())
 }
@@ -798,7 +970,7 @@ fn directory_deleted() -> anyhow::Result<()> {
     let a_file = case
         .system_file(sub_path.join("a.py"))
         .expect("a.py to exist");
-    assert_eq!(case.collect_project_files(), &[bar, init_file, a_file]);
+    case.assert_indexed_project_files([bar, init_file, a_file]);
 
     std::fs::remove_dir_all(sub_path.as_std_path())
         .with_context(|| "Failed to remove the sub directory")?;
@@ -816,15 +988,17 @@ fn directory_deleted() -> anyhow::Result<()> {
 
     assert!(!init_file.exists(case.db()));
     assert!(!a_file.exists(case.db()));
-    assert_eq!(case.collect_project_files(), &[bar]);
+    case.assert_indexed_project_files([bar]);
 
     Ok(())
 }
 
 #[test]
 fn search_path() -> anyhow::Result<()> {
-    let mut case = setup_with_options([("bar.py", "import sub.a")], |context| {
-        Some(Options {
+    let mut case = setup(|context: &mut SetupContext| {
+        context.write_project_file("bar.py", "import sub.a")?;
+
+        context.set_options(Options {
             environment: Some(EnvironmentOptions {
                 extra_paths: Some(vec![RelativePathBuf::cli(
                     context.join_root_path("site_packages"),
@@ -832,7 +1006,8 @@ fn search_path() -> anyhow::Result<()> {
                 ..EnvironmentOptions::default()
             }),
             ..Options::default()
-        })
+        });
+        Ok(())
     })?;
 
     let site_packages = case.root_path().join("site_packages");
@@ -849,10 +1024,7 @@ fn search_path() -> anyhow::Result<()> {
     case.apply_changes(changes);
 
     assert!(resolve_module(case.db().upcast(), &ModuleName::new_static("a").unwrap()).is_some());
-    assert_eq!(
-        case.collect_project_files(),
-        &[case.system_file(case.project_path("bar.py")).unwrap()]
-    );
+    case.assert_indexed_project_files([case.system_file(case.project_path("bar.py")).unwrap()]);
 
     Ok(())
 }
@@ -889,8 +1061,9 @@ fn add_search_path() -> anyhow::Result<()> {
 
 #[test]
 fn remove_search_path() -> anyhow::Result<()> {
-    let mut case = setup_with_options([("bar.py", "import sub.a")], |context| {
-        Some(Options {
+    let mut case = setup(|context: &mut SetupContext| {
+        context.write_project_file("bar.py", "import sub.a")?;
+        context.set_options(Options {
             environment: Some(EnvironmentOptions {
                 extra_paths: Some(vec![RelativePathBuf::cli(
                     context.join_root_path("site_packages"),
@@ -898,7 +1071,9 @@ fn remove_search_path() -> anyhow::Result<()> {
                 ..EnvironmentOptions::default()
             }),
             ..Options::default()
-        })
+        });
+
+        Ok(())
     })?;
 
     // Remove site packages from the search path settings.
@@ -921,30 +1096,30 @@ fn remove_search_path() -> anyhow::Result<()> {
 
 #[test]
 fn change_python_version_and_platform() -> anyhow::Result<()> {
-    let mut case = setup_with_options(
+    let mut case = setup(|context: &mut SetupContext| {
         // `sys.last_exc` is a Python 3.12 only feature
         // `os.getegid()` is Unix only
-        [(
+        context.write_project_file(
             "bar.py",
             r#"
 import sys
 import os
 print(sys.last_exc, os.getegid())
 "#,
-        )],
-        |_context| {
-            Some(Options {
-                environment: Some(EnvironmentOptions {
-                    python_version: Some(RangedValue::cli(PythonVersion::PY311)),
-                    python_platform: Some(RangedValue::cli(PythonPlatform::Identifier(
-                        "win32".to_string(),
-                    ))),
-                    ..EnvironmentOptions::default()
-                }),
-                ..Options::default()
-            })
-        },
-    )?;
+        )?;
+        context.set_options(Options {
+            environment: Some(EnvironmentOptions {
+                python_version: Some(RangedValue::cli(PythonVersion::PY311)),
+                python_platform: Some(RangedValue::cli(PythonPlatform::Identifier(
+                    "win32".to_string(),
+                ))),
+                ..EnvironmentOptions::default()
+            }),
+            ..Options::default()
+        });
+
+        Ok(())
+    })?;
 
     let diagnostics = case.db.check().context("Failed to check project.")?;
 
@@ -979,38 +1154,35 @@ print(sys.last_exc, os.getegid())
 
 #[test]
 fn changed_versions_file() -> anyhow::Result<()> {
-    let mut case = setup_with_options(
-        |context: &SetupContext| {
-            std::fs::write(
-                context.join_project_path("bar.py").as_std_path(),
-                "import sub.a",
-            )?;
-            std::fs::create_dir_all(context.join_root_path("typeshed/stdlib").as_std_path())?;
-            std::fs::write(
-                context
-                    .join_root_path("typeshed/stdlib/VERSIONS")
-                    .as_std_path(),
-                "",
-            )?;
-            std::fs::write(
-                context
-                    .join_root_path("typeshed/stdlib/os.pyi")
-                    .as_std_path(),
-                "# not important",
-            )?;
+    let mut case = setup(|context: &mut SetupContext| {
+        std::fs::write(
+            context.join_project_path("bar.py").as_std_path(),
+            "import sub.a",
+        )?;
+        std::fs::create_dir_all(context.join_root_path("typeshed/stdlib").as_std_path())?;
+        std::fs::write(
+            context
+                .join_root_path("typeshed/stdlib/VERSIONS")
+                .as_std_path(),
+            "",
+        )?;
+        std::fs::write(
+            context
+                .join_root_path("typeshed/stdlib/os.pyi")
+                .as_std_path(),
+            "# not important",
+        )?;
 
-            Ok(())
-        },
-        |context| {
-            Some(Options {
-                environment: Some(EnvironmentOptions {
-                    typeshed: Some(RelativePathBuf::cli(context.join_root_path("typeshed"))),
-                    ..EnvironmentOptions::default()
-                }),
-                ..Options::default()
-            })
-        },
-    )?;
+        context.set_options(Options {
+            environment: Some(EnvironmentOptions {
+                typeshed: Some(RelativePathBuf::cli(context.join_root_path("typeshed"))),
+                ..EnvironmentOptions::default()
+            }),
+            ..Options::default()
+        });
+
+        Ok(())
+    })?;
 
     // Unset the custom typeshed directory.
     assert_eq!(
@@ -1055,7 +1227,7 @@ fn changed_versions_file() -> anyhow::Result<()> {
 /// we're seeing is that Windows only emits a single event, similar to Linux.
 #[test]
 fn hard_links_in_project() -> anyhow::Result<()> {
-    let mut case = setup(|context: &SetupContext| {
+    let mut case = setup(|context: &mut SetupContext| {
         let foo_path = context.join_project_path("foo.py");
         std::fs::write(foo_path.as_std_path(), "print('Version 1')")?;
 
@@ -1074,6 +1246,7 @@ fn hard_links_in_project() -> anyhow::Result<()> {
 
     assert_eq!(source_text(case.db(), foo).as_str(), "print('Version 1')");
     assert_eq!(source_text(case.db(), bar).as_str(), "print('Version 1')");
+    case.assert_indexed_project_files([bar, foo]);
 
     // Write to the hard link target.
     update_file(foo_path, "print('Version 2')").context("Failed to update foo.py")?;
@@ -1126,7 +1299,7 @@ fn hard_links_in_project() -> anyhow::Result<()> {
     ignore = "windows doesn't support observing changes to hard linked files."
 )]
 fn hard_links_to_target_outside_project() -> anyhow::Result<()> {
-    let mut case = setup(|context: &SetupContext| {
+    let mut case = setup(|context: &mut SetupContext| {
         let foo_path = context.join_root_path("foo.py");
         std::fs::write(foo_path.as_std_path(), "print('Version 1')")?;
 
@@ -1234,7 +1407,7 @@ mod unix {
         ignore = "FSEvents doesn't emit change events for symlinked directories outside of the watched paths."
     )]
     fn symlink_target_outside_watched_paths() -> anyhow::Result<()> {
-        let mut case = setup(|context: &SetupContext| {
+        let mut case = setup(|context: &mut SetupContext| {
             // Set up the symlink target.
             let link_target = context.join_root_path("bar");
             std::fs::create_dir_all(link_target.as_std_path())
@@ -1315,7 +1488,7 @@ mod unix {
     /// ```
     #[test]
     fn symlink_inside_project() -> anyhow::Result<()> {
-        let mut case = setup(|context: &SetupContext| {
+        let mut case = setup(|context: &mut SetupContext| {
             // Set up the symlink target.
             let link_target = context.join_project_path("patched/bar");
             std::fs::create_dir_all(link_target.as_std_path())
@@ -1353,6 +1526,8 @@ mod unix {
         );
         assert_eq!(baz.file().path(case.db()).as_system_path(), Some(&*bar_baz));
 
+        case.assert_indexed_project_files([patched_bar_baz_file]);
+
         // Write to the symlink target.
         update_file(&patched_bar_baz, "def baz(): print('Version 2')")
             .context("Failed to update bar/baz.py")?;
@@ -1388,6 +1563,7 @@ mod unix {
             bar_baz_text = bar_baz_text.as_str()
         );
 
+        case.assert_indexed_project_files([patched_bar_baz_file]);
         Ok(())
     }
 
@@ -1405,43 +1581,39 @@ mod unix {
     /// ```
     #[test]
     fn symlinked_module_search_path() -> anyhow::Result<()> {
-        let mut case = setup_with_options(
-            |context: &SetupContext| {
-                // Set up the symlink target.
-                let site_packages = context.join_root_path("site-packages");
-                let bar = site_packages.join("bar");
-                std::fs::create_dir_all(bar.as_std_path())
-                    .context("Failed to create bar directory")?;
-                let baz_original = bar.join("baz.py");
-                std::fs::write(baz_original.as_std_path(), "def baz(): ...")
-                    .context("Failed to write baz.py")?;
+        let mut case = setup(|context: &mut SetupContext| {
+            // Set up the symlink target.
+            let site_packages = context.join_root_path("site-packages");
+            let bar = site_packages.join("bar");
+            std::fs::create_dir_all(bar.as_std_path()).context("Failed to create bar directory")?;
+            let baz_original = bar.join("baz.py");
+            std::fs::write(baz_original.as_std_path(), "def baz(): ...")
+                .context("Failed to write baz.py")?;
 
-                // Symlink the site packages in the venv to the global site packages
-                let venv_site_packages =
-                    context.join_project_path(".venv/lib/python3.12/site-packages");
-                std::fs::create_dir_all(venv_site_packages.parent().unwrap())
-                    .context("Failed to create .venv directory")?;
-                std::os::unix::fs::symlink(
-                    site_packages.as_std_path(),
-                    venv_site_packages.as_std_path(),
-                )
-                .context("Failed to create symlink to site-packages")?;
+            // Symlink the site packages in the venv to the global site packages
+            let venv_site_packages =
+                context.join_project_path(".venv/lib/python3.12/site-packages");
+            std::fs::create_dir_all(venv_site_packages.parent().unwrap())
+                .context("Failed to create .venv directory")?;
+            std::os::unix::fs::symlink(
+                site_packages.as_std_path(),
+                venv_site_packages.as_std_path(),
+            )
+            .context("Failed to create symlink to site-packages")?;
 
-                Ok(())
-            },
-            |_context| {
-                Some(Options {
-                    environment: Some(EnvironmentOptions {
-                        extra_paths: Some(vec![RelativePathBuf::cli(
-                            ".venv/lib/python3.12/site-packages",
-                        )]),
-                        python_version: Some(RangedValue::cli(PythonVersion::PY312)),
-                        ..EnvironmentOptions::default()
-                    }),
-                    ..Options::default()
-                })
-            },
-        )?;
+            context.set_options(Options {
+                environment: Some(EnvironmentOptions {
+                    extra_paths: Some(vec![RelativePathBuf::cli(
+                        ".venv/lib/python3.12/site-packages",
+                    )]),
+                    python_version: Some(RangedValue::cli(PythonVersion::PY312)),
+                    ..EnvironmentOptions::default()
+                }),
+                ..Options::default()
+            });
+
+            Ok(())
+        })?;
 
         let baz = resolve_module(
             case.db().upcast(),
@@ -1468,6 +1640,8 @@ mod unix {
             Some(&*baz_original)
         );
 
+        case.assert_indexed_project_files([]);
+
         // Write to the symlink target.
         update_file(&baz_original, "def baz(): print('Version 2')")
             .context("Failed to update bar/baz.py")?;
@@ -1493,13 +1667,15 @@ mod unix {
             "def baz(): print('Version 2')"
         );
 
+        case.assert_indexed_project_files([]);
+
         Ok(())
     }
 }
 
 #[test]
 fn nested_projects_delete_root() -> anyhow::Result<()> {
-    let mut case = setup(|context: &SetupContext| {
+    let mut case = setup(|context: &mut SetupContext| {
         std::fs::write(
             context.join_project_path("pyproject.toml").as_std_path(),
             r#"
@@ -1541,7 +1717,7 @@ fn nested_projects_delete_root() -> anyhow::Result<()> {
 fn changes_to_user_configuration() -> anyhow::Result<()> {
     let mut _config_dir_override: Option<UserConfigDirectoryOverrideGuard> = None;
 
-    let mut case = setup(|context: &SetupContext| {
+    let mut case = setup(|context: &mut SetupContext| {
         std::fs::write(
             context.join_project_path("pyproject.toml").as_std_path(),
             r#"
@@ -1608,6 +1784,85 @@ fn changes_to_user_configuration() -> anyhow::Result<()> {
     assert!(
         diagnostics.len() == 1,
         "Expected exactly one diagnostic but got: {diagnostics:#?}"
+    );
+
+    Ok(())
+}
+
+/// Tests that renaming a file from `lib.py` to `Lib.py` is correctly reflected.
+///
+/// This test currently fails on case-insensitive systems because `Files` is case-sensitive
+/// but the `System::metadata` call isn't. This means that
+/// Red Knot considers both `Lib.py` and `lib.py` to exist when only `lib.py` does
+///
+/// The incoming change events then are no-ops because they don't change either file's
+/// status nor does it update their last modified time (renaming a file doesn't bump it's
+/// last modified timestamp).
+///
+/// Fixing this requires to either make `Files` case-insensitive and store the
+/// real-case path (if it differs) on `File` or make `Files` use a
+/// case-sensitive `System::metadata` call. This does open the question if all
+/// `System` calls should be case sensitive. This would be the most consistent
+/// but might be hard to pull off.
+///
+/// What the right solution is also depends on if Red Knot itself should be case
+/// sensitive or not. E.g. should `include="src"` be case sensitive on all systems
+/// or only on case-sensitive systems?
+///
+/// Lastly, whatever solution we pick must also work well with VS Code which,
+/// unfortunately ,doesn't propagate casing-only renames.
+/// <https://github.com/rust-lang/rust-analyzer/issues/9581>
+#[ignore]
+#[test]
+fn rename_files_casing_only() -> anyhow::Result<()> {
+    let mut case = setup([("lib.py", "class Foo: ...")])?;
+
+    assert!(
+        resolve_module(case.db(), &ModuleName::new("lib").unwrap()).is_some(),
+        "Expected `lib` module to exist."
+    );
+    assert_eq!(
+        resolve_module(case.db(), &ModuleName::new("Lib").unwrap()),
+        None,
+        "Expected `Lib` module not to exist"
+    );
+
+    // Now rename `lib.py` to `Lib.py`
+    if case.db().system().case_sensitivity().is_case_sensitive() {
+        std::fs::rename(
+            case.project_path("lib.py").as_std_path(),
+            case.project_path("Lib.py").as_std_path(),
+        )
+        .context("Failed to rename `lib.py` to `Lib.py`")?;
+    } else {
+        // On case-insensitive file systems, renaming a file to a different casing is a no-op.
+        // Rename to a different name first
+        std::fs::rename(
+            case.project_path("lib.py").as_std_path(),
+            case.project_path("temp.py").as_std_path(),
+        )
+        .context("Failed to rename `lib.py` to `temp.py`")?;
+
+        std::fs::rename(
+            case.project_path("temp.py").as_std_path(),
+            case.project_path("Lib.py").as_std_path(),
+        )
+        .context("Failed to rename `temp.py` to `Lib.py`")?;
+    }
+
+    let changes = case.stop_watch(event_for_file("Lib.py"));
+    case.apply_changes(changes);
+
+    // Resolving `lib` should now fail but `Lib` should now succeed
+    assert_eq!(
+        resolve_module(case.db(), &ModuleName::new("lib").unwrap()),
+        None,
+        "Expected `lib` module to no longer exist."
+    );
+
+    assert!(
+        resolve_module(case.db(), &ModuleName::new("Lib").unwrap()).is_some(),
+        "Expected `Lib` module to exist"
     );
 
     Ok(())

@@ -19,7 +19,7 @@ use super::helpers;
 /// call, since the literal or comprehension syntax already returns a
 /// dictionary.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// dict({})
 /// dict({"a": 1})

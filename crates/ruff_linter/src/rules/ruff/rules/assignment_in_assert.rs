@@ -19,7 +19,7 @@ use crate::checkers::ast::Checker;
 /// which may result in unexpected behavior (e.g., undefined variable
 /// accesses).
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// assert (x := 0) == 0
 /// print(x)

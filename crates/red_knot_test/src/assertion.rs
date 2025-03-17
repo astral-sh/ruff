@@ -35,16 +35,15 @@
 //! ```
 
 use crate::db::Db;
-use regex::Regex;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::{line_index, source_text, SourceText};
-use ruff_python_trivia::CommentRanges;
+use ruff_python_trivia::{CommentRanges, Cursor};
 use ruff_source_file::{LineIndex, OneIndexed};
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use smallvec::SmallVec;
 use std::ops::Deref;
-use std::sync::LazyLock;
+use std::str::FromStr;
 
 /// Diagnostic assertion comments in a single embedded file.
 #[derive(Debug)]
@@ -92,12 +91,12 @@ impl<'a> IntoIterator for &'a InlineFileAssertions {
     }
 }
 
-/// An [`Assertion`] with the [`TextRange`] of its original inline comment.
+/// An [`UnparsedAssertion`] with the [`TextRange`] of its original inline comment.
 #[derive(Debug)]
-struct AssertionWithRange<'a>(Assertion<'a>, TextRange);
+struct AssertionWithRange<'a>(UnparsedAssertion<'a>, TextRange);
 
 impl<'a> Deref for AssertionWithRange<'a> {
-    type Target = Assertion<'a>;
+    type Target = UnparsedAssertion<'a>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -110,7 +109,7 @@ impl Ranged for AssertionWithRange<'_> {
     }
 }
 
-impl<'a> From<AssertionWithRange<'a>> for Assertion<'a> {
+impl<'a> From<AssertionWithRange<'a>> for UnparsedAssertion<'a> {
     fn from(value: AssertionWithRange<'a>) -> Self {
         value.0
     }
@@ -130,7 +129,7 @@ impl<'a> Iterator for AssertionWithRangeIterator<'a> {
         loop {
             let inner_next = self.inner.next()?;
             let comment = &self.file_assertions.source[inner_next];
-            if let Some(assertion) = Assertion::from_comment(comment) {
+            if let Some(assertion) = UnparsedAssertion::from_comment(comment) {
                 return Some(AssertionWithRange(assertion, inner_next));
             };
         }
@@ -139,11 +138,11 @@ impl<'a> Iterator for AssertionWithRangeIterator<'a> {
 
 impl std::iter::FusedIterator for AssertionWithRangeIterator<'_> {}
 
-/// A vector of [`Assertion`]s belonging to a single line.
+/// A vector of [`UnparsedAssertion`]s belonging to a single line.
 ///
 /// Most lines will have zero or one assertion, so we use a [`SmallVec`] optimized for a single
 /// element to avoid most heap vector allocations.
-type AssertionVec<'a> = SmallVec<[Assertion<'a>; 1]>;
+type AssertionVec<'a> = SmallVec<[UnparsedAssertion<'a>; 1]>;
 
 #[derive(Debug)]
 pub(crate) struct LineAssertionsIterator<'a> {
@@ -227,50 +226,80 @@ pub(crate) struct LineAssertions<'a> {
 }
 
 impl<'a> Deref for LineAssertions<'a> {
-    type Target = [Assertion<'a>];
+    type Target = [UnparsedAssertion<'a>];
 
     fn deref(&self) -> &Self::Target {
         &self.assertions
     }
 }
 
-static TYPE_RE: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"^#\s*revealed:\s*(?<ty_display>.+?)\s*$").unwrap());
-
-static ERROR_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(
-        r#"^#\s*error:(\s*(?<column>\d+))?(\s*\[(?<rule>.+?)\])?(\s*"(?<message>.+?)")?\s*$"#,
-    )
-    .unwrap()
-});
-
 /// A single diagnostic assertion comment.
+///
+/// This type represents an *attempted* assertion, but not necessarily a *valid* assertion.
+/// Parsing is done lazily in `matcher.rs`; this allows us to emit nicer error messages
+/// in the event of an invalid assertion
 #[derive(Debug)]
-pub(crate) enum Assertion<'a> {
-    /// A `revealed: ` assertion.
+pub(crate) enum UnparsedAssertion<'a> {
+    /// A `# revealed:` assertion.
     Revealed(&'a str),
 
-    /// An `error: ` assertion.
-    Error(ErrorAssertion<'a>),
+    /// An `# error:` assertion.
+    Error(&'a str),
 }
 
-impl<'a> Assertion<'a> {
+impl<'a> UnparsedAssertion<'a> {
+    /// Returns `Some(_)` if the comment starts with `# error:` or `# revealed:`,
+    /// indicating that it is an assertion comment.
     fn from_comment(comment: &'a str) -> Option<Self> {
-        if let Some(caps) = TYPE_RE.captures(comment) {
-            Some(Self::Revealed(caps.name("ty_display").unwrap().as_str()))
-        } else {
-            ERROR_RE.captures(comment).map(|caps| {
-                Self::Error(ErrorAssertion {
-                    rule: caps.name("rule").map(|m| m.as_str()),
-                    column: caps.name("column").and_then(|m| m.as_str().parse().ok()),
-                    message_contains: caps.name("message").map(|m| m.as_str()),
-                })
-            })
+        let comment = comment.trim().strip_prefix('#')?.trim();
+        let (keyword, body) = comment.split_once(':')?;
+        let keyword = keyword.trim();
+        let body = body.trim();
+
+        match keyword {
+            "revealed" => Some(Self::Revealed(body)),
+            "error" => Some(Self::Error(body)),
+            _ => None,
+        }
+    }
+
+    /// Parse the attempted assertion into a [`ParsedAssertion`] structured representation.
+    pub(crate) fn parse(&self) -> Result<ParsedAssertion<'a>, PragmaParseError<'a>> {
+        match self {
+            Self::Revealed(revealed) => {
+                if revealed.is_empty() {
+                    Err(PragmaParseError::EmptyRevealTypeAssertion)
+                } else {
+                    Ok(ParsedAssertion::Revealed(revealed))
+                }
+            }
+            Self::Error(error) => ErrorAssertion::from_str(error)
+                .map(ParsedAssertion::Error)
+                .map_err(PragmaParseError::ErrorAssertionParseError),
         }
     }
 }
 
-impl std::fmt::Display for Assertion<'_> {
+impl std::fmt::Display for UnparsedAssertion<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Revealed(expected_type) => write!(f, "revealed: {expected_type}"),
+            Self::Error(assertion) => write!(f, "error: {assertion}"),
+        }
+    }
+}
+
+/// An assertion comment that has been parsed and validated for correctness.
+#[derive(Debug)]
+pub(crate) enum ParsedAssertion<'a> {
+    /// A `# revealed:` assertion.
+    Revealed(&'a str),
+
+    /// An `# error:` assertion.
+    Error(ErrorAssertion<'a>),
+}
+
+impl std::fmt::Display for ParsedAssertion<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Revealed(expected_type) => write!(f, "revealed: {expected_type}"),
@@ -279,7 +308,7 @@ impl std::fmt::Display for Assertion<'_> {
     }
 }
 
-/// An `error: ` assertion comment.
+/// A parsed and validated `# error:` assertion comment.
 #[derive(Debug)]
 pub(crate) struct ErrorAssertion<'a> {
     /// The diagnostic rule code we expect.
@@ -290,6 +319,12 @@ pub(crate) struct ErrorAssertion<'a> {
 
     /// A string we expect to be contained in the diagnostic message.
     pub(crate) message_contains: Option<&'a str>,
+}
+
+impl<'a> ErrorAssertion<'a> {
+    fn from_str(source: &'a str) -> Result<Self, ErrorAssertionParseError<'a>> {
+        ErrorAssertionParser::new(source).parse()
+    }
 }
 
 impl std::fmt::Display for ErrorAssertion<'_> {
@@ -308,16 +343,159 @@ impl std::fmt::Display for ErrorAssertion<'_> {
     }
 }
 
+/// A parser to convert a string into a [`ErrorAssertion`].
+#[derive(Debug, Clone)]
+struct ErrorAssertionParser<'a> {
+    cursor: Cursor<'a>,
+
+    /// string slice representing all characters *after* the `# error:` prefix.
+    comment_source: &'a str,
+}
+
+impl<'a> ErrorAssertionParser<'a> {
+    fn new(comment: &'a str) -> Self {
+        Self {
+            cursor: Cursor::new(comment),
+            comment_source: comment,
+        }
+    }
+
+    /// Retrieves the current offset of the cursor within the source code.
+    fn offset(&self) -> TextSize {
+        self.comment_source.text_len() - self.cursor.text_len()
+    }
+
+    /// Consume characters in the assertion comment until we find a non-whitespace character
+    fn skip_whitespace(&mut self) {
+        self.cursor.eat_while(char::is_whitespace);
+    }
+
+    /// Attempt to parse the assertion comment into a [`ErrorAssertion`].
+    fn parse(mut self) -> Result<ErrorAssertion<'a>, ErrorAssertionParseError<'a>> {
+        let mut column = None;
+        let mut rule = None;
+
+        self.skip_whitespace();
+
+        while let Some(character) = self.cursor.bump() {
+            match character {
+                // column number
+                '0'..='9' => {
+                    if column.is_some() {
+                        return Err(ErrorAssertionParseError::MultipleColumnNumbers);
+                    }
+                    if rule.is_some() {
+                        return Err(ErrorAssertionParseError::ColumnNumberAfterRuleCode);
+                    }
+                    let offset = self.offset() - TextSize::new(1);
+                    self.cursor.eat_while(|c| !c.is_whitespace());
+                    let column_str = &self.comment_source[TextRange::new(offset, self.offset())];
+                    column = OneIndexed::from_str(column_str)
+                        .map(Some)
+                        .map_err(|e| ErrorAssertionParseError::BadColumnNumber(column_str, e))?;
+                }
+
+                // rule code
+                '[' => {
+                    if rule.is_some() {
+                        return Err(ErrorAssertionParseError::MultipleRuleCodes);
+                    }
+                    let offset = self.offset();
+                    self.cursor.eat_while(|c| c != ']');
+                    if self.cursor.is_eof() {
+                        return Err(ErrorAssertionParseError::UnclosedRuleCode);
+                    }
+                    rule = Some(self.comment_source[TextRange::new(offset, self.offset())].trim());
+                    self.cursor.bump();
+                }
+
+                // message text
+                '"' => {
+                    let comment_source = self.comment_source.trim();
+                    return if comment_source.ends_with('"') {
+                        let rest =
+                            &comment_source[self.offset().to_usize()..comment_source.len() - 1];
+                        Ok(ErrorAssertion {
+                            rule,
+                            column,
+                            message_contains: Some(rest),
+                        })
+                    } else {
+                        Err(ErrorAssertionParseError::UnclosedMessage)
+                    };
+                }
+
+                // Some other assumptions we make don't hold true if we hit this branch:
+                '\n' | '\r' => {
+                    unreachable!("Assertion comments should never contain newlines")
+                }
+
+                // something else (bad!)...
+                unexpected => {
+                    return Err(ErrorAssertionParseError::UnexpectedCharacter {
+                        character: unexpected,
+                        offset: self.offset().to_usize(),
+                    });
+                }
+            }
+
+            self.skip_whitespace();
+        }
+
+        if rule.is_some() {
+            Ok(ErrorAssertion {
+                rule,
+                column,
+                message_contains: None,
+            })
+        } else {
+            Err(ErrorAssertionParseError::NoRuleOrMessage)
+        }
+    }
+}
+
+/// Enumeration of ways in which parsing an assertion comment can fail.
+///
+/// The assertion comment could be either a "revealed" assertion or an "error" assertion.
+#[derive(Debug, thiserror::Error)]
+pub(crate) enum PragmaParseError<'a> {
+    #[error("Must specify which type should be revealed")]
+    EmptyRevealTypeAssertion,
+    #[error("{0}")]
+    ErrorAssertionParseError(ErrorAssertionParseError<'a>),
+}
+
+/// Enumeration of ways in which parsing an *error* assertion comment can fail.
+#[derive(Debug, thiserror::Error)]
+pub(crate) enum ErrorAssertionParseError<'a> {
+    #[error("no rule or message text")]
+    NoRuleOrMessage,
+    #[error("bad column number `{0}`")]
+    BadColumnNumber(&'a str, #[source] std::num::ParseIntError),
+    #[error("column number must precede the rule code")]
+    ColumnNumberAfterRuleCode,
+    #[error("multiple column numbers in one assertion")]
+    MultipleColumnNumbers,
+    #[error("expected ']' to close rule code")]
+    UnclosedRuleCode,
+    #[error("cannot use multiple rule codes in one assertion")]
+    MultipleRuleCodes,
+    #[error("expected '\"' to be the final character in an assertion with an error message")]
+    UnclosedMessage,
+    #[error("unexpected character `{character}` at offset {offset} (relative to the `:` in the assertion comment)")]
+    UnexpectedCharacter { character: char, offset: usize },
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{Assertion, InlineFileAssertions, LineAssertions};
+    use super::*;
     use ruff_db::files::system_path_to_file;
-    use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
+    use ruff_db::system::DbWithWritableSystem as _;
     use ruff_python_trivia::textwrap::dedent;
     use ruff_source_file::OneIndexed;
 
     fn get_assertions(source: &str) -> InlineFileAssertions {
-        let mut db = crate::db::Db::setup(SystemPathBuf::from("/src"));
+        let mut db = Db::setup();
         db.write_file("/src/test.py", source).unwrap();
         let file = system_path_to_file(&db, "/src/test.py").unwrap();
         InlineFileAssertions::from_file(&db, file)
@@ -366,7 +544,7 @@ mod tests {
             panic!("expected one assertion");
         };
 
-        assert_eq!(format!("{assert}"), "error:");
+        assert_eq!(format!("{assert}"), "error: ");
     }
 
     #[test]
@@ -455,15 +633,19 @@ mod tests {
         assert_eq!(line1.line_number, OneIndexed::from_zero_indexed(2));
         assert_eq!(line2.line_number, OneIndexed::from_zero_indexed(3));
 
-        let [Assertion::Error(error1)] = &line1.assertions[..] else {
+        let [UnparsedAssertion::Error(error1)] = &line1.assertions[..] else {
             panic!("expected one error assertion");
         };
+
+        let error1 = ErrorAssertion::from_str(error1).unwrap();
 
         assert_eq!(error1.rule, Some("invalid-assignment"));
 
-        let [Assertion::Error(error2)] = &line2.assertions[..] else {
+        let [UnparsedAssertion::Error(error2)] = &line2.assertions[..] else {
             panic!("expected one error assertion");
         };
+
+        let error2 = ErrorAssertion::from_str(error2).unwrap();
 
         assert_eq!(error2.rule, Some("unbound-name"));
     }
@@ -485,17 +667,22 @@ mod tests {
         assert_eq!(line1.line_number, OneIndexed::from_zero_indexed(2));
         assert_eq!(line2.line_number, OneIndexed::from_zero_indexed(3));
 
-        let [Assertion::Error(error1), Assertion::Revealed(expected_ty)] = &line1.assertions[..]
+        let [UnparsedAssertion::Error(error1), UnparsedAssertion::Revealed(expected_ty)] =
+            &line1.assertions[..]
         else {
             panic!("expected one error assertion and one Revealed assertion");
         };
 
-        assert_eq!(error1.rule, Some("invalid-assignment"));
-        assert_eq!(*expected_ty, "str");
+        let error1 = ErrorAssertion::from_str(error1).unwrap();
 
-        let [Assertion::Error(error2)] = &line2.assertions[..] else {
+        assert_eq!(error1.rule, Some("invalid-assignment"));
+        assert_eq!(expected_ty.trim(), "str");
+
+        let [UnparsedAssertion::Error(error2)] = &line2.assertions[..] else {
             panic!("expected one error assertion");
         };
+
+        let error2 = ErrorAssertion::from_str(error2).unwrap();
 
         assert_eq!(error2.rule, Some("unbound-name"));
     }

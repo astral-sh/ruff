@@ -325,6 +325,7 @@ impl<'a> CheckSuppressionsContext<'a> {
             range,
             severity,
             file: self.file,
+            secondary_messages: vec![],
         });
     }
 }

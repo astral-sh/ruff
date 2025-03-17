@@ -19,16 +19,18 @@ pub(crate) mod tests {
     use std::sync::Arc;
 
     use crate::program::{Program, SearchPathSettings};
-    use crate::python_version::PythonVersion;
     use crate::{default_lint_registry, ProgramSettings, PythonPlatform};
 
     use super::Db;
     use crate::lint::{LintRegistry, RuleSelection};
     use anyhow::Context;
     use ruff_db::files::{File, Files};
-    use ruff_db::system::{DbWithTestSystem, System, SystemPathBuf, TestSystem};
+    use ruff_db::system::{
+        DbWithTestSystem, DbWithWritableSystem as _, System, SystemPathBuf, TestSystem,
+    };
     use ruff_db::vendored::VendoredFileSystem;
     use ruff_db::{Db as SourceDb, Upcast};
+    use ruff_python_ast::PythonVersion;
 
     #[salsa::db]
     #[derive(Clone)]

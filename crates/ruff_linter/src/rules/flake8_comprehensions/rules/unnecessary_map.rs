@@ -30,7 +30,7 @@ use crate::rules::flake8_comprehensions::fixes;
 /// - Instead of `dict(map(lambda v: (v, v ** 2), values))`, use
 ///   `{v: v ** 2 for v in values}`.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// map(lambda x: x + 1, iterable)
 /// ```

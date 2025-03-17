@@ -1,5 +1,7 @@
 use std::cmp::Ordering;
 
+use crate::types::CallableType;
+
 use super::{
     class_base::ClassBase, ClassLiteralType, DynamicType, InstanceType, KnownInstanceType,
     TodoType, Type,
@@ -53,6 +55,33 @@ pub(super) fn union_elements_ordering<'db>(left: &Type<'db>, right: &Type<'db>) 
         (Type::FunctionLiteral(left), Type::FunctionLiteral(right)) => left.cmp(right),
         (Type::FunctionLiteral(_), _) => Ordering::Less,
         (_, Type::FunctionLiteral(_)) => Ordering::Greater,
+
+        (
+            Type::Callable(CallableType::BoundMethod(left)),
+            Type::Callable(CallableType::BoundMethod(right)),
+        ) => left.cmp(right),
+        (Type::Callable(CallableType::BoundMethod(_)), _) => Ordering::Less,
+        (_, Type::Callable(CallableType::BoundMethod(_))) => Ordering::Greater,
+
+        (
+            Type::Callable(CallableType::MethodWrapperDunderGet(left)),
+            Type::Callable(CallableType::MethodWrapperDunderGet(right)),
+        ) => left.cmp(right),
+        (Type::Callable(CallableType::MethodWrapperDunderGet(_)), _) => Ordering::Less,
+        (_, Type::Callable(CallableType::MethodWrapperDunderGet(_))) => Ordering::Greater,
+
+        (
+            Type::Callable(CallableType::WrapperDescriptorDunderGet),
+            Type::Callable(CallableType::WrapperDescriptorDunderGet),
+        ) => Ordering::Equal,
+        (Type::Callable(CallableType::WrapperDescriptorDunderGet), _) => Ordering::Less,
+        (_, Type::Callable(CallableType::WrapperDescriptorDunderGet)) => Ordering::Greater,
+
+        (Type::Callable(CallableType::General(_)), Type::Callable(CallableType::General(_))) => {
+            Ordering::Equal
+        }
+        (Type::Callable(CallableType::General(_)), _) => Ordering::Less,
+        (_, Type::Callable(CallableType::General(_))) => Ordering::Greater,
 
         (Type::Tuple(left), Type::Tuple(right)) => left.cmp(right),
         (Type::Tuple(_), _) => Ordering::Less,
@@ -161,6 +190,9 @@ pub(super) fn union_elements_ordering<'db>(left: &Type<'db>, right: &Type<'db>) 
                 (KnownInstanceType::OrderedDict, _) => Ordering::Less,
                 (_, KnownInstanceType::OrderedDict) => Ordering::Greater,
 
+                (KnownInstanceType::Protocol, _) => Ordering::Less,
+                (_, KnownInstanceType::Protocol) => Ordering::Greater,
+
                 (KnownInstanceType::NoReturn, _) => Ordering::Less,
                 (_, KnownInstanceType::NoReturn) => Ordering::Greater,
 
@@ -187,6 +219,9 @@ pub(super) fn union_elements_ordering<'db>(left: &Type<'db>, right: &Type<'db>) 
 
                 (KnownInstanceType::TypeOf, _) => Ordering::Less,
                 (_, KnownInstanceType::TypeOf) => Ordering::Greater,
+
+                (KnownInstanceType::CallableTypeFromFunction, _) => Ordering::Less,
+                (_, KnownInstanceType::CallableTypeFromFunction) => Ordering::Greater,
 
                 (KnownInstanceType::Unpack, _) => Ordering::Less,
                 (_, KnownInstanceType::Unpack) => Ordering::Greater,
@@ -262,5 +297,8 @@ fn dynamic_elements_ordering(left: DynamicType, right: DynamicType) -> Ordering 
 
         #[cfg(not(debug_assertions))]
         (DynamicType::Todo(TodoType), DynamicType::Todo(TodoType)) => Ordering::Equal,
+
+        (DynamicType::TodoProtocol, _) => Ordering::Less,
+        (_, DynamicType::TodoProtocol) => Ordering::Greater,
     }
 }

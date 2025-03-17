@@ -13,6 +13,11 @@ use crate::Locator;
 /// ## Why is this bad?
 /// In some codebases, it's common to have a license header at the top of every
 /// file. This rule ensures that the license header is present.
+///
+/// ## Options
+/// - `lint.flake8-copyright.author`
+/// - `lint.flake8-copyright.min-file-size`
+/// - `lint.flake8-copyright.notice-rgx`
 #[derive(ViolationMetadata)]
 pub(crate) struct MissingCopyrightNotice;
 

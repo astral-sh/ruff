@@ -113,6 +113,24 @@ class D(B, A): ...  # fine
 class E(B, C, A): ...  # fine
 ```
 
+## Post-hoc modifications
+
+```py
+class A:
+    __slots__ = ()
+    __slots__ += ("a", "b")
+
+reveal_type(A.__slots__)  # revealed: tuple[Literal["a"], Literal["b"]]
+
+class B:
+    __slots__ = ("c", "d")
+
+class C(
+    A,  # error: [incompatible-slots]
+    B,  # error: [incompatible-slots]
+): ...
+```
+
 ## False negatives
 
 ### Possibly unbound
@@ -152,22 +170,6 @@ def _(flag: bool):
 ```py
 class A:
     __slots__ = ["a", "b"]  # This is treated as "dynamic"
-
-class B:
-    __slots__ = ("c", "d")
-
-# False negative: [incompatible-slots]
-class C(A, B): ...
-```
-
-### Post-hoc modifications
-
-```py
-class A:
-    __slots__ = ()
-    __slots__ += ("a", "b")
-
-reveal_type(A.__slots__)  # revealed: @Todo(return type)
 
 class B:
     __slots__ = ("c", "d")

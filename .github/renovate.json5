@@ -59,12 +59,6 @@
       enabled: false,
     },
     {
-      // TODO: Remove this once the codebase is upgrade to v4 (https://github.com/astral-sh/ruff/pull/16069)
-      matchPackageNames: ["tailwindcss"],
-      matchManagers: ["npm"],
-      enabled: false,
-    },
-    {
       // Disable updates of `zip-rs`; intentionally pinned for now due to ownership change
       // See: https://github.com/astral-sh/uv/issues/3642
       matchPackageNames: ["zip"],
@@ -101,14 +95,7 @@
       matchManagers: ["cargo"],
       matchPackageNames: ["strum"],
       description: "Weekly update of strum dependencies",
-    },
-    {
-      groupName: "ESLint",
-      matchManagers: ["npm"],
-      matchPackageNames: ["eslint"],
-      allowedVersions: "<9",
-      description: "Constraint ESLint to version 8 until TypeScript-eslint supports ESLint 9", // https://github.com/typescript-eslint/typescript-eslint/issues/8211
-    },
+    }
   ],
   vulnerabilityAlerts: {
     commitMessageSuffix: "",

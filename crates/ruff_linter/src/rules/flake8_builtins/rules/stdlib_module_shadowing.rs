@@ -3,7 +3,7 @@ use std::path::{Component, Path, PathBuf};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::PySourceType;
+use ruff_python_ast::{PySourceType, PythonVersion};
 use ruff_python_stdlib::path::is_module_file;
 use ruff_python_stdlib::sys::is_known_standard_library;
 use ruff_text_size::TextRange;
@@ -21,15 +21,14 @@ use crate::settings::LinterSettings;
 /// standard-library module and vice versa.
 ///
 /// Standard-library modules can be marked as exceptions to this rule via the
-/// [`lint.flake8-builtins.builtins-allowed-modules`] configuration option.
+/// [`lint.flake8-builtins.allowed-modules`] configuration option.
 ///
-/// By default, only the last component of the module name is considered, so `logging.py`,
-/// `utils/logging.py`, and `utils/logging/__init__.py` would all clash with the builtin `logging`
-/// module. With the [`lint.flake8-builtins.builtins-strict-checking`] option set to `false`, the
-/// module path is considered, so only a top-level `logging.py` or `logging/__init__.py` will
-/// trigger the rule and `utils/logging.py`, for example, would not. In preview mode, the default
-/// value of [`lint.flake8-builtins.builtins-strict-checking`] is `false` rather than `true` in
-/// stable mode.
+/// By default, the module path relative to the project root or [`src`] directories is considered,
+/// so a top-level `logging.py` or `logging/__init__.py` will clash with the builtin `logging`
+/// module, but `utils/logging.py`, for example, will not. With the
+/// [`lint.flake8-builtins.strict-checking`] option set to `true`, only the last component
+/// of the module name is considered, so `logging.py`, `utils/logging.py`, and
+/// `utils/logging/__init__.py` will all trigger the rule.
 ///
 /// This rule is not applied to stub files, as the name of a stub module is out
 /// of the control of the author of the stub file. Instead, a stub should aim to
@@ -50,8 +49,8 @@ use crate::settings::LinterSettings;
 /// ```
 ///
 /// ## Options
-/// - `lint.flake8-builtins.builtins-allowed-modules`
-/// - `lint.flake8-builtins.builtins-strict-checking`
+/// - `lint.flake8-builtins.allowed-modules`
+/// - `lint.flake8-builtins.strict-checking`
 #[derive(ViolationMetadata)]
 pub(crate) struct StdlibModuleShadowing {
     name: String,
@@ -69,6 +68,7 @@ impl Violation for StdlibModuleShadowing {
 pub(crate) fn stdlib_module_shadowing(
     mut path: &Path,
     settings: &LinterSettings,
+    target_version: PythonVersion,
 ) -> Option<Diagnostic> {
     if !PySourceType::try_from_path(path).is_some_and(PySourceType::is_py_file) {
         return None;
@@ -98,12 +98,12 @@ pub(crate) fn stdlib_module_shadowing(
 
     let module_name = components.next()?;
 
-    if is_allowed_module(settings, &module_name) {
+    if is_allowed_module(settings, target_version, &module_name) {
         return None;
     }
 
     // not allowed generally, but check for a parent in non-strict mode
-    if !settings.flake8_builtins.builtins_strict_checking && components.next().is_some() {
+    if !settings.flake8_builtins.strict_checking && components.next().is_some() {
         return None;
     }
 
@@ -119,17 +119,14 @@ pub(crate) fn stdlib_module_shadowing(
 fn get_prefix<'a>(settings: &'a LinterSettings, path: &Path) -> Option<&'a PathBuf> {
     let mut prefix = None;
     for dir in settings.src.iter().chain([&settings.project_root]) {
-        if path.starts_with(dir)
-            // TODO `is_none_or` when MSRV >= 1.82
-            && (prefix.is_none() || prefix.is_some_and(|existing| existing < dir))
-        {
+        if path.starts_with(dir) && prefix.is_none_or(|existing| existing < dir) {
             prefix = Some(dir);
         }
     }
     prefix
 }
 
-fn is_allowed_module(settings: &LinterSettings, module: &str) -> bool {
+fn is_allowed_module(settings: &LinterSettings, version: PythonVersion, module: &str) -> bool {
     // Shadowing private stdlib modules is okay.
     // https://github.com/astral-sh/ruff/issues/12949
     if module.starts_with('_') && !module.starts_with("__") {
@@ -138,12 +135,12 @@ fn is_allowed_module(settings: &LinterSettings, module: &str) -> bool {
 
     if settings
         .flake8_builtins
-        .builtins_allowed_modules
+        .allowed_modules
         .iter()
         .any(|allowed_module| allowed_module == module)
     {
         return true;
     }
 
-    !is_known_standard_library(settings.target_version.minor(), module)
+    !is_known_standard_library(version.minor, module)
 }

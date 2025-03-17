@@ -112,8 +112,7 @@ def _(flag: bool):
         reveal_type(t)  # revealed: Literal[NoneType]
 
     if issubclass(t, type(None)):
-        # TODO: this should be just `Literal[NoneType]`
-        reveal_type(t)  # revealed: Literal[int, NoneType]
+        reveal_type(t)  # revealed: Literal[NoneType]
 ```
 
 ## `classinfo` contains multiple types
@@ -171,7 +170,8 @@ if issubclass(t, int):
 def issubclass(c, ci):
     return True
 
-def flag() -> bool: ...
+def flag() -> bool:
+    return True
 
 t = int if flag() else str
 if issubclass(t, int):
@@ -183,7 +183,8 @@ if issubclass(t, int):
 ```py
 issubclass_alias = issubclass
 
-def flag() -> bool: ...
+def flag() -> bool:
+    return True
 
 t = int if flag() else str
 if issubclass_alias(t, int):
@@ -195,7 +196,8 @@ if issubclass_alias(t, int):
 ```py
 from builtins import issubclass as imported_issubclass
 
-def flag() -> bool: ...
+def flag() -> bool:
+    return True
 
 t = int if flag() else str
 if imported_issubclass(t, int):
@@ -207,7 +209,8 @@ if imported_issubclass(t, int):
 ```py
 from typing import Any
 
-def flag() -> bool: ...
+def flag() -> bool:
+    return True
 
 t = int if flag() else str
 
@@ -230,7 +233,8 @@ if issubclass(t, Any):
 ### Do not narrow if there are keyword arguments
 
 ```py
-def flag() -> bool: ...
+def flag() -> bool:
+    return True
 
 t = int if flag() else str
 

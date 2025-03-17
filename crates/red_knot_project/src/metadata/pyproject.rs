@@ -1,7 +1,7 @@
 use crate::metadata::options::Options;
 use crate::metadata::value::{RangedValue, ValueSource, ValueSourceGuard};
 use pep440_rs::{release_specifiers_to_ranges, Version, VersionSpecifiers};
-use red_knot_python_semantic::PythonVersion;
+use ruff_python_ast::PythonVersion;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::Bound;
 use std::ops::Deref;

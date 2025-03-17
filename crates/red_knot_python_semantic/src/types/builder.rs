@@ -26,7 +26,7 @@
 //!     eliminate the supertype from the intersection).
 //!   * An intersection containing two non-overlapping types should simplify to [`Type::Never`].
 
-use crate::types::{InstanceType, IntersectionType, KnownClass, Type, UnionType};
+use crate::types::{IntersectionType, KnownClass, Type, UnionType};
 use crate::{Db, FxOrderSet};
 use smallvec::SmallVec;
 
@@ -41,6 +41,10 @@ impl<'db> UnionBuilder<'db> {
             db,
             elements: vec![],
         }
+    }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        self.elements.is_empty()
     }
 
     /// Collapse the union to a single type: `object`.
@@ -299,7 +303,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
             _ => {
                 let known_instance = new_positive
                     .into_instance()
-                    .and_then(|instance| instance.class.known(db));
+                    .and_then(|instance| instance.class().known(db));
 
                 if known_instance == Some(KnownClass::Object) {
                     // `object & T` -> `T`; it is always redundant to add `object` to an intersection
@@ -318,8 +322,8 @@ impl<'db> InnerIntersectionBuilder<'db> {
                         Type::AlwaysFalsy if addition_is_bool_instance => {
                             new_positive = Type::BooleanLiteral(false);
                         }
-                        Type::Instance(InstanceType { class })
-                            if class.is_known(db, KnownClass::Bool) =>
+                        Type::Instance(instance)
+                            if instance.class().is_known(db, KnownClass::Bool) =>
                         {
                             match new_positive {
                                 // `bool & AlwaysTruthy` -> `Literal[True]`
@@ -413,7 +417,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
             self.positive
                 .iter()
                 .filter_map(|ty| ty.into_instance())
-                .filter_map(|instance| instance.class.known(db))
+                .filter_map(|instance| instance.class().known(db))
                 .any(KnownClass::is_bool)
         };
 
@@ -429,7 +433,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
             Type::Never => {
                 // Adding ~Never to an intersection is a no-op.
             }
-            Type::Instance(instance) if instance.class.is_object(db) => {
+            Type::Instance(instance) if instance.class().is_object(db) => {
                 // Adding ~object to an intersection results in Never.
                 *self = Self::default();
                 self.positive.insert(Type::Never);

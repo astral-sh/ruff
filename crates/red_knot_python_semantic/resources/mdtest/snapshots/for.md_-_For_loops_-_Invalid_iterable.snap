@@ -1,0 +1,32 @@
+---
+source: crates/red_knot_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: for.md - For loops - Invalid iterable
+mdtest path: crates/red_knot_python_semantic/resources/mdtest/loops/for.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | nonsense = 123
+2 | for x in nonsense:  # error: [not-iterable]
+3 |     pass
+```
+
+# Diagnostics
+
+```
+error: lint:not-iterable
+ --> /src/mdtest_snippet.py:2:10
+  |
+1 | nonsense = 123
+2 | for x in nonsense:  # error: [not-iterable]
+  |          ^^^^^^^^ Object of type `Literal[123]` is not iterable because it doesn't have an `__iter__` method or a `__getitem__` method
+3 |     pass
+  |
+
+```

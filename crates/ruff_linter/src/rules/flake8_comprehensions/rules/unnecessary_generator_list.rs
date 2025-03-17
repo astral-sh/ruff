@@ -4,7 +4,7 @@ use ruff_python_ast as ast;
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::ExprGenerator;
-use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
+use ruff_python_parser::TokenKind;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
@@ -24,7 +24,7 @@ use super::helpers;
 /// `list(x for x in foo)`, it's better to use `list(foo)` directly, since it's
 /// even more direct.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// list(f(x) for x in foo)
 /// list(x for x in foo)
@@ -125,11 +125,13 @@ pub(crate) fn unnecessary_generator_list(checker: &Checker, call: &ast::ExprCall
 
         // Replace `)` with `]`.
         // Place `]` at argument's end or at trailing comma if present
-        let mut tokenizer =
-            SimpleTokenizer::new(checker.source(), TextRange::new(argument.end(), call.end()));
-        let right_bracket_loc = tokenizer
-            .find(|token| token.kind == SimpleTokenKind::Comma)
-            .map_or(call.arguments.end(), |comma| comma.end())
+        let after_arg_tokens = checker
+            .tokens()
+            .in_range(TextRange::new(argument.end(), call.end()));
+        let right_bracket_loc = after_arg_tokens
+            .iter()
+            .find(|token| token.kind() == TokenKind::Comma)
+            .map_or(call.arguments.end(), Ranged::end)
             - TextSize::from(1);
         let call_end = Edit::replacement("]".to_string(), right_bracket_loc, call.end());
 

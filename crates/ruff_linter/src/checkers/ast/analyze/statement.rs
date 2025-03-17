@@ -14,7 +14,7 @@ use crate::rules::{
     flake8_slots, flake8_tidy_imports, flake8_type_checking, mccabe, pandas_vet, pep8_naming,
     perflint, pycodestyle, pyflakes, pygrep_hooks, pylint, pyupgrade, refurb, ruff, tryceratops,
 };
-use crate::settings::types::PythonVersion;
+use ruff_python_ast::PythonVersion;
 
 /// Run lint rules over a [`Stmt`] syntax node.
 pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
@@ -164,9 +164,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     flake8_pyi::rules::str_or_repr_defined_in_stub(checker, stmt);
                 }
             }
-            if checker.source_type.is_stub()
-                || checker.settings.target_version >= PythonVersion::Py311
-            {
+            if checker.source_type.is_stub() || checker.target_version() >= PythonVersion::PY311 {
                 if checker.enabled(Rule::NoReturnArgumentAnnotationInStub) {
                     flake8_pyi::rules::no_return_argument_annotation(checker, parameters);
                 }
@@ -194,12 +192,12 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 pylint::rules::global_statement(checker, name);
             }
             if checker.enabled(Rule::LRUCacheWithoutParameters) {
-                if checker.settings.target_version >= PythonVersion::Py38 {
+                if checker.target_version() >= PythonVersion::PY38 {
                     pyupgrade::rules::lru_cache_without_parameters(checker, decorator_list);
                 }
             }
             if checker.enabled(Rule::LRUCacheWithMaxsizeNone) {
-                if checker.settings.target_version >= PythonVersion::Py39 {
+                if checker.target_version() >= PythonVersion::PY39 {
                     pyupgrade::rules::lru_cache_with_maxsize_none(checker, decorator_list);
                 }
             }
@@ -445,7 +443,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 pyupgrade::rules::useless_object_inheritance(checker, class_def);
             }
             if checker.enabled(Rule::ReplaceStrEnum) {
-                if checker.settings.target_version >= PythonVersion::Py311 {
+                if checker.target_version() >= PythonVersion::PY311 {
                     pyupgrade::rules::replace_str_enum(checker, class_def);
                 }
             }
@@ -554,6 +552,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.enabled(Rule::ClassWithMixedTypeVars) {
                 ruff::rules::class_with_mixed_type_vars(checker, class_def);
+            }
+            if checker.enabled(Rule::ImplicitClassVarInDataclass) {
+                ruff::rules::implicit_class_var_in_dataclass(checker, class_def);
             }
         }
         Stmt::Import(ast::StmtImport { names, range: _ }) => {
@@ -762,7 +763,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 }
             }
             if checker.enabled(Rule::UnnecessaryFutureImport) {
-                if checker.settings.target_version >= PythonVersion::Py37 {
+                if checker.target_version() >= PythonVersion::PY37 {
                     if let Some("__future__") = module {
                         pyupgrade::rules::unnecessary_future_import(checker, stmt, names);
                     }
@@ -1036,7 +1037,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 }
             }
             if checker.enabled(Rule::TimeoutErrorAlias) {
-                if checker.settings.target_version >= PythonVersion::Py310 {
+                if checker.target_version() >= PythonVersion::PY310 {
                     if let Some(item) = exc {
                         pyupgrade::rules::timeout_error_alias_raise(checker, item);
                     }
@@ -1428,7 +1429,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 flake8_bugbear::rules::jump_statement_in_finally(checker, finalbody);
             }
             if checker.enabled(Rule::ContinueInFinally) {
-                if checker.settings.target_version <= PythonVersion::Py38 {
+                if checker.target_version() <= PythonVersion::PY38 {
                     pylint::rules::continue_in_finally(checker, finalbody);
                 }
             }
@@ -1452,7 +1453,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 pyupgrade::rules::os_error_alias_handlers(checker, handlers);
             }
             if checker.enabled(Rule::TimeoutErrorAlias) {
-                if checker.settings.target_version >= PythonVersion::Py310 {
+                if checker.target_version() >= PythonVersion::PY310 {
                     pyupgrade::rules::timeout_error_alias_handlers(checker, handlers);
                 }
             }
@@ -1739,6 +1740,15 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.enabled(Rule::UselessExceptionStatement) {
                 pylint::rules::useless_exception_statement(checker, expr);
+            }
+        }
+        Stmt::Match(ast::StmtMatch {
+            subject: _,
+            cases,
+            range: _,
+        }) => {
+            if checker.enabled(Rule::NanComparison) {
+                pylint::rules::nan_comparison_match(checker, cases);
             }
         }
         _ => {}

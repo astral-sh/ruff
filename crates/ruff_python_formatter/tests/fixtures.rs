@@ -1,19 +1,21 @@
+use crate::normalizer::Normalizer;
+use itertools::Itertools;
+use ruff_formatter::FormatOptions;
+use ruff_python_ast::comparable::ComparableMod;
+use ruff_python_formatter::{format_module_source, format_range, PreviewMode, PyFormatOptions};
+use ruff_python_parser::{parse, ParseOptions, UnsupportedSyntaxError};
+use ruff_source_file::{LineIndex, OneIndexed};
+use ruff_text_size::{Ranged, TextRange, TextSize};
+use rustc_hash::FxHashMap;
+use similar::TextDiff;
 use std::borrow::Cow;
+use std::collections::hash_map::Entry;
 use std::fmt::{Formatter, Write};
+use std::hash::{DefaultHasher, Hash, Hasher};
 use std::io::BufReader;
 use std::ops::Range;
 use std::path::Path;
 use std::{fmt, fs};
-
-use similar::TextDiff;
-
-use crate::normalizer::Normalizer;
-use ruff_formatter::FormatOptions;
-use ruff_python_ast::comparable::ComparableMod;
-use ruff_python_formatter::{format_module_source, format_range, PreviewMode, PyFormatOptions};
-use ruff_python_parser::{parse, AsMode};
-use ruff_source_file::{LineIndex, OneIndexed};
-use ruff_text_size::{TextRange, TextSize};
 
 mod normalizer;
 
@@ -26,8 +28,9 @@ fn black_compatibility() {
 
         let options: PyFormatOptions = if let Ok(options_file) = fs::File::open(&options_path) {
             let reader = BufReader::new(options_file);
-            serde_json::from_reader(reader)
-                .unwrap_or_else(|_| panic!("Option file {options_path:?} to be a valid Json file"))
+            serde_json::from_reader(reader).unwrap_or_else(|_| {
+                panic!("Expected option file {options_path:?} to be a valid Json file")
+            })
         } else {
             PyFormatOptions::from_extension(input_path)
         };
@@ -180,10 +183,12 @@ fn format() {
         let mut snapshot = format!("## Input\n{}", CodeFrame::new("python", &content));
         let options_path = input_path.with_extension("options.json");
 
-        if let Ok(options_file) = fs::File::open(options_path) {
+        if let Ok(options_file) = fs::File::open(&options_path) {
             let reader = BufReader::new(options_file);
             let options: Vec<PyFormatOptions> =
-                serde_json::from_reader(reader).expect("Options to be a valid Json file");
+                serde_json::from_reader(reader).unwrap_or_else(|_| {
+                    panic!("Expected option file {options_path:?} to be a valid Json file")
+                });
 
             writeln!(snapshot, "## Outputs").unwrap();
 
@@ -376,7 +381,7 @@ Formatted twice:
     }
 }
 
-/// Ensure that formatting doesn't change the AST.
+/// Ensure that formatting doesn't change the AST and doesn't introduce any new unsupported syntax errors.
 ///
 /// Like Black, there are a few exceptions to this "invariant" which are encoded in
 /// [`NormalizedMod`] and related structs. Namely, formatting can change indentation within strings,
@@ -390,16 +395,53 @@ fn ensure_unchanged_ast(
     let source_type = options.source_type();
 
     // Parse the unformatted code.
-    let mut unformatted_ast = parse(unformatted_code, source_type.as_mode())
-        .expect("Unformatted code to be valid syntax")
-        .into_syntax();
+    let unformatted_parsed = parse(
+        unformatted_code,
+        ParseOptions::from(source_type).with_target_version(options.target_version()),
+    )
+    .expect("Unformatted code to be valid syntax");
+
+    let unformatted_unsupported_syntax_errors =
+        collect_unsupported_syntax_errors(unformatted_parsed.unsupported_syntax_errors());
+    let mut unformatted_ast = unformatted_parsed.into_syntax();
+
     Normalizer.visit_module(&mut unformatted_ast);
     let unformatted_ast = ComparableMod::from(&unformatted_ast);
 
     // Parse the formatted code.
-    let mut formatted_ast = parse(formatted_code, source_type.as_mode())
-        .expect("Formatted code to be valid syntax")
-        .into_syntax();
+    let formatted_parsed = parse(
+        formatted_code,
+        ParseOptions::from(source_type).with_target_version(options.target_version()),
+    )
+    .expect("Formatted code to be valid syntax");
+
+    // Assert that there are no new unsupported syntax errors
+    let mut formatted_unsupported_syntax_errors =
+        collect_unsupported_syntax_errors(formatted_parsed.unsupported_syntax_errors());
+
+    formatted_unsupported_syntax_errors
+        .retain(|fingerprint, _| !unformatted_unsupported_syntax_errors.contains_key(fingerprint));
+
+    if !formatted_unsupported_syntax_errors.is_empty() {
+        let index = LineIndex::from_source_text(formatted_code);
+        panic!(
+            "Formatted code `{}` introduced new unsupported syntax errors:\n---\n{}\n---",
+            input_path.display(),
+            formatted_unsupported_syntax_errors
+                .into_values()
+                .map(|error| {
+                    let location = index.source_location(error.start(), formatted_code);
+                    format!(
+                        "{row}:{col} {error}",
+                        row = location.row,
+                        col = location.column
+                    )
+                })
+                .join("\n")
+        );
+    }
+
+    let mut formatted_ast = formatted_parsed.into_syntax();
     Normalizer.visit_module(&mut formatted_ast);
     let formatted_ast = ComparableMod::from(&formatted_ast);
 
@@ -473,7 +515,7 @@ magic-trailing-comma       = {magic_trailing_comma:?}
 docstring-code             = {docstring_code:?}
 docstring-code-line-width  = {docstring_code_line_width:?}
 preview                    = {preview:?}
-target_version             = {target_version:?}
+target_version             = {target_version}
 source_type                = {source_type:?}"#,
             indent_style = self.0.indent_style(),
             indent_width = self.0.indent_width().value(),
@@ -488,4 +530,50 @@ source_type                = {source_type:?}"#,
             source_type = self.0.source_type()
         )
     }
+}
+
+/// Collects the unsupported syntax errors and assigns a unique hash to each error.
+fn collect_unsupported_syntax_errors(
+    errors: &[UnsupportedSyntaxError],
+) -> FxHashMap<u64, UnsupportedSyntaxError> {
+    let mut collected = FxHashMap::default();
+
+    for error in errors {
+        let mut error_fingerprint = fingerprint_unsupported_syntax_error(error, 0);
+
+        // Make sure that we do not get a fingerprint that is already in use
+        // by adding in the previously generated one.
+        loop {
+            match collected.entry(error_fingerprint) {
+                Entry::Occupied(_) => {
+                    error_fingerprint =
+                        fingerprint_unsupported_syntax_error(error, error_fingerprint);
+                }
+                Entry::Vacant(entry) => {
+                    entry.insert(error.clone());
+                    break;
+                }
+            }
+        }
+    }
+
+    collected
+}
+
+fn fingerprint_unsupported_syntax_error(error: &UnsupportedSyntaxError, salt: u64) -> u64 {
+    let mut hasher = DefaultHasher::new();
+
+    let UnsupportedSyntaxError {
+        kind,
+        target_version,
+        // Don't hash the range because the location between the formatted and unformatted code
+        // is likely to be different
+        range: _,
+    } = error;
+
+    salt.hash(&mut hasher);
+    kind.hash(&mut hasher);
+    target_version.hash(&mut hasher);
+
+    hasher.finish()
 }

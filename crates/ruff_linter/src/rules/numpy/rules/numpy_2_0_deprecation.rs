@@ -31,7 +31,7 @@ use crate::importer::ImportRequest;
 /// This rule flags all uses of removed members, along with automatic fixes for
 /// any backwards-compatible replacements.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// import numpy as np
 ///

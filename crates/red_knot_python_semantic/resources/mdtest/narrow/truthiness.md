@@ -233,16 +233,20 @@ reveal_type(y)  # revealed: A
 from typing import Literal
 
 class MetaAmbiguous(type):
-    def __bool__(self) -> bool: ...
+    def __bool__(self) -> bool:
+        return True
 
 class MetaFalsy(type):
-    def __bool__(self) -> Literal[False]: ...
+    def __bool__(self) -> Literal[False]:
+        return False
 
 class MetaTruthy(type):
-    def __bool__(self) -> Literal[True]: ...
+    def __bool__(self) -> Literal[True]:
+        return True
 
 class MetaDeferred(type):
-    def __bool__(self) -> MetaAmbiguous: ...
+    def __bool__(self) -> MetaAmbiguous:
+        return MetaAmbiguous()
 
 class AmbiguousClass(metaclass=MetaAmbiguous): ...
 class FalsyClass(metaclass=MetaFalsy): ...
@@ -266,7 +270,7 @@ def _(
     if af:
         reveal_type(af)  # revealed: type[AmbiguousClass] & ~AlwaysFalsy
 
-    # TODO: Emit a diagnostic (`d` is not valid in boolean context)
+    # error: [unsupported-bool-conversion] "Boolean conversion is unsupported for type `MetaDeferred`; the return type of its bool method (`MetaAmbiguous`) isn't assignable to `bool"
     if d:
         # TODO: Should be `Unknown`
         reveal_type(d)  # revealed: type[DeferredClass] & ~AlwaysFalsy
@@ -300,20 +304,24 @@ def _(x: bool | str):
     reveal_type(x and A())  # revealed: Literal[False] | str & ~AlwaysTruthy | A
 
 class Falsy:
-    def __bool__(self) -> Literal[False]: ...
+    def __bool__(self) -> Literal[False]:
+        return False
 
 class Truthy:
-    def __bool__(self) -> Literal[True]: ...
+    def __bool__(self) -> Literal[True]:
+        return True
 
 def _(x: Falsy | Truthy):
     reveal_type(x or A())  # revealed: Truthy | A
     reveal_type(x and A())  # revealed: Falsy | A
 
 class MetaFalsy(type):
-    def __bool__(self) -> Literal[False]: ...
+    def __bool__(self) -> Literal[False]:
+        return False
 
 class MetaTruthy(type):
-    def __bool__(self) -> Literal[True]: ...
+    def __bool__(self) -> Literal[True]:
+        return True
 
 class FalsyClass(metaclass=MetaFalsy): ...
 class TruthyClass(metaclass=MetaTruthy): ...

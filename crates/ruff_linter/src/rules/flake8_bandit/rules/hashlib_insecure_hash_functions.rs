@@ -43,9 +43,22 @@ use super::super::helpers::string_literal;
 ///     return hash == known_hash
 /// ```
 ///
+/// or add `usedforsecurity=False` if the hashing algorithm is not used in a security context, e.g.
+/// as a non-cryptographic one-way compression function:
+/// ```python
+/// import hashlib
+///
+///
+/// def certificate_is_valid(certificate: bytes, known_hash: str) -> bool:
+///     hash = hashlib.md5(certificate, usedforsecurity=False).hexdigest()
+///     return hash == known_hash
+/// ```
+///
+///
 /// ## References
 /// - [Python documentation: `hashlib` — Secure hashes and message digests](https://docs.python.org/3/library/hashlib.html)
 /// - [Python documentation: `crypt` — Function to check Unix passwords](https://docs.python.org/3/library/crypt.html)
+/// - [Python documentation: `FIPS` - FIPS compliant hashlib implementation](https://docs.python.org/3/library/hashlib.html#hashlib.algorithms_guaranteed)
 /// - [Common Weakness Enumeration: CWE-327](https://cwe.mitre.org/data/definitions/327.html)
 /// - [Common Weakness Enumeration: CWE-328](https://cwe.mitre.org/data/definitions/328.html)
 /// - [Common Weakness Enumeration: CWE-916](https://cwe.mitre.org/data/definitions/916.html)
@@ -122,11 +135,11 @@ fn detect_insecure_hashlib_calls(
                 return;
             };
 
-            // `hashlib.new` accepts both lowercase and uppercase names for hash
+            // `hashlib.new` accepts mixed lowercase and uppercase names for hash
             // functions.
             if matches!(
-                hash_func_name,
-                "md4" | "md5" | "sha" | "sha1" | "MD4" | "MD5" | "SHA" | "SHA1"
+                hash_func_name.to_ascii_lowercase().as_str(),
+                "md4" | "md5" | "sha" | "sha1"
             ) {
                 checker.report_diagnostic(Diagnostic::new(
                     HashlibInsecureHashFunction {
@@ -186,7 +199,7 @@ fn detect_insecure_crypt_calls(checker: &Checker, call: &ast::ExprCall) {
 fn is_used_for_security(arguments: &Arguments) -> bool {
     arguments
         .find_keyword("usedforsecurity")
-        .map_or(true, |keyword| !is_const_false(&keyword.value))
+        .is_none_or(|keyword| !is_const_false(&keyword.value))
 }
 
 #[derive(Debug, Copy, Clone)]

@@ -6,11 +6,12 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
+    use ruff_python_ast::PythonVersion;
     use test_case::test_case;
 
     use crate::registry::Rule;
     use crate::rules::pep8_naming;
-    use crate::settings::types::{PreviewMode, PythonVersion};
+    use crate::settings::types::PreviewMode;
     use crate::test::test_path;
     use crate::{assert_messages, settings};
 
@@ -155,30 +156,6 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Rule::CustomTypeVarForSelf, Path::new("PYI019_0.py"))]
-    #[test_case(Rule::CustomTypeVarForSelf, Path::new("PYI019_0.pyi"))]
-    #[test_case(Rule::CustomTypeVarForSelf, Path::new("PYI019_1.pyi"))]
-    fn custom_classmethod_rules_preview(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!(
-            "preview_{}_{}",
-            rule_code.noqa_code(),
-            path.to_string_lossy()
-        );
-        let diagnostics = test_path(
-            Path::new("flake8_pyi").join(path).as_path(),
-            &settings::LinterSettings {
-                pep8_naming: pep8_naming::settings::Settings {
-                    classmethod_decorators: vec!["foo_classmethod".to_string()],
-                    ..pep8_naming::settings::Settings::default()
-                },
-                preview: PreviewMode::Enabled,
-                ..settings::LinterSettings::for_rule(rule_code)
-            },
-        )?;
-        assert_messages!(snapshot, diagnostics);
-        Ok(())
-    }
-
     #[test_case(Rule::TypeAliasWithoutAnnotation, Path::new("PYI026.py"))]
     #[test_case(Rule::TypeAliasWithoutAnnotation, Path::new("PYI026.pyi"))]
     #[test_case(Rule::RedundantNoneLiteral, Path::new("PYI061.py"))]
@@ -188,7 +165,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_pyi").join(path).as_path(),
             &settings::LinterSettings {
-                target_version: PythonVersion::Py38,
+                unresolved_target_version: PythonVersion::PY38,
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
@@ -197,8 +174,6 @@ mod tests {
     }
 
     #[test_case(Rule::FutureAnnotationsInStub, Path::new("PYI044.pyi"))]
-    #[test_case(Rule::UnusedPrivateTypeVar, Path::new("PYI018.py"))]
-    #[test_case(Rule::UnusedPrivateTypeVar, Path::new("PYI018.pyi"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",

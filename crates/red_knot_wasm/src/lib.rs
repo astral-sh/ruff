@@ -7,12 +7,12 @@ use red_knot_project::metadata::options::{EnvironmentOptions, Options};
 use red_knot_project::metadata::value::RangedValue;
 use red_knot_project::ProjectMetadata;
 use red_knot_project::{Db, ProjectDatabase};
-use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig};
+use ruff_db::diagnostic::{DisplayDiagnosticConfig, OldDiagnosticTrait};
 use ruff_db::files::{system_path_to_file, File};
 use ruff_db::system::walk_directory::WalkDirectoryBuilder;
 use ruff_db::system::{
-    DirectoryEntry, GlobError, MemoryFileSystem, Metadata, PatternError, System, SystemPath,
-    SystemPathBuf, SystemVirtualPath,
+    CaseSensitivity, DirectoryEntry, GlobError, MemoryFileSystem, Metadata, PatternError, System,
+    SystemPath, SystemPathBuf, SystemVirtualPath,
 };
 use ruff_notebook::Notebook;
 
@@ -64,7 +64,7 @@ impl Workspace {
     pub fn open_file(&mut self, path: &str, contents: &str) -> Result<FileHandle, Error> {
         self.system
             .fs
-            .write_file(path, contents)
+            .write_file_all(path, contents)
             .map_err(into_error)?;
 
         let file = system_path_to_file(&self.db, path).expect("File to exist");
@@ -198,7 +198,7 @@ pub enum PythonVersion {
     Py313,
 }
 
-impl From<PythonVersion> for red_knot_python_semantic::PythonVersion {
+impl From<PythonVersion> for ruff_python_ast::PythonVersion {
     fn from(value: PythonVersion) -> Self {
         match value {
             PythonVersion::Py37 => Self::PY37,
@@ -260,6 +260,14 @@ impl System for WasmSystem {
         Err(ruff_notebook::NotebookError::Io(not_found()))
     }
 
+    fn path_exists_case_sensitive(&self, path: &SystemPath, _prefix: &SystemPath) -> bool {
+        self.path_exists(path)
+    }
+
+    fn case_sensitivity(&self) -> CaseSensitivity {
+        CaseSensitivity::CaseSensitive
+    }
+
     fn current_directory(&self) -> &SystemPath {
         self.fs.current_directory()
     }
@@ -308,8 +316,8 @@ mod tests {
     #[test]
     fn same_default_as_python_version() {
         assert_eq!(
-            red_knot_python_semantic::PythonVersion::from(PythonVersion::default()),
-            red_knot_python_semantic::PythonVersion::default()
+            ruff_python_ast::PythonVersion::from(PythonVersion::default()),
+            ruff_python_ast::PythonVersion::default()
         );
     }
 }

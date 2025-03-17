@@ -5,16 +5,20 @@
 import pathlib
 import sys
 import zipfile
-from _typeshed import Incomplete, StrPath
+from _typeshed import StrPath
 from collections.abc import Iterable, Iterator
 from io import BufferedReader
 from typing import Literal, NoReturn, TypeVar
 from typing_extensions import Never
 
+if sys.version_info >= (3, 10):
+    from importlib._bootstrap_external import FileLoader
+    from zipimport import zipimporter
+
 if sys.version_info >= (3, 11):
-    import importlib.resources.abc as abc
+    from importlib.resources import abc
 else:
-    import importlib.abc as abc
+    from importlib import abc
 
 if sys.version_info >= (3, 10):
     if sys.version_info >= (3, 11):
@@ -27,14 +31,14 @@ if sys.version_info >= (3, 10):
 
     class FileReader(abc.TraversableResources):
         path: pathlib.Path
-        def __init__(self, loader) -> None: ...
+        def __init__(self, loader: FileLoader) -> None: ...
         def resource_path(self, resource: StrPath) -> str: ...
         def files(self) -> pathlib.Path: ...
 
     class ZipReader(abc.TraversableResources):
         prefix: str
-        archive: Incomplete
-        def __init__(self, loader, module: str) -> None: ...
+        archive: str
+        def __init__(self, loader: zipimporter, module: str) -> None: ...
         def open_resource(self, resource: str) -> BufferedReader: ...
         def is_resource(self, path: StrPath) -> bool: ...
         def files(self) -> zipfile.Path: ...
@@ -63,6 +67,6 @@ if sys.version_info >= (3, 10):
 
     class NamespaceReader(abc.TraversableResources):
         path: MultiplexedPath
-        def __init__(self, namespace_path) -> None: ...
+        def __init__(self, namespace_path: Iterable[str]) -> None: ...
         def resource_path(self, resource: str) -> str: ...
         def files(self) -> MultiplexedPath: ...

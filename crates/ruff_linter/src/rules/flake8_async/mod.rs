@@ -11,9 +11,9 @@ mod tests {
 
     use crate::assert_messages;
     use crate::registry::Rule;
-    use crate::settings::types::PythonVersion;
     use crate::settings::LinterSettings;
     use crate::test::test_path;
+    use ruff_python_ast::PythonVersion;
 
     #[test_case(Rule::CancelScopeNoCheckpoint, Path::new("ASYNC100.py"))]
     #[test_case(Rule::TrioSyncCall, Path::new("ASYNC105.py"))]
@@ -44,7 +44,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_async").join(path),
             &LinterSettings {
-                target_version: PythonVersion::Py310,
+                unresolved_target_version: PythonVersion::PY310,
                 ..LinterSettings::for_rule(Rule::AsyncFunctionWithTimeout)
             },
         )?;

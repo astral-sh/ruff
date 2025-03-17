@@ -19,17 +19,19 @@ use crate::semantic_index::expression::Expression;
 use crate::semantic_index::symbol::{
     FileScopeId, NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopedSymbolId, SymbolTable,
 };
-use crate::semantic_index::use_def::UseDefMap;
+use crate::semantic_index::use_def::{EagerBindingsKey, ScopedEagerBindingsId, UseDefMap};
 use crate::Db;
 
 pub mod ast_ids;
 pub mod attribute_assignment;
 mod builder;
-pub(crate) mod constraint;
 pub mod definition;
 pub mod expression;
+mod narrowing_constraints;
+pub(crate) mod predicate;
 pub mod symbol;
 mod use_def;
+mod visibility_constraints;
 
 pub(crate) use self::use_def::{
     BindingWithConstraints, BindingWithConstraintsIterator, DeclarationWithConstraint,
@@ -165,6 +167,9 @@ pub(crate) struct SemanticIndex<'db> {
     /// Maps from class body scopes to attribute assignments that were found
     /// in methods of that class.
     attribute_assignments: FxHashMap<FileScopeId, Arc<AttributeAssignments<'db>>>,
+
+    /// Map of all of the eager bindings that appear in this file.
+    eager_bindings: FxHashMap<EagerBindingsKey, ScopedEagerBindingsId>,
 }
 
 impl<'db> SemanticIndex<'db> {
@@ -220,7 +225,7 @@ impl<'db> SemanticIndex<'db> {
     /// Returns the id of the parent scope.
     pub(crate) fn parent_scope_id(&self, scope_id: FileScopeId) -> Option<FileScopeId> {
         let scope = self.scope(scope_id);
-        scope.parent
+        scope.parent()
     }
 
     /// Returns the parent scope of `scope_id`.
@@ -243,7 +248,6 @@ impl<'db> SemanticIndex<'db> {
     }
 
     /// Returns an iterator over all ancestors of `scope`, starting with `scope` itself.
-    #[allow(unused)]
     pub(crate) fn ancestor_scopes(&self, scope: FileScopeId) -> AncestorsIter {
         AncestorsIter::new(self, scope)
     }
@@ -290,6 +294,23 @@ impl<'db> SemanticIndex<'db> {
     pub(super) fn has_future_annotations(&self) -> bool {
         self.has_future_annotations
     }
+
+    /// Returns an iterator of bindings for a particular nested eager scope reference.
+    pub(crate) fn eager_bindings(
+        &self,
+        enclosing_scope: FileScopeId,
+        symbol: &str,
+        nested_scope: FileScopeId,
+    ) -> Option<BindingWithConstraintsIterator<'_, 'db>> {
+        let symbol_id = self.symbol_tables[enclosing_scope].symbol_id_by_name(symbol)?;
+        let key = EagerBindingsKey {
+            enclosing_scope,
+            enclosing_symbol: symbol_id,
+            nested_scope,
+        };
+        let id = self.eager_bindings.get(&key)?;
+        self.use_def_maps[enclosing_scope].eager_bindings(*id)
+    }
 }
 
 pub struct AncestorsIter<'a> {
@@ -312,7 +333,7 @@ impl<'a> Iterator for AncestorsIter<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         let current_id = self.next_id?;
         let current = &self.scopes[current_id];
-        self.next_id = current.parent;
+        self.next_id = current.parent();
 
         Some((current_id, current))
     }
@@ -328,7 +349,7 @@ pub struct DescendentsIter<'a> {
 impl<'a> DescendentsIter<'a> {
     fn new(symbol_table: &'a SemanticIndex, scope_id: FileScopeId) -> Self {
         let scope = &symbol_table.scopes[scope_id];
-        let scopes = &symbol_table.scopes[scope.descendents.clone()];
+        let scopes = &symbol_table.scopes[scope.descendents()];
 
         Self {
             next_id: scope_id + 1,
@@ -378,7 +399,7 @@ impl<'a> Iterator for ChildrenIter<'a> {
 
     fn next(&mut self) -> Option<Self::Item> {
         self.descendents
-            .find(|(_, scope)| scope.parent == Some(self.parent))
+            .find(|(_, scope)| scope.parent() == Some(self.parent))
     }
 }
 
@@ -388,7 +409,7 @@ impl FusedIterator for ChildrenIter<'_> {}
 mod tests {
     use ruff_db::files::{system_path_to_file, File};
     use ruff_db::parsed::parsed_module;
-    use ruff_db::system::DbWithTestSystem;
+    use ruff_db::system::DbWithWritableSystem as _;
     use ruff_python_ast as ast;
     use ruff_text_size::{Ranged, TextRange};
 
@@ -419,7 +440,7 @@ mod tests {
         file: File,
     }
 
-    fn test_case(content: impl ToString) -> TestCase {
+    fn test_case(content: impl AsRef<str>) -> TestCase {
         let mut db = TestDb::new();
         db.write_file("test.py", content).unwrap();
 

@@ -38,7 +38,7 @@ use ruff_python_ast::visitor::{walk_except_handler, walk_pattern, Visitor};
 use ruff_python_ast::{
     self as ast, AnyParameterRef, ArgOrKeyword, Comprehension, ElifElseClause, ExceptHandler, Expr,
     ExprContext, FStringElement, Keyword, MatchCase, ModModule, Parameter, Parameters, Pattern,
-    Stmt, Suite, UnaryOp,
+    PythonVersion, Stmt, Suite, UnaryOp,
 };
 use ruff_python_ast::{helpers, str, visitor, PySourceType};
 use ruff_python_codegen::{Generator, Stylist};
@@ -223,6 +223,8 @@ pub(crate) struct Checker<'a> {
     last_stmt_end: TextSize,
     /// A state describing if a docstring is expected or not.
     docstring_state: DocstringState,
+    /// The target [`PythonVersion`] for version-dependent checks
+    target_version: PythonVersion,
 }
 
 impl<'a> Checker<'a> {
@@ -242,12 +244,9 @@ impl<'a> Checker<'a> {
         source_type: PySourceType,
         cell_offsets: Option<&'a CellOffsets>,
         notebook_index: Option<&'a NotebookIndex>,
+        target_version: PythonVersion,
     ) -> Checker<'a> {
-        let mut semantic = SemanticModel::new(&settings.typing_modules, path, module);
-        if settings.preview.is_enabled() {
-            // Set the feature flag to test `TYPE_CHECKING` semantic changes
-            semantic.flags |= SemanticModelFlags::NEW_TYPE_CHECKING_BLOCK_DETECTION;
-        }
+        let semantic = SemanticModel::new(&settings.typing_modules, path, module);
         Self {
             parsed,
             parsed_type_annotation: None,
@@ -272,6 +271,7 @@ impl<'a> Checker<'a> {
             notebook_index,
             last_stmt_end: TextSize::default(),
             docstring_state: DocstringState::default(),
+            target_version,
         }
     }
 }
@@ -289,7 +289,14 @@ impl<'a> Checker<'a> {
         if !self.noqa.is_enabled() {
             return false;
         }
-        noqa::rule_is_ignored(code, offset, self.noqa_line_for, self.locator)
+
+        noqa::rule_is_ignored(
+            code,
+            offset,
+            self.noqa_line_for,
+            self.comment_ranges(),
+            self.locator,
+        )
     }
 
     /// Create a [`Generator`] to generate source code based on the current AST state.
@@ -500,6 +507,11 @@ impl<'a> Checker<'a> {
             self.report_diagnostic(diagnostic);
         }
     }
+
+    /// Return the [`PythonVersion`] to use for version-related checks.
+    pub(crate) const fn target_version(&self) -> PythonVersion {
+        self.target_version
+    }
 }
 
 impl<'a> Visitor<'a> for Checker<'a> {
@@ -556,7 +568,8 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     || imports::is_matplotlib_activation(stmt, self.semantic())
                     || imports::is_sys_path_modification(stmt, self.semantic())
                     || imports::is_os_environ_modification(stmt, self.semantic())
-                    || imports::is_pytest_importorskip(stmt, self.semantic()))
+                    || imports::is_pytest_importorskip(stmt, self.semantic())
+                    || imports::is_site_sys_path_modification(stmt, self.semantic()))
                 {
                     self.semantic.flags |= SemanticModelFlags::IMPORT_BOUNDARY;
                 }
@@ -2107,17 +2120,14 @@ impl<'a> Checker<'a> {
     }
 
     fn bind_builtins(&mut self) {
+        let target_version = self.target_version();
         let mut bind_builtin = |builtin| {
             // Add the builtin to the scope.
             let binding_id = self.semantic.push_builtin();
             let scope = self.semantic.global_scope_mut();
             scope.add(builtin, binding_id);
         };
-
-        let standard_builtins = python_builtins(
-            self.settings.target_version.minor(),
-            self.source_type.is_ipynb(),
-        );
+        let standard_builtins = python_builtins(target_version.minor, self.source_type.is_ipynb());
         for builtin in standard_builtins {
             bind_builtin(builtin);
         }
@@ -2663,6 +2673,7 @@ pub(crate) fn check_ast(
     source_type: PySourceType,
     cell_offsets: Option<&CellOffsets>,
     notebook_index: Option<&NotebookIndex>,
+    target_version: PythonVersion,
 ) -> Vec<Diagnostic> {
     let module_path = package
         .map(PackageRoot::path)
@@ -2702,6 +2713,7 @@ pub(crate) fn check_ast(
         source_type,
         cell_offsets,
         notebook_index,
+        target_version,
     );
     checker.bind_builtins();
 

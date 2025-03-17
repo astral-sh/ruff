@@ -23,6 +23,10 @@ extend-ignore-re = [
     # Line ignore with trailing "spellchecker:disable-line"
     "(?Rm)^.*#\\s*spellchecker:disable-line$",
     "LICENSEs",
+    # Various third party dependencies uses `typ` as struct field names (e.g., lsp_types::LogMessageParams)
+    "typ",
+    # TODO: Remove this once the `TYP` redirects are removed from `rule_redirects.rs`
+    "TYP",
 ]
 
 [default.extend-identifiers]

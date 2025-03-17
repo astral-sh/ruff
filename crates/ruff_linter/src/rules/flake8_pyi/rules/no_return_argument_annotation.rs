@@ -6,7 +6,7 @@ use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::settings::types::PythonVersion::Py311;
+use ruff_python_ast::PythonVersion;
 
 /// ## What it does
 /// Checks for uses of `typing.NoReturn` (and `typing_extensions.NoReturn`) for
@@ -67,7 +67,7 @@ pub(crate) fn no_return_argument_annotation(checker: &Checker, parameters: &ast:
         if is_no_return(annotation, checker) {
             checker.report_diagnostic(Diagnostic::new(
                 NoReturnArgumentAnnotationInStub {
-                    module: if checker.settings.target_version >= Py311 {
+                    module: if checker.target_version() >= PythonVersion::PY311 {
                         TypingModule::Typing
                     } else {
                         TypingModule::TypingExtensions

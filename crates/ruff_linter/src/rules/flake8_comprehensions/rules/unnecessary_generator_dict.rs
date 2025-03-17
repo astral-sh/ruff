@@ -18,7 +18,7 @@ use super::helpers;
 /// there are equivalent comprehensions for these types. Using a
 /// comprehension is clearer and more idiomatic.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// dict((x, f(x)) for x in foo)
 /// ```

@@ -27,4 +27,4 @@ a persistent datastore based on [Workers KV](https://developers.cloudflare.com/w
 and exposed via a [Cloudflare Worker](https://developers.cloudflare.com/workers/learning/how-workers-works/).
 
 The playground design is originally based on [Tailwind Play](https://play.tailwindcss.com/), with
-additional inspiration from the [Rome Tools Playground](https://docs.rome.tools/playground/).
+additional inspiration from the [Biome Playground](https://biomejs.dev/playground/).

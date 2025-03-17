@@ -27,11 +27,12 @@
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 
 use crate::db::tests::{setup_db, TestDb};
+use crate::symbol::{builtins_symbol, known_module_symbol};
 use crate::types::{
-    builtins_symbol, known_module_symbol, IntersectionBuilder, KnownClass, KnownInstanceType,
+    BoundMethodType, CallableType, IntersectionBuilder, KnownClass, KnownInstanceType,
     SubclassOfType, TupleType, Type, UnionType,
 };
-use crate::KnownModule;
+use crate::{Db, KnownModule};
 use quickcheck::{Arbitrary, Gen};
 
 /// A test representation of a type that can be transformed unambiguously into a real Type,
@@ -67,6 +68,24 @@ pub(crate) enum Ty {
     SubclassOfAbcClass(&'static str),
     AlwaysTruthy,
     AlwaysFalsy,
+    BuiltinsFunction(&'static str),
+    BuiltinsBoundMethod {
+        class: &'static str,
+        method: &'static str,
+    },
+}
+
+#[salsa::tracked]
+fn create_bound_method<'db>(
+    db: &'db dyn Db,
+    function: Type<'db>,
+    builtins_class: Type<'db>,
+) -> Type<'db> {
+    Type::Callable(CallableType::BoundMethod(BoundMethodType::new(
+        db,
+        function.expect_function_literal(),
+        builtins_class.to_instance(db).unwrap(),
+    )))
 }
 
 impl Ty {
@@ -81,13 +100,21 @@ impl Ty {
             Ty::BooleanLiteral(b) => Type::BooleanLiteral(b),
             Ty::LiteralString => Type::LiteralString,
             Ty::BytesLiteral(s) => Type::bytes_literal(db, s.as_bytes()),
-            Ty::BuiltinInstance(s) => builtins_symbol(db, s).expect_type().to_instance(db),
-            Ty::AbcInstance(s) => known_module_symbol(db, KnownModule::Abc, s)
+            Ty::BuiltinInstance(s) => builtins_symbol(db, s)
+                .symbol
                 .expect_type()
-                .to_instance(db),
-            Ty::AbcClassLiteral(s) => known_module_symbol(db, KnownModule::Abc, s).expect_type(),
+                .to_instance(db)
+                .unwrap(),
+            Ty::AbcInstance(s) => known_module_symbol(db, KnownModule::Abc, s)
+                .symbol
+                .expect_type()
+                .to_instance(db)
+                .unwrap(),
+            Ty::AbcClassLiteral(s) => known_module_symbol(db, KnownModule::Abc, s)
+                .symbol
+                .expect_type(),
             Ty::TypingLiteral => Type::KnownInstance(KnownInstanceType::Literal),
-            Ty::BuiltinClassLiteral(s) => builtins_symbol(db, s).expect_type(),
+            Ty::BuiltinClassLiteral(s) => builtins_symbol(db, s).symbol.expect_type(),
             Ty::KnownClassInstance(known_class) => known_class.to_instance(db),
             Ty::Union(tys) => {
                 UnionType::from_elements(db, tys.into_iter().map(|ty| ty.into_type(db)))
@@ -110,6 +137,7 @@ impl Ty {
             Ty::SubclassOfBuiltinClass(s) => SubclassOfType::from(
                 db,
                 builtins_symbol(db, s)
+                    .symbol
                     .expect_type()
                     .expect_class_literal()
                     .class,
@@ -117,12 +145,20 @@ impl Ty {
             Ty::SubclassOfAbcClass(s) => SubclassOfType::from(
                 db,
                 known_module_symbol(db, KnownModule::Abc, s)
+                    .symbol
                     .expect_type()
                     .expect_class_literal()
                     .class,
             ),
             Ty::AlwaysTruthy => Type::AlwaysTruthy,
             Ty::AlwaysFalsy => Type::AlwaysFalsy,
+            Ty::BuiltinsFunction(name) => builtins_symbol(db, name).symbol.expect_type(),
+            Ty::BuiltinsBoundMethod { class, method } => {
+                let builtins_class = builtins_symbol(db, class).symbol.expect_type();
+                let function = builtins_class.member(db, method).symbol.expect_type();
+
+                create_bound_method(db, function, builtins_class)
+            }
         }
     }
 }
@@ -173,6 +209,16 @@ fn arbitrary_core_type(g: &mut Gen) -> Ty {
         Ty::SubclassOfAbcClass("ABCMeta"),
         Ty::AlwaysTruthy,
         Ty::AlwaysFalsy,
+        Ty::BuiltinsFunction("chr"),
+        Ty::BuiltinsFunction("ascii"),
+        Ty::BuiltinsBoundMethod {
+            class: "str",
+            method: "isascii",
+        },
+        Ty::BuiltinsBoundMethod {
+            class: "int",
+            method: "bit_length",
+        },
     ])
     .unwrap()
     .clone()

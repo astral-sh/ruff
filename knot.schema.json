@@ -49,6 +49,25 @@
   },
   "additionalProperties": false,
   "definitions": {
+    "DiagnosticFormat": {
+      "description": "The diagnostic output format.",
+      "oneOf": [
+        {
+          "description": "The default full mode will print \"pretty\" diagnostics.\n\nThat is, color will be used when printing to a `tty`. Moreover, diagnostic messages may include additional context and annotations on the input to help understand the message.",
+          "type": "string",
+          "enum": [
+            "full"
+          ]
+        },
+        {
+          "description": "Print diagnostics in a concise mode.\n\nThis will guarantee that each diagnostic is printed on a single line. Only the most important or primary aspects of the diagnostic are included. Contextual information is dropped.\n\nThis may use color when printing to a `tty`.",
+          "type": "string",
+          "enum": [
+            "concise"
+          ]
+        }
+      ]
+    },
     "EnvironmentOptions": {
       "type": "object",
       "properties": {
@@ -61,6 +80,13 @@
           "items": {
             "type": "string"
           }
+        },
+        "python": {
+          "description": "Path to the Python installation from which Red Knot resolves type information and third-party dependencies.\n\nRed Knot will search in the path's `site-packages` directories for type information and third-party imports.\n\nThis option is commonly used to specify the path to a virtual environment.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "python-platform": {
           "description": "Specifies the target platform that will be used to execute the source code. If specified, Red Knot will tailor its use of type stub files, which conditionalize type definitions based on the platform.\n\nIf no platform is specified, knot will use `all` or the current platform in the LSP use case.",
@@ -86,13 +112,6 @@
         },
         "typeshed": {
           "description": "Optional path to a \"typeshed\" directory on disk for us to use for standard-library types. If this is not provided, we will fallback to our vendored typeshed stubs for the stdlib, bundled as a zip file in the binary",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "venv-path": {
-          "description": "The path to the user's `site-packages` directory, where third-party packages from ``PyPI`` are installed.",
           "type": [
             "string",
             "null"
@@ -441,9 +460,29 @@
             }
           ]
         },
+        "invalid-return-type": {
+          "title": "detects returned values that can't be assigned to the function's annotated return type",
+          "description": "## What it does\nDetects returned values that can't be assigned to the function's annotated return type.\n\n## Why is this bad?\nReturning an object of a type incompatible with the annotated return type may cause confusion to the user calling the function.\n\n## Examples\n```python\ndef func() -> int:\n    return \"a\"  # error: [invalid-return-type]\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "invalid-syntax-in-forward-annotation": {
           "title": "detects invalid syntax in forward annotations",
           "description": "TODO #14889",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "invalid-type-checking-constant": {
+          "title": "detects invalid TYPE_CHECKING constant assignments",
+          "description": "## What it does\nChecks for a value other than `False` assigned to the `TYPE_CHECKING` variable, or an\nannotation not assignable from `bool`.\n\n## Why is this bad?\nThe name `TYPE_CHECKING` is reserved for a flag that can be used to provide conditional\ncode seen only by the type checker, and not at runtime. Normally this flag is imported from\n`typing` or `typing_extensions`, but it can also be defined locally. If defined locally, it\nmust be assigned the value `False` at runtime; the type checker will consider its value to\nbe `True`. If annotated, it must be annotated as a type that can accept `bool` values.",
           "default": "error",
           "oneOf": [
             {
@@ -474,6 +513,16 @@
         "missing-argument": {
           "title": "detects missing required arguments in a call",
           "description": "## What it does\nChecks for missing required arguments in a call.\n\n## Why is this bad?\nFailing to provide a required argument will raise a `TypeError` at runtime.\n\n## Examples\n```python\ndef func(x: int): ...\nfunc()  # TypeError: func() missing 1 required positional argument: 'x'\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "no-matching-overload": {
+          "title": "detects calls that do not match any overload",
+          "description": "## What it does\nChecks for calls to an overloaded function that do not match any of the overloads.\n\n## Why is this bad?\nFailing to provide the correct arguments to one of the overloads will raise a `TypeError`\nat runtime.\n\n## Examples\n```python\n@overload\ndef func(x: int): ...\n@overload\ndef func(x: bool): ...\nfunc(\"string\")  # error: [no-matching-overload]\n```",
           "default": "error",
           "oneOf": [
             {
@@ -651,6 +700,16 @@
             }
           ]
         },
+        "unsupported-bool-conversion": {
+          "title": "detects boolean conversion where the object incorrectly implements `__bool__`",
+          "description": "## What it does\nChecks for bool conversions where the object doesn't correctly implement `__bool__`.\n\n## Why is this bad?\nIf an exception is raised when you attempt to evaluate the truthiness of an object,\nusing the object in a boolean context will fail at runtime.\n\n## Examples\n\n```python\nclass NotBoolable:\n    __bool__ = None\n\nb1 = NotBoolable()\nb2 = NotBoolable()\n\nif b1:  # exception raised here\n    pass\n\nb1 and b2  # exception raised here\nnot b1  # exception raised here\nb1 < b2 < b1  # exception raised here\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "unsupported-operator": {
           "title": "detects binary, unary, or comparison expressions where the operands don't support the operator",
           "description": "## What it does\nChecks for binary expressions, comparisons, and unary expressions where the operands don't support the operator.\n\nTODO #14889",
@@ -707,6 +766,17 @@
           "type": [
             "boolean",
             "null"
+          ]
+        },
+        "output-format": {
+          "description": "The format to use for printing diagnostic messages.\n\nDefaults to `full`.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/DiagnosticFormat"
+            },
+            {
+              "type": "null"
+            }
           ]
         }
       },

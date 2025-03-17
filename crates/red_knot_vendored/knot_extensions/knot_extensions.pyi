@@ -12,6 +12,7 @@ AlwaysFalsy = object()
 Not: _SpecialForm
 Intersection: _SpecialForm
 TypeOf: _SpecialForm
+CallableTypeFromFunction: _SpecialForm
 
 # Predicates on types
 #

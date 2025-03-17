@@ -1,7 +1,7 @@
 use ruff_formatter::{format_args, write, FormatError, RemoveSoftLinesBuffer};
 use ruff_python_ast::{
-    AnyNodeRef, Expr, ExprAttribute, ExprCall, FString, FStringPart, Operator, StmtAssign,
-    StringLike, TypeParams,
+    AnyNodeRef, Expr, ExprAttribute, ExprCall, FString, Operator, StmtAssign, StringLike,
+    TypeParams,
 };
 
 use crate::builders::parenthesize_if_expands;
@@ -1107,9 +1107,7 @@ fn format_f_string_assignment<'a>(
         return None;
     };
 
-    let [FStringPart::FString(f_string)] = expr.value.as_slice() else {
-        return None;
-    };
+    let f_string = expr.as_single_part_fstring()?;
 
     // If the f-string is flat, there are no breakpoints from which it can be made multiline.
     // This is the case when the f-string has no expressions or if it does then the expressions

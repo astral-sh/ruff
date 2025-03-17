@@ -21,7 +21,7 @@ use crate::rules::flake8_comprehensions::fixes;
 ///
 /// In both cases, it's clearer and more efficient to avoid the redundant call.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// reversed(sorted(iterable))
 /// ```

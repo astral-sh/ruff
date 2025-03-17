@@ -11,6 +11,7 @@ use itertools::Itertools;
 use log::{error, warn};
 use rayon::iter::Either::{Left, Right};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use ruff_python_parser::ParseError;
 use rustc_hash::FxHashSet;
 use thiserror::Error;
 use tracing::debug;
@@ -341,7 +342,7 @@ pub(crate) fn format_source(
 ) -> Result<FormattedSource, FormatCommandError> {
     match &source_kind {
         SourceKind::Python(unformatted) => {
-            let options = settings.to_format_options(source_type, unformatted);
+            let options = settings.to_format_options(source_type, unformatted, path);
 
             let formatted = if let Some(range) = range {
                 let line_index = LineIndex::from_source_text(unformatted);
@@ -391,7 +392,7 @@ pub(crate) fn format_source(
                 ));
             }
 
-            let options = settings.to_format_options(source_type, notebook.source_code());
+            let options = settings.to_format_options(source_type, notebook.source_code(), path);
 
             let mut output: Option<String> = None;
             let mut last: Option<TextSize> = None;
@@ -406,8 +407,12 @@ pub(crate) fn format_source(
                 let formatted =
                     format_module_source(unformatted, options.clone()).map_err(|err| {
                         if let FormatModuleError::ParseError(err) = err {
+                            // Offset the error by the start of the cell
                             DisplayParseError::from_source_kind(
-                                err,
+                                ParseError {
+                                    error: err.error,
+                                    location: err.location.checked_add(*start).unwrap(),
+                                },
                                 path.map(Path::to_path_buf),
                                 source_kind,
                             )

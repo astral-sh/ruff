@@ -6,8 +6,8 @@ use hashbrown::hash_map::RawEntryMut;
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModule;
 use ruff_index::{newtype_index, IndexVec};
+use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
-use ruff_python_ast::{self as ast};
 use rustc_hash::FxHasher;
 
 use crate::ast_node_ref::AstNodeRef;
@@ -111,16 +111,7 @@ pub struct ScopeId<'db> {
 
 impl<'db> ScopeId<'db> {
     pub(crate) fn is_function_like(self, db: &'db dyn Db) -> bool {
-        // Type parameter scopes behave like function scopes in terms of name resolution; CPython
-        // symbol table also uses the term "function-like" for these scopes.
-        matches!(
-            self.node(db).scope_kind(),
-            ScopeKind::Annotation
-                | ScopeKind::Function
-                | ScopeKind::Lambda
-                | ScopeKind::TypeAlias
-                | ScopeKind::Comprehension
-        )
+        self.node(db).scope_kind().is_function_like()
     }
 
     pub(crate) fn node(self, db: &dyn Db) -> &NodeWithScopeKind {
@@ -178,13 +169,25 @@ impl FileScopeId {
 
 #[derive(Debug, salsa::Update)]
 pub struct Scope {
-    pub(super) parent: Option<FileScopeId>,
-    pub(super) node: NodeWithScopeKind,
-    pub(super) descendents: Range<FileScopeId>,
+    parent: Option<FileScopeId>,
+    node: NodeWithScopeKind,
+    descendents: Range<FileScopeId>,
 }
 
 impl Scope {
-    pub fn parent(self) -> Option<FileScopeId> {
+    pub(super) fn new(
+        parent: Option<FileScopeId>,
+        node: NodeWithScopeKind,
+        descendents: Range<FileScopeId>,
+    ) -> Self {
+        Scope {
+            parent,
+            node,
+            descendents,
+        }
+    }
+
+    pub fn parent(&self) -> Option<FileScopeId> {
         self.parent
     }
 
@@ -194,6 +197,18 @@ impl Scope {
 
     pub fn kind(&self) -> ScopeKind {
         self.node().scope_kind()
+    }
+
+    pub fn descendents(&self) -> Range<FileScopeId> {
+        self.descendents.clone()
+    }
+
+    pub(super) fn extend_descendents(&mut self, children_end: FileScopeId) {
+        self.descendents = self.descendents.start..children_end;
+    }
+
+    pub(crate) fn is_eager(&self) -> bool {
+        self.kind().is_eager()
     }
 }
 
@@ -209,8 +224,32 @@ pub enum ScopeKind {
 }
 
 impl ScopeKind {
-    pub const fn is_comprehension(self) -> bool {
-        matches!(self, ScopeKind::Comprehension)
+    pub(crate) fn is_eager(self) -> bool {
+        match self {
+            ScopeKind::Class | ScopeKind::Comprehension => true,
+            ScopeKind::Module
+            | ScopeKind::Annotation
+            | ScopeKind::Function
+            | ScopeKind::Lambda
+            | ScopeKind::TypeAlias => false,
+        }
+    }
+
+    pub(crate) fn is_function_like(self) -> bool {
+        // Type parameter scopes behave like function scopes in terms of name resolution; CPython
+        // symbol table also uses the term "function-like" for these scopes.
+        matches!(
+            self,
+            ScopeKind::Annotation
+                | ScopeKind::Function
+                | ScopeKind::Lambda
+                | ScopeKind::TypeAlias
+                | ScopeKind::Comprehension
+        )
+    }
+
+    pub(crate) fn is_class(self) -> bool {
+        matches!(self, ScopeKind::Class)
     }
 }
 
@@ -314,6 +353,18 @@ impl SymbolTableBuilder {
 
     pub(super) fn mark_symbol_used(&mut self, id: ScopedSymbolId) {
         self.table.symbols[id].insert_flags(SymbolFlags::IS_USED);
+    }
+
+    pub(super) fn symbols(&self) -> impl Iterator<Item = &Symbol> {
+        self.table.symbols()
+    }
+
+    pub(super) fn symbol_id_by_name(&self, name: &str) -> Option<ScopedSymbolId> {
+        self.table.symbol_id_by_name(name)
+    }
+
+    pub(super) fn symbol(&self, symbol_id: impl Into<ScopedSymbolId>) -> &Symbol {
+        self.table.symbol(symbol_id)
     }
 
     pub(super) fn finish(mut self) -> SymbolTable {
@@ -440,7 +491,7 @@ pub enum NodeWithScopeKind {
 }
 
 impl NodeWithScopeKind {
-    pub(super) const fn scope_kind(&self) -> ScopeKind {
+    pub(crate) const fn scope_kind(&self) -> ScopeKind {
         match self {
             Self::Module => ScopeKind::Module,
             Self::Class(_) => ScopeKind::Class,

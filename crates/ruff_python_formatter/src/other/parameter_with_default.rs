@@ -49,8 +49,7 @@ impl FormatNodeRule<ParameterWithDefault> for FormatParameterWithDefault {
                 debug_assert!(equals.is_some_and(|token| token.kind == SimpleTokenKind::Equals));
                 let lparens = tokenizer.next();
                 debug_assert!(lparens
-                    .as_ref()
-                    .map_or(true, |token| token.kind == SimpleTokenKind::LParen));
+                    .as_ref().is_none_or(|token| token.kind == SimpleTokenKind::LParen));
                 lparens.is_none()
             });
             let needs_line_break = needs_line_break_trailing || needs_line_break_leading;

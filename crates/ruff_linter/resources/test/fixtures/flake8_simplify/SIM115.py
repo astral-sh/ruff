@@ -264,3 +264,22 @@ def func(filepath, encoding):
 # OK
 def func(filepath, encoding):
     return f(open(filepath, mode="rt", encoding=encoding))
+
+
+from unittest import IsolatedAsyncioTestCase, TestCase
+
+# OK
+class ExampleClassTests(TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.enterClassContext(open("filename"))
+
+# OK
+class ExampleAsyncTests(IsolatedAsyncioTestCase):
+    async def test_something(self):
+        await self.enterAsyncContext(open("filename"))
+
+# OK
+class ExampleTests(TestCase):
+    def setUp(self):
+        self.enterContext(open("filename"))
