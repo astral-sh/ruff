@@ -165,3 +165,52 @@ impl SyntaxChecker {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    use insta::assert_debug_snapshot;
+    use ruff_python_ast::{visitor::Visitor, PySourceType, PythonVersion};
+    use ruff_python_trivia::textwrap::dedent;
+    use test_case::test_case;
+
+    use crate::{SyntaxChecker, SyntaxError};
+
+    struct TestVisitor {
+        checker: SyntaxChecker,
+    }
+
+    impl Visitor<'_> for TestVisitor {
+        fn visit_stmt(&mut self, stmt: &ruff_python_ast::Stmt) {
+            self.checker.enter_stmt(stmt);
+            ruff_python_ast::visitor::walk_stmt(self, stmt);
+        }
+
+        fn visit_expr(&mut self, expr: &ruff_python_ast::Expr) {
+            self.checker.enter_expr(expr);
+            ruff_python_ast::visitor::walk_expr(self, expr);
+        }
+    }
+
+    /// Run [`check_syntax`] on a snippet of Python code.
+    fn test_snippet(contents: &str, target_version: PythonVersion) -> Vec<SyntaxError> {
+        let path = Path::new("<filename>");
+        let source_type = PySourceType::from(path);
+        let parsed = ruff_python_parser::parse_unchecked_source(&dedent(contents), source_type);
+        let mut visitor = TestVisitor {
+            checker: SyntaxChecker::new(target_version),
+        };
+
+        for stmt in parsed.suite() {
+            visitor.visit_stmt(stmt);
+        }
+
+        visitor.checker.errors
+    }
+
+    #[test_case("[(a := 0) for a in range(0)]", "listcomp")]
+    fn expr(contents: &str, name: &str) {
+        assert_debug_snapshot!(name, test_snippet(contents, PythonVersion::default()));
+    }
+}

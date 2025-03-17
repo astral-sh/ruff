@@ -3218,6 +3218,7 @@ dependencies = [
  "ruff_python_parser",
  "ruff_python_trivia",
  "ruff_text_size",
+ "test-case",
 ]
 
 [[package]]

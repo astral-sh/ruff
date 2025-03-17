@@ -20,6 +20,7 @@ ruff_text_size = { workspace = true }
 
 [dev-dependencies]
 insta = { workspace = true, features = ["filters", "json", "redactions"] }
+test-case = { workspace = true }
 
 [lints]
 workspace = true
