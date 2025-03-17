@@ -75,3 +75,27 @@ static_assert(not is_fully_static(Callable))
 # error: [invalid-type-form]
 static_assert(not is_fully_static(Callable[int, int]))
 ```
+
+Using function literals, we can check more variations of callable types as it allows us to define
+parameters without annotations and no return type.
+
+```py
+from knot_extensions import CallableTypeFromFunction, is_fully_static, static_assert
+
+def f00() -> None: ...
+def f01(a: int, b: str) -> None: ...
+def f11(): ...
+def f12(a, b): ...
+def f13(a, b: int): ...
+def f14(a, b: int) -> None: ...
+def f15(a, b) -> None: ...
+
+static_assert(is_fully_static(CallableTypeFromFunction[f00]))
+static_assert(is_fully_static(CallableTypeFromFunction[f01]))
+
+static_assert(not is_fully_static(CallableTypeFromFunction[f11]))
+static_assert(not is_fully_static(CallableTypeFromFunction[f12]))
+static_assert(not is_fully_static(CallableTypeFromFunction[f13]))
+static_assert(not is_fully_static(CallableTypeFromFunction[f14]))
+static_assert(not is_fully_static(CallableTypeFromFunction[f15]))
+```
