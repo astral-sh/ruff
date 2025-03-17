@@ -63,7 +63,7 @@ pub(crate) enum PatternPredicateKind<'db> {
     Unsupported,
 }
 
-#[salsa::tracked]
+#[salsa::tracked(debug)]
 pub(crate) struct PatternPredicate<'db> {
     pub(crate) file: File,
 

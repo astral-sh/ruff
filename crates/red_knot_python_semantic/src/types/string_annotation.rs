@@ -134,7 +134,8 @@ pub(crate) fn parse_string_annotation(
     let file = context.file();
     let db = context.db();
 
-    let _span = tracing::trace_span!("parse_string_annotation", string=?string_expr.range(), file=%file.path(db)).entered();
+    let _span = tracing::trace_span!("parse_string_annotation", string=?string_expr.range(), ?file)
+        .entered();
 
     let source = source_text(db.upcast(), file);
 
