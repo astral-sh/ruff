@@ -1435,14 +1435,13 @@ impl<'src> Parser<'src> {
             let quote_bytes = flags.quote_str().as_bytes();
             let quote_len = flags.quote_len();
             for expr in elements.expressions() {
-                if let Some(slash_index) = memchr::memchr(b'\\', self.source[expr.range].as_bytes())
-                {
+                for slash_index in memchr::memchr_iter(b'\\', self.source[expr.range].as_bytes()) {
                     let slash_index = TextSize::try_from(slash_index).unwrap();
                     self.add_unsupported_syntax_error(
                         UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::Backslash),
                         TextRange::at(expr.range.start() + slash_index, TextSize::from(1)),
                     );
-                };
+                }
 
                 if let Some(quote_index) =
                     memchr::memmem::find(self.source[expr.range].as_bytes(), quote_bytes)
