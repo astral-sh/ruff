@@ -26,74 +26,66 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       # Flag that is raised when any code that affects parser is changed
-      parser: "true"
+      parser: ${{ steps.check_parser.outputs.changed }}
       # Flag that is raised when any code that affects linter is changed
-      linter: "true"
+      linter: ${{ steps.check_linter.outputs.changed }}
       # Flag that is raised when any code that affects formatter is changed
-      formatter: "true"
+      formatter: ${{ steps.check_formatter.outputs.changed }}
       # Flag that is raised when any code is changed
       # This is superset of the linter and formatter
-      code: "true"
+      code: ${{ steps.check_code.outputs.changed }}
       # Flag that is raised when any code that affects the fuzzer is changed
-      fuzz: "true"
+      fuzz: ${{ steps.check_fuzzer.outputs.changed }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
         with:
           fetch-depth: 0
           persist-credentials: false
 
-  # TODO: Replace with plain git command?
-  #          files_yaml: |
-  #            parser:
-  #              - Cargo.toml
-  #              - Cargo.lock
-  #              - crates/ruff_python_trivia/**
-  #              - crates/ruff_source_file/**
-  #              - crates/ruff_text_size/**
-  #              - crates/ruff_python_ast/**
-  #              - crates/ruff_python_parser/**
-  #              - python/py-fuzzer/**
-  #              - .github/workflows/ci.yaml
-  #
-  #            linter:
-  #              - Cargo.toml
-  #              - Cargo.lock
-  #              - crates/**
-  #              - "!crates/red_knot*/**"
-  #              - "!crates/ruff_python_formatter/**"
-  #              - "!crates/ruff_formatter/**"
-  #              - "!crates/ruff_dev/**"
-  #              - scripts/*
-  #              - python/**
-  #              - .github/workflows/ci.yaml
-  #
-  #            formatter:
-  #              - Cargo.toml
-  #              - Cargo.lock
-  #              - crates/ruff_python_formatter/**
-  #              - crates/ruff_formatter/**
-  #              - crates/ruff_python_trivia/**
-  #              - crates/ruff_python_ast/**
-  #              - crates/ruff_source_file/**
-  #              - crates/ruff_python_index/**
-  #              - crates/ruff_text_size/**
-  #              - crates/ruff_python_parser/**
-  #              - crates/ruff_dev/**
-  #              - scripts/*
-  #              - python/**
-  #              - .github/workflows/ci.yaml
-  #
-  #            fuzz:
-  #              - fuzz/Cargo.toml
-  #              - fuzz/Cargo.lock
-  #              - fuzz/fuzz_targets/**
-  #
-  #            code:
-  #              - "**/*"
-  #              - "!**/*.md"
-  #              - "crates/red_knot_python_semantic/resources/mdtest/**/*.md"
-  #              - "!docs/**"
-  #              - "!assets/**"
+      - name: Check if the parser code changed
+        id: check_parser
+        run: |
+          if git diff --quiet ${{ github.event.pull_request.base.sha || 'origin/main' }}...HEAD -- ':Cargo.toml' ':Cargo.lock' ':crates/ruff_python_trivia/**' ':crates/ruff_source_file/**' ':crates/ruff_text_size/**' ':crates/ruff_python_ast/**' ':crates/ruff_python_parser/**' ':python/py-fuzzer/**' ':.github/workflows/ci.yaml'; then
+              echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+              echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check if the linter code changed
+        id: check_linter
+        run: |
+          if git diff --quiet ${{ github.event.pull_request.base.sha || 'origin/main' }}...HEAD -- ':Cargo.toml' ':Cargo.lock' ':crates/**' ':!crates/red_knot*/**' ':!crates/ruff_python_formatter/**' ':!crates/ruff_formatter/**' ':!crates/ruff_dev/**' ':!crates/ruff_db/**' ':scripts/*' ':python/**' ':.github/workflows/ci.yaml'; then
+              echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+              echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check if the formatter code changed
+        id: check_formatter
+        run: |
+          if git diff --quiet ${{ github.event.pull_request.base.sha || 'origin/main' }}...HEAD -- ':Cargo.toml' ':Cargo.lock' ':crates/ruff_python_formatter/**' ':crates/ruff_formatter/**' ':crates/ruff_python_trivia/**' ':crates/ruff_python_ast/**' ':crates/ruff_source_file/**' ':crates/ruff_python_index/**' ':crates/ruff_python_index/**' ':crates/ruff_text_size/**' ':crates/ruff_python_parser/**' ':scripts/*' ':python/**' ':.github/workflows/ci.yaml'; then
+              echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+              echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check if the fuzzer code changed
+        id: check_fuzzer
+        run: |
+          if git diff --quiet ${{ github.event.pull_request.base.sha || 'origin/main' }}...HEAD -- ':Cargo.toml' ':Cargo.lock' ':fuzz/fuzz_targets/**' ':.github/workflows/ci.yaml'; then
+              echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+              echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check if there was any code related change
+        id: check_code
+        run: |
+          if git diff --quiet ${{ github.event.pull_request.base.sha || 'origin/main' }}...HEAD -- ':**/*' ':!**/*.md' ':crates/red_knot_python_semantic/resources/mdtest/**/*.md' ':!docs/**' ':!assets/**' ':.github/workflows/ci.yaml'; then
+              echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+              echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
 
   cargo-fmt:
     name: "cargo fmt"
