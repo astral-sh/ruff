@@ -306,16 +306,12 @@ impl<'db> Parameters<'db> {
     pub(crate) fn todo() -> Self {
         Self {
             value: vec![
-                Parameter {
-                    name: Some(Name::new_static("args")),
-                    annotated_type: Some(todo_type!("todo signature *args")),
-                    kind: ParameterKind::Variadic,
-                },
-                Parameter {
-                    name: Some(Name::new_static("kwargs")),
-                    annotated_type: Some(todo_type!("todo signature **kwargs")),
-                    kind: ParameterKind::KeywordVariadic,
-                },
+                Parameter::variadic()
+                    .with_static_name("args")
+                    .with_annotated_type(todo_type!("todo signature *args")),
+                Parameter::keyword_variadic()
+                    .with_static_name("kwargs")
+                    .with_annotated_type(todo_type!("todo signature **kwargs")),
             ],
             is_gradual: false,
         }
@@ -329,16 +325,12 @@ impl<'db> Parameters<'db> {
     pub(crate) fn gradual_form() -> Self {
         Self {
             value: vec![
-                Parameter {
-                    name: None,
-                    annotated_type: Some(Type::Dynamic(DynamicType::Any)),
-                    kind: ParameterKind::Variadic,
-                },
-                Parameter {
-                    name: None,
-                    annotated_type: Some(Type::Dynamic(DynamicType::Any)),
-                    kind: ParameterKind::KeywordVariadic,
-                },
+                Parameter::variadic()
+                    .with_static_name("args")
+                    .with_annotated_type(Type::Dynamic(DynamicType::Any)),
+                Parameter::keyword_variadic()
+                    .with_static_name("kwargs")
+                    .with_annotated_type(Type::Dynamic(DynamicType::Any)),
             ],
             is_gradual: true,
         }
@@ -353,16 +345,12 @@ impl<'db> Parameters<'db> {
     pub(crate) fn unknown() -> Self {
         Self {
             value: vec![
-                Parameter {
-                    name: None,
-                    annotated_type: Some(Type::Dynamic(DynamicType::Unknown)),
-                    kind: ParameterKind::Variadic,
-                },
-                Parameter {
-                    name: None,
-                    annotated_type: Some(Type::Dynamic(DynamicType::Unknown)),
-                    kind: ParameterKind::KeywordVariadic,
-                },
+                Parameter::variadic()
+                    .with_static_name("args")
+                    .with_annotated_type(Type::Dynamic(DynamicType::Unknown)),
+                Parameter::keyword_variadic()
+                    .with_static_name("kwargs")
+                    .with_annotated_type(Type::Dynamic(DynamicType::Unknown)),
             ],
             is_gradual: true,
         }
@@ -520,16 +508,70 @@ pub(crate) struct Parameter<'db> {
 }
 
 impl<'db> Parameter<'db> {
-    pub(crate) fn new(
-        name: Option<Name>,
-        annotated_type: Option<Type<'db>>,
-        kind: ParameterKind<'db>,
-    ) -> Self {
+    pub(crate) fn positional_only() -> Self {
         Self {
-            name,
-            annotated_type,
-            kind,
+            name: None,
+            annotated_type: None,
+            kind: ParameterKind::PositionalOnly { default_ty: None },
         }
+    }
+
+    pub(crate) fn positional_or_keyword() -> Self {
+        Self {
+            name: None,
+            annotated_type: None,
+            kind: ParameterKind::PositionalOrKeyword { default_ty: None },
+        }
+    }
+
+    pub(crate) fn variadic() -> Self {
+        Self {
+            name: None,
+            annotated_type: None,
+            kind: ParameterKind::Variadic,
+        }
+    }
+
+    pub(crate) fn keyword_only() -> Self {
+        Self {
+            name: None,
+            annotated_type: None,
+            kind: ParameterKind::KeywordOnly { default_ty: None },
+        }
+    }
+
+    pub(crate) fn keyword_variadic() -> Self {
+        Self {
+            name: None,
+            annotated_type: None,
+            kind: ParameterKind::KeywordVariadic,
+        }
+    }
+
+    pub(crate) fn with_name(mut self, name: Name) -> Self {
+        self.name = Some(name);
+        self
+    }
+
+    pub(crate) fn with_static_name(self, name: &'static str) -> Self {
+        self.with_name(Name::new_static(name))
+    }
+
+    pub(crate) fn with_annotated_type(mut self, annotated_type: Type<'db>) -> Self {
+        self.annotated_type = Some(annotated_type);
+        self
+    }
+
+    pub(crate) fn with_default_type(mut self, default_type: Type<'db>) -> Self {
+        match &mut self.kind {
+            ParameterKind::PositionalOnly { default_ty }
+            | ParameterKind::PositionalOrKeyword { default_ty }
+            | ParameterKind::KeywordOnly { default_ty } => *default_ty = Some(default_type),
+            ParameterKind::Variadic | ParameterKind::KeywordVariadic => {
+                panic!("cannot set default value for variadic parameter")
+            }
+        }
+        self
     }
 
     fn from_node_and_kind(
@@ -682,68 +724,37 @@ mod tests {
         assert_params(
             &sig,
             &[
-                Parameter {
-                    name: Some(Name::new_static("a")),
-                    annotated_type: None,
-                    kind: ParameterKind::PositionalOnly { default_ty: None },
-                },
-                Parameter {
-                    name: Some(Name::new_static("b")),
-                    annotated_type: Some(KnownClass::Int.to_instance(&db)),
-                    kind: ParameterKind::PositionalOnly { default_ty: None },
-                },
-                Parameter {
-                    name: Some(Name::new_static("c")),
-                    annotated_type: None,
-                    kind: ParameterKind::PositionalOnly {
-                        default_ty: Some(Type::IntLiteral(1)),
-                    },
-                },
-                Parameter {
-                    name: Some(Name::new_static("d")),
-                    annotated_type: Some(KnownClass::Int.to_instance(&db)),
-                    kind: ParameterKind::PositionalOnly {
-                        default_ty: Some(Type::IntLiteral(2)),
-                    },
-                },
-                Parameter {
-                    name: Some(Name::new_static("e")),
-                    annotated_type: None,
-                    kind: ParameterKind::PositionalOrKeyword {
-                        default_ty: Some(Type::IntLiteral(3)),
-                    },
-                },
-                Parameter {
-                    name: Some(Name::new_static("f")),
-                    annotated_type: Some(Type::IntLiteral(4)),
-                    kind: ParameterKind::PositionalOrKeyword {
-                        default_ty: Some(Type::IntLiteral(4)),
-                    },
-                },
-                Parameter {
-                    name: Some(Name::new_static("args")),
-                    annotated_type: Some(Type::object(&db)),
-                    kind: ParameterKind::Variadic,
-                },
-                Parameter {
-                    name: Some(Name::new_static("g")),
-                    annotated_type: None,
-                    kind: ParameterKind::KeywordOnly {
-                        default_ty: Some(Type::IntLiteral(5)),
-                    },
-                },
-                Parameter {
-                    name: Some(Name::new_static("h")),
-                    annotated_type: Some(Type::IntLiteral(6)),
-                    kind: ParameterKind::KeywordOnly {
-                        default_ty: Some(Type::IntLiteral(6)),
-                    },
-                },
-                Parameter {
-                    name: Some(Name::new_static("kwargs")),
-                    annotated_type: Some(KnownClass::Str.to_instance(&db)),
-                    kind: ParameterKind::KeywordVariadic,
-                },
+                Parameter::positional_only().with_static_name("a"),
+                Parameter::positional_only()
+                    .with_static_name("b")
+                    .with_annotated_type(KnownClass::Int.to_instance(&db)),
+                Parameter::positional_only()
+                    .with_static_name("c")
+                    .with_default_type(Type::IntLiteral(1)),
+                Parameter::positional_only()
+                    .with_static_name("d")
+                    .with_annotated_type(KnownClass::Int.to_instance(&db))
+                    .with_default_type(Type::IntLiteral(2)),
+                Parameter::positional_or_keyword()
+                    .with_static_name("e")
+                    .with_default_type(Type::IntLiteral(3)),
+                Parameter::positional_or_keyword()
+                    .with_static_name("f")
+                    .with_annotated_type(Type::IntLiteral(4))
+                    .with_default_type(Type::IntLiteral(4)),
+                Parameter::variadic()
+                    .with_static_name("args")
+                    .with_annotated_type(Type::object(&db)),
+                Parameter::keyword_only()
+                    .with_static_name("g")
+                    .with_default_type(Type::IntLiteral(5)),
+                Parameter::keyword_only()
+                    .with_static_name("h")
+                    .with_annotated_type(Type::IntLiteral(6))
+                    .with_default_type(Type::IntLiteral(6)),
+                Parameter::keyword_variadic()
+                    .with_static_name("kwargs")
+                    .with_annotated_type(KnownClass::Str.to_instance(&db)),
             ],
         );
     }

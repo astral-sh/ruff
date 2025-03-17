@@ -84,7 +84,7 @@ use crate::types::{
     TypeArrayDisplay, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarInstance, UnionBuilder,
     UnionType,
 };
-use crate::types::{CallableType, GeneralCallableType, ParameterKind, Signature};
+use crate::types::{CallableType, GeneralCallableType, Signature};
 use crate::unpack::Unpack;
 use crate::util::subscript::{PyIndex, PySlice};
 use crate::Db;
@@ -3769,62 +3769,47 @@ impl<'db> TypeInferenceBuilder<'db> {
             let positional_only = parameters
                 .posonlyargs
                 .iter()
-                .map(|parameter| {
-                    Parameter::new(
-                        Some(parameter.name().id.clone()),
-                        None,
-                        ParameterKind::PositionalOnly {
-                            default_ty: parameter
-                                .default()
-                                .map(|default| self.infer_expression(default)),
-                        },
-                    )
+                .map(|param| {
+                    let mut parameter =
+                        Parameter::positional_only().with_name(param.name().id.clone());
+                    if let Some(default) = param.default() {
+                        parameter = parameter.with_default_type(self.infer_expression(default));
+                    }
+                    parameter
                 })
                 .collect::<Vec<_>>();
             let positional_or_keyword = parameters
                 .args
                 .iter()
-                .map(|parameter| {
-                    Parameter::new(
-                        Some(parameter.name().id.clone()),
-                        None,
-                        ParameterKind::PositionalOrKeyword {
-                            default_ty: parameter
-                                .default()
-                                .map(|default| self.infer_expression(default)),
-                        },
-                    )
+                .map(|param| {
+                    let mut parameter =
+                        Parameter::positional_or_keyword().with_name(param.name().id.clone());
+                    if let Some(default) = param.default() {
+                        parameter = parameter.with_default_type(self.infer_expression(default));
+                    }
+                    parameter
                 })
                 .collect::<Vec<_>>();
-            let variadic = parameters.vararg.as_ref().map(|parameter| {
-                Parameter::new(
-                    Some(parameter.name.id.clone()),
-                    None,
-                    ParameterKind::Variadic,
-                )
-            });
+            let variadic = parameters
+                .vararg
+                .as_ref()
+                .map(|param| Parameter::variadic().with_name(param.name().id.clone()));
             let keyword_only = parameters
                 .kwonlyargs
                 .iter()
-                .map(|parameter| {
-                    Parameter::new(
-                        Some(parameter.name().id.clone()),
-                        None,
-                        ParameterKind::KeywordOnly {
-                            default_ty: parameter
-                                .default()
-                                .map(|default| self.infer_expression(default)),
-                        },
-                    )
+                .map(|param| {
+                    let mut parameter =
+                        Parameter::keyword_only().with_name(param.name().id.clone());
+                    if let Some(default) = param.default() {
+                        parameter = parameter.with_default_type(self.infer_expression(default));
+                    }
+                    parameter
                 })
                 .collect::<Vec<_>>();
-            let keyword_variadic = parameters.kwarg.as_ref().map(|parameter| {
-                Parameter::new(
-                    Some(parameter.name.id.clone()),
-                    None,
-                    ParameterKind::KeywordVariadic,
-                )
-            });
+            let keyword_variadic = parameters
+                .kwarg
+                .as_ref()
+                .map(|param| Parameter::keyword_variadic().with_name(param.name().id.clone()));
 
             Parameters::new(
                 positional_only
@@ -6885,11 +6870,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     Parameters::todo()
                 } else {
                     Parameters::new(parameter_types.iter().map(|param_type| {
-                        Parameter::new(
-                            None,
-                            Some(*param_type),
-                            ParameterKind::PositionalOnly { default_ty: None },
-                        )
+                        Parameter::positional_only().with_annotated_type(*param_type)
                     }))
                 }
             }
