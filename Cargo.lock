@@ -506,6 +506,20 @@ dependencies = [
  "itoa",
  "rustversion",
  "ryu",
+ "static_assertions",
+]
+
+[[package]]
+name = "compact_str"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3fdb1325a1cece981e8a296ab8f0f9b63ae357bd0784a9faaf548cc7b480707a"
+dependencies = [
+ "castaway",
+ "cfg-if",
+ "itoa",
+ "rustversion",
+ "ryu",
  "serde",
  "static_assertions",
 ]
@@ -2517,7 +2531,7 @@ dependencies = [
  "anyhow",
  "bitflags 2.9.0",
  "camino",
- "compact_str",
+ "compact_str 0.9.0",
  "countme",
  "dir-test",
  "drop_bomb",
@@ -3041,7 +3055,7 @@ version = "0.0.0"
 dependencies = [
  "aho-corasick",
  "bitflags 2.9.0",
- "compact_str",
+ "compact_str 0.9.0",
  "is-macro",
  "itertools 0.14.0",
  "memchr",
@@ -3137,7 +3151,7 @@ dependencies = [
  "anyhow",
  "bitflags 2.9.0",
  "bstr",
- "compact_str",
+ "compact_str 0.9.0",
  "insta",
  "memchr",
  "ruff_annotate_snippets",
@@ -3384,7 +3398,7 @@ version = "0.19.0"
 source = "git+https://github.com/salsa-rs/salsa.git?rev=095d8b2b8115c3cf8bf31914dd9ea74648bb7cf9#095d8b2b8115c3cf8bf31914dd9ea74648bb7cf9"
 dependencies = [
  "boxcar",
- "compact_str",
+ "compact_str 0.8.1",
  "crossbeam-queue",
  "dashmap 6.1.0",
  "hashbrown 0.15.2",

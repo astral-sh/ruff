@@ -63,7 +63,7 @@ colored = { version = "3.0.0" }
 console_error_panic_hook = { version = "0.1.7" }
 console_log = { version = "1.0.0" }
 countme = { version = "3.0.1" }
-compact_str = "0.8.0"
+compact_str = "0.9.0"
 criterion = { version = "0.5.1", default-features = false }
 crossbeam = { version = "0.8.4" }
 dashmap = { version = "6.0.1" }
