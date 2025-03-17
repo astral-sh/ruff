@@ -1,33 +1,116 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
-snapshot_kind: text
 ---
-S308.py:5:12: S308 Use of `mark_safe` may expose cross-site scripting vulnerabilities
+S308.py:6:5: S308 Use of `mark_safe` may expose cross-site scripting vulnerabilities
   |
-4 | def some_func():
-5 |     return mark_safe('<script>alert("evil!")</script>')
-  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S308
+4 | def bad_func():
+5 |     inject = "harmful_input"
+6 |     mark_safe(inject)
+  |     ^^^^^^^^^^^^^^^^^ S308
+7 |     mark_safe("I will add" + inject + "to my string")
+8 |     mark_safe("I will add %s to my string" % inject)
   |
 
-S308.py:8:1: S308 Use of `mark_safe` may expose cross-site scripting vulnerabilities
+S308.py:7:5: S308 Use of `mark_safe` may expose cross-site scripting vulnerabilities
+  |
+5 |     inject = "harmful_input"
+6 |     mark_safe(inject)
+7 |     mark_safe("I will add" + inject + "to my string")
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S308
+8 |     mark_safe("I will add %s to my string" % inject)
+9 |     mark_safe("I will add {} to my string".format(inject))
+  |
+
+S308.py:8:5: S308 Use of `mark_safe` may expose cross-site scripting vulnerabilities
    |
- 8 | @mark_safe
-   | ^^^^^^^^^^ S308
- 9 | def some_func():
-10 |     return '<script>alert("evil!")</script>'
+ 6 |     mark_safe(inject)
+ 7 |     mark_safe("I will add" + inject + "to my string")
+ 8 |     mark_safe("I will add %s to my string" % inject)
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S308
+ 9 |     mark_safe("I will add {} to my string".format(inject))
+10 |     mark_safe(f"I will add {inject} to my string")
    |
 
-S308.py:17:12: S308 Use of `mark_safe` may expose cross-site scripting vulnerabilities
+S308.py:9:5: S308 Use of `mark_safe` may expose cross-site scripting vulnerabilities
    |
-16 | def some_func():
-17 |     return mark_safe('<script>alert("evil!")</script>')
-   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S308
+ 7 |     mark_safe("I will add" + inject + "to my string")
+ 8 |     mark_safe("I will add %s to my string" % inject)
+ 9 |     mark_safe("I will add {} to my string".format(inject))
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S308
+10 |     mark_safe(f"I will add {inject} to my string")
    |
 
-S308.py:20:1: S308 Use of `mark_safe` may expose cross-site scripting vulnerabilities
+S308.py:10:5: S308 Use of `mark_safe` may expose cross-site scripting vulnerabilities
    |
-20 | @mark_safe
+ 8 |     mark_safe("I will add %s to my string" % inject)
+ 9 |     mark_safe("I will add {} to my string".format(inject))
+10 |     mark_safe(f"I will add {inject} to my string")
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S308
+11 |
+12 | def good_func():
+   |
+
+S308.py:16:1: S308 Use of `mark_safe` may expose cross-site scripting vulnerabilities
+   |
+16 | @mark_safe
    | ^^^^^^^^^^ S308
-21 | def some_func():
-22 |     return '<script>alert("evil!")</script>'
+17 | def some_func():
+18 |     return '<script>alert("evil!")</script>'
+   |
+
+S308.py:26:5: S308 Use of `mark_safe` may expose cross-site scripting vulnerabilities
+   |
+24 | def bad_func():
+25 |     inject = "harmful_input"
+26 |     mark_safe(inject)
+   |     ^^^^^^^^^^^^^^^^^ S308
+27 |     mark_safe("I will add" + inject + "to my string")
+28 |     mark_safe("I will add %s to my string" % inject)
+   |
+
+S308.py:27:5: S308 Use of `mark_safe` may expose cross-site scripting vulnerabilities
+   |
+25 |     inject = "harmful_input"
+26 |     mark_safe(inject)
+27 |     mark_safe("I will add" + inject + "to my string")
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S308
+28 |     mark_safe("I will add %s to my string" % inject)
+29 |     mark_safe("I will add {} to my string".format(inject))
+   |
+
+S308.py:28:5: S308 Use of `mark_safe` may expose cross-site scripting vulnerabilities
+   |
+26 |     mark_safe(inject)
+27 |     mark_safe("I will add" + inject + "to my string")
+28 |     mark_safe("I will add %s to my string" % inject)
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S308
+29 |     mark_safe("I will add {} to my string".format(inject))
+30 |     mark_safe(f"I will add {inject} to my string")
+   |
+
+S308.py:29:5: S308 Use of `mark_safe` may expose cross-site scripting vulnerabilities
+   |
+27 |     mark_safe("I will add" + inject + "to my string")
+28 |     mark_safe("I will add %s to my string" % inject)
+29 |     mark_safe("I will add {} to my string".format(inject))
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S308
+30 |     mark_safe(f"I will add {inject} to my string")
+   |
+
+S308.py:30:5: S308 Use of `mark_safe` may expose cross-site scripting vulnerabilities
+   |
+28 |     mark_safe("I will add %s to my string" % inject)
+29 |     mark_safe("I will add {} to my string".format(inject))
+30 |     mark_safe(f"I will add {inject} to my string")
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S308
+31 |
+32 | def good_func():
+   |
+
+S308.py:36:1: S308 Use of `mark_safe` may expose cross-site scripting vulnerabilities
+   |
+36 | @mark_safe
+   | ^^^^^^^^^^ S308
+37 | def some_func():
+38 |     return '<script>alert("evil!")</script>'
    |
