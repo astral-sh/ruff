@@ -1139,6 +1139,8 @@ impl<'a> Visitor<'a> for Checker<'a> {
     }
 
     fn visit_expr(&mut self, expr: &'a Expr) {
+        self.syntax_checker.enter_expr(expr);
+
         // Step 0: Pre-processing
         if self.source_type.is_stub()
             && self.semantic.in_class_base()
@@ -2763,5 +2765,20 @@ fn try_diagnostic_from_syntax_error(error: &SyntaxError, checker: &Checker) -> O
             Some(Diagnostic::new(LateFutureImport, error.range))
         }
         SyntaxErrorKind::LateFutureImport => None,
+        SyntaxErrorKind::ReboundComprehensionVariable => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use insta::assert_debug_snapshot;
+
+    use crate::{settings::LinterSettings, test::test_snippet};
+
+    #[test]
+    fn rebound_comprehension_iteration_variable() {
+        let contents = "[(a := 0) for a in range(0)]";
+        assert_debug_snapshot!(test_snippet(contents, &LinterSettings::default()), @"");
     }
 }
