@@ -27,7 +27,7 @@ impl<'a> Locator<'a> {
     }
 
     #[deprecated(
-        note = "This is expensive, avoid using outside of the diagnostic phase. Prefer the other `Locator` methods instead."
+        note = "This is expensive, avoid using outside of the diagnostic phase. Prefer the other `Locator` methods instead TEEEEST."
     )]
     pub fn compute_line_index(&self, offset: TextSize) -> OneIndexed {
         self.to_index().line_index(offset)
