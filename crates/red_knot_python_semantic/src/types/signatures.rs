@@ -458,6 +458,10 @@ impl<'db> Parameters<'db> {
         self.value.len()
     }
 
+    pub(crate) fn is_empty(&self) -> bool {
+        self.value.is_empty()
+    }
+
     pub(crate) fn iter(&self) -> std::slice::Iter<Parameter<'db>> {
         self.value.iter()
     }
@@ -615,6 +619,11 @@ impl<'db> Parameter<'db> {
             ParameterKind::KeywordOnly { name, .. } => Some(name),
             ParameterKind::KeywordVariadic { name } => Some(name),
         }
+    }
+
+    /// Returns the kind of the parameter which will contain the default type if any.
+    pub(crate) fn kind(&self) -> &ParameterKind<'db> {
+        &self.kind
     }
 
     /// Display name of the parameter, if it has one.

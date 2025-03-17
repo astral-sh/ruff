@@ -654,6 +654,11 @@ impl<'db> Type<'db> {
                     .is_subtype_of(db, target)
             }
 
+            (
+                Type::Callable(CallableType::General(self_callable)),
+                Type::Callable(CallableType::General(other_callable)),
+            ) => self_callable.is_subtype_of(db, other_callable),
+
             (Type::Callable(CallableType::General(_)), _) => {
                 // TODO: Implement subtyping for general callable types
                 false
@@ -4738,7 +4743,223 @@ impl<'db> GeneralCallableType<'db> {
                 )
             })
     }
+
+    /// Return `true` if `self` is a subtype of `other`.
+    pub(crate) fn is_subtype_of(self, db: &'db dyn Db, other: Self) -> bool {
+        // At this stage, we know that both the callable types are fully static but not equivalent.
+        // They do not contain gradual form (`...`) and their parameters and return type are
+        // statically known.
+        let self_signature = self.signature(db);
+        let other_signature = other.signature(db);
+
+        let is_subtype = |type1: Option<Type<'db>>, type2: Option<Type<'db>>| {
+            // SAFETY: Subtype relation is only checked for fully static types.
+            type1.unwrap().is_subtype_of(db, type2.unwrap())
+        };
+
+        // Return types are covariant.
+        if !is_subtype(self_signature.return_ty, other_signature.return_ty) {
+            return false;
+        }
+
+        let self_parameters = self_signature.parameters();
+        let other_parameters = other_signature.parameters();
+
+        if self_parameters.is_empty() && other_parameters.is_empty() {
+            return true;
+        }
+
+        let mut self_parameters_iter = self_parameters.iter();
+        let mut other_parameters_iter = other_parameters.iter();
+
+        let mut self_parameter = self_parameters_iter.next();
+        let mut other_parameter = other_parameters_iter.next();
+
+        // Type of the variadic parameter in `self`.
+        let mut self_variadic = None;
+
+        loop {
+            match (self_parameter, other_parameter) {
+                (None, None) => return true,
+                (Some(self_parameter), None) => match self_parameter.kind() {
+                    ParameterKind::PositionalOnly { default_ty } => {
+                        if default_ty.is_none() {
+                            return false;
+                        }
+                    }
+                    ParameterKind::PositionalOrKeyword { default_ty } => {
+                        if default_ty.is_none() {
+                            return false;
+                        }
+                    }
+                    ParameterKind::Variadic => {}
+                    ParameterKind::KeywordOnly { .. } => {}
+                    ParameterKind::KeywordVariadic => {}
+                },
+                (None, Some(other_parameter)) => match other_parameter.kind() {
+                    ParameterKind::PositionalOnly { .. } | ParameterKind::Variadic
+                        if self_variadic.is_some() =>
+                    {
+                        if !is_subtype(other_parameter.annotated_type(), self_variadic) {
+                            return false;
+                        }
+                    }
+                    _ => return false,
+                },
+                (Some(self_parameter), Some(other_parameter)) => {
+                    match (self_parameter.kind(), other_parameter.kind()) {
+                        (
+                            ParameterKind::PositionalOnly {
+                                default_ty: self_default,
+                            }
+                            | ParameterKind::PositionalOrKeyword {
+                                default_ty: self_default,
+                            },
+                            ParameterKind::PositionalOnly {
+                                default_ty: other_default,
+                            },
+                        ) => {
+                            if self_default.is_none() && other_default.is_some() {
+                                return false;
+                            }
+                            if !is_subtype(
+                                other_parameter.annotated_type(),
+                                self_parameter.annotated_type(),
+                            ) {
+                                return false;
+                            }
+                        }
+
+                        (
+                            ParameterKind::PositionalOnly { .. },
+                            ParameterKind::PositionalOrKeyword { .. },
+                        ) => return false,
+
+                        (ParameterKind::PositionalOnly { .. }, ParameterKind::Variadic) => {
+                            return false;
+                        }
+
+                        (
+                            ParameterKind::PositionalOnly { .. },
+                            ParameterKind::KeywordOnly { .. },
+                        ) => return false,
+
+                        (ParameterKind::PositionalOnly { .. }, ParameterKind::KeywordVariadic) => {
+                            return false;
+                        }
+
+                        (
+                            ParameterKind::PositionalOrKeyword {
+                                default_ty: self_default,
+                            },
+                            ParameterKind::PositionalOrKeyword {
+                                default_ty: other_default,
+                            }
+                            | ParameterKind::KeywordOnly {
+                                default_ty: other_default,
+                            },
+                        ) => {
+                            if self_parameter.name() != other_parameter.name() {
+                                return false;
+                            }
+                            // The following checks are the same as positional-only parameters.
+                            if self_default.is_none() && other_default.is_some() {
+                                return false;
+                            }
+                            if !is_subtype(
+                                other_parameter.annotated_type(),
+                                self_parameter.annotated_type(),
+                            ) {
+                                return false;
+                            }
+                        }
+
+                        (ParameterKind::PositionalOrKeyword { .. }, ParameterKind::Variadic) => {
+                            return false;
+                        }
+                        (
+                            ParameterKind::PositionalOrKeyword { .. },
+                            ParameterKind::KeywordVariadic,
+                        ) => {
+                            return false;
+                        }
+
+                        (
+                            ParameterKind::Variadic,
+                            ParameterKind::Variadic | ParameterKind::PositionalOnly { .. },
+                        ) => {
+                            self_variadic = self_parameter.annotated_type();
+                            if !is_subtype(other_parameter.annotated_type(), self_variadic) {
+                                return false;
+                            }
+                        }
+
+                        (ParameterKind::Variadic, ParameterKind::PositionalOrKeyword { .. }) => {
+                            return false;
+                        }
+                        (ParameterKind::Variadic, ParameterKind::KeywordOnly { .. }) => {
+                            return false;
+                        }
+                        (ParameterKind::Variadic, ParameterKind::KeywordVariadic) => {
+                            return false;
+                        }
+
+                        (
+                            ParameterKind::KeywordOnly { .. },
+                            ParameterKind::PositionalOnly { .. },
+                        ) => {}
+                        (
+                            ParameterKind::KeywordOnly { .. },
+                            ParameterKind::PositionalOrKeyword { .. },
+                        ) => {}
+                        (ParameterKind::KeywordOnly { .. }, ParameterKind::Variadic) => {}
+
+                        (ParameterKind::KeywordVariadic, ParameterKind::PositionalOnly { .. }) => {}
+                        (
+                            ParameterKind::KeywordVariadic,
+                            ParameterKind::PositionalOrKeyword { .. },
+                        ) => {}
+                        (ParameterKind::KeywordVariadic, ParameterKind::Variadic) => {}
+
+                        (_, ParameterKind::KeywordOnly { .. } | ParameterKind::KeywordVariadic) => {
+                            break;
+                        }
+                    }
+                }
+            }
+
+            self_parameter = self_parameters_iter.next();
+            other_parameter = other_parameters_iter.next();
+        }
+
+        false
+    }
 }
+
+// struct PositionalParametersZipIter<'a, 'db> {
+//     self_iter: std::slice::Iter<'a, Parameter<'db>>,
+//     other_iter: std::slice::Iter<'a, Parameter<'db>>,
+// }
+//
+// impl<'a, 'db> Iterator for PositionalParametersZipIter<'a, 'db> {
+//     type Item = (&'a Parameter<'db>, &'a Parameter<'db>);
+//
+//     fn next(&mut self) -> Option<Self::Item> {
+//         loop {
+//             let self_param = self.self_iter.next()?;
+//             let other_param = self.other_iter.next()?;
+//
+//             if matches!(
+//                 other_param.kind(),
+//                 ParameterKind::KeywordOnly { .. } | ParameterKind::KeywordVariadic
+//             ) {
+//                 return None;
+//             }
+//
+//             return Some((self_param, other_param));
+//         }
+//     }
+// }
 
 /// A type that represents callable objects.
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, salsa::Update)]
