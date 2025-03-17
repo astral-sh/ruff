@@ -1414,6 +1414,7 @@ impl<'src> Parser<'src> {
         // f"""{f'''{f'{"# not a comment"}'}'''}"""
         // f"""{f'''# before expression {f'# aro{f"#{1+1}#"}und #'}'''} # after expression"""
         // f"escape outside of \t {expr}\n"
+        // f"test\"abcd"
 
         // test_err pep701_f_string_py311
         // # parse_options: {"target-version": "3.11"}

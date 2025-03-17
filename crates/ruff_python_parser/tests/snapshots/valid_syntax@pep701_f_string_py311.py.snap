@@ -7,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/inline/ok/pep701_f_string_py311.
 ```
 Module(
     ModModule {
-        range: 0..264,
+        range: 0..278,
         body: [
             Expr(
                 StmtExpr {
@@ -478,6 +478,38 @@ Module(
                                                     FStringLiteralElement {
                                                         range: 260..262,
                                                         value: "\n",
+                                                    },
+                                                ),
+                                            ],
+                                            flags: FStringFlags {
+                                                quote_style: Double,
+                                                prefix: Regular,
+                                                triple_quoted: false,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 264..277,
+                    value: FString(
+                        ExprFString {
+                            range: 264..277,
+                            value: FStringValue {
+                                inner: Single(
+                                    FString(
+                                        FString {
+                                            range: 264..277,
+                                            elements: [
+                                                Literal(
+                                                    FStringLiteralElement {
+                                                        range: 266..276,
+                                                        value: "test\"abcd",
                                                     },
                                                 ),
                                             ],
