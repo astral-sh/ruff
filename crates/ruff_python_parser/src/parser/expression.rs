@@ -1435,10 +1435,11 @@ impl<'src> Parser<'src> {
         if UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::NestedQuote)
             .is_unsupported(self.options.target_version)
         {
-            let quote_str = flags.quote_str();
+            let quote_bytes = flags.quote_str().as_bytes();
             let quote_len = flags.quote_len();
             for expr in elements.expressions() {
-                if let Some(slash_index) = self.source[expr.range].find('\\') {
+                if let Some(slash_index) = memchr::memchr(b'\\', self.source[expr.range].as_bytes())
+                {
                     let Ok(slash_index) = TextSize::try_from(slash_index) else {
                         continue;
                     };
@@ -1448,7 +1449,9 @@ impl<'src> Parser<'src> {
                     );
                 };
 
-                if let Some(quote_index) = self.source[expr.range].find(quote_str) {
+                if let Some(quote_index) =
+                    memchr::memmem::find(self.source[expr.range].as_bytes(), quote_bytes)
+                {
                     let Ok(quote_index) = TextSize::try_from(quote_index) else {
                         continue;
                     };
