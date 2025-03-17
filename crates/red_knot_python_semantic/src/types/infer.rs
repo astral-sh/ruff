@@ -110,9 +110,7 @@ use super::{CallDunderError, ParameterExpectation, ParameterExpectations};
 #[salsa::tracked(return_ref, cycle_fn=scope_cycle_recover, cycle_initial=scope_cycle_initial)]
 pub(crate) fn infer_scope_types<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> TypeInference<'db> {
     let file = scope.file(db);
-    let _span =
-        tracing::trace_span!("infer_scope_types", scope=?scope.as_id(), file=%file.path(db))
-            .entered();
+    let _span = tracing::trace_span!("infer_scope_types", scope=?scope.as_id(), ?file).entered();
 
     // Using the index here is fine because the code below depends on the AST anyway.
     // The isolation of the query is by the return inferred types.
@@ -145,7 +143,7 @@ pub(crate) fn infer_definition_types<'db>(
     let _span = tracing::trace_span!(
         "infer_definition_types",
         range = ?definition.kind(db).target_range(),
-        file = %file.path(db)
+        ?file
     )
     .entered();
 
@@ -184,7 +182,7 @@ pub(crate) fn infer_deferred_types<'db>(
         "infer_deferred_types",
         definition = ?definition.as_id(),
         range = ?definition.kind(db).target_range(),
-        file = %file.path(db)
+        ?file
     )
     .entered();
 
@@ -220,7 +218,7 @@ pub(crate) fn infer_expression_types<'db>(
         "infer_expression_types",
         expression = ?expression.as_id(),
         range = ?expression.node_ref(db).range(),
-        file = %file.path(db)
+        ?file
     )
     .entered();
 
@@ -301,8 +299,7 @@ fn single_expression_cycle_initial<'db>(
 pub(super) fn infer_unpack_types<'db>(db: &'db dyn Db, unpack: Unpack<'db>) -> UnpackResult<'db> {
     let file = unpack.file(db);
     let _span =
-        tracing::trace_span!("infer_unpack_types", range=?unpack.range(db), file=%file.path(db))
-            .entered();
+        tracing::trace_span!("infer_unpack_types", range=?unpack.range(db), ?file).entered();
 
     let mut unpacker = Unpacker::new(db, unpack.scope(db));
     unpacker.unpack(unpack.target(db), unpack.value(db));
@@ -6039,6 +6036,13 @@ impl<'db> TypeInferenceBuilder<'db> {
     /// Infer the type of a type expression without storing the result.
     fn infer_type_expression_no_store(&mut self, expression: &ast::Expr) -> Type<'db> {
         // https://typing.readthedocs.io/en/latest/spec/annotations.html#grammar-token-expression-grammar-type_expression
+
+        let report_invalid_type_expression = |message: std::fmt::Arguments| {
+            self.context
+                .report_lint(&INVALID_TYPE_FORM, expression, message);
+            Type::unknown()
+        };
+
         match expression {
             ast::Expr::Name(name) => match name.ctx {
                 ast::ExprContext::Load => self
@@ -6069,12 +6073,40 @@ impl<'db> TypeInferenceBuilder<'db> {
                 todo_type!("ellipsis literal in type expression")
             }
 
-            // Other literals do not have meaningful values in the annotation expression context.
-            // However, we will we want to handle these differently when working with special forms,
-            // since (e.g.) `123` is not valid in an annotation expression but `Literal[123]` is.
-            ast::Expr::BytesLiteral(_literal) => todo_type!("bytes literal in type expression"),
-            ast::Expr::NumberLiteral(_literal) => todo_type!("number literal in type expression"),
-            ast::Expr::BooleanLiteral(_literal) => todo_type!("boolean literal in type expression"),
+            // TODO: add a subdiagnostic linking to type-expression grammar
+            // and stating that it is only valid in `typing.Literal[]` or `typing.Annotated[]`
+            ast::Expr::BytesLiteral(_) => report_invalid_type_expression(format_args!(
+                "Bytes literals are not allowed in this context in a type expression"
+            )),
+
+            // TODO: add a subdiagnostic linking to type-expression grammar
+            // and stating that it is only valid in `typing.Literal[]` or `typing.Annotated[]`
+            ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
+                value: ast::Number::Int(_),
+                ..
+            }) => report_invalid_type_expression(format_args!(
+                "Int literals are not allowed in this context in a type expression"
+            )),
+
+            ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
+                value: ast::Number::Float(_),
+                ..
+            }) => report_invalid_type_expression(format_args!(
+                "Float literals are not allowed in type expressions"
+            )),
+
+            ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
+                value: ast::Number::Complex { .. },
+                ..
+            }) => report_invalid_type_expression(format_args!(
+                "Complex literals are not allowed in type expressions"
+            )),
+
+            // TODO: add a subdiagnostic linking to type-expression grammar
+            // and stating that it is only valid in `typing.Literal[]` or `typing.Annotated[]`
+            ast::Expr::BooleanLiteral(_) => report_invalid_type_expression(format_args!(
+                "Boolean literals are not allowed in this context in a type expression"
+            )),
 
             ast::Expr::Subscript(subscript) => {
                 let ast::ExprSubscript {

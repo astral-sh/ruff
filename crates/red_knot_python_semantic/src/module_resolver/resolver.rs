@@ -534,7 +534,7 @@ impl<'db> Iterator for PthFileIterator<'db> {
 /// A thin wrapper around `ModuleName` to make it a Salsa ingredient.
 ///
 /// This is needed because Salsa requires that all query arguments are salsa ingredients.
-#[salsa::interned]
+#[salsa::interned(debug)]
 struct ModuleNameIngredient<'db> {
     #[return_ref]
     pub(super) name: ModuleName,

@@ -16,7 +16,7 @@ use crate::Db;
 /// The main usage of file roots is to determine a file's durability. But it can also be used
 /// to make a salsa query dependent on whether a file in a root has changed without writing any
 /// manual invalidation logic.
-#[salsa::input]
+#[salsa::input(debug)]
 pub struct FileRoot {
     /// The path of a root is guaranteed to never change.
     #[return_ref]

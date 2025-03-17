@@ -32,7 +32,7 @@ use super::{
 ///
 /// Does not in itself represent a type,
 /// but is used as the inner data for several structs that *do* represent types.
-#[salsa::interned]
+#[salsa::interned(debug)]
 pub struct Class<'db> {
     /// Name of the class at definition
     #[return_ref]

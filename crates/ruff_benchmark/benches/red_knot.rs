@@ -1,21 +1,23 @@
 #![allow(clippy::disallowed_names)]
+use ruff_benchmark::criterion;
 
 use std::borrow::Cow;
 use std::ops::Range;
 
+use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use rayon::ThreadPoolBuilder;
+use rustc_hash::FxHashSet;
+
 use red_knot_project::metadata::options::{EnvironmentOptions, Options};
 use red_knot_project::metadata::value::RangedValue;
 use red_knot_project::watch::{ChangeEvent, ChangedKind};
 use red_knot_project::{Db, ProjectDatabase, ProjectMetadata};
-use ruff_benchmark::criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use ruff_benchmark::TestFile;
 use ruff_db::diagnostic::{DiagnosticId, OldDiagnosticTrait, Severity};
 use ruff_db::files::{system_path_to_file, File};
 use ruff_db::source::source_text;
 use ruff_db::system::{MemoryFileSystem, SystemPath, SystemPathBuf, TestSystem};
 use ruff_python_ast::PythonVersion;
-use rustc_hash::FxHashSet;
 
 struct Case {
     db: ProjectDatabase,
