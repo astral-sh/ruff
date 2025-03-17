@@ -128,16 +128,21 @@ impl<'a> ResolvedDiagnostic<'a> {
                 ResolvedAnnotation::new(path, &input, ann)
             })
             .collect();
-        ResolvedDiagnostic {
-            severity: diag.inner.severity,
+        let message = if diag.inner.message.is_empty() {
+            diag.inner.id.to_string()
+        } else {
             // TODO: See the comment on `Renderable::id` for
             // a plausible better idea than smushing the ID
             // into the diagnostic message.
-            message: format!(
+            format!(
                 "{id}: {message}",
                 id = diag.inner.id,
                 message = diag.inner.message
-            ),
+            )
+        };
+        ResolvedDiagnostic {
+            severity: diag.inner.severity,
+            message,
             annotations,
         }
     }
