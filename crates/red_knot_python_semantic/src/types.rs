@@ -2983,12 +2983,12 @@ impl<'db> Type<'db> {
             .try_call_dunder(db, "__iter__", &CallArguments::none())
             .map(|dunder_iter_outcome| dunder_iter_outcome.return_type(db));
 
-        let iteration_result = match dunder_iter_result {
+        match dunder_iter_result {
             Ok(iterator) => {
                 // `__iter__` is definitely bound and calling it succeeds.
                 // See what calling `__next__` on the object returned by `__iter__` gives us...
                 try_call_dunder_next_on_iterator(iterator).map_err(|dunder_next_error| {
-                    IterationErrorKind::IterReturnsInvalidIterator {
+                    IterationError::IterReturnsInvalidIterator {
                         iterator,
                         dunder_next_error,
                     }
@@ -3016,14 +3016,14 @@ impl<'db> Type<'db> {
                                 )
                             })
                             .map_err(|dunder_getitem_error| {
-                                IterationErrorKind::PossiblyUnboundIterAndGetitemError {
+                                IterationError::PossiblyUnboundIterAndGetitemError {
                                     dunder_next_return,
                                     dunder_getitem_error,
                                 }
                             })
                     }
 
-                    Err(dunder_next_error) => Err(IterationErrorKind::IterReturnsInvalidIterator {
+                    Err(dunder_next_error) => Err(IterationError::IterReturnsInvalidIterator {
                         iterator,
                         dunder_next_error,
                     }),
@@ -3032,23 +3032,18 @@ impl<'db> Type<'db> {
 
             // `__iter__` is definitely bound but it can't be called with the expected arguments
             Err(CallDunderError::CallError(kind, bindings)) => {
-                Err(IterationErrorKind::IterCallError(kind, bindings))
+                Err(IterationError::IterCallError(kind, bindings))
             }
 
             // There's no `__iter__` method. Try `__getitem__` instead...
             Err(CallDunderError::MethodNotAvailable) => {
                 try_call_dunder_getitem().map_err(|dunder_getitem_error| {
-                    IterationErrorKind::UnboundIterAndGetitemError {
+                    IterationError::UnboundIterAndGetitemError {
                         dunder_getitem_error,
                     }
                 })
             }
-        };
-
-        iteration_result.map_err(|error_kind| IterationError {
-            iterable_type: self,
-            error_kind,
-        })
+        }
     }
 
     /// Returns the type bound from a context manager with type `self`.
@@ -3771,34 +3766,7 @@ context_expression = context_expression_ty.display(db)
 
 /// Error returned if a type is not (or may not be) iterable.
 #[derive(Debug)]
-struct IterationError<'db> {
-    /// The type of the object that the analysed code attempted to iterate over.
-    iterable_type: Type<'db>,
-
-    /// The precise kind of error encountered when trying to iterate over the type.
-    error_kind: IterationErrorKind<'db>,
-}
-
-impl<'db> IterationError<'db> {
-    /// Returns the element type if it is known, or `None` if the type is never iterable.
-    fn element_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
-        self.error_kind.element_type(db)
-    }
-
-    /// Returns the element type if it is known, or `Type::unknown()` if it is not.
-    fn fallback_element_type(&self, db: &'db dyn Db) -> Type<'db> {
-        self.element_type(db).unwrap_or(Type::unknown())
-    }
-
-    /// Reports the diagnostic for this error.
-    fn report_diagnostic(&self, context: &InferContext<'db>, iterable_node: ast::AnyNodeRef) {
-        self.error_kind
-            .report_diagnostic(context, self.iterable_type, iterable_node);
-    }
-}
-
-#[derive(Debug)]
-enum IterationErrorKind<'db> {
+enum IterationError<'db> {
     /// The object being iterated over has a bound `__iter__` method,
     /// but calling it with the expected arguments results in an error.
     IterCallError(CallErrorKind, Box<Bindings<'db>>),
@@ -3833,7 +3801,11 @@ enum IterationErrorKind<'db> {
     },
 }
 
-impl<'db> IterationErrorKind<'db> {
+impl<'db> IterationError<'db> {
+    fn fallback_element_type(&self, db: &'db dyn Db) -> Type<'db> {
+        self.element_type(db).unwrap_or(Type::unknown())
+    }
+
     /// Returns the element type if it is known, or `None` if the type is never iterable.
     fn element_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
         match self {
@@ -3887,10 +3859,9 @@ impl<'db> IterationErrorKind<'db> {
             context.report_lint(&NOT_ITERABLE, iterable_node, arguments);
         };
 
-        // TODO: for all of these error variant, the "explanation" for the diagnostic
+        // TODO: for all of these error variants, the "explanation" for the diagnostic
         // (everything after the "because") should really be presented as a "help:", "note",
         // or similar, rather than as part of the same sentence as the error message.
-
         match self {
             Self::IterCallError(CallErrorKind::NotCallable, bindings) => report_not_iterable(format_args!(
                 "Object of type `{iterable_type}` is not iterable \

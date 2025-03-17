@@ -2879,7 +2879,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     unpacked.expression_type(name_ast_id)
                 }
                 TargetKind::Name => iterable_ty.try_iterate(self.db()).unwrap_or_else(|err| {
-                    err.report_diagnostic(&self.context, iterable.into());
+                    err.report_diagnostic(&self.context, iterable_ty, iterable.into());
                     err.fallback_element_type(self.db())
                 }),
             }
@@ -3682,7 +3682,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             todo_type!("async iterables/iterators")
         } else {
             iterable_ty.try_iterate(self.db()).unwrap_or_else(|err| {
-                err.report_diagnostic(&self.context, iterable.into());
+                err.report_diagnostic(&self.context, iterable_ty, iterable.into());
                 err.fallback_element_type(self.db())
             })
         };
@@ -3983,7 +3983,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         let iterable_ty = self.infer_expression(value);
         iterable_ty.try_iterate(self.db()).unwrap_or_else(|err| {
-            err.report_diagnostic(&self.context, value.as_ref().into());
+            err.report_diagnostic(&self.context, iterable_ty, value.as_ref().into());
             err.fallback_element_type(self.db())
         });
 
@@ -4002,7 +4002,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         let iterable_ty = self.infer_expression(value);
         iterable_ty.try_iterate(self.db()).unwrap_or_else(|err| {
-            err.report_diagnostic(&self.context, value.as_ref().into());
+            err.report_diagnostic(&self.context, iterable_ty, value.as_ref().into());
             err.fallback_element_type(self.db())
         });
 
