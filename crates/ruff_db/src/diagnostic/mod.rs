@@ -109,6 +109,20 @@ impl Diagnostic {
     /// This also marks the diagnostic as having been printed. If a
     /// diagnostic is not rendered this way, then it will panic when
     /// it's dropped when `debug_assertions` is enabled.
+    ///
+    /// # Defuses panics
+    ///
+    /// When `debug_assertions` is enabled and a `Diagnostic` does
+    /// _not_ have this method called, then its `Drop` implementation
+    /// will panic. The intent of this panic is to avoid mistakes where
+    /// a diagnostic is created and then never printed. That is usually
+    /// indicative of a bug.
+    ///
+    /// # Errors
+    ///
+    /// This is guaranteed to only return an error if the underlying
+    /// writer given returns an error. Otherwise, the formatting of
+    /// diagnostics themselves is infallible.
     pub fn print(
         &mut self,
         db: &dyn Db,
