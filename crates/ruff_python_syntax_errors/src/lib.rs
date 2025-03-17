@@ -119,49 +119,51 @@ impl SyntaxChecker {
         self.check_stmt(stmt);
     }
 
-    #[allow(unused)]
     pub fn enter_expr(&mut self, expr: &Expr) {
         match expr {
             Expr::ListComp(ast::ExprListComp {
-                range,
-                elt,
-                generators,
-            }) => {
-                let Expr::Named(ast::ExprNamed { target, range, .. }) = &**elt else {
-                    return;
-                };
-                let Expr::Name(ast::ExprName { id, .. }) = &**target else {
-                    return;
-                };
-                if generators
-                    .iter()
-                    .any(|gen| gen.target.as_name_expr().is_some_and(|name| name.id == *id))
-                {
-                    self.errors.push(SyntaxError {
-                        kind: SyntaxErrorKind::ReboundComprehensionVariable,
-                        range: *range,
-                        target_version: self.target_version,
-                    });
-                }
-            }
-            Expr::SetComp(ast::ExprSetComp {
-                range,
-                elt,
-                generators,
-            }) => todo!("set comprehension"),
+                elt, generators, ..
+            })
+            | Expr::SetComp(ast::ExprSetComp {
+                elt, generators, ..
+            })
+            | Expr::Generator(ast::ExprGenerator {
+                elt, generators, ..
+            }) => self.check_generator_expr(elt, generators),
             Expr::DictComp(ast::ExprDictComp {
-                range,
                 key,
                 value,
                 generators,
-            }) => todo!("dict comprehension"),
-            Expr::Generator(ast::ExprGenerator {
-                range,
-                elt,
-                generators,
-                parenthesized,
-            }) => todo!("generator"),
+                ..
+            }) => {
+                self.check_generator_expr(key, generators);
+                self.check_generator_expr(value, generators);
+            }
             _ => {}
+        }
+    }
+
+    /// Add a [`SyntaxErrorKind::ReboundComprehensionVariable`] if `named_expr` rebinds an iteration
+    /// variable in `generators`.
+    fn check_generator_expr(&mut self, named_expr: &Expr, generators: &[ast::Comprehension]) {
+        let Expr::Named(ast::ExprNamed { target, range, .. }) = named_expr else {
+            return;
+        };
+        let Expr::Name(ast::ExprName { id, .. }) = &**target else {
+            return;
+        };
+
+        // TODO(brent) with multiple diagnostic ranges, we could mark both the named expr (current)
+        // and the name expr being rebound
+        if generators
+            .iter()
+            .any(|gen| gen.target.as_name_expr().is_some_and(|name| name.id == *id))
+        {
+            self.errors.push(SyntaxError {
+                kind: SyntaxErrorKind::ReboundComprehensionVariable,
+                range: *range,
+                target_version: self.target_version,
+            });
         }
     }
 }
@@ -210,7 +212,11 @@ mod tests {
     }
 
     #[test_case("[(a := 0) for a in range(0)]", "listcomp")]
-    fn expr(contents: &str, name: &str) {
+    #[test_case("{(a := 0) for a in range(0)}", "setcomp")]
+    #[test_case("{(a := 0): val for a in range(0)}", "dictcomp_key")]
+    #[test_case("{key: (a := 0) for a in range(0)}", "dictcomp_val")]
+    #[test_case("((a := 0) for a in range(0))", "generator")]
+    fn rebound_comprehension_variable(contents: &str, name: &str) {
         assert_debug_snapshot!(name, test_snippet(contents, PythonVersion::default()));
     }
 }
