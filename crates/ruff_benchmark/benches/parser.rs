@@ -1,4 +1,6 @@
-use ruff_benchmark::criterion::{
+use ruff_benchmark::criterion;
+
+use criterion::{
     criterion_group, criterion_main, measurement::WallTime, BenchmarkId, Criterion, Throughput,
 };
 use ruff_benchmark::{
