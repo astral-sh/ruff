@@ -28,7 +28,7 @@ use ruff_text_size::Ranged;
 /// It's guaranteed that the wrapped bindings have no errors.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Bindings<'db> {
-    pub(crate) callable_type: Type<'db>,
+    signatures: Signatures<'db>,
     /// By using `SmallVec`, we avoid an extra heap allocation for the common case of a non-union
     /// type.
     elements: SmallVec<[CallableBinding<'db>; 1]>,
@@ -42,11 +42,11 @@ impl<'db> Bindings<'db> {
     /// overload (if any).
     pub(crate) fn bind(
         db: &'db dyn Db,
-        signatures: &Signatures<'db>,
+        signatures: Signatures<'db>,
         arguments: &CallArguments<'_, 'db>,
     ) -> Result<Self, CallError<'db>> {
         let elements: SmallVec<[CallableBinding<'db>; 1]> = signatures
-            .into_iter()
+            .iter()
             .map(|signature| CallableBinding::bind(db, signature, arguments))
             .collect();
 
@@ -76,7 +76,7 @@ impl<'db> Bindings<'db> {
         }
 
         let bindings = Bindings {
-            callable_type: signatures.callable_type,
+            signatures,
             elements,
         };
 
@@ -96,6 +96,10 @@ impl<'db> Bindings<'db> {
 
     pub(crate) fn is_single(&self) -> bool {
         self.elements.len() == 1
+    }
+
+    pub(crate) fn callable_type(&self) -> Type<'db> {
+        self.signatures.callable_type
     }
 
     /// Returns the return type of the call. For successful calls, this is the actual return type.
@@ -122,7 +126,7 @@ impl<'db> Bindings<'db> {
                 node,
                 format_args!(
                     "Object of type `{}` is not callable",
-                    self.callable_type.display(context.db())
+                    self.callable_type().display(context.db())
                 ),
             );
             return;

@@ -5640,7 +5640,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             value_node,
                             format_args!(
                                 "Method `__getitem__` of type `{}` is not callable on object of type `{}`",
-                                bindings.callable_type.display(self.db()),
+                                bindings.callable_type().display(self.db()),
                                 value_ty.display(self.db()),
                             ),
                         );
@@ -5690,7 +5690,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                         value_node,
                                         format_args!(
                                             "Method `__class_getitem__` of type `{}` is not callable on object of type `{}`",
-                                            bindings.callable_type.display(self.db()),
+                                            bindings.callable_type().display(self.db()),
                                             value_ty.display(self.db()),
                                         ),
                                     );
