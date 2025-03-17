@@ -1437,9 +1437,7 @@ impl<'src> Parser<'src> {
             for expr in elements.expressions() {
                 if let Some(slash_index) = memchr::memchr(b'\\', self.source[expr.range].as_bytes())
                 {
-                    let Ok(slash_index) = TextSize::try_from(slash_index) else {
-                        continue;
-                    };
+                    let slash_index = TextSize::try_from(slash_index).unwrap();
                     self.add_unsupported_syntax_error(
                         UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::Backslash),
                         TextRange::at(expr.range.start() + slash_index, TextSize::from(1)),
@@ -1449,9 +1447,7 @@ impl<'src> Parser<'src> {
                 if let Some(quote_index) =
                     memchr::memmem::find(self.source[expr.range].as_bytes(), quote_bytes)
                 {
-                    let Ok(quote_index) = TextSize::try_from(quote_index) else {
-                        continue;
-                    };
+                    let quote_index = TextSize::try_from(quote_index).unwrap();
                     self.add_unsupported_syntax_error(
                         UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::NestedQuote),
                         TextRange::at(expr.range.start() + quote_index, quote_len),
