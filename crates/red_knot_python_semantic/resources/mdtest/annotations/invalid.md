@@ -54,10 +54,16 @@ def _(
     d: True,  # error: [invalid-type-form] "Boolean literals are not allowed in this context in a type expression"
     # error: [invalid-type-form] "Bytes literals are not allowed in this context in a type expression"
     e: int | b"foo",
+    f: 1 and 2,  # error: [invalid-type-form] "Boolean operations like `and` and `or` are not allowed in type expressions"
+    g: 1 or 2,  # error: [invalid-type-form] "Boolean operations like `and` and `or` are not allowed in type expressions"
+    h: (foo := 1),  # error: [invalid-type-form] "Named expressions like `foo =: 1` are not allowed in type expressions"
 ):
     reveal_type(a)  # revealed: Unknown
     reveal_type(b)  # revealed: Unknown
     reveal_type(c)  # revealed: Unknown
     reveal_type(d)  # revealed: Unknown
     reveal_type(e)  # revealed: int | Unknown
+    reveal_type(f)  # revealed: Unknown
+    reveal_type(g)  # revealed: Unknown
+    reveal_type(h)  # revealed: Unknown
 ```

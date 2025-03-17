@@ -6033,16 +6033,19 @@ impl<'db> TypeInferenceBuilder<'db> {
         annotation_ty
     }
 
+    fn report_invalid_type_expression(
+        &mut self,
+        expression: &ast::Expr,
+        message: std::fmt::Arguments,
+    ) -> Type<'db> {
+        self.context
+            .report_lint(&INVALID_TYPE_FORM, expression, message);
+        Type::unknown()
+    }
+
     /// Infer the type of a type expression without storing the result.
     fn infer_type_expression_no_store(&mut self, expression: &ast::Expr) -> Type<'db> {
         // https://typing.readthedocs.io/en/latest/spec/annotations.html#grammar-token-expression-grammar-type_expression
-
-        let report_invalid_type_expression = |message: std::fmt::Arguments| {
-            self.context
-                .report_lint(&INVALID_TYPE_FORM, expression, message);
-            Type::unknown()
-        };
-
         match expression {
             ast::Expr::Name(name) => match name.ctx {
                 ast::ExprContext::Load => self
@@ -6075,38 +6078,45 @@ impl<'db> TypeInferenceBuilder<'db> {
 
             // TODO: add a subdiagnostic linking to type-expression grammar
             // and stating that it is only valid in `typing.Literal[]` or `typing.Annotated[]`
-            ast::Expr::BytesLiteral(_) => report_invalid_type_expression(format_args!(
-                "Bytes literals are not allowed in this context in a type expression"
-            )),
+            ast::Expr::BytesLiteral(_) => self.report_invalid_type_expression(
+                expression,
+                format_args!("Bytes literals are not allowed in this context in a type expression"),
+            ),
 
             // TODO: add a subdiagnostic linking to type-expression grammar
             // and stating that it is only valid in `typing.Literal[]` or `typing.Annotated[]`
             ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
                 value: ast::Number::Int(_),
                 ..
-            }) => report_invalid_type_expression(format_args!(
-                "Int literals are not allowed in this context in a type expression"
-            )),
+            }) => self.report_invalid_type_expression(
+                expression,
+                format_args!("Int literals are not allowed in this context in a type expression"),
+            ),
 
             ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
                 value: ast::Number::Float(_),
                 ..
-            }) => report_invalid_type_expression(format_args!(
-                "Float literals are not allowed in type expressions"
-            )),
+            }) => self.report_invalid_type_expression(
+                expression,
+                format_args!("Float literals are not allowed in type expressions"),
+            ),
 
             ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
                 value: ast::Number::Complex { .. },
                 ..
-            }) => report_invalid_type_expression(format_args!(
-                "Complex literals are not allowed in type expressions"
-            )),
+            }) => self.report_invalid_type_expression(
+                expression,
+                format_args!("Complex literals are not allowed in type expressions"),
+            ),
 
             // TODO: add a subdiagnostic linking to type-expression grammar
             // and stating that it is only valid in `typing.Literal[]` or `typing.Annotated[]`
-            ast::Expr::BooleanLiteral(_) => report_invalid_type_expression(format_args!(
-                "Boolean literals are not allowed in this context in a type expression"
-            )),
+            ast::Expr::BooleanLiteral(_) => self.report_invalid_type_expression(
+                expression,
+                format_args!(
+                    "Boolean literals are not allowed in this context in a type expression"
+                ),
+            ),
 
             ast::Expr::Subscript(subscript) => {
                 let ast::ExprSubscript {
@@ -6152,11 +6162,19 @@ impl<'db> TypeInferenceBuilder<'db> {
             // always `Type::unknown` in these cases.
             ast::Expr::BoolOp(bool_op) => {
                 self.infer_boolean_expression(bool_op);
-                Type::unknown()
+                self.report_invalid_type_expression(
+                    expression,
+                    format_args!("Boolean operations like `and` and `or` are not allowed in type expressions"),
+                )
             }
             ast::Expr::Named(named) => {
                 self.infer_named_expression(named);
-                Type::unknown()
+                self.report_invalid_type_expression(
+                    expression,
+                    format_args!(
+                        "Named expressions like `foo := 1` are not allowed in type expressions"
+                    ),
+                )
             }
             ast::Expr::UnaryOp(unary) => {
                 self.infer_unary_expression(unary);
