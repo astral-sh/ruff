@@ -1436,21 +1436,22 @@ impl<'src> Parser<'src> {
             let quote_bytes = flags.quote_str().as_bytes();
             let quote_len = flags.quote_len();
             for expr in elements.expressions() {
-                for slash_index in memchr::memchr_iter(b'\\', self.source[expr.range].as_bytes()) {
-                    let slash_index = TextSize::try_from(slash_index).unwrap();
+                for slash_position in memchr::memchr_iter(b'\\', self.source[expr.range].as_bytes())
+                {
+                    let slash_position = TextSize::try_from(slash_position).unwrap();
                     self.add_unsupported_syntax_error(
                         UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::Backslash),
-                        TextRange::at(expr.range.start() + slash_index, TextSize::from(1)),
+                        TextRange::at(expr.range.start() + slash_position, TextSize::from(1)),
                     );
                 }
 
-                if let Some(quote_index) =
+                if let Some(quote_position) =
                     memchr::memmem::find(self.source[expr.range].as_bytes(), quote_bytes)
                 {
-                    let quote_index = TextSize::try_from(quote_index).unwrap();
+                    let quote_position = TextSize::try_from(quote_position).unwrap();
                     self.add_unsupported_syntax_error(
                         UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::NestedQuote),
-                        TextRange::at(expr.range.start() + quote_index, quote_len),
+                        TextRange::at(expr.range.start() + quote_position, quote_len),
                     );
                 };
             }
