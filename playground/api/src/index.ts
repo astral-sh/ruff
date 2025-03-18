@@ -40,8 +40,7 @@ export default {
     const { DEV, PLAYGROUND } = env;
 
     const headers = DEV ? DEVELOPMENT_HEADERS : PRODUCTION_HEADERS;
-
-    if (!DEV && request.url.startsWith("https://playknot.ruff.rs")) {
+    if (!DEV && request.headers.get("origin") === "https://playknot.ruff.rs") {
       headers["Access-Control-Allow-Origin"] = "https://playknot.ruff.rs";
     }
 
