@@ -22,8 +22,10 @@ default = ["console_error_panic_hook"]
 red_knot_project = { workspace = true, default-features = false, features = ["deflate"] }
 
 ruff_db = { workspace = true, default-features = false, features = [] }
-ruff_python_ast = { workspace = true }
 ruff_notebook = { workspace = true }
+ruff_python_ast = { workspace = true }
+ruff_source_file = { workspace = true }
+ruff_text_size = { workspace = true }
 
 console_error_panic_hook = { workspace = true, optional = true }
 console_log = { workspace = true }

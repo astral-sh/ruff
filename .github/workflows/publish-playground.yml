@@ -38,11 +38,11 @@ jobs:
       - name: "Install Node dependencies"
         run: npm ci
         working-directory: playground
-      - name: "Build Ruff playground"
-        run: npm run build --workspace ruff-playground
-        working-directory: playground
       - name: "Run TypeScript checks"
         run: npm run check
+        working-directory: playground
+      - name: "Build Ruff playground"
+        run: npm run build --workspace ruff-playground
         working-directory: playground
       - name: "Deploy to Cloudflare Pages"
         if: ${{ env.CF_API_TOKEN_EXISTS == 'true' }}

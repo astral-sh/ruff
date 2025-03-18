@@ -1,20 +1,23 @@
 use std::any::Any;
 
-use js_sys::Error;
-use wasm_bindgen::prelude::*;
-
+use js_sys::{Error, JsString};
 use red_knot_project::metadata::options::{EnvironmentOptions, Options};
 use red_knot_project::metadata::value::RangedValue;
+use red_knot_project::watch::{ChangeEvent, ChangedKind, CreatedKind, DeletedKind};
 use red_knot_project::ProjectMetadata;
 use red_knot_project::{Db, ProjectDatabase};
 use ruff_db::diagnostic::{DisplayDiagnosticConfig, OldDiagnosticTrait};
 use ruff_db::files::{system_path_to_file, File};
+use ruff_db::source::{line_index, source_text};
 use ruff_db::system::walk_directory::WalkDirectoryBuilder;
 use ruff_db::system::{
     CaseSensitivity, DirectoryEntry, GlobError, MemoryFileSystem, Metadata, PatternError, System,
     SystemPath, SystemPathBuf, SystemVirtualPath,
 };
+use ruff_db::Upcast;
 use ruff_notebook::Notebook;
+use ruff_source_file::SourceLocation;
+use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen(start)]
 pub fn run() {
@@ -36,6 +39,7 @@ pub fn run() {
 pub struct Workspace {
     db: ProjectDatabase,
     system: WasmSystem,
+    options: Options,
 }
 
 #[wasm_bindgen]
@@ -47,34 +51,49 @@ impl Workspace {
         let mut workspace =
             ProjectMetadata::discover(SystemPath::new(root), &system).map_err(into_error)?;
 
-        workspace.apply_cli_options(Options {
+        let options = Options {
             environment: Some(EnvironmentOptions {
                 python_version: Some(RangedValue::cli(settings.python_version.into())),
                 ..EnvironmentOptions::default()
             }),
             ..Options::default()
-        });
+        };
+
+        workspace.apply_cli_options(options.clone());
 
         let db = ProjectDatabase::new(workspace, system.clone()).map_err(into_error)?;
 
-        Ok(Self { db, system })
+        Ok(Self {
+            db,
+            system,
+            options,
+        })
     }
 
     #[wasm_bindgen(js_name = "openFile")]
     pub fn open_file(&mut self, path: &str, contents: &str) -> Result<FileHandle, Error> {
+        let path = SystemPath::new(path);
+
         self.system
             .fs
             .write_file_all(path, contents)
             .map_err(into_error)?;
 
+        self.db.apply_changes(
+            vec![ChangeEvent::Created {
+                path: path.to_path_buf(),
+                kind: CreatedKind::File,
+            }],
+            Some(&self.options),
+        );
+
         let file = system_path_to_file(&self.db, path).expect("File to exist");
-        file.sync(&mut self.db);
 
         self.db.project().open_file(&mut self.db, file);
 
         Ok(FileHandle {
             file,
-            path: SystemPath::new(path).to_path_buf(),
+            path: path.to_path_buf(),
         })
     }
 
@@ -89,7 +108,19 @@ impl Workspace {
             .write_file(&file_id.path, contents)
             .map_err(into_error)?;
 
-        file_id.file.sync(&mut self.db);
+        self.db.apply_changes(
+            vec![
+                ChangeEvent::Changed {
+                    path: file_id.path.to_path_buf(),
+                    kind: ChangedKind::FileContent,
+                },
+                ChangeEvent::Changed {
+                    path: file_id.path.to_path_buf(),
+                    kind: ChangedKind::FileMetadata,
+                },
+            ],
+            Some(&self.options),
+        );
 
         Ok(())
     }
@@ -104,32 +135,30 @@ impl Workspace {
             .remove_file(&file_id.path)
             .map_err(into_error)?;
 
-        file.sync(&mut self.db);
+        self.db.apply_changes(
+            vec![ChangeEvent::Deleted {
+                path: file_id.path.to_path_buf(),
+                kind: DeletedKind::File,
+            }],
+            Some(&self.options),
+        );
 
         Ok(())
     }
 
     /// Checks a single file.
     #[wasm_bindgen(js_name = "checkFile")]
-    pub fn check_file(&self, file_id: &FileHandle) -> Result<Vec<String>, Error> {
+    pub fn check_file(&self, file_id: &FileHandle) -> Result<Vec<Diagnostic>, Error> {
         let result = self.db.check_file(file_id.file).map_err(into_error)?;
 
-        let display_config = DisplayDiagnosticConfig::default().color(false);
-        Ok(result
-            .into_iter()
-            .map(|diagnostic| diagnostic.display(&self.db, &display_config).to_string())
-            .collect())
+        Ok(result.into_iter().map(Diagnostic::wrap).collect())
     }
 
     /// Checks all open files
-    pub fn check(&self) -> Result<Vec<String>, Error> {
+    pub fn check(&self) -> Result<Vec<Diagnostic>, Error> {
         let result = self.db.check().map_err(into_error)?;
 
-        let display_config = DisplayDiagnosticConfig::default().color(false);
-        Ok(result
-            .into_iter()
-            .map(|diagnostic| diagnostic.display(&self.db, &display_config).to_string())
-            .collect())
+        Ok(result.into_iter().map(Diagnostic::wrap).collect())
     }
 
     /// Returns the parsed AST for `path`
@@ -182,6 +211,124 @@ impl Settings {
     #[wasm_bindgen(constructor)]
     pub fn new(python_version: PythonVersion) -> Self {
         Self { python_version }
+    }
+}
+
+#[wasm_bindgen]
+pub struct Diagnostic {
+    #[wasm_bindgen(readonly)]
+    inner: Box<dyn OldDiagnosticTrait>,
+}
+
+#[wasm_bindgen]
+impl Diagnostic {
+    fn wrap(diagnostic: Box<dyn OldDiagnosticTrait>) -> Self {
+        Self { inner: diagnostic }
+    }
+
+    #[wasm_bindgen]
+    pub fn message(&self) -> JsString {
+        JsString::from(&*self.inner.message())
+    }
+
+    #[wasm_bindgen]
+    pub fn id(&self) -> JsString {
+        JsString::from(self.inner.id().to_string())
+    }
+
+    #[wasm_bindgen]
+    pub fn severity(&self) -> Severity {
+        Severity::from(self.inner.severity())
+    }
+
+    #[wasm_bindgen]
+    pub fn text_range(&self) -> Option<TextRange> {
+        self.inner
+            .span()
+            .and_then(|span| Some(TextRange::from(span.range()?)))
+    }
+
+    #[wasm_bindgen]
+    pub fn to_range(&self, workspace: &Workspace) -> Option<Range> {
+        self.inner.span().and_then(|span| {
+            let line_index = line_index(workspace.db.upcast(), span.file());
+            let source = source_text(workspace.db.upcast(), span.file());
+            let text_range = span.range()?;
+
+            Some(Range {
+                start: line_index
+                    .source_location(text_range.start(), &source)
+                    .into(),
+                end: line_index.source_location(text_range.end(), &source).into(),
+            })
+        })
+    }
+
+    #[wasm_bindgen]
+    pub fn display(&self, workspace: &Workspace) -> JsString {
+        let config = DisplayDiagnosticConfig::default().color(false);
+        self.inner
+            .display(workspace.db.upcast(), &config)
+            .to_string()
+            .into()
+    }
+}
+
+#[wasm_bindgen]
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+pub struct Range {
+    pub start: Position,
+    pub end: Position,
+}
+
+impl From<SourceLocation> for Position {
+    fn from(location: SourceLocation) -> Self {
+        Self {
+            line: location.row.to_zero_indexed(),
+            character: location.column.to_zero_indexed(),
+        }
+    }
+}
+
+#[wasm_bindgen]
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+pub struct Position {
+    pub line: usize,
+    pub character: usize,
+}
+
+#[wasm_bindgen]
+#[derive(Copy, Clone, Hash, PartialEq, Eq)]
+pub enum Severity {
+    Info,
+    Warning,
+    Error,
+    Fatal,
+}
+
+impl From<ruff_db::diagnostic::Severity> for Severity {
+    fn from(value: ruff_db::diagnostic::Severity) -> Self {
+        match value {
+            ruff_db::diagnostic::Severity::Info => Self::Info,
+            ruff_db::diagnostic::Severity::Warning => Self::Warning,
+            ruff_db::diagnostic::Severity::Error => Self::Error,
+            ruff_db::diagnostic::Severity::Fatal => Self::Fatal,
+        }
+    }
+}
+
+#[wasm_bindgen]
+pub struct TextRange {
+    pub start: u32,
+    pub end: u32,
+}
+
+impl From<ruff_text_size::TextRange> for TextRange {
+    fn from(value: ruff_text_size::TextRange) -> Self {
+        Self {
+            start: value.start().into(),
+            end: value.end().into(),
+        }
     }
 }
 

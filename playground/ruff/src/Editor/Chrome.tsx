@@ -21,6 +21,7 @@ export default function Chrome() {
     }
 
     persist(settings, pythonSource).catch((error) =>
+      // eslint-disable-next-line no-console
       console.error(`Failed to share playground: ${error}`),
     );
   }, [pythonSource, settings]);
@@ -34,6 +35,7 @@ export default function Chrome() {
         setRevision(1);
       })
       .catch((error) => {
+        // eslint-disable-next-line no-console
         console.error("Failed to initialize playground.", error);
       });
   }
@@ -75,6 +77,7 @@ export default function Chrome() {
       <Header
         edit={revision}
         theme={theme}
+        logo="ruff"
         version={ruffVersion}
         onChangeTheme={setTheme}
         onShare={handleShare}

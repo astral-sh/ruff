@@ -1,5 +1,4 @@
-import { Icons } from "shared";
-import SideBar, { SideBarEntry } from "./SideBar";
+import { Icons, SideBar, SideBarEntry } from "shared";
 
 type Tool = "Settings" | "Source";
 

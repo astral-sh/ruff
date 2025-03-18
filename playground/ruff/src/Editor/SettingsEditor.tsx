@@ -91,6 +91,7 @@ export default function SettingsEditor({
               model.setValue(JSON.stringify(cleansed, null, 4));
             } catch (e) {
               // Turned out to not be TOML after all.
+              // eslint-disable-next-line no-console
               console.warn("Failed to parse settings as TOML", e);
             }
           });
