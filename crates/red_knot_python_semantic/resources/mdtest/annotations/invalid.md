@@ -65,9 +65,10 @@ def _(
     l: await 1,  # error: [invalid-type-form] "Await expressions are not allowed in type expressions"
     m: (yield 1),  # error: [invalid-type-form] "Yield expressions are not allowed in type expressions"
     n: (yield from [1]),  # error: [invalid-type-form] "Yield from expressions are not allowed in type expressions"
-    o: 1 < 2,  # error: [invalid-type-form] "Compare expressions are not allowed in type expressions"
+    o: 1 < 2,  # error: [invalid-type-form] "Comparisons like `1 < 2` are not allowed in type expressions"
     p: bar(),  # error: [invalid-type-form] "Function calls are not allowed in type expressions"
-    q: int | f"foo",  # error: [invalid-type-form] "F-string expressions are not allowed in type expressions"
+    q: int | f"foo",  # error: [invalid-type-form] "F-strings are not allowed in type expressions"
+    r: [1, 2, 3][1:2],  # error: [invalid-type-form] "Slices are not allowed in type expressions"
 ):
     reveal_type(a)  # revealed: Unknown
     reveal_type(b)  # revealed: Unknown
@@ -82,6 +83,7 @@ def _(
     reveal_type(k)  # revealed: Unknown
     reveal_type(p)  # revealed: Unknown
     reveal_type(q)  # revealed: int | Unknown
+    reveal_type(r)  # revealed: @Todo(generics)
 ```
 
 ## Invalid Collection based AST nodes
@@ -93,7 +95,7 @@ def _(
     c: {k: v for k, v in [(1, 2)]},  # error: [invalid-type-form] "Dictionary comprehensions are not allowed in type expressions"
     d: [k for k in [1, 2]],  # error: [invalid-type-form] "List comprehensions are not allowed in type expressions"
     e: {k for k in [1, 2]},  # error: [invalid-type-form] "Set comprehensions are not allowed in type expressions"
-    f: (k for k in [1, 2]),  # error: [invalid-type-form] "Generator expressions are not allowed in type expressions"
+    f: (k for k in [1, 2]),  # error: [invalid-type-form] "Generators are not allowed in type expressions"
 ):
     reveal_type(a)  # revealed: Unknown
     reveal_type(b)  # revealed: Unknown

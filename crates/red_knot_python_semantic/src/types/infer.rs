@@ -6244,7 +6244,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 self.infer_generator_expression(generator);
                 self.report_invalid_type_expression(
                     expression,
-                    format_args!("Generator expressions are not allowed in type expressions"),
+                    format_args!("Generators are not allowed in type expressions"),
                 )
             }
             ast::Expr::Await(await_expression) => {
@@ -6272,7 +6272,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 self.infer_compare_expression(compare);
                 self.report_invalid_type_expression(
                     expression,
-                    format_args!("Compare expressions are not allowed in type expressions"),
+                    format_args!("Comparisons like `1 < 2` are not allowed in type expressions"),
                 )
             }
             ast::Expr::Call(call_expr) => {
@@ -6286,7 +6286,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 self.infer_fstring_expression(fstring);
                 self.report_invalid_type_expression(
                     expression,
-                    format_args!("F-string expressions are not allowed in type expressions"),
+                    format_args!("F-strings are not allowed in type expressions"),
                 )
             }
             ast::Expr::Slice(slice) => {
