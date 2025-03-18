@@ -13,7 +13,7 @@ import {
 } from "monaco-editor";
 import { useCallback, useEffect, useRef } from "react";
 import { Diagnostic } from "ruff_wasm";
-import { Theme } from "./theme";
+import { Theme } from "shared";
 import CodeActionProvider = languages.CodeActionProvider;
 import IStandaloneCodeEditor = editor.IStandaloneCodeEditor;
 

@@ -23,7 +23,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE
 
-export function FileIcon() {
+export function File() {
   return (
     <svg
       width="24"
@@ -40,7 +40,7 @@ export function FileIcon() {
   );
 }
 
-export function SettingsIcon() {
+export function Settings() {
   return (
     <svg
       width="24"
@@ -57,7 +57,7 @@ export function SettingsIcon() {
   );
 }
 
-export function StructureIcon() {
+export function Structure() {
   return (
     <svg
       width="24"
@@ -74,7 +74,7 @@ export function StructureIcon() {
   );
 }
 
-export function FormatIcon() {
+export function Format() {
   return (
     <svg
       width="24"
@@ -91,7 +91,7 @@ export function FormatIcon() {
   );
 }
 
-export function TokensIcon() {
+export function Token() {
   return (
     <svg
       width="24"
@@ -108,7 +108,7 @@ export function TokensIcon() {
   );
 }
 
-export function FormatterIRIcon() {
+export function FormatterIR() {
   return (
     <svg
       width="24"
@@ -124,7 +124,7 @@ export function FormatterIRIcon() {
     </svg>
   );
 }
-export function CommentsIcon() {
+export function Comments() {
   return (
     <svg
       viewBox="0 0 24 24"

@@ -1,4 +1,4 @@
-import { Theme } from "./theme";
+import { Theme } from "shared";
 import { useCallback, useEffect, useState } from "react";
 import { editor, Range } from "monaco-editor";
 import IStandaloneCodeEditor = editor.IStandaloneCodeEditor;

@@ -27,6 +27,8 @@ export default tseslint.config(
         },
       ],
       "@typescript-eslint/no-explicit-any": "off",
+      // Handled by typescript. It doesn't support shared?
+      "import/no-unresolved": "off",
     },
   },
   {

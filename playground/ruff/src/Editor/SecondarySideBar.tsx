@@ -1,11 +1,5 @@
 import SideBar, { SideBarEntry } from "./SideBar";
-import {
-  FormatIcon,
-  FormatterIRIcon,
-  StructureIcon,
-  TokensIcon,
-  CommentsIcon,
-} from "./Icons";
+import { Icons } from "shared";
 import { SecondaryTool } from "./SecondaryPanel";
 
 interface RightSideBarProps {
@@ -25,7 +19,7 @@ export default function SecondarySideBar({
         selected={selected === SecondaryTool.Format}
         onClick={() => onSelected(SecondaryTool.Format)}
       >
-        <FormatIcon />
+        <Icons.Format />
       </SideBarEntry>
 
       <SideBarEntry
@@ -34,7 +28,7 @@ export default function SecondarySideBar({
         selected={selected === SecondaryTool.AST}
         onClick={() => onSelected(SecondaryTool.AST)}
       >
-        <StructureIcon />
+        <Icons.Structure />
       </SideBarEntry>
 
       <SideBarEntry
@@ -43,7 +37,7 @@ export default function SecondarySideBar({
         selected={selected === SecondaryTool.Tokens}
         onClick={() => onSelected(SecondaryTool.Tokens)}
       >
-        <TokensIcon />
+        <Icons.Token />
       </SideBarEntry>
 
       <SideBarEntry
@@ -52,7 +46,7 @@ export default function SecondarySideBar({
         selected={selected === SecondaryTool.FIR}
         onClick={() => onSelected(SecondaryTool.FIR)}
       >
-        <FormatterIRIcon />
+        <Icons.FormatterIR />
       </SideBarEntry>
 
       <SideBarEntry
@@ -61,7 +55,7 @@ export default function SecondarySideBar({
         selected={selected === SecondaryTool.Comments}
         onClick={() => onSelected(SecondaryTool.Comments)}
       >
-        <CommentsIcon />
+        <Icons.Comments />
       </SideBarEntry>
     </SideBar>
   );
