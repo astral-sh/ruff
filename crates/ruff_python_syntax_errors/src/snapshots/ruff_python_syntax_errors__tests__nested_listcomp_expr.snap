@@ -5,7 +5,7 @@ expression: "test_snippet(contents, PythonVersion::default())"
 [
     SyntaxError {
         kind: ReboundComprehensionVariable,
-        range: 7..8,
+        range: 3..4,
         target_version: PythonVersion {
             major: 3,
             minor: 9,

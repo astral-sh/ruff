@@ -3,8 +3,14 @@
 //! This checker is not responsible for traversing the AST itself. Instead, its
 //! [`SyntaxChecker::enter_stmt`] method should be called on every node by a parent `Visitor`.
 
-use ruff_python_ast::{self as ast, Expr, PythonVersion, Stmt, StmtExpr, StmtImportFrom};
+use ruff_python_ast::{
+    self as ast,
+    name::Name,
+    visitor::{walk_expr, Visitor},
+    Expr, PythonVersion, Stmt, StmtExpr, StmtImportFrom,
+};
 use ruff_text_size::TextRange;
+use rustc_hash::FxHashSet;
 
 pub struct SyntaxChecker {
     /// The target Python version for detecting backwards-incompatible syntax
@@ -143,28 +149,51 @@ impl SyntaxChecker {
         }
     }
 
-    /// Add a [`SyntaxErrorKind::ReboundComprehensionVariable`] if `named_expr` rebinds an iteration
+    /// Add a [`SyntaxErrorKind::ReboundComprehensionVariable`] if `expr` rebinds an iteration
     /// variable in `generators`.
-    fn check_generator_expr(&mut self, named_expr: &Expr, generators: &[ast::Comprehension]) {
-        let Expr::Named(ast::ExprNamed { target, range, .. }) = named_expr else {
-            return;
-        };
-        let Expr::Name(ast::ExprName { id, .. }) = &**target else {
-            return;
+    fn check_generator_expr(&mut self, expr: &Expr, generators: &[ast::Comprehension]) {
+        let rebound_variable = {
+            let mut visitor = ReboundComprehensionVisitor {
+                iteration_variables: generators
+                    .iter()
+                    .filter_map(|gen| gen.target.as_name_expr().map(|name| &name.id))
+                    .collect(),
+                rebound_variable: None,
+            };
+            visitor.visit_expr(expr);
+            visitor.rebound_variable
         };
 
         // TODO(brent) with multiple diagnostic ranges, we could mark both the named expr (current)
         // and the name expr being rebound
-        if generators
-            .iter()
-            .any(|gen| gen.target.as_name_expr().is_some_and(|name| name.id == *id))
-        {
+        if let Some(range) = rebound_variable {
             self.errors.push(SyntaxError {
                 kind: SyntaxErrorKind::ReboundComprehensionVariable,
-                range: *range,
+                range,
                 target_version: self.target_version,
             });
         }
+    }
+}
+
+/// Searches for the first named expression (`x := y`) rebinding one of the `iteration_variables` in
+/// a comprehension or generator expression.
+struct ReboundComprehensionVisitor<'a> {
+    iteration_variables: FxHashSet<&'a Name>,
+    rebound_variable: Option<TextRange>,
+}
+
+impl Visitor<'_> for ReboundComprehensionVisitor<'_> {
+    fn visit_expr(&mut self, expr: &Expr) {
+        if let Expr::Named(ast::ExprNamed { target, .. }) = expr {
+            if let Expr::Name(ast::ExprName { id, range, .. }) = &**target {
+                if self.iteration_variables.contains(id) {
+                    self.rebound_variable = Some(*range);
+                    return;
+                }
+            };
+        }
+        walk_expr(self, expr);
     }
 }
 
@@ -216,6 +245,9 @@ mod tests {
     #[test_case("{(a := 0): val for a in range(0)}", "dictcomp_key")]
     #[test_case("{key: (a := 0) for a in range(0)}", "dictcomp_val")]
     #[test_case("((a := 0) for a in range(0))", "generator")]
+    #[test_case("[[(a := 0)] for a in range(0)]", "nested_listcomp_expr")]
+    #[test_case("[(a := 0) for b in range (0) for a in range(0)]", "nested_listcomp")]
+    #[test_case("[(a := 0) for a in range (0) for b in range(0)]", "nested_listcomp2")]
     fn rebound_comprehension_variable(contents: &str, name: &str) {
         assert_debug_snapshot!(name, test_snippet(contents, PythonVersion::default()));
     }
