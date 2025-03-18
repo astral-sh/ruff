@@ -1,0 +1,35 @@
+{
+  "name": "knot-playground",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "prebuild": "npm run build:wasm",
+    "build": "vite build",
+    "build:wasm": "wasm-pack build ../../crates/red_knot_wasm --target web --out-dir ../../playground/knot/red_knot_wasm",
+    "dev:wasm": "wasm-pack build ../../crates/red_knot_wasm --dev --target web --out-dir ../../playground/knot/red_knot_wasm",
+    "predev:build": "npm run dev:wasm",
+    "dev:build": "vite build",
+    "prestart": "npm run dev:wasm",
+    "start": "vite",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@monaco-editor/react": "^4.7.0",
+    "classnames": "^2.5.1",
+    "lz-string": "^1.5.0",
+    "monaco-editor": "^0.52.2",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-resizable-panels": "^2.1.7",
+    "red_knot_wasm": "file:red_knot_wasm",
+    "shared": "0.0.0",
+    "smol-toml": "^1.3.1"
+  },
+  "overrides": {
+    "@monaco-editor/react": {
+      "react": "$react",
+      "react-dom": "$react-dom"
+    }
+  }
+}

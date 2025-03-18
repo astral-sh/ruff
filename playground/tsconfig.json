@@ -16,6 +16,6 @@
     "noEmit": true,
     "jsx": "react-jsx"
   },
-  "include": ["ruff/src"],
+  "include": ["ruff/src", "knot/src"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

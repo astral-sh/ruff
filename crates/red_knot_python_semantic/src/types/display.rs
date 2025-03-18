@@ -472,6 +472,8 @@ impl Display for DisplayStringLiteralType<'_> {
 
 #[cfg(test)]
 mod tests {
+    use ruff_python_ast::name::Name;
+
     use crate::db::tests::setup_db;
     use crate::types::{
         KnownClass, Parameter, Parameters, Signature, SliceLiteralType, StringLiteralType, Type,
@@ -571,10 +573,10 @@ mod tests {
         assert_eq!(
             display_signature(
                 &db,
-                [Parameter::positional_or_keyword().with_annotated_type(Type::none(&db))],
+                [Parameter::positional_only(None).with_annotated_type(Type::none(&db))],
                 Some(Type::none(&db))
             ),
-            "(None) -> None"
+            "(None, /) -> None"
         );
 
         // Two parameters where one has annotation and the other doesn't.
@@ -582,11 +584,9 @@ mod tests {
             display_signature(
                 &db,
                 [
-                    Parameter::positional_or_keyword()
-                        .with_static_name("x")
+                    Parameter::positional_or_keyword(Name::new_static("x"))
                         .with_default_type(KnownClass::Int.to_instance(&db)),
-                    Parameter::positional_or_keyword()
-                        .with_static_name("y")
+                    Parameter::positional_or_keyword(Name::new_static("y"))
                         .with_annotated_type(KnownClass::Str.to_instance(&db))
                         .with_default_type(KnownClass::Str.to_instance(&db)),
                 ],
@@ -600,8 +600,8 @@ mod tests {
             display_signature(
                 &db,
                 [
-                    Parameter::positional_only().with_static_name("x"),
-                    Parameter::positional_only().with_static_name("y"),
+                    Parameter::positional_only(Some(Name::new_static("x"))),
+                    Parameter::positional_only(Some(Name::new_static("y"))),
                 ],
                 Some(Type::none(&db))
             ),
@@ -613,8 +613,8 @@ mod tests {
             display_signature(
                 &db,
                 [
-                    Parameter::positional_only().with_static_name("x"),
-                    Parameter::positional_or_keyword().with_static_name("y"),
+                    Parameter::positional_only(Some(Name::new_static("x"))),
+                    Parameter::positional_or_keyword(Name::new_static("y")),
                 ],
                 Some(Type::none(&db))
             ),
@@ -626,8 +626,8 @@ mod tests {
             display_signature(
                 &db,
                 [
-                    Parameter::keyword_only().with_static_name("x"),
-                    Parameter::keyword_only().with_static_name("y"),
+                    Parameter::keyword_only(Name::new_static("x")),
+                    Parameter::keyword_only(Name::new_static("y")),
                 ],
                 Some(Type::none(&db))
             ),
@@ -639,8 +639,8 @@ mod tests {
             display_signature(
                 &db,
                 [
-                    Parameter::positional_or_keyword().with_static_name("x"),
-                    Parameter::keyword_only().with_static_name("y"),
+                    Parameter::positional_or_keyword(Name::new_static("x")),
+                    Parameter::keyword_only(Name::new_static("y")),
                 ],
                 Some(Type::none(&db))
             ),
@@ -652,36 +652,27 @@ mod tests {
             display_signature(
                 &db,
                 [
-                    Parameter::positional_only().with_static_name("a"),
-                    Parameter::positional_only()
-                        .with_static_name("b")
+                    Parameter::positional_only(Some(Name::new_static("a"))),
+                    Parameter::positional_only(Some(Name::new_static("b")))
                         .with_annotated_type(KnownClass::Int.to_instance(&db)),
-                    Parameter::positional_only()
-                        .with_static_name("c")
+                    Parameter::positional_only(Some(Name::new_static("c")))
                         .with_default_type(Type::IntLiteral(1)),
-                    Parameter::positional_only()
-                        .with_static_name("d")
+                    Parameter::positional_only(Some(Name::new_static("d")))
                         .with_annotated_type(KnownClass::Int.to_instance(&db))
                         .with_default_type(Type::IntLiteral(2)),
-                    Parameter::positional_or_keyword()
-                        .with_static_name("e")
+                    Parameter::positional_or_keyword(Name::new_static("e"))
                         .with_default_type(Type::IntLiteral(3)),
-                    Parameter::positional_or_keyword()
-                        .with_static_name("f")
+                    Parameter::positional_or_keyword(Name::new_static("f"))
                         .with_annotated_type(KnownClass::Int.to_instance(&db))
                         .with_default_type(Type::IntLiteral(4)),
-                    Parameter::variadic()
-                        .with_static_name("args")
+                    Parameter::variadic(Name::new_static("args"))
                         .with_annotated_type(Type::object(&db)),
-                    Parameter::keyword_only()
-                        .with_static_name("g")
+                    Parameter::keyword_only(Name::new_static("g"))
                         .with_default_type(Type::IntLiteral(5)),
-                    Parameter::keyword_only()
-                        .with_static_name("h")
+                    Parameter::keyword_only(Name::new_static("h"))
                         .with_annotated_type(KnownClass::Int.to_instance(&db))
                         .with_default_type(Type::IntLiteral(6)),
-                    Parameter::keyword_variadic()
-                        .with_static_name("kwargs")
+                    Parameter::keyword_variadic(Name::new_static("kwargs"))
                         .with_annotated_type(KnownClass::Str.to_instance(&db)),
                 ],
                 Some(KnownClass::Bytes.to_instance(&db))

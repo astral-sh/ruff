@@ -4,13 +4,16 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "check": "npm run lint && npm run tsc",
+    "check": "npm run dev:wasm && npm run lint && npm run tsc",
+    "dev:wasm": "npm run dev:wasm --workspace knot-playground && npm run dev:wasm --workspace ruff-playground",
+    "dev:build": "npm run dev:build --workspace knot-playground && npm run dev:build --workspace ruff-playground",
     "fmt": "prettier --cache -w .",
     "fmt:check": "prettier --cache --check .",
-    "lint": "eslint --cache --ext .ts,.tsx ruff/src",
+    "lint": "eslint --cache --ext .ts,.tsx ruff/src knot/src",
     "tsc": "tsc"
   },
   "workspaces": [
+    "knot",
     "ruff",
     "shared"
   ],

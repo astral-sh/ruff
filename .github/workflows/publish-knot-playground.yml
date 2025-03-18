@@ -1,0 +1,58 @@
+# Publish the Red Knot playground.
+name: "[Knot Playground] Release"
+
+permissions: {}
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "crates/red_knot*/**"
+      - "crates/ruff_db"
+      - "crates/ruff_python_ast"
+      - "crates/ruff_python_parser"
+      - "playground"
+      - ".github/workflows/publish-knot-playground.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref_name }}
+  cancel-in-progress: true
+
+env:
+  CARGO_INCREMENTAL: 0
+  CARGO_NET_RETRY: 10
+  CARGO_TERM_COLOR: always
+  RUSTUP_MAX_RETRIES: 10
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      CF_API_TOKEN_EXISTS: ${{ secrets.CF_API_TOKEN != '' }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        with:
+          persist-credentials: false
+      - name: "Install Rust toolchain"
+        run: rustup target add wasm32-unknown-unknown
+      - uses: actions/setup-node@cdca7365b2dadb8aad0a33bc7601856ffabcc48e # v4
+        with:
+          node-version: 22
+      - uses: jetli/wasm-bindgen-action@20b33e20595891ab1a0ed73145d8a21fc96e7c29 # v0.2.0
+      - name: "Install Node dependencies"
+        run: npm ci
+        working-directory: playground
+      - name: "Run TypeScript checks"
+        run: npm run check
+        working-directory: playground
+      - name: "Build Knot playground"
+        run: npm run build --workspace knot-playground
+        working-directory: playground
+      - name: "Deploy to Cloudflare Pages"
+        if: ${{ env.CF_API_TOKEN_EXISTS == 'true' }}
+        uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65 # v3.14.1
+        with:
+          apiToken: ${{ secrets.CF_API_TOKEN }}
+          accountId: ${{ secrets.CF_ACCOUNT_ID }}
+          # `github.head_ref` is only set during pull requests and for manual runs or tags we use `main` to deploy to production
+          command: pages deploy playground/knot/dist --project-name=knot-playground --branch ${{ github.head_ref || 'main' }} --commit-hash ${GITHUB_SHA}
