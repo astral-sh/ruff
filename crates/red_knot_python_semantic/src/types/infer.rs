@@ -3283,7 +3283,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn infer_argument_type<'a>(&mut self, ast_argument: &ast::Expr, argument: &Argument<'a, 'db>) {
-        if argument.form().contains(ArgumentForm::VALUE) {
+        if argument.form().is_empty() || argument.form().contains(ArgumentForm::VALUE) {
             let ty = self.infer_expression(ast_argument);
             argument.set_argument_type(ty);
         }
