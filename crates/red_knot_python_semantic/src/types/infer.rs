@@ -6213,17 +6213,11 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
             ast::Expr::List(list) => {
                 self.infer_list_expression(list);
-                self.report_invalid_type_expression(
-                    expression,
-                    format_args!("Lists are not allowed in type expressions"),
-                )
+                Type::unknown()
             }
             ast::Expr::Tuple(tuple) => {
                 self.infer_tuple_expression(tuple);
-                self.report_invalid_type_expression(
-                    expression,
-                    format_args!("Tuples are not allowed in type expressions"),
-                )
+                Type::unknown()
             }
             ast::Expr::DictComp(dictcomp) => {
                 self.infer_dict_comprehension_expression(dictcomp);

@@ -90,12 +90,10 @@ def _(
 def _(
     a: {1: 2},  # error: [invalid-type-form] "Dictionaries are not allowed in type expressions"
     b: {1, 2},  # error: [invalid-type-form] "Sets are not allowed in type expressions"
-    c: [1, 2],  # error: [invalid-type-form] "Lists are not allowed in type expressions"
-    d: (1, 2),  # error: [invalid-type-form] "Tuples are not allowed in type expressions"
-    e: {k: v for k, v in [(1, 2)]},  # error: [invalid-type-form] "Dictionary comprehensions are not allowed in type expressions"
-    f: [k for k in [1, 2]],  # error: [invalid-type-form] "List comprehensions are not allowed in type expressions"
-    g: {k for k in [1, 2]},  # error: [invalid-type-form] "Set comprehensions are not allowed in type expressions"
-    h: (k for k in [1, 2]),  # error: [invalid-type-form] "Generator expressions are not allowed in type expressions"
+    c: {k: v for k, v in [(1, 2)]},  # error: [invalid-type-form] "Dictionary comprehensions are not allowed in type expressions"
+    d: [k for k in [1, 2]],  # error: [invalid-type-form] "List comprehensions are not allowed in type expressions"
+    e: {k for k in [1, 2]},  # error: [invalid-type-form] "Set comprehensions are not allowed in type expressions"
+    f: (k for k in [1, 2]),  # error: [invalid-type-form] "Generator expressions are not allowed in type expressions"
 ):
     reveal_type(a)  # revealed: Unknown
     reveal_type(b)  # revealed: Unknown
@@ -103,6 +101,4 @@ def _(
     reveal_type(d)  # revealed: Unknown
     reveal_type(e)  # revealed: Unknown
     reveal_type(f)  # revealed: Unknown
-    reveal_type(g)  # revealed: Unknown
-    reveal_type(h)  # revealed: Unknown
 ```
