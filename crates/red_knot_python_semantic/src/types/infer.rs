@@ -3767,9 +3767,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                 .iter()
                 .map(|parameter| {
                     Parameter::new(
-                        Some(parameter.name().id.clone()),
                         None,
                         ParameterKind::PositionalOnly {
+                            name: Some(parameter.name().id.clone()),
                             default_ty: parameter
                                 .default()
                                 .map(|default| self.infer_expression(default)),
@@ -3782,9 +3782,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                 .iter()
                 .map(|parameter| {
                     Parameter::new(
-                        Some(parameter.name().id.clone()),
                         None,
                         ParameterKind::PositionalOrKeyword {
+                            name: parameter.name().id.clone(),
                             default_ty: parameter
                                 .default()
                                 .map(|default| self.infer_expression(default)),
@@ -3794,9 +3794,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                 .collect::<Vec<_>>();
             let variadic = parameters.vararg.as_ref().map(|parameter| {
                 Parameter::new(
-                    Some(parameter.name.id.clone()),
                     None,
-                    ParameterKind::Variadic,
+                    ParameterKind::Variadic {
+                        name: parameter.name.id.clone(),
+                    },
                 )
             });
             let keyword_only = parameters
@@ -3804,9 +3805,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                 .iter()
                 .map(|parameter| {
                     Parameter::new(
-                        Some(parameter.name().id.clone()),
                         None,
                         ParameterKind::KeywordOnly {
+                            name: parameter.name().id.clone(),
                             default_ty: parameter
                                 .default()
                                 .map(|default| self.infer_expression(default)),
@@ -3816,9 +3817,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                 .collect::<Vec<_>>();
             let keyword_variadic = parameters.kwarg.as_ref().map(|parameter| {
                 Parameter::new(
-                    Some(parameter.name.id.clone()),
                     None,
-                    ParameterKind::KeywordVariadic,
+                    ParameterKind::KeywordVariadic {
+                        name: parameter.name.id.clone(),
+                    },
                 )
             });
 
@@ -6882,9 +6884,11 @@ impl<'db> TypeInferenceBuilder<'db> {
                 } else {
                     Parameters::new(parameter_types.iter().map(|param_type| {
                         Parameter::new(
-                            None,
                             Some(*param_type),
-                            ParameterKind::PositionalOnly { default_ty: None },
+                            ParameterKind::PositionalOnly {
+                                name: None,
+                                default_ty: None,
+                            },
                         )
                     }))
                 }
