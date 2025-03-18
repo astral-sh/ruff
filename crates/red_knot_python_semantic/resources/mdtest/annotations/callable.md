@@ -209,15 +209,3 @@ def _(c: Callable[[int], int]):
     # error: [unresolved-attribute] "Type `(int, /) -> int` has no attribute `__call__`"
     reveal_type(c.__call__)  # revealed: Unknown
 ```
-
-## Invalid
-
-```py
-from typing_extensions import Unpack
-
-# error: [invalid-type-form] "`typing.Unpack` requires at least one argument when used in a type expression"
-def f(x: Unpack) -> None:
-    reveal_type(x)  # revealed: Unknown
-```
-
-[gradual form]: https://typing.readthedocs.io/en/latest/spec/glossary.html#term-gradual-form
