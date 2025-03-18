@@ -736,10 +736,9 @@ jobs:
       - name: "Install Node dependencies"
         run: npm ci
         working-directory: playground
-      - name: "Build Ruff playground"
-        run: npm run dev:build --workspace ruff-playground
+      - name: "Build playgrounds"
+        run: npm run dev:wasm
         working-directory: playground
-        # Requires a build for ruff_wasm to exist
       - name: "Run TypeScript checks"
         run: npm run check
         working-directory: playground

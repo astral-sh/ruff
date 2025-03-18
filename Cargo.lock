@@ -2644,6 +2644,8 @@ dependencies = [
  "ruff_db",
  "ruff_notebook",
  "ruff_python_ast",
+ "ruff_source_file",
+ "ruff_text_size",
  "wasm-bindgen",
  "wasm-bindgen-test",
 ]

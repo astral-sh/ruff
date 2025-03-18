@@ -41,6 +41,10 @@ export default {
 
     const headers = DEV ? DEVELOPMENT_HEADERS : PRODUCTION_HEADERS;
 
+    if (!DEV && request.url.startsWith("https://playknot.ruff.rs")) {
+      headers["Access-Control-Allow-Origin"] = "https://playknot.ruff.rs";
+    }
+
     switch (request.method) {
       case "GET": {
         // Ex) `https://api.astral-1ad.workers.dev/<key>`
@@ -55,7 +59,7 @@ export default {
         }
 
         const playground = await PLAYGROUND.get(key);
-        if (playground === null) {
+        if (playground == null) {
           return new Response("Not Found", {
             status: 404,
             headers,
