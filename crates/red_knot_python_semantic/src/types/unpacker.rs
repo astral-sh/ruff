@@ -42,30 +42,36 @@ impl<'db> Unpacker<'db> {
             "Unpacking target must be a list or tuple expression"
         );
 
-        let value_ty = infer_expression_types(self.db(), value.expression())
+        let value_type = infer_expression_types(self.db(), value.expression())
             .expression_type(value.scoped_expression_id(self.db(), self.scope));
 
-        let value_ty = match value {
+        let value_type = match value {
             UnpackValue::Assign(expression) => {
                 if self.context.in_stub()
                     && expression.node_ref(self.db()).is_ellipsis_literal_expr()
                 {
                     Type::unknown()
                 } else {
-                    value_ty
+                    value_type
                 }
             }
-            UnpackValue::Iterable(_) => value_ty.try_iterate(self.db()).unwrap_or_else(|err| {
-                err.report_diagnostic(&self.context, value.as_any_node_ref(self.db()));
+            UnpackValue::Iterable(_) => value_type.try_iterate(self.db()).unwrap_or_else(|err| {
+                err.report_diagnostic(&self.context, value_type, value.as_any_node_ref(self.db()));
                 err.fallback_element_type(self.db())
             }),
-            UnpackValue::ContextManager(_) => value_ty.try_enter(self.db()).unwrap_or_else(|err| {
-                err.report_diagnostic(&self.context, value.as_any_node_ref(self.db()));
-                err.fallback_enter_type(self.db())
-            }),
+            UnpackValue::ContextManager(_) => {
+                value_type.try_enter(self.db()).unwrap_or_else(|err| {
+                    err.report_diagnostic(
+                        &self.context,
+                        value_type,
+                        value.as_any_node_ref(self.db()),
+                    );
+                    err.fallback_enter_type(self.db())
+                })
+            }
         };
 
-        self.unpack_inner(target, value.as_any_node_ref(self.db()), value_ty);
+        self.unpack_inner(target, value.as_any_node_ref(self.db()), value_type);
     }
 
     fn unpack_inner(
@@ -165,7 +171,7 @@ impl<'db> Unpacker<'db> {
                             Type::LiteralString
                         } else {
                             ty.try_iterate(self.db()).unwrap_or_else(|err| {
-                                err.report_diagnostic(&self.context, value_expr);
+                                err.report_diagnostic(&self.context, ty, value_expr);
                                 err.fallback_element_type(self.db())
                             })
                         };
