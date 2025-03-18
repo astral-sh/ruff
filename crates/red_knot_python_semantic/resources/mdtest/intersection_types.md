@@ -846,5 +846,23 @@ def mixed(
     reveal_type(i4)  # revealed: Any & Unknown
 ```
 
+## Invalid
+
+```py
+from knot_extensions import Intersection
+
+# error: [invalid-type-form] "`knot_extensions.Intersection` requires at least one argument when used in a type expression"
+def f(x: Intersection) -> None:
+    reveal_type(x)  # revealed: Unknown
+```
+
+```py
+from knot_extensions import Not
+
+# error: [invalid-type-form] "`knot_extensions.Not` requires at least one argument when used in a type expression"
+def f(x: Not) -> None:
+    reveal_type(x)  # revealed: Unknown
+```
+
 [complement laws]: https://en.wikipedia.org/wiki/Complement_(set_theory)
 [de morgan's laws]: https://en.wikipedia.org/wiki/De_Morgan%27s_laws

@@ -432,3 +432,21 @@ def _(
     reveal_type(c2)  # revealed: () -> int
     reveal_type(c3)  # revealed: (x: int, y: str) -> None
 ```
+
+## Invalid
+
+```py
+from knot_extensions import TypeOf
+
+# error: [invalid-type-form] "`knot_extensions.TypeOf` requires at least one argument when used in a type expression"
+def f(x: TypeOf) -> None:
+    reveal_type(x)  # revealed: Unknown
+```
+
+```py
+from knot_extensions import CallableTypeFromFunction
+
+# error: [invalid-type-form] "`knot_extensions.CallableTypeFromFunction` requires at least one argument when used in a type expression"
+def f(x: CallableTypeFromFunction) -> None:
+    reveal_type(x)  # revealed: Unknown
+```

@@ -3269,15 +3269,28 @@ impl<'db> Type<'db> {
                 KnownInstanceType::Literal
                 | KnownInstanceType::Optional
                 | KnownInstanceType::Union
-                | KnownInstanceType::Protocol,
+                | KnownInstanceType::Protocol
+                | KnownInstanceType::Not
+                | KnownInstanceType::Intersection
+                | KnownInstanceType::TypeOf
+                | KnownInstanceType::CallableTypeFromFunction,
             ) => Err(InvalidTypeExpressionError {
                 invalid_expressions: smallvec::smallvec![InvalidTypeExpression::InvalidBareType(
                     *self
                 )],
                 fallback_type: Type::unknown(),
             }),
-
-            Type::KnownInstance(_) => Ok(todo_type!(
+            Type::KnownInstance(
+                KnownInstanceType::TypingSelf
+                | KnownInstanceType::ReadOnly
+                | KnownInstanceType::TypeAlias
+                | KnownInstanceType::NotRequired
+                | KnownInstanceType::Concatenate
+                | KnownInstanceType::TypeIs
+                | KnownInstanceType::TypeGuard
+                | KnownInstanceType::Unpack
+                | KnownInstanceType::Required,
+            ) => Ok(todo_type!(
                 "Invalid or unsupported `KnownInstanceType` in `Type::to_type_expression`"
             )),
             Type::Instance(_) => Ok(todo_type!(
