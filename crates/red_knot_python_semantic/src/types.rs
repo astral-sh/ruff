@@ -4936,7 +4936,7 @@ impl<'db> GeneralCallableType<'db> {
                             | ParameterKind::KeywordOnly {
                                 default_ty: self_default,
                             } => {
-                                if self_default.is_some() && other_default.is_none() {
+                                if self_default.is_none() && other_default.is_some() {
                                     return false;
                                 }
                                 if !is_subtype(

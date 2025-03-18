@@ -730,6 +730,148 @@ def mixed(a: int, /, b: int) -> None: ...
 static_assert(not is_subtype_of(CallableTypeFromFunction[variadic], CallableTypeFromFunction[mixed]))
 ```
 
+#### Keyword-only
+
+For keyword-only parameters, the name matters:
+
+```py
+from knot_extensions import CallableTypeFromFunction, is_subtype_of, static_assert
+
+def keyword_int(*, a: int) -> None: ...
+def keyword_float(*, a: float) -> None: ...
+def keyword_b(*, b: int) -> None: ...
+
+static_assert(is_subtype_of(CallableTypeFromFunction[keyword_float], CallableTypeFromFunction[keyword_int]))
+static_assert(not is_subtype_of(CallableTypeFromFunction[keyword_int], CallableTypeFromFunction[keyword_float]))
+static_assert(not is_subtype_of(CallableTypeFromFunction[keyword_int], CallableTypeFromFunction[keyword_b]))
+```
+
+But, the order of the keyword-only parameters does not:
+
+```py
+def keyword_ab(*, a: float, b: float) -> None: ...
+def keyword_ba(*, b: int, a: int) -> None: ...
+
+static_assert(is_subtype_of(CallableTypeFromFunction[keyword_ab], CallableTypeFromFunction[keyword_ba]))
+static_assert(not is_subtype_of(CallableTypeFromFunction[keyword_ba], CallableTypeFromFunction[keyword_ab]))
+```
+
+#### Keyword-only with default
+
+```py
+from knot_extensions import CallableTypeFromFunction, is_subtype_of, static_assert
+
+def float_with_default(*, a: float = 1) -> None: ...
+def int_with_default(*, a: int = 1) -> None: ...
+def int_keyword(*, a: int) -> None: ...
+def empty() -> None: ...
+
+static_assert(is_subtype_of(CallableTypeFromFunction[float_with_default], CallableTypeFromFunction[int_with_default]))
+static_assert(not is_subtype_of(CallableTypeFromFunction[int_with_default], CallableTypeFromFunction[float_with_default]))
+
+static_assert(is_subtype_of(CallableTypeFromFunction[int_with_default], CallableTypeFromFunction[int_keyword]))
+static_assert(not is_subtype_of(CallableTypeFromFunction[int_keyword], CallableTypeFromFunction[int_with_default]))
+
+static_assert(is_subtype_of(CallableTypeFromFunction[int_with_default], CallableTypeFromFunction[empty]))
+static_assert(not is_subtype_of(CallableTypeFromFunction[empty], CallableTypeFromFunction[int_with_default]))
+```
+
+Here, we mix keyword-only parameter with and without the default value:
+
+```py
+def mixed(*, b: int = 1, a: int) -> None: ...
+
+static_assert(is_subtype_of(CallableTypeFromFunction[mixed], CallableTypeFromFunction[int_keyword]))
+static_assert(not is_subtype_of(CallableTypeFromFunction[int_keyword], CallableTypeFromFunction[mixed]))
+```
+
+#### Keyword-only with positional
+
+```py
+from knot_extensions import CallableTypeFromFunction, is_subtype_of, static_assert
+
+def keywords1(*, a: int, b: int) -> None: ...
+def standard(b: float, a: float) -> None: ...
+
+static_assert(is_subtype_of(CallableTypeFromFunction[standard], CallableTypeFromFunction[keywords1]))
+static_assert(not is_subtype_of(CallableTypeFromFunction[keywords1], CallableTypeFromFunction[standard]))
+```
+
+The subtype can include additional standard parameters as long as it has the default value:
+
+```py
+def standard_with_default(b: float, a: float, c: float = 1) -> None: ...
+def standard_without_default(b: float, a: float, c: float) -> None: ...
+
+static_assert(is_subtype_of(CallableTypeFromFunction[standard_with_default], CallableTypeFromFunction[keywords1]))
+static_assert(not is_subtype_of(CallableTypeFromFunction[standard_without_default], CallableTypeFromFunction[keywords1]))
+```
+
+Here, we mix keyword-only parameters with standard parameters:
+
+```py
+def keywords2(*, a: int, c: int, b: int) -> None: ...
+def mixed(b: float, a: float, *, c: float) -> None: ...
+
+static_assert(is_subtype_of(CallableTypeFromFunction[mixed], CallableTypeFromFunction[keywords2]))
+static_assert(not is_subtype_of(CallableTypeFromFunction[keywords2], CallableTypeFromFunction[mixed]))
+```
+
+But, we shouldn't consider any unmatched positional-only parameters:
+
+```py
+def mixed_positional(b: float, /, a: float) -> None: ...
+
+static_assert(not is_subtype_of(CallableTypeFromFunction[mixed_positional], CallableTypeFromFunction[keywords1]))
+```
+
+#### Keyword-variadic
+
+The name of the keyword-variadic parameter does not need to be the same in the subtype.
+
+```py
+from knot_extensions import CallableTypeFromFunction, is_subtype_of, static_assert
+
+def kwargs_float(**kwargs2: float) -> None: ...
+def kwargs_int(**kwargs1: int) -> None: ...
+
+static_assert(is_subtype_of(CallableTypeFromFunction[kwargs_float], CallableTypeFromFunction[kwargs_int]))
+static_assert(not is_subtype_of(CallableTypeFromFunction[kwargs_int], CallableTypeFromFunction[kwargs_float]))
+```
+
+A variadic parameter can be omitted in the subtype:
+
+```py
+def empty() -> None: ...
+
+static_assert(is_subtype_of(CallableTypeFromFunction[kwargs_int], CallableTypeFromFunction[empty]))
+static_assert(not is_subtype_of(CallableTypeFromFunction[empty], CallableTypeFromFunction[kwargs_int]))
+```
+
+#### Keyword-variadic with keyword-only
+
+If the subtype has a variadic parameter then any unmatched positional-only parameter from the
+supertype should be checked against the variadic parameter.
+
+```py
+from knot_extensions import CallableTypeFromFunction, is_subtype_of, static_assert
+
+def kwargs(**kwargs: float) -> None: ...
+def keyword_only(*, a: int, b: float) -> None: ...
+def keyword_variadic(*, a: int, **kwargs: int) -> None: ...
+
+static_assert(is_subtype_of(CallableTypeFromFunction[kwargs], CallableTypeFromFunction[keyword_only]))
+static_assert(is_subtype_of(CallableTypeFromFunction[kwargs], CallableTypeFromFunction[keyword_variadic]))
+```
+
+This is valid only for positional-only parameter, not any other parameter kind:
+
+```py
+def mixed(a: int, *, b: int) -> None: ...
+
+static_assert(not is_subtype_of(CallableTypeFromFunction[kwargs], CallableTypeFromFunction[mixed]))
+```
+
 #### Empty
 
 When the supertype has an empty list of parameters, then the subtype can have any kind of parameters
