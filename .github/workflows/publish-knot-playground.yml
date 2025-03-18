@@ -14,6 +14,10 @@ on:
       - "playground"
       - ".github/workflows/publish-knot-playground.yml"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref_name }}
+  cancel-in-progress: true
+
 env:
   CARGO_INCREMENTAL: 0
   CARGO_NET_RETRY: 10
