@@ -61,7 +61,7 @@ use crate::symbol::{
     module_type_implicit_global_symbol, symbol, symbol_from_bindings, symbol_from_declarations,
     typing_extensions_symbol, Boundness, LookupError,
 };
-use crate::types::call::{Argument, CallArguments, CallError};
+use crate::types::call::{Argument, Bindings, CallArguments, CallError};
 use crate::types::diagnostic::{
     report_implicit_return_type, report_invalid_arguments_to_annotated,
     report_invalid_arguments_to_callable, report_invalid_assignment,
@@ -1141,7 +1141,8 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.infer_type_parameters(type_params);
 
         if let Some(arguments) = class.arguments.as_deref() {
-            self.infer_arguments(arguments, ParameterExpectations::default());
+            let call_arguments = Self::parse_arguments(arguments);
+            self.infer_argument_types(arguments, &call_arguments, ParameterExpectations::default());
         }
     }
 
@@ -3232,51 +3233,60 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.infer_expression(expression)
     }
 
-    fn infer_arguments<'a>(
-        &mut self,
-        arguments: &'a ast::Arguments,
-        parameter_expectations: ParameterExpectations,
-    ) -> CallArguments<'a, 'db> {
+    fn parse_arguments<'a>(arguments: &'a ast::Arguments) -> CallArguments<'a, 'db> {
         arguments
             .arguments_source_order()
-            .enumerate()
-            .map(|(index, arg_or_keyword)| {
-                let infer_argument_type = match parameter_expectations.expectation_at_index(index) {
-                    ParameterExpectation::TypeExpression => Self::infer_type_expression,
-                    ParameterExpectation::ValueExpression => Self::infer_expression,
-                };
-
+            .map(|arg_or_keyword| {
                 match arg_or_keyword {
                     ast::ArgOrKeyword::Arg(arg) => match arg {
-                        ast::Expr::Starred(ast::ExprStarred {
-                            value,
-                            range: _,
-                            ctx: _,
-                        }) => {
-                            let ty = infer_argument_type(self, value);
-                            self.store_expression_type(arg, ty);
-                            Argument::variadic().with_argument_type(ty)
-                        }
+                        ast::Expr::Starred(ast::ExprStarred { .. }) => Argument::variadic(),
                         // TODO diagnostic if after a keyword argument
-                        _ => Argument::positional()
-                            .with_argument_type(infer_argument_type(self, arg)),
+                        _ => Argument::positional(),
                     },
-                    ast::ArgOrKeyword::Keyword(ast::Keyword {
-                        arg,
-                        value,
-                        range: _,
-                    }) => {
-                        let ty = infer_argument_type(self, value);
+                    ast::ArgOrKeyword::Keyword(ast::Keyword { arg, .. }) => {
                         if let Some(arg) = arg {
-                            Argument::keyword(&arg.id).with_argument_type(ty)
+                            Argument::keyword(&arg.id)
                         } else {
                             // TODO diagnostic if not last
-                            Argument::keywords().with_argument_type(ty)
+                            Argument::keywords()
                         }
                     }
                 }
             })
             .collect()
+    }
+
+    fn infer_argument_types<'a>(
+        &mut self,
+        ast_arguments: &'a ast::Arguments,
+        arguments: &CallArguments<'a, 'db>,
+        parameter_expectations: ParameterExpectations,
+    ) {
+        for (index, (arg_or_keyword, argument)) in ast_arguments
+            .arguments_source_order()
+            .zip(arguments.iter())
+            .enumerate()
+        {
+            let infer_argument_type = match parameter_expectations.expectation_at_index(index) {
+                ParameterExpectation::TypeExpression => Self::infer_type_expression,
+                ParameterExpectation::ValueExpression => Self::infer_expression,
+            };
+
+            match arg_or_keyword {
+                ast::ArgOrKeyword::Arg(arg) => match arg {
+                    ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
+                        let ty = infer_argument_type(self, value);
+                        self.store_expression_type(arg, ty);
+                        argument.set_argument_type(ty);
+                    }
+                    _ => argument.set_argument_type(infer_argument_type(self, arg)),
+                },
+                ast::ArgOrKeyword::Keyword(ast::Keyword { value, .. }) => {
+                    let ty = infer_argument_type(self, value);
+                    argument.set_argument_type(ty);
+                }
+            }
+        }
     }
 
     fn infer_optional_expression(&mut self, expression: Option<&ast::Expr>) -> Option<Type<'db>> {
@@ -3837,16 +3847,19 @@ impl<'db> TypeInferenceBuilder<'db> {
             arguments,
         } = call_expression;
 
+        let call_arguments = Self::parse_arguments(arguments);
         let function_type = self.infer_expression(func);
+        let signatures = function_type.signatures(self.db());
+        let bindings = Bindings::match_parameters(signatures, &call_arguments);
 
         let parameter_expectations = function_type
             .into_function_literal()
             .and_then(|f| f.known(self.db()))
             .map(KnownFunction::parameter_expectations)
             .unwrap_or_default();
+        self.infer_argument_types(arguments, &call_arguments, parameter_expectations);
 
-        let call_arguments = self.infer_arguments(arguments, parameter_expectations);
-        match function_type.try_call(self.db(), &call_arguments) {
+        match bindings.check_types(self.db()) {
             Ok(bindings) => {
                 for binding in &bindings {
                     let Some(known_function) = binding

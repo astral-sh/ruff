@@ -1,3 +1,4 @@
+use std::cell::Cell;
 use std::rc::Rc;
 
 use super::Type;
@@ -75,48 +76,52 @@ impl<'a, 'db> FromIterator<Argument<'a, 'db>> for CallArguments<'a, 'db> {
 pub(crate) struct Argument<'a, 'db> {
     kind: ArgumentKind<'a>,
     /// The inferred type of this argument.
-    argument_type: Type<'db>,
+    argument_type: Cell<Type<'db>>,
 }
 
 impl<'a, 'db> Argument<'a, 'db> {
     pub(crate) fn keyword(name: &'a str) -> Self {
         Self {
             kind: ArgumentKind::Keyword(name),
-            argument_type: Type::unknown(),
+            argument_type: Cell::new(Type::unknown()),
         }
     }
 
     pub(crate) fn keywords() -> Self {
         Self {
             kind: ArgumentKind::Keywords,
-            argument_type: Type::unknown(),
+            argument_type: Cell::new(Type::unknown()),
         }
     }
 
     pub(crate) fn positional() -> Self {
         Self {
             kind: ArgumentKind::Positional,
-            argument_type: Type::unknown(),
+            argument_type: Cell::new(Type::unknown()),
         }
     }
 
     pub(crate) fn synthetic() -> Self {
         Self {
             kind: ArgumentKind::Synthetic,
-            argument_type: Type::unknown(),
+            argument_type: Cell::new(Type::unknown()),
         }
     }
 
     pub(crate) fn variadic() -> Self {
         Self {
             kind: ArgumentKind::Variadic,
-            argument_type: Type::unknown(),
+            argument_type: Cell::new(Type::unknown()),
         }
     }
 
-    pub(crate) fn with_argument_type(mut self, argument_type: Type<'db>) -> Self {
-        self.argument_type = argument_type;
+    pub(crate) fn with_argument_type(self, argument_type: Type<'db>) -> Self {
+        self.argument_type.set(argument_type);
         self
+    }
+
+    pub(crate) fn set_argument_type(&self, argument_type: Type<'db>) {
+        self.argument_type.set(argument_type);
     }
 
     pub(crate) fn kind(&self) -> ArgumentKind<'a> {
@@ -124,7 +129,7 @@ impl<'a, 'db> Argument<'a, 'db> {
     }
 
     pub(crate) fn argument_type(&self) -> Type<'db> {
-        self.argument_type
+        self.argument_type.get()
     }
 }
 
