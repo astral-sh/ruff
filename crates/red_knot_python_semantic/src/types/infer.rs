@@ -3874,7 +3874,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                     match known_function {
                         KnownFunction::RevealType => {
-                            if let [revealed_type] = overload.parameter_types() {
+                            if let [Some(revealed_type)] = overload.parameter_types() {
                                 self.context.report_diagnostic(
                                     call_expression,
                                     DiagnosticId::RevealedType,
@@ -3888,7 +3888,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                             }
                         }
                         KnownFunction::AssertType => {
-                            if let [actual_ty, asserted_ty] = overload.parameter_types() {
+                            if let [Some(actual_ty), Some(asserted_ty)] = overload.parameter_types()
+                            {
                                 if !actual_ty.is_gradual_equivalent_to(self.db(), *asserted_ty) {
                                     self.context.report_lint(
                                             &TYPE_ASSERTION_FAILURE,
@@ -3903,7 +3904,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             }
                         }
                         KnownFunction::StaticAssert => {
-                            if let [parameter_ty, message] = overload.parameter_types() {
+                            if let [Some(parameter_ty), message] = overload.parameter_types() {
                                 let truthiness = match parameter_ty.try_bool(self.db()) {
                                     Ok(truthiness) => truthiness,
                                     Err(err) => {
@@ -3926,8 +3927,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 };
 
                                 if !truthiness.is_always_true() {
-                                    if let Some(message) =
-                                        message.into_string_literal().map(|s| &**s.value(self.db()))
+                                    if let Some(message) = message
+                                        .and_then(Type::into_string_literal)
+                                        .map(|s| &**s.value(self.db()))
                                     {
                                         self.context.report_lint(
                                             &STATIC_ASSERT_ERROR,

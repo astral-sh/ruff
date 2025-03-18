@@ -48,21 +48,6 @@ impl<'a, 'db> CallArguments<'a, 'db> {
     pub(crate) fn iter(&self) -> impl Iterator<Item = &Argument<'a, 'db>> {
         self.bound_self.iter().chain(self.arguments.as_ref())
     }
-
-    /// This should only be used when evaluating known functions with special-case return values.
-    pub(crate) fn first_argument(&self) -> Option<Type<'db>> {
-        self.iter().next().map(Argument::argument_type)
-    }
-
-    /// This should only be used when evaluating known functions with special-case return values.
-    pub(crate) fn second_argument(&self) -> Option<Type<'db>> {
-        self.iter().nth(1).map(Argument::argument_type)
-    }
-
-    /// This should only be used when evaluating known functions with special-case return values.
-    pub(crate) fn third_argument(&self) -> Option<Type<'db>> {
-        self.iter().nth(2).map(Argument::argument_type)
-    }
 }
 
 impl<'a, 'db> FromIterator<Argument<'a, 'db>> for CallArguments<'a, 'db> {
