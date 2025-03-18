@@ -75,7 +75,7 @@ RUF060.py:19:1: RUF060 [*] Use `.setdefault(...)` instead of check and assign
 20 | |     d[x] = 3
    | |____________^ RUF060
 21 |
-22 |   if "c" in to_list:
+22 |   if "c" not in to_list:
    |
    = help: Replace the statement with `d.setdefault(...)
 
@@ -87,20 +87,18 @@ RUF060.py:19:1: RUF060 [*] Use `.setdefault(...)` instead of check and assign
 20    |-    d[x] = 3
    19 |+d.setdefault(x := get_s(), 3)
 21 20 | 
-22 21 | if "c" in to_list:
-23 22 |     to_list["c"].append(3)
+22 21 | if "c" not in to_list:
+23 22 |     to_list["c"] = []
 
 RUF060.py:22:1: RUF060 [*] Use `.setdefault(...)` instead of check and assign
    |
 20 |       d[x] = 3
 21 |
-22 | / if "c" in to_list:
-23 | |     to_list["c"].append(3)
-24 | | else:
-25 | |     to_list["c"] = [3]
-   | |______________________^ RUF060
-26 |
-27 |   if "c" not in to_list:
+22 | / if "c" not in to_list:
+23 | |     to_list["c"] = []
+   | |_____________________^ RUF060
+24 |
+25 |   if "c" in to_list:
    |
    = help: Replace the statement with `to_list.setdefault(...)
 
@@ -108,203 +106,251 @@ RUF060.py:22:1: RUF060 [*] Use `.setdefault(...)` instead of check and assign
 19 19 | if (x := get_s()) not in d:
 20 20 |     d[x] = 3
 21 21 | 
-22    |-if "c" in to_list:
-23    |-    to_list["c"].append(3)
-24    |-else:
-25    |-    to_list["c"] = [3]
-   22 |+to_list.setdefault("c", []).append(3)
-26 23 | 
-27 24 | if "c" not in to_list:
-28 25 |     to_list["c"] = [3]
+22    |-if "c" not in to_list:
+23    |-    to_list["c"] = []
+   22 |+to_list.setdefault("c", [])
+24 23 | 
+25 24 | if "c" in to_list:
+26 25 |     to_list["c"].append(3)
 
-RUF060.py:27:1: RUF060 [*] Use `.setdefault(...)` instead of check and assign
+RUF060.py:25:1: RUF060 [*] Use `.setdefault(...)` instead of check and assign
    |
-25 |       to_list["c"] = [3]
-26 |
-27 | / if "c" not in to_list:
+23 |       to_list["c"] = []
+24 |
+25 | / if "c" in to_list:
+26 | |     to_list["c"].append(3)
+27 | | else:
 28 | |     to_list["c"] = [3]
-29 | | else:
-30 | |     to_list["c"].append(3)
-   | |__________________________^ RUF060
-31 |
-32 |   if "c" in to_list:
+   | |______________________^ RUF060
+29 |
+30 |   if "c" not in to_list:
    |
    = help: Replace the statement with `to_list.setdefault(...)
 
 ℹ Safe fix
-24 24 | else:
-25 25 |     to_list["c"] = [3]
-26 26 | 
-27    |-if "c" not in to_list:
+22 22 | if "c" not in to_list:
+23 23 |     to_list["c"] = []
+24 24 | 
+25    |-if "c" in to_list:
+26    |-    to_list["c"].append(3)
+27    |-else:
 28    |-    to_list["c"] = [3]
-29    |-else:
-30    |-    to_list["c"].append(3)
-   27 |+to_list.setdefault("c", []).append(3)
-31 28 | 
-32 29 | if "c" in to_list:
-33 30 |     to_list["c"].append(expensive())
+   25 |+to_list.setdefault("c", []).append(3)
+29 26 | 
+30 27 | if "c" not in to_list:
+31 28 |     to_list["c"] = [3]
 
-RUF060.py:32:1: RUF060 [*] Use `.setdefault(...)` instead of check and assign
+RUF060.py:30:1: RUF060 [*] Use `.setdefault(...)` instead of check and assign
    |
-30 |       to_list["c"].append(3)
-31 |
-32 | / if "c" in to_list:
-33 | |     to_list["c"].append(expensive())
-34 | | else:
-35 | |     to_list["c"] = [expensive()]
-   | |________________________________^ RUF060
-36 |
-37 |   if "c" in to_set:
+28 |       to_list["c"] = [3]
+29 |
+30 | / if "c" not in to_list:
+31 | |     to_list["c"] = [3]
+32 | | else:
+33 | |     to_list["c"].append(3)
+   | |__________________________^ RUF060
+34 |
+35 |   if "c" in to_list:
    |
    = help: Replace the statement with `to_list.setdefault(...)
 
 ℹ Safe fix
-29 29 | else:
-30 30 |     to_list["c"].append(3)
-31 31 | 
-32    |-if "c" in to_list:
-33    |-    to_list["c"].append(expensive())
-34    |-else:
-35    |-    to_list["c"] = [expensive()]
-   32 |+to_list.setdefault("c", []).append(expensive())
-36 33 | 
-37 34 | if "c" in to_set:
-38 35 |     to_set["c"].add(3)
+27 27 | else:
+28 28 |     to_list["c"] = [3]
+29 29 | 
+30    |-if "c" not in to_list:
+31    |-    to_list["c"] = [3]
+32    |-else:
+33    |-    to_list["c"].append(3)
+   30 |+to_list.setdefault("c", []).append(3)
+34 31 | 
+35 32 | if "c" in to_list:
+36 33 |     to_list["c"].append(expensive())
 
-RUF060.py:37:1: RUF060 [*] Use `.setdefault(...)` instead of check and assign
+RUF060.py:35:1: RUF060 [*] Use `.setdefault(...)` instead of check and assign
    |
-35 |       to_list["c"] = [expensive()]
-36 |
-37 | / if "c" in to_set:
-38 | |     to_set["c"].add(3)
-39 | | else:
-40 | |     to_set["c"] = {3}
-   | |_____________________^ RUF060
-41 |
-42 |   def foo(**kwargs):
+33 |       to_list["c"].append(3)
+34 |
+35 | / if "c" in to_list:
+36 | |     to_list["c"].append(expensive())
+37 | | else:
+38 | |     to_list["c"] = [expensive()]
+   | |________________________________^ RUF060
+39 |
+40 |   if "c" not in to_set:
+   |
+   = help: Replace the statement with `to_list.setdefault(...)
+
+ℹ Safe fix
+32 32 | else:
+33 33 |     to_list["c"].append(3)
+34 34 | 
+35    |-if "c" in to_list:
+36    |-    to_list["c"].append(expensive())
+37    |-else:
+38    |-    to_list["c"] = [expensive()]
+   35 |+to_list.setdefault("c", []).append(expensive())
+39 36 | 
+40 37 | if "c" not in to_set:
+41 38 |     to_set["c"] = set()
+
+RUF060.py:40:1: RUF060 [*] Use `.setdefault(...)` instead of check and assign
+   |
+38 |       to_list["c"] = [expensive()]
+39 |
+40 | / if "c" not in to_set:
+41 | |     to_set["c"] = set()
+   | |_______________________^ RUF060
+42 |
+43 |   if "c" in to_set:
    |
    = help: Replace the statement with `to_set.setdefault(...)
 
 ℹ Safe fix
-34 34 | else:
-35 35 |     to_list["c"] = [expensive()]
-36 36 | 
-37    |-if "c" in to_set:
-38    |-    to_set["c"].add(3)
-39    |-else:
-40    |-    to_set["c"] = {3}
-   37 |+to_set.setdefault("c", set()).add(3)
-41 38 | 
-42 39 | def foo(**kwargs):
-43 40 |     if "option" not in kwargs:
+37 37 | else:
+38 38 |     to_list["c"] = [expensive()]
+39 39 | 
+40    |-if "c" not in to_set:
+41    |-    to_set["c"] = set()
+   40 |+to_set.setdefault("c", set())
+42 41 | 
+43 42 | if "c" in to_set:
+44 43 |     to_set["c"].add(3)
 
-RUF060.py:43:5: RUF060 [*] Use `.setdefault(...)` instead of check and assign
+RUF060.py:43:1: RUF060 [*] Use `.setdefault(...)` instead of check and assign
    |
-42 |   def foo(**kwargs):
-43 | /     if "option" not in kwargs:
-44 | |         kwargs["option"] = 3
+41 |       to_set["c"] = set()
+42 |
+43 | / if "c" in to_set:
+44 | |     to_set["c"].add(3)
+45 | | else:
+46 | |     to_set["c"] = {3}
+   | |_____________________^ RUF060
+47 |
+48 |   def foo(**kwargs):
+   |
+   = help: Replace the statement with `to_set.setdefault(...)
+
+ℹ Safe fix
+40 40 | if "c" not in to_set:
+41 41 |     to_set["c"] = set()
+42 42 | 
+43    |-if "c" in to_set:
+44    |-    to_set["c"].add(3)
+45    |-else:
+46    |-    to_set["c"] = {3}
+   43 |+to_set.setdefault("c", set()).add(3)
+47 44 | 
+48 45 | def foo(**kwargs):
+49 46 |     if "option" not in kwargs:
+
+RUF060.py:49:5: RUF060 [*] Use `.setdefault(...)` instead of check and assign
+   |
+48 |   def foo(**kwargs):
+49 | /     if "option" not in kwargs:
+50 | |         kwargs["option"] = 3
    | |____________________________^ RUF060
    |
    = help: Replace the statement with `kwargs.setdefault(...)
 
 ℹ Safe fix
-40 40 |     to_set["c"] = {3}
-41 41 | 
-42 42 | def foo(**kwargs):
-43    |-    if "option" not in kwargs:
-44    |-        kwargs["option"] = 3
-   43 |+    kwargs.setdefault("option", 3)
-45 44 | 
-46 45 | 
-47 46 | # Errors (unsafe).
+46 46 |     to_set["c"] = {3}
+47 47 | 
+48 48 | def foo(**kwargs):
+49    |-    if "option" not in kwargs:
+50    |-        kwargs["option"] = 3
+   49 |+    kwargs.setdefault("option", 3)
+51 50 | 
+52 51 | 
+53 52 | # Errors (unsafe).
 
-RUF060.py:48:1: RUF060 [*] Use `.setdefault(...)` instead of check and assign
+RUF060.py:54:1: RUF060 [*] Use `.setdefault(...)` instead of check and assign
    |
-47 |   # Errors (unsafe).
-48 | / if "c" not in d:
-49 | |     # important comment
-50 | |     d["c"] = 3
+53 |   # Errors (unsafe).
+54 | / if "c" not in d:
+55 | |     # important comment
+56 | |     d["c"] = 3
    | |______________^ RUF060
-51 |
-52 |   if "c" not in d:
-   |
-   = help: Replace the statement with `d.setdefault(...)
-
-ℹ Unsafe fix
-45 45 | 
-46 46 | 
-47 47 | # Errors (unsafe).
-48    |-if "c" not in d:
-49    |-    # important comment
-50    |-    d["c"] = 3
-   48 |+d.setdefault("c", 3)
-51 49 | 
-52 50 | if "c" not in d:
-53 51 |     d["c"] = 1 + 1
-
-RUF060.py:52:1: RUF060 [*] Use `.setdefault(...)` instead of check and assign
-   |
-50 |       d["c"] = 3
-51 |
-52 | / if "c" not in d:
-53 | |     d["c"] = 1 + 1
-   | |__________________^ RUF060
-54 |
-55 |   if "c" not in d:
-   |
-   = help: Replace the statement with `d.setdefault(...)
-
-ℹ Unsafe fix
-49 49 |     # important comment
-50 50 |     d["c"] = 3
-51 51 | 
-52    |-if "c" not in d:
-53    |-    d["c"] = 1 + 1
-   52 |+d.setdefault("c", 1 + 1)
-54 53 | 
-55 54 | if "c" not in d:
-56 55 |     d["c"] = expensive()
-
-RUF060.py:55:1: RUF060 [*] Use `.setdefault(...)` instead of check and assign
-   |
-53 |       d["c"] = 1 + 1
-54 |
-55 | / if "c" not in d:
-56 | |     d["c"] = expensive()
-   | |________________________^ RUF060
 57 |
-58 |   if get_s() not in d:
+58 |   if "c" not in d:
    |
    = help: Replace the statement with `d.setdefault(...)
 
 ℹ Unsafe fix
-52 52 | if "c" not in d:
-53 53 |     d["c"] = 1 + 1
-54 54 | 
-55    |-if "c" not in d:
-56    |-    d["c"] = expensive()
-   55 |+d.setdefault("c", expensive())
-57 56 | 
-58 57 | if get_s() not in d:
-59 58 |     d[get_s()] = 3
+51 51 | 
+52 52 | 
+53 53 | # Errors (unsafe).
+54    |-if "c" not in d:
+55    |-    # important comment
+56    |-    d["c"] = 3
+   54 |+d.setdefault("c", 3)
+57 55 | 
+58 56 | if "c" not in d:
+59 57 |     d["c"] = 1 + 1
 
 RUF060.py:58:1: RUF060 [*] Use `.setdefault(...)` instead of check and assign
    |
-56 |       d["c"] = expensive()
+56 |       d["c"] = 3
 57 |
-58 | / if get_s() not in d:
-59 | |     d[get_s()] = 3
+58 | / if "c" not in d:
+59 | |     d["c"] = 1 + 1
+   | |__________________^ RUF060
+60 |
+61 |   if "c" not in d:
+   |
+   = help: Replace the statement with `d.setdefault(...)
+
+ℹ Unsafe fix
+55 55 |     # important comment
+56 56 |     d["c"] = 3
+57 57 | 
+58    |-if "c" not in d:
+59    |-    d["c"] = 1 + 1
+   58 |+d.setdefault("c", 1 + 1)
+60 59 | 
+61 60 | if "c" not in d:
+62 61 |     d["c"] = expensive()
+
+RUF060.py:61:1: RUF060 [*] Use `.setdefault(...)` instead of check and assign
+   |
+59 |       d["c"] = 1 + 1
+60 |
+61 | / if "c" not in d:
+62 | |     d["c"] = expensive()
+   | |________________________^ RUF060
+63 |
+64 |   if get_s() not in d:
+   |
+   = help: Replace the statement with `d.setdefault(...)
+
+ℹ Unsafe fix
+58 58 | if "c" not in d:
+59 59 |     d["c"] = 1 + 1
+60 60 | 
+61    |-if "c" not in d:
+62    |-    d["c"] = expensive()
+   61 |+d.setdefault("c", expensive())
+63 62 | 
+64 63 | if get_s() not in d:
+65 64 |     d[get_s()] = 3
+
+RUF060.py:64:1: RUF060 [*] Use `.setdefault(...)` instead of check and assign
+   |
+62 |       d["c"] = expensive()
+63 |
+64 | / if get_s() not in d:
+65 | |     d[get_s()] = 3
    | |__________________^ RUF060
    |
    = help: Replace the statement with `d.setdefault(...)
 
 ℹ Unsafe fix
-55 55 | if "c" not in d:
-56 56 |     d["c"] = expensive()
-57 57 | 
-58    |-if get_s() not in d:
-59    |-    d[get_s()] = 3
-   58 |+d.setdefault(get_s(), 3)
-60 59 | 
-61 60 | 
-62 61 | # Ok
+61 61 | if "c" not in d:
+62 62 |     d["c"] = expensive()
+63 63 | 
+64    |-if get_s() not in d:
+65    |-    d[get_s()] = 3
+   64 |+d.setdefault(get_s(), 3)
+66 65 | 
+67 66 | 
+68 67 | # Ok

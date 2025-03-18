@@ -19,6 +19,9 @@ d["c"] = d.get("c", 3)
 if (x := get_s()) not in d:
     d[x] = 3
 
+if "c" not in to_list:
+    to_list["c"] = []
+
 if "c" in to_list:
     to_list["c"].append(3)
 else:
@@ -33,6 +36,9 @@ if "c" in to_list:
     to_list["c"].append(expensive())
 else:
     to_list["c"] = [expensive()]
+
+if "c" not in to_set:
+    to_set["c"] = set()
 
 if "c" in to_set:
     to_set["c"].add(3)
