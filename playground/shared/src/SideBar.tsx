@@ -40,7 +40,7 @@ export function SideBarEntry({
       aria-label={title}
       onClick={onClick}
       role="button"
-      className={`group py-4 px-2 relative flex items-center justify-center flex-col fill-white text-white ${
+      className={`group py-4 px-2 relative flex items-center justify-center flex-col fill-white text-white cursor-pointer ${
         selected ? "opacity-100" : "opacity-50 hover:opacity-100"
       }`}
     >

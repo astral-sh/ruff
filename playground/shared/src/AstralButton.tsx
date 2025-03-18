@@ -18,6 +18,7 @@ export default function AstralButton({
         "text-black",
         "hover:text-white",
         "hover:bg-galaxy",
+        "cursor-pointer",
         "outline-1",
         "dark:outline",
         "dark:hover:outline-white",

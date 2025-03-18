@@ -64,7 +64,7 @@ export function Files({
           <button
             disabled={lastFile}
             onClick={lastFile ? undefined : () => onRemove(id)}
-            className={"inline-block disabled:opacity-50"}
+            className={"inline-block disabled:opacity-50 cursor-pointer"}
             title="Close file"
           >
             <span className="sr-only">Close</span>
@@ -73,7 +73,11 @@ export function Files({
         </ListItem>
       ))}
       <ListItem selected={false} theme={theme}>
-        <button onClick={handleAdd} title="Add file" className="inline-block">
+        <button
+          onClick={handleAdd}
+          title="Add file"
+          className="inline-block cursor-pointer"
+        >
           <span className="sr-only">Add file</span>
           <Icons.Add />
         </button>
@@ -143,7 +147,7 @@ function FileEntry({ name, onClicked, onRenamed, selected }: FileEntryProps) {
           onClicked();
         }
       }}
-      className="flex gap-2 items-center py-4"
+      className="flex gap-2 items-center py-4 cursor-pointer"
     >
       <span className="inline-block flex-none" aria-hidden>
         <Icons.Python width={12} height={12} />
