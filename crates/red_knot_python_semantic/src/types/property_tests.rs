@@ -24,7 +24,7 @@
 //!   --ignored types::property_tests::stable; do :; done
 //! ```
 
-use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock};
 
 use crate::db::tests::{setup_db, TestDb};
 use crate::symbol::{builtins_symbol, known_module_symbol};
@@ -327,9 +327,9 @@ impl Arbitrary for Ty {
 
 static CACHED_DB: OnceLock<Arc<Mutex<TestDb>>> = OnceLock::new();
 
-fn get_cached_db() -> MutexGuard<'static, TestDb> {
+fn get_cached_db() -> TestDb {
     let db = CACHED_DB.get_or_init(|| Arc::new(Mutex::new(setup_db())));
-    db.lock().unwrap()
+    db.lock().unwrap().clone()
 }
 
 /// A macro to define a property test for types.
@@ -348,8 +348,7 @@ macro_rules! type_property_test {
         #[quickcheck_macros::quickcheck]
         #[ignore]
         fn $test_name($($types: super::Ty),+) -> bool {
-            let db_cached = super::get_cached_db();
-            let $db = &*db_cached;
+            let $db = &super::get_cached_db();
             $(let $types = $types.into_type($db);)+
 
             $property
