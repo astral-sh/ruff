@@ -1,5 +1,4 @@
 use std::hash::Hash;
-use std::rc::Rc;
 use std::str::FromStr;
 
 use bitflags::bitflags;
@@ -1690,7 +1689,7 @@ impl<'db> Type<'db> {
 
         if let Symbol::Type(descr_get, descr_get_boundness) = descr_get {
             let return_ty = descr_get
-                .try_call(db, CallArguments::positional([self, instance, owner]))
+                .try_call(db, &CallArguments::positional([self, instance, owner]))
                 .map(|bindings| {
                     if descr_get_boundness == Boundness::Bound {
                         bindings.return_type(db)
@@ -2042,7 +2041,7 @@ impl<'db> Type<'db> {
                         self.try_call_dunder(
                             db,
                             "__getattr__",
-                            CallArguments::positional([Type::StringLiteral(
+                            &CallArguments::positional([Type::StringLiteral(
                                 StringLiteralType::new(db, Box::from(name.as_str())),
                             )]),
                         )
@@ -2163,7 +2162,7 @@ impl<'db> Type<'db> {
                         }
                     };
 
-                    match self.try_call_dunder(db, "__bool__", CallArguments::none()) {
+                    match self.try_call_dunder(db, "__bool__", &CallArguments::none()) {
                         Ok(outcome) => {
                             let return_type = outcome.return_type(db);
                             if !return_type.is_assignable_to(db, KnownClass::Bool.to_instance(db)) {
@@ -2301,7 +2300,7 @@ impl<'db> Type<'db> {
             return usize_len.try_into().ok().map(Type::IntLiteral);
         }
 
-        let return_ty = match self.try_call_dunder(db, "__len__", CallArguments::none()) {
+        let return_ty = match self.try_call_dunder(db, "__len__", &CallArguments::none()) {
             Ok(bindings) => bindings.return_type(db),
             Err(CallDunderError::PossiblyUnbound(bindings)) => bindings.return_type(db),
 
@@ -2597,11 +2596,10 @@ impl<'db> Type<'db> {
     fn try_call<'call>(
         self,
         db: &'db dyn Db,
-        arguments: CallArguments<'call, 'db>,
+        arguments: &CallArguments<'call, 'db>,
     ) -> Result<Bindings<'call, 'db>, CallError<'call, 'db>> {
         let signatures = self.signatures(db);
-        let arguments = Rc::new(arguments);
-        Bindings::match_parameters(signatures, &arguments).check_types(db)
+        Bindings::match_parameters(signatures, arguments).check_types(db)
     }
 
     /// Look up a dunder method on the meta-type of `self` and call it.
@@ -2612,7 +2610,7 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         name: &str,
-        arguments: CallArguments<'call, 'db>,
+        arguments: &CallArguments<'call, 'db>,
     ) -> Result<Bindings<'call, 'db>, CallDunderError<'call, 'db>> {
         match self
             .member_lookup_with_policy(db, name.into(), MemberLookupPolicy::NoInstanceFallback)
@@ -2620,9 +2618,7 @@ impl<'db> Type<'db> {
         {
             Symbol::Type(dunder_callable, boundness) => {
                 let signatures = dunder_callable.signatures(db);
-                let arguments = Rc::new(arguments);
-                let bindings =
-                    Bindings::match_parameters(signatures, &arguments).check_types(db)?;
+                let bindings = Bindings::match_parameters(signatures, arguments).check_types(db)?;
                 if boundness == Boundness::PossiblyUnbound {
                     return Err(CallDunderError::PossiblyUnbound(Box::new(bindings)));
                 }
@@ -2658,19 +2654,19 @@ impl<'db> Type<'db> {
             self.try_call_dunder(
                 db,
                 "__getitem__",
-                CallArguments::positional([KnownClass::Int.to_instance(db)]),
+                &CallArguments::positional([KnownClass::Int.to_instance(db)]),
             )
             .map(|dunder_getitem_outcome| dunder_getitem_outcome.return_type(db))
         };
 
         let try_call_dunder_next_on_iterator = |iterator: Type<'db>| {
             iterator
-                .try_call_dunder(db, "__next__", CallArguments::none())
+                .try_call_dunder(db, "__next__", &CallArguments::none())
                 .map(|dunder_next_outcome| dunder_next_outcome.return_type(db))
         };
 
         let dunder_iter_result = self
-            .try_call_dunder(db, "__iter__", CallArguments::none())
+            .try_call_dunder(db, "__iter__", &CallArguments::none())
             .map(|dunder_iter_outcome| dunder_iter_outcome.return_type(db));
 
         match dunder_iter_result {
@@ -2757,11 +2753,11 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
     ) -> Result<Type<'db>, ContextManagerError<'call, 'db>> {
-        let enter = self.try_call_dunder(db, "__enter__", CallArguments::none());
+        let enter = self.try_call_dunder(db, "__enter__", &CallArguments::none());
         let exit = self.try_call_dunder(
             db,
             "__exit__",
-            CallArguments::positional([Type::none(db), Type::none(db), Type::none(db)]),
+            &CallArguments::positional([Type::none(db), Type::none(db), Type::none(db)]),
         );
 
         // TODO: Make use of Protocols when we support it (the manager be assignable to `contextlib.AbstractContextManager`).
@@ -3482,7 +3478,7 @@ impl<'db> IterationError<'_, 'db> {
 
             Self::IterCallError(_, dunder_iter_bindings) => dunder_iter_bindings
                 .return_type(db)
-                .try_call_dunder(db, "__next__", CallArguments::none())
+                .try_call_dunder(db, "__next__", &CallArguments::none())
                 .map(|dunder_next_outcome| Some(dunder_next_outcome.return_type(db)))
                 .unwrap_or_else(|dunder_next_call_error| dunder_next_call_error.return_type(db)),
 

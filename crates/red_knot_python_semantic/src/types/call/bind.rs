@@ -3,8 +3,6 @@
 //! [signatures][crate::types::signatures], we have to handle the fact that the callable might be a
 //! union of types, each of which might contain multiple overloads.
 
-use std::rc::Rc;
-
 use smallvec::SmallVec;
 
 use super::{
@@ -46,7 +44,7 @@ impl<'call, 'db> Bindings<'call, 'db> {
     /// overload (if any).
     pub(crate) fn match_parameters(
         signatures: Signatures<'db>,
-        arguments: &Rc<CallArguments<'call, 'db>>,
+        arguments: &CallArguments<'call, 'db>,
     ) -> Self {
         let elements: SmallVec<[CallableBinding<'call, 'db>; 1]> = signatures
             .iter()
@@ -469,7 +467,7 @@ pub(crate) struct CallableBinding<'call, 'db> {
     pub(crate) callable_type: Type<'db>,
     pub(crate) signature_type: Type<'db>,
     pub(crate) dunder_call_is_possibly_unbound: bool,
-    arguments: Rc<CallArguments<'call, 'db>>,
+    arguments: CallArguments<'call, 'db>,
 
     /// The bindings of each overload of this callable. Will be empty if the type is not callable.
     ///
@@ -481,13 +479,12 @@ pub(crate) struct CallableBinding<'call, 'db> {
 impl<'call, 'db> CallableBinding<'call, 'db> {
     fn match_parameters(
         signature: &CallableSignature<'db>,
-        mut arguments: Rc<CallArguments<'call, 'db>>,
+        mut arguments: CallArguments<'call, 'db>,
     ) -> Self {
         // If this callable is a bound method, prepend the self instance onto the arguments list
         // before checking.
         if let Some(bound_type) = signature.bound_type {
-            let with_self = arguments.with_self(bound_type);
-            *Rc::make_mut(&mut arguments) = with_self;
+            arguments = arguments.with_self(bound_type);
         }
 
         // TODO: This checks every overload. In the proposed more detailed call checking spec [1],
@@ -498,7 +495,7 @@ impl<'call, 'db> CallableBinding<'call, 'db> {
         // [1] https://github.com/python/typing/pull/1839
         let overloads = signature
             .into_iter()
-            .map(|signature| Binding::match_parameters(signature, arguments.as_ref()))
+            .map(|signature| Binding::match_parameters(signature, &arguments))
             .collect();
         CallableBinding {
             callable_type: signature.callable_type,
@@ -511,7 +508,7 @@ impl<'call, 'db> CallableBinding<'call, 'db> {
 
     fn check_types(&mut self, db: &'db dyn Db, signature: &CallableSignature<'db>) {
         for (signature, overload) in signature.iter().zip(&mut self.overloads) {
-            overload.check_types(db, signature, self.arguments.as_ref());
+            overload.check_types(db, signature, &self.arguments);
         }
     }
 

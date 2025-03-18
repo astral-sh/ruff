@@ -1,13 +1,21 @@
+use std::rc::Rc;
+
 use super::Type;
 
-/// Typed arguments for a single call, in source order.
+/// Typed arguments for a single call, in source order, with an optional bound self/cls parameter.
 #[derive(Clone, Debug, Default)]
-pub(crate) struct CallArguments<'a, 'db>(Vec<Argument<'a, 'db>>);
+pub(crate) struct CallArguments<'a, 'db> {
+    bound_self: Option<Argument<'a, 'db>>,
+    arguments: Rc<[Argument<'a, 'db>]>,
+}
 
 impl<'a, 'db> CallArguments<'a, 'db> {
     /// Create a [`CallArguments`] with no arguments.
     pub(crate) fn none() -> Self {
-        Self(Vec::new())
+        Self {
+            bound_self: None,
+            arguments: vec![].into(),
+        }
     }
 
     /// Create a [`CallArguments`] from an iterator over non-variadic positional argument types.
@@ -20,48 +28,46 @@ impl<'a, 'db> CallArguments<'a, 'db> {
 
     /// Prepend an extra positional argument.
     pub(crate) fn with_self(&self, self_ty: Type<'db>) -> Self {
-        let mut arguments = Vec::with_capacity(self.0.len() + 1);
-        arguments.push(Argument::synthetic().with_argument_type(self_ty));
-        arguments.extend_from_slice(&self.0);
-        Self(arguments)
+        assert!(
+            self.bound_self.is_none(),
+            "cannot bind multiple self/cls parameters"
+        );
+        Self {
+            bound_self: Some(Argument::synthetic().with_argument_type(self_ty)),
+            arguments: self.arguments.clone(),
+        }
     }
 
     pub(crate) fn len(&self) -> usize {
-        self.0.len()
+        self.arguments.len() + usize::from(self.bound_self.is_some())
     }
 
     pub(crate) fn iter(&self) -> impl Iterator<Item = &Argument<'a, 'db>> {
-        self.0.iter()
+        self.bound_self.iter().chain(self.arguments.as_ref())
     }
 
     // TODO this should be eliminated in favor of [`bind_call`]
     pub(crate) fn first_argument(&self) -> Option<Type<'db>> {
-        self.0.first().map(Argument::argument_type)
+        self.iter().next().map(Argument::argument_type)
     }
 
     // TODO this should be eliminated in favor of [`bind_call`]
     pub(crate) fn second_argument(&self) -> Option<Type<'db>> {
-        self.0.get(1).map(Argument::argument_type)
+        self.iter().nth(1).map(Argument::argument_type)
     }
 
     // TODO this should be eliminated in favor of [`bind_call`]
     pub(crate) fn third_argument(&self) -> Option<Type<'db>> {
-        self.0.get(2).map(Argument::argument_type)
-    }
-}
-
-impl<'db, 'a, 'b> IntoIterator for &'b CallArguments<'a, 'db> {
-    type Item = &'b Argument<'a, 'db>;
-    type IntoIter = std::slice::Iter<'b, Argument<'a, 'db>>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.iter()
+        self.iter().nth(2).map(Argument::argument_type)
     }
 }
 
 impl<'a, 'db> FromIterator<Argument<'a, 'db>> for CallArguments<'a, 'db> {
     fn from_iter<T: IntoIterator<Item = Argument<'a, 'db>>>(iter: T) -> Self {
-        Self(iter.into_iter().collect())
+        Self {
+            bound_self: None,
+            arguments: iter.into_iter().collect(),
+        }
     }
 }
 
