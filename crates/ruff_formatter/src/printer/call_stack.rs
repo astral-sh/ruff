@@ -99,7 +99,7 @@ impl Default for PrintElementArgs {
             indent: Indentation::Level(0),
             mode: PrintMode::Expanded,
             measure_mode: MeasureMode::FirstLine,
-            line_width_limit: LineWidthLimit::default()
+            line_width_limit: LineWidthLimit::default(),
         }
     }
 }

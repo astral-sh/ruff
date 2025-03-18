@@ -7,7 +7,10 @@ use crate::format_element::tag::{Condition, DedentMode};
 use crate::prelude::tag::GroupMode;
 use crate::prelude::*;
 use crate::source_code::SourceCode;
-use crate::{format, write, BufferExtensions, Format, FormatContext, FormatElement, FormatOptions, FormatResult, Formatter, IndentStyle, IndentWidth, LineWidth, LineWidthLimit, PrinterOptions};
+use crate::{
+    format, write, BufferExtensions, Format, FormatContext, FormatElement, FormatOptions,
+    FormatResult, Formatter, IndentStyle, IndentWidth, LineWidth, LineWidthLimit, PrinterOptions,
+};
 
 use super::tag::Tag;
 
@@ -609,20 +612,27 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
 
                         StartWidthLimitedBlock {
                             limit_from_current_position: width_limit,
-                            inherit_enclosing_limit: inherit_parent_limit
+                            inherit_enclosing_limit: inherit_parent_limit,
                         } => {
-                            write!(f, [
-                                token("width_limited_block(width_limit:"),
-                                space(),
-                                text(&std::format!("{width_limit:?}")),
-                                token(","),
-                                space(),
-                                token("inherit_parent_limit:"),
-                                space(),
-                                token(if *inherit_parent_limit { "true" } else { "false" }),
-                                token(","),
-                                space()
-                            ])?;
+                            write!(
+                                f,
+                                [
+                                    token("width_limited_block(width_limit:"),
+                                    space(),
+                                    text(&std::format!("{width_limit:?}")),
+                                    token(","),
+                                    space(),
+                                    token("inherit_parent_limit:"),
+                                    space(),
+                                    token(if *inherit_parent_limit {
+                                        "true"
+                                    } else {
+                                        "false"
+                                    }),
+                                    token(","),
+                                    space()
+                                ]
+                            )?;
                         }
 
                         StartEntry | StartBestFittingEntry { .. } => {

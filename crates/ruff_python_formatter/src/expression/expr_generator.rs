@@ -44,10 +44,7 @@ impl FormatNodeRule<ExprGenerator> for FormatExprGenerator {
         let dangling = comments.dangling(item);
 
         let inner_content = format_with(|f| {
-            write!(f, [
-                group(&elt.format()),
-                soft_line_break_or_space(),
-            ])?;
+            write!(f, [group(&elt.format()), soft_line_break_or_space()])?;
 
             f.join_with(soft_line_break_or_space())
                 .entries(generators.iter().formatted())
@@ -58,11 +55,14 @@ impl FormatNodeRule<ExprGenerator> for FormatExprGenerator {
             && dangling.is_empty()
             && !is_parenthesized
         {
-            write!(f, [group_with_flat_width_limit(
-                &inner_content,
-                f.options().generator_expression_width_limit().into(),
-                true,
-            )])
+            write!(
+                f,
+                [group_with_flat_width_limit(
+                    &inner_content,
+                    f.options().generator_expression_width_limit().into(),
+                    true,
+                )]
+            )
         } else {
             write!(
                 f,

@@ -99,7 +99,7 @@ pub enum Tag {
 
     /// Marks the start and end of a block that has a different width limit than the surrounding content.
     StartWidthLimitedBlock {
-        /// The width limit to use for the content inside the block. 
+        /// The width limit to use for the content inside the block.
         /// Final line width will the sum of the current cursor position and this limit.
         limit_from_current_position: LineWidthLimit,
         /// If true, respect enclosing limits and the document width limit.

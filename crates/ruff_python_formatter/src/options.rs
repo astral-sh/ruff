@@ -249,7 +249,10 @@ impl PyFormatOptions {
     }
 
     #[must_use]
-    pub fn with_generator_expression_width_limit(mut self, width: FlatExpressionExpandWidth) -> Self {
+    pub fn with_generator_expression_width_limit(
+        mut self,
+        width: FlatExpressionExpandWidth,
+    ) -> Self {
         self.generator_expression_width_limit = width;
         self
     }

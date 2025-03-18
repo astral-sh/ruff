@@ -20,10 +20,7 @@ impl FormatNodeRule<ExprListComp> for FormatExprListComp {
         let dangling = comments.dangling(item);
 
         let inner_content = format_with(|f| {
-            write!(f, [
-                group(&elt.format()),
-                soft_line_break_or_space(),
-            ])?;
+            write!(f, [group(&elt.format()), soft_line_break_or_space()])?;
 
             f.join_with(soft_line_break_or_space())
                 .entries(generators.iter().formatted())

@@ -21,8 +21,8 @@ use crate::printer::queue::{
 };
 use crate::source_code::SourceCode;
 use crate::{
-    ActualStart, FormatElement, GroupId, IndentStyle, InvalidDocumentError, PrintError, PrintResult,
-    Printed, SourceMarker, TextRange,
+    ActualStart, FormatElement, GroupId, IndentStyle, InvalidDocumentError, PrintError,
+    PrintResult, Printed, SourceMarker, TextRange,
 };
 
 mod call_stack;
@@ -365,17 +365,23 @@ impl<'a> Printer<'a> {
                 stack.push(TagKind::FitsExpanded, args);
             }
 
-            FormatElement::Tag(StartWidthLimitedBlock { limit_from_current_position: block_width_limit, inherit_enclosing_limit: inherit }) => {
+            FormatElement::Tag(StartWidthLimitedBlock {
+                limit_from_current_position: block_width_limit,
+                inherit_enclosing_limit: inherit,
+            }) => {
                 let current_column = self.state.line_width - self.state.line_suffix_reserved_width;
                 let current_column = u16::try_from(current_column).unwrap_or(u16::MAX);
                 let indented_width_limit = block_width_limit.indented_by(current_column);
                 let width_limit = if *inherit {
-                    min(indented_width_limit, args.line_width_limit().into())
+                    min(indented_width_limit, args.line_width_limit())
                 } else {
                     indented_width_limit
                 };
 
-                stack.push(TagKind::WidthLimitedBlock, args.with_line_width_limit(width_limit));
+                stack.push(
+                    TagKind::WidthLimitedBlock,
+                    args.with_line_width_limit(width_limit),
+                );
             }
 
             FormatElement::Tag(
@@ -1383,7 +1389,8 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
             FormatElement::Tag(StartLineSuffix { reserved_width }) => {
                 if *reserved_width > 0 {
                     self.state.line_width += reserved_width;
-                    self.state.line_suffix_reserved_width = Some(self.state.line_suffix_reserved_width.unwrap_or(0) + reserved_width);
+                    self.state.line_suffix_reserved_width =
+                        Some(self.state.line_suffix_reserved_width.unwrap_or(0) + reserved_width);
                     if self.state.line_width > self.options().line_width.into() {
                         return Ok(Fits::No);
                     }
@@ -1438,8 +1445,12 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
                 }
             }
 
-            FormatElement::Tag(StartWidthLimitedBlock { limit_from_current_position: block_width_limit, inherit_enclosing_limit: inherit }) => {
-                let current_column: u32 = self.state.line_width - self.state.line_suffix_reserved_width.unwrap_or(0);
+            FormatElement::Tag(StartWidthLimitedBlock {
+                limit_from_current_position: block_width_limit,
+                inherit_enclosing_limit: inherit,
+            }) => {
+                let suffix_width = self.state.line_suffix_reserved_width.unwrap_or(0);
+                let current_column: u32 = self.state.line_width - suffix_width;
                 let current_column: u16 = current_column.try_into().unwrap_or(u16::MAX);
                 let indented_width_limit = block_width_limit.indented_by(current_column);
                 let line_width = if *inherit {
@@ -1448,7 +1459,10 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
                     indented_width_limit
                 };
 
-                self.stack.push(TagKind::WidthLimitedBlock, args.with_line_width_limit(line_width));
+                self.stack.push(
+                    TagKind::WidthLimitedBlock,
+                    args.with_line_width_limit(line_width),
+                );
             }
 
             FormatElement::Tag(

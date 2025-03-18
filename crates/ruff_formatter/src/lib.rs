@@ -200,13 +200,14 @@ pub enum LineWidthLimit {
 }
 
 impl LineWidthLimit {
+    #[must_use]
     pub fn indented_by(self, indent: u16) -> Self {
         match self {
             LineWidthLimit::Limited(width) => {
                 let old_width: NonZeroU16 = width.into();
                 let new_width: NonZeroU16 = old_width.saturating_add(indent);
                 LineWidthLimit::Limited(new_width.into())
-            },
+            }
             LineWidthLimit::Unlimited => LineWidthLimit::Unlimited,
         }
     }
@@ -236,18 +237,17 @@ impl PartialOrd for LineWidthLimit {
     }
 }
 
-impl From <LineWidth> for LineWidthLimit {
+impl From<LineWidth> for LineWidthLimit {
     fn from(width: LineWidth) -> Self {
         LineWidthLimit::Limited(width)
     }
 }
 
-impl Default for LineWidthLimit{
+impl Default for LineWidthLimit {
     fn default() -> Self {
         LineWidth::default().into()
     }
 }
-
 
 /// Context object storing data relevant when formatting an object.
 pub trait FormatContext {
