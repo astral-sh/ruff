@@ -751,11 +751,18 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         }
 
         // airflow.utils.helpers
-        ["airflow", "utils", "helpers", "chain"] => {
-            Replacement::Name("airflow.models.baseoperator.chain")
-        }
+        ["airflow", "utils", "helpers", "chain"] => Replacement::Name("airflow.sdk.chain"),
         ["airflow", "utils", "helpers", "cross_downstream"] => {
-            Replacement::Name("airflow.models.baseoperator.cross_downstream")
+            Replacement::Name("airflow.sdk.cross_downstream")
+        }
+
+        // airflow.models.baseoperator
+        ["airflow", "models", "baseoperator", "chain"] => Replacement::Name("airflow.sdk.chain"),
+        ["airflow", "models", "baseoperator", "chain_linear"] => {
+            Replacement::Name("airflow.sdk.chain_linear")
+        }
+        ["airflow", "models", "baseoperator", "cross_downstream"] => {
+            Replacement::Name("airflow.sdk.cross_downstream")
         }
 
         // airflow.utils.state
