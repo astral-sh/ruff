@@ -6298,7 +6298,6 @@ impl<'db> TypeInferenceBuilder<'db> {
             // =================================================================================
             // Branches where we probably should emit diagnostics in some context, but don't yet
             // =================================================================================
-
             ast::Expr::IpyEscapeCommand(_) => todo!("Implement Ipy escape command support"),
 
             ast::Expr::EllipsisLiteral(_) => {
