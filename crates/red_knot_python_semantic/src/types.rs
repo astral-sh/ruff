@@ -4785,19 +4785,18 @@ impl<'db> GeneralCallableType<'db> {
 
             match next_parameter {
                 EitherOrBoth::Left(self_parameter) => match self_parameter.kind() {
-                    ParameterKind::PositionalOnly { default_ty }
-                    | ParameterKind::PositionalOrKeyword { default_ty }
-                    | ParameterKind::KeywordOnly { default_ty } => {
+                    ParameterKind::PositionalOnly { default_ty, .. }
+                    | ParameterKind::PositionalOrKeyword { default_ty, .. }
+                    | ParameterKind::KeywordOnly { default_ty, .. } => {
                         if default_ty.is_none() {
                             return false;
                         }
                     }
-                    ParameterKind::Variadic => {}
-                    ParameterKind::KeywordVariadic => {}
+                    ParameterKind::Variadic { .. } | ParameterKind::KeywordVariadic { .. } => {}
                 },
 
                 EitherOrBoth::Right(other_parameter) => match other_parameter.kind() {
-                    ParameterKind::PositionalOnly { .. } | ParameterKind::Variadic
+                    ParameterKind::PositionalOnly { .. } | ParameterKind::Variadic { .. }
                         if self_variadic.is_some() =>
                     {
                         if !is_subtype(other_parameter.annotated_type(), self_variadic) {
@@ -4812,12 +4811,15 @@ impl<'db> GeneralCallableType<'db> {
                         (
                             ParameterKind::PositionalOnly {
                                 default_ty: self_default,
+                                ..
                             }
                             | ParameterKind::PositionalOrKeyword {
                                 default_ty: self_default,
+                                ..
                             },
                             ParameterKind::PositionalOnly {
                                 default_ty: other_default,
+                                ..
                             },
                         ) => {
                             if self_default.is_none() && other_default.is_some() {
@@ -4833,13 +4835,15 @@ impl<'db> GeneralCallableType<'db> {
 
                         (
                             ParameterKind::PositionalOrKeyword {
+                                name: self_name,
                                 default_ty: self_default,
                             },
                             ParameterKind::PositionalOrKeyword {
+                                name: other_name,
                                 default_ty: other_default,
                             },
                         ) => {
-                            if self_parameter.name() != other_parameter.name() {
+                            if self_name != other_name {
                                 return false;
                             }
                             // The following checks are the same as positional-only parameters.
@@ -4854,7 +4858,7 @@ impl<'db> GeneralCallableType<'db> {
                             }
                         }
 
-                        (ParameterKind::Variadic, ParameterKind::PositionalOnly { .. }) => {
+                        (ParameterKind::Variadic { .. }, ParameterKind::PositionalOnly { .. }) => {
                             self_variadic = self_parameter.annotated_type();
                             if !is_subtype(other_parameter.annotated_type(), self_variadic) {
                                 return false;
@@ -4865,7 +4869,8 @@ impl<'db> GeneralCallableType<'db> {
                                 };
                                 if !matches!(
                                     other_parameter.kind(),
-                                    ParameterKind::PositionalOnly { .. } | ParameterKind::Variadic
+                                    ParameterKind::PositionalOnly { .. }
+                                        | ParameterKind::Variadic { .. }
                                 ) {
                                     break;
                                 }
@@ -4876,20 +4881,25 @@ impl<'db> GeneralCallableType<'db> {
                             }
                         }
 
-                        (ParameterKind::Variadic, ParameterKind::Variadic) => {
+                        (ParameterKind::Variadic { .. }, ParameterKind::Variadic { .. }) => {
                             self_variadic = self_parameter.annotated_type();
                             if !is_subtype(other_parameter.annotated_type(), self_variadic) {
                                 return false;
                             }
                         }
 
-                        // Short circuit on certain combinations before breaking out of the loop.
+                        // Short-circuit on certain combinations before breaking out of the loop.
                         (
-                            ParameterKind::PositionalOnly { .. },
-                            ParameterKind::KeywordOnly { .. } | ParameterKind::KeywordVariadic,
+                            ParameterKind::PositionalOnly { .. } | ParameterKind::Variadic { .. },
+                            ParameterKind::KeywordOnly { .. }
+                            | ParameterKind::KeywordVariadic { .. },
                         ) => return false,
 
-                        (_, ParameterKind::KeywordOnly { .. } | ParameterKind::KeywordVariadic) => {
+                        (
+                            _,
+                            ParameterKind::KeywordOnly { .. }
+                            | ParameterKind::KeywordVariadic { .. },
+                        ) => {
                             break;
                         }
 
@@ -4908,13 +4918,11 @@ impl<'db> GeneralCallableType<'db> {
 
         for &self_parameter in &self_parameters {
             match self_parameter.kind() {
-                ParameterKind::KeywordOnly { .. } | ParameterKind::PositionalOrKeyword { .. } => {
-                    // SAFETY: Standard and keyword-only parameter names are guaranteed to be
-                    // present. It's only the positional-only parameter which might not contain a
-                    // name as it could represent a `typing.Callable` signature.
-                    self_keywords.insert(self_parameter.name().unwrap().clone(), self_parameter);
+                ParameterKind::KeywordOnly { name, .. }
+                | ParameterKind::PositionalOrKeyword { name, .. } => {
+                    self_keywords.insert(name.clone(), self_parameter);
                 }
-                ParameterKind::KeywordVariadic => {
+                ParameterKind::KeywordVariadic { .. } => {
                     self_keyword_variadic = self_parameter.annotated_type();
                 }
                 kind => unreachable!("Unhandled parameter kind from `self`: {:?}", kind),
@@ -4924,17 +4932,16 @@ impl<'db> GeneralCallableType<'db> {
         for &other_parameter in &other_parameters {
             match other_parameter.kind() {
                 ParameterKind::KeywordOnly {
+                    name: other_name,
                     default_ty: other_default,
                 } => {
-                    if let Some(self_parameter) =
-                        self_keywords.remove(other_parameter.name().unwrap())
-                    {
+                    if let Some(self_parameter) = self_keywords.remove(other_name) {
                         match self_parameter.kind() {
                             ParameterKind::PositionalOrKeyword {
-                                default_ty: self_default,
+                                default_ty: self_default, ..
                             }
                             | ParameterKind::KeywordOnly {
-                                default_ty: self_default,
+                                default_ty: self_default, ..
                             } => {
                                 if self_default.is_none() && other_default.is_some() {
                                     return false;
@@ -4960,7 +4967,7 @@ impl<'db> GeneralCallableType<'db> {
                         return false;
                     }
                 }
-                ParameterKind::KeywordVariadic => {
+                ParameterKind::KeywordVariadic { .. } => {
                     let Some(self_keyword_variadic) = self_keyword_variadic else {
                         // For a `self <: other` relationship, if `other` has a keyword variadic
                         // parameter, `self` must also have a keyword variadic parameter.
