@@ -458,10 +458,6 @@ impl<'db> Parameters<'db> {
         self.value.len()
     }
 
-    pub(crate) fn is_empty(&self) -> bool {
-        self.value.is_empty()
-    }
-
     pub(crate) fn iter(&self) -> std::slice::Iter<Parameter<'db>> {
         self.value.iter()
     }

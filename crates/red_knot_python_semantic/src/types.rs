@@ -4748,9 +4748,67 @@ impl<'db> GeneralCallableType<'db> {
 
     /// Return `true` if `self` is a subtype of `other`.
     pub(crate) fn is_subtype_of(self, db: &'db dyn Db, other: Self) -> bool {
-        // At this stage, we know that both the callable types are fully static but not equivalent.
-        // They do not contain gradual form (`...`) and their parameters and return type are
-        // statically known.
+        /// A helper struct to zip two slices of parameters together that provides control over the
+        /// two iterators individually. It also keeps track of the current parameter in each
+        /// iterator.
+        struct ParametersZip<'a, 'db> {
+            current_self: Option<&'a Parameter<'db>>,
+            current_other: Option<&'a Parameter<'db>>,
+            iter_self: Iter<'a, Parameter<'db>>,
+            iter_other: Iter<'a, Parameter<'db>>,
+        }
+
+        impl<'a, 'db> ParametersZip<'a, 'db> {
+            /// Move to the next parameter in both the `self` and `other` parameter iterators,
+            /// [`None`] if both iterators are exhausted.
+            fn next(&mut self) -> Option<EitherOrBoth<&'a Parameter<'db>, &'a Parameter<'db>>> {
+                match (self.next_self(), self.next_other()) {
+                    (Some(self_param), Some(other_param)) => {
+                        Some(EitherOrBoth::Both(self_param, other_param))
+                    }
+                    (Some(self_param), None) => Some(EitherOrBoth::Left(self_param)),
+                    (None, Some(other_param)) => Some(EitherOrBoth::Right(other_param)),
+                    (None, None) => None,
+                }
+            }
+
+            /// Move to the next parameter in the `self` parameter iterator, [`None`] if the
+            /// iterator is exhausted.
+            fn next_self(&mut self) -> Option<&'a Parameter<'db>> {
+                self.current_self = self.iter_self.next();
+                self.current_self
+            }
+
+            /// Move to the next parameter in the `other` parameter iterator, [`None`] if the
+            /// iterator is exhausted.
+            fn next_other(&mut self) -> Option<&'a Parameter<'db>> {
+                self.current_other = self.iter_other.next();
+                self.current_other
+            }
+
+            /// Peek at the next parameter in the `other` parameter iterator without consuming it.
+            fn peek_other(&mut self) -> Option<&'a Parameter<'db>> {
+                self.iter_other.clone().next()
+            }
+
+            /// Consumes the `ParametersZip` and returns a two-element tuple containing the
+            /// remaining parameters in the `self` and `other` iterators respectively.
+            ///
+            /// The returned iterators starts with the current parameter, if any, followed by the
+            /// remaining parameters in the respective iterators.
+            fn into_remaining(
+                self,
+            ) -> (
+                impl Iterator<Item = &'a Parameter<'db>>,
+                impl Iterator<Item = &'a Parameter<'db>>,
+            ) {
+                (
+                    self.current_self.into_iter().chain(self.iter_self),
+                    self.current_other.into_iter().chain(self.iter_other),
+                )
+            }
+        }
+
         let self_signature = self.signature(db);
         let other_signature = other.signature(db);
 
@@ -4766,20 +4824,17 @@ impl<'db> GeneralCallableType<'db> {
             return false;
         }
 
-        if self_signature.parameters().is_empty() && other_signature.parameters().is_empty() {
-            return true;
-        }
-
-        let mut parameters = ParametersZip::new(
-            self_signature.parameters().as_slice(),
-            other_signature.parameters().as_slice(),
-        );
-
-        // Type of the variadic parameter in `self`.
-        let mut self_variadic = None;
+        let mut parameters = ParametersZip {
+            current_self: None,
+            current_other: None,
+            iter_self: self_signature.parameters().iter(),
+            iter_other: other_signature.parameters().iter(),
+        };
 
         loop {
             let Some(next_parameter) = parameters.next() else {
+                // All parameters have been checked or both the parameter lists were empty. In
+                // either case, `self` is a subtype of `other`.
                 return true;
             };
 
@@ -4788,23 +4843,24 @@ impl<'db> GeneralCallableType<'db> {
                     ParameterKind::PositionalOnly { default_ty, .. }
                     | ParameterKind::PositionalOrKeyword { default_ty, .. }
                     | ParameterKind::KeywordOnly { default_ty, .. } => {
+                        // For `self <: other` to be valid, if there are no more parameters in
+                        // `other`, then the non-variadic parameters in `self` must have a default
+                        // value.
                         if default_ty.is_none() {
                             return false;
                         }
                     }
-                    ParameterKind::Variadic { .. } | ParameterKind::KeywordVariadic { .. } => {}
+                    ParameterKind::Variadic { .. } | ParameterKind::KeywordVariadic { .. } => {
+                        // Variadic parameters don't have any restrictions in this context, so
+                        // we'll just continue to the next parameter set.
+                    }
                 },
 
-                EitherOrBoth::Right(other_parameter) => match other_parameter.kind() {
-                    ParameterKind::PositionalOnly { .. } | ParameterKind::Variadic { .. }
-                        if self_variadic.is_some() =>
-                    {
-                        if !is_subtype(other_parameter.annotated_type(), self_variadic) {
-                            return false;
-                        }
-                    }
-                    _ => return false,
-                },
+                EitherOrBoth::Right(_) => {
+                    // If there are more parameters in `other` than in `self`, then `self` is not a
+                    // subtype of `other`.
+                    return false;
+                }
 
                 EitherOrBoth::Both(self_parameter, other_parameter) => {
                     match (self_parameter.kind(), other_parameter.kind()) {
@@ -4859,10 +4915,23 @@ impl<'db> GeneralCallableType<'db> {
                         }
 
                         (ParameterKind::Variadic { .. }, ParameterKind::PositionalOnly { .. }) => {
-                            self_variadic = self_parameter.annotated_type();
-                            if !is_subtype(other_parameter.annotated_type(), self_variadic) {
+                            if !is_subtype(
+                                other_parameter.annotated_type(),
+                                self_parameter.annotated_type(),
+                            ) {
                                 return false;
                             }
+
+                            // We've reached a variadic parameter in `self` which means there can
+                            // be no more positional parameters after this in a valid AST. But, the
+                            // current parameter in `other` is a positional-only which means there
+                            // can be more positional parameters after this which could be either
+                            // more positional-only parameters, standard parameters or a variadic
+                            // parameter.
+                            //
+                            // So, any remaining positional parameters in `other` would need to be
+                            // checked against the variadic parameter in `self`. This loop does
+                            // that by only moving the `other` iterator forward.
                             loop {
                                 let Some(other_parameter) = parameters.peek_other() else {
                                     break;
@@ -4872,9 +4941,14 @@ impl<'db> GeneralCallableType<'db> {
                                     ParameterKind::PositionalOnly { .. }
                                         | ParameterKind::Variadic { .. }
                                 ) {
+                                    // Any other parameter kind cannot be checked against a
+                                    // variadic parameter and is deferred to the next iteration.
                                     break;
                                 }
-                                if !is_subtype(other_parameter.annotated_type(), self_variadic) {
+                                if !is_subtype(
+                                    other_parameter.annotated_type(),
+                                    self_parameter.annotated_type(),
+                                ) {
                                     return false;
                                 }
                                 parameters.next_other();
@@ -4882,24 +4956,22 @@ impl<'db> GeneralCallableType<'db> {
                         }
 
                         (ParameterKind::Variadic { .. }, ParameterKind::Variadic { .. }) => {
-                            self_variadic = self_parameter.annotated_type();
-                            if !is_subtype(other_parameter.annotated_type(), self_variadic) {
+                            if !is_subtype(
+                                other_parameter.annotated_type(),
+                                self_parameter.annotated_type(),
+                            ) {
                                 return false;
                             }
                         }
-
-                        // Short-circuit on certain combinations before breaking out of the loop.
-                        (
-                            ParameterKind::PositionalOnly { .. } | ParameterKind::Variadic { .. },
-                            ParameterKind::KeywordOnly { .. }
-                            | ParameterKind::KeywordVariadic { .. },
-                        ) => return false,
 
                         (
                             _,
                             ParameterKind::KeywordOnly { .. }
                             | ParameterKind::KeywordVariadic { .. },
                         ) => {
+                            // Keyword parameters are not considered in this loop as the order of
+                            // parameters is not important for them and so they are checked by
+                            // doing name-based lookups.
                             break;
                         }
 
@@ -4909,14 +4981,18 @@ impl<'db> GeneralCallableType<'db> {
             }
         }
 
+        // At this point, the remaining parameters in `other` are keyword-only parameters or
+        // keyword variadic parameters. But, `self` could contain any unmatched positional
+        // parameters.
         let (self_parameters, other_parameters) = parameters.into_remaining();
 
         // Collect all the keyword-only parameters and the unmatched standard parameters.
         let mut self_keywords = HashMap::new();
+
         // Type of the variadic keyword parameter in `self`.
         let mut self_keyword_variadic = None;
 
-        for &self_parameter in &self_parameters {
+        for self_parameter in self_parameters {
             match self_parameter.kind() {
                 ParameterKind::KeywordOnly { name, .. }
                 | ParameterKind::PositionalOrKeyword { name, .. } => {
@@ -4925,11 +5001,16 @@ impl<'db> GeneralCallableType<'db> {
                 ParameterKind::KeywordVariadic { .. } => {
                     self_keyword_variadic = self_parameter.annotated_type();
                 }
-                kind => unreachable!("Unhandled parameter kind from `self`: {:?}", kind),
+                ParameterKind::PositionalOnly { .. } | ParameterKind::Variadic { .. } => {
+                    // These are the unmatched parameters in `self` from the above loop. They
+                    // cannot be matched against any parameter in `other` so the subtype relation
+                    // is invalid.
+                    return false;
+                }
             }
         }
 
-        for &other_parameter in &other_parameters {
+        for other_parameter in other_parameters {
             match other_parameter.kind() {
                 ParameterKind::KeywordOnly {
                     name: other_name,
@@ -4938,10 +5019,12 @@ impl<'db> GeneralCallableType<'db> {
                     if let Some(self_parameter) = self_keywords.remove(other_name) {
                         match self_parameter.kind() {
                             ParameterKind::PositionalOrKeyword {
-                                default_ty: self_default, ..
+                                default_ty: self_default,
+                                ..
                             }
                             | ParameterKind::KeywordOnly {
-                                default_ty: self_default, ..
+                                default_ty: self_default,
+                                ..
                             } => {
                                 if self_default.is_none() && other_default.is_some() {
                                     return false;
@@ -4953,7 +5036,9 @@ impl<'db> GeneralCallableType<'db> {
                                     return false;
                                 }
                             }
-                            _ => unreachable!("`self_keywords` should only contain keyword-only or standard parameters"),
+                            _ => unreachable!(
+                                "`self_keywords` should only contain keyword-only or standard parameters"
+                            ),
                         }
                     } else if let Some(self_keyword_variadic) = self_keyword_variadic {
                         if !other_parameter
@@ -4981,10 +5066,16 @@ impl<'db> GeneralCallableType<'db> {
                         return false;
                     }
                 }
-                kind => unreachable!("Unhandled parameter kind from `other`: {:?}", kind),
+                kind => {
+                    // TODO: Maybe we should just return `false` here instead of panicking in case
+                    // the AST is invalid?
+                    unreachable!("Unhandled parameter kind from `other`: {:?}", kind);
+                }
             }
         }
 
+        // If there are still unmatched keyword parameters from `self`, then they should be
+        // optional otherwise the subtype relation is invalid.
         for (_, self_parameter) in self_keywords {
             if self_parameter.default_type().is_none() {
                 return false;
@@ -4992,67 +5083,6 @@ impl<'db> GeneralCallableType<'db> {
         }
 
         true
-    }
-}
-
-#[derive(Debug)]
-struct ParametersZip<'a, 'db> {
-    current_self: Option<&'a Parameter<'db>>,
-    current_other: Option<&'a Parameter<'db>>,
-    iter_self: Iter<'a, Parameter<'db>>,
-    iter_other: Iter<'a, Parameter<'db>>,
-}
-
-impl<'a, 'db> ParametersZip<'a, 'db> {
-    fn new(parameters_self: &'a [Parameter<'db>], parameters_other: &'a [Parameter<'db>]) -> Self {
-        Self {
-            current_self: None,
-            current_other: None,
-            iter_self: parameters_self.iter(),
-            iter_other: parameters_other.iter(),
-        }
-    }
-
-    fn next_self(&mut self) -> Option<&'a Parameter<'db>> {
-        self.current_self = self.iter_self.next();
-        self.current_self
-    }
-
-    fn next_other(&mut self) -> Option<&'a Parameter<'db>> {
-        self.current_other = self.iter_other.next();
-        self.current_other
-    }
-
-    fn peek_other(&mut self) -> Option<&'a Parameter<'db>> {
-        self.iter_other.clone().next()
-    }
-
-    fn into_remaining(self) -> (Vec<&'a Parameter<'db>>, Vec<&'a Parameter<'db>>) {
-        (
-            self.current_self
-                .into_iter()
-                .chain(self.iter_self)
-                .collect(),
-            self.current_other
-                .into_iter()
-                .chain(self.iter_other)
-                .collect(),
-        )
-    }
-}
-
-impl<'a, 'db> Iterator for ParametersZip<'a, 'db> {
-    type Item = EitherOrBoth<&'a Parameter<'db>, &'a Parameter<'db>>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        match (self.next_self(), self.next_other()) {
-            (Some(self_param), Some(other_param)) => {
-                Some(EitherOrBoth::Both(self_param, other_param))
-            }
-            (Some(self_param), None) => Some(EitherOrBoth::Left(self_param)),
-            (None, Some(other_param)) => Some(EitherOrBoth::Right(other_param)),
-            (None, None) => None,
-        }
     }
 }
 
