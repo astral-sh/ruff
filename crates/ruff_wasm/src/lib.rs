@@ -32,7 +32,7 @@ const TYPES: &'static str = r#"
 export interface Diagnostic {
     code: string | null;
     message: string;
-    location: {
+    start_location: {
         row: number;
         column: number;
     };
