@@ -26,6 +26,10 @@ impl<'a, 'db> CallArguments<'a, 'db> {
         Self(arguments)
     }
 
+    pub(crate) fn len(&self) -> usize {
+        self.0.len()
+    }
+
     pub(crate) fn iter(&self) -> impl Iterator<Item = &Argument<'a, 'db>> {
         self.0.iter()
     }

@@ -183,6 +183,10 @@ impl<'db> CallableSignature<'db> {
         self
     }
 
+    pub(crate) fn iter(&self) -> std::slice::Iter<'_, Signature<'db>> {
+        self.overloads.iter()
+    }
+
     fn replace_callable_type(&mut self, before: Type<'db>, after: Type<'db>) {
         if self.callable_type == before {
             self.callable_type = after;
@@ -195,7 +199,7 @@ impl<'a, 'db> IntoIterator for &'a CallableSignature<'db> {
     type IntoIter = std::slice::Iter<'a, Signature<'db>>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.overloads.iter()
+        self.iter()
     }
 }
 
