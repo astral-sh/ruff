@@ -1441,7 +1441,7 @@ impl<'src> Parser<'src> {
                     let slash_position = TextSize::try_from(slash_position).unwrap();
                     self.add_unsupported_syntax_error(
                         UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::Backslash),
-                        TextRange::at(expr.range.start() + slash_position, TextSize::from(1)),
+                        TextRange::at(expr.range.start() + slash_position, '\\'.text_len()),
                     );
                 }
 
