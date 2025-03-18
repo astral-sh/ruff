@@ -41,24 +41,25 @@ mod text;
 
 /// Message represents either a diagnostic message corresponding to a rule violation or a syntax
 /// error message raised by the parser.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Message {
     Diagnostic(DiagnosticMessage),
     SyntaxError(SyntaxErrorMessage),
 }
 
 /// A diagnostic message corresponding to a rule violation.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DiagnosticMessage {
     pub kind: DiagnosticKind,
     pub range: TextRange,
     pub fix: Option<Fix>,
+    pub parent: Option<TextSize>,
     pub file: SourceFile,
     pub noqa_offset: TextSize,
 }
 
 /// A syntax error message raised by the parser.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SyntaxErrorMessage {
     pub message: String,
     pub range: TextRange,
@@ -91,6 +92,7 @@ impl Message {
             range: diagnostic.range(),
             kind: diagnostic.kind,
             fix: diagnostic.fix,
+            parent: diagnostic.parent,
             file,
             noqa_offset,
         })
@@ -134,6 +136,13 @@ impl Message {
     }
 
     pub const fn as_diagnostic_message(&self) -> Option<&DiagnosticMessage> {
+        match self {
+            Message::Diagnostic(m) => Some(m),
+            Message::SyntaxError(_) => None,
+        }
+    }
+
+    pub fn into_diagnostic_message(self) -> Option<DiagnosticMessage> {
         match self {
             Message::Diagnostic(m) => Some(m),
             Message::SyntaxError(_) => None,

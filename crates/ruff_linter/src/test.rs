@@ -9,7 +9,7 @@ use anyhow::Result;
 use itertools::Itertools;
 use rustc_hash::FxHashMap;
 
-use ruff_diagnostics::{Applicability, Diagnostic, FixAvailability};
+use ruff_diagnostics::{Applicability, FixAvailability};
 use ruff_notebook::Notebook;
 #[cfg(not(fuzzing))]
 use ruff_notebook::NotebookError;
@@ -19,7 +19,6 @@ use ruff_python_index::Indexer;
 use ruff_python_parser::{ParseError, ParseOptions};
 use ruff_python_trivia::textwrap::dedent;
 use ruff_source_file::SourceFileBuilder;
-use ruff_text_size::Ranged;
 
 use crate::fix::{fix_file, FixResult};
 use crate::linter::check_path;
@@ -150,6 +149,7 @@ pub(crate) fn test_contents<'a>(
 
     if diagnostics
         .iter()
+        .filter_map(Message::as_diagnostic_message)
         .any(|diagnostic| diagnostic.fix.is_some())
     {
         let mut diagnostics = diagnostics.clone();
@@ -236,7 +236,8 @@ Source with applied fixes:
 
     let messages = diagnostics
         .into_iter()
-        .map(|diagnostic| {
+        .filter_map(Message::into_diagnostic_message)
+        .map(|mut diagnostic| {
             let rule = diagnostic.kind.rule();
             let fixable = diagnostic.fix.as_ref().is_some_and(|fix| {
                 matches!(
@@ -277,9 +278,10 @@ Either ensure you always emit a fix or change `Violation::FIX_AVAILABILITY` to e
             );
 
             // Not strictly necessary but adds some coverage for this code path
-            let noqa = directives.noqa_line_for.resolve(diagnostic.start());
+            diagnostic.noqa_offset = directives.noqa_line_for.resolve(diagnostic.range.start());
+            diagnostic.file = source_code.clone();
 
-            Message::from_diagnostic(diagnostic, source_code.clone(), noqa)
+            Message::Diagnostic(diagnostic)
         })
         .chain(parsed.errors().iter().map(|parse_error| {
             Message::from_parse_error(parse_error, &locator, source_code.clone())
@@ -310,16 +312,18 @@ fn print_syntax_errors(
     }
 }
 
-fn print_diagnostics(diagnostics: Vec<Diagnostic>, path: &Path, source: &SourceKind) -> String {
+fn print_diagnostics(diagnostics: Vec<Message>, path: &Path, source: &SourceKind) -> String {
     let filename = path.file_name().unwrap().to_string_lossy();
     let source_file = SourceFileBuilder::new(filename.as_ref(), source.source_code()).finish();
 
     let messages: Vec<_> = diagnostics
         .into_iter()
-        .map(|diagnostic| {
-            let noqa_start = diagnostic.start();
-
-            Message::from_diagnostic(diagnostic, source_file.clone(), noqa_start)
+        .filter_map(Message::into_diagnostic_message)
+        .map(|mut diagnostic| {
+            let noqa_start = diagnostic.range.start();
+            diagnostic.file = source_file.clone();
+            diagnostic.noqa_offset = noqa_start;
+            Message::Diagnostic(diagnostic)
         })
         .collect();
 

@@ -3,10 +3,11 @@ use std::collections::BTreeSet;
 use itertools::Itertools;
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, IsolationLevel, SourceMap};
+use ruff_diagnostics::{Edit, Fix, IsolationLevel, SourceMap};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::linter::FixTable;
+use crate::message::{DiagnosticMessage, Message};
 use crate::registry::{AsRule, Rule};
 use crate::settings::types::UnsafeFixes;
 use crate::Locator;
@@ -26,7 +27,7 @@ pub(crate) struct FixResult {
 
 /// Fix errors in a file, and write the fixed source code to disk.
 pub(crate) fn fix_file(
-    diagnostics: &[Diagnostic],
+    diagnostics: &[Message],
     locator: &Locator,
     unsafe_fixes: UnsafeFixes,
 ) -> Option<FixResult> {
@@ -34,6 +35,7 @@ pub(crate) fn fix_file(
 
     let mut with_fixes = diagnostics
         .iter()
+        .filter_map(Message::as_diagnostic_message)
         .filter(|diagnostic| {
             diagnostic
                 .fix
@@ -51,7 +53,7 @@ pub(crate) fn fix_file(
 
 /// Apply a series of fixes.
 fn apply_fixes<'a>(
-    diagnostics: impl Iterator<Item = &'a Diagnostic>,
+    diagnostics: impl Iterator<Item = &'a DiagnosticMessage>,
     locator: &'a Locator<'a>,
 ) -> FixResult {
     let mut output = String::with_capacity(locator.len());
@@ -161,22 +163,26 @@ fn cmp_fix(rule1: Rule, rule2: Rule, fix1: &Fix, fix2: &Fix) -> std::cmp::Orderi
 
 #[cfg(test)]
 mod tests {
-    use ruff_diagnostics::{Diagnostic, Edit, Fix, SourceMarker};
+    use ruff_diagnostics::{Edit, Fix, SourceMarker};
+    use ruff_source_file::SourceFileBuilder;
     use ruff_text_size::{Ranged, TextSize};
 
     use crate::fix::{apply_fixes, FixResult};
+    use crate::message::DiagnosticMessage;
     use crate::rules::pycodestyle::rules::MissingNewlineAtEndOfFile;
     use crate::Locator;
 
     #[allow(deprecated)]
-    fn create_diagnostics(edit: impl IntoIterator<Item = Edit>) -> Vec<Diagnostic> {
+    fn create_diagnostics(edit: impl IntoIterator<Item = Edit>) -> Vec<DiagnosticMessage> {
         edit.into_iter()
-            .map(|edit| Diagnostic {
+            .map(|edit| DiagnosticMessage {
                 // The choice of rule here is arbitrary.
                 kind: MissingNewlineAtEndOfFile.into(),
                 range: edit.range(),
                 fix: Some(Fix::safe_edit(edit)),
                 parent: None,
+                file: SourceFileBuilder::new("<filename>", "<code>").finish(),
+                noqa_offset: TextSize::default(),
             })
             .collect()
     }

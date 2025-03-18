@@ -58,8 +58,7 @@ pub struct FixerResult<'a> {
     pub fixed: FixTable,
 }
 
-/// Generate `Diagnostic`s from the source code contents at the
-/// given `Path`.
+/// Generate [`Message`]s from the source code contents at the given `Path`.
 #[allow(clippy::too_many_arguments)]
 pub fn check_path(
     path: &Path,
@@ -74,7 +73,7 @@ pub fn check_path(
     source_type: PySourceType,
     parsed: &Parsed<ModModule>,
     target_version: PythonVersion,
-) -> Vec<Diagnostic> {
+) -> Vec<Message> {
     // Aggregate all diagnostics.
     let mut diagnostics = vec![];
 
@@ -322,7 +321,20 @@ pub fn check_path(
         }
     }
 
-    diagnostics
+    let syntax_errors = if settings.preview.is_enabled() {
+        parsed.unsupported_syntax_errors()
+    } else {
+        &[]
+    };
+
+    diagnostics_to_messages(
+        diagnostics,
+        parsed.errors(),
+        syntax_errors,
+        path,
+        locator,
+        directives,
+    )
 }
 
 const MAX_ITERATIONS: usize = 100;
@@ -417,7 +429,7 @@ pub fn lint_only(
     );
 
     // Generate diagnostics.
-    let diagnostics = check_path(
+    let messages = check_path(
         path,
         package,
         &locator,
@@ -432,21 +444,8 @@ pub fn lint_only(
         target_version,
     );
 
-    let syntax_errors = if settings.preview.is_enabled() {
-        parsed.unsupported_syntax_errors()
-    } else {
-        &[]
-    };
-
     LinterResult {
-        messages: diagnostics_to_messages(
-            diagnostics,
-            parsed.errors(),
-            syntax_errors,
-            path,
-            &locator,
-            &directives,
-        ),
+        messages,
         has_syntax_error: parsed.has_syntax_errors(),
     }
 }
@@ -591,22 +590,9 @@ pub fn lint_fix<'a>(
             report_failed_to_converge_error(path, transformed.source_code(), &diagnostics);
         }
 
-        let syntax_errors = if settings.preview.is_enabled() {
-            parsed.unsupported_syntax_errors()
-        } else {
-            &[]
-        };
-
         return Ok(FixerResult {
             result: LinterResult {
-                messages: diagnostics_to_messages(
-                    diagnostics,
-                    parsed.errors(),
-                    syntax_errors,
-                    path,
-                    &locator,
-                    &directives,
-                ),
+                messages: diagnostics,
                 has_syntax_error: !is_valid_syntax,
             },
             transformed,
@@ -625,8 +611,8 @@ fn collect_rule_codes(rules: impl IntoIterator<Item = Rule>) -> String {
 }
 
 #[allow(clippy::print_stderr)]
-fn report_failed_to_converge_error(path: &Path, transformed: &str, diagnostics: &[Diagnostic]) {
-    let codes = collect_rule_codes(diagnostics.iter().map(|diagnostic| diagnostic.kind.rule()));
+fn report_failed_to_converge_error(path: &Path, transformed: &str, diagnostics: &[Message]) {
+    let codes = collect_rule_codes(diagnostics.iter().filter_map(Message::rule));
     if cfg!(debug_assertions) {
         eprintln!(
             "{}{} Failed to converge after {} iterations in `{}` with rule codes {}:---\n{}\n---",

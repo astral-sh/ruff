@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use js_sys::Error;
+use ruff_linter::message::{DiagnosticMessage, Message, SyntaxErrorMessage};
 use ruff_linter::settings::types::PythonVersion;
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
@@ -60,7 +61,7 @@ export interface Diagnostic {
 pub struct ExpandedMessage {
     pub code: Option<String>,
     pub message: String,
-    pub location: SourceLocation,
+    pub start_location: SourceLocation,
     pub end_location: SourceLocation,
     pub fix: Option<ExpandedFix>,
 }
@@ -205,25 +206,18 @@ impl Workspace {
 
         let source_code = locator.to_source_code();
 
-        let unsupported_syntax_errors = if self.settings.linter.preview.is_enabled() {
-            parsed.unsupported_syntax_errors()
-        } else {
-            &[]
-        };
-
         let messages: Vec<ExpandedMessage> = diagnostics
             .into_iter()
-            .map(|diagnostic| {
-                let start_location = source_code.source_location(diagnostic.start());
-                let end_location = source_code.source_location(diagnostic.end());
-
-                ExpandedMessage {
-                    code: Some(diagnostic.kind.rule().noqa_code().to_string()),
-                    message: diagnostic.kind.body,
-                    location: start_location,
-                    end_location,
-                    fix: diagnostic.fix.map(|fix| ExpandedFix {
-                        message: diagnostic.kind.suggestion,
+            .map(|diagnostic| match diagnostic {
+                Message::Diagnostic(DiagnosticMessage {
+                    kind, range, fix, ..
+                }) => ExpandedMessage {
+                    code: Some(kind.rule().noqa_code().to_string()),
+                    message: kind.body,
+                    start_location: source_code.source_location(range.start()),
+                    end_location: source_code.source_location(range.end()),
+                    fix: fix.map(|fix| ExpandedFix {
+                        message: kind.suggestion,
                         edits: fix
                             .edits()
                             .iter()
@@ -234,32 +228,17 @@ impl Workspace {
                             })
                             .collect(),
                     }),
+                },
+                Message::SyntaxError(SyntaxErrorMessage { message, range, .. }) => {
+                    ExpandedMessage {
+                        code: None,
+                        message,
+                        start_location: source_code.source_location(range.start()),
+                        end_location: source_code.source_location(range.end()),
+                        fix: None,
+                    }
                 }
             })
-            .chain(parsed.errors().iter().map(|parse_error| {
-                let start_location = source_code.source_location(parse_error.location.start());
-                let end_location = source_code.source_location(parse_error.location.end());
-
-                ExpandedMessage {
-                    code: None,
-                    message: format!("SyntaxError: {}", parse_error.error),
-                    location: start_location,
-                    end_location,
-                    fix: None,
-                }
-            }))
-            .chain(unsupported_syntax_errors.iter().map(|error| {
-                let start_location = source_code.source_location(error.range.start());
-                let end_location = source_code.source_location(error.range.end());
-
-                ExpandedMessage {
-                    code: None,
-                    message: format!("SyntaxError: {error}"),
-                    location: start_location,
-                    end_location,
-                    fix: None,
-                }
-            }))
             .collect();
 
         serde_wasm_bindgen::to_value(&messages).map_err(into_error)

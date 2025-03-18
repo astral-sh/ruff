@@ -22,6 +22,7 @@ mod tests {
     use ruff_text_size::Ranged;
 
     use crate::linter::check_path;
+    use crate::message::Message;
     use crate::registry::{AsRule, Linter, Rule};
     use crate::rules::isort;
     use crate::rules::pyflakes;
@@ -774,6 +775,7 @@ mod tests {
         diagnostics.sort_by_key(Ranged::start);
         let actual = diagnostics
             .iter()
+            .filter_map(Message::as_diagnostic_message)
             .map(|diagnostic| diagnostic.kind.rule())
             .collect::<Vec<_>>();
         assert_eq!(actual, expected);
