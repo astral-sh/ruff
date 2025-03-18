@@ -63,7 +63,7 @@ from typing import Callable
 
 # error: [invalid-type-form] "Special form `typing.Callable` expected exactly two arguments (parameter types and return type)"
 def _(c: Callable[[int, str]]):
-    reveal_type(c)  # revealed: (int, str, /) -> Unknown
+    reveal_type(c)  # revealed: (...) -> Unknown
 ```
 
 Or, an ellipsis:
@@ -71,6 +71,18 @@ Or, an ellipsis:
 ```py
 # error: [invalid-type-form] "Special form `typing.Callable` expected exactly two arguments (parameter types and return type)"
 def _(c: Callable[...]):
+    reveal_type(c)  # revealed: (...) -> Unknown
+```
+
+Or something else that's invalid in a type expression generally:
+
+```py
+# fmt: off
+
+def _(c: Callable[  # error: [invalid-type-form] "Special form `typing.Callable` expected exactly two arguments (parameter types and return type)"
+            {1, 2}  # error: [invalid-type-form] "The first argument to `Callable` must be either a list of types, ParamSpec, Concatenate, or `...`"
+        ]
+    ):
     reveal_type(c)  # revealed: (...) -> Unknown
 ```
 
@@ -84,6 +96,48 @@ from typing import Callable
 
 # error: [invalid-type-form] "Special form `typing.Callable` expected exactly two arguments (parameter types and return type)"
 def _(c: Callable[[int], str, str]):
+    reveal_type(c)  # revealed: (...) -> Unknown
+```
+
+### List as the second argument
+
+```py
+from typing import Callable
+
+# fmt: off
+
+def _(c: Callable[
+            int,  # error: [invalid-type-form] "The first argument to `Callable` must be either a list of types, ParamSpec, Concatenate, or `...`"
+            [str]  # error: [invalid-type-form] "List literals are not allowed in this context in a type expression"
+        ]
+    ):
+    reveal_type(c)  # revealed: (...) -> Unknown
+```
+
+### List as both arguments
+
+```py
+from typing import Callable
+
+# error: [invalid-type-form] "List literals are not allowed in this context in a type expression"
+def _(c: Callable[[int], [str]]):
+    reveal_type(c)  # revealed: (int, /) -> Unknown
+```
+
+### Three list arguments
+
+```py
+from typing import Callable
+
+# fmt: off
+
+
+def _(c: Callable[  # error: [invalid-type-form] "Special form `typing.Callable` expected exactly two arguments (parameter types and return type)"
+            [int],
+            [str],  # error: [invalid-type-form] "List literals are not allowed in this context in a type expression"
+            [bytes]  # error: [invalid-type-form] "List literals are not allowed in this context in a type expression"
+        ]
+    ):
     reveal_type(c)  # revealed: (...) -> Unknown
 ```
 
