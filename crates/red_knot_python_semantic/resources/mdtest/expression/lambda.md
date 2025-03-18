@@ -5,10 +5,10 @@
 `lambda` expressions can be defined without any parameters.
 
 ```py
-reveal_type(lambda: 1)  # revealed: () -> @Todo(lambda return type)
+reveal_type(lambda: 1)  # revealed: () -> Unknown
 
 # error: [unresolved-reference]
-reveal_type(lambda: a)  # revealed: () -> @Todo(lambda return type)
+reveal_type(lambda: a)  # revealed: () -> Unknown
 ```
 
 ## With parameters
@@ -17,45 +17,45 @@ Unlike parameters in function definition, the parameters in a `lambda` expressio
 annotated.
 
 ```py
-reveal_type(lambda a: a)  # revealed: (a) -> @Todo(lambda return type)
-reveal_type(lambda a, b: a + b)  # revealed: (a, b) -> @Todo(lambda return type)
+reveal_type(lambda a: a)  # revealed: (a) -> Unknown
+reveal_type(lambda a, b: a + b)  # revealed: (a, b) -> Unknown
 ```
 
 But, it can have default values:
 
 ```py
-reveal_type(lambda a=1: a)  # revealed: (a=Literal[1]) -> @Todo(lambda return type)
-reveal_type(lambda a, b=2: a)  # revealed: (a, b=Literal[2]) -> @Todo(lambda return type)
+reveal_type(lambda a=1: a)  # revealed: (a=Literal[1]) -> Unknown
+reveal_type(lambda a, b=2: a)  # revealed: (a, b=Literal[2]) -> Unknown
 ```
 
 And, positional-only parameters:
 
 ```py
-reveal_type(lambda a, b, /, c: c)  # revealed: (a, b, /, c) -> @Todo(lambda return type)
+reveal_type(lambda a, b, /, c: c)  # revealed: (a, b, /, c) -> Unknown
 ```
 
 And, keyword-only parameters:
 
 ```py
-reveal_type(lambda a, *, b=2, c: b)  # revealed: (a, *, b=Literal[2], c) -> @Todo(lambda return type)
+reveal_type(lambda a, *, b=2, c: b)  # revealed: (a, *, b=Literal[2], c) -> Unknown
 ```
 
 And, variadic parameter:
 
 ```py
-reveal_type(lambda *args: args)  # revealed: (*args) -> @Todo(lambda return type)
+reveal_type(lambda *args: args)  # revealed: (*args) -> Unknown
 ```
 
 And, keyword-varidic parameter:
 
 ```py
-reveal_type(lambda **kwargs: kwargs)  # revealed: (**kwargs) -> @Todo(lambda return type)
+reveal_type(lambda **kwargs: kwargs)  # revealed: (**kwargs) -> Unknown
 ```
 
 Mixing all of them together:
 
 ```py
-# revealed: (a, b, /, c=Literal[True], *args, *, d=Literal["default"], e=Literal[5], **kwargs) -> @Todo(lambda return type)
+# revealed: (a, b, /, c=Literal[True], *args, *, d=Literal["default"], e=Literal[5], **kwargs) -> Unknown
 reveal_type(lambda a, b, /, c=True, *args, d="default", e=5, **kwargs: None)
 ```
 
@@ -96,5 +96,5 @@ Here, a `lambda` expression is used as the default value for a parameter in anot
 expression.
 
 ```py
-reveal_type(lambda a=lambda x, y: 0: 2)  # revealed: (a=(x, y) -> @Todo(lambda return type)) -> @Todo(lambda return type)
+reveal_type(lambda a=lambda x, y: 0: 2)  # revealed: (a=(x, y) -> Unknown) -> Unknown
 ```

@@ -3835,9 +3835,12 @@ impl<'db> TypeInferenceBuilder<'db> {
             Parameters::empty()
         };
 
+        // TODO: Useful inference of a lambda's return type will require a different approach,
+        // which does the inference of the body expression based on arguments at each call site,
+        // rather than eagerly computing a return type without knowing the argument types.
         Type::Callable(CallableType::General(GeneralCallableType::new(
             self.db(),
-            Signature::new(parameters, Some(todo_type!("lambda return type"))),
+            Signature::new(parameters, Some(Type::unknown())),
         )))
     }
 
