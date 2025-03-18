@@ -23,10 +23,10 @@
 //! while cargo test --release -p red_knot_python_semantic -- \
 //!   --ignored types::property_tests::stable; do :; done
 //! ```
-mod db;
-mod tys;
+mod setup;
+mod type_generation;
 
-use tys::{intersection, union};
+use type_generation::{intersection, union};
 
 /// A macro to define a property test for types.
 ///
@@ -43,8 +43,8 @@ macro_rules! type_property_test {
     ($test_name:ident, $db:ident, forall types $($types:ident),+ . $property:expr) => {
         #[quickcheck_macros::quickcheck]
         #[ignore]
-        fn $test_name($($types: crate::types::property_tests::tys::Ty),+) -> bool {
-            let $db = &crate::types::property_tests::db::get_cached_db();
+        fn $test_name($($types: crate::types::property_tests::type_generation::Ty),+) -> bool {
+            let $db = &crate::types::property_tests::setup::get_cached_db();
             $(let $types = $types.into_type($db);)+
 
             $property
