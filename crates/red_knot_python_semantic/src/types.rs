@@ -2654,7 +2654,8 @@ impl<'db> Type<'db> {
     }
 
     /// Calls `self`. Returns a [`CallError`] if `self` is (always or possibly) not callable, or if
-    /// the arguments are not compatible with the formal parameters.
+    /// the arguments are not compatible with the formal parameters. You must have already have
+    /// types inferred for all of the arguments.
     ///
     /// You get back a [`Bindings`] for both successful and unsuccessful calls.
     /// It contains information about which formal parameters each argument was matched to,

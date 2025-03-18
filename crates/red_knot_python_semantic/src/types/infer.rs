@@ -3851,6 +3851,9 @@ impl<'db> TypeInferenceBuilder<'db> {
             arguments,
         } = call_expression;
 
+        // We don't call `Type::try_call`, because we want to perform type inference on the
+        // arguments after matching them to parameters, but before checking that the argument types
+        // are assignable to any parameter annotations.
         let call_arguments = Self::parse_arguments(arguments);
         let function_type = self.infer_expression(func);
         let signatures = function_type.signatures(self.db());
