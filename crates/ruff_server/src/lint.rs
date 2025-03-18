@@ -13,14 +13,15 @@ use ruff_diagnostics::{Applicability, DiagnosticKind, Edit, Fix};
 use ruff_linter::{
     directives::{extract_directives, Flags},
     generate_noqa_edits,
+    linter::check_path,
     message::{DiagnosticMessage, Message, SyntaxErrorMessage},
+    package::PackageRoot,
     packaging::detect_package_root,
     registry::AsRule,
     settings::flags,
     source_kind::SourceKind,
     Locator,
 };
-use ruff_linter::{linter::check_path, package::PackageRoot};
 use ruff_notebook::Notebook;
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
