@@ -120,7 +120,7 @@ pub(crate) fn check(
     let directives = extract_directives(parsed.tokens(), Flags::all(), &locator, &indexer);
 
     // Generate checks.
-    let diagnostics = check_path(
+    let messages = check_path(
         &query.virtual_file_path(),
         package,
         &locator,
@@ -137,7 +137,7 @@ pub(crate) fn check(
 
     let noqa_edits = generate_noqa_edits(
         &query.virtual_file_path(),
-        &diagnostics,
+        &messages,
         &locator,
         indexer.comment_ranges(),
         &settings.linter.external,
@@ -160,10 +160,10 @@ pub(crate) fn check(
     }
 
     let lsp_diagnostics =
-        diagnostics
+        messages
             .into_iter()
             .zip(noqa_edits)
-            .filter_map(|(diagnostic, noqa_edit)| match diagnostic {
+            .filter_map(|(message, noqa_edit)| match message {
                 Message::Diagnostic(diagnostic_message) => Some(to_lsp_diagnostic(
                     diagnostic_message,
                     noqa_edit,

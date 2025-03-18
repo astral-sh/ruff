@@ -27,17 +27,17 @@ pub(crate) struct FixResult {
 
 /// Fix errors in a file, and write the fixed source code to disk.
 pub(crate) fn fix_file(
-    diagnostics: &[Message],
+    messages: &[Message],
     locator: &Locator,
     unsafe_fixes: UnsafeFixes,
 ) -> Option<FixResult> {
     let required_applicability = unsafe_fixes.required_applicability();
 
-    let mut with_fixes = diagnostics
+    let mut with_fixes = messages
         .iter()
         .filter_map(Message::as_diagnostic_message)
-        .filter(|diagnostic| {
-            diagnostic
+        .filter(|message| {
+            message
                 .fix
                 .as_ref()
                 .is_some_and(|fix| fix.applies(required_applicability))

@@ -123,7 +123,7 @@ pub(crate) fn test_contents<'a>(
         &locator,
         &indexer,
     );
-    let diagnostics = check_path(
+    let messages = check_path(
         path,
         path.parent()
             .and_then(|parent| detect_package_root(parent, &settings.namespace_packages))
@@ -147,26 +147,22 @@ pub(crate) fn test_contents<'a>(
 
     let mut transformed = Cow::Borrowed(source_kind);
 
-    if diagnostics
-        .iter()
-        .filter_map(Message::as_diagnostic_message)
-        .any(|diagnostic| diagnostic.fix.is_some())
-    {
-        let mut diagnostics = diagnostics.clone();
+    if messages.iter().any(|message| message.fix().is_some()) {
+        let mut messages = messages.clone();
 
         while let Some(FixResult {
             code: fixed_contents,
             source_map,
             ..
         }) = fix_file(
-            &diagnostics,
+            &messages,
             &Locator::new(transformed.source_code()),
             UnsafeFixes::Enabled,
         ) {
             if iterations < max_iterations() {
                 iterations += 1;
             } else {
-                let output = print_diagnostics(diagnostics, path, &transformed);
+                let output = print_diagnostics(messages, path, &transformed);
 
                 panic!(
                     "Failed to converge after {} iterations. This likely \
@@ -192,7 +188,7 @@ pub(crate) fn test_contents<'a>(
                 &indexer,
             );
 
-            let fixed_diagnostics = check_path(
+            let fixed_messages = check_path(
                 path,
                 None,
                 &locator,
@@ -209,7 +205,7 @@ pub(crate) fn test_contents<'a>(
 
             if parsed.has_invalid_syntax() && !source_has_errors {
                 // Previous fix introduced a syntax error, abort
-                let fixes = print_diagnostics(diagnostics, path, source_kind);
+                let fixes = print_diagnostics(messages, path, source_kind);
                 let syntax_errors =
                     print_syntax_errors(parsed.errors(), path, &locator, &transformed);
 
@@ -224,7 +220,7 @@ Source with applied fixes:
                 );
             }
 
-            diagnostics = fixed_diagnostics;
+            messages = fixed_messages;
         }
     }
 
@@ -234,7 +230,7 @@ Source with applied fixes:
     )
     .finish();
 
-    let messages = diagnostics
+    let messages = messages
         .into_iter()
         .filter_map(Message::into_diagnostic_message)
         .map(|mut diagnostic| {
@@ -312,11 +308,12 @@ fn print_syntax_errors(
     }
 }
 
-fn print_diagnostics(diagnostics: Vec<Message>, path: &Path, source: &SourceKind) -> String {
+/// Print the [`Message::Diagnostic`]s in `messages`.
+fn print_diagnostics(messages: Vec<Message>, path: &Path, source: &SourceKind) -> String {
     let filename = path.file_name().unwrap().to_string_lossy();
     let source_file = SourceFileBuilder::new(filename.as_ref(), source.source_code()).finish();
 
-    let messages: Vec<_> = diagnostics
+    let messages: Vec<_> = messages
         .into_iter()
         .filter_map(Message::into_diagnostic_message)
         .map(|mut diagnostic| {

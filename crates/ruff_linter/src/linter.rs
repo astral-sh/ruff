@@ -369,7 +369,7 @@ pub fn add_noqa_to_path(
     );
 
     // Generate diagnostics, ignoring any existing `noqa` directives.
-    let diagnostics = check_path(
+    let messages = check_path(
         path,
         package,
         &locator,
@@ -388,7 +388,7 @@ pub fn add_noqa_to_path(
     // TODO(dhruvmanila): Add support for Jupyter Notebooks
     add_noqa(
         path,
-        &diagnostics,
+        &messages,
         &locator,
         indexer.comment_ranges(),
         &settings.external,
@@ -531,7 +531,7 @@ pub fn lint_fix<'a>(
         );
 
         // Generate diagnostics.
-        let diagnostics = check_path(
+        let messages = check_path(
             path,
             package,
             &locator,
@@ -570,7 +570,7 @@ pub fn lint_fix<'a>(
             code: fixed_contents,
             fixes: applied,
             source_map,
-        }) = fix_file(&diagnostics, &locator, unsafe_fixes)
+        }) = fix_file(&messages, &locator, unsafe_fixes)
         {
             if iterations < MAX_ITERATIONS {
                 // Count the number of fixed errors.
@@ -587,12 +587,12 @@ pub fn lint_fix<'a>(
                 continue;
             }
 
-            report_failed_to_converge_error(path, transformed.source_code(), &diagnostics);
+            report_failed_to_converge_error(path, transformed.source_code(), &messages);
         }
 
         return Ok(FixerResult {
             result: LinterResult {
-                messages: diagnostics,
+                messages,
                 has_syntax_error: !is_valid_syntax,
             },
             transformed,
@@ -611,8 +611,8 @@ fn collect_rule_codes(rules: impl IntoIterator<Item = Rule>) -> String {
 }
 
 #[allow(clippy::print_stderr)]
-fn report_failed_to_converge_error(path: &Path, transformed: &str, diagnostics: &[Message]) {
-    let codes = collect_rule_codes(diagnostics.iter().filter_map(Message::rule));
+fn report_failed_to_converge_error(path: &Path, transformed: &str, messages: &[Message]) {
+    let codes = collect_rule_codes(messages.iter().filter_map(Message::rule));
     if cfg!(debug_assertions) {
         eprintln!(
             "{}{} Failed to converge after {} iterations in `{}` with rule codes {}:---\n{}\n---",
