@@ -2427,10 +2427,94 @@ impl<'db> Type<'db> {
                 Signatures::single(signature)
             }
 
-            Type::FunctionLiteral(function_type) => Signatures::single(CallableSignature::single(
-                self,
-                function_type.signature(db).clone(),
-            )),
+            Type::FunctionLiteral(function_type) => match function_type.known(db) {
+                Some(
+                    KnownFunction::IsEquivalentTo
+                    | KnownFunction::IsSubtypeOf
+                    | KnownFunction::IsAssignableTo
+                    | KnownFunction::IsDisjointFrom
+                    | KnownFunction::IsGradualEquivalentTo,
+                ) => {
+                    let signature = CallableSignature::single(
+                        self,
+                        Signature::new(
+                            Parameters::new([
+                                Parameter::positional_only()
+                                    .with_static_name("a")
+                                    .type_form()
+                                    .with_annotated_type(Type::any()),
+                                Parameter::positional_only()
+                                    .with_static_name("b")
+                                    .type_form()
+                                    .with_annotated_type(Type::any()),
+                            ]),
+                            Some(KnownClass::Bool.to_instance(db)),
+                        ),
+                    );
+                    Signatures::single(signature)
+                }
+
+                Some(
+                    KnownFunction::IsFullyStatic
+                    | KnownFunction::IsSingleton
+                    | KnownFunction::IsSingleValued,
+                ) => {
+                    let signature = CallableSignature::single(
+                        self,
+                        Signature::new(
+                            Parameters::new([Parameter::positional_only()
+                                .with_static_name("a")
+                                .type_form()
+                                .with_annotated_type(Type::any())]),
+                            Some(KnownClass::Bool.to_instance(db)),
+                        ),
+                    );
+                    Signatures::single(signature)
+                }
+
+                Some(KnownFunction::AssertType) => {
+                    let signature = CallableSignature::single(
+                        self,
+                        Signature::new(
+                            Parameters::new([
+                                Parameter::positional_only()
+                                    .with_static_name("value")
+                                    .with_annotated_type(Type::any()),
+                                Parameter::positional_only()
+                                    .with_static_name("type")
+                                    .type_form()
+                                    .with_annotated_type(Type::any()),
+                            ]),
+                            Some(Type::none(db)),
+                        ),
+                    );
+                    Signatures::single(signature)
+                }
+
+                Some(KnownFunction::Cast) => {
+                    let signature = CallableSignature::single(
+                        self,
+                        Signature::new(
+                            Parameters::new([
+                                Parameter::positional_or_keyword()
+                                    .with_static_name("typ")
+                                    .type_form()
+                                    .with_annotated_type(Type::any()),
+                                Parameter::positional_or_keyword()
+                                    .with_static_name("val")
+                                    .with_annotated_type(Type::any()),
+                            ]),
+                            Some(Type::any()),
+                        ),
+                    );
+                    Signatures::single(signature)
+                }
+
+                _ => Signatures::single(CallableSignature::single(
+                    self,
+                    function_type.signature(db).clone(),
+                )),
+            },
 
             Type::ClassLiteral(ClassLiteralType { class }) => match class.known(db) {
                 Some(KnownClass::Bool) => {
@@ -4116,35 +4200,6 @@ impl KnownFunction {
             | Self::StaticAssert => module.is_knot_extensions(),
         }
     }
-
-    /// Return the [`ParameterExpectations`] for this function.
-    const fn parameter_expectations(self) -> ParameterExpectations {
-        match self {
-            Self::IsFullyStatic | Self::IsSingleton | Self::IsSingleValued => {
-                ParameterExpectations::SingleTypeExpression
-            }
-
-            Self::IsEquivalentTo
-            | Self::IsSubtypeOf
-            | Self::IsAssignableTo
-            | Self::IsDisjointFrom
-            | Self::IsGradualEquivalentTo => ParameterExpectations::TwoTypeExpressions,
-
-            Self::AssertType => ParameterExpectations::ValueExpressionAndTypeExpression,
-            Self::Cast => ParameterExpectations::TypeExpressionAndValueExpression,
-
-            Self::IsInstance
-            | Self::IsSubclass
-            | Self::Len
-            | Self::Repr
-            | Self::Overload
-            | Self::Final
-            | Self::NoTypeCheck
-            | Self::RevealType
-            | Self::GetattrStatic
-            | Self::StaticAssert => ParameterExpectations::AllValueExpressions,
-        }
-    }
 }
 
 /// This type represents bound method objects that are created when a method is accessed
@@ -4282,69 +4337,6 @@ pub enum CallableType<'db> {
     /// type. We currently add this as a separate variant because `FunctionType.__get__`
     /// is an overloaded method and we do not support `@overload` yet.
     WrapperDescriptorDunderGet,
-}
-
-/// Describes whether the parameters in a function expect value expressions or type expressions.
-///
-/// Whether a specific parameter in the function expects a type expression can be queried
-/// using [`ParameterExpectations::expectation_at_index`].
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
-enum ParameterExpectations {
-    /// All parameters in the function expect value expressions
-    #[default]
-    AllValueExpressions,
-    /// The first parameter in the function expects a type expression
-    SingleTypeExpression,
-    /// The first two parameters in the function expect type expressions
-    TwoTypeExpressions,
-    /// The first parameter in the function expects a value expression,
-    /// and the second expects a type expression
-    ValueExpressionAndTypeExpression,
-    /// The first parameter in the function expects a type expression,
-    /// and the second expects a value expression
-    TypeExpressionAndValueExpression,
-}
-
-impl ParameterExpectations {
-    /// Query whether the parameter at `parameter_index` expects a value expression or a type expression
-    fn expectation_at_index(self, parameter_index: usize) -> ParameterExpectation {
-        match self {
-            Self::AllValueExpressions => ParameterExpectation::ValueExpression,
-            Self::SingleTypeExpression | Self::TypeExpressionAndValueExpression => {
-                if parameter_index == 0 {
-                    ParameterExpectation::TypeExpression
-                } else {
-                    ParameterExpectation::ValueExpression
-                }
-            }
-            Self::TwoTypeExpressions => {
-                if parameter_index < 2 {
-                    ParameterExpectation::TypeExpression
-                } else {
-                    ParameterExpectation::ValueExpression
-                }
-            }
-            Self::ValueExpressionAndTypeExpression => {
-                if parameter_index == 1 {
-                    ParameterExpectation::TypeExpression
-                } else {
-                    ParameterExpectation::ValueExpression
-                }
-            }
-        }
-    }
-}
-
-/// Whether a single parameter in a given function expects a value expression or a [type expression]
-///
-/// [type expression]: https://typing.readthedocs.io/en/latest/spec/annotations.html#type-and-annotation-expressions
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
-enum ParameterExpectation {
-    /// The parameter expects a value expression
-    #[default]
-    ValueExpression,
-    /// The parameter expects a type expression
-    TypeExpression,
 }
 
 #[salsa::interned(debug)]

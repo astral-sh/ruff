@@ -513,7 +513,7 @@ pub(crate) struct Parameter<'db> {
     annotated_type: Option<Type<'db>>,
 
     kind: ParameterKind<'db>,
-    is_type_form: bool,
+    pub(crate) is_type_form: bool,
 }
 
 impl<'db> Parameter<'db> {

@@ -61,7 +61,7 @@ use crate::symbol::{
     module_type_implicit_global_symbol, symbol, symbol_from_bindings, symbol_from_declarations,
     typing_extensions_symbol, Boundness, LookupError,
 };
-use crate::types::call::{Argument, Bindings, CallArguments, CallError};
+use crate::types::call::{Argument, ArgumentForm, Bindings, CallArguments, CallError};
 use crate::types::diagnostic::{
     report_implicit_return_type, report_invalid_arguments_to_annotated,
     report_invalid_arguments_to_callable, report_invalid_assignment,
@@ -102,7 +102,7 @@ use super::slots::check_class_slots;
 use super::string_annotation::{
     parse_string_annotation, BYTE_STRING_TYPE_ANNOTATION, FSTRING_TYPE_ANNOTATION,
 };
-use super::{CallDunderError, ParameterExpectation, ParameterExpectations};
+use super::CallDunderError;
 
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
 /// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
@@ -1142,7 +1142,10 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         if let Some(arguments) = class.arguments.as_deref() {
             let call_arguments = Self::parse_arguments(arguments);
-            self.infer_argument_types(arguments, &call_arguments, ParameterExpectations::default());
+            for argument in call_arguments.iter() {
+                argument.add_form(ArgumentForm::VALUE);
+            }
+            self.infer_argument_types(arguments, &call_arguments);
         }
     }
 
@@ -3260,32 +3263,33 @@ impl<'db> TypeInferenceBuilder<'db> {
         &mut self,
         ast_arguments: &'a ast::Arguments,
         arguments: &CallArguments<'a, 'db>,
-        parameter_expectations: ParameterExpectations,
     ) {
-        for (index, (arg_or_keyword, argument)) in ast_arguments
-            .arguments_source_order()
-            .zip(arguments.iter())
-            .enumerate()
+        for (arg_or_keyword, argument) in
+            ast_arguments.arguments_source_order().zip(arguments.iter())
         {
-            let infer_argument_type = match parameter_expectations.expectation_at_index(index) {
-                ParameterExpectation::TypeExpression => Self::infer_type_expression,
-                ParameterExpectation::ValueExpression => Self::infer_expression,
-            };
-
             match arg_or_keyword {
                 ast::ArgOrKeyword::Arg(arg) => match arg {
                     ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
-                        let ty = infer_argument_type(self, value);
-                        self.store_expression_type(arg, ty);
-                        argument.set_argument_type(ty);
+                        self.infer_argument_type(value, argument);
+                        self.store_expression_type(arg, argument.argument_type());
                     }
-                    _ => argument.set_argument_type(infer_argument_type(self, arg)),
+                    _ => self.infer_argument_type(arg, argument),
                 },
                 ast::ArgOrKeyword::Keyword(ast::Keyword { value, .. }) => {
-                    let ty = infer_argument_type(self, value);
-                    argument.set_argument_type(ty);
+                    self.infer_argument_type(value, argument);
                 }
             }
+        }
+    }
+
+    fn infer_argument_type<'a>(&mut self, ast_argument: &ast::Expr, argument: &Argument<'a, 'db>) {
+        if argument.form().contains(ArgumentForm::VALUE) {
+            let ty = self.infer_expression(ast_argument);
+            argument.set_argument_type(ty);
+        }
+        if argument.form().contains(ArgumentForm::TYPE_FORM) {
+            let ty = self.infer_type_expression(ast_argument);
+            argument.set_type_form_type(ty);
         }
     }
 
@@ -3851,13 +3855,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let function_type = self.infer_expression(func);
         let signatures = function_type.signatures(self.db());
         let bindings = Bindings::match_parameters(signatures, &call_arguments);
-
-        let parameter_expectations = function_type
-            .into_function_literal()
-            .and_then(|f| f.known(self.db()))
-            .map(KnownFunction::parameter_expectations)
-            .unwrap_or_default();
-        self.infer_argument_types(arguments, &call_arguments, parameter_expectations);
+        self.infer_argument_types(arguments, &call_arguments);
 
         match bindings.check_types(self.db()) {
             Ok(bindings) => {

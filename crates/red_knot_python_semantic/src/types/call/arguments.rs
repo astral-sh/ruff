@@ -1,6 +1,8 @@
 use std::cell::Cell;
 use std::rc::Rc;
 
+use bitflags::bitflags;
+
 use super::Type;
 
 /// Typed arguments for a single call, in source order, with an optional bound self/cls parameter.
@@ -47,17 +49,17 @@ impl<'a, 'db> CallArguments<'a, 'db> {
         self.bound_self.iter().chain(self.arguments.as_ref())
     }
 
-    // TODO this should be eliminated in favor of [`bind_call`]
+    /// This should only be used when evaluating known functions with special-case return values.
     pub(crate) fn first_argument(&self) -> Option<Type<'db>> {
         self.iter().next().map(Argument::argument_type)
     }
 
-    // TODO this should be eliminated in favor of [`bind_call`]
+    /// This should only be used when evaluating known functions with special-case return values.
     pub(crate) fn second_argument(&self) -> Option<Type<'db>> {
         self.iter().nth(1).map(Argument::argument_type)
     }
 
-    // TODO this should be eliminated in favor of [`bind_call`]
+    /// This should only be used when evaluating known functions with special-case return values.
     pub(crate) fn third_argument(&self) -> Option<Type<'db>> {
         self.iter().nth(2).map(Argument::argument_type)
     }
@@ -75,6 +77,7 @@ impl<'a, 'db> FromIterator<Argument<'a, 'db>> for CallArguments<'a, 'db> {
 #[derive(Clone, Debug)]
 pub(crate) struct Argument<'a, 'db> {
     kind: ArgumentKind<'a>,
+    form: Cell<ArgumentForm>,
 
     /// The inferred type of this argument. Will be `Type::Unknown` if we haven't inferred a type
     /// for this argument yet.
@@ -90,6 +93,7 @@ impl<'a, 'db> Argument<'a, 'db> {
     pub(crate) fn keyword(name: &'a str) -> Self {
         Self {
             kind: ArgumentKind::Keyword(name),
+            form: Cell::default(),
             argument_type: Cell::new(Type::unknown()),
             type_form_type: Cell::new(Type::unknown()),
         }
@@ -98,6 +102,7 @@ impl<'a, 'db> Argument<'a, 'db> {
     pub(crate) fn keywords() -> Self {
         Self {
             kind: ArgumentKind::Keywords,
+            form: Cell::default(),
             argument_type: Cell::new(Type::unknown()),
             type_form_type: Cell::new(Type::unknown()),
         }
@@ -106,6 +111,7 @@ impl<'a, 'db> Argument<'a, 'db> {
     pub(crate) fn positional() -> Self {
         Self {
             kind: ArgumentKind::Positional,
+            form: Cell::default(),
             argument_type: Cell::new(Type::unknown()),
             type_form_type: Cell::new(Type::unknown()),
         }
@@ -114,6 +120,7 @@ impl<'a, 'db> Argument<'a, 'db> {
     pub(crate) fn synthetic() -> Self {
         Self {
             kind: ArgumentKind::Synthetic,
+            form: Cell::default(),
             argument_type: Cell::new(Type::unknown()),
             type_form_type: Cell::new(Type::unknown()),
         }
@@ -122,6 +129,7 @@ impl<'a, 'db> Argument<'a, 'db> {
     pub(crate) fn variadic() -> Self {
         Self {
             kind: ArgumentKind::Variadic,
+            form: Cell::default(),
             argument_type: Cell::new(Type::unknown()),
             type_form_type: Cell::new(Type::unknown()),
         }
@@ -130,6 +138,11 @@ impl<'a, 'db> Argument<'a, 'db> {
     pub(crate) fn with_argument_type(self, argument_type: Type<'db>) -> Self {
         self.argument_type.set(argument_type);
         self
+    }
+
+    pub(crate) fn add_form(&self, form: ArgumentForm) {
+        let old = self.form.get();
+        self.form.set(old | form);
     }
 
     pub(crate) fn set_argument_type(&self, argument_type: Type<'db>) {
@@ -142,6 +155,10 @@ impl<'a, 'db> Argument<'a, 'db> {
 
     pub(crate) fn kind(&self) -> ArgumentKind<'a> {
         self.kind
+    }
+
+    pub(crate) fn form(&self) -> ArgumentForm {
+        self.form.get()
     }
 
     pub(crate) fn argument_type(&self) -> Type<'db> {
@@ -165,4 +182,13 @@ pub(crate) enum ArgumentKind<'a> {
     Keyword(&'a str),
     /// The double-starred keywords argument (e.g. `**kwargs`).
     Keywords,
+}
+
+bitflags! {
+    /// Whether an argument is used as a value and/or a type form in the call site.
+    #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+    pub(crate) struct ArgumentForm: u8 {
+        const VALUE = 1 << 0;
+        const TYPE_FORM = 1 << 1;
+    }
 }

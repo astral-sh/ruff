@@ -6,8 +6,8 @@
 use smallvec::SmallVec;
 
 use super::{
-    ArgumentKind, CallArguments, CallError, CallErrorKind, CallableSignature, InferContext,
-    Signature, Signatures, Type,
+    ArgumentForm, ArgumentKind, CallArguments, CallError, CallErrorKind, CallableSignature,
+    InferContext, Signature, Signatures, Type,
 };
 use crate::db::Db;
 use crate::symbol::{Boundness, Symbol};
@@ -339,12 +339,9 @@ impl<'call, 'db> Bindings<'call, 'db> {
                     }
 
                     Some(KnownFunction::Cast) => {
-                        // TODO: Use `.parameter_types()` exclusively when overloads are supported.
-                        if let Some(casted_ty) = arguments.first_argument() {
-                            if let [_, _] = overload.parameter_types() {
-                                overload.set_return_type(casted_ty);
-                            }
-                        };
+                        if let [casted_ty, _] = overload.parameter_types() {
+                            overload.set_return_type(*casted_ty);
+                        }
                     }
 
                     Some(KnownFunction::Overload) => {
@@ -700,6 +697,11 @@ impl<'db> Binding<'db> {
                     continue;
                 }
             };
+            if parameter.is_type_form {
+                argument.add_form(ArgumentForm::TYPE_FORM);
+            } else {
+                argument.add_form(ArgumentForm::VALUE);
+            }
             if parameter_matched[index] {
                 if !parameter.is_variadic() && !parameter.is_keyword_variadic() {
                     errors.push(BindingError::ParameterAlreadyAssigned {
@@ -781,7 +783,11 @@ impl<'db> Binding<'db> {
                 continue;
             }
             let parameter = &parameters[parameter_index];
-            let argument_ty = argument.argument_type();
+            let argument_ty = if parameter.is_type_form {
+                argument.type_form_type()
+            } else {
+                argument.argument_type()
+            };
             if let Some(expected_ty) = parameter.annotated_type() {
                 if !argument_ty.is_assignable_to(db, expected_ty) {
                     let positional = matches!(
