@@ -1,6 +1,4 @@
-use crate::types::{
-    todo_type, Class, ClassLiteralType, DynamicType, KnownClass, KnownInstanceType, Type,
-};
+use crate::types::{todo_type, Class, DynamicType, KnownClass, KnownInstanceType, Type};
 use crate::Db;
 use itertools::Either;
 
@@ -10,28 +8,28 @@ use itertools::Either;
 /// all types that would be invalid to have as a class base are
 /// transformed into [`ClassBase::unknown`]
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, salsa::Update)]
-pub enum ClassBase<'db> {
+pub(crate) enum ClassBase<'db> {
     Dynamic(DynamicType),
     Class(Class<'db>),
 }
 
 impl<'db> ClassBase<'db> {
-    pub const fn any() -> Self {
+    pub(crate) const fn any() -> Self {
         Self::Dynamic(DynamicType::Any)
     }
 
-    pub const fn unknown() -> Self {
+    pub(crate) const fn unknown() -> Self {
         Self::Dynamic(DynamicType::Unknown)
     }
 
-    pub const fn is_dynamic(self) -> bool {
+    pub(crate) const fn is_dynamic(self) -> bool {
         match self {
             ClassBase::Dynamic(_) => true,
             ClassBase::Class(_) => false,
         }
     }
 
-    pub fn display(self, db: &'db dyn Db) -> impl std::fmt::Display + 'db {
+    pub(crate) fn display(self, db: &'db dyn Db) -> impl std::fmt::Display + 'db {
         struct Display<'db> {
             base: ClassBase<'db>,
             db: &'db dyn Db,
@@ -54,9 +52,7 @@ impl<'db> ClassBase<'db> {
         KnownClass::Object
             .to_class_literal(db)
             .into_class_literal()
-            .map_or(Self::unknown(), |ClassLiteralType { class }| {
-                Self::Class(class)
-            })
+            .map_or(Self::unknown(), |literal| Self::Class(literal.class()))
     }
 
     /// Attempt to resolve `ty` into a `ClassBase`.
@@ -65,13 +61,14 @@ impl<'db> ClassBase<'db> {
     pub(super) fn try_from_type(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
         match ty {
             Type::Dynamic(dynamic) => Some(Self::Dynamic(dynamic)),
-            Type::ClassLiteral(ClassLiteralType { class }) => Some(Self::Class(class)),
+            Type::ClassLiteral(literal) => Some(Self::Class(literal.class())),
             Type::Union(_) => None, // TODO -- forces consideration of multiple possible MROs?
             Type::Intersection(_) => None, // TODO -- probably incorrect?
             Type::Instance(_) => None, // TODO -- handle `__mro_entries__`?
             Type::Never
             | Type::BooleanLiteral(_)
             | Type::FunctionLiteral(_)
+            | Type::Callable(..)
             | Type::BytesLiteral(_)
             | Type::IntLiteral(_)
             | Type::StringLiteral(_)
@@ -106,6 +103,7 @@ impl<'db> ClassBase<'db> {
                 | KnownInstanceType::Not
                 | KnownInstanceType::Intersection
                 | KnownInstanceType::TypeOf
+                | KnownInstanceType::CallableTypeFromFunction
                 | KnownInstanceType::AlwaysTruthy
                 | KnownInstanceType::AlwaysFalsy => None,
                 KnownInstanceType::Unknown => Some(Self::unknown()),
@@ -147,6 +145,7 @@ impl<'db> ClassBase<'db> {
                 KnownInstanceType::Callable => {
                     Self::try_from_type(db, todo_type!("Support for Callable as a base class"))
                 }
+                KnownInstanceType::Protocol => Some(ClassBase::Dynamic(DynamicType::TodoProtocol)),
             },
         }
     }

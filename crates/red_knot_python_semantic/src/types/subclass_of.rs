@@ -1,4 +1,6 @@
-use super::{ClassBase, ClassLiteralType, Db, KnownClass, Symbol, Type};
+use crate::symbol::SymbolAndQualifiers;
+
+use super::{ClassBase, ClassLiteralType, Db, KnownClass, Type};
 
 /// A type that represents `type[C]`, i.e. the class object `C` and class objects that are subclasses of `C`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update)]
@@ -26,7 +28,7 @@ impl<'db> SubclassOfType<'db> {
             ClassBase::Class(class) => {
                 if class.is_final(db) {
                     Type::ClassLiteral(ClassLiteralType { class })
-                } else if class.is_known(db, KnownClass::Object) {
+                } else if class.is_object(db) {
                     KnownClass::Type.to_instance(db)
                 } else {
                     Type::SubclassOf(Self { subclass_of })
@@ -64,8 +66,12 @@ impl<'db> SubclassOfType<'db> {
         !self.is_dynamic()
     }
 
-    pub(crate) fn member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
-        Type::from(self.subclass_of).member(db, name)
+    pub(crate) fn find_name_in_mro(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+    ) -> Option<SymbolAndQualifiers<'db>> {
+        Type::from(self.subclass_of).find_name_in_mro(db, name)
     }
 
     /// Return `true` if `self` is a subtype of `other`.
@@ -84,6 +90,13 @@ impl<'db> SubclassOfType<'db> {
                 // N.B. The subclass relation is fully static
                 self_class.is_subclass_of(db, other_class)
             }
+        }
+    }
+
+    pub(crate) fn to_instance(self) -> Type<'db> {
+        match self.subclass_of {
+            ClassBase::Class(class) => Type::instance(class),
+            ClassBase::Dynamic(dynamic_type) => Type::Dynamic(dynamic_type),
         }
     }
 }

@@ -1,0 +1,102 @@
+---
+source: crates/red_knot_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: for.md - For loops - Possibly invalid `__next__` method
+mdtest path: crates/red_knot_python_semantic/resources/mdtest/loops/for.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing_extensions import reveal_type
+ 2 | 
+ 3 | def _(flag: bool):
+ 4 |     class Iterator1:
+ 5 |         if flag:
+ 6 |             def __next__(self) -> int:
+ 7 |                 return 42
+ 8 |         else:
+ 9 |             def __next__(self, invalid_extra_arg) -> str:
+10 |                 return "foo"
+11 | 
+12 |     class Iterator2:
+13 |         if flag:
+14 |             def __next__(self) -> int:
+15 |                 return 42
+16 |         else:
+17 |             __next__: None = None
+18 | 
+19 |     class Iterable1:
+20 |         def __iter__(self) -> Iterator1:
+21 |             return Iterator1()
+22 | 
+23 |     class Iterable2:
+24 |         def __iter__(self) -> Iterator2:
+25 |             return Iterator2()
+26 | 
+27 |     # error: [not-iterable]
+28 |     for x in Iterable1():
+29 |         reveal_type(x)  # revealed: int | str
+30 | 
+31 |     # error: [not-iterable]
+32 |     for y in Iterable2():
+33 |         # TODO: `int` would probably be better here:
+34 |         reveal_type(y)  # revealed: int | Unknown
+```
+
+# Diagnostics
+
+```
+error: lint:not-iterable
+  --> /src/mdtest_snippet.py:28:14
+   |
+27 |     # error: [not-iterable]
+28 |     for x in Iterable1():
+   |              ^^^^^^^^^^^ Object of type `Iterable1` may not be iterable because its `__iter__` method returns an object of type `Iterator1`, which may have an invalid `__next__` method (expected `def __next__(self): ...`)
+29 |         reveal_type(x)  # revealed: int | str
+   |
+
+```
+
+```
+info: revealed-type
+  --> /src/mdtest_snippet.py:29:9
+   |
+27 |     # error: [not-iterable]
+28 |     for x in Iterable1():
+29 |         reveal_type(x)  # revealed: int | str
+   |         ^^^^^^^^^^^^^^ Revealed type is `int | str`
+30 |
+31 |     # error: [not-iterable]
+   |
+
+```
+
+```
+error: lint:not-iterable
+  --> /src/mdtest_snippet.py:32:14
+   |
+31 |     # error: [not-iterable]
+32 |     for y in Iterable2():
+   |              ^^^^^^^^^^^ Object of type `Iterable2` may not be iterable because its `__iter__` method returns an object of type `Iterator2`, which has a `__next__` attribute that may not be callable
+33 |         # TODO: `int` would probably be better here:
+34 |         reveal_type(y)  # revealed: int | Unknown
+   |
+
+```
+
+```
+info: revealed-type
+  --> /src/mdtest_snippet.py:34:9
+   |
+32 |     for y in Iterable2():
+33 |         # TODO: `int` would probably be better here:
+34 |         reveal_type(y)  # revealed: int | Unknown
+   |         ^^^^^^^^^^^^^^ Revealed type is `int | Unknown`
+   |
+
+```

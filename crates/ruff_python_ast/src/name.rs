@@ -3,11 +3,13 @@ use std::fmt::{Debug, Display, Formatter, Write};
 use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 
-use crate::{nodes, Expr};
+use crate::generated::ExprName;
+use crate::Expr;
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "cache", derive(ruff_macros::CacheKey))]
+#[cfg_attr(feature = "salsa", derive(salsa::Update))]
 pub struct Name(compact_str::CompactString);
 
 impl Name {
@@ -386,16 +388,14 @@ impl<'a> UnqualifiedName<'a> {
         let attr1 = match expr {
             Expr::Attribute(attr1) => attr1,
             // Ex) `foo`
-            Expr::Name(nodes::ExprName { id, .. }) => {
-                return Some(Self::from_slice(&[id.as_str()]))
-            }
+            Expr::Name(ExprName { id, .. }) => return Some(Self::from_slice(&[id.as_str()])),
             _ => return None,
         };
 
         let attr2 = match attr1.value.as_ref() {
             Expr::Attribute(attr2) => attr2,
             // Ex) `foo.bar`
-            Expr::Name(nodes::ExprName { id, .. }) => {
+            Expr::Name(ExprName { id, .. }) => {
                 return Some(Self::from_slice(&[id.as_str(), attr1.attr.as_str()]))
             }
             _ => return None,
@@ -404,7 +404,7 @@ impl<'a> UnqualifiedName<'a> {
         let attr3 = match attr2.value.as_ref() {
             Expr::Attribute(attr3) => attr3,
             // Ex) `foo.bar.baz`
-            Expr::Name(nodes::ExprName { id, .. }) => {
+            Expr::Name(ExprName { id, .. }) => {
                 return Some(Self::from_slice(&[
                     id.as_str(),
                     attr2.attr.as_str(),
@@ -417,7 +417,7 @@ impl<'a> UnqualifiedName<'a> {
         let attr4 = match attr3.value.as_ref() {
             Expr::Attribute(attr4) => attr4,
             // Ex) `foo.bar.baz.bop`
-            Expr::Name(nodes::ExprName { id, .. }) => {
+            Expr::Name(ExprName { id, .. }) => {
                 return Some(Self::from_slice(&[
                     id.as_str(),
                     attr3.attr.as_str(),
@@ -431,7 +431,7 @@ impl<'a> UnqualifiedName<'a> {
         let attr5 = match attr4.value.as_ref() {
             Expr::Attribute(attr5) => attr5,
             // Ex) `foo.bar.baz.bop.bap`
-            Expr::Name(nodes::ExprName { id, .. }) => {
+            Expr::Name(ExprName { id, .. }) => {
                 return Some(Self::from_slice(&[
                     id.as_str(),
                     attr4.attr.as_str(),
@@ -446,7 +446,7 @@ impl<'a> UnqualifiedName<'a> {
         let attr6 = match attr5.value.as_ref() {
             Expr::Attribute(attr6) => attr6,
             // Ex) `foo.bar.baz.bop.bap.bab`
-            Expr::Name(nodes::ExprName { id, .. }) => {
+            Expr::Name(ExprName { id, .. }) => {
                 return Some(Self::from_slice(&[
                     id.as_str(),
                     attr5.attr.as_str(),
@@ -462,7 +462,7 @@ impl<'a> UnqualifiedName<'a> {
         let attr7 = match attr6.value.as_ref() {
             Expr::Attribute(attr7) => attr7,
             // Ex) `foo.bar.baz.bop.bap.bab.bob`
-            Expr::Name(nodes::ExprName { id, .. }) => {
+            Expr::Name(ExprName { id, .. }) => {
                 return Some(Self::from_slice(&[
                     id.as_str(),
                     attr6.attr.as_str(),
@@ -479,7 +479,7 @@ impl<'a> UnqualifiedName<'a> {
         let attr8 = match attr7.value.as_ref() {
             Expr::Attribute(attr8) => attr8,
             // Ex) `foo.bar.baz.bop.bap.bab.bob.bib`
-            Expr::Name(nodes::ExprName { id, .. }) => {
+            Expr::Name(ExprName { id, .. }) => {
                 return Some(Self(SegmentsVec::from([
                     id.as_str(),
                     attr7.attr.as_str(),
@@ -504,7 +504,7 @@ impl<'a> UnqualifiedName<'a> {
                     segments.push(attr.attr.as_str());
                     &*attr.value
                 }
-                Expr::Name(nodes::ExprName { id, .. }) => {
+                Expr::Name(ExprName { id, .. }) => {
                     segments.push(id.as_str());
                     break;
                 }

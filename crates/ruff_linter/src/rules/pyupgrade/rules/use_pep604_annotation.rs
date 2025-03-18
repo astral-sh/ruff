@@ -3,6 +3,7 @@ use ruff_diagnostics::{
 };
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::{pep_604_optional, pep_604_union};
+use ruff_python_ast::PythonVersion;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::analyze::typing::Pep604Operator;
 use ruff_text_size::Ranged;
@@ -10,7 +11,7 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;
 use crate::fix::edits::pad;
-use crate::settings::types::{PreviewMode, PythonVersion};
+use crate::settings::types::PreviewMode;
 
 /// ## What it does
 /// Check for type annotations that can be rewritten based on [PEP 604] syntax.
@@ -130,7 +131,7 @@ impl Violation for NonPEP604AnnotationOptional {
 
 /// UP007, UP045
 pub(crate) fn non_pep604_annotation(
-    checker: &mut Checker,
+    checker: &Checker,
     expr: &Expr,
     slice: &Expr,
     operator: Pep604Operator,
@@ -141,7 +142,7 @@ pub(crate) fn non_pep604_annotation(
         && !checker.semantic().in_complex_string_type_definition()
         && is_allowed_value(slice);
 
-    let applicability = if checker.settings.target_version >= PythonVersion::Py310 {
+    let applicability = if checker.target_version() >= PythonVersion::PY310 {
         Applicability::Safe
     } else {
         Applicability::Unsafe
@@ -186,7 +187,7 @@ pub(crate) fn non_pep604_annotation(
                     }
                 }
             }
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
         Pep604Operator::Union => {
             if !checker.enabled(Rule::NonPEP604AnnotationUnion) {
@@ -228,7 +229,7 @@ pub(crate) fn non_pep604_annotation(
                     }
                 }
             }
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 }

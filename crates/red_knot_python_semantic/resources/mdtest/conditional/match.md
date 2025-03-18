@@ -43,3 +43,21 @@ def _(target: int):
 
     reveal_type(y)  # revealed: Literal[2, 3, 4]
 ```
+
+## Guard with object that implements `__bool__` incorrectly
+
+```py
+class NotBoolable:
+    __bool__: int = 3
+
+def _(target: int, flag: NotBoolable):
+    y = 1
+    match target:
+        # error: [unsupported-bool-conversion] "Boolean conversion is unsupported for type `NotBoolable`; its `__bool__` method isn't callable"
+        case 1 if flag:
+            y = 2
+        case 2:
+            y = 3
+
+    reveal_type(y)  # revealed: Literal[1, 2, 3]
+```

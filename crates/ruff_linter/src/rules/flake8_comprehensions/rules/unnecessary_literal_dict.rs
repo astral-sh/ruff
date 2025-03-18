@@ -16,7 +16,7 @@ use super::helpers;
 /// It's unnecessary to use a list or tuple literal within a call to `dict()`.
 /// It can be rewritten as a dict literal (`{}`).
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// dict([(1, 2), (3, 4)])
 /// dict(((1, 2), (3, 4)))
@@ -52,7 +52,7 @@ impl AlwaysFixableViolation for UnnecessaryLiteralDict {
 
 /// C406 (`dict([(1, 2)])`)
 pub(crate) fn unnecessary_literal_dict(
-    checker: &mut Checker,
+    checker: &Checker,
     expr: &Expr,
     func: &Expr,
     args: &[Expr],
@@ -81,7 +81,7 @@ pub(crate) fn unnecessary_literal_dict(
     let mut diagnostic = Diagnostic::new(UnnecessaryLiteralDict { obj_type: kind }, expr.range());
     diagnostic
         .try_set_fix(|| fixes::fix_unnecessary_literal_dict(expr, checker).map(Fix::unsafe_edit));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

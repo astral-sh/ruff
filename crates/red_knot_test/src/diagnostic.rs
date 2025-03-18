@@ -2,7 +2,7 @@
 //!
 //! We don't assume that we will get the diagnostics in source order.
 
-use ruff_db::diagnostic::Diagnostic;
+use ruff_db::diagnostic::OldDiagnosticTrait;
 use ruff_source_file::{LineIndex, OneIndexed};
 use std::ops::{Deref, Range};
 
@@ -19,14 +19,15 @@ pub(crate) struct SortedDiagnostics<T> {
 
 impl<T> SortedDiagnostics<T>
 where
-    T: Diagnostic,
+    T: OldDiagnosticTrait,
 {
     pub(crate) fn new(diagnostics: impl IntoIterator<Item = T>, line_index: &LineIndex) -> Self {
         let mut diagnostics: Vec<_> = diagnostics
             .into_iter()
             .map(|diagnostic| DiagnosticWithLine {
                 line_number: diagnostic
-                    .range()
+                    .span()
+                    .and_then(|span| span.range())
                     .map_or(OneIndexed::from_zero_indexed(0), |range| {
                         line_index.line_index(range.start())
                     }),
@@ -98,7 +99,7 @@ pub(crate) struct LineDiagnosticsIterator<'a, T> {
 
 impl<'a, T> Iterator for LineDiagnosticsIterator<'a, T>
 where
-    T: Diagnostic,
+    T: OldDiagnosticTrait,
 {
     type Item = LineDiagnostics<'a, T>;
 
@@ -114,7 +115,7 @@ where
     }
 }
 
-impl<T> std::iter::FusedIterator for LineDiagnosticsIterator<'_, T> where T: Diagnostic {}
+impl<T> std::iter::FusedIterator for LineDiagnosticsIterator<'_, T> where T: OldDiagnosticTrait {}
 
 /// All diagnostics that start on a single line of source code in one embedded Python file.
 #[derive(Debug)]
@@ -143,18 +144,18 @@ struct DiagnosticWithLine<T> {
 #[cfg(test)]
 mod tests {
     use crate::db::Db;
-    use crate::diagnostic::Diagnostic;
-    use ruff_db::diagnostic::{DiagnosticId, LintName, Severity};
+    use crate::diagnostic::OldDiagnosticTrait;
+    use ruff_db::diagnostic::{DiagnosticId, LintName, Severity, Span};
     use ruff_db::files::{system_path_to_file, File};
     use ruff_db::source::line_index;
-    use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
+    use ruff_db::system::DbWithWritableSystem as _;
     use ruff_source_file::OneIndexed;
     use ruff_text_size::{TextRange, TextSize};
     use std::borrow::Cow;
 
     #[test]
     fn sort_and_group() {
-        let mut db = Db::setup(SystemPathBuf::from("/src"));
+        let mut db = Db::setup();
         db.write_file("/src/test.py", "one\ntwo\n").unwrap();
         let file = system_path_to_file(&db, "/src/test.py").unwrap();
         let lines = line_index(&db, file);
@@ -189,7 +190,7 @@ mod tests {
         file: File,
     }
 
-    impl Diagnostic for DummyDiagnostic {
+    impl OldDiagnosticTrait for DummyDiagnostic {
         fn id(&self) -> DiagnosticId {
             DiagnosticId::Lint(LintName::of("dummy"))
         }
@@ -198,12 +199,8 @@ mod tests {
             "dummy".into()
         }
 
-        fn file(&self) -> Option<File> {
-            Some(self.file)
-        }
-
-        fn range(&self) -> Option<TextRange> {
-            Some(self.range)
+        fn span(&self) -> Option<Span> {
+            Some(Span::from(self.file).with_range(self.range))
         }
 
         fn severity(&self) -> Severity {

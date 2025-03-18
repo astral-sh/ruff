@@ -1,0 +1,101 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/decorator_expression_py38.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..89,
+        body: [
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 45..88,
+                    is_async: false,
+                    decorator_list: [
+                        Decorator {
+                            range: 45..72,
+                            expression: Attribute(
+                                ExprAttribute {
+                                    range: 46..72,
+                                    value: Attribute(
+                                        ExprAttribute {
+                                            range: 46..64,
+                                            value: Subscript(
+                                                ExprSubscript {
+                                                    range: 46..56,
+                                                    value: Name(
+                                                        ExprName {
+                                                            range: 46..53,
+                                                            id: Name("buttons"),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    slice: NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            range: 54..55,
+                                                            value: Int(
+                                                                0,
+                                                            ),
+                                                        },
+                                                    ),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            attr: Identifier {
+                                                id: Name("clicked"),
+                                                range: 57..64,
+                                            },
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    attr: Identifier {
+                                        id: Name("connect"),
+                                        range: 65..72,
+                                    },
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ],
+                    name: Identifier {
+                        id: Name("spam"),
+                        range: 77..81,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 81..83,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 85..88,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 85..88,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Unsupported Syntax Errors
+
+  |
+1 | # parse_options: { "target-version": "3.8" }
+2 | @buttons[0].clicked.connect
+  |  ^^^^^^^^^^ Syntax Error: Cannot use subscript expression outside function call arguments in a decorator on Python 3.8 (syntax was added in Python 3.9)
+3 | def spam(): ...
+  |

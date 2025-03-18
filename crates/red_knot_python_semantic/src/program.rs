@@ -1,10 +1,10 @@
 use crate::module_resolver::SearchPaths;
 use crate::python_platform::PythonPlatform;
-use crate::python_version::PythonVersion;
 use crate::Db;
 
 use anyhow::Context;
 use ruff_db::system::{SystemPath, SystemPathBuf};
+use ruff_python_ast::PythonVersion;
 use salsa::Durability;
 use salsa::Setter;
 
@@ -110,8 +110,9 @@ pub struct SearchPathSettings {
     /// bundled as a zip file in the binary
     pub custom_typeshed: Option<SystemPathBuf>,
 
-    /// The path to the user's `site-packages` directory, where third-party packages from ``PyPI`` are installed.
-    pub site_packages: SitePackages,
+    /// Path to the Python installation from which Red Knot resolves third party dependencies
+    /// and their type information.
+    pub python_path: PythonPath,
 }
 
 impl SearchPathSettings {
@@ -120,17 +121,32 @@ impl SearchPathSettings {
             src_roots,
             extra_paths: vec![],
             custom_typeshed: None,
-            site_packages: SitePackages::Known(vec![]),
+            python_path: PythonPath::KnownSitePackages(vec![]),
         }
     }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum SitePackages {
-    Derived {
-        venv_path: SystemPathBuf,
-    },
-    /// Resolved site packages paths
-    Known(Vec<SystemPathBuf>),
+pub enum PythonPath {
+    /// A path that represents the value of [`sys.prefix`] at runtime in Python
+    /// for a given Python executable.
+    ///
+    /// For the case of a virtual environment, where a
+    /// Python binary is at `/.venv/bin/python`, `sys.prefix` is the path to
+    /// the virtual environment the Python binary lies inside, i.e. `/.venv`,
+    /// and `site-packages` will be at `.venv/lib/python3.X/site-packages`.
+    /// System Python installations generally work the same way: if a system
+    /// Python installation lies at `/opt/homebrew/bin/python`, `sys.prefix`
+    /// will be `/opt/homebrew`, and `site-packages` will be at
+    /// `/opt/homebrew/lib/python3.X/site-packages`.
+    ///
+    /// [`sys.prefix`]: https://docs.python.org/3/library/sys.html#sys.prefix
+    SysPrefix(SystemPathBuf),
+
+    /// Resolved site packages paths.
+    ///
+    /// This variant is mainly intended for testing where we want to skip resolving `site-packages`
+    /// because it would unnecessarily complicate the test setup.
+    KnownSitePackages(Vec<SystemPathBuf>),
 }

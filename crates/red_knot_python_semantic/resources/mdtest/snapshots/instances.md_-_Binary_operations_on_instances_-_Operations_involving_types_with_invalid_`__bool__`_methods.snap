@@ -1,0 +1,35 @@
+---
+source: crates/red_knot_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: instances.md - Binary operations on instances - Operations involving types with invalid `__bool__` methods
+mdtest path: crates/red_knot_python_semantic/resources/mdtest/binary/instances.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | class NotBoolable:
+2 |     __bool__: int = 3
+3 | 
+4 | a = NotBoolable()
+5 | 
+6 | # error: [unsupported-bool-conversion]
+7 | 10 and a and True
+```
+
+# Diagnostics
+
+```
+error: lint:unsupported-bool-conversion
+ --> /src/mdtest_snippet.py:7:8
+  |
+6 | # error: [unsupported-bool-conversion]
+7 | 10 and a and True
+  |        ^ Boolean conversion is unsupported for type `NotBoolable`; its `__bool__` method isn't callable
+  |
+
+```

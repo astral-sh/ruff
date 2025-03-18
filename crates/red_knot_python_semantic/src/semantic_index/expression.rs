@@ -30,26 +30,23 @@ pub(crate) enum ExpressionKind {
 /// * a return type of a cross-module query
 /// * a field of a type that is a return type of a cross-module query
 /// * an argument of a cross-module query
-#[salsa::tracked]
+#[salsa::tracked(debug)]
 pub(crate) struct Expression<'db> {
     /// The file in which the expression occurs.
-    #[id]
     pub(crate) file: File,
 
     /// The scope in which the expression occurs.
-    #[id]
     pub(crate) file_scope: FileScopeId,
 
     /// The expression node.
     #[no_eq]
+    #[tracked]
     #[return_ref]
     pub(crate) node_ref: AstNodeRef<ast::Expr>,
 
     /// Should this expression be inferred as a normal expression or a type expression?
-    #[id]
     pub(crate) kind: ExpressionKind,
 
-    #[no_eq]
     count: countme::Count<Expression<'static>>,
 }
 

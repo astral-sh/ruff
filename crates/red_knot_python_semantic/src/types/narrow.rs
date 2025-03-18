@@ -1,14 +1,15 @@
 use crate::semantic_index::ast_ids::HasScopedExpressionId;
-use crate::semantic_index::constraint::{
-    Constraint, ConstraintNode, PatternConstraint, PatternConstraintKind,
-};
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::expression::Expression;
+use crate::semantic_index::predicate::{
+    PatternPredicate, PatternPredicateKind, Predicate, PredicateNode,
+};
 use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId, SymbolTable};
 use crate::semantic_index::symbol_table;
+use crate::types::infer::infer_same_file_expression_type;
 use crate::types::{
-    infer_expression_types, ClassLiteralType, IntersectionBuilder, KnownClass, KnownFunction,
-    SubclassOfType, Truthiness, Type, UnionBuilder,
+    infer_expression_types, ClassLiteralType, IntersectionBuilder, KnownClass, SubclassOfType,
+    Truthiness, Type, UnionBuilder,
 };
 use crate::Db;
 use itertools::Itertools;
@@ -34,20 +35,20 @@ use std::sync::Arc;
 ///
 /// But if we called this with the same `test` expression, but the `definition` of `y`, no
 /// constraint is applied to that definition, so we'd just return `None`.
-pub(crate) fn narrowing_constraint<'db>(
+pub(crate) fn infer_narrowing_constraint<'db>(
     db: &'db dyn Db,
-    constraint: Constraint<'db>,
+    predicate: Predicate<'db>,
     definition: Definition<'db>,
 ) -> Option<Type<'db>> {
-    let constraints = match constraint.node {
-        ConstraintNode::Expression(expression) => {
-            if constraint.is_positive {
+    let constraints = match predicate.node {
+        PredicateNode::Expression(expression) => {
+            if predicate.is_positive {
                 all_narrowing_constraints_for_expression(db, expression)
             } else {
                 all_negative_narrowing_constraints_for_expression(db, expression)
             }
         }
-        ConstraintNode::Pattern(pattern) => all_narrowing_constraints_for_pattern(db, pattern),
+        PredicateNode::Pattern(pattern) => all_narrowing_constraints_for_pattern(db, pattern),
     };
     if let Some(constraints) = constraints {
         constraints.get(&definition.symbol(db)).copied()
@@ -60,9 +61,9 @@ pub(crate) fn narrowing_constraint<'db>(
 #[salsa::tracked(return_ref)]
 fn all_narrowing_constraints_for_pattern<'db>(
     db: &'db dyn Db,
-    pattern: PatternConstraint<'db>,
+    pattern: PatternPredicate<'db>,
 ) -> Option<NarrowingConstraints<'db>> {
-    NarrowingConstraintsBuilder::new(db, ConstraintNode::Pattern(pattern), true).finish()
+    NarrowingConstraintsBuilder::new(db, PredicateNode::Pattern(pattern), true).finish()
 }
 
 #[allow(clippy::ref_option)]
@@ -71,7 +72,7 @@ fn all_narrowing_constraints_for_expression<'db>(
     db: &'db dyn Db,
     expression: Expression<'db>,
 ) -> Option<NarrowingConstraints<'db>> {
-    NarrowingConstraintsBuilder::new(db, ConstraintNode::Expression(expression), true).finish()
+    NarrowingConstraintsBuilder::new(db, PredicateNode::Expression(expression), true).finish()
 }
 
 #[allow(clippy::ref_option)]
@@ -80,7 +81,7 @@ fn all_negative_narrowing_constraints_for_expression<'db>(
     db: &'db dyn Db,
     expression: Expression<'db>,
 ) -> Option<NarrowingConstraints<'db>> {
-    NarrowingConstraintsBuilder::new(db, ConstraintNode::Expression(expression), false).finish()
+    NarrowingConstraintsBuilder::new(db, PredicateNode::Expression(expression), false).finish()
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -110,7 +111,7 @@ impl KnownConstraintFunction {
                 }
                 Some(builder.build())
             }
-            Type::ClassLiteral(ClassLiteralType { class }) => Some(constraint_fn(class)),
+            Type::ClassLiteral(class_literal) => Some(constraint_fn(class_literal.class())),
             Type::SubclassOf(subclass_of_ty) => {
                 subclass_of_ty.subclass_of().into_class().map(constraint_fn)
             }
@@ -152,38 +153,38 @@ fn merge_constraints_or<'db>(
                 *entry.get_mut() = UnionBuilder::new(db).add(*entry.get()).add(*value).build();
             }
             Entry::Vacant(entry) => {
-                entry.insert(KnownClass::Object.to_instance(db));
+                entry.insert(Type::object(db));
             }
         }
     }
     for (key, value) in into.iter_mut() {
         if !from.contains_key(key) {
-            *value = KnownClass::Object.to_instance(db);
+            *value = Type::object(db);
         }
     }
 }
 
 struct NarrowingConstraintsBuilder<'db> {
     db: &'db dyn Db,
-    constraint: ConstraintNode<'db>,
+    predicate: PredicateNode<'db>,
     is_positive: bool,
 }
 
 impl<'db> NarrowingConstraintsBuilder<'db> {
-    fn new(db: &'db dyn Db, constraint: ConstraintNode<'db>, is_positive: bool) -> Self {
+    fn new(db: &'db dyn Db, predicate: PredicateNode<'db>, is_positive: bool) -> Self {
         Self {
             db,
-            constraint,
+            predicate,
             is_positive,
         }
     }
 
     fn finish(mut self) -> Option<NarrowingConstraints<'db>> {
-        let constraints: Option<NarrowingConstraints<'db>> = match self.constraint {
-            ConstraintNode::Expression(expression) => {
-                self.evaluate_expression_constraint(expression, self.is_positive)
+        let constraints: Option<NarrowingConstraints<'db>> = match self.predicate {
+            PredicateNode::Expression(expression) => {
+                self.evaluate_expression_predicate(expression, self.is_positive)
             }
-            ConstraintNode::Pattern(pattern) => self.evaluate_pattern_constraint(pattern),
+            PredicateNode::Pattern(pattern) => self.evaluate_pattern_predicate(pattern),
         };
         if let Some(mut constraints) = constraints {
             constraints.shrink_to_fit();
@@ -193,16 +194,16 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         }
     }
 
-    fn evaluate_expression_constraint(
+    fn evaluate_expression_predicate(
         &mut self,
         expression: Expression<'db>,
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
         let expression_node = expression.node_ref(self.db).node();
-        self.evaluate_expression_node_constraint(expression_node, expression, is_positive)
+        self.evaluate_expression_node_predicate(expression_node, expression, is_positive)
     }
 
-    fn evaluate_expression_node_constraint(
+    fn evaluate_expression_node_predicate(
         &mut self,
         expression_node: &ruff_python_ast::Expr,
         expression: Expression<'db>,
@@ -216,28 +217,29 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
             ast::Expr::Call(expr_call) => {
                 self.evaluate_expr_call(expr_call, expression, is_positive)
             }
-            ast::Expr::UnaryOp(unary_op) if unary_op.op == ast::UnaryOp::Not => self
-                .evaluate_expression_node_constraint(&unary_op.operand, expression, !is_positive),
+            ast::Expr::UnaryOp(unary_op) if unary_op.op == ast::UnaryOp::Not => {
+                self.evaluate_expression_node_predicate(&unary_op.operand, expression, !is_positive)
+            }
             ast::Expr::BoolOp(bool_op) => self.evaluate_bool_op(bool_op, expression, is_positive),
             _ => None, // TODO other test expression kinds
         }
     }
 
-    fn evaluate_pattern_constraint(
+    fn evaluate_pattern_predicate(
         &mut self,
-        pattern: PatternConstraint<'db>,
+        pattern: PatternPredicate<'db>,
     ) -> Option<NarrowingConstraints<'db>> {
         let subject = pattern.subject(self.db);
 
         match pattern.kind(self.db) {
-            PatternConstraintKind::Singleton(singleton, _guard) => {
-                self.evaluate_match_pattern_singleton(*subject, *singleton)
+            PatternPredicateKind::Singleton(singleton, _guard) => {
+                self.evaluate_match_pattern_singleton(subject, *singleton)
             }
-            PatternConstraintKind::Class(cls, _guard) => {
-                self.evaluate_match_pattern_class(*subject, *cls)
+            PatternPredicateKind::Class(cls, _guard) => {
+                self.evaluate_match_pattern_class(subject, *cls)
             }
             // TODO: support more pattern kinds
-            PatternConstraintKind::Value(..) | PatternConstraintKind::Unsupported => None,
+            PatternPredicateKind::Value(..) | PatternPredicateKind::Unsupported => None,
         }
     }
 
@@ -246,9 +248,9 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
     }
 
     fn scope(&self) -> ScopeId<'db> {
-        match self.constraint {
-            ConstraintNode::Expression(expression) => expression.scope(self.db),
-            ConstraintNode::Pattern(pattern) => pattern.scope(self.db),
+        match self.predicate {
+            PredicateNode::Expression(expression) => expression.scope(self.db),
+            PredicateNode::Pattern(pattern) => pattern.scope(self.db),
         }
     }
 
@@ -377,7 +379,11 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                             keywords,
                             range: _,
                         },
-                }) if rhs_ty.is_class_literal() && keywords.is_empty() => {
+                }) if keywords.is_empty() => {
+                    let Type::ClassLiteral(ClassLiteralType { class: rhs_class }) = rhs_ty else {
+                        continue;
+                    };
+
                     let [ast::Expr::Name(ast::ExprName { id, .. })] = &**args else {
                         continue;
                     };
@@ -392,18 +398,18 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                         continue;
                     }
 
-                    let callable_ty =
+                    let callable_type =
                         inference.expression_type(callable.scoped_expression_id(self.db, scope));
 
-                    if callable_ty
+                    if callable_type
                         .into_class_literal()
-                        .is_some_and(|c| c.class.is_known(self.db, KnownClass::Type))
+                        .is_some_and(|c| c.class().is_known(self.db, KnownClass::Type))
                     {
                         let symbol = self
                             .symbols()
                             .symbol_id_by_name(id)
                             .expect("Should always have a symbol for every Name node");
-                        constraints.insert(symbol, rhs_ty.to_instance(self.db));
+                        constraints.insert(symbol, Type::instance(rhs_class));
                     }
                 }
                 _ => {}
@@ -428,9 +434,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         // and `issubclass`, for example `isinstance(x, str | (int | float))`.
         match callable_ty {
             Type::FunctionLiteral(function_type) if expr_call.arguments.keywords.is_empty() => {
-                let function = function_type
-                    .known(self.db)
-                    .and_then(KnownFunction::constraint_function)?;
+                let function = function_type.known(self.db)?.into_constraint_function()?;
 
                 let [ast::Expr::Name(ast::ExprName { id, .. }), class_info] =
                     &*expr_call.arguments.args
@@ -455,9 +459,9 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
             Type::ClassLiteral(class_type)
                 if expr_call.arguments.args.len() == 1
                     && expr_call.arguments.keywords.is_empty()
-                    && class_type.class.is_known(self.db, KnownClass::Bool) =>
+                    && class_type.class().is_known(self.db, KnownClass::Bool) =>
             {
-                self.evaluate_expression_node_constraint(
+                self.evaluate_expression_node_predicate(
                     &expr_call.arguments.args[0],
                     expression,
                     is_positive,
@@ -494,20 +498,16 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         subject: Expression<'db>,
         cls: Expression<'db>,
     ) -> Option<NarrowingConstraints<'db>> {
-        if let Some(ast::ExprName { id, .. }) = subject.node_ref(self.db).as_name_expr() {
-            // SAFETY: we should always have a symbol for every Name node.
-            let symbol = self.symbols().symbol_id_by_name(id).unwrap();
-            let scope = self.scope();
-            let inference = infer_expression_types(self.db, cls);
-            let ty = inference
-                .expression_type(cls.node_ref(self.db).scoped_expression_id(self.db, scope))
-                .to_instance(self.db);
-            let mut constraints = NarrowingConstraints::default();
-            constraints.insert(symbol, ty);
-            Some(constraints)
-        } else {
-            None
-        }
+        let ast::ExprName { id, .. } = subject.node_ref(self.db).as_name_expr()?;
+        let symbol = self
+            .symbols()
+            .symbol_id_by_name(id)
+            .expect("We should always have a symbol for every `Name` node");
+        let ty = infer_same_file_expression_type(self.db, cls).to_instance(self.db)?;
+
+        let mut constraints = NarrowingConstraints::default();
+        constraints.insert(symbol, ty);
+        Some(constraints)
     }
 
     fn evaluate_bool_op(
@@ -532,7 +532,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                     }
             })
             .map(|sub_expr| {
-                self.evaluate_expression_node_constraint(sub_expr, expression, is_positive)
+                self.evaluate_expression_node_predicate(sub_expr, expression, is_positive)
             })
             .collect::<Vec<_>>();
         match (expr_bool_op.op, is_positive) {

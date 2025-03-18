@@ -1,0 +1,28 @@
+---
+source: crates/red_knot_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: unpacking.md - Unpacking - Right hand side not iterable
+mdtest path: crates/red_knot_python_semantic/resources/mdtest/diagnostics/unpacking.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | a, b = 1  # error: [not-iterable]
+```
+
+# Diagnostics
+
+```
+error: lint:not-iterable
+ --> /src/mdtest_snippet.py:1:8
+  |
+1 | a, b = 1  # error: [not-iterable]
+  |        ^ Object of type `Literal[1]` is not iterable because it doesn't have an `__iter__` method or a `__getitem__` method
+  |
+
+```

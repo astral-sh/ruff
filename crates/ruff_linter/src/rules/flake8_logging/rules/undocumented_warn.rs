@@ -49,7 +49,7 @@ impl Violation for UndocumentedWarn {
 }
 
 /// LOG009
-pub(crate) fn undocumented_warn(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn undocumented_warn(checker: &Checker, expr: &Expr) {
     if !checker.semantic().seen_module(Modules::LOGGING) {
         return;
     }
@@ -69,6 +69,6 @@ pub(crate) fn undocumented_warn(checker: &mut Checker, expr: &Expr) {
             let reference_edit = Edit::range_replacement(binding, expr.range());
             Ok(Fix::safe_edits(import_edit, [reference_edit]))
         });
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }

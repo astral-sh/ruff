@@ -548,6 +548,13 @@ pub fn is_dunder(id: &str) -> bool {
     id.starts_with("__") && id.ends_with("__")
 }
 
+/// Whether a name starts and ends with a single underscore.
+///
+/// `_a__` is considered neither a dunder nor a sunder name.
+pub fn is_sunder(id: &str) -> bool {
+    id.starts_with('_') && id.ends_with('_') && !id.starts_with("__") && !id.ends_with("__")
+}
+
 /// Return `true` if the [`Stmt`] is an assignment to a dunder (like `__all__`).
 pub fn is_assignment_to_a_dunder(stmt: &Stmt) -> bool {
     // Check whether it's an assignment to a dunder, with or without a type
@@ -1437,33 +1444,22 @@ pub fn typing_optional(elt: Expr, binding: Name) -> Expr {
 }
 
 /// Format the expressions as a `typing.Union`-style union.
+///
+/// Note: It is a syntax error to have `Union[]` so the caller
+/// should ensure that the `elts` argument is nonempty.
 pub fn typing_union(elts: &[Expr], binding: Name) -> Expr {
-    fn tuple(elts: &[Expr], binding: Name) -> Expr {
-        match elts {
-            [] => Expr::Tuple(ast::ExprTuple {
-                elts: vec![],
-                ctx: ExprContext::Load,
-                range: TextRange::default(),
-                parenthesized: true,
-            }),
-            [Expr::Tuple(ast::ExprTuple { elts, .. })] => typing_union(elts, binding),
-            [elt] => elt.clone(),
-            [rest @ .., elt] => Expr::BinOp(ast::ExprBinOp {
-                left: Box::new(tuple(rest, binding)),
-                op: Operator::BitOr,
-                right: Box::new(elt.clone()),
-                range: TextRange::default(),
-            }),
-        }
-    }
-
     Expr::Subscript(ast::ExprSubscript {
         value: Box::new(Expr::Name(ast::ExprName {
-            id: binding.clone(),
+            id: binding,
             range: TextRange::default(),
             ctx: ExprContext::Load,
         })),
-        slice: Box::new(tuple(elts, binding)),
+        slice: Box::new(Expr::Tuple(ast::ExprTuple {
+            range: TextRange::default(),
+            elts: elts.to_vec(),
+            ctx: ExprContext::Load,
+            parenthesized: false,
+        })),
         ctx: ExprContext::Load,
         range: TextRange::default(),
     })

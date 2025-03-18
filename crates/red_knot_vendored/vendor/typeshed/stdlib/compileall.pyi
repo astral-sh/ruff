@@ -25,7 +25,7 @@ if sys.version_info >= (3, 10):
         prependdir: StrPath | None = None,
         limit_sl_dest: StrPath | None = None,
         hardlink_dupes: bool = False,
-    ) -> int: ...
+    ) -> bool: ...
     def compile_file(
         fullname: StrPath,
         ddir: StrPath | None = None,
@@ -40,7 +40,7 @@ if sys.version_info >= (3, 10):
         prependdir: StrPath | None = None,
         limit_sl_dest: StrPath | None = None,
         hardlink_dupes: bool = False,
-    ) -> int: ...
+    ) -> bool: ...
 
 elif sys.version_info >= (3, 9):
     def compile_dir(
@@ -59,7 +59,7 @@ elif sys.version_info >= (3, 9):
         prependdir: StrPath | None = None,
         limit_sl_dest: StrPath | None = None,
         hardlink_dupes: bool = False,
-    ) -> int: ...
+    ) -> bool: ...
     def compile_file(
         fullname: StrPath,
         ddir: StrPath | None = None,
@@ -74,7 +74,7 @@ elif sys.version_info >= (3, 9):
         prependdir: StrPath | None = None,
         limit_sl_dest: StrPath | None = None,
         hardlink_dupes: bool = False,
-    ) -> int: ...
+    ) -> bool: ...
 
 else:
     def compile_dir(
@@ -88,7 +88,7 @@ else:
         optimize: int = -1,
         workers: int = 1,
         invalidation_mode: PycInvalidationMode | None = None,
-    ) -> int: ...
+    ) -> bool: ...
     def compile_file(
         fullname: StrPath,
         ddir: StrPath | None = None,
@@ -98,7 +98,7 @@ else:
         legacy: bool = False,
         optimize: int = -1,
         invalidation_mode: PycInvalidationMode | None = None,
-    ) -> int: ...
+    ) -> bool: ...
 
 def compile_path(
     skip_curdir: bool = ...,
@@ -108,4 +108,4 @@ def compile_path(
     legacy: bool = False,
     optimize: int = -1,
     invalidation_mode: PycInvalidationMode | None = None,
-) -> int: ...
+) -> bool: ...

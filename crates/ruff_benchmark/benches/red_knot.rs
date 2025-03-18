@@ -1,21 +1,23 @@
 #![allow(clippy::disallowed_names)]
+use ruff_benchmark::criterion;
 
 use std::borrow::Cow;
 use std::ops::Range;
 
+use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use rayon::ThreadPoolBuilder;
+use rustc_hash::FxHashSet;
+
 use red_knot_project::metadata::options::{EnvironmentOptions, Options};
 use red_knot_project::metadata::value::RangedValue;
 use red_knot_project::watch::{ChangeEvent, ChangedKind};
 use red_knot_project::{Db, ProjectDatabase, ProjectMetadata};
-use red_knot_python_semantic::PythonVersion;
-use ruff_benchmark::criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use ruff_benchmark::TestFile;
-use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
+use ruff_db::diagnostic::{DiagnosticId, OldDiagnosticTrait, Severity};
 use ruff_db::files::{system_path_to_file, File};
 use ruff_db::source::source_text;
 use ruff_db::system::{MemoryFileSystem, SystemPath, SystemPathBuf, TestSystem};
-use rustc_hash::FxHashSet;
+use ruff_python_ast::PythonVersion;
 
 struct Case {
     db: ProjectDatabase,
@@ -67,28 +69,6 @@ static EXPECTED_DIAGNOSTICS: &[KeyDiagnosticFields] = &[
         Cow::Borrowed("Module `collections.abc` has no member `Iterable`"),
         Severity::Error,
     ),
-    // We don't handle intersections in `is_assignable_to` yet
-    (
-        DiagnosticId::lint("invalid-argument-type"),
-        Some("/src/tomllib/_parser.py"),
-        Some(20158..20172),
-        Cow::Borrowed("Object of type `Unknown & ~AlwaysFalsy | @Todo & ~AlwaysFalsy` cannot be assigned to parameter 1 (`match`) of function `match_to_datetime`; expected type `Match`"),
-        Severity::Error,
-    ),
-    (
-        DiagnosticId::lint("invalid-argument-type"),
-        Some("/src/tomllib/_parser.py"),
-        Some(20464..20479),
-        Cow::Borrowed("Object of type `Unknown & ~AlwaysFalsy | @Todo & ~AlwaysFalsy` cannot be assigned to parameter 1 (`match`) of function `match_to_localtime`; expected type `Match`"),
-        Severity::Error,
-    ),
-    (
-        DiagnosticId::lint("invalid-argument-type"),
-        Some("/src/tomllib/_parser.py"),
-        Some(20774..20786),
-        Cow::Borrowed("Object of type `Unknown & ~AlwaysFalsy | @Todo & ~AlwaysFalsy` cannot be assigned to parameter 1 (`match`) of function `match_to_number`; expected type `Match`"),
-        Severity::Error,
-    ),
     (
         DiagnosticId::lint("unused-ignore-comment"),
         Some("/src/tomllib/_parser.py"),
@@ -106,7 +86,7 @@ fn setup_case() -> Case {
     let system = TestSystem::default();
     let fs = system.memory_file_system().clone();
 
-    fs.write_files(
+    fs.write_files_all(
         TOMLLIB_FILES
             .iter()
             .map(|file| (tomllib_path(file), file.code().to_string())),
@@ -173,7 +153,7 @@ fn benchmark_incremental(criterion: &mut Criterion) {
         assert_diagnostics(&case.db, &result);
 
         case.fs
-            .write_file(
+            .write_file_all(
                 &case.re_path,
                 format!("{}\n# A comment\n", source_text(&case.db, case.re).as_str()),
             )
@@ -223,14 +203,20 @@ fn benchmark_cold(criterion: &mut Criterion) {
 }
 
 #[track_caller]
-fn assert_diagnostics(db: &dyn Db, diagnostics: &[Box<dyn Diagnostic>]) {
+fn assert_diagnostics(db: &dyn Db, diagnostics: &[Box<dyn OldDiagnosticTrait>]) {
     let normalized: Vec<_> = diagnostics
         .iter()
         .map(|diagnostic| {
             (
                 diagnostic.id(),
-                diagnostic.file().map(|file| file.path(db).as_str()),
-                diagnostic.range().map(Range::<usize>::from),
+                diagnostic
+                    .span()
+                    .map(|span| span.file())
+                    .map(|file| file.path(db).as_str()),
+                diagnostic
+                    .span()
+                    .and_then(|span| span.range())
+                    .map(Range::<usize>::from),
                 diagnostic.message(),
                 diagnostic.severity(),
             )

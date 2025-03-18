@@ -50,7 +50,7 @@ impl AlwaysFixableViolation for PathConstructorCurrentDirectory {
 }
 
 /// PTH201
-pub(crate) fn path_constructor_current_directory(checker: &mut Checker, call: &ExprCall) {
+pub(crate) fn path_constructor_current_directory(checker: &Checker, call: &ExprCall) {
     let applicability = |range| {
         if checker.comment_ranges().intersects(range) {
             Applicability::Unsafe
@@ -112,7 +112,7 @@ pub(crate) fn path_constructor_current_directory(checker: &mut Checker, call: &E
         }),
     };
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 fn parent_and_next_path_fragment_range(

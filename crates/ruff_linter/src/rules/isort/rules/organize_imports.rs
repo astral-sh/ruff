@@ -3,7 +3,7 @@ use itertools::{EitherOrBoth, Itertools};
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::whitespace::trailing_lines_end;
-use ruff_python_ast::{PySourceType, Stmt};
+use ruff_python_ast::{PySourceType, PythonVersion, Stmt};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_parser::Tokens;
@@ -88,6 +88,7 @@ pub(crate) fn organize_imports(
     package: Option<PackageRoot<'_>>,
     source_type: PySourceType,
     tokens: &Tokens,
+    target_version: PythonVersion,
 ) -> Option<Diagnostic> {
     let indentation = locator.slice(extract_indentation_range(&block.imports, locator));
     let indentation = leading_indentation(indentation);
@@ -127,7 +128,7 @@ pub(crate) fn organize_imports(
         &settings.src,
         package,
         source_type,
-        settings.target_version,
+        target_version,
         &settings.isort,
         tokens,
     );

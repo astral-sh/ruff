@@ -66,10 +66,10 @@ impl Violation for MissingBlankLineAfterSummary {
 }
 
 /// D205
-pub(crate) fn blank_after_summary(checker: &mut Checker, docstring: &Docstring) {
+pub(crate) fn blank_after_summary(checker: &Checker, docstring: &Docstring) {
     let body = docstring.body();
 
-    if !docstring.triple_quoted() {
+    if !docstring.is_triple_quoted() {
         return;
     }
 
@@ -118,6 +118,6 @@ pub(crate) fn blank_after_summary(checker: &mut Checker, docstring: &Docstring) 
                 blank_end,
             )));
         }
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }

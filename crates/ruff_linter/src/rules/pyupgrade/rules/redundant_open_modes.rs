@@ -56,7 +56,7 @@ impl AlwaysFixableViolation for RedundantOpenModes {
 }
 
 /// UP015
-pub(crate) fn redundant_open_modes(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn redundant_open_modes(checker: &Checker, call: &ast::ExprCall) {
     if !checker
         .semantic()
         .resolve_qualified_name(&call.func)
@@ -81,9 +81,7 @@ pub(crate) fn redundant_open_modes(checker: &mut Checker, call: &ast::ExprCall) 
     };
     let reduced = mode.reduce();
     if reduced != mode {
-        checker
-            .diagnostics
-            .push(create_diagnostic(call, mode_arg, reduced, checker));
+        checker.report_diagnostic(create_diagnostic(call, mode_arg, reduced, checker));
     }
 }
 
@@ -93,17 +91,11 @@ fn create_diagnostic(
     mode: OpenMode,
     checker: &Checker,
 ) -> Diagnostic {
-    let range = if checker.settings.preview.is_enabled() {
-        mode_arg.range()
-    } else {
-        call.range
-    };
-
     let mut diagnostic = Diagnostic::new(
         RedundantOpenModes {
             replacement: mode.to_string(),
         },
-        range,
+        mode_arg.range(),
     );
 
     if mode.is_empty() {

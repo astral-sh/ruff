@@ -18,7 +18,7 @@ use crate::rules::fastapi::rules::is_fastapi_route;
 /// contexts where that function may be called. In some cases, labeling a function `async` is
 /// semantically meaningful (e.g. with the trio library).
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// async def foo():
 ///     bar()
@@ -154,7 +154,7 @@ where
 
 /// RUF029
 pub(crate) fn unused_async(
-    checker: &mut Checker,
+    checker: &Checker,
     function_def @ ast::StmtFunctionDef {
         is_async,
         name,
@@ -188,7 +188,7 @@ pub(crate) fn unused_async(
     };
 
     if !found_await_or_async {
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             UnusedAsync {
                 name: name.to_string(),
             },

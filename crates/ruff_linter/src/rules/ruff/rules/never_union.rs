@@ -66,7 +66,7 @@ impl Violation for NeverUnion {
 }
 
 /// RUF020
-pub(crate) fn never_union(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn never_union(checker: &Checker, expr: &Expr) {
     match expr {
         // Ex) `typing.NoReturn | int`
         Expr::BinOp(ast::ExprBinOp {
@@ -95,7 +95,7 @@ pub(crate) fn never_union(checker: &mut Checker, expr: &Expr) {
                         expr.range(),
                     )));
                 }
-                checker.diagnostics.push(diagnostic);
+                checker.report_diagnostic(diagnostic);
             }
 
             // Analyze the right-hand side of the `|` operator.
@@ -113,7 +113,7 @@ pub(crate) fn never_union(checker: &mut Checker, expr: &Expr) {
                         expr.range(),
                     )));
                 }
-                checker.diagnostics.push(diagnostic);
+                checker.report_diagnostic(diagnostic);
             }
         }
 
@@ -172,7 +172,7 @@ pub(crate) fn never_union(checker: &mut Checker, expr: &Expr) {
                         },
                         expr.range(),
                     )));
-                    checker.diagnostics.push(diagnostic);
+                    checker.report_diagnostic(diagnostic);
                 }
             }
         }

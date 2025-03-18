@@ -9,6 +9,7 @@ from _asyncio import (
 from _typeshed import FileDescriptorLike, ReadableBuffer, StrPath, Unused, WriteableBuffer
 from abc import ABCMeta, abstractmethod
 from collections.abc import Callable, Sequence
+from concurrent.futures import Executor
 from contextvars import Context
 from socket import AddressFamily, SocketKind, _Address, _RetAddress, socket
 from typing import IO, Any, Literal, Protocol, TypeVar, overload
@@ -188,9 +189,9 @@ class AbstractEventLoop:
         def call_soon_threadsafe(self, callback: Callable[[Unpack[_Ts]], object], *args: Unpack[_Ts]) -> Handle: ...
 
     @abstractmethod
-    def run_in_executor(self, executor: Any, func: Callable[[Unpack[_Ts]], _T], *args: Unpack[_Ts]) -> Future[_T]: ...
+    def run_in_executor(self, executor: Executor | None, func: Callable[[Unpack[_Ts]], _T], *args: Unpack[_Ts]) -> Future[_T]: ...
     @abstractmethod
-    def set_default_executor(self, executor: Any) -> None: ...
+    def set_default_executor(self, executor: Executor) -> None: ...
     # Network I/O methods returning Futures.
     @abstractmethod
     async def getaddrinfo(

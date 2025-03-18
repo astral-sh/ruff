@@ -86,7 +86,7 @@ impl AlwaysFixableViolation for NonAugmentedAssignment {
 }
 
 /// PLR6104
-pub(crate) fn non_augmented_assignment(checker: &mut Checker, assign: &ast::StmtAssign) {
+pub(crate) fn non_augmented_assignment(checker: &Checker, assign: &ast::StmtAssign) {
     // Ignore multiple assignment targets.
     let [target] = assign.targets.as_slice() else {
         return;
@@ -110,7 +110,7 @@ pub(crate) fn non_augmented_assignment(checker: &mut Checker, assign: &ast::Stmt
             value,
             assign.range,
         )));
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
         return;
     }
 
@@ -129,7 +129,7 @@ pub(crate) fn non_augmented_assignment(checker: &mut Checker, assign: &ast::Stmt
             value,
             assign.range,
         )));
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }
 

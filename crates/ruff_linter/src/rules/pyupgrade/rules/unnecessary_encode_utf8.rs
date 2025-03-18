@@ -148,7 +148,7 @@ fn replace_with_bytes_literal(locator: &Locator, call: &ast::ExprCall, tokens: &
 }
 
 /// UP012
-pub(crate) fn unnecessary_encode_utf8(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn unnecessary_encode_utf8(checker: &Checker, call: &ast::ExprCall) {
     let Some(variable) = match_encoded_variable(&call.func) else {
         return;
     };
@@ -169,7 +169,7 @@ pub(crate) fn unnecessary_encode_utf8(checker: &mut Checker, call: &ast::ExprCal
                         call,
                         checker.tokens(),
                     ));
-                    checker.diagnostics.push(diagnostic);
+                    checker.report_diagnostic(diagnostic);
                 } else if let EncodingArg::Keyword(kwarg) = encoding_arg {
                     // Ex) Convert `"unicode text©".encode(encoding="utf-8")` to
                     // `"unicode text©".encode()`.
@@ -188,7 +188,7 @@ pub(crate) fn unnecessary_encode_utf8(checker: &mut Checker, call: &ast::ExprCal
                         )
                         .map(Fix::safe_edit)
                     });
-                    checker.diagnostics.push(diagnostic);
+                    checker.report_diagnostic(diagnostic);
                 } else if let EncodingArg::Positional(arg) = encoding_arg {
                     // Ex) Convert `"unicode text©".encode("utf-8")` to `"unicode text©".encode()`.
                     let mut diagnostic = Diagnostic::new(
@@ -206,7 +206,7 @@ pub(crate) fn unnecessary_encode_utf8(checker: &mut Checker, call: &ast::ExprCal
                         )
                         .map(Fix::safe_edit)
                     });
-                    checker.diagnostics.push(diagnostic);
+                    checker.report_diagnostic(diagnostic);
                 }
             }
         }
@@ -231,7 +231,7 @@ pub(crate) fn unnecessary_encode_utf8(checker: &mut Checker, call: &ast::ExprCal
                         )
                         .map(Fix::safe_edit)
                     });
-                    checker.diagnostics.push(diagnostic);
+                    checker.report_diagnostic(diagnostic);
                 } else if let EncodingArg::Positional(arg) = encoding_arg {
                     // Ex) Convert `f"unicode text©".encode("utf-8")` to `f"unicode text©".encode()`.
                     let mut diagnostic = Diagnostic::new(
@@ -249,7 +249,7 @@ pub(crate) fn unnecessary_encode_utf8(checker: &mut Checker, call: &ast::ExprCal
                         )
                         .map(Fix::safe_edit)
                     });
-                    checker.diagnostics.push(diagnostic);
+                    checker.report_diagnostic(diagnostic);
                 }
             }
         }

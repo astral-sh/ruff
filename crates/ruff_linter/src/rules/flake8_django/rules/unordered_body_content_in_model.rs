@@ -27,7 +27,7 @@ use super::helpers;
 /// 6. `def get_absolute_url()`
 /// 7. Any custom methods
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// from django.db import models
 ///
@@ -80,10 +80,7 @@ impl Violation for DjangoUnorderedBodyContentInModel {
 }
 
 /// DJ012
-pub(crate) fn unordered_body_content_in_model(
-    checker: &mut Checker,
-    class_def: &ast::StmtClassDef,
-) {
+pub(crate) fn unordered_body_content_in_model(checker: &Checker, class_def: &ast::StmtClassDef) {
     if !checker.semantic().seen_module(Modules::DJANGO) {
         return;
     }
@@ -120,7 +117,7 @@ pub(crate) fn unordered_body_content_in_model(
                 },
                 element.range(),
             );
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         } else {
             element_types.push(element_type);
         }

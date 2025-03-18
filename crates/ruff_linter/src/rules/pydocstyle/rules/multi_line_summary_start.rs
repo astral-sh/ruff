@@ -1,6 +1,8 @@
+use std::borrow::Cow;
+
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::str::{is_triple_quote, leading_quote};
+use ruff_python_ast::str::is_triple_quote;
 use ruff_python_semantic::Definition;
 use ruff_source_file::{LineRanges, NewlineWithTrailingNewline, UniversalNewlineIterator};
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -136,8 +138,7 @@ impl AlwaysFixableViolation for MultiLineSummarySecondLine {
 }
 
 /// D212, D213
-pub(crate) fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstring) {
-    let contents = docstring.contents;
+pub(crate) fn multi_line_summary_start(checker: &Checker, docstring: &Docstring) {
     let body = docstring.body();
 
     if NewlineWithTrailingNewline::from(body.as_str())
@@ -146,7 +147,8 @@ pub(crate) fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstr
     {
         return;
     };
-    let mut content_lines = UniversalNewlineIterator::with_offset(contents, docstring.start());
+    let mut content_lines =
+        UniversalNewlineIterator::with_offset(docstring.contents(), docstring.start());
 
     let Some(first_line) = content_lines.next() else {
         return;
@@ -165,7 +167,7 @@ pub(crate) fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstr
                     break;
                 }
             }
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     } else if first_line.as_str().ends_with('\\') {
         // Ignore the edge case whether a single quoted string is multiple lines through an
@@ -179,7 +181,7 @@ pub(crate) fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstr
     } else {
         if checker.enabled(Rule::MultiLineSummarySecondLine) {
             let mut diagnostic = Diagnostic::new(MultiLineSummarySecondLine, docstring.range());
-            let mut indentation = String::from(docstring.indentation);
+            let mut indentation = Cow::Borrowed(docstring.compute_indentation());
             let mut fixable = true;
             if !indentation.chars().all(char::is_whitespace) {
                 fixable = false;
@@ -193,6 +195,7 @@ pub(crate) fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstr
                         .slice(TextRange::new(stmt_line_start, member.start()));
 
                     if stmt_indentation.chars().all(char::is_whitespace) {
+                        let indentation = indentation.to_mut();
                         indentation.clear();
                         indentation.push_str(stmt_indentation);
                         indentation.push_str(checker.stylist().indentation());
@@ -202,14 +205,16 @@ pub(crate) fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstr
             }
 
             if fixable {
-                let prefix = leading_quote(contents).unwrap();
                 // Use replacement instead of insert to trim possible whitespace between leading
                 // quote and text.
                 let repl = format!(
                     "{}{}{}",
                     checker.stylist().line_ending().as_str(),
                     indentation,
-                    first_line.strip_prefix(prefix).unwrap().trim_start()
+                    first_line
+                        .strip_prefix(docstring.opener())
+                        .unwrap()
+                        .trim_start()
                 );
 
                 diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
@@ -218,7 +223,7 @@ pub(crate) fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstr
                     first_line.end(),
                 )));
             }
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 }

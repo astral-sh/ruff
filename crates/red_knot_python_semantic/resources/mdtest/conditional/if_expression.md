@@ -35,3 +35,13 @@ def _(flag: bool):
     x = 1 if flag else None
     reveal_type(x)  # revealed: Literal[1] | None
 ```
+
+## Condition with object that implements `__bool__` incorrectly
+
+```py
+class NotBoolable:
+    __bool__: int = 3
+
+# error: [unsupported-bool-conversion] "Boolean conversion is unsupported for type `NotBoolable`; its `__bool__` method isn't callable"
+3 if NotBoolable() else 4
+```

@@ -58,7 +58,7 @@ impl Violation for CallDateFromtimestamp {
     }
 }
 
-pub(crate) fn call_date_fromtimestamp(checker: &mut Checker, func: &Expr, location: TextRange) {
+pub(crate) fn call_date_fromtimestamp(checker: &Checker, func: &Expr, location: TextRange) {
     if !checker.semantic().seen_module(Modules::DATETIME) {
         return;
     }
@@ -73,8 +73,6 @@ pub(crate) fn call_date_fromtimestamp(checker: &mut Checker, func: &Expr, locati
             )
         })
     {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(CallDateFromtimestamp, location));
+        checker.report_diagnostic(Diagnostic::new(CallDateFromtimestamp, location));
     }
 }

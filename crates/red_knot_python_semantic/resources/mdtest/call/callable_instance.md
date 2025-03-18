@@ -4,14 +4,14 @@
 
 ```py
 class Multiplier:
-    def __init__(self, factor: float):
+    def __init__(self, factor: int):
         self.factor = factor
 
-    def __call__(self, number: float) -> float:
+    def __call__(self, number: int) -> int:
         return number * self.factor
 
-a = Multiplier(2.0)(3.0)
-reveal_type(a)  # revealed: float
+a = Multiplier(2)(3)
+reveal_type(a)  # revealed: int
 
 class Unit: ...
 
@@ -25,7 +25,8 @@ reveal_type(b)  # revealed: Unknown
 def _(flag: bool):
     class PossiblyNotCallable:
         if flag:
-            def __call__(self) -> int: ...
+            def __call__(self) -> int:
+                return 1
 
     a = PossiblyNotCallable()
     result = a()  # error: "Object of type `PossiblyNotCallable` is not callable (possibly unbound `__call__` method)"
@@ -38,7 +39,8 @@ def _(flag: bool):
 def _(flag: bool):
     if flag:
         class PossiblyUnbound:
-            def __call__(self) -> int: ...
+            def __call__(self) -> int:
+                return 1
 
     # error: [possibly-unresolved-reference]
     a = PossiblyUnbound()
@@ -52,7 +54,7 @@ class NonCallable:
     __call__ = 1
 
 a = NonCallable()
-# error: "Object of type `Unknown | Literal[1]` is not callable (due to union element `Literal[1]`)"
+# error: [call-non-callable] "Object of type `Literal[1]` is not callable"
 reveal_type(a())  # revealed: Unknown
 ```
 
@@ -64,10 +66,11 @@ def _(flag: bool):
         if flag:
             __call__ = 1
         else:
-            def __call__(self) -> int: ...
+            def __call__(self) -> int:
+                return 1
 
     a = NonCallable()
-    # error: "Object of type `Literal[1] | Literal[__call__]` is not callable (due to union element `Literal[1]`)"
+    # error: [call-non-callable] "Object of type `Literal[1]` is not callable"
     reveal_type(a())  # revealed: Unknown | int
 ```
 
@@ -82,7 +85,7 @@ class C:
 
 c = C()
 
-# error: 15 [invalid-argument-type] "Object of type `Literal["foo"]` cannot be assigned to parameter 2 (`x`) of function `__call__`; expected type `int`"
+# error: 15 [invalid-argument-type] "Object of type `Literal["foo"]` cannot be assigned to parameter 2 (`x`) of bound method `__call__`; expected type `int`"
 reveal_type(c("foo"))  # revealed: int
 ```
 
@@ -96,6 +99,29 @@ class C:
 
 c = C()
 
-# error: 13 [invalid-argument-type] "Object of type `C` cannot be assigned to parameter 1 (`self`) of function `__call__`; expected type `int`"
+# error: 13 [invalid-argument-type] "Object of type `C` cannot be assigned to parameter 1 (`self`) of bound method `__call__`; expected type `int`"
 reveal_type(c())  # revealed: int
+```
+
+## Union over callables
+
+### Possibly unbound `__call__`
+
+```py
+def outer(cond1: bool):
+    class Test:
+        if cond1:
+            def __call__(self): ...
+
+    class Other:
+        def __call__(self): ...
+
+    def inner(cond2: bool):
+        if cond2:
+            a = Test()
+        else:
+            a = Other()
+
+            # error: [call-non-callable] "Object of type `Test` is not callable (possibly unbound `__call__` method)"
+        a()
 ```

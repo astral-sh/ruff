@@ -53,7 +53,7 @@ impl Violation for CancelScopeNoCheckpoint {
 
 /// ASYNC100
 pub(crate) fn cancel_scope_no_checkpoint(
-    checker: &mut Checker,
+    checker: &Checker,
     with_stmt: &StmtWith,
     with_items: &[WithItem],
 ) {
@@ -98,7 +98,7 @@ pub(crate) fn cancel_scope_no_checkpoint(
         return;
     }
 
-    checker.diagnostics.push(Diagnostic::new(
+    checker.report_diagnostic(Diagnostic::new(
         CancelScopeNoCheckpoint { method_name },
         with_stmt.range,
     ));

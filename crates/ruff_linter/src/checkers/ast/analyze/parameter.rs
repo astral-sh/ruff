@@ -6,7 +6,7 @@ use crate::codes::Rule;
 use crate::rules::{flake8_builtins, pycodestyle};
 
 /// Run lint rules over a [`Parameter`] syntax node.
-pub(crate) fn parameter(parameter: &Parameter, checker: &mut Checker) {
+pub(crate) fn parameter(parameter: &Parameter, checker: &Checker) {
     if checker.enabled(Rule::AmbiguousVariableName) {
         pycodestyle::rules::ambiguous_variable_name(
             checker,

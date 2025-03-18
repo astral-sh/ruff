@@ -5,7 +5,7 @@ A type is fully static iff it does not contain any gradual forms.
 ## Fully-static
 
 ```py
-from typing_extensions import Literal, LiteralString, Never
+from typing_extensions import Literal, LiteralString, Never, Callable
 from knot_extensions import Intersection, Not, TypeOf, is_fully_static, static_assert
 
 static_assert(is_fully_static(Never))
@@ -38,7 +38,7 @@ static_assert(is_fully_static(type[object]))
 ## Non-fully-static
 
 ```py
-from typing_extensions import Any, Literal, LiteralString
+from typing_extensions import Any, Literal, LiteralString, Callable
 from knot_extensions import Intersection, Not, TypeOf, Unknown, is_fully_static, static_assert
 
 static_assert(not is_fully_static(Any))
@@ -51,4 +51,51 @@ static_assert(not is_fully_static(Intersection[Any, Not[LiteralString]]))
 static_assert(not is_fully_static(tuple[Any, ...]))
 static_assert(not is_fully_static(tuple[int, Any]))
 static_assert(not is_fully_static(type[Any]))
+```
+
+## Callable
+
+```py
+from typing_extensions import Callable, Any
+from knot_extensions import Unknown, is_fully_static, static_assert
+
+static_assert(is_fully_static(Callable[[], int]))
+static_assert(is_fully_static(Callable[[int, str], int]))
+
+static_assert(not is_fully_static(Callable[..., int]))
+static_assert(not is_fully_static(Callable[[], Any]))
+static_assert(not is_fully_static(Callable[[int, Unknown], int]))
+```
+
+The invalid forms of `Callable` annotation are never fully static because we represent them with the
+`(...) -> Unknown` signature.
+
+```py
+static_assert(not is_fully_static(Callable))
+# error: [invalid-type-form]
+static_assert(not is_fully_static(Callable[int, int]))
+```
+
+Using function literals, we can check more variations of callable types as it allows us to define
+parameters without annotations and no return type.
+
+```py
+from knot_extensions import CallableTypeFromFunction, is_fully_static, static_assert
+
+def f00() -> None: ...
+def f01(a: int, b: str) -> None: ...
+def f11(): ...
+def f12(a, b): ...
+def f13(a, b: int): ...
+def f14(a, b: int) -> None: ...
+def f15(a, b) -> None: ...
+
+static_assert(is_fully_static(CallableTypeFromFunction[f00]))
+static_assert(is_fully_static(CallableTypeFromFunction[f01]))
+
+static_assert(not is_fully_static(CallableTypeFromFunction[f11]))
+static_assert(not is_fully_static(CallableTypeFromFunction[f12]))
+static_assert(not is_fully_static(CallableTypeFromFunction[f13]))
+static_assert(not is_fully_static(CallableTypeFromFunction[f14]))
+static_assert(not is_fully_static(CallableTypeFromFunction[f15]))
 ```

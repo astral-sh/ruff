@@ -16,7 +16,7 @@ pub use pylint::PylintEmitter;
 pub use rdjson::RdjsonEmitter;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind, Fix};
 use ruff_notebook::NotebookIndex;
-use ruff_python_parser::ParseError;
+use ruff_python_parser::{ParseError, UnsupportedSyntaxError};
 use ruff_source_file::{SourceFile, SourceLocation};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 pub use sarif::SarifEmitter;
@@ -117,6 +117,18 @@ impl Message {
                 DisplayParseErrorType::new(&parse_error.error)
             ),
             range: TextRange::at(parse_error.location.start(), len),
+            file,
+        })
+    }
+
+    /// Create a [`Message`] from the given [`UnsupportedSyntaxError`].
+    pub fn from_unsupported_syntax_error(
+        unsupported_syntax_error: &UnsupportedSyntaxError,
+        file: SourceFile,
+    ) -> Message {
+        Message::SyntaxError(SyntaxErrorMessage {
+            message: format!("SyntaxError: {unsupported_syntax_error}"),
+            range: unsupported_syntax_error.range,
             file,
         })
     }
@@ -309,7 +321,7 @@ mod tests {
 
     use ruff_diagnostics::{Diagnostic, DiagnosticKind, Edit, Fix};
     use ruff_notebook::NotebookIndex;
-    use ruff_python_parser::{parse_unchecked, Mode};
+    use ruff_python_parser::{parse_unchecked, Mode, ParseOptions};
     use ruff_source_file::{OneIndexed, SourceFileBuilder};
     use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -325,7 +337,7 @@ if call(foo
 ";
         let locator = Locator::new(source);
         let source_file = SourceFileBuilder::new("syntax_errors.py", source).finish();
-        parse_unchecked(source, Mode::Module)
+        parse_unchecked(source, ParseOptions::from(Mode::Module))
             .errors()
             .iter()
             .map(|parse_error| {

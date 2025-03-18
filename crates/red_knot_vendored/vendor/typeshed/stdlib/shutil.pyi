@@ -3,7 +3,7 @@ import sys
 from _typeshed import BytesPath, ExcInfo, FileDescriptorOrPath, StrOrBytesPath, StrPath, SupportsRead, SupportsWrite
 from collections.abc import Callable, Iterable, Sequence
 from tarfile import _TarfileFilter
-from typing import Any, AnyStr, NamedTuple, Protocol, TypeVar, overload
+from typing import Any, AnyStr, NamedTuple, NoReturn, Protocol, TypeVar, overload
 from typing_extensions import TypeAlias, deprecated
 
 __all__ = [
@@ -36,7 +36,6 @@ __all__ = [
 ]
 
 _StrOrBytesPathT = TypeVar("_StrOrBytesPathT", bound=StrOrBytesPath)
-_StrPathT = TypeVar("_StrPathT", bound=StrPath)
 # Return value of some functions that may either return a path-like object that was passed in or
 # a string
 _PathReturn: TypeAlias = Any
@@ -83,7 +82,7 @@ class _RmtreeType(Protocol):
             self,
             path: StrOrBytesPath,
             ignore_errors: bool,
-            onerror: _OnErrorCallback,
+            onerror: _OnErrorCallback | None,
             *,
             onexc: None = None,
             dir_fd: int | None = None,
@@ -95,7 +94,7 @@ class _RmtreeType(Protocol):
             path: StrOrBytesPath,
             ignore_errors: bool = False,
             *,
-            onerror: _OnErrorCallback,
+            onerror: _OnErrorCallback | None,
             onexc: None = None,
             dir_fd: int | None = None,
         ) -> None: ...
@@ -185,8 +184,13 @@ else:
     @overload
     def chown(path: FileDescriptorOrPath, user: str | int, group: str | int) -> None: ...
 
+if sys.platform == "win32" and sys.version_info < (3, 12):
+    @overload
+    @deprecated("On Windows before Python 3.12, using a PathLike as `cmd` would always fail or return `None`.")
+    def which(cmd: os.PathLike[str], mode: int = 1, path: StrPath | None = None) -> NoReturn: ...
+
 @overload
-def which(cmd: _StrPathT, mode: int = 1, path: StrPath | None = None) -> str | _StrPathT | None: ...
+def which(cmd: StrPath, mode: int = 1, path: StrPath | None = None) -> str | None: ...
 @overload
 def which(cmd: bytes, mode: int = 1, path: StrPath | None = None) -> bytes | None: ...
 def make_archive(

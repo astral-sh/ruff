@@ -1,9 +1,9 @@
 use std::fmt;
 use std::str::FromStr;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{self as ast, Expr, Int, LiteralExpressionRef, UnaryOp};
+use ruff_python_ast::{self as ast, Expr, Int, LiteralExpressionRef, OperatorPrecedence, UnaryOp};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -113,6 +113,9 @@ impl fmt::Display for LiteralType {
 /// "foo"
 /// ```
 ///
+/// ## Fix safety
+/// The fix is marked as unsafe if it might remove comments.
+///
 /// ## References
 /// - [Python documentation: `str`](https://docs.python.org/3/library/stdtypes.html#str)
 /// - [Python documentation: `bytes`](https://docs.python.org/3/library/stdtypes.html#bytes)
@@ -145,7 +148,7 @@ impl AlwaysFixableViolation for NativeLiterals {
 
 /// UP018
 pub(crate) fn native_literals(
-    checker: &mut Checker,
+    checker: &Checker,
     call: &ast::ExprCall,
     parent_expr: Option<&ast::Expr>,
 ) {
@@ -202,15 +205,15 @@ pub(crate) fn native_literals(
                 content,
                 call.range(),
             )));
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
         Some(arg) => {
-            let literal_expr = if let Some(literal_expr) = arg.as_literal_expr() {
+            let (has_unary_op, literal_expr) = if let Some(literal_expr) = arg.as_literal_expr() {
                 // Skip implicit concatenated strings.
                 if literal_expr.is_implicit_concatenated() {
                     return;
                 }
-                literal_expr
+                (false, literal_expr)
             } else if let Expr::UnaryOp(ast::ExprUnaryOp {
                 op: UnaryOp::UAdd | UnaryOp::USub,
                 operand,
@@ -221,7 +224,7 @@ pub(crate) fn native_literals(
                     .as_literal_expr()
                     .filter(|expr| matches!(expr, LiteralExpressionRef::NumberLiteral(_)))
                 {
-                    literal_expr
+                    (true, literal_expr)
                 } else {
                     // Only allow unary operators for numbers.
                     return;
@@ -240,21 +243,34 @@ pub(crate) fn native_literals(
 
             let arg_code = checker.locator().slice(arg);
 
-            // Attribute access on an integer requires the integer to be parenthesized to disambiguate from a float
-            // Ex) `(7).denominator` is valid but `7.denominator` is not
-            // Note that floats do not have this problem
-            // Ex) `(1.0).real` is valid and `1.0.real` is too
-            let content = match (parent_expr, literal_type) {
-                (Some(Expr::Attribute(_)), LiteralType::Int) => format!("({arg_code})"),
+            let content = match (parent_expr, literal_type, has_unary_op) {
+                // Attribute access on an integer requires the integer to be parenthesized to disambiguate from a float
+                // Ex) `(7).denominator` is valid but `7.denominator` is not
+                // Note that floats do not have this problem
+                // Ex) `(1.0).real` is valid and `1.0.real` is too
+                (Some(Expr::Attribute(_)), LiteralType::Int, _) => format!("({arg_code})"),
+
+                (Some(parent), _, _) => {
+                    if OperatorPrecedence::from(parent) > OperatorPrecedence::from(arg) {
+                        format!("({arg_code})")
+                    } else {
+                        arg_code.to_string()
+                    }
+                }
+
                 _ => arg_code.to_string(),
             };
 
-            let mut diagnostic = Diagnostic::new(NativeLiterals { literal_type }, call.range());
-            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                content,
-                call.range(),
-            )));
-            checker.diagnostics.push(diagnostic);
+            let applicability = if checker.comment_ranges().intersects(call.range) {
+                Applicability::Unsafe
+            } else {
+                Applicability::Safe
+            };
+            let edit = Edit::range_replacement(content, call.range());
+            let fix = Fix::applicable_edit(edit, applicability);
+
+            let diagnostic = Diagnostic::new(NativeLiterals { literal_type }, call.range());
+            checker.report_diagnostic(diagnostic.with_fix(fix));
         }
     }
 }

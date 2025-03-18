@@ -59,8 +59,7 @@ fn is_document_excluded(
 ) -> bool {
     if let Some(exclusion) = match_any_exclusion(
         path,
-        &resolver_settings.exclude,
-        &resolver_settings.extend_exclude,
+        resolver_settings,
         linter_settings.map(|s| &*s.exclude),
         formatter_settings.map(|s| &*s.exclude),
     ) {
@@ -68,11 +67,7 @@ fn is_document_excluded(
         return true;
     }
 
-    if let Some(inclusion) = match_any_inclusion(
-        path,
-        &resolver_settings.include,
-        &resolver_settings.extend_include,
-    ) {
+    if let Some(inclusion) = match_any_inclusion(path, resolver_settings) {
         tracing::debug!("Included path via `{}`: {}", inclusion, path.display());
         false
     } else if let Some(LanguageId::Python) = language_id {

@@ -60,7 +60,7 @@ impl Violation for CallDatetimeUtcnow {
 }
 
 /// DTZ003
-pub(crate) fn call_datetime_utcnow(checker: &mut Checker, func: &Expr, location: TextRange) {
+pub(crate) fn call_datetime_utcnow(checker: &Checker, func: &Expr, location: TextRange) {
     if !checker.semantic().seen_module(Modules::DATETIME) {
         return;
     }
@@ -78,11 +78,9 @@ pub(crate) fn call_datetime_utcnow(checker: &mut Checker, func: &Expr, location:
         return;
     }
 
-    if helpers::parent_expr_is_astimezone(checker) {
+    if helpers::followed_by_astimezone(checker) {
         return;
     }
 
-    checker
-        .diagnostics
-        .push(Diagnostic::new(CallDatetimeUtcnow, location));
+    checker.report_diagnostic(Diagnostic::new(CallDatetimeUtcnow, location));
 }

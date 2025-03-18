@@ -300,8 +300,10 @@ impl<'a> SortClassification<'a> {
                     let Some(string_node) = expr.as_string_literal_expr() else {
                         return Self::NotAListOfStringLiterals;
                     };
-                    any_implicit_concatenation |= string_node.value.is_implicit_concatenated();
-                    items.push(string_node.value.to_str());
+                    match string_node.as_single_part_string() {
+                        Some(literal) => items.push(&*literal.value),
+                        None => any_implicit_concatenation = true,
+                    }
                 }
                 if any_implicit_concatenation {
                     return Self::UnsortedButUnfixable;
@@ -511,7 +513,7 @@ impl<'a> MultilineStringSequenceValue<'a> {
         //     we'll end up with two commas after the final item, which would be invalid syntax)
         let needs_trailing_comma = self.ends_with_trailing_comma
             && first_non_trivia_token(TextSize::new(0), &postlude)
-                .map_or(true, |tok| tok.kind() != SimpleTokenKind::Comma);
+                .is_none_or(|tok| tok.kind() != SimpleTokenKind::Comma);
 
         self.items
             .sort_by(|a, b| sorting_style.compare(a.value, b.value));
@@ -977,7 +979,7 @@ fn multiline_string_sequence_postlude<'a>(
     if postlude.len() <= 2 {
         let mut reversed_postlude_chars = postlude.chars().rev();
         if let Some(closing_paren @ (')' | '}' | ']')) = reversed_postlude_chars.next() {
-            if reversed_postlude_chars.next().map_or(true, |c| c == ',') {
+            if reversed_postlude_chars.next().is_none_or(|c| c == ',') {
                 return Cow::Owned(format!(",{newline}{leading_indent}{closing_paren}"));
             }
         }

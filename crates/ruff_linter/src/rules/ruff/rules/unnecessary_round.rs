@@ -42,7 +42,7 @@ impl AlwaysFixableViolation for UnnecessaryRound {
 }
 
 /// RUF057
-pub(crate) fn unnecessary_round(checker: &mut Checker, call: &ExprCall) {
+pub(crate) fn unnecessary_round(checker: &Checker, call: &ExprCall) {
     if !checker.semantic().match_builtin_expr(&call.func, "round") {
         return;
     }
@@ -96,7 +96,7 @@ pub(crate) fn unnecessary_round(checker: &mut Checker, call: &ExprCall) {
 
     let diagnostic = Diagnostic::new(UnnecessaryRound, call.range());
 
-    checker.diagnostics.push(diagnostic.with_fix(fix));
+    checker.report_diagnostic(diagnostic.with_fix(fix));
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

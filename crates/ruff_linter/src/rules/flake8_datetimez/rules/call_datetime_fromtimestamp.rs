@@ -69,7 +69,7 @@ impl Violation for CallDatetimeFromtimestamp {
     }
 }
 
-pub(crate) fn call_datetime_fromtimestamp(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn call_datetime_fromtimestamp(checker: &Checker, call: &ast::ExprCall) {
     if !checker.semantic().seen_module(Modules::DATETIME) {
         return;
     }
@@ -87,7 +87,7 @@ pub(crate) fn call_datetime_fromtimestamp(checker: &mut Checker, call: &ast::Exp
         return;
     }
 
-    if helpers::parent_expr_is_astimezone(checker) {
+    if helpers::followed_by_astimezone(checker) {
         return;
     }
 
@@ -97,7 +97,7 @@ pub(crate) fn call_datetime_fromtimestamp(checker: &mut Checker, call: &ast::Exp
         None => DatetimeModuleAntipattern::NoTzArgumentPassed,
     };
 
-    checker.diagnostics.push(Diagnostic::new(
+    checker.report_diagnostic(Diagnostic::new(
         CallDatetimeFromtimestamp(antipattern),
         call.range,
     ));

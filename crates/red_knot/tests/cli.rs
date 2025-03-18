@@ -28,7 +28,7 @@ fn config_override() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -40,16 +40,18 @@ fn config_override() -> anyhow::Result<()> {
       |       ^^^^^^^^^^^^ Type `<module 'sys'>` has no attribute `last_exc`
       |
 
+    Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     assert_cmd_snapshot!(case.command().arg("--python-version").arg("3.12"), @r"
-        success: true
-        exit_code: 0
-        ----- stdout -----
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
 
-        ----- stderr -----
+    ----- stderr -----
     ");
 
     Ok(())
@@ -84,7 +86,7 @@ fn cli_arguments_are_relative_to_the_current_directory() -> anyhow::Result<()> {
             "libs/utils.py",
             r#"
             def add(a: int, b: int) -> int:
-                a + b
+                return a + b
             "#,
         ),
         (
@@ -98,7 +100,7 @@ fn cli_arguments_are_relative_to_the_current_directory() -> anyhow::Result<()> {
     ])?;
 
     // Make sure that the CLI fails when the `libs` directory is not in the search path.
-    assert_cmd_snapshot!(case.command().current_dir(case.project_dir().join("child")), @r###"
+    assert_cmd_snapshot!(case.command().current_dir(case.root().join("child")), @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -111,16 +113,18 @@ fn cli_arguments_are_relative_to_the_current_directory() -> anyhow::Result<()> {
     4 | stat = add(10, 15)
       |
 
+    Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
-    assert_cmd_snapshot!(case.command().current_dir(case.project_dir().join("child")).arg("--extra-search-path").arg("../libs"), @r"
-        success: true
-        exit_code: 0
-        ----- stdout -----
+    assert_cmd_snapshot!(case.command().current_dir(case.root().join("child")).arg("--extra-search-path").arg("../libs"), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
 
-        ----- stderr -----
+    ----- stderr -----
     ");
 
     Ok(())
@@ -154,7 +158,7 @@ fn paths_in_configuration_files_are_relative_to_the_project_root() -> anyhow::Re
             "libs/utils.py",
             r#"
             def add(a: int, b: int) -> int:
-                a + b
+                return a + b
             "#,
         ),
         (
@@ -167,12 +171,13 @@ fn paths_in_configuration_files_are_relative_to_the_project_root() -> anyhow::Re
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command().current_dir(case.project_dir().join("child")), @r"
-        success: true
-        exit_code: 0
-        ----- stdout -----
+    assert_cmd_snapshot!(case.command().current_dir(case.root().join("child")), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
 
-        ----- stderr -----
+    ----- stderr -----
     ");
 
     Ok(())
@@ -195,7 +200,7 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
 
     // Assert that there's a possibly unresolved reference diagnostic
     // and that division-by-zero has a severity of error by default.
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -214,12 +219,13 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
     5 |     x = a
     6 |
     7 | print(x)  # possibly-unresolved-reference
-      |       - Name `x` used when possibly not defined
+      |       ^ Name `x` used when possibly not defined
       |
 
+    Found 2 diagnostics
 
     ----- stderr -----
-    "###);
+    ");
 
     case.write_file(
         "pyproject.toml",
@@ -230,7 +236,7 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
     "#,
     )?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -238,14 +244,15 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
      --> <temp_dir>/test.py:2:5
       |
     2 | y = 4 / 0
-      |     ----- Cannot divide object of type `Literal[4]` by zero
+      |     ^^^^^ Cannot divide object of type `Literal[4]` by zero
     3 |
     4 | for a in range(0, y):
       |
 
+    Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -269,7 +276,7 @@ fn cli_rule_severity() -> anyhow::Result<()> {
 
     // Assert that there's a possibly unresolved reference diagnostic
     // and that division-by-zero has a severity of error by default.
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -299,12 +306,13 @@ fn cli_rule_severity() -> anyhow::Result<()> {
     7 |     x = a
     8 |
     9 | print(x)  # possibly-unresolved-reference
-      |       - Name `x` used when possibly not defined
+      |       ^ Name `x` used when possibly not defined
       |
 
+    Found 3 diagnostics
 
     ----- stderr -----
-    "###);
+    ");
 
     assert_cmd_snapshot!(
         case
@@ -315,7 +323,7 @@ fn cli_rule_severity() -> anyhow::Result<()> {
             .arg("division-by-zero")
             .arg("--warn")
             .arg("unresolved-import"),
-        @r###"
+        @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -323,7 +331,7 @@ fn cli_rule_severity() -> anyhow::Result<()> {
      --> <temp_dir>/test.py:2:8
       |
     2 | import does_not_exit
-      |        ------------- Cannot resolve import `does_not_exit`
+      |        ^^^^^^^^^^^^^ Cannot resolve import `does_not_exit`
     3 |
     4 | y = 4 / 0
       |
@@ -334,14 +342,15 @@ fn cli_rule_severity() -> anyhow::Result<()> {
     2 | import does_not_exit
     3 |
     4 | y = 4 / 0
-      |     ----- Cannot divide object of type `Literal[4]` by zero
+      |     ^^^^^ Cannot divide object of type `Literal[4]` by zero
     5 |
     6 | for a in range(0, y):
       |
 
+    Found 2 diagnostics
 
     ----- stderr -----
-    "###
+    "
     );
 
     Ok(())
@@ -365,7 +374,7 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
 
     // Assert that there's a possibly unresolved reference diagnostic
     // and that division-by-zero has a severity of error by default.
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -384,12 +393,13 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
     5 |     x = a
     6 |
     7 | print(x)  # possibly-unresolved-reference
-      |       - Name `x` used when possibly not defined
+      |       ^ Name `x` used when possibly not defined
       |
 
+    Found 2 diagnostics
 
     ----- stderr -----
-    "###);
+    ");
 
     assert_cmd_snapshot!(
         case
@@ -401,7 +411,7 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
             // Override the error severity with warning
             .arg("--ignore")
             .arg("possibly-unresolved-reference"),
-        @r###"
+        @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -409,14 +419,15 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
      --> <temp_dir>/test.py:2:5
       |
     2 | y = 4 / 0
-      |     ----- Cannot divide object of type `Literal[4]` by zero
+      |     ^^^^^ Cannot divide object of type `Literal[4]` by zero
     3 |
     4 | for a in range(0, y):
       |
 
+    Found 1 diagnostic
 
     ----- stderr -----
-    "###
+    "
     );
 
     Ok(())
@@ -436,7 +447,7 @@ fn configuration_unknown_rules() -> anyhow::Result<()> {
         ("test.py", "print(10)"),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @r#"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -445,12 +456,13 @@ fn configuration_unknown_rules() -> anyhow::Result<()> {
       |
     2 | [tool.knot.rules]
     3 | division-by-zer = "warn" # incorrect rule name
-      | --------------- Unknown lint rule `division-by-zer`
+      | ^^^^^^^^^^^^^^^ Unknown lint rule `division-by-zer`
       |
 
+    Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    "#);
 
     Ok(())
 }
@@ -460,15 +472,16 @@ fn configuration_unknown_rules() -> anyhow::Result<()> {
 fn cli_unknown_rules() -> anyhow::Result<()> {
     let case = TestCase::with_file("test.py", "print(10)")?;
 
-    assert_cmd_snapshot!(case.command().arg("--ignore").arg("division-by-zer"), @r###"
+    assert_cmd_snapshot!(case.command().arg("--ignore").arg("division-by-zer"), @r"
     success: true
     exit_code: 0
     ----- stdout -----
     warning: unknown-rule: Unknown lint rule `division-by-zer`
 
+    Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -477,7 +490,7 @@ fn cli_unknown_rules() -> anyhow::Result<()> {
 fn exit_code_only_warnings() -> anyhow::Result<()> {
     let case = TestCase::with_file("test.py", r"print(x)  # [unresolved-reference]")?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -485,12 +498,13 @@ fn exit_code_only_warnings() -> anyhow::Result<()> {
      --> <temp_dir>/test.py:1:7
       |
     1 | print(x)  # [unresolved-reference]
-      |       - Name `x` used when not defined
+      |       ^ Name `x` used when not defined
       |
 
+    Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -505,7 +519,7 @@ fn exit_code_only_info() -> anyhow::Result<()> {
         "#,
     )?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -514,12 +528,13 @@ fn exit_code_only_info() -> anyhow::Result<()> {
       |
     2 | from typing_extensions import reveal_type
     3 | reveal_type(1)
-      | -------------- info: Revealed type is `Literal[1]`
+      | ^^^^^^^^^^^^^^ Revealed type is `Literal[1]`
       |
 
+    Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -534,7 +549,7 @@ fn exit_code_only_info_and_error_on_warning_is_true() -> anyhow::Result<()> {
         "#,
     )?;
 
-    assert_cmd_snapshot!(case.command().arg("--error-on-warning"), @r###"
+    assert_cmd_snapshot!(case.command().arg("--error-on-warning"), @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -543,12 +558,13 @@ fn exit_code_only_info_and_error_on_warning_is_true() -> anyhow::Result<()> {
       |
     2 | from typing_extensions import reveal_type
     3 | reveal_type(1)
-      | -------------- info: Revealed type is `Literal[1]`
+      | ^^^^^^^^^^^^^^ Revealed type is `Literal[1]`
       |
 
+    Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -557,7 +573,7 @@ fn exit_code_only_info_and_error_on_warning_is_true() -> anyhow::Result<()> {
 fn exit_code_no_errors_but_error_on_warning_is_true() -> anyhow::Result<()> {
     let case = TestCase::with_file("test.py", r"print(x)  # [unresolved-reference]")?;
 
-    assert_cmd_snapshot!(case.command().arg("--error-on-warning"), @r###"
+    assert_cmd_snapshot!(case.command().arg("--error-on-warning"), @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -565,12 +581,45 @@ fn exit_code_no_errors_but_error_on_warning_is_true() -> anyhow::Result<()> {
      --> <temp_dir>/test.py:1:7
       |
     1 | print(x)  # [unresolved-reference]
-      |       - Name `x` used when not defined
+      |       ^ Name `x` used when not defined
       |
 
+    Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn exit_code_no_errors_but_error_on_warning_is_enabled_in_configuration() -> anyhow::Result<()> {
+    let case = TestCase::with_files([
+        ("test.py", r"print(x)  # [unresolved-reference]"),
+        (
+            "knot.toml",
+            r#"
+            [terminal]
+            error-on-warning = true
+        "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    warning: lint:unresolved-reference
+     --> <temp_dir>/test.py:1:7
+      |
+    1 | print(x)  # [unresolved-reference]
+      |       ^ Name `x` used when not defined
+      |
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
 
     Ok(())
 }
@@ -585,7 +634,7 @@ fn exit_code_both_warnings_and_errors() -> anyhow::Result<()> {
         "#,
     )?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -593,7 +642,7 @@ fn exit_code_both_warnings_and_errors() -> anyhow::Result<()> {
      --> <temp_dir>/test.py:2:7
       |
     2 | print(x)     # [unresolved-reference]
-      |       - Name `x` used when not defined
+      |       ^ Name `x` used when not defined
     3 | print(4[1])  # [non-subscriptable]
       |
 
@@ -605,9 +654,10 @@ fn exit_code_both_warnings_and_errors() -> anyhow::Result<()> {
       |       ^ Cannot subscript object of type `Literal[4]` with no `__getitem__` method
       |
 
+    Found 2 diagnostics
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -622,7 +672,7 @@ fn exit_code_both_warnings_and_errors_and_error_on_warning_is_true() -> anyhow::
         "###,
     )?;
 
-    assert_cmd_snapshot!(case.command().arg("--error-on-warning"), @r###"
+    assert_cmd_snapshot!(case.command().arg("--error-on-warning"), @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -630,7 +680,7 @@ fn exit_code_both_warnings_and_errors_and_error_on_warning_is_true() -> anyhow::
      --> <temp_dir>/test.py:2:7
       |
     2 | print(x)     # [unresolved-reference]
-      |       - Name `x` used when not defined
+      |       ^ Name `x` used when not defined
     3 | print(4[1])  # [non-subscriptable]
       |
 
@@ -642,9 +692,10 @@ fn exit_code_both_warnings_and_errors_and_error_on_warning_is_true() -> anyhow::
       |       ^ Cannot subscript object of type `Literal[4]` with no `__getitem__` method
       |
 
+    Found 2 diagnostics
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -659,7 +710,7 @@ fn exit_code_exit_zero_is_true() -> anyhow::Result<()> {
         "#,
     )?;
 
-    assert_cmd_snapshot!(case.command().arg("--exit-zero"), @r###"
+    assert_cmd_snapshot!(case.command().arg("--exit-zero"), @r"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -667,7 +718,7 @@ fn exit_code_exit_zero_is_true() -> anyhow::Result<()> {
      --> <temp_dir>/test.py:2:7
       |
     2 | print(x)     # [unresolved-reference]
-      |       - Name `x` used when not defined
+      |       ^ Name `x` used when not defined
     3 | print(4[1])  # [non-subscriptable]
       |
 
@@ -679,9 +730,263 @@ fn exit_code_exit_zero_is_true() -> anyhow::Result<()> {
       |       ^ Cannot subscript object of type `Literal[4]` with no `__getitem__` method
       |
 
+    Found 2 diagnostics
 
     ----- stderr -----
-    "###);
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn user_configuration() -> anyhow::Result<()> {
+    let case = TestCase::with_files([
+        (
+            "project/knot.toml",
+            r#"
+            [rules]
+            division-by-zero = "warn"
+            "#,
+        ),
+        (
+            "project/main.py",
+            r#"
+            y = 4 / 0
+
+            for a in range(0, y):
+                x = a
+
+            print(x)
+            "#,
+        ),
+    ])?;
+
+    let config_directory = case.root().join("home/.config");
+    let config_env_var = if cfg!(windows) {
+        "APPDATA"
+    } else {
+        "XDG_CONFIG_HOME"
+    };
+
+    assert_cmd_snapshot!(
+        case.command().current_dir(case.root().join("project")).env(config_env_var, config_directory.as_os_str()),
+        @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    warning: lint:division-by-zero
+     --> <temp_dir>/project/main.py:2:5
+      |
+    2 | y = 4 / 0
+      |     ^^^^^ Cannot divide object of type `Literal[4]` by zero
+    3 |
+    4 | for a in range(0, y):
+      |
+
+    warning: lint:possibly-unresolved-reference
+     --> <temp_dir>/project/main.py:7:7
+      |
+    5 |     x = a
+    6 |
+    7 | print(x)
+      |       ^ Name `x` used when possibly not defined
+      |
+
+    Found 2 diagnostics
+
+    ----- stderr -----
+    "
+    );
+
+    // The user-level configuration promotes `possibly-unresolved-reference` to an error.
+    // Changing the level for `division-by-zero` has no effect, because the project-level configuration
+    // has higher precedence.
+    case.write_file(
+        config_directory.join("knot/knot.toml"),
+        r#"
+        [rules]
+        division-by-zero = "error"
+        possibly-unresolved-reference = "error"
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(
+        case.command().current_dir(case.root().join("project")).env(config_env_var, config_directory.as_os_str()),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    warning: lint:division-by-zero
+     --> <temp_dir>/project/main.py:2:5
+      |
+    2 | y = 4 / 0
+      |     ^^^^^ Cannot divide object of type `Literal[4]` by zero
+    3 |
+    4 | for a in range(0, y):
+      |
+
+    error: lint:possibly-unresolved-reference
+     --> <temp_dir>/project/main.py:7:7
+      |
+    5 |     x = a
+    6 |
+    7 | print(x)
+      |       ^ Name `x` used when possibly not defined
+      |
+
+    Found 2 diagnostics
+
+    ----- stderr -----
+    "
+    );
+
+    Ok(())
+}
+
+#[test]
+fn check_specific_paths() -> anyhow::Result<()> {
+    let case = TestCase::with_files([
+        (
+            "project/main.py",
+            r#"
+            y = 4 / 0  # error: division-by-zero
+            "#,
+        ),
+        (
+            "project/tests/test_main.py",
+            r#"
+            import does_not_exist  # error: unresolved-import
+            "#,
+        ),
+        (
+            "project/other.py",
+            r#"
+            from main2 import z  # error: unresolved-import
+
+            print(z)
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(
+        case.command(),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error: lint:unresolved-import
+     --> <temp_dir>/project/tests/test_main.py:2:8
+      |
+    2 | import does_not_exist  # error: unresolved-import
+      |        ^^^^^^^^^^^^^^ Cannot resolve import `does_not_exist`
+      |
+
+    error: lint:division-by-zero
+     --> <temp_dir>/project/main.py:2:5
+      |
+    2 | y = 4 / 0  # error: division-by-zero
+      |     ^^^^^ Cannot divide object of type `Literal[4]` by zero
+      |
+
+    error: lint:unresolved-import
+     --> <temp_dir>/project/other.py:2:6
+      |
+    2 | from main2 import z  # error: unresolved-import
+      |      ^^^^^ Cannot resolve import `main2`
+    3 |
+    4 | print(z)
+      |
+
+    Found 3 diagnostics
+
+    ----- stderr -----
+    "
+    );
+
+    // Now check only the `tests` and `other.py` files.
+    // We should no longer see any diagnostics related to `main.py`.
+    assert_cmd_snapshot!(
+        case.command().arg("project/tests").arg("project/other.py"),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error: lint:unresolved-import
+     --> <temp_dir>/project/tests/test_main.py:2:8
+      |
+    2 | import does_not_exist  # error: unresolved-import
+      |        ^^^^^^^^^^^^^^ Cannot resolve import `does_not_exist`
+      |
+
+    error: lint:unresolved-import
+     --> <temp_dir>/project/other.py:2:6
+      |
+    2 | from main2 import z  # error: unresolved-import
+      |      ^^^^^ Cannot resolve import `main2`
+    3 |
+    4 | print(z)
+      |
+
+    Found 2 diagnostics
+
+    ----- stderr -----
+    "
+    );
+
+    Ok(())
+}
+
+#[test]
+fn check_non_existing_path() -> anyhow::Result<()> {
+    let case = TestCase::with_files([])?;
+
+    let mut settings = insta::Settings::clone_current();
+    settings.add_filter(
+        &regex::escape("The system cannot find the path specified. (os error 3)"),
+        "No such file or directory (os error 2)",
+    );
+    let _s = settings.bind_to_scope();
+
+    assert_cmd_snapshot!(
+        case.command().arg("project/main.py").arg("project/tests"),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error: io: `<temp_dir>/project/main.py`: No such file or directory (os error 2)
+
+    error: io: `<temp_dir>/project/tests`: No such file or directory (os error 2)
+
+    Found 2 diagnostics
+
+    ----- stderr -----
+    WARN No python files found under the given path(s)
+    "
+    );
+
+    Ok(())
+}
+
+#[test]
+fn concise_diagnostics() -> anyhow::Result<()> {
+    let case = TestCase::with_file(
+        "test.py",
+        r#"
+        print(x)     # [unresolved-reference]
+        print(4[1])  # [non-subscriptable]
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(case.command().arg("--output-format=concise"), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    warning[lint:unresolved-reference] <temp_dir>/test.py:2:7: Name `x` used when not defined
+    error[lint:non-subscriptable] <temp_dir>/test.py:3:7: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
+    Found 2 diagnostics
+
+    ----- stderr -----
+    ");
 
     Ok(())
 }
@@ -753,7 +1058,7 @@ impl TestCase {
         Ok(())
     }
 
-    fn project_dir(&self) -> &Path {
+    fn root(&self) -> &Path {
         &self.project_dir
     }
 

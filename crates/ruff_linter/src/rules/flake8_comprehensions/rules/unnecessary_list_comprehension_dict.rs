@@ -16,7 +16,7 @@ use super::helpers;
 /// It's unnecessary to use a list comprehension inside a call to `dict()`,
 /// since there is an equivalent comprehension for this type.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// dict([(x, f(x)) for x in foo])
 /// ```
@@ -45,7 +45,7 @@ impl AlwaysFixableViolation for UnnecessaryListComprehensionDict {
 
 /// C404 (`dict([...])`)
 pub(crate) fn unnecessary_list_comprehension_dict(
-    checker: &mut Checker,
+    checker: &Checker,
     expr: &Expr,
     func: &Expr,
     args: &[Expr],
@@ -72,5 +72,5 @@ pub(crate) fn unnecessary_list_comprehension_dict(
     diagnostic.try_set_fix(|| {
         fixes::fix_unnecessary_list_comprehension_dict(expr, checker).map(Fix::unsafe_edit)
     });
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

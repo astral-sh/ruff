@@ -2,9 +2,8 @@ use crate::checkers::ast::Checker;
 use crate::fix::edits::{remove_argument, Parentheses};
 use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{helpers::Truthiness, Expr, ExprAttribute, ExprName};
+use ruff_python_ast::{helpers::Truthiness, Expr, ExprAttribute};
 use ruff_python_semantic::analyze::typing;
-use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
 /// ## What it does
@@ -43,7 +42,7 @@ impl AlwaysFixableViolation for FalsyDictGetFallback {
     }
 }
 
-pub(crate) fn falsy_dict_get_fallback(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn falsy_dict_get_fallback(checker: &Checker, expr: &Expr) {
     let semantic = checker.semantic();
 
     // Check if we are in a boolean test
@@ -69,7 +68,7 @@ pub(crate) fn falsy_dict_get_fallback(checker: &mut Checker, expr: &Expr) {
     // Check if the object is a dictionary using the semantic model
     if !value
         .as_name_expr()
-        .is_some_and(|name| is_known_to_be_of_type_dict(semantic, name))
+        .is_some_and(|name| typing::is_known_to_be_of_type_dict(semantic, name))
     {
         return;
     }
@@ -108,13 +107,5 @@ pub(crate) fn falsy_dict_get_fallback(checker: &mut Checker, expr: &Expr) {
         .map(|edit| Fix::applicable_edit(edit, applicability))
     });
 
-    checker.diagnostics.push(diagnostic);
-}
-
-fn is_known_to_be_of_type_dict(semantic: &SemanticModel, expr: &ExprName) -> bool {
-    let Some(binding) = semantic.only_binding(expr).map(|id| semantic.binding(id)) else {
-        return false;
-    };
-
-    typing::is_dict(binding, semantic)
+    checker.report_diagnostic(diagnostic);
 }

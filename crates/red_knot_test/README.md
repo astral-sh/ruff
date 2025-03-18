@@ -34,7 +34,8 @@ syntax, it's just how this README embeds an example mdtest Markdown document.)
 See actual example mdtest suites in
 [`crates/red_knot_python_semantic/resources/mdtest`](https://github.com/astral-sh/ruff/tree/main/crates/red_knot_python_semantic/resources/mdtest).
 
-> ℹ️ Note: If you use `dir-test`, `rstest` or similar to generate a separate test for all Markdown files in a certain directory,
+> [!NOTE]
+> If you use `dir-test`, `rstest` or similar to generate a separate test for all Markdown files in a certain directory,
 > as with the example in `crates/red_knot_python_semantic/tests/mdtest.rs`,
 > you will likely want to also make sure that the crate the tests are in is rebuilt every time a
 > Markdown file is added or removed from the directory. See
@@ -126,7 +127,7 @@ Intervening empty lines or non-assertion comments are not allowed; an assertion 
 assertion per line, immediately following each other, with the line immediately following the last
 assertion as the line of source code on which the matched diagnostics are emitted.
 
-## Literal style
+## Literate style
 
 If multiple code blocks (without an explicit path, see below) are present in a single test, they will
 be merged into a single file in the order they appear in the Markdown file. This allows for tests that

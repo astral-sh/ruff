@@ -1,0 +1,81 @@
+---
+source: crates/red_knot_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: invalid_argument_type.md - Invalid argument type diagnostics - Many parameters with multiple invalid arguments
+mdtest path: crates/red_knot_python_semantic/resources/mdtest/diagnostics/invalid_argument_type.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | def foo(x: int, y: int, z: int) -> int:
+2 |     return x * y * z
+3 | 
+4 | # error: [invalid-argument-type]
+5 | # error: [invalid-argument-type]
+6 | # error: [invalid-argument-type]
+7 | foo("a", "b", "c")
+```
+
+# Diagnostics
+
+```
+error: lint:invalid-argument-type
+ --> /src/mdtest_snippet.py:7:5
+  |
+5 | # error: [invalid-argument-type]
+6 | # error: [invalid-argument-type]
+7 | foo("a", "b", "c")
+  |     ^^^ Object of type `Literal["a"]` cannot be assigned to parameter 1 (`x`) of function `foo`; expected type `int`
+  |
+info
+ --> /src/mdtest_snippet.py:1:9
+  |
+1 | def foo(x: int, y: int, z: int) -> int:
+  |         ------ parameter declared in function definition here
+2 |     return x * y * z
+  |
+
+```
+
+```
+error: lint:invalid-argument-type
+ --> /src/mdtest_snippet.py:7:10
+  |
+5 | # error: [invalid-argument-type]
+6 | # error: [invalid-argument-type]
+7 | foo("a", "b", "c")
+  |          ^^^ Object of type `Literal["b"]` cannot be assigned to parameter 2 (`y`) of function `foo`; expected type `int`
+  |
+info
+ --> /src/mdtest_snippet.py:1:17
+  |
+1 | def foo(x: int, y: int, z: int) -> int:
+  |                 ------ parameter declared in function definition here
+2 |     return x * y * z
+  |
+
+```
+
+```
+error: lint:invalid-argument-type
+ --> /src/mdtest_snippet.py:7:15
+  |
+5 | # error: [invalid-argument-type]
+6 | # error: [invalid-argument-type]
+7 | foo("a", "b", "c")
+  |               ^^^ Object of type `Literal["c"]` cannot be assigned to parameter 3 (`z`) of function `foo`; expected type `int`
+  |
+info
+ --> /src/mdtest_snippet.py:1:25
+  |
+1 | def foo(x: int, y: int, z: int) -> int:
+  |                         ------ parameter declared in function definition here
+2 |     return x * y * z
+  |
+
+```

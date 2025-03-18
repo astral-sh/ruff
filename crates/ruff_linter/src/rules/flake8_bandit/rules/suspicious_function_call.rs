@@ -344,8 +344,12 @@ impl Violation for SuspiciousEvalUsage {
 /// before rending them.
 ///
 /// `django.utils.safestring.mark_safe` marks a string as safe for use in HTML
-/// templates, bypassing XSS protection. This is dangerous because it may allow
+/// templates, bypassing XSS protection. Its usage can be dangerous if the
+/// contents of the string are dynamically generated, because it may allow
 /// cross-site scripting attacks if the string is not properly escaped.
+///
+/// For dynamically generated strings, consider utilizing
+/// `django.utils.html.format_html`.
 ///
 /// In [preview], this rule will also flag references to `django.utils.safestring.mark_safe`.
 ///
@@ -353,12 +357,18 @@ impl Violation for SuspiciousEvalUsage {
 /// ```python
 /// from django.utils.safestring import mark_safe
 ///
-/// content = mark_safe("<script>alert('Hello, world!')</script>")  # XSS.
+///
+/// def render_username(username):
+///     return mark_safe(f"<i>{username}</i>")  # Dangerous if username is user-provided.
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// content = "<script>alert('Hello, world!')</script>"  # Safe if rendered.
+/// from django.utils.html import format_html
+///
+///
+/// def render_username(username):
+///     return django.utils.html.format_html("<i>{}</i>", username)  # username is escaped.
 /// ```
 ///
 /// ## References
@@ -779,6 +789,13 @@ impl Violation for SuspiciousXMLPullDOMUsage {
     }
 }
 
+/// ## Deprecation
+///
+/// This rule was deprecated as the `lxml` library has been modified to address
+/// known vulnerabilities and unsafe defaults. As such, the `defusedxml`
+/// library is no longer necessary, `defusedxml` has [deprecated] its `lxml`
+/// module.
+///
 /// ## What it does
 /// Checks for uses of insecure XML parsers.
 ///
@@ -802,6 +819,7 @@ impl Violation for SuspiciousXMLPullDOMUsage {
 /// - [Common Weakness Enumeration: CWE-776](https://cwe.mitre.org/data/definitions/776.html)
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
+/// [deprecated]: https://pypi.org/project/defusedxml/0.8.0rc2/#defusedxml-lxml
 #[derive(ViolationMetadata)]
 pub(crate) struct SuspiciousXMLETreeUsage;
 
@@ -908,7 +926,7 @@ impl Violation for SuspiciousFTPLibUsage {
     }
 }
 
-pub(crate) fn suspicious_function_call(checker: &mut Checker, call: &ExprCall) {
+pub(crate) fn suspicious_function_call(checker: &Checker, call: &ExprCall) {
     suspicious_function(
         checker,
         call.func.as_ref(),
@@ -917,7 +935,7 @@ pub(crate) fn suspicious_function_call(checker: &mut Checker, call: &ExprCall) {
     );
 }
 
-pub(crate) fn suspicious_function_reference(checker: &mut Checker, func: &Expr) {
+pub(crate) fn suspicious_function_reference(checker: &Checker, func: &Expr) {
     if checker.settings.preview.is_disabled() {
         return;
     }
@@ -953,7 +971,7 @@ pub(crate) fn suspicious_function_reference(checker: &mut Checker, func: &Expr) 
 
 /// S301, S302, S303, S304, S305, S306, S307, S308, S310, S311, S312, S313, S314, S315, S316, S317, S318, S319, S320, S321, S323
 fn suspicious_function(
-    checker: &mut Checker,
+    checker: &Checker,
     func: &Expr,
     arguments: Option<&Arguments>,
     range: TextRange,
@@ -1051,7 +1069,16 @@ fn suspicious_function(
         ["" | "builtins", "eval"] => SuspiciousEvalUsage.into(),
 
         // MarkSafe
-        ["django", "utils", "safestring" | "html", "mark_safe"] => SuspiciousMarkSafeUsage.into(),
+        ["django", "utils", "safestring" | "html", "mark_safe"] => {
+            if let Some(arguments) = arguments {
+                if let [single] = &*arguments.args {
+                    if single.is_string_literal_expr() {
+                        return;
+                    }
+                }
+            }
+            SuspiciousMarkSafeUsage.into()
+        }
 
         // URLOpen (`Request`)
         ["urllib", "request", "Request"] | ["six", "moves", "urllib", "request", "Request"] => {
@@ -1176,12 +1203,12 @@ fn suspicious_function(
 
     let diagnostic = Diagnostic::new(diagnostic_kind, range);
     if checker.enabled(diagnostic.kind.rule()) {
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }
 
 /// S308
-pub(crate) fn suspicious_function_decorator(checker: &mut Checker, decorator: &Decorator) {
+pub(crate) fn suspicious_function_decorator(checker: &Checker, decorator: &Decorator) {
     // In preview mode, references are handled collectively by `suspicious_function_reference`
     if checker.settings.preview.is_disabled() {
         suspicious_function(checker, &decorator.expression, None, decorator.range);

@@ -19,7 +19,7 @@ use crate::checkers::ast::Checker;
 /// Prefer `dict.fromkeys(iterable)` over `{value: None for value in iterable}`,
 /// as `dict.fromkeys` is more readable and efficient.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// {a: None for a in iterable}
 /// {a: 1 for a in iterable}
@@ -58,7 +58,7 @@ impl Violation for UnnecessaryDictComprehensionForIterable {
 
 /// C420
 pub(crate) fn unnecessary_dict_comprehension_for_iterable(
-    checker: &mut Checker,
+    checker: &Checker,
     dict_comp: &ast::ExprDictComp,
 ) {
     let [generator] = dict_comp.generators.as_slice() else {
@@ -132,7 +132,7 @@ pub(crate) fn unnecessary_dict_comprehension_for_iterable(
         )));
     }
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// Returns `true` if the expression can be shared across multiple values.

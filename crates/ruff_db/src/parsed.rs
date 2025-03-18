@@ -22,7 +22,7 @@ use crate::Db;
 /// for determining if a query result is unchanged.
 #[salsa::tracked(return_ref, no_eq)]
 pub fn parsed_module(db: &dyn Db, file: File) -> ParsedModule {
-    let _span = tracing::trace_span!("parsed_module", file = %file.path(db)).entered();
+    let _span = tracing::trace_span!("parsed_module", ?file).entered();
 
     let source = source_text(db, file);
     let path = file.path(db);
@@ -73,11 +73,21 @@ impl std::fmt::Debug for ParsedModule {
     }
 }
 
+impl PartialEq for ParsedModule {
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.inner, &other.inner)
+    }
+}
+
+impl Eq for ParsedModule {}
+
 #[cfg(test)]
 mod tests {
     use crate::files::{system_path_to_file, vendored_path_to_file};
     use crate::parsed::parsed_module;
-    use crate::system::{DbWithTestSystem, SystemPath, SystemVirtualPath};
+    use crate::system::{
+        DbWithTestSystem, DbWithWritableSystem as _, SystemPath, SystemVirtualPath,
+    };
     use crate::tests::TestDb;
     use crate::vendored::{VendoredFileSystemBuilder, VendoredPath};
     use crate::Db;
@@ -88,13 +98,13 @@ mod tests {
         let mut db = TestDb::new();
         let path = "test.py";
 
-        db.write_file(path, "x = 10".to_string())?;
+        db.write_file(path, "x = 10")?;
 
         let file = system_path_to_file(&db, path).unwrap();
 
         let parsed = parsed_module(&db, file);
 
-        assert!(parsed.is_valid());
+        assert!(parsed.has_valid_syntax());
 
         Ok(())
     }
@@ -104,13 +114,13 @@ mod tests {
         let mut db = TestDb::new();
         let path = SystemPath::new("test.ipynb");
 
-        db.write_file(path, "%timeit a = b".to_string())?;
+        db.write_file(path, "%timeit a = b")?;
 
         let file = system_path_to_file(&db, path).unwrap();
 
         let parsed = parsed_module(&db, file);
 
-        assert!(parsed.is_valid());
+        assert!(parsed.has_valid_syntax());
 
         Ok(())
     }
@@ -126,7 +136,7 @@ mod tests {
 
         let parsed = parsed_module(&db, virtual_file.file());
 
-        assert!(parsed.is_valid());
+        assert!(parsed.has_valid_syntax());
 
         Ok(())
     }
@@ -142,7 +152,7 @@ mod tests {
 
         let parsed = parsed_module(&db, virtual_file.file());
 
-        assert!(parsed.is_valid());
+        assert!(parsed.has_valid_syntax());
 
         Ok(())
     }
@@ -173,6 +183,6 @@ else:
 
         let parsed = parsed_module(&db, file);
 
-        assert!(parsed.is_valid());
+        assert!(parsed.has_valid_syntax());
     }
 }

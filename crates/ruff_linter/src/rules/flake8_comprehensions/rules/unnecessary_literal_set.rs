@@ -16,7 +16,7 @@ use super::helpers;
 /// It's unnecessary to use a list or tuple literal within a call to `set()`.
 /// Instead, the expression can be rewritten as a set literal.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// set([1, 2])
 /// set((1, 2))
@@ -51,7 +51,7 @@ impl AlwaysFixableViolation for UnnecessaryLiteralSet {
 }
 
 /// C405 (`set([1, 2])`)
-pub(crate) fn unnecessary_literal_set(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn unnecessary_literal_set(checker: &Checker, call: &ast::ExprCall) {
     let Some(argument) = helpers::exactly_one_argument_with_matching_function(
         "set",
         &call.func,
@@ -125,7 +125,7 @@ pub(crate) fn unnecessary_literal_set(checker: &mut Checker, call: &ast::ExprCal
         }
     });
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

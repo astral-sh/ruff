@@ -51,19 +51,14 @@ impl Violation for ReadWholeFile {
 }
 
 /// FURB101
-pub(crate) fn read_whole_file(checker: &mut Checker, with: &ast::StmtWith) {
+pub(crate) fn read_whole_file(checker: &Checker, with: &ast::StmtWith) {
     // `async` check here is more of a precaution.
     if with.is_async {
         return;
     }
 
     // First we go through all the items in the statement and find all `open` operations.
-    let candidates = find_file_opens(
-        with,
-        checker.semantic(),
-        true,
-        checker.settings.target_version,
-    );
+    let candidates = find_file_opens(with, checker.semantic(), true, checker.target_version());
     if candidates.is_empty() {
         return;
     }
@@ -88,7 +83,7 @@ pub(crate) fn read_whole_file(checker: &mut Checker, with: &ast::StmtWith) {
             )
         })
         .collect();
-    checker.diagnostics.extend(diagnostics);
+    checker.report_diagnostics(diagnostics);
 }
 
 /// AST visitor that matches `open` operations with the corresponding `read` calls.

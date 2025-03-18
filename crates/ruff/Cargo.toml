@@ -1,6 +1,6 @@
 [package]
 name = "ruff"
-version = "0.9.4"
+version = "0.11.0"
 publish = true
 authors = { workspace = true }
 edition = { workspace = true }
@@ -22,6 +22,7 @@ ruff_macros = { workspace = true }
 ruff_notebook = { workspace = true }
 ruff_python_ast = { workspace = true }
 ruff_python_formatter = { workspace = true }
+ruff_python_parser = { workspace = true }
 ruff_server = { workspace = true }
 ruff_source_file = { workspace = true }
 ruff_text_size = { workspace = true }

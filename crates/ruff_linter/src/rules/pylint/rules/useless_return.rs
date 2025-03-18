@@ -44,13 +44,13 @@ impl AlwaysFixableViolation for UselessReturn {
 
 /// PLR1711
 pub(crate) fn useless_return(
-    checker: &mut Checker,
+    checker: &Checker,
     stmt: &Stmt,
     body: &[Stmt],
     returns: Option<&Expr>,
 ) {
     // Skip functions that have a return annotation that is not `None`.
-    if !returns.map_or(true, Expr::is_none_literal_expr) {
+    if !returns.is_none_or(Expr::is_none_literal_expr) {
         return;
     }
 
@@ -82,7 +82,7 @@ pub(crate) fn useless_return(
     // Verify that the return statement is either bare or returns `None`.
     if !value
         .as_ref()
-        .map_or(true, |expr| expr.is_none_literal_expr())
+        .is_none_or(|expr| expr.is_none_literal_expr())
     {
         return;
     };
@@ -99,5 +99,5 @@ pub(crate) fn useless_return(
     diagnostic.set_fix(Fix::safe_edit(edit).isolate(Checker::isolation(
         checker.semantic().current_statement_id(),
     )));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

@@ -1,0 +1,40 @@
+---
+source: crates/red_knot_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: invalid_argument_type.md - Invalid argument type diagnostics - Tests for a variety of argument types - Mix of arguments
+mdtest path: crates/red_knot_python_semantic/resources/mdtest/diagnostics/invalid_argument_type.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | def foo(x: int, /, y: int, *, z: int = 0) -> int:
+2 |     return x * y * z
+3 | 
+4 | foo(1, 2, z="hello")  # error: [invalid-argument-type]
+```
+
+# Diagnostics
+
+```
+error: lint:invalid-argument-type
+ --> /src/mdtest_snippet.py:4:11
+  |
+2 |     return x * y * z
+3 |
+4 | foo(1, 2, z="hello")  # error: [invalid-argument-type]
+  |           ^^^^^^^^^ Object of type `Literal["hello"]` cannot be assigned to parameter `z` of function `foo`; expected type `int`
+  |
+info
+ --> /src/mdtest_snippet.py:1:31
+  |
+1 | def foo(x: int, /, y: int, *, z: int = 0) -> int:
+  |                               ---------- parameter declared in function definition here
+2 |     return x * y * z
+  |
+
+```

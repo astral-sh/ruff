@@ -23,10 +23,8 @@ impl ExpectedParams {
             | "__neg__" | "__pos__" | "__abs__" | "__invert__" | "__complex__" | "__int__"
             | "__float__" | "__index__" | "__trunc__" | "__floor__" | "__ceil__" | "__enter__"
             | "__aenter__" | "__getnewargs_ex__" | "__getnewargs__" | "__getstate__"
-            | "__reduce__" | "__copy__" | "__unicode__" | "__nonzero__" | "__await__"
-            | "__aiter__" | "__anext__" | "__fspath__" | "__subclasses__" => {
-                Some(ExpectedParams::Fixed(0))
-            }
+            | "__reduce__" | "__copy__" | "__await__" | "__aiter__" | "__anext__"
+            | "__fspath__" | "__subclasses__" | "__next__" => Some(ExpectedParams::Fixed(0)),
             "__format__" | "__lt__" | "__le__" | "__eq__" | "__ne__" | "__gt__" | "__ge__"
             | "__getattr__" | "__getattribute__" | "__delattr__" | "__delete__"
             | "__instancecheck__" | "__subclasscheck__" | "__getitem__" | "__missing__"
@@ -37,8 +35,9 @@ impl ExpectedParams {
             | "__rpow__" | "__rlshift__" | "__rrshift__" | "__rand__" | "__rxor__" | "__ror__"
             | "__iadd__" | "__isub__" | "__imul__" | "__itruediv__" | "__ifloordiv__"
             | "__imod__" | "__ilshift__" | "__irshift__" | "__iand__" | "__ixor__" | "__ior__"
-            | "__ipow__" | "__setstate__" | "__reduce_ex__" | "__deepcopy__" | "__cmp__"
-            | "__matmul__" | "__rmatmul__" | "__imatmul__" | "__div__" => {
+            | "__ipow__" | "__setstate__" | "__reduce_ex__" | "__deepcopy__" | "__matmul__"
+            | "__rmatmul__" | "__imatmul__" | "__buffer__" | "__class_getitem__"
+            | "__mro_entries__" | "__release_buffer__" | "__subclasshook__" => {
                 Some(ExpectedParams::Fixed(1))
             }
             "__setattr__" | "__get__" | "__set__" | "__setitem__" | "__set_name__" => {
@@ -137,7 +136,7 @@ impl Violation for UnexpectedSpecialMethodSignature {
 
 /// PLE0302
 pub(crate) fn unexpected_special_method_signature(
-    checker: &mut Checker,
+    checker: &Checker,
     stmt: &Stmt,
     name: &str,
     decorator_list: &[Decorator],
@@ -147,11 +146,8 @@ pub(crate) fn unexpected_special_method_signature(
         return;
     }
 
-    // Ignore methods with positional-only or keyword-only parameters, or variadic parameters.
-    if !parameters.posonlyargs.is_empty()
-        || !parameters.kwonlyargs.is_empty()
-        || parameters.kwarg.is_some()
-    {
+    // Ignore methods with keyword-only parameters or variadic parameters.
+    if !parameters.kwonlyargs.is_empty() || parameters.kwarg.is_some() {
         return;
     }
 
@@ -160,10 +156,11 @@ pub(crate) fn unexpected_special_method_signature(
         return;
     }
 
-    let actual_params = parameters.args.len();
+    let actual_params = parameters.args.len() + parameters.posonlyargs.len();
     let mandatory_params = parameters
         .args
         .iter()
+        .chain(parameters.posonlyargs.iter())
         .filter(|arg| arg.default.is_none())
         .count();
 
@@ -189,7 +186,7 @@ pub(crate) fn unexpected_special_method_signature(
     };
 
     if !valid_signature {
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             UnexpectedSpecialMethodSignature {
                 method_name: name.to_owned(),
                 expected_params,

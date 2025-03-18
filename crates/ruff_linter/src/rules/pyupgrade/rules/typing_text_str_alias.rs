@@ -46,7 +46,7 @@ impl Violation for TypingTextStrAlias {
 }
 
 /// UP019
-pub(crate) fn typing_text_str_alias(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn typing_text_str_alias(checker: &Checker, expr: &Expr) {
     if !checker.semantic().seen_module(Modules::TYPING) {
         return;
     }
@@ -68,6 +68,6 @@ pub(crate) fn typing_text_str_alias(checker: &mut Checker, expr: &Expr) {
                 import_edit,
             ))
         });
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }

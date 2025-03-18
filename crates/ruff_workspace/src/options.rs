@@ -313,7 +313,9 @@ pub struct Options {
     /// ```
     ///
     /// If both are specified, `target-version` takes precedence over
-    /// `requires-python`.
+    /// `requires-python`. See [_Inferring the Python version_](https://docs.astral.sh/ruff/configuration/#inferring-the-python-version)
+    /// for a complete description of how the `target-version` is determined
+    /// when left unspecified.
     ///
     /// Note that a stub file can [sometimes make use of a typing feature](https://typing.readthedocs.io/en/latest/spec/distributing.html#syntax)
     /// before it is available at runtime, as long as the stub does not make
@@ -333,6 +335,29 @@ pub struct Options {
         "#
     )]
     pub target_version: Option<PythonVersion>,
+
+    /// A list of mappings from glob-style file pattern to Python version to use when checking the
+    /// corresponding file(s).
+    ///
+    /// This may be useful for overriding the global Python version settings in `target-version` or
+    /// `requires-python` for a subset of files. For example, if you have a project with a minimum
+    /// supported Python version of 3.9 but a subdirectory of developer scripts that want to use a
+    /// newer feature like the `match` statement from Python 3.10, you can use
+    /// `per-file-target-version` to specify `"developer_scripts/*.py" = "py310"`.
+    ///
+    /// This setting is used by the linter to enforce any enabled version-specific lint rules, as
+    /// well as by the formatter for any version-specific formatting options, such as parenthesizing
+    /// context managers on Python 3.10+.
+    #[option(
+        default = "{}",
+        value_type = "dict[str, PythonVersion]",
+        scope = "per-file-target-version",
+        example = r#"
+            # Override the project-wide Python version for a developer scripts directory:
+            "scripts/**.py" = "py312"
+        "#
+    )]
+    pub per_file_target_version: Option<FxHashMap<String, PythonVersion>>,
 
     /// The directories to consider when resolving first- vs. third-party
     /// imports.
@@ -1048,10 +1073,57 @@ pub struct Flake8BanditOptions {
         example = "check-typed-exception = true"
     )]
     pub check_typed_exception: Option<bool>,
+
+    /// A list of additional callable names that behave like
+    /// [`markupsafe.Markup`](https://markupsafe.palletsprojects.com/en/stable/escaping/#markupsafe.Markup).
+    ///
+    /// Expects to receive a list of fully-qualified names (e.g., `webhelpers.html.literal`, rather than
+    /// `literal`).
+    #[option(
+        default = "[]",
+        value_type = "list[str]",
+        example = "extend-markup-names = [\"webhelpers.html.literal\", \"my_package.Markup\"]"
+    )]
+    pub extend_markup_names: Option<Vec<String>>,
+
+    /// A list of callable names, whose result may be safely passed into
+    /// [`markupsafe.Markup`](https://markupsafe.palletsprojects.com/en/stable/escaping/#markupsafe.Markup).
+    ///
+    /// Expects to receive a list of fully-qualified names (e.g., `bleach.clean`, rather than `clean`).
+    ///
+    /// This setting helps you avoid false positives in code like:
+    ///
+    /// ```python
+    /// from bleach import clean
+    /// from markupsafe import Markup
+    ///
+    /// cleaned_markup = Markup(clean(some_user_input))
+    /// ```
+    ///
+    /// Where the use of [`bleach.clean`](https://bleach.readthedocs.io/en/latest/clean.html)
+    /// usually ensures that there's no XSS vulnerability.
+    ///
+    /// Although it is not recommended, you may also use this setting to whitelist other
+    /// kinds of calls, e.g. calls to i18n translation functions, where how safe that is
+    /// will depend on the implementation and how well the translations are audited.
+    ///
+    /// Another common use-case is to wrap the output of functions that generate markup
+    /// like [`xml.etree.ElementTree.tostring`](https://docs.python.org/3/library/xml.etree.elementtree.html#xml.etree.ElementTree.tostring)
+    /// or template rendering engines where sanitization of potential user input is either
+    /// already baked in or has to happen before rendering.
+    #[option(
+        default = "[]",
+        value_type = "list[str]",
+        example = "allowed-markup-calls = [\"bleach.clean\", \"my_package.sanitize\"]"
+    )]
+    pub allowed_markup_calls: Option<Vec<String>>,
 }
 
 impl Flake8BanditOptions {
-    pub fn into_settings(self) -> ruff_linter::rules::flake8_bandit::settings::Settings {
+    pub fn into_settings(
+        self,
+        ruff_options: Option<&RuffOptions>,
+    ) -> ruff_linter::rules::flake8_bandit::settings::Settings {
         ruff_linter::rules::flake8_bandit::settings::Settings {
             hardcoded_tmp_directory: self
                 .hardcoded_tmp_directory
@@ -1060,6 +1132,20 @@ impl Flake8BanditOptions {
                 .chain(self.hardcoded_tmp_directory_extend.unwrap_or_default())
                 .collect(),
             check_typed_exception: self.check_typed_exception.unwrap_or(false),
+            extend_markup_names: self
+                .extend_markup_names
+                .or_else(|| {
+                    #[allow(deprecated)]
+                    ruff_options.and_then(|options| options.extend_markup_names.clone())
+                })
+                .unwrap_or_default(),
+            allowed_markup_calls: self
+                .allowed_markup_calls
+                .or_else(|| {
+                    #[allow(deprecated)]
+                    ruff_options.and_then(|options| options.allowed_markup_calls.clone())
+                })
+                .unwrap_or_default(),
         }
     }
 }
@@ -1130,27 +1216,98 @@ impl Flake8BugbearOptions {
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Flake8BuiltinsOptions {
+    /// DEPRECATED: This option has been renamed to `ignorelist`. Use `ignorelist` instead.
+    ///
+    /// Ignore list of builtins.
+    ///
+    /// This option is ignored if both `ignorelist` and `builtins-ignorelist` are set.
     #[option(
         default = r#"[]"#,
         value_type = "list[str]",
         example = "builtins-ignorelist = [\"id\"]"
     )]
-    /// Ignore list of builtins.
+    #[deprecated(
+        since = "0.10.0",
+        note = "`builtins-ignorelist` has been renamed to `ignorelist`. Use that instead."
+    )]
     pub builtins_ignorelist: Option<Vec<String>>,
+
+    /// Ignore list of builtins.
+    #[option(
+        default = r#"[]"#,
+        value_type = "list[str]",
+        example = "ignorelist = [\"id\"]"
+    )]
+    pub ignorelist: Option<Vec<String>>,
+
+    /// DEPRECATED: This option has been renamed to `allowed-modules`. Use `allowed-modules` instead.
+    ///
+    /// List of builtin module names to allow.
+    ///
+    /// This option is ignored if both `allowed-modules` and `builtins-allowed-modules` are set.
     #[option(
         default = r#"[]"#,
         value_type = "list[str]",
         example = "builtins-allowed-modules = [\"secrets\"]"
     )]
-    /// List of builtin module names to allow.
+    #[deprecated(
+        since = "0.10.0",
+        note = "`builtins-allowed-modules` has been renamed to `allowed-modules`. Use that instead."
+    )]
     pub builtins_allowed_modules: Option<Vec<String>>,
+
+    /// List of builtin module names to allow.
+    #[option(
+        default = r#"[]"#,
+        value_type = "list[str]",
+        example = "allowed-modules = [\"secrets\"]"
+    )]
+    pub allowed_modules: Option<Vec<String>>,
+
+    /// DEPRECATED: This option has been renamed to `strict-checking`. Use `strict-checking` instead.
+    ///
+    /// Compare module names instead of full module paths.
+    ///
+    /// This option is ignored if both `strict-checking` and `builtins-strict-checking` are set.
+    #[option(
+        default = r#"false"#,
+        value_type = "bool",
+        example = "builtins-strict-checking = true"
+    )]
+    #[deprecated(
+        since = "0.10.0",
+        note = "`builtins-strict-checking` has been renamed to `strict-checking`. Use that instead."
+    )]
+    pub builtins_strict_checking: Option<bool>,
+
+    /// Compare module names instead of full module paths.
+    ///
+    /// Used by [`A005` - `stdlib-module-shadowing`](https://docs.astral.sh/ruff/rules/stdlib-module-shadowing/).
+    #[option(
+        default = r#"false"#,
+        value_type = "bool",
+        example = "strict-checking = true"
+    )]
+    pub strict_checking: Option<bool>,
 }
 
 impl Flake8BuiltinsOptions {
     pub fn into_settings(self) -> ruff_linter::rules::flake8_builtins::settings::Settings {
+        #[allow(deprecated)]
         ruff_linter::rules::flake8_builtins::settings::Settings {
-            builtins_ignorelist: self.builtins_ignorelist.unwrap_or_default(),
-            builtins_allowed_modules: self.builtins_allowed_modules.unwrap_or_default(),
+            ignorelist: self
+                .ignorelist
+                .or(self.builtins_ignorelist)
+                .unwrap_or_default(),
+            allowed_modules: self
+                .allowed_modules
+                .or(self.builtins_allowed_modules)
+                .unwrap_or_default(),
+            strict_checking: self
+                .strict_checking
+                .or(self.builtins_strict_checking)
+                // use the old default of true on non-preview
+                .unwrap_or_default(),
         }
     }
 }
@@ -3360,6 +3517,10 @@ pub struct RuffOptions {
         value_type = "list[str]",
         example = "extend-markup-names = [\"webhelpers.html.literal\", \"my_package.Markup\"]"
     )]
+    #[deprecated(
+        since = "0.10.0",
+        note = "The `extend-markup-names` option has been moved to the `flake8-bandit` section of the configuration."
+    )]
     pub extend_markup_names: Option<Vec<String>>,
 
     /// A list of callable names, whose result may be safely passed into
@@ -3392,6 +3553,10 @@ pub struct RuffOptions {
         value_type = "list[str]",
         example = "allowed-markup-calls = [\"bleach.clean\", \"my_package.sanitize\"]"
     )]
+    #[deprecated(
+        since = "0.10.0",
+        note = "The `allowed-markup-names` option has been moved to the `flake8-bandit` section of the configuration."
+    )]
     pub allowed_markup_calls: Option<Vec<String>>,
 }
 
@@ -3401,8 +3566,6 @@ impl RuffOptions {
             parenthesize_tuple_in_subscript: self
                 .parenthesize_tuple_in_subscript
                 .unwrap_or_default(),
-            extend_markup_names: self.extend_markup_names.unwrap_or_default(),
-            allowed_markup_calls: self.allowed_markup_calls.unwrap_or_default(),
         }
     }
 }
@@ -3952,9 +4115,7 @@ impl From<LintOptionsWire> for LintOptions {
 mod tests {
     use crate::options::Flake8SelfOptions;
     use ruff_linter::rules::flake8_self;
-    use ruff_linter::settings::types::PythonVersion as LinterPythonVersion;
     use ruff_python_ast::name::Name;
-    use ruff_python_formatter::PythonVersion as FormatterPythonVersion;
 
     #[test]
     fn flake8_self_options() {
@@ -4000,30 +4161,6 @@ mod tests {
         assert_eq!(
             settings.ignore_names,
             vec![Name::new_static("_foo"), Name::new_static("_bar")]
-        );
-    }
-
-    #[test]
-    fn formatter_and_linter_target_version_have_same_default() {
-        assert_eq!(
-            FormatterPythonVersion::default().as_tuple(),
-            LinterPythonVersion::default().as_tuple()
-        );
-    }
-
-    #[test]
-    fn formatter_and_linter_target_version_have_same_latest() {
-        assert_eq!(
-            FormatterPythonVersion::latest().as_tuple(),
-            LinterPythonVersion::latest().as_tuple()
-        );
-    }
-
-    #[test]
-    fn formatter_and_linter_target_version_have_same_minimal_supported() {
-        assert_eq!(
-            FormatterPythonVersion::minimal_supported().as_tuple(),
-            LinterPythonVersion::minimal_supported().as_tuple()
         );
     }
 }

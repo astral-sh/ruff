@@ -1,0 +1,94 @@
+---
+source: crates/red_knot_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: for.md - For loops - Possibly invalid `__getitem__` methods
+mdtest path: crates/red_knot_python_semantic/resources/mdtest/loops/for.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing_extensions import reveal_type
+ 2 | 
+ 3 | def _(flag: bool):
+ 4 |     class Iterable1:
+ 5 |         if flag:
+ 6 |             def __getitem__(self, item: int) -> str:
+ 7 |                 return "foo"
+ 8 |         else:
+ 9 |             __getitem__: None = None
+10 | 
+11 |     class Iterable2:
+12 |         if flag:
+13 |             def __getitem__(self, item: int) -> str:
+14 |                 return "foo"
+15 |         else:
+16 |             def __getitem__(self, item: str) -> int:
+17 |                 return 42
+18 | 
+19 |     # error: [not-iterable]
+20 |     for x in Iterable1():
+21 |         # TODO: `str` might be better
+22 |         reveal_type(x)  # revealed: str | Unknown
+23 | 
+24 |     # error: [not-iterable]
+25 |     for y in Iterable2():
+26 |         reveal_type(y)  # revealed: str | int
+```
+
+# Diagnostics
+
+```
+error: lint:not-iterable
+  --> /src/mdtest_snippet.py:20:14
+   |
+19 |     # error: [not-iterable]
+20 |     for x in Iterable1():
+   |              ^^^^^^^^^^^ Object of type `Iterable1` may not be iterable because it has no `__iter__` method and its `__getitem__` attribute (with type `<bound method `__getitem__` of `Iterable1`> | None`) may not be callable
+21 |         # TODO: `str` might be better
+22 |         reveal_type(x)  # revealed: str | Unknown
+   |
+
+```
+
+```
+info: revealed-type
+  --> /src/mdtest_snippet.py:22:9
+   |
+20 |     for x in Iterable1():
+21 |         # TODO: `str` might be better
+22 |         reveal_type(x)  # revealed: str | Unknown
+   |         ^^^^^^^^^^^^^^ Revealed type is `str | Unknown`
+23 |
+24 |     # error: [not-iterable]
+   |
+
+```
+
+```
+error: lint:not-iterable
+  --> /src/mdtest_snippet.py:25:14
+   |
+24 |     # error: [not-iterable]
+25 |     for y in Iterable2():
+   |              ^^^^^^^^^^^ Object of type `Iterable2` may not be iterable because it has no `__iter__` method and its `__getitem__` method (with type `<bound method `__getitem__` of `Iterable2`> | <bound method `__getitem__` of `Iterable2`>`) may have an incorrect signature for the old-style iteration protocol (expected a signature at least as permissive as `def __getitem__(self, key: int): ...`)
+26 |         reveal_type(y)  # revealed: str | int
+   |
+
+```
+
+```
+info: revealed-type
+  --> /src/mdtest_snippet.py:26:9
+   |
+24 |     # error: [not-iterable]
+25 |     for y in Iterable2():
+26 |         reveal_type(y)  # revealed: str | int
+   |         ^^^^^^^^^^^^^^ Revealed type is `str | int`
+   |
+
+```

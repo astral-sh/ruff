@@ -1,0 +1,98 @@
+---
+source: crates/red_knot_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: for.md - For loops - Possibly invalid `__iter__` methods
+mdtest path: crates/red_knot_python_semantic/resources/mdtest/loops/for.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing_extensions import reveal_type
+ 2 | 
+ 3 | class Iterator:
+ 4 |     def __next__(self) -> int:
+ 5 |         return 42
+ 6 | 
+ 7 | def _(flag: bool):
+ 8 |     class Iterable1:
+ 9 |         if flag:
+10 |             def __iter__(self) -> Iterator:
+11 |                 return Iterator()
+12 |         else:
+13 |             def __iter__(self, invalid_extra_arg) -> Iterator:
+14 |                 return Iterator()
+15 | 
+16 |     # error: [not-iterable]
+17 |     for x in Iterable1():
+18 |         reveal_type(x)  # revealed: int
+19 | 
+20 |     class Iterable2:
+21 |         if flag:
+22 |             def __iter__(self) -> Iterator:
+23 |                 return Iterator()
+24 |         else:
+25 |             __iter__: None = None
+26 | 
+27 |     # error: [not-iterable]
+28 |     for x in Iterable2():
+29 |         # TODO: `int` would probably be better here:
+30 |         reveal_type(x)  # revealed: int | Unknown
+```
+
+# Diagnostics
+
+```
+error: lint:not-iterable
+  --> /src/mdtest_snippet.py:17:14
+   |
+16 |     # error: [not-iterable]
+17 |     for x in Iterable1():
+   |              ^^^^^^^^^^^ Object of type `Iterable1` may not be iterable because its `__iter__` method (with type `<bound method `__iter__` of `Iterable1`> | <bound method `__iter__` of `Iterable1`>`) may have an invalid signature (expected `def __iter__(self): ...`)
+18 |         reveal_type(x)  # revealed: int
+   |
+
+```
+
+```
+info: revealed-type
+  --> /src/mdtest_snippet.py:18:9
+   |
+16 |     # error: [not-iterable]
+17 |     for x in Iterable1():
+18 |         reveal_type(x)  # revealed: int
+   |         ^^^^^^^^^^^^^^ Revealed type is `int`
+19 |
+20 |     class Iterable2:
+   |
+
+```
+
+```
+error: lint:not-iterable
+  --> /src/mdtest_snippet.py:28:14
+   |
+27 |     # error: [not-iterable]
+28 |     for x in Iterable2():
+   |              ^^^^^^^^^^^ Object of type `Iterable2` may not be iterable because its `__iter__` attribute (with type `<bound method `__iter__` of `Iterable2`> | None`) may not be callable
+29 |         # TODO: `int` would probably be better here:
+30 |         reveal_type(x)  # revealed: int | Unknown
+   |
+
+```
+
+```
+info: revealed-type
+  --> /src/mdtest_snippet.py:30:9
+   |
+28 |     for x in Iterable2():
+29 |         # TODO: `int` would probably be better here:
+30 |         reveal_type(x)  # revealed: int | Unknown
+   |         ^^^^^^^^^^^^^^ Revealed type is `int | Unknown`
+   |
+
+```

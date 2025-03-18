@@ -13,7 +13,7 @@ license.workspace = true
 
 [dependencies]
 ruff_cache = { workspace = true }
-ruff_db = { workspace = true, features = ["os", "cache", "serde"] }
+ruff_db = { workspace = true, features = ["cache", "serde"] }
 ruff_macros = { workspace = true }
 ruff_python_ast = { workspace = true, features = ["serde"] }
 ruff_text_size = { workspace = true }
@@ -24,10 +24,11 @@ anyhow = { workspace = true }
 crossbeam = { workspace = true }
 glob = { workspace = true }
 notify = { workspace = true }
-pep440_rs = { workspace = true }
+pep440_rs = { workspace = true, features = ["version-ranges"] }
 rayon = { workspace = true }
 rustc-hash = { workspace = true }
 salsa = { workspace = true }
+schemars = { workspace = true, optional = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
 toml = { workspace = true }
@@ -40,8 +41,9 @@ insta = { workspace = true, features = ["redactions", "ron"] }
 
 [features]
 default = ["zstd"]
-zstd = ["red_knot_vendored/zstd"]
 deflate = ["red_knot_vendored/deflate"]
+schemars = ["dep:schemars", "ruff_db/schemars", "red_knot_python_semantic/schemars"]
+zstd = ["red_knot_vendored/zstd"]
 
 [lints]
 workspace = true

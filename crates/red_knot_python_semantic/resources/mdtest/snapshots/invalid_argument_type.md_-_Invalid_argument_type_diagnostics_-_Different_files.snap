@@ -1,0 +1,46 @@
+---
+source: crates/red_knot_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: invalid_argument_type.md - Invalid argument type diagnostics - Different files
+mdtest path: crates/red_knot_python_semantic/resources/mdtest/diagnostics/invalid_argument_type.md
+---
+
+# Python source files
+
+## package.py
+
+```
+1 | def foo(x: int) -> int:
+2 |     return x * x
+```
+
+## mdtest_snippet.py
+
+```
+1 | import package
+2 | 
+3 | package.foo("hello")  # error: [invalid-argument-type]
+```
+
+# Diagnostics
+
+```
+error: lint:invalid-argument-type
+ --> /src/mdtest_snippet.py:3:13
+  |
+1 | import package
+2 |
+3 | package.foo("hello")  # error: [invalid-argument-type]
+  |             ^^^^^^^ Object of type `Literal["hello"]` cannot be assigned to parameter 1 (`x`) of function `foo`; expected type `int`
+  |
+info
+ --> /src/package.py:1:9
+  |
+1 | def foo(x: int) -> int:
+  |         ------ parameter declared in function definition here
+2 |     return x * x
+  |
+
+```

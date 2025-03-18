@@ -1,0 +1,59 @@
+---
+source: crates/red_knot_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: for.md - For loops - Possibly unbound `__iter__` and possibly unbound `__getitem__`
+mdtest path: crates/red_knot_python_semantic/resources/mdtest/loops/for.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing_extensions import reveal_type
+ 2 | 
+ 3 | class Iterator:
+ 4 |     def __next__(self) -> int:
+ 5 |         return 42
+ 6 | 
+ 7 | def _(flag1: bool, flag2: bool):
+ 8 |     class Iterable:
+ 9 |         if flag1:
+10 |             def __iter__(self) -> Iterator:
+11 |                 return Iterator()
+12 |         if flag2:
+13 |             def __getitem__(self, key: int) -> bytes:
+14 |                 return bytes()
+15 | 
+16 |     # error: [not-iterable]
+17 |     for x in Iterable():
+18 |         reveal_type(x)  # revealed: int | bytes
+```
+
+# Diagnostics
+
+```
+error: lint:not-iterable
+  --> /src/mdtest_snippet.py:17:14
+   |
+16 |     # error: [not-iterable]
+17 |     for x in Iterable():
+   |              ^^^^^^^^^^ Object of type `Iterable` may not be iterable because it may not have an `__iter__` method or a `__getitem__` method
+18 |         reveal_type(x)  # revealed: int | bytes
+   |
+
+```
+
+```
+info: revealed-type
+  --> /src/mdtest_snippet.py:18:9
+   |
+16 |     # error: [not-iterable]
+17 |     for x in Iterable():
+18 |         reveal_type(x)  # revealed: int | bytes
+   |         ^^^^^^^^^^^^^^ Revealed type is `int | bytes`
+   |
+
+```

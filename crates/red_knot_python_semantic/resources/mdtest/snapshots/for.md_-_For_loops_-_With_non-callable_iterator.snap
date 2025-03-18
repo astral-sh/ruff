@@ -1,0 +1,69 @@
+---
+source: crates/red_knot_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: for.md - For loops - With non-callable iterator
+mdtest path: crates/red_knot_python_semantic/resources/mdtest/loops/for.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing_extensions import reveal_type
+ 2 | 
+ 3 | def _(flag: bool):
+ 4 |     class NotIterable:
+ 5 |         if flag:
+ 6 |             __iter__: int = 1
+ 7 |         else:
+ 8 |             __iter__: None = None
+ 9 | 
+10 |     # error: [not-iterable]
+11 |     for x in NotIterable():
+12 |         pass
+13 | 
+14 |     # revealed: Unknown
+15 |     # error: [possibly-unresolved-reference]
+16 |     reveal_type(x)
+```
+
+# Diagnostics
+
+```
+error: lint:not-iterable
+  --> /src/mdtest_snippet.py:11:14
+   |
+10 |     # error: [not-iterable]
+11 |     for x in NotIterable():
+   |              ^^^^^^^^^^^^^ Object of type `NotIterable` is not iterable because its `__iter__` attribute has type `int | None`, which is not callable
+12 |         pass
+   |
+
+```
+
+```
+warning: lint:possibly-unresolved-reference
+  --> /src/mdtest_snippet.py:16:17
+   |
+14 |     # revealed: Unknown
+15 |     # error: [possibly-unresolved-reference]
+16 |     reveal_type(x)
+   |                 ^ Name `x` used when possibly not defined
+   |
+
+```
+
+```
+info: revealed-type
+  --> /src/mdtest_snippet.py:16:5
+   |
+14 |     # revealed: Unknown
+15 |     # error: [possibly-unresolved-reference]
+16 |     reveal_type(x)
+   |     ^^^^^^^^^^^^^^ Revealed type is `Unknown`
+   |
+
+```

@@ -84,7 +84,7 @@ impl AlwaysFixableViolation for QuotedAnnotation {
 }
 
 /// UP037
-pub(crate) fn quoted_annotation(checker: &mut Checker, annotation: &str, range: TextRange) {
+pub(crate) fn quoted_annotation(checker: &Checker, annotation: &str, range: TextRange) {
     let diagnostic = Diagnostic::new(QuotedAnnotation, range);
 
     let placeholder_range = TextRange::up_to(annotation.text_len());
@@ -108,7 +108,7 @@ pub(crate) fn quoted_annotation(checker: &mut Checker, annotation: &str, range: 
     let edit = Edit::range_replacement(new_content, range);
     let fix = Fix::safe_edit(edit);
 
-    checker.diagnostics.push(diagnostic.with_fix(fix));
+    checker.report_diagnostic(diagnostic.with_fix(fix));
 }
 
 fn in_parameter_annotation(offset: TextSize, semantic: &SemanticModel) -> bool {

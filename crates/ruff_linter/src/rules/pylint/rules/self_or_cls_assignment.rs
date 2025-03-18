@@ -10,6 +10,9 @@ use crate::checkers::ast::Checker;
 /// ## What it does
 /// Checks for assignment of `self` and `cls` in instance and class methods respectively.
 ///
+/// This check also applies to `__new__` even though this is technically
+/// a static method.
+///
 /// ## Why is this bad?
 /// The identifiers `self` and `cls` are conventional in Python for the first parameter of instance
 /// methods and class methods, respectively. Assigning new values to these variables can be
@@ -64,7 +67,7 @@ impl Violation for SelfOrClsAssignment {
 }
 
 /// PLW0127
-pub(crate) fn self_or_cls_assignment(checker: &mut Checker, target: &Expr) {
+pub(crate) fn self_or_cls_assignment(checker: &Checker, target: &Expr) {
     let ScopeKind::Function(ast::StmtFunctionDef {
         name,
         decorator_list,
@@ -102,18 +105,19 @@ pub(crate) fn self_or_cls_assignment(checker: &mut Checker, target: &Expr) {
     let method_type = match (function_type, self_or_cls.name().as_str()) {
         (FunctionType::Method { .. }, "self") => MethodType::Instance,
         (FunctionType::ClassMethod { .. }, "cls") => MethodType::Class,
+        (FunctionType::NewMethod, "cls") => MethodType::New,
         _ => return,
     };
 
     check_expr(checker, target, method_type);
 }
 
-fn check_expr(checker: &mut Checker, target: &Expr, method_type: MethodType) {
+fn check_expr(checker: &Checker, target: &Expr, method_type: MethodType) {
     match target {
         Expr::Name(_) => {
             if let Expr::Name(ast::ExprName { id, .. }) = target {
                 if id.as_str() == method_type.arg_name() {
-                    checker.diagnostics.push(Diagnostic::new(
+                    checker.report_diagnostic(Diagnostic::new(
                         SelfOrClsAssignment { method_type },
                         target.range(),
                     ));
@@ -134,6 +138,7 @@ fn check_expr(checker: &mut Checker, target: &Expr, method_type: MethodType) {
 enum MethodType {
     Instance,
     Class,
+    New,
 }
 
 impl MethodType {
@@ -141,6 +146,7 @@ impl MethodType {
         match self {
             MethodType::Instance => "self",
             MethodType::Class => "cls",
+            MethodType::New => "cls",
         }
     }
 }
@@ -150,6 +156,7 @@ impl std::fmt::Display for MethodType {
         match self {
             MethodType::Instance => f.write_str("instance"),
             MethodType::Class => f.write_str("class"),
+            MethodType::New => f.write_str("`__new__`"),
         }
     }
 }

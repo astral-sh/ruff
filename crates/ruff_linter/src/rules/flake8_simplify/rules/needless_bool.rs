@@ -14,7 +14,7 @@ use crate::fix::snippet::SourceCodeSnippet;
 ///
 /// ## Why is this bad?
 /// `if` statements that return `True` for a truthy condition and `False` for
-/// a falsey condition can be replaced with boolean casts.
+/// a falsy condition can be replaced with boolean casts.
 ///
 /// ## Example
 /// Given:
@@ -41,10 +41,6 @@ use crate::fix::snippet::SourceCodeSnippet;
 /// ```python
 /// return x > 0
 /// ```
-///
-/// ## Preview
-/// In preview, double negations such as `not a != b`, `not a not in b`, `not a is not b`
-/// will be simplified to `a == b`, `a in b` and `a is b`, respectively.
 ///
 /// ## References
 /// - [Python documentation: Truth Value Testing](https://docs.python.org/3/library/stdtypes.html#truth-value-testing)
@@ -82,7 +78,7 @@ impl Violation for NeedlessBool {
 }
 
 /// SIM103
-pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
+pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
     let Stmt::If(stmt_if) = stmt else { return };
     let ast::StmtIf {
         test: if_test,
@@ -222,16 +218,15 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
                     left,
                     comparators,
                     ..
-                }) if checker.settings.preview.is_enabled()
-                    && matches!(
-                        ops.as_ref(),
-                        [ast::CmpOp::Eq
-                            | ast::CmpOp::NotEq
-                            | ast::CmpOp::In
-                            | ast::CmpOp::NotIn
-                            | ast::CmpOp::Is
-                            | ast::CmpOp::IsNot]
-                    ) =>
+                }) if matches!(
+                    ops.as_ref(),
+                    [ast::CmpOp::Eq
+                        | ast::CmpOp::NotEq
+                        | ast::CmpOp::In
+                        | ast::CmpOp::NotIn
+                        | ast::CmpOp::Is
+                        | ast::CmpOp::IsNot]
+                ) =>
                 {
                     let ([op], [right]) = (ops.as_ref(), comparators.as_ref()) else {
                         unreachable!("Single comparison with multiple comparators");
@@ -306,7 +301,7 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
             range,
         )));
     }
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

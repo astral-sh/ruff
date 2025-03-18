@@ -59,7 +59,7 @@ impl AlwaysFixableViolation for UnnecessaryCastToInt {
 }
 
 /// RUF046
-pub(crate) fn unnecessary_cast_to_int(checker: &mut Checker, call: &ExprCall) {
+pub(crate) fn unnecessary_cast_to_int(checker: &Checker, call: &ExprCall) {
     let Some(argument) = single_argument_to_int_call(call, checker.semantic()) else {
         return;
     };
@@ -90,7 +90,7 @@ pub(crate) fn unnecessary_cast_to_int(checker: &mut Checker, call: &ExprCall) {
     );
     let diagnostic = Diagnostic::new(UnnecessaryCastToInt, call.range());
 
-    checker.diagnostics.push(diagnostic.with_fix(fix));
+    checker.report_diagnostic(diagnostic.with_fix(fix));
 }
 
 /// Creates a fix that replaces `int(expression)` with `expression`.
@@ -150,7 +150,7 @@ fn unwrap_int_expression(
 
 /// Returns `Some` if `call` in `int(call(...))` is a method that returns an `int`
 /// and `None` otherwise.
-fn call_applicability(checker: &mut Checker, inner_call: &ExprCall) -> Option<Applicability> {
+fn call_applicability(checker: &Checker, inner_call: &ExprCall) -> Option<Applicability> {
     let (func, arguments) = (&inner_call.func, &inner_call.arguments);
 
     let qualified_name = checker.semantic().resolve_qualified_name(func)?;

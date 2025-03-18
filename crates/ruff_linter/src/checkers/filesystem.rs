@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use ruff_diagnostics::Diagnostic;
+use ruff_python_ast::PythonVersion;
 use ruff_python_trivia::CommentRanges;
 
 use crate::package::PackageRoot;
@@ -17,6 +18,7 @@ pub(crate) fn check_file_path(
     locator: &Locator,
     comment_ranges: &CommentRanges,
     settings: &LinterSettings,
+    target_version: PythonVersion,
 ) -> Vec<Diagnostic> {
     let mut diagnostics: Vec<Diagnostic> = vec![];
 
@@ -46,12 +48,7 @@ pub(crate) fn check_file_path(
 
     // flake8-builtins
     if settings.rules.enabled(Rule::StdlibModuleShadowing) {
-        if let Some(diagnostic) = stdlib_module_shadowing(
-            path,
-            package,
-            &settings.flake8_builtins.builtins_allowed_modules,
-            settings.target_version,
-        ) {
+        if let Some(diagnostic) = stdlib_module_shadowing(path, settings, target_version) {
             diagnostics.push(diagnostic);
         }
     }

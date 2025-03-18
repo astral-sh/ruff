@@ -3,13 +3,13 @@ use itertools::Itertools;
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::Name;
-use ruff_python_ast::{
-    visitor::Visitor, Expr, ExprCall, ExprName, Keyword, StmtAnnAssign, StmtAssign,
-};
+use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::{Expr, ExprCall, ExprName, Keyword, StmtAnnAssign, StmtAssign, StmtRef};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
-use crate::settings::types::PythonVersion;
+use ruff_python_ast::PythonVersion;
 
 use super::{
     expr_name_to_type_var, DisplayTypeVars, TypeParamKind, TypeVar, TypeVarReferenceVisitor,
@@ -110,8 +110,8 @@ impl Violation for NonPEP695TypeAlias {
 }
 
 /// UP040
-pub(crate) fn non_pep695_type_alias_type(checker: &mut Checker, stmt: &StmtAssign) {
-    if checker.settings.target_version < PythonVersion::Py312 {
+pub(crate) fn non_pep695_type_alias_type(checker: &Checker, stmt: &StmtAssign) {
+    if checker.target_version() < PythonVersion::PY312 {
         return;
     }
 
@@ -170,32 +170,19 @@ pub(crate) fn non_pep695_type_alias_type(checker: &mut Checker, stmt: &StmtAssig
         return;
     };
 
-    // it would be easier to check for comments in the whole `stmt.range`, but because
-    // `create_diagnostic` uses the full source text of `value`, comments within `value` are
-    // actually preserved. thus, we have to check for comments in `stmt` but outside of `value`
-    let pre_value = TextRange::new(stmt.start(), value.start());
-    let post_value = TextRange::new(value.end(), stmt.end());
-    let comment_ranges = checker.comment_ranges();
-    let safety = if comment_ranges.intersects(pre_value) || comment_ranges.intersects(post_value) {
-        Applicability::Unsafe
-    } else {
-        Applicability::Safe
-    };
-
-    checker.diagnostics.push(create_diagnostic(
-        checker.source(),
-        stmt.range,
+    checker.report_diagnostic(create_diagnostic(
+        checker,
+        stmt.into(),
         &target_name.id,
         value,
         &vars,
-        safety,
         TypeAliasKind::TypeAliasType,
     ));
 }
 
 /// UP040
-pub(crate) fn non_pep695_type_alias(checker: &mut Checker, stmt: &StmtAnnAssign) {
-    if checker.settings.target_version < PythonVersion::Py312 {
+pub(crate) fn non_pep695_type_alias(checker: &Checker, stmt: &StmtAnnAssign) {
+    if checker.target_version() < PythonVersion::PY312 {
         return;
     }
 
@@ -242,45 +229,68 @@ pub(crate) fn non_pep695_type_alias(checker: &mut Checker, stmt: &StmtAnnAssign)
         return;
     }
 
-    checker.diagnostics.push(create_diagnostic(
-        checker.source(),
-        stmt.range(),
+    checker.report_diagnostic(create_diagnostic(
+        checker,
+        stmt.into(),
         name,
         value,
         &vars,
-        // The fix is only safe in a type stub because new-style aliases have different runtime behavior
-        // See https://github.com/astral-sh/ruff/issues/6434
-        if checker.source_type.is_stub() {
-            Applicability::Safe
-        } else {
-            Applicability::Unsafe
-        },
         TypeAliasKind::TypeAlias,
     ));
 }
 
 /// Generate a [`Diagnostic`] for a non-PEP 695 type alias or type alias type.
 fn create_diagnostic(
-    source: &str,
-    stmt_range: TextRange,
+    checker: &Checker,
+    stmt: StmtRef,
     name: &Name,
     value: &Expr,
     type_vars: &[TypeVar],
-    applicability: Applicability,
     type_alias_kind: TypeAliasKind,
 ) -> Diagnostic {
+    let source = checker.source();
+    let comment_ranges = checker.comment_ranges();
+
+    let range_with_parentheses =
+        parenthesized_range(value.into(), stmt.into(), comment_ranges, source)
+            .unwrap_or(value.range());
+
     let content = format!(
         "type {name}{type_params} = {value}",
         type_params = DisplayTypeVars { type_vars, source },
-        value = &source[value.range()]
+        value = &source[range_with_parentheses]
     );
-    let edit = Edit::range_replacement(content, stmt_range);
+    let edit = Edit::range_replacement(content, stmt.range());
+
+    let applicability =
+        if type_alias_kind == TypeAliasKind::TypeAlias && !checker.source_type.is_stub() {
+            // The fix is always unsafe in non-stubs
+            // because new-style aliases have different runtime behavior.
+            // See https://github.com/astral-sh/ruff/issues/6434
+            Applicability::Unsafe
+        } else {
+            // In stub files, or in non-stub files for `TypeAliasType` assignments,
+            // the fix is only unsafe if it would delete comments.
+            //
+            // it would be easier to check for comments in the whole `stmt.range`, but because
+            // `create_diagnostic` uses the full source text of `value`, comments within `value` are
+            // actually preserved. thus, we have to check for comments in `stmt` but outside of `value`
+            let pre_value = TextRange::new(stmt.start(), range_with_parentheses.start());
+            let post_value = TextRange::new(range_with_parentheses.end(), stmt.end());
+
+            if comment_ranges.intersects(pre_value) || comment_ranges.intersects(post_value) {
+                Applicability::Unsafe
+            } else {
+                Applicability::Safe
+            }
+        };
+
     Diagnostic::new(
         NonPEP695TypeAlias {
             name: name.to_string(),
             type_alias_kind,
         },
-        stmt_range,
+        stmt.range(),
     )
     .with_fix(Fix::applicable_edit(edit, applicability))
 }

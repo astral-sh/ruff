@@ -147,3 +147,17 @@ def _(flag: bool):
 
     reveal_type(y)  # revealed: Literal[0, 1]
 ```
+
+## Condition with object that implements `__bool__` incorrectly
+
+```py
+class NotBoolable:
+    __bool__: int = 3
+
+# error: [unsupported-bool-conversion] "Boolean conversion is unsupported for type `NotBoolable`; its `__bool__` method isn't callable"
+if NotBoolable():
+    ...
+# error: [unsupported-bool-conversion] "Boolean conversion is unsupported for type `NotBoolable`; its `__bool__` method isn't callable"
+elif NotBoolable():
+    ...
+```

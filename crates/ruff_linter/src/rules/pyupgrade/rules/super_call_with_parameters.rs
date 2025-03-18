@@ -58,7 +58,7 @@ impl AlwaysFixableViolation for SuperCallWithParameters {
 }
 
 /// UP008
-pub(crate) fn super_call_with_parameters(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn super_call_with_parameters(checker: &Checker, call: &ast::ExprCall) {
     // Only bother going through the super check at all if we're in a `super` call.
     // (We check this in `super_args` too, so this is just an optimization.)
     if !is_super_call_with_arguments(call) {
@@ -157,7 +157,7 @@ pub(crate) fn super_call_with_parameters(checker: &mut Checker, call: &ast::Expr
         call.arguments.start() + TextSize::new(1),
         call.arguments.end() - TextSize::new(1),
     )));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// Returns `true` if a call is an argumented `super` invocation.

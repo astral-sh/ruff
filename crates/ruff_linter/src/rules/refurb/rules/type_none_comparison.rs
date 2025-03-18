@@ -13,9 +13,6 @@ use crate::rules::refurb::helpers::replace_with_identity_check;
 /// There is only ever one instance of `None`, so it is more efficient and
 /// readable to use the `is` operator to check if an object is `None`.
 ///
-/// Only name expressions (e.g., `type(foo) == type(None)`) are reported.
-/// In [preview], the rule will also report other kinds of expressions.
-///
 /// ## Example
 /// ```python
 /// type(obj) is type(None)
@@ -34,8 +31,6 @@ use crate::rules::refurb::helpers::replace_with_identity_check;
 /// - [Python documentation: `None`](https://docs.python.org/3/library/constants.html#None)
 /// - [Python documentation: `type`](https://docs.python.org/3/library/functions.html#type)
 /// - [Python documentation: Identity comparisons](https://docs.python.org/3/reference/expressions.html#is-not)
-///
-/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 pub(crate) struct TypeNoneComparison {
     replacement: IdentityCheck,
@@ -56,7 +51,7 @@ impl AlwaysFixableViolation for TypeNoneComparison {
 }
 
 /// FURB169
-pub(crate) fn type_none_comparison(checker: &mut Checker, compare: &ast::ExprCompare) {
+pub(crate) fn type_none_comparison(checker: &Checker, compare: &ast::ExprCompare) {
     let ([op], [right]) = (&*compare.ops, &*compare.comparators) else {
         return;
     };
@@ -80,18 +75,12 @@ pub(crate) fn type_none_comparison(checker: &mut Checker, compare: &ast::ExprCom
         _ => return,
     };
 
-    if checker.settings.preview.is_disabled()
-        && !matches!(other_arg, Expr::Name(_) | Expr::NoneLiteral(_))
-    {
-        return;
-    }
-
     let diagnostic = Diagnostic::new(TypeNoneComparison { replacement }, compare.range);
 
     let negate = replacement == IdentityCheck::IsNot;
     let fix = replace_with_identity_check(other_arg, compare.range, negate, checker);
 
-    checker.diagnostics.push(diagnostic.with_fix(fix));
+    checker.report_diagnostic(diagnostic.with_fix(fix));
 }
 
 /// Returns the object passed to the function, if the expression is a call to

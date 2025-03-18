@@ -37,6 +37,31 @@ def noreturn(u1: int | NoReturn, u2: int | NoReturn | str) -> None:
     reveal_type(u2)  # revealed:  int | str
 ```
 
+## `object` subsumes everything
+
+Unions with `object` can be simplified to `object`:
+
+```py
+from typing_extensions import Never, Any
+
+def _(
+    u1: int | object,
+    u2: object | int,
+    u3: Any | object,
+    u4: object | Any,
+    u5: object | Never,
+    u6: Never | object,
+    u7: int | str | object | bytes | Any,
+) -> None:
+    reveal_type(u1)  # revealed: object
+    reveal_type(u2)  # revealed: object
+    reveal_type(u3)  # revealed: object
+    reveal_type(u4)  # revealed: object
+    reveal_type(u5)  # revealed: object
+    reveal_type(u6)  # revealed: object
+    reveal_type(u7)  # revealed: object
+```
+
 ## Flattening of nested unions
 
 ```py
@@ -45,11 +70,11 @@ from typing import Literal
 def _(
     u1: (int | str) | bytes,
     u2: int | (str | bytes),
-    u3: int | (str | (bytes | complex)),
+    u3: int | (str | (bytes | bytearray)),
 ) -> None:
     reveal_type(u1)  # revealed: int | str | bytes
     reveal_type(u2)  # revealed: int | str | bytes
-    reveal_type(u3)  # revealed: int | str | bytes | complex
+    reveal_type(u3)  # revealed: int | str | bytes | bytearray
 ```
 
 ## Simplification using subtyping
@@ -120,8 +145,8 @@ Simplifications still apply when `Unknown` is present.
 ```py
 from knot_extensions import Unknown
 
-def _(u1: str | Unknown | int | object):
-    reveal_type(u1)  # revealed: Unknown | object
+def _(u1: int | Unknown | bool) -> None:
+    reveal_type(u1)  # revealed: int | Unknown
 ```
 
 ## Union of intersections

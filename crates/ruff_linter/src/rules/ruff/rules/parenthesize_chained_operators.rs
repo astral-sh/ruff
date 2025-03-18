@@ -48,10 +48,7 @@ impl AlwaysFixableViolation for ParenthesizeChainedOperators {
 }
 
 /// RUF021
-pub(crate) fn parenthesize_chained_logical_operators(
-    checker: &mut Checker,
-    expr: &ast::ExprBoolOp,
-) {
+pub(crate) fn parenthesize_chained_logical_operators(checker: &Checker, expr: &ast::ExprBoolOp) {
     // We're only interested in `and` expressions inside `or` expressions:
     // - `a or b or c` => `BoolOp(values=[Name("a"), Name("b"), Name("c")], op=Or)`
     // - `a and b and c` => `BoolOp(values=[Name("a"), Name("b"), Name("c")], op=And)`
@@ -89,7 +86,7 @@ pub(crate) fn parenthesize_chained_logical_operators(
                 {
                     let new_source = format!("({})", locator.slice(source_range));
                     let edit = Edit::range_replacement(new_source, source_range);
-                    checker.diagnostics.push(
+                    checker.report_diagnostic(
                         Diagnostic::new(ParenthesizeChainedOperators, source_range)
                             .with_fix(Fix::safe_edit(edit)),
                     );

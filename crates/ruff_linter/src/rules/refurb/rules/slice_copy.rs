@@ -53,7 +53,7 @@ impl Violation for SliceCopy {
 }
 
 /// FURB145
-pub(crate) fn slice_copy(checker: &mut Checker, subscript: &ast::ExprSubscript) {
+pub(crate) fn slice_copy(checker: &Checker, subscript: &ast::ExprSubscript) {
     if subscript.ctx.is_store() || subscript.ctx.is_del() {
         return;
     }
@@ -68,7 +68,7 @@ pub(crate) fn slice_copy(checker: &mut Checker, subscript: &ast::ExprSubscript) 
         subscript.start(),
         subscript.end(),
     )));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// Matches `obj[:]` where `obj` is a list.

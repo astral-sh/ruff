@@ -12,7 +12,7 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
 
-use crate::settings::types::PythonVersion;
+use ruff_python_ast::PythonVersion;
 
 use super::super::typing::type_hint_explicitly_allows_none;
 
@@ -112,7 +112,7 @@ impl fmt::Display for ConversionType {
 
 impl From<PythonVersion> for ConversionType {
     fn from(target_version: PythonVersion) -> Self {
-        if target_version >= PythonVersion::Py310 {
+        if target_version >= PythonVersion::PY310 {
             Self::BinOpOr
         } else {
             Self::Optional
@@ -162,7 +162,7 @@ fn generate_fix(checker: &Checker, conversion_type: ConversionType, expr: &Expr)
 }
 
 /// RUF013
-pub(crate) fn implicit_optional(checker: &mut Checker, parameters: &Parameters) {
+pub(crate) fn implicit_optional(checker: &Checker, parameters: &Parameters) {
     for parameter in parameters.iter_non_variadic_params() {
         let Some(Expr::NoneLiteral(_)) = parameter.default() else {
             continue;
@@ -177,34 +177,32 @@ pub(crate) fn implicit_optional(checker: &mut Checker, parameters: &Parameters) 
                 let Some(expr) = type_hint_explicitly_allows_none(
                     parsed_annotation.expression(),
                     checker,
-                    checker.settings.target_version.minor(),
+                    checker.target_version(),
                 ) else {
                     continue;
                 };
-                let conversion_type = checker.settings.target_version.into();
+                let conversion_type = checker.target_version().into();
 
                 let mut diagnostic =
                     Diagnostic::new(ImplicitOptional { conversion_type }, expr.range());
                 if parsed_annotation.kind().is_simple() {
                     diagnostic.try_set_fix(|| generate_fix(checker, conversion_type, expr));
                 }
-                checker.diagnostics.push(diagnostic);
+                checker.report_diagnostic(diagnostic);
             }
         } else {
             // Unquoted annotation.
-            let Some(expr) = type_hint_explicitly_allows_none(
-                annotation,
-                checker,
-                checker.settings.target_version.minor(),
-            ) else {
+            let Some(expr) =
+                type_hint_explicitly_allows_none(annotation, checker, checker.target_version())
+            else {
                 continue;
             };
-            let conversion_type = checker.settings.target_version.into();
+            let conversion_type = checker.target_version().into();
 
             let mut diagnostic =
                 Diagnostic::new(ImplicitOptional { conversion_type }, expr.range());
             diagnostic.try_set_fix(|| generate_fix(checker, conversion_type, expr));
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 }

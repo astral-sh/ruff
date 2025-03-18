@@ -56,7 +56,7 @@ impl Violation for ImportOutsideTopLevel {
 }
 
 /// C0415
-pub(crate) fn import_outside_top_level(checker: &mut Checker, stmt: &Stmt) {
+pub(crate) fn import_outside_top_level(checker: &Checker, stmt: &Stmt) {
     if checker.semantic().current_scope().kind.is_module() {
         // "Top-level" imports are allowed
         return;
@@ -84,9 +84,7 @@ pub(crate) fn import_outside_top_level(checker: &mut Checker, stmt: &Stmt) {
     }
 
     // Emit the diagnostic
-    checker
-        .diagnostics
-        .push(Diagnostic::new(ImportOutsideTopLevel, stmt.range()));
+    checker.report_diagnostic(Diagnostic::new(ImportOutsideTopLevel, stmt.range()));
 }
 
 fn is_banned_module_level_import(policy: &NameMatchPolicy, checker: &Checker) -> bool {

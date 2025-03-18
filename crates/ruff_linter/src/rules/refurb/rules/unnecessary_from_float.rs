@@ -15,7 +15,7 @@ use crate::checkers::ast::Checker;
 /// the use of `from_float` and `from_decimal` methods is unnecessary, and
 /// should be avoided in favor of the more concise constructor syntax.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// Decimal.from_float(4.2)
 /// Decimal.from_float(float("inf"))
@@ -59,7 +59,7 @@ impl Violation for UnnecessaryFromFloat {
 }
 
 /// FURB164
-pub(crate) fn unnecessary_from_float(checker: &mut Checker, call: &ExprCall) {
+pub(crate) fn unnecessary_from_float(checker: &Checker, call: &ExprCall) {
     let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = &*call.func else {
         return;
     };
@@ -157,13 +157,13 @@ pub(crate) fn unnecessary_from_float(checker: &mut Checker, call: &ExprCall) {
             edit,
             [Edit::range_replacement(replacement, call.range())],
         ));
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
 
         return;
     }
 
     diagnostic.set_fix(Fix::safe_edit(edit));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

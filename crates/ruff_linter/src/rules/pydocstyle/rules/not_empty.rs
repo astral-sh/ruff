@@ -40,15 +40,13 @@ impl Violation for EmptyDocstring {
 }
 
 /// D419
-pub(crate) fn not_empty(checker: &mut Checker, docstring: &Docstring) -> bool {
+pub(crate) fn not_empty(checker: &Checker, docstring: &Docstring) -> bool {
     if !docstring.body().trim().is_empty() {
         return true;
     }
 
     if checker.enabled(Rule::EmptyDocstring) {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(EmptyDocstring, docstring.range()));
+        checker.report_diagnostic(Diagnostic::new(EmptyDocstring, docstring.range()));
     }
     false
 }

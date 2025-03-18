@@ -1,0 +1,51 @@
+---
+source: crates/red_knot_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: attribute_assignment.md - Attribute assignment - Possibly-unbound attributes
+mdtest path: crates/red_knot_python_semantic/resources/mdtest/diagnostics/attribute_assignment.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | def _(flag: bool) -> None:
+2 |     class C:
+3 |         if flag:
+4 |             attr: int = 0
+5 | 
+6 |     C.attr = 1  # error: [possibly-unbound-attribute]
+7 | 
+8 |     instance = C()
+9 |     instance.attr = 1  # error: [possibly-unbound-attribute]
+```
+
+# Diagnostics
+
+```
+warning: lint:possibly-unbound-attribute
+ --> /src/mdtest_snippet.py:6:5
+  |
+4 |             attr: int = 0
+5 |
+6 |     C.attr = 1  # error: [possibly-unbound-attribute]
+  |     ^^^^^^ Attribute `attr` on type `Literal[C]` is possibly unbound
+7 |
+8 |     instance = C()
+  |
+
+```
+
+```
+warning: lint:possibly-unbound-attribute
+ --> /src/mdtest_snippet.py:9:5
+  |
+8 |     instance = C()
+9 |     instance.attr = 1  # error: [possibly-unbound-attribute]
+  |     ^^^^^^^^^^^^^ Attribute `attr` on type `C` is possibly unbound
+  |
+
+```

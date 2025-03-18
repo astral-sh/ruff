@@ -16,7 +16,7 @@ use ruff_text_size::Ranged;
 /// if the given suffix is not prefixed with a dot
 /// or it is a single dot `"."`.
 ///
-/// ## Examples
+/// ## Example
 ///
 /// ```python
 /// path.with_suffix("py")
@@ -78,7 +78,7 @@ impl Violation for InvalidPathlibWithSuffix {
 }
 
 /// PTH210
-pub(crate) fn invalid_pathlib_with_suffix(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn invalid_pathlib_with_suffix(checker: &Checker, call: &ast::ExprCall) {
     let (func, arguments) = (&call.func, &call.arguments);
 
     if !is_path_with_suffix_call(checker.semantic(), func) {
@@ -117,7 +117,7 @@ pub(crate) fn invalid_pathlib_with_suffix(checker: &mut Checker, call: &ast::Exp
         )));
     }
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 fn is_path_with_suffix_call(semantic: &SemanticModel, func: &ast::Expr) -> bool {

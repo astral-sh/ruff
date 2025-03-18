@@ -30,14 +30,14 @@ jobs:
     # Don't run the cron job on forks:
     if: ${{ github.repository == 'astral-sh/ruff' || github.event_name != 'schedule' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
         with:
           persist-credentials: false
       - name: "Install Rust toolchain"
         run: rustup show
       - name: "Install mold"
         uses: rui314/setup-mold@v1
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@f0deed1e0edfc6a9be95417288c0e1099b1eeec3 # v2
       - name: Build Red Knot
         # A release build takes longer (2 min vs 1 min), but the property tests run much faster in release
         # mode (1.5 min vs 14 min), so the overall time is shorter with a release build.
@@ -47,6 +47,7 @@ jobs:
         run: |
           export QUICKCHECK_TESTS=100000
           for _ in {1..5}; do
+            cargo test --locked --release --package red_knot_python_semantic -- --ignored list::property_tests
             cargo test --locked --release --package red_knot_python_semantic -- --ignored types::property_tests::stable
           done
 
@@ -58,7 +59,7 @@ jobs:
     permissions:
       issues: write
     steps:
-      - uses: actions/github-script@v7
+      - uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |

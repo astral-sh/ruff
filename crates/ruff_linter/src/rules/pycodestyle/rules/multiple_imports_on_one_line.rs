@@ -47,7 +47,7 @@ impl Violation for MultipleImportsOnOneLine {
 }
 
 /// E401
-pub(crate) fn multiple_imports_on_one_line(checker: &mut Checker, stmt: &Stmt, names: &[Alias]) {
+pub(crate) fn multiple_imports_on_one_line(checker: &Checker, stmt: &Stmt, names: &[Alias]) {
     if names.len() > 1 {
         let mut diagnostic = Diagnostic::new(MultipleImportsOnOneLine, stmt.range());
         diagnostic.set_fix(split_imports(
@@ -57,7 +57,7 @@ pub(crate) fn multiple_imports_on_one_line(checker: &mut Checker, stmt: &Stmt, n
             checker.indexer(),
             checker.stylist(),
         ));
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }
 

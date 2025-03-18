@@ -16,8 +16,10 @@ reveal_type(cast(int | str, 1))  # revealed: int | str
 # error: [invalid-type-form]
 reveal_type(cast(Literal, True))  # revealed: Unknown
 
+# error: [invalid-type-form]
+reveal_type(cast(1, True))  # revealed: Unknown
+
 # TODO: These should be errors
-cast(1)
 cast(str)
 cast(str, b"ar", "foo")
 

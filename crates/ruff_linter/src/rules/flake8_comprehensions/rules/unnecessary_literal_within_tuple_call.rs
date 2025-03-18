@@ -27,7 +27,7 @@ use super::helpers;
 /// calls. If a list comprehension is found, it should be rewritten as a
 /// generator expression.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// tuple([1, 2])
 /// tuple((1, 2))
@@ -82,7 +82,7 @@ impl AlwaysFixableViolation for UnnecessaryLiteralWithinTupleCall {
 
 /// C409
 pub(crate) fn unnecessary_literal_within_tuple_call(
-    checker: &mut Checker,
+    checker: &Checker,
     expr: &Expr,
     call: &ast::ExprCall,
 ) {
@@ -165,7 +165,7 @@ pub(crate) fn unnecessary_literal_within_tuple_call(
         _ => return,
     }
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 #[derive(Debug, PartialEq, Eq)]

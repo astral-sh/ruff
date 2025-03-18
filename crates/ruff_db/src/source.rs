@@ -159,7 +159,7 @@ pub enum SourceTextError {
 /// Computes the [`LineIndex`] for `file`.
 #[salsa::tracked]
 pub fn line_index(db: &dyn Db, file: File) -> LineIndex {
-    let _span = tracing::trace_span!("line_index", file = ?file).entered();
+    let _span = tracing::trace_span!("line_index", ?file).entered();
 
     let source = source_text(db, file);
 
@@ -176,7 +176,7 @@ mod tests {
 
     use crate::files::system_path_to_file;
     use crate::source::{line_index, source_text};
-    use crate::system::{DbWithTestSystem, SystemPath};
+    use crate::system::{DbWithWritableSystem as _, SystemPath};
     use crate::tests::TestDb;
 
     #[test]
@@ -184,13 +184,13 @@ mod tests {
         let mut db = TestDb::new();
         let path = SystemPath::new("test.py");
 
-        db.write_file(path, "x = 10".to_string())?;
+        db.write_file(path, "x = 10")?;
 
         let file = system_path_to_file(&db, path).unwrap();
 
         assert_eq!(source_text(&db, file).as_str(), "x = 10");
 
-        db.write_file(path, "x = 20".to_string()).unwrap();
+        db.write_file(path, "x = 20").unwrap();
 
         assert_eq!(source_text(&db, file).as_str(), "x = 20");
 
@@ -202,7 +202,7 @@ mod tests {
         let mut db = TestDb::new();
         let path = SystemPath::new("test.py");
 
-        db.write_file(path, "x = 10".to_string())?;
+        db.write_file(path, "x = 10")?;
 
         let file = system_path_to_file(&db, path).unwrap();
 
@@ -228,7 +228,7 @@ mod tests {
         let mut db = TestDb::new();
         let path = SystemPath::new("test.py");
 
-        db.write_file(path, "x = 10\ny = 20".to_string())?;
+        db.write_file(path, "x = 10\ny = 20")?;
 
         let file = system_path_to_file(&db, path).unwrap();
         let index = line_index(&db, file);

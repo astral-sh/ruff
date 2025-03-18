@@ -1,7 +1,7 @@
 use crate::logging::Verbosity;
 use crate::python_version::PythonVersion;
 use clap::{ArgAction, ArgMatches, Error, Parser};
-use red_knot_project::metadata::options::{EnvironmentOptions, Options};
+use red_knot_project::metadata::options::{EnvironmentOptions, Options, TerminalOptions};
 use red_knot_project::metadata::value::{RangedValue, RelativePathBuf};
 use red_knot_python_semantic::lint;
 use ruff_db::system::SystemPathBuf;
@@ -32,6 +32,13 @@ pub(crate) enum Command {
 
 #[derive(Debug, Parser)]
 pub(crate) struct CheckCommand {
+    /// List of files or directories to check.
+    #[clap(
+        help = "List of files or directories to check [default: the project root]",
+        value_name = "PATH"
+    )]
+    pub paths: Vec<SystemPathBuf>,
+
     /// Run the command within the given project directory.
     ///
     /// All `pyproject.toml` files will be discovered by walking up the directory tree from the given project directory,
@@ -41,12 +48,14 @@ pub(crate) struct CheckCommand {
     #[arg(long, value_name = "PROJECT")]
     pub(crate) project: Option<SystemPathBuf>,
 
-    /// Path to the virtual environment the project uses.
+    /// Path to the Python installation from which Red Knot resolves type information and third-party dependencies.
     ///
-    /// If provided, red-knot will use the `site-packages` directory of this virtual environment
-    /// to resolve type information for the project's third-party dependencies.
+    /// Red Knot will search in the path's `site-packages` directories for type information and
+    /// third-party imports.
+    ///
+    /// This option is commonly used to specify the path to a virtual environment.
     #[arg(long, value_name = "PATH")]
-    pub(crate) venv_path: Option<SystemPathBuf>,
+    pub(crate) python: Option<SystemPathBuf>,
 
     /// Custom directory to use for stdlib typeshed stubs.
     #[arg(long, value_name = "PATH", alias = "custom-typeshed-dir")]
@@ -66,15 +75,23 @@ pub(crate) struct CheckCommand {
     #[clap(flatten)]
     pub(crate) rules: RulesArg,
 
+    /// The format to use for printing diagnostic messages.
+    #[arg(long)]
+    pub(crate) output_format: Option<OutputFormat>,
+
+    /// Control when colored output is used.
+    #[arg(long, value_name = "WHEN")]
+    pub(crate) color: Option<TerminalColor>,
+
     /// Use exit code 1 if there are any warning-level diagnostics.
-    #[arg(long, conflicts_with = "exit_zero")]
-    pub(crate) error_on_warning: bool,
+    #[arg(long, conflicts_with = "exit_zero", default_missing_value = "true", num_args=0..1)]
+    pub(crate) error_on_warning: Option<bool>,
 
     /// Always use exit code 0, even when there are error-level diagnostics.
     #[arg(long)]
     pub(crate) exit_zero: bool,
 
-    /// Run in watch mode by re-running whenever files change.
+    /// Watch files for changes and recheck files related to the changed files.
     #[arg(long, short = 'W')]
     pub(crate) watch: bool,
 }
@@ -97,7 +114,7 @@ impl CheckCommand {
                 python_version: self
                     .python_version
                     .map(|version| RangedValue::cli(version.into())),
-                venv_path: self.venv_path.map(RelativePathBuf::cli),
+                python: self.python.map(RelativePathBuf::cli),
                 typeshed: self.typeshed.map(RelativePathBuf::cli),
                 extra_paths: self.extra_search_path.map(|extra_search_paths| {
                     extra_search_paths
@@ -106,6 +123,12 @@ impl CheckCommand {
                         .collect()
                 }),
                 ..EnvironmentOptions::default()
+            }),
+            terminal: Some(TerminalOptions {
+                output_format: self
+                    .output_format
+                    .map(|output_format| RangedValue::cli(output_format.into())),
+                error_on_warning: self.error_on_warning,
             }),
             rules,
             ..Default::default()
@@ -198,4 +221,47 @@ impl clap::Args for RulesArg {
     fn augment_args_for_update(cmd: clap::Command) -> clap::Command {
         Self::augment_args(cmd)
     }
+}
+
+/// The diagnostic output format.
+#[derive(Copy, Clone, Hash, Debug, PartialEq, Eq, PartialOrd, Ord, Default, clap::ValueEnum)]
+pub enum OutputFormat {
+    /// Print diagnostics verbosely, with context and helpful hints.
+    ///
+    /// Diagnostic messages may include additional context and
+    /// annotations on the input to help understand the message.
+    #[default]
+    #[value(name = "full")]
+    Full,
+    /// Print diagnostics concisely, one per line.
+    ///
+    /// This will guarantee that each diagnostic is printed on
+    /// a single line. Only the most important or primary aspects
+    /// of the diagnostic are included. Contextual information is
+    /// dropped.
+    #[value(name = "concise")]
+    Concise,
+}
+
+impl From<OutputFormat> for ruff_db::diagnostic::DiagnosticFormat {
+    fn from(format: OutputFormat) -> ruff_db::diagnostic::DiagnosticFormat {
+        match format {
+            OutputFormat::Full => Self::Full,
+            OutputFormat::Concise => Self::Concise,
+        }
+    }
+}
+
+/// Control when colored output is used.
+#[derive(Copy, Clone, Hash, Debug, PartialEq, Eq, PartialOrd, Ord, Default, clap::ValueEnum)]
+pub(crate) enum TerminalColor {
+    /// Display colors if the output goes to an interactive terminal.
+    #[default]
+    Auto,
+
+    /// Always display colors.
+    Always,
+
+    /// Never display colors.
+    Never,
 }

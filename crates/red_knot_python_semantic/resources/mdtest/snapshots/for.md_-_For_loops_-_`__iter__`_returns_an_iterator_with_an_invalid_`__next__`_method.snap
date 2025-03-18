@@ -1,0 +1,91 @@
+---
+source: crates/red_knot_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: for.md - For loops - `__iter__` returns an iterator with an invalid `__next__` method
+mdtest path: crates/red_knot_python_semantic/resources/mdtest/loops/for.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing_extensions import reveal_type
+ 2 | 
+ 3 | class Iterator1:
+ 4 |     def __next__(self, extra_arg) -> int:
+ 5 |         return 42
+ 6 | 
+ 7 | class Iterator2:
+ 8 |     __next__: None = None
+ 9 | 
+10 | class Iterable1:
+11 |     def __iter__(self) -> Iterator1:
+12 |         return Iterator1()
+13 | 
+14 | class Iterable2:
+15 |     def __iter__(self) -> Iterator2:
+16 |         return Iterator2()
+17 | 
+18 | # error: [not-iterable]
+19 | for x in Iterable1():
+20 |     reveal_type(x)  # revealed: int
+21 | 
+22 | # error: [not-iterable]
+23 | for y in Iterable2():
+24 |     reveal_type(y)  # revealed: Unknown
+```
+
+# Diagnostics
+
+```
+error: lint:not-iterable
+  --> /src/mdtest_snippet.py:19:10
+   |
+18 | # error: [not-iterable]
+19 | for x in Iterable1():
+   |          ^^^^^^^^^^^ Object of type `Iterable1` is not iterable because its `__iter__` method returns an object of type `Iterator1`, which has an invalid `__next__` method (expected `def __next__(self): ...`)
+20 |     reveal_type(x)  # revealed: int
+   |
+
+```
+
+```
+info: revealed-type
+  --> /src/mdtest_snippet.py:20:5
+   |
+18 | # error: [not-iterable]
+19 | for x in Iterable1():
+20 |     reveal_type(x)  # revealed: int
+   |     ^^^^^^^^^^^^^^ Revealed type is `int`
+21 |
+22 | # error: [not-iterable]
+   |
+
+```
+
+```
+error: lint:not-iterable
+  --> /src/mdtest_snippet.py:23:10
+   |
+22 | # error: [not-iterable]
+23 | for y in Iterable2():
+   |          ^^^^^^^^^^^ Object of type `Iterable2` is not iterable because its `__iter__` method returns an object of type `Iterator2`, which has a `__next__` attribute that is not callable
+24 |     reveal_type(y)  # revealed: Unknown
+   |
+
+```
+
+```
+info: revealed-type
+  --> /src/mdtest_snippet.py:24:5
+   |
+22 | # error: [not-iterable]
+23 | for y in Iterable2():
+24 |     reveal_type(y)  # revealed: Unknown
+   |     ^^^^^^^^^^^^^^ Revealed type is `Unknown`
+   |
+
+```

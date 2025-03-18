@@ -120,7 +120,7 @@ fn type_pattern(elts: Vec<&Expr>) -> Expr {
 
 /// B014
 fn duplicate_handler_exceptions<'a>(
-    checker: &mut Checker,
+    checker: &Checker,
     expr: &'a Expr,
     elts: &'a [Expr],
 ) -> FxHashMap<UnqualifiedName<'a>, &'a Expr> {
@@ -167,7 +167,7 @@ fn duplicate_handler_exceptions<'a>(
                 },
                 expr.range(),
             )));
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 
@@ -175,7 +175,7 @@ fn duplicate_handler_exceptions<'a>(
 }
 
 /// B025
-pub(crate) fn duplicate_exceptions(checker: &mut Checker, handlers: &[ExceptHandler]) {
+pub(crate) fn duplicate_exceptions(checker: &Checker, handlers: &[ExceptHandler]) {
     let mut seen: FxHashSet<UnqualifiedName> = FxHashSet::default();
     let mut duplicates: FxHashMap<UnqualifiedName, Vec<&Expr>> = FxHashMap::default();
     for handler in handlers {
@@ -217,7 +217,7 @@ pub(crate) fn duplicate_exceptions(checker: &mut Checker, handlers: &[ExceptHand
                     .current_statement()
                     .as_try_stmt()
                     .is_some_and(|try_stmt| try_stmt.is_star);
-                checker.diagnostics.push(Diagnostic::new(
+                checker.report_diagnostic(Diagnostic::new(
                     DuplicateTryBlockException {
                         name: name.segments().join("."),
                         is_star,

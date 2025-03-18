@@ -8,7 +8,9 @@ types, we can infer that the result for the intersection type is also true/false
 ```py
 from typing import Literal
 
-class Base: ...
+class Base:
+    def __gt__(self, other) -> bool:
+        return False
 
 class Child1(Base):
     def __eq__(self, other) -> Literal[True]:
@@ -108,7 +110,8 @@ given operator:
 
 ```py
 class Container:
-    def __contains__(self, x) -> bool: ...
+    def __contains__(self, x) -> bool:
+        return False
 
 class NonContainer: ...
 
@@ -128,7 +131,8 @@ unsupported for the given operator:
 
 ```py
 class Container:
-    def __contains__(self, x) -> bool: ...
+    def __contains__(self, x) -> bool:
+        return False
 
 class NonContainer: ...
 

@@ -144,12 +144,7 @@ fn is_exception_check(stmt: &Stmt) -> bool {
 }
 
 /// SIM201
-pub(crate) fn negation_with_equal_op(
-    checker: &mut Checker,
-    expr: &Expr,
-    op: UnaryOp,
-    operand: &Expr,
-) {
+pub(crate) fn negation_with_equal_op(checker: &Checker, expr: &Expr, op: UnaryOp, operand: &Expr) {
     if !matches!(op, UnaryOp::Not) {
         return;
     }
@@ -195,12 +190,12 @@ pub(crate) fn negation_with_equal_op(
         checker.generator().expr(&node.into()),
         expr.range(),
     )));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// SIM202
 pub(crate) fn negation_with_not_equal_op(
-    checker: &mut Checker,
+    checker: &Checker,
     expr: &Expr,
     op: UnaryOp,
     operand: &Expr,
@@ -250,11 +245,11 @@ pub(crate) fn negation_with_not_equal_op(
         checker.generator().expr(&node.into()),
         expr.range(),
     )));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// SIM208
-pub(crate) fn double_negation(checker: &mut Checker, expr: &Expr, op: UnaryOp, operand: &Expr) {
+pub(crate) fn double_negation(checker: &Checker, expr: &Expr, op: UnaryOp, operand: &Expr) {
     if !matches!(op, UnaryOp::Not) {
         return;
     }
@@ -301,5 +296,5 @@ pub(crate) fn double_negation(checker: &mut Checker, expr: &Expr, op: UnaryOp, o
             expr.range(),
         )));
     };
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

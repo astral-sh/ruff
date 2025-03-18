@@ -65,7 +65,7 @@ impl AlwaysFixableViolation for ListReverseCopy {
 }
 
 /// FURB187
-pub(crate) fn list_assign_reversed(checker: &mut Checker, assign: &StmtAssign) {
+pub(crate) fn list_assign_reversed(checker: &Checker, assign: &StmtAssign) {
     let [Expr::Name(target_expr)] = assign.targets.as_slice() else {
         return;
     };
@@ -89,7 +89,7 @@ pub(crate) fn list_assign_reversed(checker: &mut Checker, assign: &StmtAssign) {
         return;
     }
 
-    checker.diagnostics.push(
+    checker.report_diagnostic(
         Diagnostic::new(
             ListReverseCopy {
                 name: target_expr.id.to_string(),
@@ -119,7 +119,7 @@ fn peel_lists(expr: &Expr) -> &Expr {
         return expr;
     }
 
-    if !func.as_name_expr().is_some_and(|name| name.id == "list") {
+    if func.as_name_expr().is_none_or(|name| name.id != "list") {
         return expr;
     }
 
@@ -175,11 +175,11 @@ fn extract_name_from_sliced_reversed(expr: &Expr) -> Option<&ExprName> {
     else {
         return None;
     };
-    if !operand
+    if operand
         .as_number_literal_expr()
         .and_then(|num| num.value.as_int())
         .and_then(Int::as_u8)
-        .is_some_and(|value| value == 1)
+        .is_none_or(|value| value != 1)
     {
         return None;
     };

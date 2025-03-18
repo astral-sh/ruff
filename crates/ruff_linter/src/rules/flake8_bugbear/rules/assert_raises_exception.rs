@@ -57,7 +57,7 @@ impl fmt::Display for ExceptionKind {
 }
 
 /// B017
-pub(crate) fn assert_raises_exception(checker: &mut Checker, items: &[WithItem]) {
+pub(crate) fn assert_raises_exception(checker: &Checker, items: &[WithItem]) {
     for item in items {
         let Expr::Call(ast::ExprCall {
             func,
@@ -99,7 +99,7 @@ pub(crate) fn assert_raises_exception(checker: &mut Checker, items: &[WithItem])
             continue;
         };
 
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             AssertRaisesException { exception },
             item.range(),
         ));

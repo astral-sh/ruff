@@ -63,7 +63,7 @@ impl Violation for CallDatetimeWithoutTzinfo {
     }
 }
 
-pub(crate) fn call_datetime_without_tzinfo(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn call_datetime_without_tzinfo(checker: &Checker, call: &ast::ExprCall) {
     if !checker.semantic().seen_module(Modules::DATETIME) {
         return;
     }
@@ -76,7 +76,7 @@ pub(crate) fn call_datetime_without_tzinfo(checker: &mut Checker, call: &ast::Ex
         return;
     }
 
-    if helpers::parent_expr_is_astimezone(checker) {
+    if helpers::followed_by_astimezone(checker) {
         return;
     }
 
@@ -86,7 +86,7 @@ pub(crate) fn call_datetime_without_tzinfo(checker: &mut Checker, call: &ast::Ex
         None => DatetimeModuleAntipattern::NoTzArgumentPassed,
     };
 
-    checker.diagnostics.push(Diagnostic::new(
+    checker.report_diagnostic(Diagnostic::new(
         CallDatetimeWithoutTzinfo(antipattern),
         call.range,
     ));

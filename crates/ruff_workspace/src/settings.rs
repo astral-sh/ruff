@@ -4,11 +4,12 @@ use ruff_formatter::{FormatOptions, IndentStyle, IndentWidth, LineWidth};
 use ruff_graph::AnalyzeSettings;
 use ruff_linter::display_settings;
 use ruff_linter::settings::types::{
-    ExtensionMapping, FilePattern, FilePatternSet, OutputFormat, UnsafeFixes,
+    CompiledPerFileTargetVersionList, ExtensionMapping, FilePattern, FilePatternSet, OutputFormat,
+    UnsafeFixes,
 };
 use ruff_linter::settings::LinterSettings;
 use ruff_macros::CacheKey;
-use ruff_python_ast::PySourceType;
+use ruff_python_ast::{PySourceType, PythonVersion};
 use ruff_python_formatter::{
     DocstringCode, DocstringCodeLineWidth, MagicTrailingComma, PreviewMode, PyFormatOptions,
     QuoteStyle,
@@ -164,7 +165,17 @@ pub struct FormatterSettings {
     pub exclude: FilePatternSet,
     pub extension: ExtensionMapping,
     pub preview: PreviewMode,
-    pub target_version: ruff_python_formatter::PythonVersion,
+    /// The non-path-resolved Python version specified by the `target-version` input option.
+    ///
+    /// See [`FormatterSettings::resolve_target_version`] for a way to obtain the Python version for
+    /// a given file, while respecting the overrides in `per_file_target_version`.
+    pub unresolved_target_version: PythonVersion,
+    /// Path-specific overrides to `unresolved_target_version`.
+    ///
+    /// See [`FormatterSettings::resolve_target_version`] for a way to check a given [`Path`]
+    /// against these patterns, while falling back to `unresolved_target_version` if none of them
+    /// match.
+    pub per_file_target_version: CompiledPerFileTargetVersionList,
 
     pub line_width: LineWidth,
 
@@ -182,7 +193,16 @@ pub struct FormatterSettings {
 }
 
 impl FormatterSettings {
-    pub fn to_format_options(&self, source_type: PySourceType, source: &str) -> PyFormatOptions {
+    pub fn to_format_options(
+        &self,
+        source_type: PySourceType,
+        source: &str,
+        path: Option<&Path>,
+    ) -> PyFormatOptions {
+        let target_version = path
+            .map(|path| self.resolve_target_version(path))
+            .unwrap_or(self.unresolved_target_version);
+
         let line_ending = match self.line_ending {
             LineEnding::Lf => ruff_formatter::printer::LineEnding::LineFeed,
             LineEnding::CrLf => ruff_formatter::printer::LineEnding::CarriageReturnLineFeed,
@@ -205,7 +225,7 @@ impl FormatterSettings {
         };
 
         PyFormatOptions::from_source_type(source_type)
-            .with_target_version(self.target_version)
+            .with_target_version(target_version)
             .with_indent_style(self.indent_style)
             .with_indent_width(self.indent_width)
             .with_quote_style(self.quote_style)
@@ -216,6 +236,17 @@ impl FormatterSettings {
             .with_docstring_code(self.docstring_code_format)
             .with_docstring_code_line_width(self.docstring_code_line_width)
     }
+
+    /// Resolve the [`PythonVersion`] to use for formatting.
+    ///
+    /// This method respects the per-file version overrides in
+    /// [`FormatterSettings::per_file_target_version`] and falls back on
+    /// [`FormatterSettings::unresolved_target_version`] if none of the override patterns match.
+    pub fn resolve_target_version(&self, path: &Path) -> PythonVersion {
+        self.per_file_target_version
+            .is_match(path)
+            .unwrap_or(self.unresolved_target_version)
+    }
 }
 
 impl Default for FormatterSettings {
@@ -225,7 +256,8 @@ impl Default for FormatterSettings {
         Self {
             exclude: FilePatternSet::default(),
             extension: ExtensionMapping::default(),
-            target_version: default_options.target_version(),
+            unresolved_target_version: default_options.target_version(),
+            per_file_target_version: CompiledPerFileTargetVersionList::default(),
             preview: PreviewMode::Disabled,
             line_width: default_options.line_width(),
             line_ending: LineEnding::Auto,
@@ -247,7 +279,8 @@ impl fmt::Display for FormatterSettings {
             namespace = "formatter",
             fields = [
                 self.exclude,
-                self.target_version | debug,
+                self.unresolved_target_version,
+                self.per_file_target_version,
                 self.preview,
                 self.line_width,
                 self.line_ending,

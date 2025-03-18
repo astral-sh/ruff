@@ -72,7 +72,7 @@ impl AlwaysFixableViolation for UnspecifiedEncoding {
 }
 
 /// PLW1514
-pub(crate) fn unspecified_encoding(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn unspecified_encoding(checker: &Checker, call: &ast::ExprCall) {
     let Some((function_name, mode)) = Callee::try_from_call_expression(call, checker.semantic())
         .filter(|segments| is_violation(call, segments))
         .map(|segments| (segments.to_string(), segments.mode_argument()))
@@ -88,7 +88,7 @@ pub(crate) fn unspecified_encoding(checker: &mut Checker, call: &ast::ExprCall) 
         call.func.range(),
     );
     diagnostic.set_fix(generate_keyword_fix(checker, call));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// Represents the path of the function or method being called.

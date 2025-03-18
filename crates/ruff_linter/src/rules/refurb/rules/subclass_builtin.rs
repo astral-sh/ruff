@@ -1,6 +1,6 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{Arguments, StmtClassDef};
+use ruff_python_ast::{helpers::map_subscript, Arguments, StmtClassDef};
 use ruff_text_size::Ranged;
 
 use crate::{checkers::ast::Checker, importer::ImportRequest};
@@ -65,16 +65,21 @@ impl AlwaysFixableViolation for SubclassBuiltin {
 }
 
 /// FURB189
-pub(crate) fn subclass_builtin(checker: &mut Checker, class: &StmtClassDef) {
+pub(crate) fn subclass_builtin(checker: &Checker, class: &StmtClassDef) {
     let Some(Arguments { args: bases, .. }) = class.arguments.as_deref() else {
         return;
     };
 
+    // Expect only one base class else return
     let [base] = &**bases else {
         return;
     };
 
-    let Some(symbol) = checker.semantic().resolve_builtin_symbol(base) else {
+    // Check if the base class is a subscript expression so that only the name expr
+    // is checked and modified.
+    let base_expr = map_subscript(base);
+
+    let Some(symbol) = checker.semantic().resolve_builtin_symbol(base_expr) else {
         return;
     };
 
@@ -89,7 +94,7 @@ pub(crate) fn subclass_builtin(checker: &mut Checker, class: &StmtClassDef) {
             subclass: symbol.to_string(),
             replacement: user_symbol.to_string(),
         },
-        base.range(),
+        base_expr.range(),
     );
     diagnostic.try_set_fix(|| {
         let (import_edit, binding) = checker.importer().get_or_import_symbol(
@@ -97,10 +102,10 @@ pub(crate) fn subclass_builtin(checker: &mut Checker, class: &StmtClassDef) {
             base.start(),
             checker.semantic(),
         )?;
-        let other_edit = Edit::range_replacement(binding, base.range());
+        let other_edit = Edit::range_replacement(binding, base_expr.range());
         Ok(Fix::unsafe_edits(import_edit, [other_edit]))
     });
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

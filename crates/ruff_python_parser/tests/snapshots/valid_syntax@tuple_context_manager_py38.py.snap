@@ -1,0 +1,77 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/tuple_context_manager_py38.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..85,
+        body: [
+            With(
+                StmtWith {
+                    range: 43..84,
+                    is_async: false,
+                    items: [
+                        WithItem {
+                            range: 48..79,
+                            context_expr: Tuple(
+                                ExprTuple {
+                                    range: 48..72,
+                                    elts: [
+                                        Name(
+                                            ExprName {
+                                                range: 52..55,
+                                                id: Name("foo"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        Name(
+                                            ExprName {
+                                                range: 59..62,
+                                                id: Name("bar"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        Name(
+                                            ExprName {
+                                                range: 66..69,
+                                                id: Name("baz"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ],
+                                    ctx: Load,
+                                    parenthesized: true,
+                                },
+                            ),
+                            optional_vars: Some(
+                                Name(
+                                    ExprName {
+                                        range: 76..79,
+                                        id: Name("tup"),
+                                        ctx: Store,
+                                    },
+                                ),
+                            ),
+                        },
+                    ],
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 81..84,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 81..84,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```

@@ -1,0 +1,37 @@
+---
+source: crates/red_knot_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: tuples.md - Comparison: Tuples - Equality with elements that incorrectly implement `__bool__`
+mdtest path: crates/red_knot_python_semantic/resources/mdtest/comparison/tuples.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | class A:
+2 |     def __eq__(self, other) -> NotBoolable:
+3 |         return NotBoolable()
+4 | 
+5 | class NotBoolable:
+6 |     __bool__: None = None
+7 | 
+8 | # error: [unsupported-bool-conversion]
+9 | (A(),) == (A(),)
+```
+
+# Diagnostics
+
+```
+error: lint:unsupported-bool-conversion
+ --> /src/mdtest_snippet.py:9:1
+  |
+8 | # error: [unsupported-bool-conversion]
+9 | (A(),) == (A(),)
+  | ^^^^^^^^^^^^^^^^ Boolean conversion is unsupported for type `NotBoolable`; its `__bool__` method isn't callable
+  |
+
+```

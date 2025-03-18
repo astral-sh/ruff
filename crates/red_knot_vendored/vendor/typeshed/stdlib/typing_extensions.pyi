@@ -1,5 +1,3 @@
-# Since this module defines "Self" it is not recognized by Ruff as typing_extensions.Self
-# ruff: noqa: PYI034
 import abc
 import sys
 import typing
@@ -251,6 +249,7 @@ class _TypedDict(Mapping[str, object], metaclass=abc.ABCMeta):
         @overload
         def __ror__(self, value: dict[str, Any], /) -> dict[str, object]: ...
         # supposedly incompatible definitions of `__ior__` and `__or__`:
+        # Since this module defines "Self" it is not recognized by Ruff as typing_extensions.Self
         def __ior__(self, value: Self, /) -> Self: ...  # type: ignore[misc]
 
 OrderedDict = _Alias()

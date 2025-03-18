@@ -1,0 +1,101 @@
+---
+source: crates/red_knot_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: return_type.md - Function return type - Invalid implicit return type
+mdtest path: crates/red_knot_python_semantic/resources/mdtest/function/return_type.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | def f() -> None:
+ 2 |     if False:
+ 3 |         # error: [invalid-return-type]
+ 4 |         return 1
+ 5 | 
+ 6 | # error: [invalid-return-type]
+ 7 | def f(cond: bool) -> int:
+ 8 |     if cond:
+ 9 |         return 1
+10 | 
+11 | # error: [invalid-return-type]
+12 | def f(cond: bool) -> int:
+13 |     if cond:
+14 |         raise ValueError()
+15 | 
+16 | # error: [invalid-return-type]
+17 | def f(cond: bool) -> int:
+18 |     if cond:
+19 |         cond = False
+20 |     else:
+21 |         return 1
+22 |     if cond:
+23 |         return 2
+```
+
+# Diagnostics
+
+```
+error: lint:invalid-return-type
+ --> /src/mdtest_snippet.py:4:16
+  |
+2 |     if False:
+3 |         # error: [invalid-return-type]
+4 |         return 1
+  |                ^ Object of type `Literal[1]` is not assignable to return type `None`
+5 |
+6 | # error: [invalid-return-type]
+  |
+info
+ --> /src/mdtest_snippet.py:1:12
+  |
+1 | def f() -> None:
+  |            ---- Return type is declared here as `None`
+2 |     if False:
+3 |         # error: [invalid-return-type]
+  |
+
+```
+
+```
+error: lint:invalid-return-type
+ --> /src/mdtest_snippet.py:7:22
+  |
+6 | # error: [invalid-return-type]
+7 | def f(cond: bool) -> int:
+  |                      ^^^ Function can implicitly return `None`, which is not assignable to return type `int`
+8 |     if cond:
+9 |         return 1
+  |
+
+```
+
+```
+error: lint:invalid-return-type
+  --> /src/mdtest_snippet.py:12:22
+   |
+11 | # error: [invalid-return-type]
+12 | def f(cond: bool) -> int:
+   |                      ^^^ Function can implicitly return `None`, which is not assignable to return type `int`
+13 |     if cond:
+14 |         raise ValueError()
+   |
+
+```
+
+```
+error: lint:invalid-return-type
+  --> /src/mdtest_snippet.py:17:22
+   |
+16 | # error: [invalid-return-type]
+17 | def f(cond: bool) -> int:
+   |                      ^^^ Function can implicitly return `None`, which is not assignable to return type `int`
+18 |     if cond:
+19 |         cond = False
+   |
+
+```

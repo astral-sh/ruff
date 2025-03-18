@@ -1,11 +1,203 @@
-use super::{definition_expression_type, Type};
+//! _Signatures_ describe the expected parameters and return type of a function or other callable.
+//! Overloads and unions add complexity to this simple description.
+//!
+//! In a call expression, the type of the callable might be a union of several types. The call must
+//! be compatible with _all_ of these types, since at runtime the callable might be an instance of
+//! any of them.
+//!
+//! Each of the atomic types in the union must be callable. Each callable might be _overloaded_,
+//! containing multiple _overload signatures_, each of which describes a different combination of
+//! argument types and return types. For each callable type in the union, the call expression's
+//! arguments must match _at least one_ overload.
+
+use smallvec::{smallvec, SmallVec};
+
+use super::{definition_expression_type, DynamicType, Type};
+use crate::semantic_index::definition::Definition;
+use crate::types::todo_type;
 use crate::Db;
-use crate::{semantic_index::definition::Definition, types::todo_type};
 use ruff_python_ast::{self as ast, name::Name};
 
-/// A typed callable signature.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct Signature<'db> {
+/// The signature of a possible union of callables.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
+pub(crate) struct Signatures<'db> {
+    /// The type that is (hopefully) callable.
+    pub(crate) callable_type: Type<'db>,
+    /// The type we'll use for error messages referring to details of the called signature. For calls to functions this
+    /// will be the same as `callable_type`; for other callable instances it may be a `__call__` method.
+    pub(crate) signature_type: Type<'db>,
+    /// By using `SmallVec`, we avoid an extra heap allocation for the common case of a non-union
+    /// type.
+    elements: SmallVec<[CallableSignature<'db>; 1]>,
+}
+
+impl<'db> Signatures<'db> {
+    pub(crate) fn not_callable(signature_type: Type<'db>) -> Self {
+        Self {
+            callable_type: signature_type,
+            signature_type,
+            elements: smallvec![CallableSignature::not_callable(signature_type)],
+        }
+    }
+
+    pub(crate) fn single(signature: CallableSignature<'db>) -> Self {
+        Self {
+            callable_type: signature.callable_type,
+            signature_type: signature.signature_type,
+            elements: smallvec![signature],
+        }
+    }
+
+    /// Creates a new `Signatures` from an iterator of [`Signature`]s. Panics if the iterator is
+    /// empty.
+    pub(crate) fn from_union<I>(signature_type: Type<'db>, elements: I) -> Self
+    where
+        I: IntoIterator<Item = Signatures<'db>>,
+    {
+        let elements: SmallVec<_> = elements
+            .into_iter()
+            .flat_map(|s| s.elements.into_iter())
+            .collect();
+        assert!(!elements.is_empty());
+        Self {
+            callable_type: signature_type,
+            signature_type,
+            elements,
+        }
+    }
+
+    pub(crate) fn replace_callable_type(&mut self, before: Type<'db>, after: Type<'db>) {
+        if self.callable_type == before {
+            self.callable_type = after;
+        }
+        for signature in &mut self.elements {
+            signature.replace_callable_type(before, after);
+        }
+    }
+
+    pub(crate) fn set_dunder_call_is_possibly_unbound(&mut self) {
+        for signature in &mut self.elements {
+            signature.dunder_call_is_possibly_unbound = true;
+        }
+    }
+}
+
+impl<'a, 'db> IntoIterator for &'a Signatures<'db> {
+    type Item = &'a CallableSignature<'db>;
+    type IntoIter = std::slice::Iter<'a, CallableSignature<'db>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.elements.iter()
+    }
+}
+
+/// The signature of a single callable. If the callable is overloaded, there is a separate
+/// [`Signature`] for each overload.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
+pub(crate) struct CallableSignature<'db> {
+    /// The type that is (hopefully) callable.
+    pub(crate) callable_type: Type<'db>,
+
+    /// The type we'll use for error messages referring to details of the called signature. For
+    /// calls to functions this will be the same as `callable_type`; for other callable instances
+    /// it may be a `__call__` method.
+    pub(crate) signature_type: Type<'db>,
+
+    /// If this is a callable object (i.e. called via a `__call__` method), the boundness of
+    /// that call method.
+    pub(crate) dunder_call_is_possibly_unbound: bool,
+
+    /// The type of the bound `self` or `cls` parameter if this signature is for a bound method.
+    pub(crate) bound_type: Option<Type<'db>>,
+
+    /// The signatures of each overload of this callable. Will be empty if the type is not
+    /// callable.
+    ///
+    /// By using `SmallVec`, we avoid an extra heap allocation for the common case of a
+    /// non-overloaded callable.
+    overloads: SmallVec<[Signature<'db>; 1]>,
+}
+
+impl<'db> CallableSignature<'db> {
+    pub(crate) fn not_callable(signature_type: Type<'db>) -> Self {
+        Self {
+            callable_type: signature_type,
+            signature_type,
+            dunder_call_is_possibly_unbound: false,
+            bound_type: None,
+            overloads: smallvec![],
+        }
+    }
+
+    pub(crate) fn single(signature_type: Type<'db>, signature: Signature<'db>) -> Self {
+        Self {
+            callable_type: signature_type,
+            signature_type,
+            dunder_call_is_possibly_unbound: false,
+            bound_type: None,
+            overloads: smallvec![signature],
+        }
+    }
+
+    /// Creates a new `CallableSignature` from an iterator of [`Signature`]s. Returns a
+    /// non-callable signature if the iterator is empty.
+    pub(crate) fn from_overloads<I>(signature_type: Type<'db>, overloads: I) -> Self
+    where
+        I: IntoIterator<Item = Signature<'db>>,
+    {
+        Self {
+            callable_type: signature_type,
+            signature_type,
+            dunder_call_is_possibly_unbound: false,
+            bound_type: None,
+            overloads: overloads.into_iter().collect(),
+        }
+    }
+
+    /// Return a signature for a dynamic callable
+    pub(crate) fn dynamic(signature_type: Type<'db>) -> Self {
+        let signature = Signature {
+            parameters: Parameters::gradual_form(),
+            return_ty: Some(signature_type),
+        };
+        Self::single(signature_type, signature)
+    }
+
+    /// Return a todo signature: (*args: Todo, **kwargs: Todo) -> Todo
+    #[allow(unused_variables)] // 'reason' only unused in debug builds
+    pub(crate) fn todo(reason: &'static str) -> Self {
+        let signature_type = todo_type!(reason);
+        let signature = Signature {
+            parameters: Parameters::todo(),
+            return_ty: Some(signature_type),
+        };
+        Self::single(signature_type, signature)
+    }
+
+    pub(crate) fn with_bound_type(mut self, bound_type: Type<'db>) -> Self {
+        self.bound_type = Some(bound_type);
+        self
+    }
+
+    fn replace_callable_type(&mut self, before: Type<'db>, after: Type<'db>) {
+        if self.callable_type == before {
+            self.callable_type = after;
+        }
+    }
+}
+
+impl<'a, 'db> IntoIterator for &'a CallableSignature<'db> {
+    type Item = &'a Signature<'db>;
+    type IntoIter = std::slice::Iter<'a, Signature<'db>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.overloads.iter()
+    }
+}
+
+/// The signature of one of the overloads of a callable.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
+pub struct Signature<'db> {
     /// Parameters, in source order.
     ///
     /// The ordering of parameters in a valid signature must be: first positional-only parameters,
@@ -21,11 +213,19 @@ pub(crate) struct Signature<'db> {
 }
 
 impl<'db> Signature<'db> {
-    /// Return a todo signature: (*args: Todo, **kwargs: Todo) -> Todo
-    pub(crate) fn todo() -> Self {
+    pub(crate) fn new(parameters: Parameters<'db>, return_ty: Option<Type<'db>>) -> Self {
         Self {
+            parameters,
+            return_ty,
+        }
+    }
+
+    /// Return a todo signature: (*args: Todo, **kwargs: Todo) -> Todo
+    #[allow(unused_variables)] // 'reason' only unused in debug builds
+    pub(crate) fn todo(reason: &'static str) -> Self {
+        Signature {
             parameters: Parameters::todo(),
-            return_ty: Some(todo_type!("return type")),
+            return_ty: Some(todo_type!(reason)),
         }
     }
 
@@ -33,7 +233,7 @@ impl<'db> Signature<'db> {
     pub(super) fn from_function(
         db: &'db dyn Db,
         definition: Definition<'db>,
-        function_node: &'db ast::StmtFunctionDef,
+        function_node: &ast::StmtFunctionDef,
     ) -> Self {
         let return_ty = function_node.returns.as_ref().map(|returns| {
             if function_node.is_async {
@@ -59,31 +259,119 @@ impl<'db> Signature<'db> {
     }
 }
 
-// TODO: use SmallVec here once invariance bug is fixed
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct Parameters<'db>(Vec<Parameter<'db>>);
+#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
+pub(crate) struct Parameters<'db> {
+    // TODO: use SmallVec here once invariance bug is fixed
+    value: Vec<Parameter<'db>>,
+
+    /// Whether this parameter list represents a gradual form using `...` as the only parameter.
+    ///
+    /// If this is `true`, the `value` will still contain the variadic and keyword-variadic
+    /// parameters. This flag is used to distinguish between an explicit `...` in the callable type
+    /// as in `Callable[..., int]` and the variadic arguments in `lambda` expression as in
+    /// `lambda *args, **kwargs: None`.
+    ///
+    /// The display implementation utilizes this flag to use `...` instead of displaying the
+    /// individual variadic and keyword-variadic parameters.
+    ///
+    /// Note: This flag is also used to indicate invalid forms of `Callable` annotations.
+    is_gradual: bool,
+}
 
 impl<'db> Parameters<'db> {
+    pub(crate) fn new(parameters: impl IntoIterator<Item = Parameter<'db>>) -> Self {
+        Self {
+            value: parameters.into_iter().collect(),
+            is_gradual: false,
+        }
+    }
+
+    /// Create an empty parameter list.
+    pub(crate) fn empty() -> Self {
+        Self {
+            value: Vec::new(),
+            is_gradual: false,
+        }
+    }
+
+    pub(crate) fn as_slice(&self) -> &[Parameter<'db>] {
+        self.value.as_slice()
+    }
+
+    pub(crate) const fn is_gradual(&self) -> bool {
+        self.is_gradual
+    }
+
     /// Return todo parameters: (*args: Todo, **kwargs: Todo)
-    fn todo() -> Self {
-        Self(vec![
-            Parameter {
-                name: Some(Name::new_static("args")),
-                annotated_ty: Some(todo_type!("todo signature *args")),
-                kind: ParameterKind::Variadic,
-            },
-            Parameter {
-                name: Some(Name::new_static("kwargs")),
-                annotated_ty: Some(todo_type!("todo signature **kwargs")),
-                kind: ParameterKind::KeywordVariadic,
-            },
-        ])
+    pub(crate) fn todo() -> Self {
+        Self {
+            value: vec![
+                Parameter {
+                    name: Some(Name::new_static("args")),
+                    annotated_ty: Some(todo_type!("todo signature *args")),
+                    kind: ParameterKind::Variadic,
+                },
+                Parameter {
+                    name: Some(Name::new_static("kwargs")),
+                    annotated_ty: Some(todo_type!("todo signature **kwargs")),
+                    kind: ParameterKind::KeywordVariadic,
+                },
+            ],
+            is_gradual: false,
+        }
+    }
+
+    /// Return parameters that represents a gradual form using `...` as the only parameter.
+    ///
+    /// Internally, this is represented as `(*Any, **Any)` that accepts parameters of type [`Any`].
+    ///
+    /// [`Any`]: crate::types::DynamicType::Any
+    pub(crate) fn gradual_form() -> Self {
+        Self {
+            value: vec![
+                Parameter {
+                    name: None,
+                    annotated_ty: Some(Type::Dynamic(DynamicType::Any)),
+                    kind: ParameterKind::Variadic,
+                },
+                Parameter {
+                    name: None,
+                    annotated_ty: Some(Type::Dynamic(DynamicType::Any)),
+                    kind: ParameterKind::KeywordVariadic,
+                },
+            ],
+            is_gradual: true,
+        }
+    }
+
+    /// Return parameters that represents an unknown list of parameters.
+    ///
+    /// Internally, this is represented as `(*Unknown, **Unknown)` that accepts parameters of type
+    /// [`Unknown`].
+    ///
+    /// [`Unknown`]: crate::types::DynamicType::Unknown
+    pub(crate) fn unknown() -> Self {
+        Self {
+            value: vec![
+                Parameter {
+                    name: None,
+                    annotated_ty: Some(Type::Dynamic(DynamicType::Unknown)),
+                    kind: ParameterKind::Variadic,
+                },
+                Parameter {
+                    name: None,
+                    annotated_ty: Some(Type::Dynamic(DynamicType::Unknown)),
+                    kind: ParameterKind::KeywordVariadic,
+                },
+            ],
+            is_gradual: true,
+        }
     }
 
     fn from_parameters(
         db: &'db dyn Db,
         definition: Definition<'db>,
-        parameters: &'db ast::Parameters,
+        parameters: &ast::Parameters,
     ) -> Self {
         let ast::Parameters {
             posonlyargs,
@@ -134,22 +422,21 @@ impl<'db> Parameters<'db> {
         let keywords = kwarg.as_ref().map(|arg| {
             Parameter::from_node_and_kind(db, definition, arg, ParameterKind::KeywordVariadic)
         });
-        Self(
+        Self::new(
             positional_only
                 .chain(positional_or_keyword)
                 .chain(variadic)
                 .chain(keyword_only)
-                .chain(keywords)
-                .collect(),
+                .chain(keywords),
         )
     }
 
     pub(crate) fn len(&self) -> usize {
-        self.0.len()
+        self.value.len()
     }
 
     pub(crate) fn iter(&self) -> std::slice::Iter<Parameter<'db>> {
-        self.0.iter()
+        self.value.iter()
     }
 
     /// Iterate initial positional parameters, not including variadic parameter, if any.
@@ -163,7 +450,7 @@ impl<'db> Parameters<'db> {
 
     /// Return parameter at given index, or `None` if index is out-of-range.
     pub(crate) fn get(&self, index: usize) -> Option<&Parameter<'db>> {
-        self.0.get(index)
+        self.value.get(index)
     }
 
     /// Return positional parameter at given index, or `None` if `index` is out of range.
@@ -206,7 +493,7 @@ impl<'db, 'a> IntoIterator for &'a Parameters<'db> {
     type IntoIter = std::slice::Iter<'a, Parameter<'db>>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.0.iter()
+        self.value.iter()
     }
 }
 
@@ -214,11 +501,11 @@ impl<'db> std::ops::Index<usize> for Parameters<'db> {
     type Output = Parameter<'db>;
 
     fn index(&self, index: usize) -> &Self::Output {
-        &self.0[index]
+        &self.value[index]
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
 pub(crate) struct Parameter<'db> {
     /// Parameter name.
     ///
@@ -233,10 +520,22 @@ pub(crate) struct Parameter<'db> {
 }
 
 impl<'db> Parameter<'db> {
+    pub(crate) fn new(
+        name: Option<Name>,
+        annotated_ty: Option<Type<'db>>,
+        kind: ParameterKind<'db>,
+    ) -> Self {
+        Self {
+            name,
+            annotated_ty,
+            kind,
+        }
+    }
+
     fn from_node_and_kind(
         db: &'db dyn Db,
         definition: Definition<'db>,
-        parameter: &'db ast::Parameter,
+        parameter: &ast::Parameter,
         kind: ParameterKind<'db>,
     ) -> Self {
         Self {
@@ -246,6 +545,14 @@ impl<'db> Parameter<'db> {
                 .map(|annotation| definition_expression_type(db, definition, annotation)),
             kind,
         }
+    }
+
+    pub(crate) fn is_keyword_only(&self) -> bool {
+        matches!(self.kind, ParameterKind::KeywordOnly { .. })
+    }
+
+    pub(crate) fn is_positional_only(&self) -> bool {
+        matches!(self.kind, ParameterKind::PositionalOnly { .. })
     }
 
     pub(crate) fn is_variadic(&self) -> bool {
@@ -304,7 +611,7 @@ impl<'db> Parameter<'db> {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
 pub(crate) enum ParameterKind<'db> {
     /// Positional-only parameter, e.g. `def f(x, /): ...`
     PositionalOnly { default_ty: Option<Type<'db>> },
@@ -322,20 +629,22 @@ pub(crate) enum ParameterKind<'db> {
 mod tests {
     use super::*;
     use crate::db::tests::{setup_db, TestDb};
-    use crate::types::{global_symbol, FunctionType, KnownClass};
-    use ruff_db::system::DbWithTestSystem;
+    use crate::symbol::global_symbol;
+    use crate::types::{FunctionType, KnownClass};
+    use ruff_db::system::DbWithWritableSystem as _;
 
     #[track_caller]
     fn get_function_f<'db>(db: &'db TestDb, file: &'static str) -> FunctionType<'db> {
         let module = ruff_db::files::system_path_to_file(db, file).unwrap();
         global_symbol(db, module, "f")
+            .symbol
             .expect_type()
             .expect_function_literal()
     }
 
     #[track_caller]
     fn assert_params<'db>(signature: &Signature<'db>, expected: &[Parameter<'db>]) {
-        assert_eq!(signature.parameters.0.as_slice(), expected);
+        assert_eq!(signature.parameters.value.as_slice(), expected);
     }
 
     #[test]
@@ -357,6 +666,8 @@ mod tests {
         db.write_dedented(
             "/src/a.py",
             "
+            from typing import Literal
+
             def f(a, b: int, c = 1, d: int = 2, /,
                   e = 3, f: Literal[4] = 4, *args: object,
                   g = 5, h: Literal[6] = 6, **kwargs: str) -> bytes: ...
@@ -411,7 +722,7 @@ mod tests {
                 },
                 Parameter {
                     name: Some(Name::new_static("args")),
-                    annotated_ty: Some(KnownClass::Object.to_instance(&db)),
+                    annotated_ty: Some(Type::object(&db)),
                     kind: ParameterKind::Variadic,
                 },
                 Parameter {
@@ -462,7 +773,7 @@ mod tests {
             name: Some(name),
             annotated_ty,
             kind: ParameterKind::PositionalOrKeyword { .. },
-        }] = &sig.parameters.0[..]
+        }] = &sig.parameters.value[..]
         else {
             panic!("expected one positional-or-keyword parameter");
         };
@@ -496,7 +807,7 @@ mod tests {
             name: Some(name),
             annotated_ty,
             kind: ParameterKind::PositionalOrKeyword { .. },
-        }] = &sig.parameters.0[..]
+        }] = &sig.parameters.value[..]
         else {
             panic!("expected one positional-or-keyword parameter");
         };
@@ -534,7 +845,7 @@ mod tests {
             name: Some(b_name),
             annotated_ty: b_annotated_ty,
             kind: ParameterKind::PositionalOrKeyword { .. },
-        }] = &sig.parameters.0[..]
+        }] = &sig.parameters.value[..]
         else {
             panic!("expected two positional-or-keyword parameters");
         };
@@ -577,7 +888,7 @@ mod tests {
             name: Some(b_name),
             annotated_ty: b_annotated_ty,
             kind: ParameterKind::PositionalOrKeyword { .. },
-        }] = &sig.parameters.0[..]
+        }] = &sig.parameters.value[..]
         else {
             panic!("expected two positional-or-keyword parameters");
         };
@@ -624,7 +935,7 @@ mod tests {
         .unwrap();
         let func = get_function_f(&db, "/src/a.py");
 
-        let expected_sig = Signature::todo();
+        let expected_sig = Signature::todo("return type of decorated function");
 
         // With no decorators, internal and external signature are the same
         assert_eq!(func.signature(&db), &expected_sig);

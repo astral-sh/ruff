@@ -1,0 +1,99 @@
+---
+source: crates/red_knot_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: return_type.md - Function return type - Invalid conditional return type
+mdtest path: crates/red_knot_python_semantic/resources/mdtest/function/return_type.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | def f(cond: bool) -> str:
+ 2 |     if cond:
+ 3 |         return "a"
+ 4 |     else:
+ 5 |         # error: [invalid-return-type]
+ 6 |         return 1
+ 7 | 
+ 8 | def f(cond: bool) -> str:
+ 9 |     if cond:
+10 |         # error: [invalid-return-type]
+11 |         return 1
+12 |     else:
+13 |         # error: [invalid-return-type]
+14 |         return 2
+```
+
+# Diagnostics
+
+```
+error: lint:invalid-return-type
+ --> /src/mdtest_snippet.py:6:16
+  |
+4 |     else:
+5 |         # error: [invalid-return-type]
+6 |         return 1
+  |                ^ Object of type `Literal[1]` is not assignable to return type `str`
+7 |
+8 | def f(cond: bool) -> str:
+  |
+info
+ --> /src/mdtest_snippet.py:1:22
+  |
+1 | def f(cond: bool) -> str:
+  |                      --- Return type is declared here as `str`
+2 |     if cond:
+3 |         return "a"
+  |
+
+```
+
+```
+error: lint:invalid-return-type
+  --> /src/mdtest_snippet.py:11:16
+   |
+ 9 |     if cond:
+10 |         # error: [invalid-return-type]
+11 |         return 1
+   |                ^ Object of type `Literal[1]` is not assignable to return type `str`
+12 |     else:
+13 |         # error: [invalid-return-type]
+   |
+info
+  --> /src/mdtest_snippet.py:8:22
+   |
+ 6 |         return 1
+ 7 |
+ 8 | def f(cond: bool) -> str:
+   |                      --- Return type is declared here as `str`
+ 9 |     if cond:
+10 |         # error: [invalid-return-type]
+   |
+
+```
+
+```
+error: lint:invalid-return-type
+  --> /src/mdtest_snippet.py:14:16
+   |
+12 |     else:
+13 |         # error: [invalid-return-type]
+14 |         return 2
+   |                ^ Object of type `Literal[2]` is not assignable to return type `str`
+   |
+info
+  --> /src/mdtest_snippet.py:8:22
+   |
+ 6 |         return 1
+ 7 |
+ 8 | def f(cond: bool) -> str:
+   |                      --- Return type is declared here as `str`
+ 9 |     if cond:
+10 |         # error: [invalid-return-type]
+   |
+
+```

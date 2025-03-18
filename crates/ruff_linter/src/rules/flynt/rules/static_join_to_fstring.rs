@@ -72,7 +72,7 @@ fn build_fstring(joiner: &str, joinees: &[Expr], flags: FStringFlags) -> Option<
                     if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = expr {
                         if flags.is_none() {
                             // take the flags from the first Expr
-                            flags = Some(value.flags());
+                            flags = Some(value.first_literal_flags());
                         }
                         Some(value.to_str())
                     } else {
@@ -111,7 +111,7 @@ fn build_fstring(joiner: &str, joinees: &[Expr], flags: FStringFlags) -> Option<
 }
 
 /// FLY002
-pub(crate) fn static_join_to_fstring(checker: &mut Checker, expr: &Expr, joiner: &str) {
+pub(crate) fn static_join_to_fstring(checker: &Checker, expr: &Expr, joiner: &str) {
     let Expr::Call(ast::ExprCall {
         arguments: Arguments { args, keywords, .. },
         ..
@@ -154,5 +154,5 @@ pub(crate) fn static_join_to_fstring(checker: &mut Checker, expr: &Expr, joiner:
         pad(contents, expr.range(), checker.locator()),
         expr.range(),
     )));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

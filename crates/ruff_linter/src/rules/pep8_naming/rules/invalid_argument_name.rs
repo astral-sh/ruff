@@ -23,7 +23,7 @@ use crate::checkers::ast::Checker;
 /// > mixedCase is allowed only in contexts where that’s already the
 /// > prevailing style (e.g. threading.py), to retain backwards compatibility.
 ///
-/// In [preview], overridden methods are ignored.
+/// Methods decorated with `@typing.override` are ignored.
 ///
 /// ## Example
 /// ```python
@@ -36,6 +36,10 @@ use crate::checkers::ast::Checker;
 /// def my_function(a, my_arg):
 ///     pass
 /// ```
+///
+/// ## Options
+/// - `lint.pep8-naming.ignore-names`
+/// - `lint.pep8-naming.extend-ignore-names`
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#function-and-method-arguments
 /// [preview]: https://docs.astral.sh/ruff/preview/
@@ -53,15 +57,11 @@ impl Violation for InvalidArgumentName {
 }
 
 /// N803
-pub(crate) fn invalid_argument_name_function(
-    checker: &mut Checker,
-    function_def: &StmtFunctionDef,
-) {
+pub(crate) fn invalid_argument_name_function(checker: &Checker, function_def: &StmtFunctionDef) {
     let semantic = checker.semantic();
     let scope = semantic.current_scope();
 
-    if checker.settings.preview.is_enabled()
-        && matches!(scope.kind, ScopeKind::Class(_))
+    if matches!(scope.kind, ScopeKind::Class(_))
         && is_override(&function_def.decorator_list, semantic)
     {
         return;
@@ -71,7 +71,7 @@ pub(crate) fn invalid_argument_name_function(
 }
 
 /// N803
-pub(crate) fn invalid_argument_name_lambda(checker: &mut Checker, lambda: &ExprLambda) {
+pub(crate) fn invalid_argument_name_lambda(checker: &Checker, lambda: &ExprLambda) {
     let Some(parameters) = &lambda.parameters else {
         return;
     };
@@ -80,7 +80,7 @@ pub(crate) fn invalid_argument_name_lambda(checker: &mut Checker, lambda: &ExprL
 }
 
 /// N803
-fn invalid_argument_name(checker: &mut Checker, parameters: &Parameters) {
+fn invalid_argument_name(checker: &Checker, parameters: &Parameters) {
     let ignore_names = &checker.settings.pep8_naming.ignore_names;
 
     for parameter in parameters {
@@ -101,6 +101,6 @@ fn invalid_argument_name(checker: &mut Checker, parameters: &Parameters) {
             parameter.range(),
         );
 
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }

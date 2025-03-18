@@ -1,8 +1,9 @@
 use crate::combine::Combine;
 use crate::Db;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
+use ruff_macros::Combine;
 use ruff_text_size::{TextRange, TextSize};
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Deserializer};
 use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::fmt;
@@ -70,15 +71,19 @@ impl Drop for ValueSourceGuard {
 ///
 /// This ensures that two resolved configurations are identical even if the position of a value has changed
 /// or if the values were loaded from different sources.
-#[derive(Clone)]
+#[derive(Clone, serde::Serialize)]
+#[serde(transparent)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct RangedValue<T> {
     value: T,
+    #[serde(skip)]
     source: ValueSource,
 
     /// The byte range of `value` in `source`.
     ///
     /// Can be `None` because not all sources support a range.
     /// For example, arguments provided on the CLI won't have a range attached.
+    #[serde(skip)]
     range: Option<TextRange>,
 }
 
@@ -111,6 +116,15 @@ impl<T> RangedValue<T> {
     pub fn with_source(mut self, source: ValueSource) -> Self {
         self.source = source;
         self
+    }
+
+    #[must_use]
+    pub fn map_value<R>(self, f: impl FnOnce(T) -> R) -> RangedValue<R> {
+        RangedValue {
+            value: f(self.value),
+            source: self.source,
+            range: self.range,
+        }
     }
 
     pub fn into_inner(self) -> T {
@@ -266,18 +280,6 @@ where
     }
 }
 
-impl<T> Serialize for RangedValue<T>
-where
-    T: Serialize,
-{
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        self.value.serialize(serializer)
-    }
-}
-
 /// A possibly relative path in a configuration file.
 ///
 /// Relative paths in configuration files or from CLI options
@@ -286,9 +288,19 @@ where
 /// * CLI: The path is relative to the current working directory
 /// * Configuration file: The path is relative to the project's root.
 #[derive(
-    Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash,
+    Debug,
+    Clone,
+    serde::Serialize,
+    serde::Deserialize,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Combine,
 )]
 #[serde(transparent)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct RelativePathBuf(RangedValue<SystemPathBuf>);
 
 impl RelativePathBuf {
@@ -323,15 +335,5 @@ impl RelativePathBuf {
         };
 
         SystemPath::absolute(&self.0, relative_to)
-    }
-}
-
-impl Combine for RelativePathBuf {
-    fn combine(self, other: Self) -> Self {
-        Self(self.0.combine(other.0))
-    }
-
-    fn combine_with(&mut self, other: Self) {
-        self.0.combine_with(other.0);
     }
 }

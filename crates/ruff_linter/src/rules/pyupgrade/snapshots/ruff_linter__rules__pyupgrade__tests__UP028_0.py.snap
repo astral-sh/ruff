@@ -380,3 +380,46 @@ UP028_0.py:134:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
 136 135 |     # Shadowing with multiple `except` blocks
 137 136 |     try:
 138 137 |         pass
+
+UP028_0.py:170:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+    |
+168 |   # https://github.com/astral-sh/ruff/issues/15540
+169 |   def f():
+170 | /     for a in 1,:
+171 | |         yield a
+    | |_______________^ UP028
+    |
+    = help: Replace with `yield from`
+
+ℹ Unsafe fix
+167 167 | 
+168 168 | # https://github.com/astral-sh/ruff/issues/15540
+169 169 | def f():
+170     |-    for a in 1,:
+171     |-        yield a
+    170 |+    yield from (1,)
+172 171 | 
+173 172 | 
+174 173 | SOME_GLOBAL = None
+
+UP028_0.py:179:5: UP028 Replace `yield` over `for` loop with `yield from`
+    |
+177 |       global SOME_GLOBAL
+178 |
+179 | /     for SOME_GLOBAL in iterable:
+180 | |         yield SOME_GLOBAL
+    | |_________________________^ UP028
+181 |
+182 |       some_non_local = None
+    |
+    = help: Replace with `yield from`
+
+UP028_0.py:187:9: UP028 Replace `yield` over `for` loop with `yield from`
+    |
+185 |           nonlocal some_non_local
+186 |
+187 | /         for some_non_local in iterable:
+188 | |             yield some_non_local
+    | |________________________________^ UP028
+    |
+    = help: Replace with `yield from`

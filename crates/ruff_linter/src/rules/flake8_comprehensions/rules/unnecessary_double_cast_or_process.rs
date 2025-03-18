@@ -17,7 +17,7 @@ use crate::rules::flake8_comprehensions::fixes;
 /// the listed functions within an additional `list()`, `set()`, `sorted()`, or
 /// `tuple()` call. Doing so is redundant and can be confusing for readers.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// list(tuple(iterable))
 /// ```
@@ -68,7 +68,7 @@ impl AlwaysFixableViolation for UnnecessaryDoubleCastOrProcess {
 
 /// C414
 pub(crate) fn unnecessary_double_cast_or_process(
-    checker: &mut Checker,
+    checker: &Checker,
     expr: &Expr,
     outer_func: &Expr,
     args: &[Expr],
@@ -140,6 +140,6 @@ pub(crate) fn unnecessary_double_cast_or_process(
             )
             .map(Fix::unsafe_edit)
         });
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }

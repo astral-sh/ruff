@@ -112,7 +112,7 @@ impl Violation for WaitForProcessInAsyncFunction {
 }
 
 /// ASYNC220, ASYNC221, ASYNC222
-pub(crate) fn blocking_process_invocation(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn blocking_process_invocation(checker: &Checker, call: &ast::ExprCall) {
     if !checker.semantic().in_async_context() {
         return;
     }
@@ -146,7 +146,7 @@ pub(crate) fn blocking_process_invocation(checker: &mut Checker, call: &ast::Exp
     };
     let diagnostic = Diagnostic::new::<DiagnosticKind>(diagnostic_kind, call.func.range());
     if checker.enabled(diagnostic.kind.rule()) {
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }
 

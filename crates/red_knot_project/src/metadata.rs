@@ -1,3 +1,4 @@
+use configuration_file::{ConfigurationFile, ConfigurationFileError};
 use red_knot_python_semantic::ProgramSettings;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_python_ast::name::Name;
@@ -5,13 +6,15 @@ use std::sync::Arc;
 use thiserror::Error;
 
 use crate::combine::Combine;
-use crate::metadata::pyproject::{Project, PyProject, PyProjectError};
+use crate::metadata::pyproject::{Project, PyProject, PyProjectError, ResolveRequiresPythonError};
 use crate::metadata::value::ValueSource;
 use options::KnotTomlError;
 use options::Options;
 
+mod configuration_file;
 pub mod options;
 pub mod pyproject;
+pub mod settings;
 pub mod value;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -23,6 +26,15 @@ pub struct ProjectMetadata {
 
     /// The raw options
     pub(super) options: Options,
+
+    /// Paths of configurations other than the project's configuration that were combined into [`Self::options`].
+    ///
+    /// This field stores the paths of the configuration files, mainly for
+    /// knowing which files to watch for changes.
+    ///
+    /// The path ordering doesn't imply precedence.
+    #[cfg_attr(test, serde(skip_serializing_if = "Vec::is_empty"))]
+    pub(super) extra_configuration_paths: Vec<SystemPathBuf>,
 }
 
 impl ProjectMetadata {
@@ -31,12 +43,16 @@ impl ProjectMetadata {
         Self {
             name,
             root,
+            extra_configuration_paths: Vec::default(),
             options: Options::default(),
         }
     }
 
     /// Loads a project from a `pyproject.toml` file.
-    pub(crate) fn from_pyproject(pyproject: PyProject, root: SystemPathBuf) -> Self {
+    pub(crate) fn from_pyproject(
+        pyproject: PyProject,
+        root: SystemPathBuf,
+    ) -> Result<Self, ResolveRequiresPythonError> {
         Self::from_options(
             pyproject
                 .tool
@@ -49,21 +65,37 @@ impl ProjectMetadata {
 
     /// Loads a project from a set of options with an optional pyproject-project table.
     pub(crate) fn from_options(
-        options: Options,
+        mut options: Options,
         root: SystemPathBuf,
         project: Option<&Project>,
-    ) -> Self {
+    ) -> Result<Self, ResolveRequiresPythonError> {
         let name = project
-            .and_then(|project| project.name.as_ref())
-            .map(|name| Name::new(&***name))
+            .and_then(|project| project.name.as_deref())
+            .map(|name| Name::new(&**name))
             .unwrap_or_else(|| Name::new(root.file_name().unwrap_or("root")));
 
-        // TODO(https://github.com/astral-sh/ruff/issues/15491): Respect requires-python
-        Self {
+        // If the `options` don't specify a python version but the `project.requires-python` field is set,
+        // use that as a lower bound instead.
+        if let Some(project) = project {
+            if options
+                .environment
+                .as_ref()
+                .is_none_or(|env| env.python_version.is_none())
+            {
+                if let Some(requires_python) = project.resolve_requires_python_lower_bound()? {
+                    let mut environment = options.environment.unwrap_or_default();
+                    environment.python_version = Some(requires_python);
+                    options.environment = Some(environment);
+                }
+            }
+        }
+
+        Ok(Self {
             name,
             root,
             options,
-        }
+            extra_configuration_paths: Vec::new(),
+        })
     }
 
     /// Discovers the closest project at `path` and returns its metadata.
@@ -131,19 +163,34 @@ impl ProjectMetadata {
                 }
 
                 tracing::debug!("Found project at '{}'", project_root);
-                return Ok(ProjectMetadata::from_options(
+
+                let metadata = ProjectMetadata::from_options(
                     options,
                     project_root.to_path_buf(),
                     pyproject
                         .as_ref()
                         .and_then(|pyproject| pyproject.project.as_ref()),
-                ));
+                )
+                .map_err(|err| {
+                    ProjectDiscoveryError::InvalidRequiresPythonConstraint {
+                        source: err,
+                        path: pyproject_path,
+                    }
+                })?;
+
+                return Ok(metadata);
             }
 
             if let Some(pyproject) = pyproject {
                 let has_knot_section = pyproject.knot().is_some();
                 let metadata =
-                    ProjectMetadata::from_pyproject(pyproject, project_root.to_path_buf());
+                    ProjectMetadata::from_pyproject(pyproject, project_root.to_path_buf())
+                        .map_err(
+                            |err| ProjectDiscoveryError::InvalidRequiresPythonConstraint {
+                                source: err,
+                                path: pyproject_path,
+                            },
+                        )?;
 
                 if has_knot_section {
                     tracing::debug!("Found project at '{}'", project_root);
@@ -191,6 +238,10 @@ impl ProjectMetadata {
         &self.options
     }
 
+    pub fn extra_configuration_paths(&self) -> &[SystemPathBuf] {
+        &self.extra_configuration_paths
+    }
+
     pub fn to_program_settings(&self, system: &dyn System) -> ProgramSettings {
         self.options.to_program_settings(self.root(), system)
     }
@@ -200,9 +251,31 @@ impl ProjectMetadata {
         self.options = options.combine(std::mem::take(&mut self.options));
     }
 
-    /// Combine the project options with the user options where project options take precedence.
-    pub fn apply_user_options(&mut self, options: Options) {
-        self.options.combine_with(options);
+    /// Applies the options from the configuration files to the project's options.
+    ///
+    /// This includes:
+    ///
+    /// * The user-level configuration
+    pub fn apply_configuration_files(
+        &mut self,
+        system: &dyn System,
+    ) -> Result<(), ConfigurationFileError> {
+        if let Some(user) = ConfigurationFile::user(system)? {
+            tracing::debug!(
+                "Applying user-level configuration loaded from `{path}`.",
+                path = user.path()
+            );
+            self.apply_configuration_file(user);
+        }
+
+        Ok(())
+    }
+
+    /// Applies a lower-precedence configuration files to the project's options.
+    fn apply_configuration_file(&mut self, options: ConfigurationFile) {
+        self.extra_configuration_paths
+            .push(options.path().to_owned());
+        self.options.combine_with(options.into_options());
     }
 }
 
@@ -222,16 +295,22 @@ pub enum ProjectDiscoveryError {
         source: Box<KnotTomlError>,
         path: SystemPathBuf,
     },
+
+    #[error("Invalid `requires-python` version specifier (`{path}`): {source}")]
+    InvalidRequiresPythonConstraint {
+        source: ResolveRequiresPythonError,
+        path: SystemPathBuf,
+    },
 }
 
 #[cfg(test)]
 mod tests {
     //! Integration tests for project discovery
 
-    use crate::snapshot_project;
     use anyhow::{anyhow, Context};
     use insta::assert_ron_snapshot;
     use ruff_db::system::{SystemPathBuf, TestSystem};
+    use ruff_python_ast::PythonVersion;
 
     use crate::{ProjectDiscoveryError, ProjectMetadata};
 
@@ -242,7 +321,7 @@ mod tests {
 
         system
             .memory_file_system()
-            .write_files([(root.join("foo.py"), ""), (root.join("bar.py"), "")])
+            .write_files_all([(root.join("foo.py"), ""), (root.join("bar.py"), "")])
             .context("Failed to write files")?;
 
         let project =
@@ -250,7 +329,15 @@ mod tests {
 
         assert_eq!(project.root(), &*root);
 
-        snapshot_project!(project);
+        with_escaped_paths(|| {
+            assert_ron_snapshot!(&project, @r#"
+                ProjectMetadata(
+                  name: Name("app"),
+                  root: "/app",
+                  options: Options(),
+                )
+            "#);
+        });
 
         Ok(())
     }
@@ -262,7 +349,7 @@ mod tests {
 
         system
             .memory_file_system()
-            .write_files([
+            .write_files_all([
                 (
                     root.join("pyproject.toml"),
                     r#"
@@ -279,7 +366,16 @@ mod tests {
             ProjectMetadata::discover(&root, &system).context("Failed to discover project")?;
 
         assert_eq!(project.root(), &*root);
-        snapshot_project!(project);
+
+        with_escaped_paths(|| {
+            assert_ron_snapshot!(&project, @r#"
+                ProjectMetadata(
+                  name: Name("backend"),
+                  root: "/app",
+                  options: Options(),
+                )
+            "#);
+        });
 
         // Discovering the same package from a subdirectory should give the same result
         let from_src = ProjectMetadata::discover(&root.join("db"), &system)
@@ -297,7 +393,7 @@ mod tests {
 
         system
             .memory_file_system()
-            .write_files([
+            .write_files_all([
                 (
                     root.join("pyproject.toml"),
                     r#"
@@ -336,7 +432,7 @@ expected `.`, `]`
 
         system
             .memory_file_system()
-            .write_files([
+            .write_files_all([
                 (
                     root.join("pyproject.toml"),
                     r#"
@@ -362,7 +458,19 @@ expected `.`, `]`
 
         let sub_project = ProjectMetadata::discover(&root.join("packages/a"), &system)?;
 
-        snapshot_project!(sub_project);
+        with_escaped_paths(|| {
+            assert_ron_snapshot!(sub_project, @r#"
+            ProjectMetadata(
+              name: Name("nested-project"),
+              root: "/app/packages/a",
+              options: Options(
+                src: Some(SrcOptions(
+                  root: Some("src"),
+                )),
+              ),
+            )
+            "#);
+        });
 
         Ok(())
     }
@@ -374,7 +482,7 @@ expected `.`, `]`
 
         system
             .memory_file_system()
-            .write_files([
+            .write_files_all([
                 (
                     root.join("pyproject.toml"),
                     r#"
@@ -400,7 +508,19 @@ expected `.`, `]`
 
         let root = ProjectMetadata::discover(&root, &system)?;
 
-        snapshot_project!(root);
+        with_escaped_paths(|| {
+            assert_ron_snapshot!(root, @r#"
+                              ProjectMetadata(
+                                name: Name("project-root"),
+                                root: "/app",
+                                options: Options(
+                                  src: Some(SrcOptions(
+                                    root: Some("src"),
+                                  )),
+                                ),
+                              )
+                              "#);
+        });
 
         Ok(())
     }
@@ -412,7 +532,7 @@ expected `.`, `]`
 
         system
             .memory_file_system()
-            .write_files([
+            .write_files_all([
                 (
                     root.join("pyproject.toml"),
                     r#"
@@ -432,7 +552,15 @@ expected `.`, `]`
 
         let sub_project = ProjectMetadata::discover(&root.join("packages/a"), &system)?;
 
-        snapshot_project!(sub_project);
+        with_escaped_paths(|| {
+            assert_ron_snapshot!(sub_project, @r#"
+            ProjectMetadata(
+              name: Name("nested-project"),
+              root: "/app/packages/a",
+              options: Options(),
+            )
+            "#);
+        });
 
         Ok(())
     }
@@ -444,7 +572,7 @@ expected `.`, `]`
 
         system
             .memory_file_system()
-            .write_files([
+            .write_files_all([
                 (
                     root.join("pyproject.toml"),
                     r#"
@@ -467,7 +595,19 @@ expected `.`, `]`
 
         let root = ProjectMetadata::discover(&root.join("packages/a"), &system)?;
 
-        snapshot_project!(root);
+        with_escaped_paths(|| {
+            assert_ron_snapshot!(root, @r#"
+            ProjectMetadata(
+              name: Name("project-root"),
+              root: "/app",
+              options: Options(
+                environment: Some(EnvironmentOptions(
+                  r#python-version: Some("3.10"),
+                )),
+              ),
+            )
+            "#);
+        });
 
         Ok(())
     }
@@ -483,31 +623,308 @@ expected `.`, `]`
 
         system
             .memory_file_system()
-            .write_files([
+            .write_files_all([
                 (
                     root.join("pyproject.toml"),
                     r#"
-                        [project]
-                        name = "super-app"
-                        requires-python = ">=3.12"
+                    [project]
+                    name = "super-app"
+                    requires-python = ">=3.12"
 
-                        [tool.knot.src]
-                        root = "this_option_is_ignored"
-                        "#,
+                    [tool.knot.src]
+                    root = "this_option_is_ignored"
+                    "#,
                 ),
                 (
                     root.join("knot.toml"),
                     r#"
-                        [src]
-                        root = "src"
-                        "#,
+                    [src]
+                    root = "src"
+                    "#,
                 ),
             ])
             .context("Failed to write files")?;
 
         let root = ProjectMetadata::discover(&root, &system)?;
 
-        snapshot_project!(root);
+        with_escaped_paths(|| {
+            assert_ron_snapshot!(root, @r#"
+            ProjectMetadata(
+              name: Name("super-app"),
+              root: "/app",
+              options: Options(
+                environment: Some(EnvironmentOptions(
+                  r#python-version: Some("3.12"),
+                )),
+                src: Some(SrcOptions(
+                  root: Some("src"),
+                )),
+              ),
+            )
+            "#);
+        });
+
+        Ok(())
+    }
+    #[test]
+    fn requires_python_major_minor() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = SystemPathBuf::from("/app");
+
+        system
+            .memory_file_system()
+            .write_file_all(
+                root.join("pyproject.toml"),
+                r#"
+                [project]
+                requires-python = ">=3.12"
+                "#,
+            )
+            .context("Failed to write file")?;
+
+        let root = ProjectMetadata::discover(&root, &system)?;
+
+        assert_eq!(
+            root.options
+                .environment
+                .unwrap_or_default()
+                .python_version
+                .as_deref(),
+            Some(&PythonVersion::PY312)
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn requires_python_major_only() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = SystemPathBuf::from("/app");
+
+        system
+            .memory_file_system()
+            .write_file_all(
+                root.join("pyproject.toml"),
+                r#"
+                [project]
+                requires-python = ">=3"
+                "#,
+            )
+            .context("Failed to write file")?;
+
+        let root = ProjectMetadata::discover(&root, &system)?;
+
+        assert_eq!(
+            root.options
+                .environment
+                .unwrap_or_default()
+                .python_version
+                .as_deref(),
+            Some(&PythonVersion::from((3, 0)))
+        );
+
+        Ok(())
+    }
+
+    /// A `requires-python` constraint with major, minor and patch can be simplified
+    /// to major and minor (e.g. 3.12.1 -> 3.12).
+    #[test]
+    fn requires_python_major_minor_patch() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = SystemPathBuf::from("/app");
+
+        system
+            .memory_file_system()
+            .write_file_all(
+                root.join("pyproject.toml"),
+                r#"
+                [project]
+                requires-python = ">=3.12.8"
+                "#,
+            )
+            .context("Failed to write file")?;
+
+        let root = ProjectMetadata::discover(&root, &system)?;
+
+        assert_eq!(
+            root.options
+                .environment
+                .unwrap_or_default()
+                .python_version
+                .as_deref(),
+            Some(&PythonVersion::PY312)
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn requires_python_beta_version() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = SystemPathBuf::from("/app");
+
+        system
+            .memory_file_system()
+            .write_file_all(
+                root.join("pyproject.toml"),
+                r#"
+                [project]
+                requires-python = ">= 3.13.0b0"
+                "#,
+            )
+            .context("Failed to write file")?;
+
+        let root = ProjectMetadata::discover(&root, &system)?;
+
+        assert_eq!(
+            root.options
+                .environment
+                .unwrap_or_default()
+                .python_version
+                .as_deref(),
+            Some(&PythonVersion::PY313)
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn requires_python_greater_than_major_minor() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = SystemPathBuf::from("/app");
+
+        system
+            .memory_file_system()
+            .write_file_all(
+                root.join("pyproject.toml"),
+                r#"
+                [project]
+                # This is somewhat nonsensical because 3.12.1 > 3.12 is true.
+                # That's why simplifying the constraint to >= 3.12 is correct
+                requires-python = ">3.12"
+                "#,
+            )
+            .context("Failed to write file")?;
+
+        let root = ProjectMetadata::discover(&root, &system)?;
+
+        assert_eq!(
+            root.options
+                .environment
+                .unwrap_or_default()
+                .python_version
+                .as_deref(),
+            Some(&PythonVersion::PY312)
+        );
+
+        Ok(())
+    }
+
+    /// `python-version` takes precedence if both `requires-python` and `python-version` are configured.
+    #[test]
+    fn requires_python_and_python_version() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = SystemPathBuf::from("/app");
+
+        system
+            .memory_file_system()
+            .write_file_all(
+                root.join("pyproject.toml"),
+                r#"
+                [project]
+                requires-python = ">=3.12"
+
+                [tool.knot.environment]
+                python-version = "3.10"
+                "#,
+            )
+            .context("Failed to write file")?;
+
+        let root = ProjectMetadata::discover(&root, &system)?;
+
+        assert_eq!(
+            root.options
+                .environment
+                .unwrap_or_default()
+                .python_version
+                .as_deref(),
+            Some(&PythonVersion::PY310)
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn requires_python_less_than() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = SystemPathBuf::from("/app");
+
+        system
+            .memory_file_system()
+            .write_file_all(
+                root.join("pyproject.toml"),
+                r#"
+                [project]
+                requires-python = "<3.12"
+                "#,
+            )
+            .context("Failed to write file")?;
+
+        let Err(error) = ProjectMetadata::discover(&root, &system) else {
+            return Err(anyhow!("Expected project discovery to fail because the `requires-python` doesn't specify a lower bound (it only specifies an upper bound)."));
+        };
+
+        assert_error_eq(&error, "Invalid `requires-python` version specifier (`/app/pyproject.toml`): value `<3.12` does not contain a lower bound. Add a lower bound to indicate the minimum compatible Python version (e.g., `>=3.13`) or specify a version in `environment.python-version`.");
+
+        Ok(())
+    }
+
+    #[test]
+    fn requires_python_no_specifiers() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = SystemPathBuf::from("/app");
+
+        system
+            .memory_file_system()
+            .write_file_all(
+                root.join("pyproject.toml"),
+                r#"
+                [project]
+                requires-python = ""
+                "#,
+            )
+            .context("Failed to write file")?;
+
+        let Err(error) = ProjectMetadata::discover(&root, &system) else {
+            return Err(anyhow!("Expected project discovery to fail because the `requires-python` specifiers are empty and don't define a lower bound."));
+        };
+
+        assert_error_eq(&error, "Invalid `requires-python` version specifier (`/app/pyproject.toml`): value `` does not contain a lower bound. Add a lower bound to indicate the minimum compatible Python version (e.g., `>=3.13`) or specify a version in `environment.python-version`.");
+
+        Ok(())
+    }
+
+    #[test]
+    fn requires_python_too_large_major_version() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = SystemPathBuf::from("/app");
+
+        system
+            .memory_file_system()
+            .write_file_all(
+                root.join("pyproject.toml"),
+                r#"
+                [project]
+                requires-python = ">=999.0"
+                "#,
+            )
+            .context("Failed to write file")?;
+
+        let Err(error) = ProjectMetadata::discover(&root, &system) else {
+            return Err(anyhow!("Expected project discovery to fail because of the requires-python major version that is larger than 255."));
+        };
+
+        assert_error_eq(&error, "Invalid `requires-python` version specifier (`/app/pyproject.toml`): The major version `999` is larger than the maximum supported value 255");
 
         Ok(())
     }
@@ -517,15 +934,12 @@ expected `.`, `]`
         assert_eq!(error.to_string().replace('\\', "/"), message);
     }
 
-    /// Snapshots a project but with all paths using unix separators.
-    #[macro_export]
-    macro_rules! snapshot_project {
-    ($project:expr) => {{
-        assert_ron_snapshot!($project,{
-            ".root" => insta::dynamic_redaction(|content, _content_path| {
-                content.as_str().unwrap().replace("\\", "/")
-            }),
+    fn with_escaped_paths<R>(f: impl FnOnce() -> R) -> R {
+        let mut settings = insta::Settings::clone_current();
+        settings.add_dynamic_redaction(".root", |content, _path| {
+            content.as_str().unwrap().replace('\\', "/")
         });
-    }};
-}
+
+        settings.bind(f)
+    }
 }

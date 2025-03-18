@@ -1,0 +1,52 @@
+---
+source: crates/red_knot_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: for.md - For loops - Bad `__getitem__` method
+mdtest path: crates/red_knot_python_semantic/resources/mdtest/loops/for.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing_extensions import reveal_type
+ 2 | 
+ 3 | class Iterable:
+ 4 |     # invalid because it will implicitly be passed an `int`
+ 5 |     # by the interpreter
+ 6 |     def __getitem__(self, key: str) -> int:
+ 7 |         return 42
+ 8 | 
+ 9 | # error: [not-iterable]
+10 | for x in Iterable():
+11 |     reveal_type(x)  # revealed: int
+```
+
+# Diagnostics
+
+```
+error: lint:not-iterable
+  --> /src/mdtest_snippet.py:10:10
+   |
+ 9 | # error: [not-iterable]
+10 | for x in Iterable():
+   |          ^^^^^^^^^^ Object of type `Iterable` is not iterable because it has no `__iter__` method and its `__getitem__` method has an incorrect signature for the old-style iteration protocol (expected a signature at least as permissive as `def __getitem__(self, key: int): ...`)
+11 |     reveal_type(x)  # revealed: int
+   |
+
+```
+
+```
+info: revealed-type
+  --> /src/mdtest_snippet.py:11:5
+   |
+ 9 | # error: [not-iterable]
+10 | for x in Iterable():
+11 |     reveal_type(x)  # revealed: int
+   |     ^^^^^^^^^^^^^^ Revealed type is `int`
+   |
+
+```

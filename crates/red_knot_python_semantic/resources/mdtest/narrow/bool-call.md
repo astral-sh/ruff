@@ -22,11 +22,13 @@ def _(flag: bool):
 
     # invalid invocation, too many positional args
     reveal_type(x)  # revealed: Literal[1] | None
-    if bool(x is not None, 5):  # TODO diagnostic
+    # error: [too-many-positional-arguments] "Too many positional arguments to class `bool`: expected 1, got 2"
+    if bool(x is not None, 5):
         reveal_type(x)  # revealed: Literal[1] | None
 
     # invalid invocation, too many kwargs
     reveal_type(x)  # revealed: Literal[1] | None
-    if bool(x is not None, y=5):  # TODO diagnostic
+    # error: [unknown-argument] "Argument `y` does not match any known parameter of class `bool`"
+    if bool(x is not None, y=5):
         reveal_type(x)  # revealed: Literal[1] | None
 ```

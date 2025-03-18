@@ -12,14 +12,32 @@ use ruff_db::parsed::ParsedModule;
 /// Holding on to any [`AstNodeRef`] prevents the [`ParsedModule`] from being released.
 ///
 /// ## Equality
-/// Two `AstNodeRef` are considered equal if their wrapped nodes are equal.
+/// Two `AstNodeRef` are considered equal if their pointer addresses are equal.
+///
+/// ## Usage in salsa tracked structs
+/// It's important that [`AstNodeRef`] fields in salsa tracked structs are tracked fields
+/// (attributed with `#[tracked`]). It prevents that the tracked struct gets a new ID
+/// everytime the AST changes, which in turn, invalidates the result of any query
+/// that takes said tracked struct as a query argument or returns the tracked struct as part of its result.
+///
+/// For example, marking the [`AstNodeRef`] as tracked on `Expression`
+/// has the effect that salsa will consider the expression as "unchanged" for as long as it:
+///
+/// * belongs to the same file
+/// * belongs to the same scope
+/// * has the same kind
+/// * was created in the same order
+///
+/// This means that changes to expressions in other scopes don't invalidate the expression's id, giving
+/// us some form of scope-stable identity for expressions. Only queries accessing the node field
+/// run on every AST change. All other queries only run when the expression's identity changes.
 #[derive(Clone)]
 pub struct AstNodeRef<T> {
     /// Owned reference to the node's [`ParsedModule`].
     ///
     /// The node's reference is guaranteed to remain valid as long as it's enclosing
     /// [`ParsedModule`] is alive.
-    _parsed: ParsedModule,
+    parsed: ParsedModule,
 
     /// Pointer to the referenced node.
     node: std::ptr::NonNull<T>,
@@ -27,7 +45,7 @@ pub struct AstNodeRef<T> {
 
 #[allow(unsafe_code)]
 impl<T> AstNodeRef<T> {
-    /// Creates a new `AstNodeRef` that reference `node`. The `parsed` is the [`ParsedModule`] to
+    /// Creates a new `AstNodeRef` that references `node`. The `parsed` is the [`ParsedModule`] to
     /// which the `AstNodeRef` belongs.
     ///
     /// ## Safety
@@ -37,7 +55,7 @@ impl<T> AstNodeRef<T> {
     /// the invariant `node belongs to parsed` is upheld.
     pub(super) unsafe fn new(parsed: ParsedModule, node: &T) -> Self {
         Self {
-            _parsed: parsed,
+            parsed,
             node: std::ptr::NonNull::from(node),
         }
     }
@@ -72,7 +90,14 @@ where
     T: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
-        self.node().eq(other.node())
+        if self.parsed == other.parsed {
+            // Comparing the pointer addresses is sufficient to determine equality
+            // if the parsed are the same.
+            self.node.eq(&other.node)
+        } else {
+            // Otherwise perform a deep comparison.
+            self.node().eq(other.node())
+        }
     }
 }
 
@@ -84,6 +109,20 @@ where
 {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.node().hash(state);
+    }
+}
+
+#[allow(unsafe_code)]
+unsafe impl<T> salsa::Update for AstNodeRef<T> {
+    unsafe fn maybe_update(old_pointer: *mut Self, new_value: Self) -> bool {
+        let old_ref = &mut (*old_pointer);
+
+        if old_ref.parsed == new_value.parsed && old_ref.node.eq(&new_value.node) {
+            false
+        } else {
+            *old_ref = new_value;
+            true
+        }
     }
 }
 

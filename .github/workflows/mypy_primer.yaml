@@ -1,0 +1,93 @@
+name: Run mypy_primer
+
+permissions: {}
+
+on:
+  pull_request:
+    paths:
+      - "crates/red_knot*/**"
+      - "crates/ruff_db"
+      - "crates/ruff_python_ast"
+      - "crates/ruff_python_parser"
+      - ".github/workflows/mypy_primer.yaml"
+      - ".github/workflows/mypy_primer_comment.yaml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref_name }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
+env:
+  CARGO_INCREMENTAL: 0
+  CARGO_NET_RETRY: 10
+  CARGO_TERM_COLOR: always
+  RUSTUP_MAX_RETRIES: 10
+
+jobs:
+  mypy_primer:
+    name: Run mypy_primer
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        with:
+          path: ruff
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install the latest version of uv
+        uses: astral-sh/setup-uv@f94ec6bedd8674c4426838e6b50417d36b6ab231 # v5
+
+      - uses: Swatinem/rust-cache@f0deed1e0edfc6a9be95417288c0e1099b1eeec3 # v2
+        with:
+          workspaces: "ruff"
+      - name: Install Rust toolchain
+        run: rustup show
+
+      - name: Install mypy_primer
+        run: |
+          uv tool install "git+https://github.com/astral-sh/mypy_primer.git@add-red-knot-support"
+
+      - name: Run mypy_primer
+        shell: bash
+        run: |
+          cd ruff
+
+          echo "new commit"
+          git rev-list --format=%s --max-count=1 "$GITHUB_SHA"
+
+          MERGE_BASE="$(git merge-base "$GITHUB_SHA" "origin/$GITHUB_BASE_REF")"
+          git checkout -b base_commit "$MERGE_BASE"
+          echo "base commit"
+          git rev-list --format=%s --max-count=1 base_commit
+
+          cd ..
+
+          # Allow the exit code to be 0 or 1, only fail for actual mypy_primer crashes/bugs
+          uvx mypy_primer \
+            --repo ruff \
+            --type-checker knot \
+            --old base_commit \
+            --new "$GITHUB_SHA" \
+            --project-selector '/(mypy_primer|black|pyp|git-revise|zipp|arrow|isort|itsdangerous|rich|packaging|pybind11|pyinstrument)$' \
+            --output concise \
+            --debug > mypy_primer.diff || [ $? -eq 1 ]
+
+          # Output diff with ANSI color codes
+          cat mypy_primer.diff
+
+          # Remove ANSI color codes before uploading
+          sed -ie 's/\x1b\[[0-9;]*m//g' mypy_primer.diff
+
+          echo ${{ github.event.number }} > pr-number
+
+      - name: Upload diff
+        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4
+        with:
+          name: mypy_primer_diff
+          path: mypy_primer.diff
+
+      - name: Upload pr-number
+        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4
+        with:
+          name: pr-number
+          path: pr-number

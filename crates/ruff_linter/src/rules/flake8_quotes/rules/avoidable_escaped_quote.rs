@@ -3,7 +3,7 @@ use flake8_quotes::settings::Quote;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::visitor::{walk_f_string, Visitor};
-use ruff_python_ast::{self as ast, AnyStringFlags, StringFlags, StringLike};
+use ruff_python_ast::{self as ast, AnyStringFlags, PythonVersion, StringFlags, StringLike};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
@@ -50,7 +50,7 @@ impl AlwaysFixableViolation for AvoidableEscapedQuote {
 }
 
 /// Q003
-pub(crate) fn avoidable_escaped_quote(checker: &mut Checker, string_like: StringLike) {
+pub(crate) fn avoidable_escaped_quote(checker: &Checker, string_like: StringLike) {
     if checker.semantic().in_pep_257_docstring()
         || checker.semantic().in_string_type_definition()
         // This rule has support for strings nested inside another f-strings but they're checked
@@ -61,7 +61,11 @@ pub(crate) fn avoidable_escaped_quote(checker: &mut Checker, string_like: String
         return;
     }
 
-    let mut rule_checker = AvoidableEscapedQuoteChecker::new(checker.locator(), checker.settings);
+    let mut rule_checker = AvoidableEscapedQuoteChecker::new(
+        checker.locator(),
+        checker.settings,
+        checker.target_version(),
+    );
 
     for part in string_like.parts() {
         match part {
@@ -75,7 +79,7 @@ pub(crate) fn avoidable_escaped_quote(checker: &mut Checker, string_like: String
         }
     }
 
-    checker.diagnostics.extend(rule_checker.into_diagnostics());
+    checker.report_diagnostics(rule_checker.into_diagnostics());
 }
 
 /// Checks for `Q003` violations using the [`Visitor`] implementation.
@@ -88,11 +92,15 @@ struct AvoidableEscapedQuoteChecker<'a> {
 }
 
 impl<'a> AvoidableEscapedQuoteChecker<'a> {
-    fn new(locator: &'a Locator<'a>, settings: &'a LinterSettings) -> Self {
+    fn new(
+        locator: &'a Locator<'a>,
+        settings: &'a LinterSettings,
+        target_version: PythonVersion,
+    ) -> Self {
         Self {
             locator,
             quotes_settings: &settings.flake8_quotes,
-            supports_pep701: settings.target_version.supports_pep701(),
+            supports_pep701: target_version.supports_pep_701(),
             diagnostics: vec![],
         }
     }

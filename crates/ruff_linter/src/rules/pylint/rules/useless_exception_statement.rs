@@ -6,7 +6,7 @@ use ruff_python_stdlib::builtins;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::settings::types::PythonVersion;
+use ruff_python_ast::PythonVersion;
 
 /// ## What it does
 /// Checks for an exception that is not raised.
@@ -50,18 +50,18 @@ impl Violation for UselessExceptionStatement {
 }
 
 /// PLW0133
-pub(crate) fn useless_exception_statement(checker: &mut Checker, expr: &ast::StmtExpr) {
+pub(crate) fn useless_exception_statement(checker: &Checker, expr: &ast::StmtExpr) {
     let Expr::Call(ast::ExprCall { func, .. }) = expr.value.as_ref() else {
         return;
     };
 
-    if is_builtin_exception(func, checker.semantic(), checker.settings.target_version) {
+    if is_builtin_exception(func, checker.semantic(), checker.target_version()) {
         let mut diagnostic = Diagnostic::new(UselessExceptionStatement, expr.range());
         diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
             "raise ".to_string(),
             expr.start(),
         )));
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }
 
@@ -75,6 +75,6 @@ fn is_builtin_exception(
         .resolve_qualified_name(expr)
         .is_some_and(|qualified_name| {
             matches!(qualified_name.segments(), ["" | "builtins", name]
-            if builtins::is_exception(name, target_version.minor()))
+            if builtins::is_exception(name, target_version.minor))
         })
 }

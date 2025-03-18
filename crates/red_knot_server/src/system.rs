@@ -7,8 +7,8 @@ use lsp_types::Url;
 use ruff_db::file_revision::FileRevision;
 use ruff_db::system::walk_directory::WalkDirectoryBuilder;
 use ruff_db::system::{
-    DirectoryEntry, FileType, GlobError, Metadata, OsSystem, PatternError, Result, System,
-    SystemPath, SystemPathBuf, SystemVirtualPath, SystemVirtualPathBuf,
+    CaseSensitivity, DirectoryEntry, FileType, GlobError, Metadata, OsSystem, PatternError, Result,
+    System, SystemPath, SystemPathBuf, SystemVirtualPath, SystemVirtualPathBuf,
 };
 use ruff_notebook::{Notebook, NotebookError};
 
@@ -136,6 +136,10 @@ impl System for LSPSystem {
         self.os_system.canonicalize_path(path)
     }
 
+    fn path_exists_case_sensitive(&self, path: &SystemPath, prefix: &SystemPath) -> bool {
+        self.os_system.path_exists_case_sensitive(path, prefix)
+    }
+
     fn read_to_string(&self, path: &SystemPath) -> Result<String> {
         let document = self.system_path_to_document_ref(path)?;
 
@@ -187,6 +191,10 @@ impl System for LSPSystem {
         self.os_system.current_directory()
     }
 
+    fn user_config_directory(&self) -> Option<SystemPathBuf> {
+        self.os_system.user_config_directory()
+    }
+
     fn read_directory<'a>(
         &'a self,
         path: &SystemPath,
@@ -214,6 +222,10 @@ impl System for LSPSystem {
 
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
+    }
+
+    fn case_sensitivity(&self) -> CaseSensitivity {
+        self.os_system.case_sensitivity()
     }
 }
 

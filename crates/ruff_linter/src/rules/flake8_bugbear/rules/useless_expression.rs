@@ -71,7 +71,7 @@ impl Violation for UselessExpression {
 }
 
 /// B018
-pub(crate) fn useless_expression(checker: &mut Checker, value: &Expr) {
+pub(crate) fn useless_expression(checker: &Checker, value: &Expr) {
     // Ignore comparisons, as they're handled by `useless_comparison`.
     if value.is_compare_expr() {
         return;
@@ -100,7 +100,7 @@ pub(crate) fn useless_expression(checker: &mut Checker, value: &Expr) {
         // Flag attributes as useless expressions, even if they're attached to calls or other
         // expressions.
         if value.is_attribute_expr() {
-            checker.diagnostics.push(Diagnostic::new(
+            checker.report_diagnostic(Diagnostic::new(
                 UselessExpression {
                     kind: Kind::Attribute,
                 },
@@ -110,7 +110,7 @@ pub(crate) fn useless_expression(checker: &mut Checker, value: &Expr) {
         return;
     }
 
-    checker.diagnostics.push(Diagnostic::new(
+    checker.report_diagnostic(Diagnostic::new(
         UselessExpression {
             kind: Kind::Expression,
         },

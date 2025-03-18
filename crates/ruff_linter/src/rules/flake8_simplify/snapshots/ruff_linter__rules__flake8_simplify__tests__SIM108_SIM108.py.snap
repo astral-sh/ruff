@@ -226,6 +226,33 @@ SIM108.py:167:1: SIM108 [*] Use ternary operator `z = 1 if True else other` inst
 172 169 | if False:
 173 170 |     z = 1
 
+SIM108.py:172:1: SIM108 [*] Use ternary operator `z = 1 if False else other` instead of `if`-`else`-block
+    |
+170 |       z = other
+171 |
+172 | / if False:
+173 | |     z = 1
+174 | | else:
+175 | |     z = other
+    | |_____________^ SIM108
+176 |
+177 |   if 1:
+    |
+    = help: Replace `if`-`else`-block with `z = 1 if False else other`
+
+ℹ Unsafe fix
+169 169 | else:
+170 170 |     z = other
+171 171 | 
+172     |-if False:
+173     |-    z = 1
+174     |-else:
+175     |-    z = other
+    172 |+z = 1 if False else other
+176 173 | 
+177 174 | if 1:
+178 175 |     z = True
+
 SIM108.py:177:1: SIM108 [*] Use ternary operator `z = True if 1 else other` instead of `if`-`else`-block
     |
 175 |       z = other

@@ -277,7 +277,7 @@ impl<'a> Visitor<'a> for AssignedNamesVisitor<'a> {
 }
 
 /// B023
-pub(crate) fn function_uses_loop_variable(checker: &mut Checker, node: &Node) {
+pub(crate) fn function_uses_loop_variable(checker: &Checker, node: &Node) {
     // Identify any "suspicious" variables. These are defined as variables that are
     // referenced in a function or lambda body, but aren't bound as arguments.
     let suspicious_variables = {
@@ -304,9 +304,8 @@ pub(crate) fn function_uses_loop_variable(checker: &mut Checker, node: &Node) {
         // loop, flag it.
         for name in suspicious_variables {
             if reassigned_in_loop.contains(&name.id.as_str()) {
-                if !checker.flake8_bugbear_seen.contains(&name.range()) {
-                    checker.flake8_bugbear_seen.push(name.range());
-                    checker.diagnostics.push(Diagnostic::new(
+                if checker.insert_flake8_bugbear_range(name.range()) {
+                    checker.report_diagnostic(Diagnostic::new(
                         FunctionUsesLoopVariable {
                             name: name.id.to_string(),
                         },

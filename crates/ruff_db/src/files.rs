@@ -1,14 +1,14 @@
-use std::fmt::Formatter;
+use std::fmt;
 use std::sync::Arc;
 
 use countme::Count;
 use dashmap::mapref::entry::Entry;
-use salsa::{Durability, Setter};
-
 pub use file_root::{FileRoot, FileRootKind};
 pub use path::FilePath;
 use ruff_notebook::{Notebook, NotebookError};
 use ruff_python_ast::PySourceType;
+use salsa::plumbing::AsId;
+use salsa::{Durability, Setter};
 
 use crate::file_revision::FileRevision;
 use crate::files::file_root::FileRoots;
@@ -255,7 +255,7 @@ impl Files {
     }
 }
 
-impl std::fmt::Debug for Files {
+impl fmt::Debug for Files {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut map = f.debug_map();
 
@@ -429,6 +429,24 @@ impl File {
     }
 }
 
+impl fmt::Debug for File {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        salsa::with_attached_database(|db| {
+            if f.alternate() {
+                f.debug_struct("File")
+                    .field("path", &self.path(db))
+                    .field("status", &self.status(db))
+                    .field("permissions", &self.permissions(db))
+                    .field("revision", &self.revision(db))
+                    .finish()
+            } else {
+                f.debug_tuple("File").field(&self.path(db)).finish()
+            }
+        })
+        .unwrap_or_else(|| f.debug_tuple("file").field(&self.as_id()).finish())
+    }
+}
+
 /// A virtual file that doesn't exist on the file system.
 ///
 /// This is a wrapper around a [`File`] that provides additional methods to interact with a virtual
@@ -481,8 +499,8 @@ pub enum FileError {
     NotFound,
 }
 
-impl std::fmt::Display for FileError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for FileError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             FileError::IsADirectory => f.write_str("Is a directory"),
             FileError::NotFound => f.write_str("Not found"),
@@ -496,7 +514,7 @@ impl std::error::Error for FileError {}
 mod tests {
     use crate::file_revision::FileRevision;
     use crate::files::{system_path_to_file, vendored_path_to_file, FileError};
-    use crate::system::DbWithTestSystem;
+    use crate::system::DbWithWritableSystem as _;
     use crate::tests::TestDb;
     use crate::vendored::VendoredFileSystemBuilder;
     use zip::CompressionMethod;

@@ -189,7 +189,8 @@ linter.rules.should_fix = [
 linter.per_file_ignores = {}
 linter.safety_table.forced_safe = []
 linter.safety_table.forced_unsafe = []
-linter.target_version = Py37
+linter.unresolved_target_version = 3.7
+linter.per_file_target_version = {}
 linter.preview = disabled
 linter.explicit_preview_rules = false
 linter.extension = ExtensionMapping({})
@@ -225,9 +226,12 @@ linter.flake8_bandit.hardcoded_tmp_directory = [
 	/dev/shm,
 ]
 linter.flake8_bandit.check_typed_exception = false
+linter.flake8_bandit.extend_markup_names = []
+linter.flake8_bandit.allowed_markup_calls = []
 linter.flake8_bugbear.extend_immutable_calls = []
-linter.flake8_builtins.builtins_allowed_modules = []
-linter.flake8_builtins.builtins_ignorelist = []
+linter.flake8_builtins.allowed_modules = []
+linter.flake8_builtins.ignorelist = []
+linter.flake8_builtins.strict_checking = false
 linter.flake8_comprehensions.allow_dict_calls_with_keyword_arguments = false
 linter.flake8_copyright.notice_rgx = (?i)Copyright\s+((?:\(C\)|©)\s+)?\d{4}((-|,\s)\d{4})*
 linter.flake8_copyright.author = none
@@ -367,12 +371,11 @@ linter.pylint.max_public_methods = 20
 linter.pylint.max_locals = 15
 linter.pyupgrade.keep_runtime_typing = false
 linter.ruff.parenthesize_tuple_in_subscript = false
-linter.ruff.extend_markup_names = []
-linter.ruff.allowed_markup_calls = []
 
 # Formatter Settings
 formatter.exclude = []
-formatter.target_version = Py37
+formatter.unresolved_target_version = 3.7
+formatter.per_file_target_version = {}
 formatter.preview = disabled
 formatter.line_width = 100
 formatter.line_ending = auto
@@ -386,7 +389,7 @@ formatter.docstring_code_line_width = dynamic
 # Analyze Settings
 analyze.exclude = []
 analyze.preview = disabled
-analyze.target_version = Py37
+analyze.target_version = 3.7
 analyze.detect_string_imports = false
 analyze.extension = ExtensionMapping({})
 analyze.include_dependencies = {}

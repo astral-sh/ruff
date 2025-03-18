@@ -26,7 +26,7 @@
 //!     eliminate the supertype from the intersection).
 //!   * An intersection containing two non-overlapping types should simplify to [`Type::Never`].
 
-use crate::types::{InstanceType, IntersectionType, KnownClass, Type, UnionType};
+use crate::types::{IntersectionType, KnownClass, Type, UnionType};
 use crate::{Db, FxOrderSet};
 use smallvec::SmallVec;
 
@@ -43,6 +43,17 @@ impl<'db> UnionBuilder<'db> {
         }
     }
 
+    pub(crate) fn is_empty(&self) -> bool {
+        self.elements.is_empty()
+    }
+
+    /// Collapse the union to a single type: `object`.
+    fn collapse_to_object(mut self) -> Self {
+        self.elements.clear();
+        self.elements.push(Type::object(self.db));
+        self
+    }
+
     /// Adds a type to this union.
     pub(crate) fn add(mut self, ty: Type<'db>) -> Self {
         match ty {
@@ -53,7 +64,12 @@ impl<'db> UnionBuilder<'db> {
                     self = self.add(*element);
                 }
             }
+            // Adding `Never` to a union is a no-op.
             Type::Never => {}
+            // Adding `object` to a union results in `object`.
+            ty if ty.is_object(self.db) => {
+                return self.collapse_to_object();
+            }
             _ => {
                 let bool_pair = if let Type::BooleanLiteral(b) = ty {
                     Some(Type::BooleanLiteral(!b))
@@ -76,7 +92,10 @@ impl<'db> UnionBuilder<'db> {
                         break;
                     }
 
-                    if ty.is_same_gradual_form(*element) || ty.is_subtype_of(self.db, *element) {
+                    if ty.is_same_gradual_form(*element)
+                        || ty.is_subtype_of(self.db, *element)
+                        || element.is_object(self.db)
+                    {
                         return self;
                     } else if element.is_subtype_of(self.db, ty) {
                         to_remove.push(index);
@@ -88,9 +107,7 @@ impl<'db> UnionBuilder<'db> {
                         // `element | ty` must be `object` (object has no other supertypes). This means we can simplify
                         // the whole union to just `object`, since all other potential elements would also be subtypes of
                         // `object`.
-                        self.elements.clear();
-                        self.elements.push(KnownClass::Object.to_instance(self.db));
-                        return self;
+                        return self.collapse_to_object();
                     }
                 }
                 match to_remove[..] {
@@ -286,7 +303,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
             _ => {
                 let known_instance = new_positive
                     .into_instance()
-                    .and_then(|instance| instance.class.known(db));
+                    .and_then(|instance| instance.class().known(db));
 
                 if known_instance == Some(KnownClass::Object) {
                     // `object & T` -> `T`; it is always redundant to add `object` to an intersection
@@ -305,8 +322,8 @@ impl<'db> InnerIntersectionBuilder<'db> {
                         Type::AlwaysFalsy if addition_is_bool_instance => {
                             new_positive = Type::BooleanLiteral(false);
                         }
-                        Type::Instance(InstanceType { class })
-                            if class.is_known(db, KnownClass::Bool) =>
+                        Type::Instance(instance)
+                            if instance.class().is_known(db, KnownClass::Bool) =>
                         {
                             match new_positive {
                                 // `bool & AlwaysTruthy` -> `Literal[True]`
@@ -400,7 +417,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
             self.positive
                 .iter()
                 .filter_map(|ty| ty.into_instance())
-                .filter_map(|instance| instance.class.known(db))
+                .filter_map(|instance| instance.class().known(db))
                 .any(KnownClass::is_bool)
         };
 
@@ -416,7 +433,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
             Type::Never => {
                 // Adding ~Never to an intersection is a no-op.
             }
-            Type::Instance(instance) if instance.class.is_known(db, KnownClass::Object) => {
+            Type::Instance(instance) if instance.class().is_object(db) => {
                 // Adding ~object to an intersection results in Never.
                 *self = Self::default();
                 self.positive.insert(Type::Never);
@@ -481,7 +498,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
 
     fn build(mut self, db: &'db dyn Db) -> Type<'db> {
         match (self.positive.len(), self.negative.len()) {
-            (0, 0) => KnownClass::Object.to_instance(db),
+            (0, 0) => Type::object(db),
             (1, 0) => self.positive[0],
             _ => {
                 self.positive.shrink_to_fit();
@@ -534,7 +551,7 @@ mod tests {
         let db = setup_db();
 
         let intersection = IntersectionBuilder::new(&db).build();
-        assert_eq!(intersection, KnownClass::Object.to_instance(&db));
+        assert_eq!(intersection, Type::object(&db));
     }
 
     #[test_case(Type::BooleanLiteral(true))]
@@ -548,7 +565,7 @@ mod tests {
         // We add t_object in various orders (in first or second position) in
         // the tests below to ensure that the boolean simplification eliminates
         // everything from the intersection, not just `bool`.
-        let t_object = KnownClass::Object.to_instance(&db);
+        let t_object = Type::object(&db);
         let t_bool = KnownClass::Bool.to_instance(&db);
 
         let ty = IntersectionBuilder::new(&db)

@@ -1,0 +1,95 @@
+---
+source: crates/red_knot_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: return_type.md - Function return type - Invalid return type
+mdtest path: crates/red_knot_python_semantic/resources/mdtest/function/return_type.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | # error: [invalid-return-type]
+ 2 | def f() -> int:
+ 3 |     1
+ 4 | 
+ 5 | def f() -> str:
+ 6 |     # error: [invalid-return-type]
+ 7 |     return 1
+ 8 | 
+ 9 | def f() -> int:
+10 |     # error: [invalid-return-type]
+11 |     return
+12 | 
+13 | from typing import TypeVar
+14 | 
+15 | T = TypeVar("T")
+16 | 
+17 | # TODO: `invalid-return-type` error should be emitted
+18 | def m(x: T) -> T: ...
+```
+
+# Diagnostics
+
+```
+error: lint:invalid-return-type
+ --> /src/mdtest_snippet.py:2:12
+  |
+1 | # error: [invalid-return-type]
+2 | def f() -> int:
+  |            ^^^ Function can implicitly return `None`, which is not assignable to return type `int`
+3 |     1
+  |
+
+```
+
+```
+error: lint:invalid-return-type
+ --> /src/mdtest_snippet.py:7:12
+  |
+5 | def f() -> str:
+6 |     # error: [invalid-return-type]
+7 |     return 1
+  |            ^ Object of type `Literal[1]` is not assignable to return type `str`
+8 |
+9 | def f() -> int:
+  |
+info
+ --> /src/mdtest_snippet.py:5:12
+  |
+3 |     1
+4 |
+5 | def f() -> str:
+  |            --- Return type is declared here as `str`
+6 |     # error: [invalid-return-type]
+7 |     return 1
+  |
+
+```
+
+```
+error: lint:invalid-return-type
+  --> /src/mdtest_snippet.py:11:5
+   |
+ 9 | def f() -> int:
+10 |     # error: [invalid-return-type]
+11 |     return
+   |     ^^^^^^ Object of type `None` is not assignable to return type `int`
+12 |
+13 | from typing import TypeVar
+   |
+info
+  --> /src/mdtest_snippet.py:9:12
+   |
+ 7 |     return 1
+ 8 |
+ 9 | def f() -> int:
+   |            --- Return type is declared here as `int`
+10 |     # error: [invalid-return-type]
+11 |     return
+   |
+
+```

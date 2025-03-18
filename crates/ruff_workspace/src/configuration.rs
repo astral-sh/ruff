@@ -9,7 +9,7 @@ use std::num::{NonZeroU16, NonZeroU8};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use glob::{glob, GlobError, Paths, PatternError};
 use itertools::Itertools;
 use regex::Regex;
@@ -29,14 +29,16 @@ use ruff_linter::rules::{flake8_import_conventions, isort, pycodestyle};
 use ruff_linter::settings::fix_safety_table::FixSafetyTable;
 use ruff_linter::settings::rule_table::RuleTable;
 use ruff_linter::settings::types::{
-    CompiledPerFileIgnoreList, ExtensionMapping, FilePattern, FilePatternSet, OutputFormat,
-    PerFileIgnore, PreviewMode, PythonVersion, RequiredVersion, UnsafeFixes,
+    CompiledPerFileIgnoreList, CompiledPerFileTargetVersionList, ExtensionMapping, FilePattern,
+    FilePatternSet, GlobPath, OutputFormat, PerFileIgnore, PerFileTargetVersion, PreviewMode,
+    RequiredVersion, UnsafeFixes,
 };
 use ruff_linter::settings::{LinterSettings, DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX, TASK_TAGS};
 use ruff_linter::{
     fs, warn_user_once, warn_user_once_by_id, warn_user_once_by_message, RuleSelector,
     RUFF_PKG_VERSION,
 };
+use ruff_python_ast as ast;
 use ruff_python_formatter::{
     DocstringCode, DocstringCodeLineWidth, MagicTrailingComma, QuoteStyle,
 };
@@ -136,7 +138,8 @@ pub struct Configuration {
     pub builtins: Option<Vec<String>>,
     pub namespace_packages: Option<Vec<PathBuf>>,
     pub src: Option<Vec<PathBuf>>,
-    pub target_version: Option<PythonVersion>,
+    pub target_version: Option<ast::PythonVersion>,
+    pub per_file_target_version: Option<Vec<PerFileTargetVersion>>,
 
     // Global formatting options
     pub line_length: Option<LineLength>,
@@ -173,19 +176,17 @@ impl Configuration {
             PreviewMode::Enabled => ruff_python_formatter::PreviewMode::Enabled,
         };
 
+        let per_file_target_version = CompiledPerFileTargetVersionList::resolve(
+            self.per_file_target_version.unwrap_or_default(),
+        )
+        .context("failed to resolve `per-file-target-version` table")?;
+
         let formatter = FormatterSettings {
             exclude: FilePatternSet::try_from_iter(format.exclude.unwrap_or_default())?,
             extension: self.extension.clone().unwrap_or_default(),
             preview: format_preview,
-            target_version: match target_version {
-                PythonVersion::Py37 => ruff_python_formatter::PythonVersion::Py37,
-                PythonVersion::Py38 => ruff_python_formatter::PythonVersion::Py38,
-                PythonVersion::Py39 => ruff_python_formatter::PythonVersion::Py39,
-                PythonVersion::Py310 => ruff_python_formatter::PythonVersion::Py310,
-                PythonVersion::Py311 => ruff_python_formatter::PythonVersion::Py311,
-                PythonVersion::Py312 => ruff_python_formatter::PythonVersion::Py312,
-                PythonVersion::Py313 => ruff_python_formatter::PythonVersion::Py313,
-            },
+            unresolved_target_version: target_version,
+            per_file_target_version: per_file_target_version.clone(),
             line_width: self
                 .line_length
                 .map_or(format_defaults.line_width, |length| {
@@ -278,7 +279,8 @@ impl Configuration {
                 exclude: FilePatternSet::try_from_iter(lint.exclude.unwrap_or_default())?,
                 extension: self.extension.unwrap_or_default(),
                 preview: lint_preview,
-                target_version,
+                unresolved_target_version: target_version,
+                per_file_target_version,
                 project_root: project_root.to_path_buf(),
                 allowed_confusables: lint
                     .allowed_confusables
@@ -325,7 +327,7 @@ impl Configuration {
                     .unwrap_or_default(),
                 flake8_bandit: lint
                     .flake8_bandit
-                    .map(Flake8BanditOptions::into_settings)
+                    .map(|flake8_bandit| flake8_bandit.into_settings(lint.ruff.as_ref()))
                     .unwrap_or_default(),
                 flake8_boolean_trap: lint
                     .flake8_boolean_trap
@@ -470,7 +472,7 @@ impl Configuration {
                 paths
                     .into_iter()
                     .map(|pattern| {
-                        let absolute = fs::normalize_path_to(&pattern, project_root);
+                        let absolute = GlobPath::normalize(&pattern, project_root);
                         FilePattern::User(pattern, absolute)
                     })
                     .collect()
@@ -489,7 +491,7 @@ impl Configuration {
                     paths
                         .into_iter()
                         .map(|pattern| {
-                            let absolute = fs::normalize_path_to(&pattern, project_root);
+                            let absolute = GlobPath::normalize(&pattern, project_root);
                             FilePattern::User(pattern, absolute)
                         })
                         .collect()
@@ -501,7 +503,7 @@ impl Configuration {
                     paths
                         .into_iter()
                         .map(|pattern| {
-                            let absolute = fs::normalize_path_to(&pattern, project_root);
+                            let absolute = GlobPath::normalize(&pattern, project_root);
                             FilePattern::User(pattern, absolute)
                         })
                         .collect()
@@ -511,7 +513,7 @@ impl Configuration {
                 paths
                     .into_iter()
                     .map(|pattern| {
-                        let absolute = fs::normalize_path_to(&pattern, project_root);
+                        let absolute = GlobPath::normalize(&pattern, project_root);
                         FilePattern::User(pattern, absolute)
                     })
                     .collect()
@@ -535,7 +537,19 @@ impl Configuration {
                 .src
                 .map(|src| resolve_src(&src, project_root))
                 .transpose()?,
-            target_version: options.target_version,
+            target_version: options.target_version.map(ast::PythonVersion::from),
+            per_file_target_version: options.per_file_target_version.map(|versions| {
+                versions
+                    .into_iter()
+                    .map(|(pattern, version)| {
+                        PerFileTargetVersion::new(
+                            pattern,
+                            ast::PythonVersion::from(version),
+                            Some(project_root),
+                        )
+                    })
+                    .collect()
+            }),
             // `--extension` is a hidden command-line argument that isn't supported in configuration
             // files at present.
             extension: None,
@@ -583,6 +597,9 @@ impl Configuration {
             show_fixes: self.show_fixes.or(config.show_fixes),
             src: self.src.or(config.src),
             target_version: self.target_version.or(config.target_version),
+            per_file_target_version: self
+                .per_file_target_version
+                .or(config.per_file_target_version),
             preview: self.preview.or(config.preview),
             extension: self.extension.or(config.extension),
 
@@ -679,7 +696,7 @@ impl LintConfiguration {
                 paths
                     .into_iter()
                     .map(|pattern| {
-                        let absolute = fs::normalize_path_to(&pattern, project_root);
+                        let absolute = GlobPath::normalize(&pattern, project_root);
                         FilePattern::User(pattern, absolute)
                     })
                     .collect()
@@ -1182,7 +1199,7 @@ impl FormatConfiguration {
                 paths
                     .into_iter()
                     .map(|pattern| {
-                        let absolute = fs::normalize_path_to(&pattern, project_root);
+                        let absolute = GlobPath::normalize(&pattern, project_root);
                         FilePattern::User(pattern, absolute)
                     })
                     .collect()
@@ -1246,7 +1263,7 @@ impl AnalyzeConfiguration {
                 paths
                     .into_iter()
                     .map(|pattern| {
-                        let absolute = fs::normalize_path_to(&pattern, project_root);
+                        let absolute = GlobPath::normalize(&pattern, project_root);
                         FilePattern::User(pattern, absolute)
                     })
                     .collect()

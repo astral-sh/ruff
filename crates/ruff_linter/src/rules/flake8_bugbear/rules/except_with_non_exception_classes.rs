@@ -53,10 +53,7 @@ impl Violation for ExceptWithNonExceptionClasses {
 }
 
 /// B030
-pub(crate) fn except_with_non_exception_classes(
-    checker: &mut Checker,
-    except_handler: &ExceptHandler,
-) {
+pub(crate) fn except_with_non_exception_classes(checker: &Checker, except_handler: &ExceptHandler) {
     let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { type_, .. }) =
         except_handler;
     let Some(type_) = type_ else {
@@ -72,7 +69,7 @@ pub(crate) fn except_with_non_exception_classes(
                 .current_statement()
                 .as_try_stmt()
                 .is_some_and(|try_stmt| try_stmt.is_star);
-            checker.diagnostics.push(Diagnostic::new(
+            checker.report_diagnostic(Diagnostic::new(
                 ExceptWithNonExceptionClasses { is_star },
                 expr.range(),
             ));

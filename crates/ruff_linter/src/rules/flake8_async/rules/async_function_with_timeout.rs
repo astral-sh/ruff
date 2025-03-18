@@ -6,7 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_async::helpers::AsyncModule;
-use crate::settings::types::PythonVersion;
+use ruff_python_ast::PythonVersion;
 
 #[allow(clippy::doc_link_with_quotes)]
 /// ## What it does
@@ -87,10 +87,7 @@ impl Violation for AsyncFunctionWithTimeout {
 }
 
 /// ASYNC109
-pub(crate) fn async_function_with_timeout(
-    checker: &mut Checker,
-    function_def: &ast::StmtFunctionDef,
-) {
+pub(crate) fn async_function_with_timeout(checker: &Checker, function_def: &ast::StmtFunctionDef) {
     // Detect `async` calls with a `timeout` argument.
     if !function_def.is_async {
         return;
@@ -111,11 +108,11 @@ pub(crate) fn async_function_with_timeout(
     };
 
     // asyncio.timeout feature was first introduced in Python 3.11
-    if module == AsyncModule::AsyncIo && checker.settings.target_version < PythonVersion::Py311 {
+    if module == AsyncModule::AsyncIo && checker.target_version() < PythonVersion::PY311 {
         return;
     }
 
-    checker.diagnostics.push(Diagnostic::new(
+    checker.report_diagnostic(Diagnostic::new(
         AsyncFunctionWithTimeout { module },
         timeout.range(),
     ));

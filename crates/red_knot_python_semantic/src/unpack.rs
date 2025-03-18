@@ -26,26 +26,23 @@ use crate::Db;
 /// * a return type of a cross-module query
 /// * a field of a type that is a return type of a cross-module query
 /// * an argument of a cross-module query
-#[salsa::tracked]
+#[salsa::tracked(debug)]
 pub(crate) struct Unpack<'db> {
-    #[id]
     pub(crate) file: File,
 
-    #[id]
     pub(crate) file_scope: FileScopeId,
 
     /// The target expression that is being unpacked. For example, in `(a, b) = (1, 2)`, the target
     /// expression is `(a, b)`.
     #[no_eq]
     #[return_ref]
+    #[tracked]
     pub(crate) target: AstNodeRef<ast::Expr>,
 
     /// The ingredient representing the value expression of the unpacking. For example, in
     /// `(a, b) = (1, 2)`, the value expression is `(1, 2)`.
-    #[no_eq]
     pub(crate) value: UnpackValue<'db>,
 
-    #[no_eq]
     count: countme::Count<Unpack<'static>>,
 }
 
@@ -62,29 +59,23 @@ impl<'db> Unpack<'db> {
 }
 
 /// The expression that is being unpacked.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Hash, salsa::Update)]
 pub(crate) enum UnpackValue<'db> {
     /// An iterable expression like the one in a `for` loop or a comprehension.
     Iterable(Expression<'db>),
+    /// An context manager expression like the one in a `with` statement.
+    ContextManager(Expression<'db>),
     /// An expression that is being assigned to a target.
     Assign(Expression<'db>),
 }
 
 impl<'db> UnpackValue<'db> {
-    /// Returns `true` if the value is an iterable expression.
-    pub(crate) const fn is_iterable(self) -> bool {
-        matches!(self, UnpackValue::Iterable(_))
-    }
-
-    /// Returns `true` if the value is being assigned to a target.
-    pub(crate) const fn is_assign(self) -> bool {
-        matches!(self, UnpackValue::Assign(_))
-    }
-
     /// Returns the underlying [`Expression`] that is being unpacked.
     pub(crate) const fn expression(self) -> Expression<'db> {
         match self {
-            UnpackValue::Assign(expr) | UnpackValue::Iterable(expr) => expr,
+            UnpackValue::Assign(expr)
+            | UnpackValue::Iterable(expr)
+            | UnpackValue::ContextManager(expr) => expr,
         }
     }
 

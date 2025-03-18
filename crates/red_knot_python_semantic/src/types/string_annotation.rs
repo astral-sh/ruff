@@ -1,5 +1,4 @@
 use ruff_db::source::source_text;
-use ruff_python_ast::str::raw_contents;
 use ruff_python_ast::{self as ast, ModExpression};
 use ruff_python_parser::Parsed;
 use ruff_text_size::Ranged;
@@ -135,29 +134,27 @@ pub(crate) fn parse_string_annotation(
     let file = context.file();
     let db = context.db();
 
-    let _span = tracing::trace_span!("parse_string_annotation", string=?string_expr.range(), file=%file.path(db)).entered();
+    let _span = tracing::trace_span!("parse_string_annotation", string=?string_expr.range(), ?file)
+        .entered();
 
     let source = source_text(db.upcast(), file);
-    let node_text = &source[string_expr.range()];
 
-    if let [string_literal] = string_expr.value.as_slice() {
+    if let Some(string_literal) = string_expr.as_single_part_string() {
         let prefix = string_literal.flags.prefix();
         if prefix.is_raw() {
             context.report_lint(
                 &RAW_STRING_TYPE_ANNOTATION,
-                string_literal.into(),
+                string_literal,
                 format_args!("Type expressions cannot use raw string literal"),
             );
         // Compare the raw contents (without quotes) of the expression with the parsed contents
         // contained in the string literal.
-        } else if raw_contents(node_text)
-            .is_some_and(|raw_contents| raw_contents == string_literal.as_str())
-        {
+        } else if &source[string_literal.content_range()] == string_literal.as_str() {
             match ruff_python_parser::parse_string_annotation(source.as_str(), string_literal) {
                 Ok(parsed) => return Some(parsed),
                 Err(parse_error) => context.report_lint(
                     &INVALID_SYNTAX_IN_FORWARD_ANNOTATION,
-                    string_literal.into(),
+                    string_literal,
                     format_args!("Syntax error in forward annotation: {}", parse_error.error),
                 ),
             }
@@ -166,7 +163,7 @@ pub(crate) fn parse_string_annotation(
             // case for annotations that contain escape sequences.
             context.report_lint(
                 &ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION,
-                string_expr.into(),
+                string_expr,
                 format_args!("Type expressions cannot contain escape characters"),
             );
         }
@@ -174,7 +171,7 @@ pub(crate) fn parse_string_annotation(
         // String is implicitly concatenated.
         context.report_lint(
             &IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION,
-            string_expr.into(),
+            string_expr,
             format_args!("Type expressions cannot span multiple string literals"),
         );
     }

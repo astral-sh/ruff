@@ -43,9 +43,22 @@ use super::super::helpers::string_literal;
 ///     return hash == known_hash
 /// ```
 ///
+/// or add `usedforsecurity=False` if the hashing algorithm is not used in a security context, e.g.
+/// as a non-cryptographic one-way compression function:
+/// ```python
+/// import hashlib
+///
+///
+/// def certificate_is_valid(certificate: bytes, known_hash: str) -> bool:
+///     hash = hashlib.md5(certificate, usedforsecurity=False).hexdigest()
+///     return hash == known_hash
+/// ```
+///
+///
 /// ## References
 /// - [Python documentation: `hashlib` — Secure hashes and message digests](https://docs.python.org/3/library/hashlib.html)
 /// - [Python documentation: `crypt` — Function to check Unix passwords](https://docs.python.org/3/library/crypt.html)
+/// - [Python documentation: `FIPS` - FIPS compliant hashlib implementation](https://docs.python.org/3/library/hashlib.html#hashlib.algorithms_guaranteed)
 /// - [Common Weakness Enumeration: CWE-327](https://cwe.mitre.org/data/definitions/327.html)
 /// - [Common Weakness Enumeration: CWE-328](https://cwe.mitre.org/data/definitions/328.html)
 /// - [Common Weakness Enumeration: CWE-916](https://cwe.mitre.org/data/definitions/916.html)
@@ -64,7 +77,7 @@ impl Violation for HashlibInsecureHashFunction {
 }
 
 /// S324
-pub(crate) fn hashlib_insecure_hash_functions(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn hashlib_insecure_hash_functions(checker: &Checker, call: &ast::ExprCall) {
     if !checker
         .semantic()
         .seen_module(Modules::HASHLIB | Modules::CRYPT)
@@ -105,7 +118,7 @@ pub(crate) fn hashlib_insecure_hash_functions(checker: &mut Checker, call: &ast:
 }
 
 fn detect_insecure_hashlib_calls(
-    checker: &mut Checker,
+    checker: &Checker,
     call: &ast::ExprCall,
     hashlib_call: HashlibCall,
 ) {
@@ -122,13 +135,13 @@ fn detect_insecure_hashlib_calls(
                 return;
             };
 
-            // `hashlib.new` accepts both lowercase and uppercase names for hash
+            // `hashlib.new` accepts mixed lowercase and uppercase names for hash
             // functions.
             if matches!(
-                hash_func_name,
-                "md4" | "md5" | "sha" | "sha1" | "MD4" | "MD5" | "SHA" | "SHA1"
+                hash_func_name.to_ascii_lowercase().as_str(),
+                "md4" | "md5" | "sha" | "sha1"
             ) {
-                checker.diagnostics.push(Diagnostic::new(
+                checker.report_diagnostic(Diagnostic::new(
                     HashlibInsecureHashFunction {
                         library: "hashlib".to_string(),
                         string: hash_func_name.to_string(),
@@ -138,7 +151,7 @@ fn detect_insecure_hashlib_calls(
             }
         }
         HashlibCall::WeakHash(func_name) => {
-            checker.diagnostics.push(Diagnostic::new(
+            checker.report_diagnostic(Diagnostic::new(
                 HashlibInsecureHashFunction {
                     library: "hashlib".to_string(),
                     string: (*func_name).to_string(),
@@ -149,7 +162,7 @@ fn detect_insecure_hashlib_calls(
     }
 }
 
-fn detect_insecure_crypt_calls(checker: &mut Checker, call: &ast::ExprCall) {
+fn detect_insecure_crypt_calls(checker: &Checker, call: &ast::ExprCall) {
     let Some(method) = checker
         .semantic()
         .resolve_qualified_name(&call.func)
@@ -173,7 +186,7 @@ fn detect_insecure_crypt_calls(checker: &mut Checker, call: &ast::ExprCall) {
         qualified_name.segments(),
         ["crypt", "METHOD_CRYPT" | "METHOD_MD5" | "METHOD_BLOWFISH"]
     ) {
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             HashlibInsecureHashFunction {
                 library: "crypt".to_string(),
                 string: qualified_name.to_string(),
@@ -186,7 +199,7 @@ fn detect_insecure_crypt_calls(checker: &mut Checker, call: &ast::ExprCall) {
 fn is_used_for_security(arguments: &Arguments) -> bool {
     arguments
         .find_keyword("usedforsecurity")
-        .map_or(true, |keyword| !is_const_false(&keyword.value))
+        .is_none_or(|keyword| !is_const_false(&keyword.value))
 }
 
 #[derive(Debug, Copy, Clone)]

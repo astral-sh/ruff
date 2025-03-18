@@ -66,7 +66,7 @@ impl AlwaysFixableViolation for QuadraticListSummation {
 }
 
 /// RUF017
-pub(crate) fn quadratic_list_summation(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn quadratic_list_summation(checker: &Checker, call: &ast::ExprCall) {
     let ast::ExprCall {
         func,
         arguments,
@@ -89,7 +89,7 @@ pub(crate) fn quadratic_list_summation(checker: &mut Checker, call: &ast::ExprCa
 
     let mut diagnostic = Diagnostic::new(QuadraticListSummation, *range);
     diagnostic.try_set_fix(|| convert_to_reduce(iterable, call, checker));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// Generate a [`Fix`] to convert a `sum()` call to a `functools.reduce()` call.

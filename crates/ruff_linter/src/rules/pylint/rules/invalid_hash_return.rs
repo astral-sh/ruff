@@ -49,7 +49,7 @@ impl Violation for InvalidHashReturnType {
 }
 
 /// E0309
-pub(crate) fn invalid_hash_return(checker: &mut Checker, function_def: &ast::StmtFunctionDef) {
+pub(crate) fn invalid_hash_return(checker: &Checker, function_def: &ast::StmtFunctionDef) {
     if function_def.name.as_str() != "__hash__" {
         return;
     }
@@ -72,7 +72,7 @@ pub(crate) fn invalid_hash_return(checker: &mut Checker, function_def: &ast::Stm
 
     // If there are no return statements, add a diagnostic.
     if terminal == Terminal::Implicit {
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             InvalidHashReturnType,
             function_def.identifier(),
         ));
@@ -92,15 +92,11 @@ pub(crate) fn invalid_hash_return(checker: &mut Checker, function_def: &ast::Stm
                 ResolvedPythonType::Unknown
                     | ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer))
             ) {
-                checker
-                    .diagnostics
-                    .push(Diagnostic::new(InvalidHashReturnType, value.range()));
+                checker.report_diagnostic(Diagnostic::new(InvalidHashReturnType, value.range()));
             }
         } else {
             // Disallow implicit `None`.
-            checker
-                .diagnostics
-                .push(Diagnostic::new(InvalidHashReturnType, stmt.range()));
+            checker.report_diagnostic(Diagnostic::new(InvalidHashReturnType, stmt.range()));
         }
     }
 }

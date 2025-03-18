@@ -4,6 +4,7 @@ use itertools::Itertools;
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
+use ruff_python_semantic::analyze::class::is_metaclass;
 use ruff_python_semantic::analyze::function_type::{self, FunctionType};
 use ruff_python_semantic::analyze::visibility::{is_abstract, is_overload};
 use ruff_python_semantic::{Binding, ResolvedReference, ScopeId, SemanticModel};
@@ -11,7 +12,7 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
 use crate::importer::{ImportRequest, ResolutionError};
-use crate::settings::types::PythonVersion;
+use ruff_python_ast::PythonVersion;
 
 /// ## What it does
 /// Checks for methods that use custom [`TypeVar`s][typing_TypeVar] in their
@@ -30,6 +31,10 @@ use crate::settings::types::PythonVersion;
 /// ## Example
 ///
 /// ```pyi
+/// from typing import TypeVar
+///
+/// _S = TypeVar("_S", bound="Foo")
+///
 /// class Foo:
 ///     def __new__(cls: type[_S], *args: str, **kwargs: int) -> _S: ...
 ///     def foo(self: _S, arg: bytes) -> _S: ...
@@ -50,32 +55,29 @@ use crate::settings::types::PythonVersion;
 /// ```
 ///
 /// ## Fix behaviour and safety
-/// The fix removes all usages and declarations of the custom type variable.
-/// [PEP-695]-style `TypeVar` declarations are also removed from the [type parameter list];
-/// however, old-style `TypeVar`s do not have their declarations removed. See
-/// [`unused-private-type-var`][PYI018] for a rule to clean up unused private type variables.
+/// The fix replaces all references to the custom type variable in the method's header and body
+/// with references to `Self`. The fix also adds an import of `Self` if neither `Self` nor `typing`
+/// is already imported in the module. If your [`target-version`] setting is set to Python 3.11 or
+/// newer, the fix imports `Self` from the standard-library `typing` module; otherwise, the fix
+/// imports `Self` from the third-party [`typing_extensions`][typing_extensions] backport package.
 ///
-/// If there are any comments within the fix ranges, it will be marked as unsafe.
-/// Otherwise, it will be marked as safe.
+/// If the custom type variable is a [PEP-695]-style `TypeVar`, the fix also removes the `TypeVar`
+/// declaration from the method's [type parameter list]. However, if the type variable is an
+/// old-style `TypeVar`, the declaration of the type variable will not be removed by this rule's
+/// fix, as the type variable could still be used by other functions, methods or classes. See
+/// [`unused-private-type-var`][PYI018] for a rule that will clean up unused private type
+/// variables.
 ///
-/// ## Preview-mode behaviour
-/// This rule's behaviour has several differences when [`preview`] mode is enabled:
-/// 1. The fix for this rule is currently only available if `preview` mode is enabled.
-/// 2. By default, this rule is only applied to methods that have return-type annotations,
-///    and the range of the diagnostic is the range of the return-type annotation.
-///    In preview mode, this rule is also applied to some methods that do not have
-///    return-type annotations. The range of the diagnostic is the range of the function
-///    header (from the end of the function name to the end of the parameters).
-/// 3. In `preview` mode, the rule uses different logic to determine whether an annotation
-///    refers to a type variable. The `preview`-mode logic is more accurate, but may lead
-///    to more methods being flagged than if `preview` mode is disabled.
+/// The fix is only marked as unsafe if there is the possibility that it might delete a comment
+/// from your code.
 ///
 /// [PEP 673]: https://peps.python.org/pep-0673/#motivation
-/// [PEP 695]: https://peps.python.org/pep-0695/
+/// [PEP-695]: https://peps.python.org/pep-0695/
 /// [PYI018]: https://docs.astral.sh/ruff/rules/unused-private-type-var/
 /// [type parameter list]: https://docs.python.org/3/reference/compound_stmts.html#type-params
 /// [Self]: https://docs.python.org/3/library/typing.html#typing.Self
 /// [typing_TypeVar]: https://docs.python.org/3/library/typing.html#typing.TypeVar
+/// [typing_extensions]: https://typing-extensions.readthedocs.io/en/latest/
 #[derive(ViolationMetadata)]
 pub(crate) struct CustomTypeVarForSelf {
     typevar_name: String,
@@ -128,9 +130,14 @@ pub(crate) fn custom_type_var_instead_of_self(
         .next()?;
 
     let self_or_cls_annotation = self_or_cls_parameter.annotation()?;
+    let parent_class = current_scope.kind.as_class()?;
 
-    // Skip any abstract, static, and overloaded methods.
-    if is_abstract(decorator_list, semantic) || is_overload(decorator_list, semantic) {
+    // Skip any abstract/static/overloaded methods,
+    // and any methods in metaclasses
+    if is_abstract(decorator_list, semantic)
+        || is_overload(decorator_list, semantic)
+        || is_metaclass(parent_class, semantic).is_yes()
+    {
         return None;
     }
 
@@ -143,73 +150,33 @@ pub(crate) fn custom_type_var_instead_of_self(
         &checker.settings.pep8_naming.staticmethod_decorators,
     );
 
-    let function_header_end = returns
-        .as_deref()
-        .map(Ranged::end)
-        .unwrap_or_else(|| parameters.end());
-
-    // In stable mode, we only emit the diagnostic on methods that have a return type annotation.
-    // In preview mode, we have a more principled approach to determine if an annotation refers
-    // to a type variable, and we emit the diagnostic on some methods that do not have return
-    // annotations.
-    let (method, diagnostic_range) = match function_kind {
-        FunctionType::ClassMethod => {
-            if checker.settings.preview.is_enabled() {
-                (
-                    Method::PreviewClass(PreviewClassMethod {
-                        cls_annotation: self_or_cls_annotation,
-                        type_params,
-                    }),
-                    TextRange::new(function_name.end(), function_header_end),
-                )
-            } else {
-                returns.as_deref().map(|returns| {
-                    (
-                        Method::Class(ClassMethod {
-                            cls_annotation: self_or_cls_annotation,
-                            returns,
-                            type_params,
-                        }),
-                        returns.range(),
-                    )
-                })?
-            }
-        }
-        FunctionType::Method => {
-            if checker.settings.preview.is_enabled() {
-                (
-                    Method::PreviewInstance(PreviewInstanceMethod {
-                        self_annotation: self_or_cls_annotation,
-                        type_params,
-                    }),
-                    TextRange::new(function_name.end(), function_header_end),
-                )
-            } else {
-                returns.as_deref().map(|returns| {
-                    (
-                        Method::Instance(InstanceMethod {
-                            self_annotation: self_or_cls_annotation,
-                            returns,
-                            type_params,
-                        }),
-                        returns.range(),
-                    )
-                })?
-            }
-        }
+    let method = match function_kind {
+        FunctionType::ClassMethod | FunctionType::NewMethod => Method::Class(ClassMethod {
+            cls_annotation: self_or_cls_annotation,
+            type_params,
+        }),
+        FunctionType::Method => Method::Instance(InstanceMethod {
+            self_annotation: self_or_cls_annotation,
+            type_params,
+        }),
         FunctionType::Function | FunctionType::StaticMethod => return None,
     };
 
     let custom_typevar = method.custom_typevar(semantic, binding.scope)?;
 
+    let function_header_end = returns
+        .as_deref()
+        .map(Ranged::end)
+        .unwrap_or_else(|| parameters.end());
+
     let mut diagnostic = Diagnostic::new(
         CustomTypeVarForSelf {
             typevar_name: custom_typevar.name(checker.source()).to_string(),
         },
-        diagnostic_range,
+        TextRange::new(function_name.end(), function_header_end),
     );
 
-    diagnostic.try_set_optional_fix(|| {
+    diagnostic.try_set_fix(|| {
         replace_custom_typevar_with_self(
             checker,
             function_def,
@@ -225,9 +192,7 @@ pub(crate) fn custom_type_var_instead_of_self(
 #[derive(Debug)]
 enum Method<'a> {
     Class(ClassMethod<'a>),
-    PreviewClass(PreviewClassMethod<'a>),
     Instance(InstanceMethod<'a>),
-    PreviewInstance(PreviewInstanceMethod<'a>),
 }
 
 impl Method<'_> {
@@ -238,9 +203,7 @@ impl Method<'_> {
     ) -> Option<TypeVar<'a>> {
         match self {
             Self::Class(class_method) => class_method.custom_typevar(semantic, scope),
-            Self::PreviewClass(class_method) => class_method.custom_typevar(semantic, scope),
             Self::Instance(instance_method) => instance_method.custom_typevar(semantic),
-            Self::PreviewInstance(instance_method) => instance_method.custom_typevar(semantic),
         }
     }
 }
@@ -248,76 +211,10 @@ impl Method<'_> {
 #[derive(Debug)]
 struct ClassMethod<'a> {
     cls_annotation: &'a ast::Expr,
-    returns: &'a ast::Expr,
     type_params: Option<&'a ast::TypeParams>,
 }
 
 impl ClassMethod<'_> {
-    /// Returns `Some(typevar)` if the class method is annotated with
-    /// a custom `TypeVar` that is likely private.
-    fn custom_typevar<'a>(
-        &'a self,
-        semantic: &'a SemanticModel<'a>,
-        scope: ScopeId,
-    ) -> Option<TypeVar<'a>> {
-        let ast::ExprSubscript {
-            value: cls_annotation_value,
-            slice: cls_annotation_typevar,
-            ..
-        } = self.cls_annotation.as_subscript_expr()?;
-
-        let cls_annotation_typevar = cls_annotation_typevar.as_name_expr()?;
-        let cls_annotation_typevar_name = &cls_annotation_typevar.id;
-        let ast::ExprName { id, .. } = cls_annotation_value.as_name_expr()?;
-
-        if id != "type" {
-            return None;
-        }
-
-        if !semantic.has_builtin_binding_in_scope("type", scope) {
-            return None;
-        }
-
-        let return_annotation_typevar = match self.returns {
-            ast::Expr::Name(ast::ExprName { id, .. }) => id,
-            ast::Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
-                let return_annotation_typevar = slice.as_name_expr()?;
-                let ast::ExprName { id, .. } = value.as_name_expr()?;
-                if id != "type" {
-                    return None;
-                }
-                &return_annotation_typevar.id
-            }
-            _ => return None,
-        };
-
-        if cls_annotation_typevar_name != return_annotation_typevar {
-            return None;
-        }
-
-        if !is_likely_private_typevar(cls_annotation_typevar_name, self.type_params) {
-            return None;
-        }
-
-        semantic
-            .resolve_name(cls_annotation_typevar)
-            .map(|binding_id| TypeVar(semantic.binding(binding_id)))
-    }
-}
-
-/// Struct for implementing this rule as applied to classmethods in preview mode.
-///
-/// In stable mode, we only emit this diagnostic on methods that have return annotations,
-/// so the stable-mode version of this struct has a `returns: &ast::Expr` field. In preview
-/// mode, we also emit this diagnostic on methods that do not have return annotations, so
-/// the preview-mode version of this struct does not have a `returns` field.
-#[derive(Debug)]
-struct PreviewClassMethod<'a> {
-    cls_annotation: &'a ast::Expr,
-    type_params: Option<&'a ast::TypeParams>,
-}
-
-impl PreviewClassMethod<'_> {
     /// Returns `Some(typevar)` if the class method is annotated with
     /// a custom `TypeVar` for the `cls` parameter
     fn custom_typevar<'a>(
@@ -341,59 +238,21 @@ impl PreviewClassMethod<'_> {
             return None;
         }
 
-        custom_typevar_preview(cls_annotation_typevar, self.type_params, semantic)
+        custom_typevar(cls_annotation_typevar, self.type_params, semantic)
     }
 }
 
 #[derive(Debug)]
 struct InstanceMethod<'a> {
     self_annotation: &'a ast::Expr,
-    returns: &'a ast::Expr,
     type_params: Option<&'a ast::TypeParams>,
 }
 
 impl InstanceMethod<'_> {
     /// Returns `Some(typevar)` if the instance method is annotated with
-    /// a custom `TypeVar` that is likely private.
-    fn custom_typevar<'a>(&'a self, semantic: &'a SemanticModel<'a>) -> Option<TypeVar<'a>> {
-        let self_annotation = self.self_annotation.as_name_expr()?;
-        let first_arg_type = &self_annotation.id;
-
-        let ast::ExprName {
-            id: return_type, ..
-        } = self.returns.as_name_expr()?;
-
-        if first_arg_type != return_type {
-            return None;
-        }
-
-        if !is_likely_private_typevar(first_arg_type, self.type_params) {
-            return None;
-        }
-
-        semantic
-            .resolve_name(self_annotation)
-            .map(|binding_id| TypeVar(semantic.binding(binding_id)))
-    }
-}
-
-/// Struct for implementing this rule as applied to instance methods in preview mode.
-///
-/// In stable mode, we only emit this diagnostic on methods that have return annotations,
-/// so the stable-mode version of this struct has a `returns: &ast::Expr` field. In preview
-/// mode, we also emit this diagnostic on methods that do not have return annotations, so
-/// the preview-mode version of this struct does not have a `returns` field.
-#[derive(Debug)]
-struct PreviewInstanceMethod<'a> {
-    self_annotation: &'a ast::Expr,
-    type_params: Option<&'a ast::TypeParams>,
-}
-
-impl PreviewInstanceMethod<'_> {
-    /// Returns `Some(typevar)` if the instance method is annotated with
     /// a custom `TypeVar` for the `self` parameter
     fn custom_typevar<'a>(&'a self, semantic: &'a SemanticModel<'a>) -> Option<TypeVar<'a>> {
-        custom_typevar_preview(
+        custom_typevar(
             self.self_annotation.as_name_expr()?,
             self.type_params,
             semantic,
@@ -401,30 +260,8 @@ impl PreviewInstanceMethod<'_> {
     }
 }
 
-/// Returns `true` if the type variable is likely private.
-///
-/// This routine is only used if `--preview` is not enabled,
-/// as it uses heuristics to determine if an annotation uses a type variable.
-/// In preview mode, we apply a more principled approach.
-fn is_likely_private_typevar(type_var_name: &str, type_params: Option<&ast::TypeParams>) -> bool {
-    // Ex) `_T`
-    if type_var_name.starts_with('_') {
-        return true;
-    }
-    // Ex) `class Foo[T]: ...`
-    type_params.is_some_and(|type_params| {
-        type_params.iter().any(|type_param| {
-            if let ast::TypeParam::TypeVar(ast::TypeParamTypeVar { name, .. }) = type_param {
-                name == type_var_name
-            } else {
-                false
-            }
-        })
-    })
-}
-
 /// Returns `Some(TypeVar)` if `typevar_expr` refers to a `TypeVar` binding
-fn custom_typevar_preview<'a>(
+fn custom_typevar<'a>(
     typevar_expr: &'a ast::ExprName,
     type_params: Option<&ast::TypeParams>,
     semantic: &'a SemanticModel<'a>,
@@ -478,11 +315,7 @@ fn replace_custom_typevar_with_self(
     custom_typevar: TypeVar,
     self_or_cls_parameter: &ast::ParameterWithDefault,
     self_or_cls_annotation: &ast::Expr,
-) -> anyhow::Result<Option<Fix>> {
-    if checker.settings.preview.is_disabled() {
-        return Ok(None);
-    }
-
+) -> anyhow::Result<Fix> {
     // (1) Import `Self` (if necessary)
     let (import_edit, self_symbol_binding) = import_self(checker, function_def.start())?;
 
@@ -494,9 +327,9 @@ fn replace_custom_typevar_with_self(
 
     // (3) If it was a PEP-695 type variable, remove that `TypeVar` from the PEP-695 type-parameter list
     if custom_typevar.is_pep695_typevar() {
-        let Some(type_params) = function_def.type_params.as_deref() else {
-            bail!("Should not be possible to have a type parameter without a type parameter list");
-        };
+        let type_params = function_def.type_params.as_deref().context(
+            "Should not be possible to have a type parameter without a type parameter list",
+        )?;
         let deletion_edit = remove_pep695_typevar_declaration(type_params, custom_typevar)
             .context("Failed to find a `TypeVar` in the type params that matches the binding")?;
         other_edits.push(deletion_edit);
@@ -527,11 +360,11 @@ fn replace_custom_typevar_with_self(
         Applicability::Safe
     };
 
-    Ok(Some(Fix::applicable_edits(
+    Ok(Fix::applicable_edits(
         import_edit,
         other_edits,
         applicability,
-    )))
+    ))
 }
 
 /// Attempt to create an [`Edit`] that imports `Self`.
@@ -541,7 +374,7 @@ fn replace_custom_typevar_with_self(
 /// This is because it was added to the `typing` module on Python 3.11,
 /// but is available from the backport package `typing_extensions` on all versions.
 fn import_self(checker: &Checker, position: TextSize) -> Result<(Edit, String), ResolutionError> {
-    let source_module = if checker.settings.target_version >= PythonVersion::Py311 {
+    let source_module = if checker.target_version() >= PythonVersion::PY311 {
         "typing"
     } else {
         "typing_extensions"
@@ -570,7 +403,7 @@ fn replace_typevar_usages_with_self<'a>(
         let reference_range = reference.range();
         if &source[reference_range] != tvar_name {
             bail!(
-                "Cannot autofix: feference in the source code (`{}`) is not equal to the typevar name (`{}`)",
+                "Cannot autofix: reference in the source code (`{}`) is not equal to the typevar name (`{}`)",
                 &source[reference_range],
                 tvar_name
             );

@@ -18,7 +18,7 @@ use super::helpers;
 /// there are equivalent comprehensions for these types. Using a
 /// comprehension is clearer and more idiomatic.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// dict((x, f(x)) for x in foo)
 /// ```
@@ -47,7 +47,7 @@ impl AlwaysFixableViolation for UnnecessaryGeneratorDict {
 
 /// C402 (`dict((x, y) for x, y in iterable)`)
 pub(crate) fn unnecessary_generator_dict(
-    checker: &mut Checker,
+    checker: &Checker,
     expr: &Expr,
     func: &Expr,
     args: &[Expr],
@@ -73,5 +73,5 @@ pub(crate) fn unnecessary_generator_dict(
     let mut diagnostic = Diagnostic::new(UnnecessaryGeneratorDict, expr.range());
     diagnostic
         .try_set_fix(|| fixes::fix_unnecessary_generator_dict(expr, checker).map(Fix::unsafe_edit));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

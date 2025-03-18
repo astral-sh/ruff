@@ -1,10 +1,8 @@
-use ruff_python_ast::str::raw_contents_range;
 use ruff_python_semantic::all::DunderAllName;
 use ruff_python_semantic::{
     BindingKind, ContextualizedDefinition, Definition, Export, Member, MemberKind,
 };
-use ruff_source_file::LineRanges;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;
@@ -139,13 +137,11 @@ pub(crate) fn definitions(checker: &mut Checker) {
                     &checker.semantic,
                 )
             }) {
-                checker
-                    .diagnostics
-                    .extend(flake8_annotations::rules::definition(
-                        checker,
-                        definition,
-                        *visibility,
-                    ));
+                checker.report_diagnostics(flake8_annotations::rules::definition(
+                    checker,
+                    definition,
+                    *visibility,
+                ));
             }
             overloaded_name =
                 flake8_annotations::helpers::overloaded_name(definition, &checker.semantic);
@@ -186,14 +182,8 @@ pub(crate) fn definitions(checker: &mut Checker) {
                 continue;
             };
 
-            let contents = checker.locator().slice(string_literal);
-
-            let indentation = checker.locator().slice(TextRange::new(
-                checker.locator.line_start(string_literal.start()),
-                string_literal.start(),
-            ));
-
-            if string_literal.value.is_implicit_concatenated() {
+            // We don't recognise implicitly concatenated strings as valid docstrings in our model currently.
+            let Some(sole_string_part) = string_literal.as_single_part_string() else {
                 #[allow(deprecated)]
                 let location = checker
                     .locator
@@ -205,16 +195,12 @@ pub(crate) fn definitions(checker: &mut Checker) {
                     location.column
                 );
                 continue;
-            }
+            };
 
-            // SAFETY: Safe for docstrings that pass `should_ignore_docstring`.
-            let body_range = raw_contents_range(contents).unwrap();
             let docstring = Docstring {
                 definition,
-                expr: string_literal,
-                contents,
-                body_range,
-                indentation,
+                expr: sole_string_part,
+                source: checker.source(),
             };
 
             if !pydocstyle::rules::not_empty(checker, &docstring) {

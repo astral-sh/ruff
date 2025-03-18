@@ -46,7 +46,7 @@ impl AlwaysFixableViolation for UnnecessaryListIndexLookup {
 }
 
 /// PLR1736
-pub(crate) fn unnecessary_list_index_lookup(checker: &mut Checker, stmt_for: &StmtFor) {
+pub(crate) fn unnecessary_list_index_lookup(checker: &Checker, stmt_for: &StmtFor) {
     let Some((sequence, index_name, value_name)) =
         enumerate_items(&stmt_for.iter, &stmt_for.target, checker.semantic())
     else {
@@ -66,12 +66,12 @@ pub(crate) fn unnecessary_list_index_lookup(checker: &mut Checker, stmt_for: &St
             Edit::range_replacement(value_name.id.to_string(), range),
             [noop(index_name), noop(value_name)],
         ));
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }
 
 /// PLR1736
-pub(crate) fn unnecessary_list_index_lookup_comprehension(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn unnecessary_list_index_lookup_comprehension(checker: &Checker, expr: &Expr) {
     let (Expr::Generator(ast::ExprGenerator {
         elt, generators, ..
     })
@@ -110,7 +110,7 @@ pub(crate) fn unnecessary_list_index_lookup_comprehension(checker: &mut Checker,
                 Edit::range_replacement(value_name.id.to_string(), range),
                 [noop(index_name), noop(value_name)],
             ));
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 }
@@ -154,7 +154,7 @@ fn enumerate_items<'a>(
     // If the `enumerate` call has a non-zero `start`, don't omit.
     if !arguments
         .find_argument_value("start", 1)
-        .map_or(true, |expr| {
+        .is_none_or(|expr| {
             matches!(
                 expr,
                 Expr::NumberLiteral(ast::ExprNumberLiteral {

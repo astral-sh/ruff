@@ -16,7 +16,7 @@ use super::helpers;
 /// ## Why is this bad?
 /// It is redundant to use a `list()` call around a list comprehension.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// list([f(x) for x in foo])
 /// ```
@@ -44,7 +44,7 @@ impl AlwaysFixableViolation for UnnecessaryListCall {
 }
 
 /// C411
-pub(crate) fn unnecessary_list_call(checker: &mut Checker, expr: &Expr, call: &ExprCall) {
+pub(crate) fn unnecessary_list_call(checker: &Checker, expr: &Expr, call: &ExprCall) {
     let ExprCall {
         func,
         arguments,
@@ -79,5 +79,5 @@ pub(crate) fn unnecessary_list_call(checker: &mut Checker, expr: &Expr, call: &E
         fixes::fix_unnecessary_list_call(expr, checker.locator(), checker.stylist())
             .map(Fix::unsafe_edit)
     });
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

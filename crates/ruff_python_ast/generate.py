@@ -14,6 +14,32 @@ from typing import Any
 
 import tomllib
 
+# Types that require `crate::`. We can slowly remove these types as we move them to generate scripts.
+types_requiring_create_prefix = [
+    "IpyEscapeKind",
+    "ExprContext",
+    "Identifier",
+    "Number",
+    "BytesLiteralValue",
+    "StringLiteralValue",
+    "FStringValue",
+    "Arguments",
+    "CmpOp",
+    "Comprehension",
+    "DictItem",
+    "UnaryOp",
+    "BoolOp",
+    "Operator",
+    "Decorator",
+    "TypeParams",
+    "Parameters",
+    "Arguments",
+    "ElifElseClause",
+    "WithItem",
+    "MatchCase",
+    "Alias",
+]
+
 
 def rustfmt(code: str) -> str:
     return check_output(["rustfmt", "--emit=stdout"], input=code, text=True)
@@ -22,6 +48,11 @@ def rustfmt(code: str) -> str:
 def to_snake_case(node: str) -> str:
     """Converts CamelCase to snake_case"""
     return re.sub("([A-Z])", r"_\1", node).lower().lstrip("_")
+
+
+def write_rustdoc(out: list[str], doc: str) -> None:
+    for line in doc.split("\n"):
+        out.append(f"/// {line}")
 
 
 # ------------------------------------------------------------------------------
@@ -71,7 +102,7 @@ class Group:
 
     add_suffix_to_is_methods: bool
     anynode_is_label: str
-    rustdoc: str | None
+    doc: str | None
 
     def __init__(self, group_name: str, group: dict[str, Any]) -> None:
         self.name = group_name
@@ -79,7 +110,7 @@ class Group:
         self.ref_enum_ty = group_name + "Ref"
         self.add_suffix_to_is_methods = group.get("add_suffix_to_is_methods", False)
         self.anynode_is_label = group.get("anynode_is_label", to_snake_case(group_name))
-        self.rustdoc = group.get("rustdoc")
+        self.doc = group.get("doc")
         self.nodes = [
             Node(self, node_name, node) for node_name, node in group["nodes"].items()
         ]
@@ -90,11 +121,74 @@ class Node:
     name: str
     variant: str
     ty: str
+    doc: str | None
+    fields: list[Field] | None
+    derives: list[str]
 
     def __init__(self, group: Group, node_name: str, node: dict[str, Any]) -> None:
         self.name = node_name
         self.variant = node.get("variant", node_name.removeprefix(group.name))
         self.ty = f"crate::{node_name}"
+        self.fields = None
+        fields = node.get("fields")
+        if fields is not None:
+            self.fields = [Field(f) for f in fields]
+        self.derives = node.get("derives", [])
+        self.doc = node.get("doc")
+
+
+@dataclass
+class Field:
+    name: str
+    ty: str
+    parsed_ty: FieldType
+
+    def __init__(self, field: dict[str, Any]) -> None:
+        self.name = field["name"]
+        self.ty = field["type"]
+        self.parsed_ty = FieldType(self.ty)
+
+
+@dataclass
+class FieldType:
+    rule: str
+    name: str
+    seq: bool = False
+    optional: bool = False
+    slice_: bool = False
+
+    def __init__(self, rule: str) -> None:
+        self.rule = rule
+        self.name = ""
+
+        # The following cases are the limitations of this parser(and not used in the ast.toml):
+        # * Rules that involve declaring a sequence with optional items e.g. Vec<Option<...>>
+        last_pos = len(rule) - 1
+        for i, ch in enumerate(rule):
+            if ch == "?":
+                if i == last_pos:
+                    self.optional = True
+                else:
+                    raise ValueError(f"`?` must be at the end: {rule}")
+            elif ch == "*":
+                if self.slice_:  # The * after & is a slice
+                    continue
+                if i == last_pos:
+                    self.seq = True
+                else:
+                    raise ValueError(f"`*` must be at the end: {rule}")
+            elif ch == "&":
+                if i == 0 and rule.endswith("*"):
+                    self.slice_ = True
+                else:
+                    raise ValueError(
+                        f"`&` must be at the start and end with `*`: {rule}"
+                    )
+            else:
+                self.name += ch
+
+        if self.optional and (self.seq or self.slice_):
+            raise ValueError(f"optional field cannot be sequence or slice: {rule}")
 
 
 # ------------------------------------------------------------------------------
@@ -105,6 +199,8 @@ def write_preamble(out: list[str]) -> None:
     out.append("""
     // This is a generated file. Don't modify it by hand!
     // Run `crates/ruff_python_ast/generate.py` to re-generate the file.
+
+    use crate::name::Name;
     """)
 
 
@@ -137,14 +233,11 @@ def write_owned_enum(out: list[str], ast: Ast) -> None:
 
     for group in ast.groups:
         out.append("")
-        if group.rustdoc is not None:
-            out.append(group.rustdoc)
-        out.append("#[derive(Clone, Debug, PartialEq, is_macro::Is)]")
+        if group.doc is not None:
+            write_rustdoc(out, group.doc)
+        out.append("#[derive(Clone, Debug, PartialEq)]")
         out.append(f"pub enum {group.owned_enum_ty} {{")
         for node in group.nodes:
-            if group.add_suffix_to_is_methods:
-                is_name = to_snake_case(node.variant + group.name)
-                out.append(f'#[is(name = "{is_name}")]')
             out.append(f"{node.variant}({node.ty}),")
         out.append("}")
 
@@ -169,6 +262,93 @@ def write_owned_enum(out: list[str], ast: Ast) -> None:
             }
         }
         """)
+
+        out.append(
+            "#[allow(dead_code, clippy::match_wildcard_for_single_variants)]"
+        )  # Not all is_methods are used
+        out.append(f"impl {group.name} {{")
+        for node in group.nodes:
+            is_name = to_snake_case(node.variant)
+            variant_name = node.variant
+            match_arm = f"Self::{variant_name}"
+            if group.add_suffix_to_is_methods:
+                is_name = to_snake_case(node.variant + group.name)
+            if len(group.nodes) > 1:
+                out.append(f"""
+                    #[inline]
+                    pub const fn is_{is_name}(&self) -> bool {{
+                        matches!(self, {match_arm}(_))
+                    }}
+
+                    #[inline]
+                    pub fn {is_name}(self) -> Option<{node.ty}> {{
+                        match self {{
+                            {match_arm}(val) => Some(val),
+                            _ => None,
+                        }}
+                    }}
+
+                    #[inline]
+                    pub fn expect_{is_name}(self) -> {node.ty} {{
+                        match self {{
+                            {match_arm}(val) => val,
+                            _ => panic!("called expect on {{self:?}}"),
+                        }}
+                    }}
+
+                    #[inline]
+                    pub fn as_{is_name}_mut(&mut self) -> Option<&mut {node.ty}> {{
+                        match self {{
+                            {match_arm}(val) => Some(val),
+                            _ => None,
+                        }}
+                    }}
+
+                    #[inline]
+                    pub fn as_{is_name}(&self) -> Option<&{node.ty}> {{
+                        match self {{
+                            {match_arm}(val) => Some(val),
+                            _ => None,
+                        }}
+                    }}
+                           """)
+            elif len(group.nodes) == 1:
+                out.append(f"""
+                    #[inline]
+                    pub const fn is_{is_name}(&self) -> bool {{
+                        matches!(self, {match_arm}(_))
+                    }}
+
+                    #[inline]
+                    pub fn {is_name}(self) -> Option<{node.ty}> {{
+                        match self {{
+                            {match_arm}(val) => Some(val),
+                        }}
+                    }}
+
+                    #[inline]
+                    pub fn expect_{is_name}(self) -> {node.ty} {{
+                        match self {{
+                            {match_arm}(val) => val,
+                        }}
+                    }}
+
+                    #[inline]
+                    pub fn as_{is_name}_mut(&mut self) -> Option<&mut {node.ty}> {{
+                        match self {{
+                            {match_arm}(val) => Some(val),
+                        }}
+                    }}
+
+                    #[inline]
+                    pub fn as_{is_name}(&self) -> Option<&{node.ty}> {{
+                        match self {{
+                            {match_arm}(val) => Some(val),
+                        }}
+                    }}
+                           """)
+
+        out.append("}")
 
     for node in ast.all_nodes:
         out.append(f"""
@@ -229,8 +409,8 @@ def write_ref_enum(out: list[str], ast: Ast) -> None:
 
     for group in ast.groups:
         out.append("")
-        if group.rustdoc is not None:
-            out.append(group.rustdoc)
+        if group.doc is not None:
+            write_rustdoc(out, group.doc)
         out.append("""#[derive(Clone, Copy, Debug, PartialEq, is_macro::Is)]""")
         out.append(f"""pub enum {group.ref_enum_ty}<'a> {{""")
         for node in group.nodes:
@@ -464,6 +644,49 @@ def write_nodekind(out: list[str], ast: Ast) -> None:
 
 
 # ------------------------------------------------------------------------------
+# Node structs
+
+
+def write_node(out: list[str], ast: Ast) -> None:
+    group_names = [group.name for group in ast.groups]
+    for group in ast.groups:
+        for node in group.nodes:
+            if node.fields is None:
+                continue
+            if node.doc is not None:
+                write_rustdoc(out, node.doc)
+            out.append(
+                "#[derive(Clone, Debug, PartialEq"
+                + "".join(f", {derive}" for derive in node.derives)
+                + ")]"
+            )
+            name = node.name
+            out.append(f"pub struct {name} {{")
+            out.append("pub range: ruff_text_size::TextRange,")
+            for field in node.fields:
+                field_str = f"pub {field.name}: "
+                ty = field.parsed_ty
+
+                rust_ty = f"{field.parsed_ty.name}"
+                if ty.name in types_requiring_create_prefix:
+                    rust_ty = f"crate::{rust_ty}"
+                if ty.slice_:
+                    rust_ty = f"[{rust_ty}]"
+                if (ty.name in group_names or ty.slice_) and ty.seq is False:
+                    rust_ty = f"Box<{rust_ty}>"
+
+                if ty.seq:
+                    rust_ty = f"Vec<{rust_ty}>"
+                elif ty.optional:
+                    rust_ty = f"Option<{rust_ty}>"
+
+                field_str += rust_ty + ","
+                out.append(field_str)
+            out.append("}")
+            out.append("")
+
+
+# ------------------------------------------------------------------------------
 # Format and write output
 
 
@@ -474,6 +697,7 @@ def generate(ast: Ast) -> list[str]:
     write_ref_enum(out, ast)
     write_anynoderef(out, ast)
     write_nodekind(out, ast)
+    write_node(out, ast)
     return out
 
 

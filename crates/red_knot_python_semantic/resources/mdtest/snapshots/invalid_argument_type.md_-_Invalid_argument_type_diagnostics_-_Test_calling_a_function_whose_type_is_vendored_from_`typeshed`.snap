@@ -1,0 +1,42 @@
+---
+source: crates/red_knot_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: invalid_argument_type.md - Invalid argument type diagnostics - Test calling a function whose type is vendored from `typeshed`
+mdtest path: crates/red_knot_python_semantic/resources/mdtest/diagnostics/invalid_argument_type.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | import json
+2 | 
+3 | json.loads(5)  # error: [invalid-argument-type]
+```
+
+# Diagnostics
+
+```
+error: lint:invalid-argument-type
+ --> /src/mdtest_snippet.py:3:12
+  |
+1 | import json
+2 |
+3 | json.loads(5)  # error: [invalid-argument-type]
+  |            ^ Object of type `Literal[5]` cannot be assigned to parameter 1 (`s`) of function `loads`; expected type `str | bytes | bytearray`
+  |
+info
+  --> stdlib/json/__init__.pyi:40:5
+   |
+38 | ) -> None: ...
+39 | def loads(
+40 |     s: str | bytes | bytearray,
+   |     -------------------------- parameter declared in function definition here
+41 |     *,
+42 |     cls: type[JSONDecoder] | None = None,
+   |
+
+```

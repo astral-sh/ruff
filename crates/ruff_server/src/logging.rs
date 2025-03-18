@@ -9,7 +9,7 @@ use serde::Deserialize;
 use std::{path::PathBuf, str::FromStr, sync::Arc};
 use tracing::level_filters::LevelFilter;
 use tracing_subscriber::{
-    fmt::{format::FmtSpan, time::Uptime, writer::BoxMakeWriter},
+    fmt::{format::FmtSpan, time::ChronoLocal, writer::BoxMakeWriter},
     layer::SubscriberExt,
     Layer,
 };
@@ -49,10 +49,13 @@ pub(crate) fn init_logging(log_level: LogLevel, log_file: Option<&std::path::Pat
         Some(file) => BoxMakeWriter::new(Arc::new(file)),
         None => BoxMakeWriter::new(std::io::stderr),
     };
+
+    let is_trace_level = log_level == LogLevel::Trace;
     let subscriber = tracing_subscriber::Registry::default().with(
         tracing_subscriber::fmt::layer()
-            .with_timer(Uptime::default())
-            .with_thread_names(true)
+            .with_timer(ChronoLocal::new("%Y-%m-%d %H:%M:%S.%f".to_string()))
+            .with_thread_names(is_trace_level)
+            .with_target(is_trace_level)
             .with_ansi(false)
             .with_writer(logger)
             .with_span_events(FmtSpan::ENTER)
@@ -61,6 +64,8 @@ pub(crate) fn init_logging(log_level: LogLevel, log_file: Option<&std::path::Pat
 
     tracing::subscriber::set_global_default(subscriber)
         .expect("should be able to set global default subscriber");
+
+    tracing_log::LogTracer::init().unwrap();
 }
 
 /// The log level for the server as provided by the client during initialization.

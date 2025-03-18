@@ -1,15 +1,16 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{Arguments, ExprSubscript, StmtClassDef};
-use ruff_python_semantic::SemanticModel;
+use ruff_python_ast::{ExprSubscript, StmtClassDef};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::{remove_argument, Parentheses};
-use crate::settings::types::PythonVersion;
+use ruff_python_ast::PythonVersion;
 
-use super::{check_type_vars, in_nested_context, DisplayTypeVars, TypeVarReferenceVisitor};
+use super::{
+    check_type_vars, find_generic, in_nested_context, DisplayTypeVars, TypeVarReferenceVisitor,
+};
 
 /// ## What it does
 ///
@@ -103,9 +104,9 @@ impl Violation for NonPEP695GenericClass {
 }
 
 /// UP046
-pub(crate) fn non_pep695_generic_class(checker: &mut Checker, class_def: &StmtClassDef) {
+pub(crate) fn non_pep695_generic_class(checker: &Checker, class_def: &StmtClassDef) {
     // PEP-695 syntax is only available on Python 3.12+
-    if checker.settings.target_version < PythonVersion::Py312 {
+    if checker.target_version() < PythonVersion::PY312 {
         return;
     }
 
@@ -153,7 +154,7 @@ pub(crate) fn non_pep695_generic_class(checker: &mut Checker, class_def: &StmtCl
     // because `find_generic` also finds the *first* Generic argument, this has the additional
     // benefit of bailing out with a diagnostic if multiple Generic arguments are present
     if generic_idx != arguments.len() - 1 {
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
         return;
     }
 
@@ -209,20 +210,5 @@ pub(crate) fn non_pep695_generic_class(checker: &mut Checker, class_def: &StmtCl
         });
     }
 
-    checker.diagnostics.push(diagnostic);
-}
-
-/// Search `class_bases` for a `typing.Generic` base class. Returns the `Generic` expression (if
-/// any), along with its index in the class's bases tuple.
-fn find_generic<'a>(
-    class_bases: &'a Arguments,
-    semantic: &SemanticModel,
-) -> Option<(usize, &'a ExprSubscript)> {
-    class_bases.args.iter().enumerate().find_map(|(idx, expr)| {
-        expr.as_subscript_expr().and_then(|sub_expr| {
-            semantic
-                .match_typing_expr(&sub_expr.value, "Generic")
-                .then_some((idx, sub_expr))
-        })
-    })
+    checker.report_diagnostic(diagnostic);
 }

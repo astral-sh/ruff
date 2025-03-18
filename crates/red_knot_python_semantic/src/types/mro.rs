@@ -4,13 +4,13 @@ use std::ops::Deref;
 use rustc_hash::FxHashSet;
 
 use crate::types::class_base::ClassBase;
-use crate::types::{Class, KnownClass, Type};
+use crate::types::{Class, Type};
 use crate::Db;
 
 /// The inferred method resolution order of a given class.
 ///
 /// See [`Class::iter_mro`] for more details.
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(PartialEq, Eq, Clone, Debug, salsa::Update)]
 pub(super) struct Mro<'db>(Box<[ClassBase<'db>]>);
 
 impl<'db> Mro<'db> {
@@ -52,9 +52,7 @@ impl<'db> Mro<'db> {
         match class_bases {
             // `builtins.object` is the special case:
             // the only class in Python that has an MRO with length <2
-            [] if class.is_known(db, KnownClass::Object) => {
-                Ok(Self::from([ClassBase::Class(class)]))
-            }
+            [] if class.is_object(db) => Ok(Self::from([ClassBase::Class(class)])),
 
             // All other classes in Python have an MRO with length >=2.
             // Even if a class has no explicit base classes,
@@ -238,7 +236,7 @@ impl<'db> Iterator for MroIterator<'db> {
 
 impl std::iter::FusedIterator for MroIterator<'_> {}
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, salsa::Update)]
 pub(super) struct MroError<'db> {
     kind: MroErrorKind<'db>,
     fallback_mro: Mro<'db>,
@@ -258,7 +256,7 @@ impl<'db> MroError<'db> {
 }
 
 /// Possible ways in which attempting to resolve the MRO of a class might fail.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, salsa::Update)]
 pub(super) enum MroErrorKind<'db> {
     /// The class inherits from one or more invalid bases.
     ///

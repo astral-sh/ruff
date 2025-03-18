@@ -4,16 +4,13 @@ use ruff_diagnostics::{Diagnostic, Fix};
 use ruff_diagnostics::{FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::any_over_expr;
-use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, Parameters, Stmt};
-use ruff_text_size::Ranged;
+use ruff_python_ast::{self as ast, Expr, ExprContext, Parameters, Stmt};
+use ruff_python_ast::{visitor, ExprLambda};
+use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
-
 use crate::rules::flake8_comprehensions::fixes;
-
-use super::helpers;
 
 /// ## What it does
 /// Checks for unnecessary `map()` calls with lambda functions.
@@ -33,7 +30,7 @@ use super::helpers;
 /// - Instead of `dict(map(lambda v: (v, v ** 2), values))`, use
 ///   `{v: v ** 2 for v in values}`.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// map(lambda x: x + 1, iterable)
 /// ```
@@ -67,140 +64,84 @@ impl Violation for UnnecessaryMap {
 }
 
 /// C417
-pub(crate) fn unnecessary_map(
-    checker: &mut Checker,
-    expr: &Expr,
-    parent: Option<&Expr>,
-    func: &Expr,
-    args: &[Expr],
-) {
-    let Some(builtin_name) = checker.semantic().resolve_builtin_symbol(func) else {
+pub(crate) fn unnecessary_map(checker: &Checker, call: &ast::ExprCall) {
+    let semantic = checker.semantic();
+    let (func, arguments) = (&call.func, &call.arguments);
+
+    if !arguments.keywords.is_empty() {
+        return;
+    }
+
+    let Some(object_type) = ObjectType::from(func, semantic) else {
         return;
     };
 
-    let object_type = match builtin_name {
-        "map" => ObjectType::Generator,
-        "list" => ObjectType::List,
-        "set" => ObjectType::Set,
-        "dict" => ObjectType::Dict,
-        _ => return,
-    };
+    let parent = semantic.current_expression_parent();
 
-    match object_type {
+    let (lambda, iterables) = match object_type {
         ObjectType::Generator => {
+            let parent_call_func = match parent {
+                Some(Expr::Call(call)) => Some(&call.func),
+                _ => None,
+            };
+
             // Exclude the parent if already matched by other arms.
-            if parent
-                .and_then(Expr::as_call_expr)
-                .and_then(|call| call.func.as_name_expr())
-                .is_some_and(|name| matches!(name.id.as_str(), "list" | "set" | "dict"))
-            {
+            if parent_call_func.is_some_and(|func| is_list_set_or_dict(func, semantic)) {
                 return;
             }
 
-            // Only flag, e.g., `map(lambda x: x + 1, iterable)`.
-            let [Expr::Lambda(ast::ExprLambda {
-                parameters, body, ..
-            }), iterable] = args
-            else {
+            let Some(result) = map_lambda_and_iterables(call, semantic) else {
                 return;
             };
 
-            // For example, (x+1 for x in (c:=a)) is invalid syntax
-            // so we can't suggest it.
-            if any_over_expr(iterable, &|expr| expr.is_named_expr()) {
-                return;
-            }
-
-            if !lambda_has_expected_arity(parameters.as_deref(), body) {
-                return;
-            }
+            result
         }
-        ObjectType::List | ObjectType::Set => {
-            // Only flag, e.g., `list(map(lambda x: x + 1, iterable))`.
-            let [Expr::Call(ast::ExprCall {
-                func,
-                arguments: Arguments { args, keywords, .. },
-                ..
-            })] = args
-            else {
+
+        ObjectType::List | ObjectType::Set | ObjectType::Dict => {
+            let [Expr::Call(inner_call)] = arguments.args.as_ref() else {
                 return;
             };
 
-            if args.len() != 2 {
-                return;
-            }
-
-            if !keywords.is_empty() {
-                return;
-            }
-
-            let Some(argument) = helpers::first_argument_with_matching_function("map", func, args)
-            else {
+            let Some((lambda, iterables)) = map_lambda_and_iterables(inner_call, semantic) else {
                 return;
             };
 
-            let Expr::Lambda(ast::ExprLambda {
-                parameters, body, ..
-            }) = argument
-            else {
-                return;
-            };
+            if object_type == ObjectType::Dict {
+                let (Expr::Tuple(ast::ExprTuple { elts, .. })
+                | Expr::List(ast::ExprList { elts, .. })) = &*lambda.body
+                else {
+                    return;
+                };
 
-            if !lambda_has_expected_arity(parameters.as_deref(), body) {
-                return;
-            }
-        }
-        ObjectType::Dict => {
-            // Only flag, e.g., `dict(map(lambda v: (v, v ** 2), values))`.
-            let [Expr::Call(ast::ExprCall {
-                func,
-                arguments: Arguments { args, keywords, .. },
-                ..
-            })] = args
-            else {
-                return;
-            };
-
-            if args.len() != 2 {
-                return;
+                if elts.len() != 2 {
+                    return;
+                }
             }
 
-            if !keywords.is_empty() {
-                return;
-            }
-
-            let Some(argument) = helpers::first_argument_with_matching_function("map", func, args)
-            else {
-                return;
-            };
-
-            let Expr::Lambda(ast::ExprLambda {
-                parameters, body, ..
-            }) = argument
-            else {
-                return;
-            };
-
-            let (Expr::Tuple(ast::ExprTuple { elts, .. }) | Expr::List(ast::ExprList { elts, .. })) =
-                body.as_ref()
-            else {
-                return;
-            };
-
-            if elts.len() != 2 {
-                return;
-            }
-
-            if !lambda_has_expected_arity(parameters.as_deref(), body) {
-                return;
-            }
+            (lambda, iterables)
         }
     };
 
-    let mut diagnostic = Diagnostic::new(UnnecessaryMap { object_type }, expr.range());
+    for iterable in iterables {
+        // For example, (x+1 for x in (c:=a)) is invalid syntax
+        // so we can't suggest it.
+        if any_over_expr(iterable, &|expr| expr.is_named_expr()) {
+            return;
+        }
+
+        if iterable.is_starred_expr() {
+            return;
+        }
+    }
+
+    if !lambda_has_expected_arity(lambda) {
+        return;
+    }
+
+    let mut diagnostic = Diagnostic::new(UnnecessaryMap { object_type }, call.range);
     diagnostic.try_set_fix(|| {
         fixes::fix_unnecessary_map(
-            expr,
+            call,
             parent,
             object_type,
             checker.locator(),
@@ -208,7 +149,39 @@ pub(crate) fn unnecessary_map(
         )
         .map(Fix::unsafe_edit)
     });
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
+}
+
+fn is_list_set_or_dict(func: &Expr, semantic: &SemanticModel) -> bool {
+    semantic
+        .resolve_qualified_name(func)
+        .is_some_and(|qualified_name| {
+            matches!(
+                qualified_name.segments(),
+                ["" | "builtins", "list" | "set" | "dict"]
+            )
+        })
+}
+
+fn map_lambda_and_iterables<'a>(
+    call: &'a ast::ExprCall,
+    semantic: &'a SemanticModel,
+) -> Option<(&'a ExprLambda, &'a [Expr])> {
+    if !semantic.match_builtin_expr(&call.func, "map") {
+        return None;
+    }
+
+    let arguments = &call.arguments;
+
+    if !arguments.keywords.is_empty() {
+        return None;
+    }
+
+    let Some((Expr::Lambda(lambda), iterables)) = arguments.args.split_first() else {
+        return None;
+    };
+
+    Some((lambda, iterables))
 }
 
 /// A lambda as the first argument to `map()` has the "expected" arity when:
@@ -216,12 +189,12 @@ pub(crate) fn unnecessary_map(
 /// * It has exactly one parameter
 /// * That parameter is not variadic
 /// * That parameter does not have a default value
-fn lambda_has_expected_arity(parameters: Option<&Parameters>, body: &Expr) -> bool {
-    let Some(parameters) = parameters else {
+fn lambda_has_expected_arity(lambda: &ExprLambda) -> bool {
+    let Some(parameters) = lambda.parameters.as_deref() else {
         return false;
     };
 
-    let [parameter] = &parameters.args[..] else {
+    let [parameter] = &*parameters.args else {
         return false;
     };
 
@@ -233,7 +206,7 @@ fn lambda_has_expected_arity(parameters: Option<&Parameters>, body: &Expr) -> bo
         return false;
     }
 
-    if late_binding(parameters, body) {
+    if late_binding(parameters, &lambda.body) {
         return false;
     }
 
@@ -246,6 +219,18 @@ pub(crate) enum ObjectType {
     List,
     Set,
     Dict,
+}
+
+impl ObjectType {
+    fn from(func: &Expr, semantic: &SemanticModel) -> Option<Self> {
+        match semantic.resolve_builtin_symbol(func) {
+            Some("map") => Some(Self::Generator),
+            Some("list") => Some(Self::List),
+            Some("set") => Some(Self::Set),
+            Some("dict") => Some(Self::Dict),
+            _ => None,
+        }
+    }
 }
 
 impl fmt::Display for ObjectType {

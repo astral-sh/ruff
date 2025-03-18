@@ -58,7 +58,7 @@ impl Violation for SingleStringSlots {
 }
 
 /// PLC0205
-pub(crate) fn single_string_slots(checker: &mut Checker, class: &StmtClassDef) {
+pub(crate) fn single_string_slots(checker: &Checker, class: &StmtClassDef) {
     for stmt in &class.body {
         match stmt {
             Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
@@ -66,9 +66,10 @@ pub(crate) fn single_string_slots(checker: &mut Checker, class: &StmtClassDef) {
                     if let Expr::Name(ast::ExprName { id, .. }) = target {
                         if id.as_str() == "__slots__" {
                             if matches!(value.as_ref(), Expr::StringLiteral(_) | Expr::FString(_)) {
-                                checker
-                                    .diagnostics
-                                    .push(Diagnostic::new(SingleStringSlots, stmt.identifier()));
+                                checker.report_diagnostic(Diagnostic::new(
+                                    SingleStringSlots,
+                                    stmt.identifier(),
+                                ));
                             }
                         }
                     }
@@ -82,9 +83,10 @@ pub(crate) fn single_string_slots(checker: &mut Checker, class: &StmtClassDef) {
                 if let Expr::Name(ast::ExprName { id, .. }) = target.as_ref() {
                     if id.as_str() == "__slots__" {
                         if matches!(value.as_ref(), Expr::StringLiteral(_) | Expr::FString(_)) {
-                            checker
-                                .diagnostics
-                                .push(Diagnostic::new(SingleStringSlots, stmt.identifier()));
+                            checker.report_diagnostic(Diagnostic::new(
+                                SingleStringSlots,
+                                stmt.identifier(),
+                            ));
                         }
                     }
                 }

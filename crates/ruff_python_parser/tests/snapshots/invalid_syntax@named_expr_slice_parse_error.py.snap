@@ -1,0 +1,85 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/named_expr_slice_parse_error.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..130,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 117..129,
+                    value: Subscript(
+                        ExprSubscript {
+                            range: 117..129,
+                            value: Name(
+                                ExprName {
+                                    range: 117..120,
+                                    id: Name("lst"),
+                                    ctx: Load,
+                                },
+                            ),
+                            slice: Slice(
+                                ExprSlice {
+                                    range: 121..128,
+                                    lower: Some(
+                                        Named(
+                                            ExprNamed {
+                                                range: 121..125,
+                                                target: Name(
+                                                    ExprName {
+                                                        range: 121..122,
+                                                        id: Name("x"),
+                                                        ctx: Store,
+                                                    },
+                                                ),
+                                                value: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        range: 124..125,
+                                                        value: Int(
+                                                            1,
+                                                        ),
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                    ),
+                                    upper: Some(
+                                        UnaryOp(
+                                            ExprUnaryOp {
+                                                range: 126..128,
+                                                op: USub,
+                                                operand: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        range: 127..128,
+                                                        value: Int(
+                                                            1,
+                                                        ),
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                    ),
+                                    step: None,
+                                },
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | # parse_options: {"target-version": "3.8"}
+2 | # before 3.9, only emit the parse error, not the unsupported syntax error
+3 | lst[x:=1:-1]
+  |     ^^^^ Syntax Error: Unparenthesized named expression cannot be used here
+  |

@@ -75,7 +75,7 @@ impl AlwaysFixableViolation for IsLiteral {
 
 /// F632
 pub(crate) fn invalid_literal_comparison(
-    checker: &mut Checker,
+    checker: &Checker,
     left: &Expr,
     ops: &[CmpOp],
     comparators: &[Expr],
@@ -117,7 +117,7 @@ pub(crate) fn invalid_literal_comparison(
                     bail!("Failed to fix invalid comparison due to missing op")
                 }
             });
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
         left = right;
     }

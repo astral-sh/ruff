@@ -1,11 +1,11 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast as ast;
+use ruff_python_ast::{self as ast, PythonVersion};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
+use crate::checkers::ast::Checker;
 use crate::Locator;
-use crate::{checkers::ast::Checker, settings::types::PythonVersion};
 
 /// ## What it does
 /// Checks for code that could be written more idiomatically using
@@ -68,8 +68,8 @@ impl AlwaysFixableViolation for SliceToRemovePrefixOrSuffix {
 }
 
 /// FURB188
-pub(crate) fn slice_to_remove_affix_expr(checker: &mut Checker, if_expr: &ast::ExprIf) {
-    if checker.settings.target_version < PythonVersion::Py39 {
+pub(crate) fn slice_to_remove_affix_expr(checker: &Checker, if_expr: &ast::ExprIf) {
+    if checker.target_version() < PythonVersion::PY39 {
         return;
     }
 
@@ -93,14 +93,14 @@ pub(crate) fn slice_to_remove_affix_expr(checker: &mut Checker, if_expr: &ast::E
                 if_expr.start(),
                 if_expr.end(),
             )));
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 }
 
 /// FURB188
-pub(crate) fn slice_to_remove_affix_stmt(checker: &mut Checker, if_stmt: &ast::StmtIf) {
-    if checker.settings.target_version < PythonVersion::Py39 {
+pub(crate) fn slice_to_remove_affix_stmt(checker: &Checker, if_stmt: &ast::StmtIf) {
+    if checker.target_version() < PythonVersion::PY39 {
         return;
     }
     if let Some(removal_data) = affix_removal_data_stmt(if_stmt) {
@@ -127,7 +127,7 @@ pub(crate) fn slice_to_remove_affix_stmt(checker: &mut Checker, if_stmt: &ast::S
                 if_stmt.start(),
                 if_stmt.end(),
             )));
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 }
@@ -365,7 +365,7 @@ fn affix_matches_slice_bound(data: &RemoveAffixData, semantic: &SemanticModel) -
                 range: _,
                 value: string_val,
             }),
-        ) => operand.as_number_literal_expr().is_some_and(
+        ) if operand.is_number_literal_expr() => operand.as_number_literal_expr().is_some_and(
             |ast::ExprNumberLiteral { value, .. }| {
                 // Only support prefix removal for size at most `u32::MAX`
                 value

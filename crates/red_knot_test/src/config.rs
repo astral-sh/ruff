@@ -9,8 +9,10 @@
 //! ```
 
 use anyhow::Context;
-use red_knot_python_semantic::{PythonPlatform, PythonVersion};
-use serde::Deserialize;
+use red_knot_python_semantic::PythonPlatform;
+use ruff_db::system::{SystemPath, SystemPathBuf};
+use ruff_python_ast::PythonVersion;
+use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Debug, Default, Clone)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
@@ -18,6 +20,11 @@ pub(crate) struct MarkdownTestConfig {
     pub(crate) environment: Option<Environment>,
 
     pub(crate) log: Option<Log>,
+
+    /// The [`ruff_db::system::System`] to use for tests.
+    ///
+    /// Defaults to the case-sensitive [`ruff_db::system::InMemorySystem`].
+    pub(crate) system: Option<SystemKind>,
 }
 
 impl MarkdownTestConfig {
@@ -35,10 +42,16 @@ impl MarkdownTestConfig {
             .and_then(|env| env.python_platform.clone())
     }
 
-    pub(crate) fn typeshed(&self) -> Option<&str> {
+    pub(crate) fn typeshed(&self) -> Option<&SystemPath> {
         self.environment
             .as_ref()
             .and_then(|env| env.typeshed.as_deref())
+    }
+
+    pub(crate) fn extra_paths(&self) -> Option<&[SystemPathBuf]> {
+        self.environment
+            .as_ref()
+            .and_then(|env| env.extra_paths.as_deref())
     }
 }
 
@@ -52,7 +65,10 @@ pub(crate) struct Environment {
     pub(crate) python_platform: Option<PythonPlatform>,
 
     /// Path to a custom typeshed directory.
-    pub(crate) typeshed: Option<String>,
+    pub(crate) typeshed: Option<SystemPathBuf>,
+
+    /// Additional search paths to consider when resolving modules.
+    pub(crate) extra_paths: Option<Vec<SystemPathBuf>>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -62,4 +78,20 @@ pub(crate) enum Log {
     Bool(bool),
     /// Enable logging and only show filters that match the given [env-filter](https://docs.rs/tracing-subscriber/latest/tracing_subscriber/filter/struct.EnvFilter.html)
     Filter(String),
+}
+
+/// The system to use for tests.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Deserialize, Serialize, Default)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum SystemKind {
+    /// Use an in-memory system with a case sensitive file system..
+    ///
+    /// This is recommended for all tests because it's fast.
+    #[default]
+    InMemory,
+
+    /// Use the os system.
+    ///
+    /// This system should only be used when testing system or OS specific behavior.
+    Os,
 }

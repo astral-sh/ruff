@@ -45,7 +45,7 @@ impl Violation for MapIntVersionParsing {
 }
 
 /// RUF048
-pub(crate) fn map_int_version_parsing(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn map_int_version_parsing(checker: &Checker, call: &ast::ExprCall) {
     let semantic = checker.semantic();
 
     let Some((first, second)) = map_call_with_two_arguments(semantic, call) else {
@@ -53,9 +53,7 @@ pub(crate) fn map_int_version_parsing(checker: &mut Checker, call: &ast::ExprCal
     };
 
     if is_dunder_version_split_dot(second) && semantic.match_builtin_expr(first, "int") {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(MapIntVersionParsing, call.range()));
+        checker.report_diagnostic(Diagnostic::new(MapIntVersionParsing, call.range()));
     }
 }
 

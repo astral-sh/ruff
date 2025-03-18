@@ -41,7 +41,7 @@ use crate::rules::flake8_comprehensions::fixes;
 /// short-circuiting it may not improve performance. (It may even slightly regress performance,
 /// though the difference will usually be small.)
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// any([x.id for x in bar])
 /// all([x.id for x in bar])
@@ -88,7 +88,7 @@ impl Violation for UnnecessaryComprehensionInCall {
 
 /// C419
 pub(crate) fn unnecessary_comprehension_in_call(
-    checker: &mut Checker,
+    checker: &Checker,
     expr: &Expr,
     func: &Expr,
     args: &[Expr],
@@ -174,7 +174,7 @@ pub(crate) fn unnecessary_comprehension_in_call(
 
         diagnostic.set_fix(Fix::unsafe_edits(collection_start, [collection_end]));
     }
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// Return `true` if the [`Expr`] contains an `await` expression.

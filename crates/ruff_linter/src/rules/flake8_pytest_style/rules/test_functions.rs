@@ -50,10 +50,7 @@ impl Violation for PytestParameterWithDefaultArgument {
 }
 
 /// PT028
-pub(crate) fn parameter_with_default_argument(
-    checker: &mut Checker,
-    function_def: &StmtFunctionDef,
-) {
+pub(crate) fn parameter_with_default_argument(checker: &Checker, function_def: &StmtFunctionDef) {
     if !is_likely_pytest_test(function_def, checker) {
         return;
     }
@@ -67,6 +64,6 @@ pub(crate) fn parameter_with_default_argument(
         let diagnostic = Diagnostic::new(kind, default.range());
         let edit = Edit::deletion(parameter.parameter.end(), parameter.end());
         let fix = Fix::display_only_edit(edit);
-        checker.diagnostics.push(diagnostic.with_fix(fix));
+        checker.report_diagnostic(diagnostic.with_fix(fix));
     }
 }

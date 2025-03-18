@@ -58,7 +58,7 @@ impl Violation for TooManyArguments {
 }
 
 /// PLR0913
-pub(crate) fn too_many_arguments(checker: &mut Checker, function_def: &ast::StmtFunctionDef) {
+pub(crate) fn too_many_arguments(checker: &Checker, function_def: &ast::StmtFunctionDef) {
     // https://github.com/astral-sh/ruff/issues/14535
     if checker.source_type.is_stub() {
         return;
@@ -93,7 +93,9 @@ pub(crate) fn too_many_arguments(checker: &mut Checker, function_def: &ast::Stmt
             &checker.settings.pep8_naming.classmethod_decorators,
             &checker.settings.pep8_naming.staticmethod_decorators,
         ),
-        function_type::FunctionType::Method | function_type::FunctionType::ClassMethod
+        function_type::FunctionType::Method
+            | function_type::FunctionType::ClassMethod
+            | function_type::FunctionType::NewMethod
     ) {
         // If so, we need to subtract one from the number of positional arguments, since the first
         // argument is always `self` or `cls`.
@@ -106,7 +108,7 @@ pub(crate) fn too_many_arguments(checker: &mut Checker, function_def: &ast::Stmt
         return;
     }
 
-    checker.diagnostics.push(Diagnostic::new(
+    checker.report_diagnostic(Diagnostic::new(
         TooManyArguments {
             c_args: num_arguments,
             max_args: checker.settings.pylint.max_args,

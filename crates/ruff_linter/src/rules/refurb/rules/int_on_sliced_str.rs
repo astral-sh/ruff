@@ -64,7 +64,7 @@ impl AlwaysFixableViolation for IntOnSlicedStr {
     }
 }
 
-pub(crate) fn int_on_sliced_str(checker: &mut Checker, call: &ExprCall) {
+pub(crate) fn int_on_sliced_str(checker: &Checker, call: &ExprCall) {
     // Verify that the function is `int`.
     if !checker.semantic().match_builtin_expr(&call.func, "int") {
         return;
@@ -106,12 +106,12 @@ pub(crate) fn int_on_sliced_str(checker: &mut Checker, call: &ExprCall) {
     if expr_slice.upper.is_some() || expr_slice.step.is_some() {
         return;
     }
-    if !expr_slice
+    if expr_slice
         .lower
         .as_ref()
         .and_then(|expr| expr.as_number_literal_expr())
         .and_then(|expr| expr.value.as_int())
-        .is_some_and(|expr| expr.as_u8() == Some(2))
+        .is_none_or(|expr| expr.as_u8() != Some(2))
     {
         return;
     }
@@ -124,5 +124,5 @@ pub(crate) fn int_on_sliced_str(checker: &mut Checker, call: &ExprCall) {
         ),
         [Edit::range_replacement("0".to_string(), base.range())],
     ));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

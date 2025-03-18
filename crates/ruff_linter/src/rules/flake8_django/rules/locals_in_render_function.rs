@@ -44,7 +44,7 @@ impl Violation for DjangoLocalsInRenderFunction {
 }
 
 /// DJ003
-pub(crate) fn locals_in_render_function(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn locals_in_render_function(checker: &Checker, call: &ast::ExprCall) {
     if !checker.semantic().seen_module(Modules::DJANGO) {
         return;
     }
@@ -61,7 +61,7 @@ pub(crate) fn locals_in_render_function(checker: &mut Checker, call: &ast::ExprC
 
     if let Some(argument) = call.arguments.find_argument_value("context", 2) {
         if is_locals_call(argument, checker.semantic()) {
-            checker.diagnostics.push(Diagnostic::new(
+            checker.report_diagnostic(Diagnostic::new(
                 DjangoLocalsInRenderFunction,
                 argument.range(),
             ));

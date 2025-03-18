@@ -22,7 +22,7 @@ use crate::rules::ruff::rules::helpers::{dataclass_kind, is_class_var_annotation
 /// If the default value is intended to be mutable, it must be annotated with
 /// `typing.ClassVar`; otherwise, a `ValueError` will be raised.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// from dataclasses import dataclass
 ///
@@ -65,11 +65,7 @@ impl Violation for MutableDataclassDefault {
 }
 
 /// RUF008
-pub(crate) fn mutable_dataclass_default(
-    checker: &Checker,
-    class_def: &ast::StmtClassDef,
-    diagnostics: &mut Vec<Diagnostic>,
-) {
+pub(crate) fn mutable_dataclass_default(checker: &Checker, class_def: &ast::StmtClassDef) {
     let semantic = checker.semantic();
 
     if dataclass_kind(class_def, semantic).is_none() {
@@ -92,7 +88,7 @@ pub(crate) fn mutable_dataclass_default(
         {
             let diagnostic = Diagnostic::new(MutableDataclassDefault, value.range());
 
-            diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 }

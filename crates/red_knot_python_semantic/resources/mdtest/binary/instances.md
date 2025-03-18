@@ -244,10 +244,7 @@ class B:
     def __rsub__(self, other: A) -> B:
         return B()
 
-# TODO: this should be `B` (the return annotation of `B.__rsub__`),
-# because `A.__sub__` is annotated as only accepting `A`,
-# but `B.__rsub__` will accept `A`.
-reveal_type(A() - B())  # revealed: A
+reveal_type(A() - B())  # revealed: B
 ```
 
 ## Callable instances as dunders
@@ -262,32 +259,38 @@ class A:
 class B:
     __add__ = A()
 
-# TODO: this could be `int` if we declare `B.__add__` using a `Callable` type
 reveal_type(B() + B())  # revealed: Unknown | int
+```
+
+Note that we union with `Unknown` here because `__add__` is not declared. We do infer just `int` if
+the callable is declared:
+
+```py
+class B2:
+    __add__: A = A()
+
+reveal_type(B2() + B2())  # revealed: int
 ```
 
 ## Integration test: numbers from typeshed
 
+We get less precise results from binary operations on float/complex literals due to the special case
+for annotations of `float` or `complex`, which applies also to return annotations for typeshed
+dunder methods. Perhaps we could have a special-case on the special-case, to exclude these typeshed
+return annotations from the widening, and preserve a bit more precision here?
+
 ```py
-reveal_type(3j + 3.14)  # revealed: complex
-reveal_type(4.2 + 42)  # revealed: float
-reveal_type(3j + 3)  # revealed: complex
-
-# TODO should be complex, need to check arg type and fall back to `rhs.__radd__`
-reveal_type(3.14 + 3j)  # revealed: float
-
-# TODO should be float, need to check arg type and fall back to `rhs.__radd__`
-reveal_type(42 + 4.2)  # revealed: int
-
-# TODO should be complex, need to check arg type and fall back to `rhs.__radd__`
-reveal_type(3 + 3j)  # revealed: int
+reveal_type(3j + 3.14)  # revealed: int | float | complex
+reveal_type(4.2 + 42)  # revealed: int | float
+reveal_type(3j + 3)  # revealed: int | float | complex
+reveal_type(3.14 + 3j)  # revealed: int | float | complex
+reveal_type(42 + 4.2)  # revealed: int | float
+reveal_type(3 + 3j)  # revealed: int | float | complex
 
 def _(x: bool, y: int):
     reveal_type(x + y)  # revealed: int
-    reveal_type(4.2 + x)  # revealed: float
-
-    # TODO should be float, need to check arg type and fall back to `rhs.__radd__`
-    reveal_type(y + 4.12)  # revealed: int
+    reveal_type(4.2 + x)  # revealed: int | float
+    reveal_type(y + 4.12)  # revealed: int | float
 ```
 
 ## With literal types
@@ -304,13 +307,12 @@ class A:
         return self
 
 reveal_type(A() + 1)  # revealed: A
-# TODO should be `A` since `int.__add__` doesn't support `A` instances
-reveal_type(1 + A())  # revealed: int
+reveal_type(1 + A())  # revealed: A
 
 reveal_type(A() + "foo")  # revealed: A
 # TODO should be `A` since `str.__add__` doesn't support `A` instances
 # TODO overloads
-reveal_type("foo" + A())  # revealed: @Todo(return type)
+reveal_type("foo" + A())  # revealed: @Todo(return type of decorated function)
 
 reveal_type(A() + b"foo")  # revealed: A
 # TODO should be `A` since `bytes.__add__` doesn't support `A` instances
@@ -318,7 +320,7 @@ reveal_type(b"foo" + A())  # revealed: bytes
 
 reveal_type(A() + ())  # revealed: A
 # TODO this should be `A`, since `tuple.__add__` doesn't support `A` instances
-reveal_type(() + A())  # revealed: @Todo(return type)
+reveal_type(() + A())  # revealed: @Todo(return type of decorated function)
 
 literal_string_instance = "foo" * 1_000_000_000
 # the test is not testing what it's meant to be testing if this isn't a `LiteralString`:
@@ -327,7 +329,7 @@ reveal_type(literal_string_instance)  # revealed: LiteralString
 reveal_type(A() + literal_string_instance)  # revealed: A
 # TODO should be `A` since `str.__add__` doesn't support `A` instances
 # TODO overloads
-reveal_type(literal_string_instance + A())  # revealed: @Todo(return type)
+reveal_type(literal_string_instance + A())  # revealed: @Todo(return type of decorated function)
 ```
 
 ## Operations involving instances of classes inheriting from `Any`
@@ -353,6 +355,20 @@ class Y(Foo): ...
 
 # TODO: Should be `int | Unknown`; see above discussion.
 reveal_type(X() + Y())  # revealed: int
+```
+
+## Operations involving types with invalid `__bool__` methods
+
+<!-- snapshot-diagnostics -->
+
+```py
+class NotBoolable:
+    __bool__: int = 3
+
+a = NotBoolable()
+
+# error: [unsupported-bool-conversion]
+10 and a and True
 ```
 
 ## Unsupported
@@ -390,10 +406,12 @@ A left-hand dunder method doesn't apply for the right-hand operand, or vice vers
 
 ```py
 class A:
-    def __add__(self, other) -> int: ...
+    def __add__(self, other) -> int:
+        return 1
 
 class B:
-    def __radd__(self, other) -> int: ...
+    def __radd__(self, other) -> int:
+        return 1
 
 class C: ...
 

@@ -50,7 +50,7 @@ impl Violation for ExceptWithEmptyTuple {
 }
 
 /// B029
-pub(crate) fn except_with_empty_tuple(checker: &mut Checker, except_handler: &ExceptHandler) {
+pub(crate) fn except_with_empty_tuple(checker: &Checker, except_handler: &ExceptHandler) {
     let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { type_, .. }) =
         except_handler;
     let Some(type_) = type_ else {
@@ -66,7 +66,7 @@ pub(crate) fn except_with_empty_tuple(checker: &mut Checker, except_handler: &Ex
             .current_statement()
             .as_try_stmt()
             .is_some_and(|try_stmt| try_stmt.is_star);
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(Diagnostic::new(
             ExceptWithEmptyTuple { is_star },
             except_handler.range(),
         ));

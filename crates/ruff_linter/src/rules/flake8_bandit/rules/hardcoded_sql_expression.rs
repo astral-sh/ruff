@@ -55,17 +55,17 @@ impl Violation for HardcodedSQLExpression {
 }
 
 /// S608
-pub(crate) fn hardcoded_sql_expression(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn hardcoded_sql_expression(checker: &Checker, expr: &Expr) {
     let content = match expr {
         // "select * from table where val = " + "str" + ...
         Expr::BinOp(ast::ExprBinOp {
             op: Operator::Add, ..
         }) => {
             // Only evaluate the full BinOp, not the nested components.
-            if !checker
+            if checker
                 .semantic()
                 .current_expression_parent()
-                .map_or(true, |parent| !parent.is_bin_op_expr())
+                .is_some_and(ruff_python_ast::Expr::is_bin_op_expr)
             {
                 return;
             }
@@ -105,9 +105,7 @@ pub(crate) fn hardcoded_sql_expression(checker: &mut Checker, expr: &Expr) {
     };
 
     if SQL_REGEX.is_match(&content) {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(HardcodedSQLExpression, expr.range()));
+        checker.report_diagnostic(Diagnostic::new(HardcodedSQLExpression, expr.range()));
     }
 }
 

@@ -97,12 +97,7 @@ else:
 ## No narrowing for instances of `builtins.type`
 
 ```py
-def _(flag: bool):
-    t = type("t", (), {})
-
-    # This isn't testing what we want it to test if we infer anything more precise here:
-    reveal_type(t)  # revealed: type
-
+def _(flag: bool, t: type):
     x = 1 if flag else "foo"
 
     if isinstance(x, t):

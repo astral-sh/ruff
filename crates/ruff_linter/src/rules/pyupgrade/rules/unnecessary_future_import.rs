@@ -82,7 +82,7 @@ const PY37_PLUS_REMOVE_FUTURES: &[&str] = &[
 ];
 
 /// UP010
-pub(crate) fn unnecessary_future_import(checker: &mut Checker, stmt: &Stmt, names: &[Alias]) {
+pub(crate) fn unnecessary_future_import(checker: &Checker, stmt: &Stmt, names: &[Alias]) {
     let mut unused_imports: Vec<&Alias> = vec![];
     for alias in names {
         if alias.asname.is_some() {
@@ -127,5 +127,5 @@ pub(crate) fn unnecessary_future_import(checker: &mut Checker, stmt: &Stmt, name
             checker.semantic().current_statement_parent_id(),
         )))
     });
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

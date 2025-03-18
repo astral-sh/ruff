@@ -2,11 +2,10 @@ use std::fmt;
 
 use drop_bomb::DebugDropBomb;
 use ruff_db::{
-    diagnostic::{DiagnosticId, Severity},
+    diagnostic::{DiagnosticId, OldSecondaryDiagnosticMessage, Severity},
     files::File,
 };
-use ruff_python_ast::AnyNodeRef;
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextRange};
 
 use super::{binding_type, KnownFunction, TypeCheckDiagnostic, TypeCheckDiagnostics};
 
@@ -67,46 +66,80 @@ impl<'db> InferContext<'db> {
         self.diagnostics.get_mut().extend(other.diagnostics());
     }
 
-    /// Reports a lint located at `node`.
-    pub(super) fn report_lint(
+    /// Reports a lint located at `ranged`.
+    pub(super) fn report_lint<T>(
         &self,
         lint: &'static LintMetadata,
-        node: AnyNodeRef,
+        ranged: T,
         message: fmt::Arguments,
-    ) {
-        if !self.db.is_file_open(self.file) {
-            return;
+    ) where
+        T: Ranged,
+    {
+        self.report_lint_with_secondary_messages(lint, ranged, message, vec![]);
+    }
+
+    /// Reports a lint located at `ranged`.
+    pub(super) fn report_lint_with_secondary_messages<T>(
+        &self,
+        lint: &'static LintMetadata,
+        ranged: T,
+        message: fmt::Arguments,
+        secondary_messages: Vec<OldSecondaryDiagnosticMessage>,
+    ) where
+        T: Ranged,
+    {
+        fn lint_severity(
+            context: &InferContext,
+            lint: &'static LintMetadata,
+            range: TextRange,
+        ) -> Option<Severity> {
+            if !context.db.is_file_open(context.file) {
+                return None;
+            }
+
+            // Skip over diagnostics if the rule is disabled.
+            let severity = context.db.rule_selection().severity(LintId::of(lint))?;
+
+            if context.is_in_no_type_check() {
+                return None;
+            }
+
+            let suppressions = suppressions(context.db, context.file);
+
+            if let Some(suppression) = suppressions.find_suppression(range, LintId::of(lint)) {
+                context.diagnostics.borrow_mut().mark_used(suppression.id());
+                return None;
+            }
+
+            Some(severity)
         }
 
-        // Skip over diagnostics if the rule is disabled.
-        let Some(severity) = self.db.rule_selection().severity(LintId::of(lint)) else {
+        let Some(severity) = lint_severity(self, lint, ranged.range()) else {
             return;
         };
 
-        if self.is_in_no_type_check() {
-            return;
-        }
-
-        let suppressions = suppressions(self.db, self.file);
-
-        if let Some(suppression) = suppressions.find_suppression(node.range(), LintId::of(lint)) {
-            self.diagnostics.borrow_mut().mark_used(suppression.id());
-            return;
-        }
-
-        self.report_diagnostic(node, DiagnosticId::Lint(lint.name()), severity, message);
+        self.report_diagnostic(
+            ranged,
+            DiagnosticId::Lint(lint.name()),
+            severity,
+            message,
+            secondary_messages,
+        );
     }
 
     /// Adds a new diagnostic.
     ///
     /// The diagnostic does not get added if the rule isn't enabled for this file.
-    pub(super) fn report_diagnostic(
+    pub(super) fn report_diagnostic<T>(
         &self,
-        node: AnyNodeRef,
+        ranged: T,
         id: DiagnosticId,
         severity: Severity,
         message: fmt::Arguments,
-    ) {
+        secondary_messages: Vec<OldSecondaryDiagnosticMessage>,
+    ) where
+        T: Ranged,
+    {
         if !self.db.is_file_open(self.file) {
             return;
         }
@@ -121,8 +154,9 @@ impl<'db> InferContext<'db> {
             file: self.file,
             id,
             message: message.to_string(),
-            range: node.range(),
+            range: ranged.range(),
             severity,
+            secondary_messages,
         });
     }
 

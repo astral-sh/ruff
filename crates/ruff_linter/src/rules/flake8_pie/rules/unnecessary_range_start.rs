@@ -42,7 +42,7 @@ impl AlwaysFixableViolation for UnnecessaryRangeStart {
 }
 
 /// PIE808
-pub(crate) fn unnecessary_range_start(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn unnecessary_range_start(checker: &Checker, call: &ast::ExprCall) {
     // `range` doesn't accept keyword arguments.
     if !call.arguments.keywords.is_empty() {
         return;
@@ -80,5 +80,5 @@ pub(crate) fn unnecessary_range_start(checker: &mut Checker, call: &ast::ExprCal
         )
         .map(Fix::safe_edit)
     });
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

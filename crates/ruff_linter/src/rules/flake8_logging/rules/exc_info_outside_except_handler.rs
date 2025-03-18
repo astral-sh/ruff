@@ -59,7 +59,7 @@ impl Violation for ExcInfoOutsideExceptHandler {
     }
 }
 
-pub(crate) fn exc_info_outside_except_handler(checker: &mut Checker, call: &ExprCall) {
+pub(crate) fn exc_info_outside_except_handler(checker: &Checker, call: &ExprCall) {
     let semantic = checker.semantic();
 
     if !outside_handlers(call.start(), semantic) {
@@ -114,5 +114,5 @@ pub(crate) fn exc_info_outside_except_handler(checker: &mut Checker, call: &Expr
         Ok(Fix::unsafe_edit(edit))
     });
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

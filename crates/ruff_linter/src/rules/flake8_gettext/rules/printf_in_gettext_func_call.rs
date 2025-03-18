@@ -26,7 +26,7 @@ use ruff_text_size::Ranged;
 /// from gettext import gettext as _
 ///
 /// name = "Maria"
-/// _("Hello, {}!".format(name))  # Looks for "Hello, Maria!".
+/// _("Hello, %s!" % name)  # Looks for "Hello, Maria!".
 /// ```
 ///
 /// Use instead:
@@ -51,7 +51,7 @@ impl Violation for PrintfInGetTextFuncCall {
 }
 
 /// INT003
-pub(crate) fn printf_in_gettext_func_call(checker: &mut Checker, args: &[Expr]) {
+pub(crate) fn printf_in_gettext_func_call(checker: &Checker, args: &[Expr]) {
     if let Some(first) = args.first() {
         if let Expr::BinOp(ast::ExprBinOp {
             op: Operator::Mod { .. },
@@ -61,8 +61,7 @@ pub(crate) fn printf_in_gettext_func_call(checker: &mut Checker, args: &[Expr]) 
         {
             if left.is_string_literal_expr() {
                 checker
-                    .diagnostics
-                    .push(Diagnostic::new(PrintfInGetTextFuncCall {}, first.range()));
+                    .report_diagnostic(Diagnostic::new(PrintfInGetTextFuncCall {}, first.range()));
             }
         }
     }

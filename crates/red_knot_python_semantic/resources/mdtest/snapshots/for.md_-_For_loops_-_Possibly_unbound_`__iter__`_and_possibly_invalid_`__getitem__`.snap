@@ -1,0 +1,105 @@
+---
+source: crates/red_knot_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: for.md - For loops - Possibly unbound `__iter__` and possibly invalid `__getitem__`
+mdtest path: crates/red_knot_python_semantic/resources/mdtest/loops/for.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing_extensions import reveal_type
+ 2 | 
+ 3 | class Iterator:
+ 4 |     def __next__(self) -> bytes:
+ 5 |         return b"foo"
+ 6 | 
+ 7 | def _(flag: bool, flag2: bool):
+ 8 |     class Iterable1:
+ 9 |         if flag:
+10 |             def __getitem__(self, item: int) -> str:
+11 |                 return "foo"
+12 |         else:
+13 |             __getitem__: None = None
+14 | 
+15 |         if flag2:
+16 |             def __iter__(self) -> Iterator:
+17 |                 return Iterator()
+18 | 
+19 |     class Iterable2:
+20 |         if flag:
+21 |             def __getitem__(self, item: int) -> str:
+22 |                 return "foo"
+23 |         else:
+24 |             def __getitem__(self, item: str) -> int:
+25 |                 return 42
+26 |         if flag2:
+27 |             def __iter__(self) -> Iterator:
+28 |                 return Iterator()
+29 | 
+30 |     # error: [not-iterable]
+31 |     for x in Iterable1():
+32 |         # TODO: `bytes | str` might be better
+33 |         reveal_type(x)  # revealed: bytes | str | Unknown
+34 | 
+35 |     # error: [not-iterable]
+36 |     for y in Iterable2():
+37 |         reveal_type(y)  # revealed: bytes | str | int
+```
+
+# Diagnostics
+
+```
+error: lint:not-iterable
+  --> /src/mdtest_snippet.py:31:14
+   |
+30 |     # error: [not-iterable]
+31 |     for x in Iterable1():
+   |              ^^^^^^^^^^^ Object of type `Iterable1` may not be iterable because it may not have an `__iter__` method and its `__getitem__` attribute (with type `<bound method `__getitem__` of `Iterable1`> | None`) may not be callable
+32 |         # TODO: `bytes | str` might be better
+33 |         reveal_type(x)  # revealed: bytes | str | Unknown
+   |
+
+```
+
+```
+info: revealed-type
+  --> /src/mdtest_snippet.py:33:9
+   |
+31 |     for x in Iterable1():
+32 |         # TODO: `bytes | str` might be better
+33 |         reveal_type(x)  # revealed: bytes | str | Unknown
+   |         ^^^^^^^^^^^^^^ Revealed type is `bytes | str | Unknown`
+34 |
+35 |     # error: [not-iterable]
+   |
+
+```
+
+```
+error: lint:not-iterable
+  --> /src/mdtest_snippet.py:36:14
+   |
+35 |     # error: [not-iterable]
+36 |     for y in Iterable2():
+   |              ^^^^^^^^^^^ Object of type `Iterable2` may not be iterable because it may not have an `__iter__` method and its `__getitem__` method (with type `<bound method `__getitem__` of `Iterable2`> | <bound method `__getitem__` of `Iterable2`>`) may have an incorrect signature for the old-style iteration protocol (expected a signature at least as permissive as `def __getitem__(self, key: int): ...`)
+37 |         reveal_type(y)  # revealed: bytes | str | int
+   |
+
+```
+
+```
+info: revealed-type
+  --> /src/mdtest_snippet.py:37:9
+   |
+35 |     # error: [not-iterable]
+36 |     for y in Iterable2():
+37 |         reveal_type(y)  # revealed: bytes | str | int
+   |         ^^^^^^^^^^^^^^ Revealed type is `bytes | str | int`
+   |
+
+```

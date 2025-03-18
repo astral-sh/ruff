@@ -1,0 +1,53 @@
+---
+source: crates/red_knot_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: membership_test.md - Comparison: Membership Test - Return type that doesn't implement `__bool__` correctly
+mdtest path: crates/red_knot_python_semantic/resources/mdtest/comparison/instances/membership_test.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | class NotBoolable:
+ 2 |     __bool__: int = 3
+ 3 | 
+ 4 | class WithContains:
+ 5 |     def __contains__(self, item) -> NotBoolable:
+ 6 |         return NotBoolable()
+ 7 | 
+ 8 | # error: [unsupported-bool-conversion]
+ 9 | 10 in WithContains()
+10 | # error: [unsupported-bool-conversion]
+11 | 10 not in WithContains()
+```
+
+# Diagnostics
+
+```
+error: lint:unsupported-bool-conversion
+  --> /src/mdtest_snippet.py:9:1
+   |
+ 8 | # error: [unsupported-bool-conversion]
+ 9 | 10 in WithContains()
+   | ^^^^^^^^^^^^^^^^^^^^ Boolean conversion is unsupported for type `NotBoolable`; its `__bool__` method isn't callable
+10 | # error: [unsupported-bool-conversion]
+11 | 10 not in WithContains()
+   |
+
+```
+
+```
+error: lint:unsupported-bool-conversion
+  --> /src/mdtest_snippet.py:11:1
+   |
+ 9 | 10 in WithContains()
+10 | # error: [unsupported-bool-conversion]
+11 | 10 not in WithContains()
+   | ^^^^^^^^^^^^^^^^^^^^^^^^ Boolean conversion is unsupported for type `NotBoolable`; its `__bool__` method isn't callable
+   |
+
+```

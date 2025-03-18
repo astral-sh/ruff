@@ -9,11 +9,6 @@
 //! parent scopes have been fully traversed. Individual rules may also perform internal traversals
 //! of the AST.
 //!
-//! While the [`Checker`] is typically passed by mutable reference to the individual lint rule
-//! implementations, most of its constituent components are intended to be treated immutably, with
-//! the exception of the [`Diagnostic`] vector, which is intended to be mutated by the individual
-//! lint rules. In the future, this should be formalized in the API.
-//!
 //! The individual [`Visitor`] implementations within the [`Checker`] typically proceed in four
 //! steps:
 //!
@@ -31,7 +26,7 @@ use std::path::Path;
 
 use itertools::Itertools;
 use log::debug;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_diagnostics::{Diagnostic, IsolationLevel};
 use ruff_notebook::{CellOffsets, NotebookIndex};
@@ -43,7 +38,7 @@ use ruff_python_ast::visitor::{walk_except_handler, walk_pattern, Visitor};
 use ruff_python_ast::{
     self as ast, AnyParameterRef, ArgOrKeyword, Comprehension, ElifElseClause, ExceptHandler, Expr,
     ExprContext, FStringElement, Keyword, MatchCase, ModModule, Parameter, Parameters, Pattern,
-    Stmt, Suite, UnaryOp,
+    PythonVersion, Stmt, Suite, UnaryOp,
 };
 use ruff_python_ast::{helpers, str, visitor, PySourceType};
 use ruff_python_codegen::{Generator, Stylist};
@@ -221,13 +216,15 @@ pub(crate) struct Checker<'a> {
     /// A set of deferred nodes to be analyzed after the AST traversal (e.g., `for` loops).
     analyze: deferred::Analyze,
     /// The cumulative set of diagnostics computed across all lint rules.
-    pub(crate) diagnostics: Vec<Diagnostic>,
+    diagnostics: RefCell<Vec<Diagnostic>>,
     /// The list of names already seen by flake8-bugbear diagnostics, to avoid duplicate violations.
-    pub(crate) flake8_bugbear_seen: Vec<TextRange>,
+    flake8_bugbear_seen: RefCell<FxHashSet<TextRange>>,
     /// The end offset of the last visited statement.
     last_stmt_end: TextSize,
     /// A state describing if a docstring is expected or not.
     docstring_state: DocstringState,
+    /// The target [`PythonVersion`] for version-dependent checks
+    target_version: PythonVersion,
 }
 
 impl<'a> Checker<'a> {
@@ -247,12 +244,9 @@ impl<'a> Checker<'a> {
         source_type: PySourceType,
         cell_offsets: Option<&'a CellOffsets>,
         notebook_index: Option<&'a NotebookIndex>,
+        target_version: PythonVersion,
     ) -> Checker<'a> {
-        let mut semantic = SemanticModel::new(&settings.typing_modules, path, module);
-        if settings.preview.is_enabled() {
-            // Set the feature flag to test `TYPE_CHECKING` semantic changes
-            semantic.flags |= SemanticModelFlags::NEW_TYPE_CHECKING_BLOCK_DETECTION;
-        }
+        let semantic = SemanticModel::new(&settings.typing_modules, path, module);
         Self {
             parsed,
             parsed_type_annotation: None,
@@ -271,12 +265,13 @@ impl<'a> Checker<'a> {
             semantic,
             visit: deferred::Visit::default(),
             analyze: deferred::Analyze::default(),
-            diagnostics: Vec::default(),
-            flake8_bugbear_seen: Vec::default(),
+            diagnostics: RefCell::default(),
+            flake8_bugbear_seen: RefCell::default(),
             cell_offsets,
             notebook_index,
             last_stmt_end: TextSize::default(),
             docstring_state: DocstringState::default(),
+            target_version,
         }
     }
 }
@@ -294,7 +289,14 @@ impl<'a> Checker<'a> {
         if !self.noqa.is_enabled() {
             return false;
         }
-        noqa::rule_is_ignored(code, offset, self.noqa_line_for, self.locator)
+
+        noqa::rule_is_ignored(
+            code,
+            offset,
+            self.noqa_line_for,
+            self.comment_ranges(),
+            self.locator,
+        )
     }
 
     /// Create a [`Generator`] to generate source code based on the current AST state.
@@ -360,6 +362,30 @@ impl<'a> Checker<'a> {
     /// Returns the [`CommentRanges`] for the parsed source code.
     pub(crate) fn comment_ranges(&self) -> &'a CommentRanges {
         self.indexer.comment_ranges()
+    }
+
+    /// Push a new [`Diagnostic`] to the collection in the [`Checker`]
+    pub(crate) fn report_diagnostic(&self, diagnostic: Diagnostic) {
+        let mut diagnostics = self.diagnostics.borrow_mut();
+        diagnostics.push(diagnostic);
+    }
+
+    /// Extend the collection of [`Diagnostic`] objects in the [`Checker`]
+    pub(crate) fn report_diagnostics<I>(&self, diagnostics: I)
+    where
+        I: IntoIterator<Item = Diagnostic>,
+    {
+        let mut checker_diagnostics = self.diagnostics.borrow_mut();
+        checker_diagnostics.extend(diagnostics);
+    }
+
+    /// Adds a [`TextRange`] to the set of ranges of variable names
+    /// flagged in `flake8-bugbear` violations so far.
+    ///
+    /// Returns whether the value was newly inserted.
+    pub(crate) fn insert_flake8_bugbear_range(&self, range: TextRange) -> bool {
+        let mut ranges = self.flake8_bugbear_seen.borrow_mut();
+        ranges.insert(range)
     }
 
     /// Returns the [`Tokens`] for the parsed type annotation if the checker is in a typing context
@@ -476,10 +502,15 @@ impl<'a> Checker<'a> {
     }
 
     /// Push `diagnostic` if the checker is not in a `@no_type_check` context.
-    pub(crate) fn push_type_diagnostic(&mut self, diagnostic: Diagnostic) {
+    pub(crate) fn report_type_diagnostic(&self, diagnostic: Diagnostic) {
         if !self.semantic.in_no_type_check() {
-            self.diagnostics.push(diagnostic);
+            self.report_diagnostic(diagnostic);
         }
+    }
+
+    /// Return the [`PythonVersion`] to use for version-related checks.
+    pub(crate) const fn target_version(&self) -> PythonVersion {
+        self.target_version
     }
 }
 
@@ -537,7 +568,8 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     || imports::is_matplotlib_activation(stmt, self.semantic())
                     || imports::is_sys_path_modification(stmt, self.semantic())
                     || imports::is_os_environ_modification(stmt, self.semantic())
-                    || imports::is_pytest_importorskip(stmt, self.semantic()))
+                    || imports::is_pytest_importorskip(stmt, self.semantic())
+                    || imports::is_site_sys_path_modification(stmt, self.semantic()))
                 {
                     self.semantic.flags |= SemanticModelFlags::IMPORT_BOUNDARY;
                 }
@@ -2097,17 +2129,14 @@ impl<'a> Checker<'a> {
     }
 
     fn bind_builtins(&mut self) {
+        let target_version = self.target_version();
         let mut bind_builtin = |builtin| {
             // Add the builtin to the scope.
             let binding_id = self.semantic.push_builtin();
             let scope = self.semantic.global_scope_mut();
             scope.add(builtin, binding_id);
         };
-
-        let standard_builtins = python_builtins(
-            self.settings.target_version.minor(),
-            self.source_type.is_ipynb(),
-        );
+        let standard_builtins = python_builtins(target_version.minor, self.source_type.is_ipynb());
         for builtin in standard_builtins {
             bind_builtin(builtin);
         }
@@ -2428,7 +2457,7 @@ impl<'a> Checker<'a> {
                         self.semantic.restore(snapshot);
 
                         if self.enabled(Rule::ForwardAnnotationSyntaxError) {
-                            self.push_type_diagnostic(Diagnostic::new(
+                            self.report_type_diagnostic(Diagnostic::new(
                                 pyflakes::rules::ForwardAnnotationSyntaxError {
                                     parse_error: parse_error.error.to_string(),
                                 },
@@ -2570,7 +2599,7 @@ impl<'a> Checker<'a> {
                 } else {
                     if self.semantic.global_scope().uses_star_imports() {
                         if self.enabled(Rule::UndefinedLocalWithImportStarUsage) {
-                            self.diagnostics.push(
+                            self.diagnostics.get_mut().push(
                                 Diagnostic::new(
                                     pyflakes::rules::UndefinedLocalWithImportStarUsage {
                                         name: name.to_string(),
@@ -2585,7 +2614,7 @@ impl<'a> Checker<'a> {
                             if self.settings.preview.is_enabled()
                                 || !self.path.ends_with("__init__.py")
                             {
-                                self.diagnostics.push(
+                                self.diagnostics.get_mut().push(
                                     Diagnostic::new(
                                         pyflakes::rules::UndefinedExport {
                                             name: name.to_string(),
@@ -2653,6 +2682,7 @@ pub(crate) fn check_ast(
     source_type: PySourceType,
     cell_offsets: Option<&CellOffsets>,
     notebook_index: Option<&NotebookIndex>,
+    target_version: PythonVersion,
 ) -> Vec<Diagnostic> {
     let module_path = package
         .map(PackageRoot::path)
@@ -2692,6 +2722,7 @@ pub(crate) fn check_ast(
         source_type,
         cell_offsets,
         notebook_index,
+        target_version,
     );
     checker.bind_builtins();
 
@@ -2709,13 +2740,13 @@ pub(crate) fn check_ast(
     analyze::deferred_lambdas(&mut checker);
     analyze::deferred_for_loops(&mut checker);
     analyze::definitions(&mut checker);
-    analyze::bindings(&mut checker);
-    analyze::unresolved_references(&mut checker);
+    analyze::bindings(&checker);
+    analyze::unresolved_references(&checker);
 
     // Reset the scope to module-level, and check all consumed scopes.
     checker.semantic.scope_id = ScopeId::global();
     checker.analyze.scopes.push(ScopeId::global());
-    analyze::deferred_scopes(&mut checker);
+    analyze::deferred_scopes(&checker);
 
-    checker.diagnostics
+    checker.diagnostics.take()
 }

@@ -85,7 +85,7 @@ impl Violation for MutableArgumentDefault {
 }
 
 /// B006
-pub(crate) fn mutable_argument_default(checker: &mut Checker, function_def: &ast::StmtFunctionDef) {
+pub(crate) fn mutable_argument_default(checker: &Checker, function_def: &ast::StmtFunctionDef) {
     // Skip stub files
     if checker.source_type.is_stub() {
         return;
@@ -124,7 +124,7 @@ pub(crate) fn mutable_argument_default(checker: &mut Checker, function_def: &ast
             ) {
                 diagnostic.set_fix(fix);
             }
-            checker.diagnostics.push(diagnostic);
+            checker.report_diagnostic(diagnostic);
         }
     }
 }

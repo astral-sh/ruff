@@ -8,21 +8,21 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
 use crate::rules::fastapi::rules::is_fastapi_route;
-use crate::settings::types::PythonVersion;
+use ruff_python_ast::PythonVersion;
 
 /// ## What it does
 /// Identifies FastAPI routes with deprecated uses of `Depends` or similar.
 ///
 /// ## Why is this bad?
-/// The [FastAPI documentation] recommends the use of [`typing.Annotated`] for
-/// defining route dependencies and parameters, rather than using `Depends`,
+/// The [FastAPI documentation] recommends the use of [`typing.Annotated`][typing-annotated]
+/// for defining route dependencies and parameters, rather than using `Depends`,
 /// `Query` or similar as a default value for a parameter. Using this approach
 /// everywhere helps ensure consistency and clarity in defining dependencies
 /// and parameters.
 ///
 /// `Annotated` was added to the `typing` module in Python 3.9; however,
-/// the third-party [`typing_extensions`] package provides a backport that can be
-/// used on older versions of Python.
+/// the third-party [`typing_extensions`][typing-extensions] package
+/// provides a backport that can be used on older versions of Python.
 ///
 /// ## Example
 ///
@@ -60,9 +60,9 @@ use crate::settings::types::PythonVersion;
 ///     return commons
 /// ```
 ///
-/// [fastAPI documentation]: https://fastapi.tiangolo.com/tutorial/query-params-str-validations/?h=annotated#advantages-of-annotated
-/// [typing.Annotated]: https://docs.python.org/3/library/typing.html#typing.Annotated
-/// [typing_extensions]: https://typing-extensions.readthedocs.io/en/stable/
+/// [FastAPI documentation]: https://fastapi.tiangolo.com/tutorial/query-params-str-validations/?h=annotated#advantages-of-annotated
+/// [typing-annotated]: https://docs.python.org/3/library/typing.html#typing.Annotated
+/// [typing-extensions]: https://typing-extensions.readthedocs.io/en/stable/
 #[derive(ViolationMetadata)]
 pub(crate) struct FastApiNonAnnotatedDependency {
     py_version: PythonVersion,
@@ -77,7 +77,7 @@ impl Violation for FastApiNonAnnotatedDependency {
     }
 
     fn fix_title(&self) -> Option<String> {
-        let title = if self.py_version >= PythonVersion::Py39 {
+        let title = if self.py_version >= PythonVersion::PY39 {
             "Replace with `typing.Annotated`"
         } else {
             "Replace with `typing_extensions.Annotated`"
@@ -88,7 +88,7 @@ impl Violation for FastApiNonAnnotatedDependency {
 
 /// FAST002
 pub(crate) fn fastapi_non_annotated_dependency(
-    checker: &mut Checker,
+    checker: &Checker,
     function_def: &ast::StmtFunctionDef,
 ) {
     if !checker.semantic().seen_module(Modules::FASTAPI)
@@ -219,20 +219,20 @@ impl<'a> DependencyCall<'a> {
 /// necessary to determine this while generating the fix, thus the need to return an updated
 /// `seen_default` here.
 fn create_diagnostic(
-    checker: &mut Checker,
+    checker: &Checker,
     parameter: &DependencyParameter,
     dependency_call: Option<DependencyCall>,
     mut seen_default: bool,
 ) -> bool {
     let mut diagnostic = Diagnostic::new(
         FastApiNonAnnotatedDependency {
-            py_version: checker.settings.target_version,
+            py_version: checker.target_version(),
         },
         parameter.range,
     );
 
     let try_generate_fix = || {
-        let module = if checker.settings.target_version >= PythonVersion::Py39 {
+        let module = if checker.target_version() >= PythonVersion::PY39 {
             "typing"
         } else {
             "typing_extensions"
@@ -304,7 +304,7 @@ fn create_diagnostic(
     }
     diagnostic.try_set_optional_fix(|| fix);
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 
     seen_default
 }

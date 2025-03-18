@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "ruff"
-version = "0.9.4"
+version = "0.11.0"
 description = "An extremely fast Python linter and code formatter, written in Rust."
 authors = [{ name = "Astral Software Inc.", email = "hey@astral.sh" }]
 readme = "README.md"
@@ -113,17 +113,17 @@ changelog_ignore_labels = ["internal", "ci", "red-knot", "testing"]
 
 changelog_sections.breaking = "Breaking changes"
 changelog_sections.preview = "Preview features"
+changelog_sections.bug = "Bug fixes"
 changelog_sections.rule = "Rule changes"
 changelog_sections.diagnostics = "Rule changes"
 changelog_sections.docstring = "Rule changes"
 changelog_sections.fixes = "Rule changes"
-changelog_sections.formatter = "Formatter"
 changelog_sections.isort = "Rule changes"
 changelog_sections.performance = "Performance"
+changelog_sections.formatter = "Formatter"
 changelog_sections.server = "Server"
 changelog_sections.cli = "CLI"
 changelog_sections.configuration = "Configuration"
-changelog_sections.bug = "Bug fixes"
 changelog_sections.documentation = "Documentation"
 changelog_sections.__unknown__ = "Other changes"
 

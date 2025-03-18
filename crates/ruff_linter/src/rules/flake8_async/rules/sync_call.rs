@@ -51,7 +51,7 @@ impl Violation for TrioSyncCall {
 }
 
 /// ASYNC105
-pub(crate) fn sync_call(checker: &mut Checker, call: &ExprCall) {
+pub(crate) fn sync_call(checker: &Checker, call: &ExprCall) {
     if !checker.semantic().seen_module(Modules::TRIO) {
         return;
     }
@@ -91,5 +91,5 @@ pub(crate) fn sync_call(checker: &mut Checker, call: &ExprCall) {
             call.func.start(),
         )));
     }
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

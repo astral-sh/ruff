@@ -50,7 +50,7 @@ impl AlwaysFixableViolation for VerboseRaise {
 }
 
 /// TRY201
-pub(crate) fn verbose_raise(checker: &mut Checker, handlers: &[ExceptHandler]) {
+pub(crate) fn verbose_raise(checker: &Checker, handlers: &[ExceptHandler]) {
     for handler in handlers {
         // If the handler assigned a name to the exception...
         if let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
@@ -77,7 +77,7 @@ pub(crate) fn verbose_raise(checker: &mut Checker, handlers: &[ExceptHandler]) {
                                 "raise".to_string(),
                                 raise.range(),
                             )));
-                            checker.diagnostics.push(diagnostic);
+                            checker.report_diagnostic(diagnostic);
                         }
                     }
                 }

@@ -1,3 +1,5 @@
+# ruff: noqa: PLR5501 # This condition is so big, it's clearer to keep to platform condition in two blocks
+# Can't NOQA on a specific line: https://github.com/plinss/flake8-noqa/issues/22
 import sys
 from collections.abc import Awaitable, Coroutine, Generator
 from typing import Any, TypeVar
@@ -397,93 +399,6 @@ if sys.platform == "win32":
             "Timeout",  # from timeouts
             "timeout",  # from timeouts
             "timeout_at",  # from timeouts
-            "BaseTransport",  # from transports
-            "ReadTransport",  # from transports
-            "WriteTransport",  # from transports
-            "Transport",  # from transports
-            "DatagramTransport",  # from transports
-            "SubprocessTransport",  # from transports
-            "SelectorEventLoop",  # from windows_events
-            "ProactorEventLoop",  # from windows_events
-            "IocpProactor",  # from windows_events
-            "DefaultEventLoopPolicy",  # from windows_events
-            "WindowsSelectorEventLoopPolicy",  # from windows_events
-            "WindowsProactorEventLoopPolicy",  # from windows_events
-        )
-    elif sys.version_info >= (3, 10):
-        __all__ = (
-            "BaseEventLoop",  # from base_events
-            "Server",  # from base_events
-            "coroutine",  # from coroutines
-            "iscoroutinefunction",  # from coroutines
-            "iscoroutine",  # from coroutines
-            "AbstractEventLoopPolicy",  # from events
-            "AbstractEventLoop",  # from events
-            "AbstractServer",  # from events
-            "Handle",  # from events
-            "TimerHandle",  # from events
-            "get_event_loop_policy",  # from events
-            "set_event_loop_policy",  # from events
-            "get_event_loop",  # from events
-            "set_event_loop",  # from events
-            "new_event_loop",  # from events
-            "get_child_watcher",  # from events
-            "set_child_watcher",  # from events
-            "_set_running_loop",  # from events
-            "get_running_loop",  # from events
-            "_get_running_loop",  # from events
-            "CancelledError",  # from exceptions
-            "InvalidStateError",  # from exceptions
-            "TimeoutError",  # from exceptions
-            "IncompleteReadError",  # from exceptions
-            "LimitOverrunError",  # from exceptions
-            "SendfileNotAvailableError",  # from exceptions
-            "Future",  # from futures
-            "wrap_future",  # from futures
-            "isfuture",  # from futures
-            "Lock",  # from locks
-            "Event",  # from locks
-            "Condition",  # from locks
-            "Semaphore",  # from locks
-            "BoundedSemaphore",  # from locks
-            "BaseProtocol",  # from protocols
-            "Protocol",  # from protocols
-            "DatagramProtocol",  # from protocols
-            "SubprocessProtocol",  # from protocols
-            "BufferedProtocol",  # from protocols
-            "run",  # from runners
-            "Queue",  # from queues
-            "PriorityQueue",  # from queues
-            "LifoQueue",  # from queues
-            "QueueFull",  # from queues
-            "QueueEmpty",  # from queues
-            "StreamReader",  # from streams
-            "StreamWriter",  # from streams
-            "StreamReaderProtocol",  # from streams
-            "open_connection",  # from streams
-            "start_server",  # from streams
-            "create_subprocess_exec",  # from subprocess
-            "create_subprocess_shell",  # from subprocess
-            "Task",  # from tasks
-            "create_task",  # from tasks
-            "FIRST_COMPLETED",  # from tasks
-            "FIRST_EXCEPTION",  # from tasks
-            "ALL_COMPLETED",  # from tasks
-            "wait",  # from tasks
-            "wait_for",  # from tasks
-            "as_completed",  # from tasks
-            "sleep",  # from tasks
-            "gather",  # from tasks
-            "shield",  # from tasks
-            "ensure_future",  # from tasks
-            "run_coroutine_threadsafe",  # from tasks
-            "current_task",  # from tasks
-            "all_tasks",  # from tasks
-            "_register_task",  # from tasks
-            "_unregister_task",  # from tasks
-            "_enter_task",  # from tasks
-            "_leave_task",  # from tasks
-            "to_thread",  # from threads
             "BaseTransport",  # from transports
             "ReadTransport",  # from transports
             "WriteTransport",  # from transports
@@ -1044,97 +959,6 @@ else:
             "Timeout",  # from timeouts
             "timeout",  # from timeouts
             "timeout_at",  # from timeouts
-            "BaseTransport",  # from transports
-            "ReadTransport",  # from transports
-            "WriteTransport",  # from transports
-            "Transport",  # from transports
-            "DatagramTransport",  # from transports
-            "SubprocessTransport",  # from transports
-            "SelectorEventLoop",  # from unix_events
-            "AbstractChildWatcher",  # from unix_events
-            "SafeChildWatcher",  # from unix_events
-            "FastChildWatcher",  # from unix_events
-            "PidfdChildWatcher",  # from unix_events
-            "MultiLoopChildWatcher",  # from unix_events
-            "ThreadedChildWatcher",  # from unix_events
-            "DefaultEventLoopPolicy",  # from unix_events
-        )
-    elif sys.version_info >= (3, 10):
-        __all__ = (
-            "BaseEventLoop",  # from base_events
-            "Server",  # from base_events
-            "coroutine",  # from coroutines
-            "iscoroutinefunction",  # from coroutines
-            "iscoroutine",  # from coroutines
-            "AbstractEventLoopPolicy",  # from events
-            "AbstractEventLoop",  # from events
-            "AbstractServer",  # from events
-            "Handle",  # from events
-            "TimerHandle",  # from events
-            "get_event_loop_policy",  # from events
-            "set_event_loop_policy",  # from events
-            "get_event_loop",  # from events
-            "set_event_loop",  # from events
-            "new_event_loop",  # from events
-            "get_child_watcher",  # from events
-            "set_child_watcher",  # from events
-            "_set_running_loop",  # from events
-            "get_running_loop",  # from events
-            "_get_running_loop",  # from events
-            "CancelledError",  # from exceptions
-            "InvalidStateError",  # from exceptions
-            "TimeoutError",  # from exceptions
-            "IncompleteReadError",  # from exceptions
-            "LimitOverrunError",  # from exceptions
-            "SendfileNotAvailableError",  # from exceptions
-            "Future",  # from futures
-            "wrap_future",  # from futures
-            "isfuture",  # from futures
-            "Lock",  # from locks
-            "Event",  # from locks
-            "Condition",  # from locks
-            "Semaphore",  # from locks
-            "BoundedSemaphore",  # from locks
-            "BaseProtocol",  # from protocols
-            "Protocol",  # from protocols
-            "DatagramProtocol",  # from protocols
-            "SubprocessProtocol",  # from protocols
-            "BufferedProtocol",  # from protocols
-            "run",  # from runners
-            "Queue",  # from queues
-            "PriorityQueue",  # from queues
-            "LifoQueue",  # from queues
-            "QueueFull",  # from queues
-            "QueueEmpty",  # from queues
-            "StreamReader",  # from streams
-            "StreamWriter",  # from streams
-            "StreamReaderProtocol",  # from streams
-            "open_connection",  # from streams
-            "start_server",  # from streams
-            "open_unix_connection",  # from streams
-            "start_unix_server",  # from streams
-            "create_subprocess_exec",  # from subprocess
-            "create_subprocess_shell",  # from subprocess
-            "Task",  # from tasks
-            "create_task",  # from tasks
-            "FIRST_COMPLETED",  # from tasks
-            "FIRST_EXCEPTION",  # from tasks
-            "ALL_COMPLETED",  # from tasks
-            "wait",  # from tasks
-            "wait_for",  # from tasks
-            "as_completed",  # from tasks
-            "sleep",  # from tasks
-            "gather",  # from tasks
-            "shield",  # from tasks
-            "ensure_future",  # from tasks
-            "run_coroutine_threadsafe",  # from tasks
-            "current_task",  # from tasks
-            "all_tasks",  # from tasks
-            "_register_task",  # from tasks
-            "_unregister_task",  # from tasks
-            "_enter_task",  # from tasks
-            "_leave_task",  # from tasks
-            "to_thread",  # from threads
             "BaseTransport",  # from transports
             "ReadTransport",  # from transports
             "WriteTransport",  # from transports

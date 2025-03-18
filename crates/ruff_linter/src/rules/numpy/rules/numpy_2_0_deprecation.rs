@@ -31,7 +31,7 @@ use crate::importer::ImportRequest;
 /// This rule flags all uses of removed members, along with automatic fixes for
 /// any backwards-compatible replacements.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// import numpy as np
 ///
@@ -156,7 +156,7 @@ enum Compatibility {
 }
 
 /// NPY201
-pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn numpy_2_0_deprecation(checker: &Checker, expr: &Expr) {
     let semantic = checker.semantic();
 
     if !semantic.seen_module(Modules::NUMPY) {
@@ -706,7 +706,7 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
         )),
         Details::Manual { guideline: _ } => {}
     };
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// Ignore attempts to access a `numpy` member via its deprecated name

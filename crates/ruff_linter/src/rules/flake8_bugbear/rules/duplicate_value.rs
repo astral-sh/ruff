@@ -55,7 +55,7 @@ impl Violation for DuplicateValue {
 }
 
 /// B033
-pub(crate) fn duplicate_value(checker: &mut Checker, set: &ast::ExprSet) {
+pub(crate) fn duplicate_value(checker: &Checker, set: &ast::ExprSet) {
     let mut seen_values: FxHashMap<HashableExpr, &Expr> = FxHashMap::default();
     for (index, value) in set.iter().enumerate() {
         if value.is_literal_expr() {
@@ -72,7 +72,7 @@ pub(crate) fn duplicate_value(checker: &mut Checker, set: &ast::ExprSet) {
                     remove_member(set, index, checker.locator().contents()).map(Fix::safe_edit)
                 });
 
-                checker.diagnostics.push(diagnostic);
+                checker.report_diagnostic(diagnostic);
             }
         };
     }

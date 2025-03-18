@@ -19,7 +19,7 @@ exclude: |
 
 repos:
   - repo: https://github.com/abravalheri/validate-pyproject
-    rev: v0.23
+    rev: v0.24
     hooks:
       - id: validate-pyproject
 
@@ -60,7 +60,7 @@ repos:
           - black==25.1.0
 
   - repo: https://github.com/crate-ci/typos
-    rev: v1.29.5
+    rev: v1.30.2
     hooks:
       - id: typos
 
@@ -74,7 +74,7 @@ repos:
         pass_filenames: false # This makes it a lot faster
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.9.4
+    rev: v0.11.0
     hooks:
       - id: ruff-format
       - id: ruff
@@ -84,7 +84,7 @@ repos:
 
   # Prettier
   - repo: https://github.com/rbubley/mirrors-prettier
-    rev: v3.4.2
+    rev: v3.5.3
     hooks:
       - id: prettier
         types: [yaml]
@@ -92,12 +92,12 @@ repos:
   # zizmor detects security vulnerabilities in GitHub Actions workflows.
   # Additional configuration for the tool is found in `.github/zizmor.yml`
   - repo: https://github.com/woodruffw/zizmor-pre-commit
-    rev: v1.3.0
+    rev: v1.5.1
     hooks:
       - id: zizmor
 
   - repo: https://github.com/python-jsonschema/check-jsonschema
-    rev: 0.31.1
+    rev: 0.31.3
     hooks:
       - id: check-github-workflows
 

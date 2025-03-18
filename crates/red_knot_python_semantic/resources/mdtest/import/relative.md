@@ -219,7 +219,11 @@ import package
 reveal_type(package.foo.X)  # revealed: Unknown
 ```
 
-## In the src-root
+## Relative imports at the top of a search path
+
+Relative imports at the top of a search path result in a runtime error:
+`ImportError: attempted relative import with no known parent package`. That's why Red Knot should
+disallow them.
 
 `parser.py`:
 
@@ -230,21 +234,5 @@ X: int = 42
 `__main__.py`:
 
 ```py
-from .parser import X
-
-reveal_type(X)  # revealed: int
-```
-
-## Beyond the src-root
-
-`parser.py`:
-
-```py
-X: int = 42
-```
-
-`__main__.py`:
-
-```py
-from ..parser import X  # error: [unresolved-import]
+from .parser import X  # error: [unresolved-import]
 ```

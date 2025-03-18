@@ -18,7 +18,7 @@ pub fn assert_function_query_was_not_run<Db, Q, QDb, I, R>(
 
     db.attach(|_| {
         if let Some(will_execute_event) = will_execute_event {
-            panic!("Expected query {query_name}({id}) not to have run but it did: {will_execute_event:?}");
+            panic!("Expected query {query_name}({id}) not to have run but it did: {will_execute_event:?}\n\n{events:#?}");
         }
     });
 }
@@ -46,7 +46,7 @@ pub fn assert_const_function_query_was_not_run<Db, Q, QDb, R>(
     db.attach(|_| {
         if let Some(will_execute_event) = event {
             panic!(
-                "Expected query {query_name}() not to have run but it did: {will_execute_event:?}"
+                "Expected query {query_name}() not to have run but it did: {will_execute_event:?}\n\n{events:#?}"
             );
         }
     });
@@ -223,7 +223,7 @@ fn query_was_not_run() {
     use crate::tests::TestDb;
     use salsa::prelude::*;
 
-    #[salsa::input]
+    #[salsa::input(debug)]
     struct Input {
         text: String,
     }
@@ -258,7 +258,7 @@ fn query_was_not_run_fails_if_query_was_run() {
     use crate::tests::TestDb;
     use salsa::prelude::*;
 
-    #[salsa::input]
+    #[salsa::input(debug)]
     struct Input {
         text: String,
     }
@@ -321,7 +321,7 @@ fn query_was_run_fails_if_query_was_not_run() {
     use crate::tests::TestDb;
     use salsa::prelude::*;
 
-    #[salsa::input]
+    #[salsa::input(debug)]
     struct Input {
         text: String,
     }

@@ -9,9 +9,9 @@ mod tests {
     use test_case::test_case;
 
     use crate::registry::Rule;
-    use crate::settings::types::PythonVersion;
     use crate::test::test_path;
     use crate::{assert_messages, settings};
+    use ruff_python_ast::PythonVersion;
 
     #[test_case(Path::new("edge_case.py"))]
     #[test_case(Path::new("from_typing_import.py"))]
@@ -30,7 +30,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_future_annotations").join(path).as_path(),
             &settings::LinterSettings {
-                target_version: PythonVersion::Py37,
+                unresolved_target_version: PythonVersion::PY37,
                 ..settings::LinterSettings::for_rule(Rule::FutureRewritableTypeAnnotation)
             },
         )?;
@@ -49,7 +49,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_future_annotations").join(path).as_path(),
             &settings::LinterSettings {
-                target_version: PythonVersion::Py37,
+                unresolved_target_version: PythonVersion::PY37,
                 ..settings::LinterSettings::for_rule(Rule::FutureRequiredTypeAnnotation)
             },
         )?;

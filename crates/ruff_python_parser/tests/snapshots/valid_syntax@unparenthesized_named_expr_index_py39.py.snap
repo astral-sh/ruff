@@ -1,0 +1,53 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/unparenthesized_named_expr_index_py39.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..53,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 43..52,
+                    value: Subscript(
+                        ExprSubscript {
+                            range: 43..52,
+                            value: Name(
+                                ExprName {
+                                    range: 43..46,
+                                    id: Name("lst"),
+                                    ctx: Load,
+                                },
+                            ),
+                            slice: Named(
+                                ExprNamed {
+                                    range: 47..51,
+                                    target: Name(
+                                        ExprName {
+                                            range: 47..48,
+                                            id: Name("x"),
+                                            ctx: Store,
+                                        },
+                                    ),
+                                    value: NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 50..51,
+                                            value: Int(
+                                                1,
+                                            ),
+                                        },
+                                    ),
+                                },
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```

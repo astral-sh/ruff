@@ -45,7 +45,7 @@ impl AlwaysFixableViolation for UselessObjectInheritance {
 }
 
 /// UP004
-pub(crate) fn useless_object_inheritance(checker: &mut Checker, class_def: &ast::StmtClassDef) {
+pub(crate) fn useless_object_inheritance(checker: &Checker, class_def: &ast::StmtClassDef) {
     let Some(arguments) = class_def.arguments.as_deref() else {
         return;
     };
@@ -70,6 +70,6 @@ pub(crate) fn useless_object_inheritance(checker: &mut Checker, class_def: &ast:
             )
             .map(Fix::safe_edit)
         });
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }

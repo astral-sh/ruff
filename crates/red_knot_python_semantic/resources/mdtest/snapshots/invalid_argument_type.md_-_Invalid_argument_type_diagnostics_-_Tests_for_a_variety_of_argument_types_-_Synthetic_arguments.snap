@@ -1,0 +1,42 @@
+---
+source: crates/red_knot_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: invalid_argument_type.md - Invalid argument type diagnostics - Tests for a variety of argument types - Synthetic arguments
+mdtest path: crates/red_knot_python_semantic/resources/mdtest/diagnostics/invalid_argument_type.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | class C:
+2 |     def __call__(self, x: int) -> int:
+3 |         return 1
+4 | 
+5 | c = C()
+6 | c("wrong")  # error: [invalid-argument-type]
+```
+
+# Diagnostics
+
+```
+error: lint:invalid-argument-type
+ --> /src/mdtest_snippet.py:6:3
+  |
+5 | c = C()
+6 | c("wrong")  # error: [invalid-argument-type]
+  |   ^^^^^^^ Object of type `Literal["wrong"]` cannot be assigned to parameter 2 (`x`) of bound method `__call__`; expected type `int`
+  |
+info
+ --> /src/mdtest_snippet.py:2:24
+  |
+1 | class C:
+2 |     def __call__(self, x: int) -> int:
+  |                        ------ parameter declared in function definition here
+3 |         return 1
+  |
+
+```

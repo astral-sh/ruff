@@ -344,14 +344,14 @@ impl<'a> SemanticModel<'a> {
     pub fn is_available_in_scope(&self, member: &str, scope_id: ScopeId) -> bool {
         self.lookup_symbol_in_scope(member, scope_id, false)
             .map(|binding_id| &self.bindings[binding_id])
-            .map_or(true, |binding| binding.kind.is_builtin())
+            .is_none_or(|binding| binding.kind.is_builtin())
     }
 
     /// Resolve a `del` reference to `symbol` at `range`.
     pub fn resolve_del(&mut self, symbol: &str, range: TextRange) {
         let is_unbound = self.scopes[self.scope_id]
             .get(symbol)
-            .map_or(true, |binding_id| {
+            .is_none_or(|binding_id| {
                 // Treat the deletion of a name as a reference to that name.
                 self.add_local_reference(binding_id, ExprContext::Del, range);
                 self.bindings[binding_id].is_unbound()
@@ -1508,7 +1508,7 @@ impl<'a> SemanticModel<'a> {
             if self
                 .global_scope()
                 .get(name)
-                .map_or(true, |binding_id| self.bindings[binding_id].is_unbound())
+                .is_none_or(|binding_id| self.bindings[binding_id].is_unbound())
             {
                 let id = self.bindings.push(Binding {
                     kind: BindingKind::Assignment,
@@ -2021,18 +2021,6 @@ impl<'a> SemanticModel<'a> {
             .intersects(SemanticModelFlags::DEFERRED_CLASS_BASE)
     }
 
-    /// Return `true` if we should use the new semantics to recognize
-    /// type checking blocks. Previously we only recognized type checking
-    /// blocks if `TYPE_CHECKING` was imported from a typing module.
-    ///
-    /// With this feature flag enabled we recognize any symbol named
-    /// `TYPE_CHECKING`, regardless of where it comes from to mirror
-    /// what mypy and pyright do.
-    pub const fn use_new_type_checking_block_detection_semantics(&self) -> bool {
-        self.flags
-            .intersects(SemanticModelFlags::NEW_TYPE_CHECKING_BLOCK_DETECTION)
-    }
-
     /// Return an iterator over all bindings shadowed by the given [`BindingId`], within the
     /// containing scope, and across scopes.
     pub fn shadowed_bindings(
@@ -2163,7 +2151,7 @@ bitflags! {
 bitflags! {
     /// Flags indicating the current model state.
     #[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
-    pub struct SemanticModelFlags: u64 {
+    pub struct SemanticModelFlags: u32 {
         /// The model is in a type annotation that will only be evaluated when running a type
         /// checker.
         ///
@@ -2564,14 +2552,6 @@ bitflags! {
         /// [#13824]: https://github.com/astral-sh/ruff/issues/13824
         const NO_TYPE_CHECK = 1 << 30;
 
-        /// The model special-cases any symbol named `TYPE_CHECKING`.
-        ///
-        /// Previously we only recognized `TYPE_CHECKING` if it was part of
-        /// one of the configured `typing` modules. This flag exists to
-        /// test out the semantic change only in preview. This flag will go
-        /// away once this change has been stabilized.
-        const NEW_TYPE_CHECKING_BLOCK_DETECTION = 1 << 31;
-
         /// The model is visiting the type expression of a `typing.cast` call.
         ///
         /// For example, the model might be visiting `float` in
@@ -2580,7 +2560,7 @@ bitflags! {
         ///
         /// cast(float, 5)
         /// ```
-        const CAST_TYPE_EXPRESSION = 1 << 32;
+        const CAST_TYPE_EXPRESSION = 1 << 31;
 
         /// The context is in any type annotation.
         const ANNOTATION = Self::TYPING_ONLY_ANNOTATION.bits() | Self::RUNTIME_EVALUATED_ANNOTATION.bits() | Self::RUNTIME_REQUIRED_ANNOTATION.bits();

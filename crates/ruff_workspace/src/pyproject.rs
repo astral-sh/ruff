@@ -4,8 +4,9 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use log::debug;
-use pep440_rs::VersionSpecifiers;
+use pep440_rs::{Operator, Version, VersionSpecifiers};
 use serde::{Deserialize, Serialize};
+use strum::IntoEnumIterator;
 
 use ruff_linter::settings::types::PythonVersion;
 
@@ -41,18 +42,18 @@ impl Pyproject {
 
 /// Parse a `ruff.toml` file.
 fn parse_ruff_toml<P: AsRef<Path>>(path: P) -> Result<Options> {
-    let contents = std::fs::read_to_string(path.as_ref())
-        .with_context(|| format!("Failed to read {}", path.as_ref().display()))?;
-    toml::from_str(&contents)
-        .with_context(|| format!("Failed to parse {}", path.as_ref().display()))
+    let path = path.as_ref();
+    let contents = std::fs::read_to_string(path)
+        .with_context(|| format!("Failed to read {}", path.display()))?;
+    toml::from_str(&contents).with_context(|| format!("Failed to parse {}", path.display()))
 }
 
 /// Parse a `pyproject.toml` file.
 fn parse_pyproject_toml<P: AsRef<Path>>(path: P) -> Result<Pyproject> {
-    let contents = std::fs::read_to_string(path.as_ref())
-        .with_context(|| format!("Failed to read {}", path.as_ref().display()))?;
-    toml::from_str(&contents)
-        .with_context(|| format!("Failed to parse {}", path.as_ref().display()))
+    let path = path.as_ref();
+    let contents = std::fs::read_to_string(path)
+        .with_context(|| format!("Failed to read {}", path.display()))?;
+    toml::from_str(&contents).with_context(|| format!("Failed to parse {}", path.display()))
 }
 
 /// Return `true` if a `pyproject.toml` contains a `[tool.ruff]` section.
@@ -64,20 +65,21 @@ pub fn ruff_enabled<P: AsRef<Path>>(path: P) -> Result<bool> {
 /// Return the path to the `pyproject.toml` or `ruff.toml` file in a given
 /// directory.
 pub fn settings_toml<P: AsRef<Path>>(path: P) -> Result<Option<PathBuf>> {
+    let path = path.as_ref();
     // Check for `.ruff.toml`.
-    let ruff_toml = path.as_ref().join(".ruff.toml");
+    let ruff_toml = path.join(".ruff.toml");
     if ruff_toml.is_file() {
         return Ok(Some(ruff_toml));
     }
 
     // Check for `ruff.toml`.
-    let ruff_toml = path.as_ref().join("ruff.toml");
+    let ruff_toml = path.join("ruff.toml");
     if ruff_toml.is_file() {
         return Ok(Some(ruff_toml));
     }
 
     // Check for `pyproject.toml`.
-    let pyproject_toml = path.as_ref().join("pyproject.toml");
+    let pyproject_toml = path.join("pyproject.toml");
     if pyproject_toml.is_file() && ruff_enabled(&pyproject_toml)? {
         return Ok(Some(pyproject_toml));
     }
@@ -94,6 +96,17 @@ pub fn find_settings_toml<P: AsRef<Path>>(path: P) -> Result<Option<PathBuf>> {
         }
     }
     Ok(None)
+}
+
+/// Derive target version from `required-version` in `pyproject.toml`, if
+/// such a file exists in an ancestor directory.
+pub fn find_fallback_target_version<P: AsRef<Path>>(path: P) -> Option<PythonVersion> {
+    for directory in path.as_ref().ancestors() {
+        if let Some(fallback) = get_fallback_target_version(directory) {
+            return Some(fallback);
+        }
+    }
+    None
 }
 
 /// Find the path to the user-specific `pyproject.toml` or `ruff.toml`, if it
@@ -140,9 +153,13 @@ pub fn find_user_settings_toml() -> Option<PathBuf> {
 }
 
 /// Load `Options` from a `pyproject.toml` or `ruff.toml` file.
-pub(super) fn load_options<P: AsRef<Path>>(path: P) -> Result<Options> {
-    if path.as_ref().ends_with("pyproject.toml") {
-        let pyproject = parse_pyproject_toml(&path)?;
+pub(super) fn load_options<P: AsRef<Path>>(
+    path: P,
+    version_strategy: &TargetVersionStrategy,
+) -> Result<Options> {
+    let path = path.as_ref();
+    if path.ends_with("pyproject.toml") {
+        let pyproject = parse_pyproject_toml(path)?;
         let mut ruff = pyproject
             .tool
             .and_then(|tool| tool.ruff)
@@ -150,21 +167,100 @@ pub(super) fn load_options<P: AsRef<Path>>(path: P) -> Result<Options> {
         if ruff.target_version.is_none() {
             if let Some(project) = pyproject.project {
                 if let Some(requires_python) = project.requires_python {
-                    ruff.target_version =
-                        PythonVersion::get_minimum_supported_version(&requires_python);
+                    ruff.target_version = get_minimum_supported_version(&requires_python);
                 }
             }
         }
         Ok(ruff)
     } else {
-        let ruff = parse_ruff_toml(path);
-        if let Ok(ruff) = &ruff {
+        let mut ruff = parse_ruff_toml(path);
+        if let Ok(ref mut ruff) = ruff {
             if ruff.target_version.is_none() {
-                debug!("`project.requires_python` in `pyproject.toml` will not be used to set `target_version` when using `ruff.toml`.");
+                debug!("No `target-version` found in `ruff.toml`");
+                match version_strategy {
+                    TargetVersionStrategy::UseDefault => {}
+                    TargetVersionStrategy::RequiresPythonFallback => {
+                        if let Some(dir) = path.parent() {
+                            let fallback = get_fallback_target_version(dir);
+                            if let Some(version) = fallback {
+                                debug!("Derived `target-version` from `requires-python` in `pyproject.toml`: {version:?}");
+                            } else {
+                                debug!("No `pyproject.toml` with `requires-python` in same directory; `target-version` unspecified");
+                            }
+                            ruff.target_version = fallback;
+                        }
+                    }
+                }
             }
         }
         ruff
     }
+}
+
+/// Extract `target-version` from `pyproject.toml` in the given directory
+/// if the file exists and has `requires-python`.
+fn get_fallback_target_version(dir: &Path) -> Option<PythonVersion> {
+    let pyproject_path = dir.join("pyproject.toml");
+    if !pyproject_path.exists() {
+        return None;
+    }
+    let parsed_pyproject = parse_pyproject_toml(&pyproject_path);
+
+    let pyproject = match parsed_pyproject {
+        Ok(pyproject) => pyproject,
+        Err(err) => {
+            debug!("Failed to find fallback `target-version` due to: {}", err);
+            return None;
+        }
+    };
+
+    if let Some(project) = pyproject.project {
+        if let Some(requires_python) = project.requires_python {
+            return get_minimum_supported_version(&requires_python);
+        }
+    }
+    None
+}
+
+/// Infer the minimum supported [`PythonVersion`] from a `requires-python` specifier.
+fn get_minimum_supported_version(requires_version: &VersionSpecifiers) -> Option<PythonVersion> {
+    /// Truncate a version to its major and minor components.
+    fn major_minor(version: &Version) -> Option<Version> {
+        let major = version.release().first()?;
+        let minor = version.release().get(1)?;
+        Some(Version::new([major, minor]))
+    }
+
+    // Extract the minimum supported version from the specifiers.
+    let minimum_version = requires_version
+        .iter()
+        .filter(|specifier| {
+            matches!(
+                specifier.operator(),
+                Operator::Equal
+                    | Operator::EqualStar
+                    | Operator::ExactEqual
+                    | Operator::TildeEqual
+                    | Operator::GreaterThan
+                    | Operator::GreaterThanEqual
+            )
+        })
+        .filter_map(|specifier| major_minor(specifier.version()))
+        .min()?;
+
+    debug!("Detected minimum supported `requires-python` version: {minimum_version}");
+
+    // Find the Python version that matches the minimum supported version.
+    PythonVersion::iter().find(|version| Version::from(*version) == minimum_version)
+}
+
+/// Strategy for handling missing `target-version` in configuration.
+#[derive(Debug)]
+pub(super) enum TargetVersionStrategy {
+    /// Use default `target-version`
+    UseDefault,
+    /// Derive from `requires-python` if available
+    RequiresPythonFallback,
 }
 
 #[cfg(test)]
@@ -180,7 +276,7 @@ mod tests {
     use ruff_linter::line_width::LineLength;
     use ruff_linter::settings::types::PatternPrefixPair;
 
-    use crate::options::{LintCommonOptions, LintOptions, Options};
+    use crate::options::{Flake8BuiltinsOptions, LintCommonOptions, LintOptions, Options};
     use crate::pyproject::{find_settings_toml, parse_pyproject_toml, Pyproject, Tools};
 
     #[test]
@@ -290,6 +386,55 @@ ignore = ["E501"]
                 })
             })
         );
+
+        let pyproject: Pyproject = toml::from_str(
+            r#"
+[tool.ruff.lint.flake8-builtins]
+builtins-allowed-modules = ["asyncio"]
+builtins-ignorelist = ["argparse", 'typing']
+builtins-strict-checking = true
+allowed-modules = ['sys']
+ignorelist = ["os", 'io']
+strict-checking = false
+"#,
+        )?;
+
+        #[allow(deprecated)]
+        let expected = Flake8BuiltinsOptions {
+            builtins_allowed_modules: Some(vec!["asyncio".to_string()]),
+            allowed_modules: Some(vec!["sys".to_string()]),
+
+            builtins_ignorelist: Some(vec!["argparse".to_string(), "typing".to_string()]),
+            ignorelist: Some(vec!["os".to_string(), "io".to_string()]),
+
+            builtins_strict_checking: Some(true),
+            strict_checking: Some(false),
+        };
+
+        assert_eq!(
+            pyproject.tool,
+            Some(Tools {
+                ruff: Some(Options {
+                    lint: Some(LintOptions {
+                        common: LintCommonOptions {
+                            flake8_builtins: Some(expected.clone()),
+                            ..LintCommonOptions::default()
+                        },
+                        ..LintOptions::default()
+                    }),
+                    ..Options::default()
+                })
+            })
+        );
+
+        let settings = expected.into_settings();
+
+        assert_eq!(settings.allowed_modules, vec!["sys".to_string()]);
+        assert_eq!(
+            settings.ignorelist,
+            vec!["os".to_string(), "io".to_string()]
+        );
+        assert!(!settings.strict_checking);
 
         assert!(toml::from_str::<Pyproject>(
             r"

@@ -1,0 +1,786 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Options",
+  "description": "The options for the project.",
+  "type": "object",
+  "properties": {
+    "environment": {
+      "description": "Configures the type checking environment.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/EnvironmentOptions"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "rules": {
+      "description": "Configures the enabled lints and their severity.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/Rules"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "src": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/SrcOptions"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "terminal": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/TerminalOptions"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "DiagnosticFormat": {
+      "description": "The diagnostic output format.",
+      "oneOf": [
+        {
+          "description": "The default full mode will print \"pretty\" diagnostics.\n\nThat is, color will be used when printing to a `tty`. Moreover, diagnostic messages may include additional context and annotations on the input to help understand the message.",
+          "type": "string",
+          "enum": [
+            "full"
+          ]
+        },
+        {
+          "description": "Print diagnostics in a concise mode.\n\nThis will guarantee that each diagnostic is printed on a single line. Only the most important or primary aspects of the diagnostic are included. Contextual information is dropped.\n\nThis may use color when printing to a `tty`.",
+          "type": "string",
+          "enum": [
+            "concise"
+          ]
+        }
+      ]
+    },
+    "EnvironmentOptions": {
+      "type": "object",
+      "properties": {
+        "extra-paths": {
+          "description": "List of user-provided paths that should take first priority in the module resolution. Examples in other type checkers are mypy's MYPYPATH environment variable, or pyright's stubPath configuration setting.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "python": {
+          "description": "Path to the Python installation from which Red Knot resolves type information and third-party dependencies.\n\nRed Knot will search in the path's `site-packages` directories for type information and third-party imports.\n\nThis option is commonly used to specify the path to a virtual environment.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "python-platform": {
+          "description": "Specifies the target platform that will be used to execute the source code. If specified, Red Knot will tailor its use of type stub files, which conditionalize type definitions based on the platform.\n\nIf no platform is specified, knot will use `all` or the current platform in the LSP use case.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/PythonPlatform"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "python-version": {
+          "description": "Specifies the version of Python that will be used to execute the source code. The version should be specified as a string in the format `M.m` where `M` is the major version and `m` is the minor (e.g. \"3.0\" or \"3.6\"). If a version is provided, knot will generate errors if the source code makes use of language features that are not supported in that version. It will also tailor its use of type stub files, which conditionalizes type definitions based on the version.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/PythonVersion"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "typeshed": {
+          "description": "Optional path to a \"typeshed\" directory on disk for us to use for standard-library types. If this is not provided, we will fallback to our vendored typeshed stubs for the stdlib, bundled as a zip file in the binary",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "Level": {
+      "oneOf": [
+        {
+          "title": "Ignore",
+          "description": "The lint is disabled and should not run.",
+          "type": "string",
+          "enum": [
+            "ignore"
+          ]
+        },
+        {
+          "title": "Warn",
+          "description": "The lint is enabled and diagnostic should have a warning severity.",
+          "type": "string",
+          "enum": [
+            "warn"
+          ]
+        },
+        {
+          "title": "Error",
+          "description": "The lint is enabled and diagnostics have an error severity.",
+          "type": "string",
+          "enum": [
+            "error"
+          ]
+        }
+      ]
+    },
+    "PythonPlatform": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "description": "Do not make any assumptions about the target platform.",
+          "const": "all"
+        },
+        {
+          "description": "Darwin",
+          "const": "darwin"
+        },
+        {
+          "description": "Linux",
+          "const": "linux"
+        },
+        {
+          "description": "Windows",
+          "const": "win32"
+        }
+      ]
+    },
+    "PythonVersion": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+$"
+        },
+        {
+          "description": "Python 3.7",
+          "const": "3.7"
+        },
+        {
+          "description": "Python 3.8",
+          "const": "3.8"
+        },
+        {
+          "description": "Python 3.9",
+          "const": "3.9"
+        },
+        {
+          "description": "Python 3.10",
+          "const": "3.10"
+        },
+        {
+          "description": "Python 3.11",
+          "const": "3.11"
+        },
+        {
+          "description": "Python 3.12",
+          "const": "3.12"
+        },
+        {
+          "description": "Python 3.13",
+          "const": "3.13"
+        }
+      ]
+    },
+    "Rules": {
+      "type": "object",
+      "properties": {
+        "byte-string-type-annotation": {
+          "title": "detects byte strings in type annotation positions",
+          "description": "## What it does\nChecks for byte-strings in type annotation positions.\n\n## Why is this bad?\nStatic analysis tools like Red Knot can't analyse type annotations that use byte-string notation.\n\n## Examples\n```python\ndef test(): -> b\"int\":\n    ...\n```\n\nUse instead:\n```python\ndef test(): -> \"int\":\n    ...\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "call-non-callable": {
+          "title": "detects calls to non-callable objects",
+          "description": "## What it does\nChecks for calls to non-callable objects.\n\n## Why is this bad?\nCalling a non-callable object will raise a `TypeError` at runtime.\n\n## Examples\n```python\n4()  # TypeError: 'int' object is not callable\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "call-possibly-unbound-method": {
+          "title": "detects calls to possibly unbound methods",
+          "description": "## What it does\nChecks for calls to possibly unbound methods.\n\nTODO #14889",
+          "default": "warn",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "conflicting-declarations": {
+          "title": "detects conflicting declarations",
+          "description": "TODO #14889",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "conflicting-metaclass": {
+          "title": "detects conflicting metaclasses",
+          "description": "TODO #14889",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "cyclic-class-definition": {
+          "title": "detects cyclic class definitions",
+          "description": "## What it does\nChecks for class definitions with a cyclic inheritance chain.\n\n## Why is it bad?\nTODO #14889",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "division-by-zero": {
+          "title": "detects division by zero",
+          "description": "## What it does\nIt detects division by zero.\n\n## Why is this bad?\nDividing by zero raises a `ZeroDivisionError` at runtime.\n\n## Examples\n```python\n5 / 0\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "duplicate-base": {
+          "title": "detects class definitions with duplicate bases",
+          "description": "TODO #14889",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "escape-character-in-forward-annotation": {
+          "title": "detects forward type annotations with escape characters",
+          "description": "TODO #14889",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "fstring-type-annotation": {
+          "title": "detects F-strings in type annotation positions",
+          "description": "## What it does\nChecks for f-strings in type annotation positions.\n\n## Why is this bad?\nStatic analysis tools like Red Knot can't analyse type annotations that use f-string notation.\n\n## Examples\n```python\ndef test(): -> f\"int\":\n    ...\n```\n\nUse instead:\n```python\ndef test(): -> \"int\":\n    ...\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "implicit-concatenated-string-type-annotation": {
+          "title": "detects implicit concatenated strings in type annotations",
+          "description": "## What it does\nChecks for implicit concatenated strings in type annotation positions.\n\n## Why is this bad?\nStatic analysis tools like Red Knot can't analyse type annotations that use implicit concatenated strings.\n\n## Examples\n```python\ndef test(): -> \"Literal[\" \"5\" \"]\":\n    ...\n```\n\nUse instead:\n```python\ndef test(): -> \"Literal[5]\":\n    ...\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "incompatible-slots": {
+          "title": "detects class definitions whose MRO has conflicting `__slots__`",
+          "description": "## What it does\nChecks for classes whose bases define incompatible `__slots__`.\n\n## Why is this bad?\nInheriting from bases with incompatible `__slots__`s\nwill lead to a `TypeError` at runtime.\n\nClasses with no or empty `__slots__` are always compatible:\n\n```python\nclass A: ...\nclass B:\n    __slots__ = ()\nclass C:\n    __slots__ = (\"a\", \"b\")\n\n# fine\nclass D(A, B, C): ...\n```\n\nMultiple inheritance from more than one different class\ndefining non-empty `__slots__` is not allowed:\n\n```python\nclass A:\n    __slots__ = (\"a\", \"b\")\n\nclass B:\n    __slots__ = (\"a\", \"b\")  # Even if the values are the same\n\n# TypeError: multiple bases have instance lay-out conflict\nclass C(A, B): ...\n```\n\n## Known problems\nDynamic (not tuple or string literal) `__slots__` are not checked.\nAdditionally, classes inheriting from built-in classes with implicit layouts\nlike `str` or `int` are also not checked.\n\n```pycon\n>>> hasattr(int, \"__slots__\")\nFalse\n>>> hasattr(str, \"__slots__\")\nFalse\n>>> class A(int, str): ...\nTraceback (most recent call last):\n  File \"<python-input-0>\", line 1, in <module>\n    class A(int, str): ...\nTypeError: multiple bases have instance lay-out conflict\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "inconsistent-mro": {
+          "title": "detects class definitions with an inconsistent MRO",
+          "description": "TODO #14889",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "index-out-of-bounds": {
+          "title": "detects index out of bounds errors",
+          "description": "## What it does\nTODO #14889",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "invalid-argument-type": {
+          "title": "detects call arguments whose type is not assignable to the corresponding typed parameter",
+          "description": "## What it does\nDetects call arguments whose type is not assignable to the corresponding typed parameter.\n\n## Why is this bad?\nPassing an argument of a type the function (or callable object) does not accept violates\nthe expectations of the function author and may cause unexpected runtime errors within the\nbody of the function.\n\n## Examples\n```python\ndef func(x: int): ...\nfunc(\"foo\")  # error: [invalid-argument-type]\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "invalid-assignment": {
+          "title": "detects invalid assignments",
+          "description": "TODO #14889",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "invalid-attribute-access": {
+          "title": "Invalid attribute access",
+          "description": "## What it does\nMakes sure that instance attribute accesses are valid.\n\n## Examples\n```python\nclass C:\n  var: ClassVar[int] = 1\n\nC.var = 3  # okay\nC().var = 3  # error: Cannot assign to class variable\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "invalid-base": {
+          "title": "detects class definitions with an invalid base",
+          "description": "TODO #14889",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "invalid-context-manager": {
+          "title": "detects expressions used in with statements that don't implement the context manager protocol",
+          "description": "TODO #14889",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "invalid-declaration": {
+          "title": "detects invalid declarations",
+          "description": "TODO #14889",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "invalid-exception-caught": {
+          "title": "detects exception handlers that catch classes that do not inherit from `BaseException`",
+          "description": "## What it does\nChecks for exception handlers that catch non-exception classes.\n\n## Why is this bad?\nCatching classes that do not inherit from `BaseException` will raise a TypeError at runtime.\n\n## Example\n```python\ntry:\n    1 / 0\nexcept 1:\n    ...\n```\n\nUse instead:\n```python\ntry:\n    1 / 0\nexcept ZeroDivisionError:\n    ...\n```\n\n## References\n- [Python documentation: except clause](https://docs.python.org/3/reference/compound_stmts.html#except-clause)\n- [Python documentation: Built-in Exceptions](https://docs.python.org/3/library/exceptions.html#built-in-exceptions)\n\n## Ruff rule\n This rule corresponds to Ruff's [`except-with-non-exception-classes` (`B030`)](https://docs.astral.sh/ruff/rules/except-with-non-exception-classes)",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "invalid-ignore-comment": {
+          "title": "detects ignore comments that use invalid syntax",
+          "description": "## What it does\nChecks for `type: ignore` and `knot: ignore` comments that are syntactically incorrect.\n\n## Why is this bad?\nA syntactically incorrect ignore comment is probably a mistake and is useless.\n\n## Examples\n```py\na = 20 / 0  # type: ignoree\n```\n\nUse instead:\n\n```py\na = 20 / 0  # type: ignore\n```",
+          "default": "warn",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "invalid-metaclass": {
+          "title": "detects invalid `metaclass=` arguments",
+          "description": "## What it does\nChecks for arguments to `metaclass=` that are invalid.\n\n## Why is this bad?\nPython allows arbitrary expressions to be used as the argument to `metaclass=`.\nThese expressions, however, need to be callable and accept the same arguments\nas `type.__new__`.\n\n## Example\n\n```python\ndef f(): ...\n\n# TypeError: f() takes 0 positional arguments but 3 were given\nclass B(metaclass=f): ...\n```\n\n## References\n- [Python documentation: Metaclasses](https://docs.python.org/3/reference/datamodel.html#metaclasses)",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "invalid-parameter-default": {
+          "title": "detects default values that can't be assigned to the parameter's annotated type",
+          "description": "## What it does\nChecks for default values that can't be assigned to the parameter's annotated type.\n\n## Why is this bad?\nTODO #14889",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "invalid-raise": {
+          "title": "detects `raise` statements that raise invalid exceptions or use invalid causes",
+          "description": "Checks for `raise` statements that raise non-exceptions or use invalid\ncauses for their raised exceptions.\n\n## Why is this bad?\nOnly subclasses or instances of `BaseException` can be raised.\nFor an exception's cause, the same rules apply, except that `None` is also\npermitted. Violating these rules results in a `TypeError` at runtime.\n\n## Examples\n```python\ndef f():\n    try:\n        something()\n    except NameError:\n        raise \"oops!\" from f\n\ndef g():\n    raise NotImplemented from 42\n```\n\nUse instead:\n```python\ndef f():\n    try:\n        something()\n    except NameError as e:\n        raise RuntimeError(\"oops!\") from e\n\ndef g():\n    raise NotImplementedError from None\n```\n\n## References\n- [Python documentation: The `raise` statement](https://docs.python.org/3/reference/simple_stmts.html#raise)\n- [Python documentation: Built-in Exceptions](https://docs.python.org/3/library/exceptions.html#built-in-exceptions)",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "invalid-return-type": {
+          "title": "detects returned values that can't be assigned to the function's annotated return type",
+          "description": "## What it does\nDetects returned values that can't be assigned to the function's annotated return type.\n\n## Why is this bad?\nReturning an object of a type incompatible with the annotated return type may cause confusion to the user calling the function.\n\n## Examples\n```python\ndef func() -> int:\n    return \"a\"  # error: [invalid-return-type]\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "invalid-syntax-in-forward-annotation": {
+          "title": "detects invalid syntax in forward annotations",
+          "description": "TODO #14889",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "invalid-type-checking-constant": {
+          "title": "detects invalid TYPE_CHECKING constant assignments",
+          "description": "## What it does\nChecks for a value other than `False` assigned to the `TYPE_CHECKING` variable, or an\nannotation not assignable from `bool`.\n\n## Why is this bad?\nThe name `TYPE_CHECKING` is reserved for a flag that can be used to provide conditional\ncode seen only by the type checker, and not at runtime. Normally this flag is imported from\n`typing` or `typing_extensions`, but it can also be defined locally. If defined locally, it\nmust be assigned the value `False` at runtime; the type checker will consider its value to\nbe `True`. If annotated, it must be annotated as a type that can accept `bool` values.",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "invalid-type-form": {
+          "title": "detects invalid type forms",
+          "description": "## What it does\nChecks for invalid type expressions.\n\n## Why is this bad?\nTODO #14889",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "invalid-type-variable-constraints": {
+          "title": "detects invalid type variable constraints",
+          "description": "TODO #14889",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "missing-argument": {
+          "title": "detects missing required arguments in a call",
+          "description": "## What it does\nChecks for missing required arguments in a call.\n\n## Why is this bad?\nFailing to provide a required argument will raise a `TypeError` at runtime.\n\n## Examples\n```python\ndef func(x: int): ...\nfunc()  # TypeError: func() missing 1 required positional argument: 'x'\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "no-matching-overload": {
+          "title": "detects calls that do not match any overload",
+          "description": "## What it does\nChecks for calls to an overloaded function that do not match any of the overloads.\n\n## Why is this bad?\nFailing to provide the correct arguments to one of the overloads will raise a `TypeError`\nat runtime.\n\n## Examples\n```python\n@overload\ndef func(x: int): ...\n@overload\ndef func(x: bool): ...\nfunc(\"string\")  # error: [no-matching-overload]\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "non-subscriptable": {
+          "title": "detects subscripting objects that do not support subscripting",
+          "description": "## What it does\nChecks for subscripting objects that do not support subscripting.\n\n## Why is this bad?\nSubscripting an object that does not support it will raise a `TypeError` at runtime.\n\n## Examples\n```python\n4[1]  # TypeError: 'int' object is not subscriptable\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "not-iterable": {
+          "title": "detects iteration over an object that is not iterable",
+          "description": "## What it does\nChecks for objects that are not iterable but are used in a context that requires them to be.\n\n## Why is this bad?\nIterating over an object that is not iterable will raise a `TypeError` at runtime.\n\n## Examples\n\n```python\nfor i in 34:  # TypeError: 'int' object is not iterable\n    pass\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "parameter-already-assigned": {
+          "title": "detects multiple arguments for the same parameter",
+          "description": "## What it does\nChecks for calls which provide more than one argument for a single parameter.\n\n## Why is this bad?\nProviding multiple values for a single parameter will raise a `TypeError` at runtime.\n\n## Examples\n\n```python\ndef f(x: int) -> int: ...\n\nf(1, x=2)  # Error raised here\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "possibly-unbound-attribute": {
+          "title": "detects references to possibly unbound attributes",
+          "description": "## What it does\nChecks for possibly unbound attributes.\n\nTODO #14889",
+          "default": "warn",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "possibly-unbound-import": {
+          "title": "detects possibly unbound imports",
+          "description": "TODO #14889",
+          "default": "warn",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "possibly-unresolved-reference": {
+          "title": "detects references to possibly undefined names",
+          "description": "## What it does\nChecks for references to names that are possibly not defined.\n\n## Why is this bad?\nUsing an undefined variable will raise a `NameError` at runtime.\n\n## Example\n\n```python\nfor i in range(0):\n    x = i\n\nprint(x)  # NameError: name 'x' is not defined\n```",
+          "default": "warn",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "raw-string-type-annotation": {
+          "title": "detects raw strings in type annotation positions",
+          "description": "## What it does\nChecks for raw-strings in type annotation positions.\n\n## Why is this bad?\nStatic analysis tools like Red Knot can't analyse type annotations that use raw-string notation.\n\n## Examples\n```python\ndef test(): -> r\"int\":\n    ...\n```\n\nUse instead:\n```python\ndef test(): -> \"int\":\n    ...\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "static-assert-error": {
+          "title": "Failed static assertion",
+          "description": "## What it does\nMakes sure that the argument of `static_assert` is statically known to be true.\n\n## Examples\n```python\nfrom knot_extensions import static_assert\n\nstatic_assert(1 + 1 == 3)  # error: evaluates to `False`\n\nstatic_assert(int(2.0 * 3.0) == 6)  # error: does not have a statically known truthiness\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "subclass-of-final-class": {
+          "title": "detects subclasses of final classes",
+          "description": "## What it does\nChecks for classes that subclass final classes.\n\n## Why is this bad?\nDecorating a class with `@final` declares to the type checker that it should not be subclassed.\n\n## Example\n\n```python\nfrom typing import final\n\n@final\nclass A: ...\nclass B(A): ...  # Error raised here\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "too-many-positional-arguments": {
+          "title": "detects calls passing too many positional arguments",
+          "description": "## What it does\nChecks for calls that pass more positional arguments than the callable can accept.\n\n## Why is this bad?\nPassing too many positional arguments will raise `TypeError` at runtime.\n\n## Example\n\n```python\ndef f(): ...\n\nf(\"foo\")  # Error raised here\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "type-assertion-failure": {
+          "title": "detects failed type assertions",
+          "description": "## What it does\nChecks for `assert_type()` calls where the actual type\nis not the same as the asserted type.\n\n## Why is this bad?\n`assert_type()` allows confirming the inferred type of a certain value.\n\n## Example\n\n```python\ndef _(x: int):\n    assert_type(x, int)  # fine\n    assert_type(x, str)  # error: Actual type does not match asserted type\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "undefined-reveal": {
+          "title": "detects usages of `reveal_type` without importing it",
+          "description": "## What it does\nChecks for calls to `reveal_type` without importing it.\n\n## Why is this bad?\nUsing `reveal_type` without importing it will raise a `NameError` at runtime.\n\n## Examples\nTODO #14889",
+          "default": "warn",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "unknown-argument": {
+          "title": "detects unknown keyword arguments in calls",
+          "description": "## What it does\nChecks for keyword arguments in calls that don't match any parameter of the callable.\n\n## Why is this bad?\nProviding an unknown keyword argument will raise `TypeError` at runtime.\n\n## Example\n\n```python\ndef f(x: int) -> int: ...\n\nf(x=1, y=2)  # Error raised here\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "unknown-rule": {
+          "title": "detects `knot: ignore` comments that reference unknown rules",
+          "description": "## What it does\nChecks for `knot: ignore[code]` where `code` isn't a known lint rule.\n\n## Why is this bad?\nA `knot: ignore[code]` directive with a `code` that doesn't match\nany known rule will not suppress any type errors, and is probably a mistake.\n\n## Examples\n```py\na = 20 / 0  # knot: ignore[division-by-zer]\n```\n\nUse instead:\n\n```py\na = 20 / 0  # knot: ignore[division-by-zero]\n```",
+          "default": "warn",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "unresolved-attribute": {
+          "title": "detects references to unresolved attributes",
+          "description": "## What it does\nChecks for unresolved attributes.\n\nTODO #14889",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "unresolved-import": {
+          "title": "detects unresolved imports",
+          "description": "## What it does\nChecks for import statements for which the module cannot be resolved.\n\n## Why is this bad?\nImporting a module that cannot be resolved will raise an `ImportError` at runtime.",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "unresolved-reference": {
+          "title": "detects references to names that are not defined",
+          "description": "## What it does\nChecks for references to names that are not defined.\n\n## Why is this bad?\nUsing an undefined variable will raise a `NameError` at runtime.\n\n## Example\n\n```python\nprint(x)  # NameError: name 'x' is not defined\n```",
+          "default": "warn",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "unsupported-bool-conversion": {
+          "title": "detects boolean conversion where the object incorrectly implements `__bool__`",
+          "description": "## What it does\nChecks for bool conversions where the object doesn't correctly implement `__bool__`.\n\n## Why is this bad?\nIf an exception is raised when you attempt to evaluate the truthiness of an object,\nusing the object in a boolean context will fail at runtime.\n\n## Examples\n\n```python\nclass NotBoolable:\n    __bool__ = None\n\nb1 = NotBoolable()\nb2 = NotBoolable()\n\nif b1:  # exception raised here\n    pass\n\nb1 and b2  # exception raised here\nnot b1  # exception raised here\nb1 < b2 < b1  # exception raised here\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "unsupported-operator": {
+          "title": "detects binary, unary, or comparison expressions where the operands don't support the operator",
+          "description": "## What it does\nChecks for binary expressions, comparisons, and unary expressions where the operands don't support the operator.\n\nTODO #14889",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "unused-ignore-comment": {
+          "title": "detects unused `type: ignore` comments",
+          "description": "## What it does\nChecks for `type: ignore` or `knot: ignore` directives that are no longer applicable.\n\n## Why is this bad?\nA `type: ignore` directive that no longer matches any diagnostic violations is likely\nincluded by mistake, and should be removed to avoid confusion.\n\n## Examples\n```py\na = 20 / 2  # knot: ignore[division-by-zero]\n```\n\nUse instead:\n\n```py\na = 20 / 2\n```",
+          "default": "warn",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "zero-stepsize-in-slice": {
+          "title": "detects a slice step size of zero",
+          "description": "## What it does\nChecks for step size 0 in slices.\n\n## Why is this bad?\nA slice with a step size of zero will raise a `ValueError` at runtime.\n\n## Examples\n```python\nl = list(range(10))\nl[1:10:0]  # ValueError: slice step cannot be zero\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        }
+      },
+      "additionalProperties": {
+        "$ref": "#/definitions/Level"
+      }
+    },
+    "SrcOptions": {
+      "type": "object",
+      "properties": {
+        "root": {
+          "description": "The root of the project, used for finding first-party modules.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "TerminalOptions": {
+      "type": "object",
+      "properties": {
+        "error-on-warning": {
+          "description": "Use exit code 1 if there are any warning-level diagnostics.\n\nDefaults to `false`.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "output-format": {
+          "description": "The format to use for printing diagnostic messages.\n\nDefaults to `full`.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/DiagnosticFormat"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

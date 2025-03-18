@@ -54,7 +54,7 @@ impl Violation for TypeOfPrimitive {
 }
 
 /// UP003
-pub(crate) fn type_of_primitive(checker: &mut Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
+pub(crate) fn type_of_primitive(checker: &Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
     let [arg] = args else {
         return;
     };
@@ -73,5 +73,5 @@ pub(crate) fn type_of_primitive(checker: &mut Checker, expr: &Expr, func: &Expr,
             expr.range(),
         )));
     }
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }

@@ -35,7 +35,8 @@ use crate::Locator;
 /// 5. The string references variables that are not in scope, or it doesn't capture variables at all.
 /// 6. Any format specifiers in the potential f-string are invalid.
 /// 7. The string is part of a function call that is known to expect a template string rather than an
-///    evaluated f-string: for example, a [`logging`] call, a [`gettext`] call, or a [fastAPI path].
+///    evaluated f-string: for example, a [`logging`][logging] call, a [`gettext`][gettext] call,
+///    or a [FastAPI path].
 ///
 /// ## Example
 ///
@@ -54,7 +55,7 @@ use crate::Locator;
 ///
 /// [logging]: https://docs.python.org/3/howto/logging-cookbook.html#using-particular-formatting-styles-throughout-your-application
 /// [gettext]: https://docs.python.org/3/library/gettext.html
-/// [fastAPI path]: https://fastapi.tiangolo.com/tutorial/path-params/
+/// [FastAPI path]: https://fastapi.tiangolo.com/tutorial/path-params/
 #[derive(ViolationMetadata)]
 pub(crate) struct MissingFStringSyntax;
 
@@ -70,8 +71,13 @@ impl AlwaysFixableViolation for MissingFStringSyntax {
 }
 
 /// RUF027
-pub(crate) fn missing_fstring_syntax(checker: &mut Checker, literal: &ast::StringLiteral) {
+pub(crate) fn missing_fstring_syntax(checker: &Checker, literal: &ast::StringLiteral) {
     let semantic = checker.semantic();
+
+    // fstrings are never correct as type definitions
+    if semantic.in_type_definition() {
+        return;
+    }
 
     // we want to avoid statement expressions that are just a string literal.
     // there's no reason to have standalone f-strings and this lets us avoid docstrings too
@@ -107,7 +113,7 @@ pub(crate) fn missing_fstring_syntax(checker: &mut Checker, literal: &ast::Strin
     if should_be_fstring(literal, checker.locator(), semantic) {
         let diagnostic = Diagnostic::new(MissingFStringSyntax, literal.range())
             .with_fix(fix_fstring_syntax(literal.range()));
-        checker.diagnostics.push(diagnostic);
+        checker.report_diagnostic(diagnostic);
     }
 }
 
@@ -218,7 +224,7 @@ fn should_be_fstring(
                         semantic.scope_id,
                         TypingOnlyBindingsStatus::Disallowed,
                     )
-                    .map_or(true, |id| semantic.binding(id).kind.is_builtin())
+                    .is_none_or(|id| semantic.binding(id).kind.is_builtin())
                 {
                     return false;
                 }

@@ -148,8 +148,63 @@ bad_str_strip_call.py:64:12: PLE1310 String `lstrip` call contains duplicate cha
 bad_str_strip_call.py:67:12: PLE1310 String `rstrip` call contains duplicate characters (did you mean `removesuffix`?)
    |
 66 | # PLE1310
-67 | b''.rstrip('http://')
-   |            ^^^^^^^^^ PLE1310
+67 | b''.rstrip(b'http://')
+   |            ^^^^^^^^^^ PLE1310
 68 |
 69 | # OK
+   |
+
+bad_str_strip_call.py:79:10: PLE1310 String `strip` call contains duplicate characters
+   |
+78 | # Errors: Multiple backslashes
+79 | ''.strip('\\b\\x09')
+   |          ^^^^^^^^^^ PLE1310
+80 | ''.strip(r'\b\x09')
+81 | ''.strip('\\\x5C')
+   |
+
+bad_str_strip_call.py:80:10: PLE1310 String `strip` call contains duplicate characters
+   |
+78 | # Errors: Multiple backslashes
+79 | ''.strip('\\b\\x09')
+80 | ''.strip(r'\b\x09')
+   |          ^^^^^^^^^ PLE1310
+81 | ''.strip('\\\x5C')
+   |
+
+bad_str_strip_call.py:81:10: PLE1310 String `strip` call contains duplicate characters
+   |
+79 | ''.strip('\\b\\x09')
+80 | ''.strip(r'\b\x09')
+81 | ''.strip('\\\x5C')
+   |          ^^^^^^^^ PLE1310
+82 |
+83 | # Errors: Type inference
+   |
+
+bad_str_strip_call.py:85:9: PLE1310 String `strip` call contains duplicate characters
+   |
+83 | # Errors: Type inference
+84 | b = b''
+85 | b.strip(b'//')
+   |         ^^^^^ PLE1310
+86 |
+87 | # Errors: Type inference (preview)
+   |
+
+bad_str_strip_call.py:89:12: PLE1310 String `rstrip` call contains duplicate characters (did you mean `removesuffix`?)
+   |
+87 | # Errors: Type inference (preview)
+88 | foo: str = ""; bar: bytes = b""
+89 | foo.rstrip("//")
+   |            ^^^^ PLE1310
+90 | bar.lstrip(b"//")
+   |
+
+bad_str_strip_call.py:90:12: PLE1310 String `lstrip` call contains duplicate characters (did you mean `removeprefix`?)
+   |
+88 | foo: str = ""; bar: bytes = b""
+89 | foo.rstrip("//")
+90 | bar.lstrip(b"//")
+   |            ^^^^^ PLE1310
    |

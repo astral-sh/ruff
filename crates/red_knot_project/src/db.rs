@@ -5,7 +5,7 @@ use crate::DEFAULT_LINT_REGISTRY;
 use crate::{Project, ProjectMetadata};
 use red_knot_python_semantic::lint::{LintRegistry, RuleSelection};
 use red_knot_python_semantic::{Db as SemanticDb, Program};
-use ruff_db::diagnostic::Diagnostic;
+use ruff_db::diagnostic::OldDiagnosticTrait;
 use ruff_db::files::{File, Files};
 use ruff_db::system::System;
 use ruff_db::vendored::VendoredFileSystem;
@@ -55,13 +55,12 @@ impl ProjectDatabase {
     }
 
     /// Checks all open files in the project and its dependencies.
-    pub fn check(&self) -> Result<Vec<Box<dyn Diagnostic>>, Cancelled> {
+    pub fn check(&self) -> Result<Vec<Box<dyn OldDiagnosticTrait>>, Cancelled> {
         self.with_db(|db| db.project().check(db))
     }
 
-    pub fn check_file(&self, file: File) -> Result<Vec<Box<dyn Diagnostic>>, Cancelled> {
-        let _span = tracing::debug_span!("check_file", file=%file.path(self)).entered();
-
+    #[tracing::instrument(level = "debug", skip(self))]
+    pub fn check_file(&self, file: File) -> Result<Vec<Box<dyn OldDiagnosticTrait>>, Cancelled> {
         self.with_db(|db| self.project().check_file(db, file))
     }
 
@@ -114,8 +113,8 @@ impl SemanticDb for ProjectDatabase {
         project.is_file_open(self, file)
     }
 
-    fn rule_selection(&self) -> &RuleSelection {
-        self.project().rule_selection(self)
+    fn rule_selection(&self) -> Arc<RuleSelection> {
+        self.project().rules(self)
     }
 
     fn lint_registry(&self) -> &LintRegistry {
@@ -186,7 +185,6 @@ pub(crate) mod tests {
         files: Files,
         system: TestSystem,
         vendored: VendoredFileSystem,
-        rule_selection: RuleSelection,
         project: Option<Project>,
     }
 
@@ -198,7 +196,6 @@ pub(crate) mod tests {
                 vendored: red_knot_vendored::file_system().clone(),
                 files: Files::default(),
                 events: Arc::default(),
-                rule_selection: RuleSelection::from_registry(&DEFAULT_LINT_REGISTRY),
                 project: None,
             };
 
@@ -270,8 +267,8 @@ pub(crate) mod tests {
             !file.path(self).is_vendored_path()
         }
 
-        fn rule_selection(&self) -> &RuleSelection {
-            &self.rule_selection
+        fn rule_selection(&self) -> Arc<RuleSelection> {
+            self.project().rules(self)
         }
 
         fn lint_registry(&self) -> &LintRegistry {

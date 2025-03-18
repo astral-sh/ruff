@@ -47,7 +47,7 @@ impl AlwaysFixableViolation for StringOrBytesTooLong {
 }
 
 /// PYI053
-pub(crate) fn string_or_bytes_too_long(checker: &mut Checker, string: StringLike) {
+pub(crate) fn string_or_bytes_too_long(checker: &Checker, string: StringLike) {
     let semantic = checker.semantic();
 
     // Ignore docstrings.
@@ -77,7 +77,7 @@ pub(crate) fn string_or_bytes_too_long(checker: &mut Checker, string: StringLike
         "...".to_string(),
         string.range(),
     )));
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
 /// Count the number of visible characters in an f-string. This accounts for

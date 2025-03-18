@@ -5,7 +5,7 @@ use ruff_python_ast::StmtFunctionDef;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
-use crate::settings::types::PythonVersion;
+use ruff_python_ast::PythonVersion;
 
 use super::{check_type_vars, in_nested_context, DisplayTypeVars, TypeVarReferenceVisitor};
 
@@ -96,9 +96,9 @@ impl Violation for NonPEP695GenericFunction {
 }
 
 /// UP047
-pub(crate) fn non_pep695_generic_function(checker: &mut Checker, function_def: &StmtFunctionDef) {
+pub(crate) fn non_pep695_generic_function(checker: &Checker, function_def: &StmtFunctionDef) {
     // PEP-695 syntax is only available on Python 3.12+
-    if checker.settings.target_version < PythonVersion::Py312 {
+    if checker.target_version() < PythonVersion::PY312 {
         return;
     }
 
@@ -163,7 +163,7 @@ pub(crate) fn non_pep695_generic_function(checker: &mut Checker, function_def: &
         source: checker.source(),
     };
 
-    checker.diagnostics.push(
+    checker.report_diagnostic(
         Diagnostic::new(
             NonPEP695GenericFunction {
                 name: name.to_string(),

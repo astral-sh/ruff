@@ -1,0 +1,33 @@
+---
+source: crates/red_knot_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: not.md - Unary not - Object that implements `__bool__` incorrectly
+mdtest path: crates/red_knot_python_semantic/resources/mdtest/unary/not.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | class NotBoolable:
+2 |     __bool__: int = 3
+3 | 
+4 | # error: [unsupported-bool-conversion]
+5 | not NotBoolable()
+```
+
+# Diagnostics
+
+```
+error: lint:unsupported-bool-conversion
+ --> /src/mdtest_snippet.py:5:1
+  |
+4 | # error: [unsupported-bool-conversion]
+5 | not NotBoolable()
+  | ^^^^^^^^^^^^^^^^^ Boolean conversion is unsupported for type `NotBoolable`; its `__bool__` method isn't callable
+  |
+
+```

@@ -42,7 +42,7 @@ impl Violation for MakoTemplates {
 }
 
 /// S702
-pub(crate) fn mako_templates(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn mako_templates(checker: &Checker, call: &ast::ExprCall) {
     if checker
         .semantic()
         .resolve_qualified_name(&call.func)
@@ -50,8 +50,6 @@ pub(crate) fn mako_templates(checker: &mut Checker, call: &ast::ExprCall) {
             matches!(qualified_name.segments(), ["mako", "template", "Template"])
         })
     {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(MakoTemplates, call.func.range()));
+        checker.report_diagnostic(Diagnostic::new(MakoTemplates, call.func.range()));
     }
 }

@@ -108,7 +108,7 @@ enum PatternKind {
 }
 
 /// RUF039
-pub(crate) fn unraw_re_pattern(checker: &mut Checker, call: &ExprCall) {
+pub(crate) fn unraw_re_pattern(checker: &Checker, call: &ExprCall) {
     let semantic = checker.semantic();
 
     if !semantic.seen_module(Modules::RE) && !semantic.seen_module(Modules::REGEX) {
@@ -153,7 +153,7 @@ fn regex_module_and_func<'model>(
     None
 }
 
-fn check_string(checker: &mut Checker, literal: &StringLiteral, module: RegexModule, func: &str) {
+fn check_string(checker: &Checker, literal: &StringLiteral, module: RegexModule, func: &str) {
     if literal.flags.prefix().is_raw() {
         return;
     }
@@ -177,10 +177,10 @@ fn check_string(checker: &mut Checker, literal: &StringLiteral, module: RegexMod
             literal.range().start(),
         )));
     }
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
 
-fn check_bytes(checker: &mut Checker, literal: &BytesLiteral, module: RegexModule, func: &str) {
+fn check_bytes(checker: &Checker, literal: &BytesLiteral, module: RegexModule, func: &str) {
     if literal.flags.prefix().is_raw() {
         return;
     }
@@ -190,5 +190,5 @@ fn check_bytes(checker: &mut Checker, literal: &BytesLiteral, module: RegexModul
     let range = literal.range;
     let diagnostic = Diagnostic::new(UnrawRePattern { module, func, kind }, range);
 
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(diagnostic);
 }
