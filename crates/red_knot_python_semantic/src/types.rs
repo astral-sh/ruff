@@ -2351,14 +2351,18 @@ impl<'db> Type<'db> {
                         Signature::new(
                             Parameters::new([
                                 Parameter::new(
-                                    Some(Name::new_static("instance")),
                                     Some(Type::none(db)),
-                                    ParameterKind::PositionalOnly { default_ty: None },
+                                    ParameterKind::PositionalOnly {
+                                        name: Some(Name::new_static("instance")),
+                                        default_ty: None,
+                                    },
                                 ),
                                 Parameter::new(
-                                    Some(Name::new_static("owner")),
                                     Some(KnownClass::Type.to_instance(db)),
-                                    ParameterKind::PositionalOnly { default_ty: None },
+                                    ParameterKind::PositionalOnly {
+                                        name: Some(Name::new_static("owner")),
+                                        default_ty: None,
+                                    },
                                 ),
                             ]),
                             None,
@@ -2366,17 +2370,19 @@ impl<'db> Type<'db> {
                         Signature::new(
                             Parameters::new([
                                 Parameter::new(
-                                    Some(Name::new_static("instance")),
                                     Some(not_none),
-                                    ParameterKind::PositionalOnly { default_ty: None },
+                                    ParameterKind::PositionalOnly {
+                                        name: Some(Name::new_static("instance")),
+                                        default_ty: None,
+                                    },
                                 ),
                                 Parameter::new(
-                                    Some(Name::new_static("owner")),
                                     Some(UnionType::from_elements(
                                         db,
                                         [KnownClass::Type.to_instance(db), Type::none(db)],
                                     )),
                                     ParameterKind::PositionalOnly {
+                                        name: Some(Name::new_static("owner")),
                                         default_ty: Some(Type::none(db)),
                                     },
                                 ),
@@ -2402,19 +2408,25 @@ impl<'db> Type<'db> {
                         Signature::new(
                             Parameters::new([
                                 Parameter::new(
-                                    Some(Name::new_static("self")),
                                     Some(KnownClass::FunctionType.to_instance(db)),
-                                    ParameterKind::PositionalOnly { default_ty: None },
+                                    ParameterKind::PositionalOnly {
+                                        name: Some(Name::new_static("self")),
+                                        default_ty: None,
+                                    },
                                 ),
                                 Parameter::new(
-                                    Some(Name::new_static("instance")),
                                     Some(Type::none(db)),
-                                    ParameterKind::PositionalOnly { default_ty: None },
+                                    ParameterKind::PositionalOnly {
+                                        name: Some(Name::new_static("instance")),
+                                        default_ty: None,
+                                    },
                                 ),
                                 Parameter::new(
-                                    Some(Name::new_static("owner")),
                                     Some(KnownClass::Type.to_instance(db)),
-                                    ParameterKind::PositionalOnly { default_ty: None },
+                                    ParameterKind::PositionalOnly {
+                                        name: Some(Name::new_static("owner")),
+                                        default_ty: None,
+                                    },
                                 ),
                             ]),
                             None,
@@ -2422,22 +2434,26 @@ impl<'db> Type<'db> {
                         Signature::new(
                             Parameters::new([
                                 Parameter::new(
-                                    Some(Name::new_static("self")),
                                     Some(KnownClass::FunctionType.to_instance(db)),
-                                    ParameterKind::PositionalOnly { default_ty: None },
+                                    ParameterKind::PositionalOnly {
+                                        name: Some(Name::new_static("self")),
+                                        default_ty: None,
+                                    },
                                 ),
                                 Parameter::new(
-                                    Some(Name::new_static("instance")),
                                     Some(not_none),
-                                    ParameterKind::PositionalOnly { default_ty: None },
+                                    ParameterKind::PositionalOnly {
+                                        name: Some(Name::new_static("instance")),
+                                        default_ty: None,
+                                    },
                                 ),
                                 Parameter::new(
-                                    Some(Name::new_static("owner")),
                                     Some(UnionType::from_elements(
                                         db,
                                         [KnownClass::Type.to_instance(db), Type::none(db)],
                                     )),
                                     ParameterKind::PositionalOnly {
+                                        name: Some(Name::new_static("owner")),
                                         default_ty: Some(Type::none(db)),
                                     },
                                 ),
@@ -2464,9 +2480,9 @@ impl<'db> Type<'db> {
                         self,
                         Signature::new(
                             Parameters::new([Parameter::new(
-                                Some(Name::new_static("o")),
                                 Some(Type::any()),
                                 ParameterKind::PositionalOnly {
+                                    name: Some(Name::new_static("o")),
                                     default_ty: Some(Type::BooleanLiteral(false)),
                                 },
                             )]),
@@ -2489,9 +2505,9 @@ impl<'db> Type<'db> {
                         [
                             Signature::new(
                                 Parameters::new([Parameter::new(
-                                    Some(Name::new_static("o")),
                                     Some(Type::any()),
                                     ParameterKind::PositionalOnly {
+                                        name: Some(Name::new_static("o")),
                                         default_ty: Some(Type::string_literal(db, "")),
                                     },
                                 )]),
@@ -2500,19 +2516,25 @@ impl<'db> Type<'db> {
                             Signature::new(
                                 Parameters::new([
                                     Parameter::new(
-                                        Some(Name::new_static("o")),
                                         Some(Type::any()), // TODO: ReadableBuffer
-                                        ParameterKind::PositionalOnly { default_ty: None },
+                                        ParameterKind::PositionalOnly {
+                                            name: Some(Name::new_static("o")),
+                                            default_ty: None,
+                                        },
                                     ),
                                     Parameter::new(
-                                        Some(Name::new_static("encoding")),
                                         Some(KnownClass::Str.to_instance(db)),
-                                        ParameterKind::PositionalOnly { default_ty: None },
+                                        ParameterKind::PositionalOnly {
+                                            name: Some(Name::new_static("encoding")),
+                                            default_ty: None,
+                                        },
                                     ),
                                     Parameter::new(
-                                        Some(Name::new_static("errors")),
                                         Some(KnownClass::Str.to_instance(db)),
-                                        ParameterKind::PositionalOnly { default_ty: None },
+                                        ParameterKind::PositionalOnly {
+                                            name: Some(Name::new_static("errors")),
+                                            default_ty: None,
+                                        },
                                     ),
                                 ]),
                                 Some(KnownClass::Str.to_instance(db)),
@@ -2535,28 +2557,36 @@ impl<'db> Type<'db> {
                         [
                             Signature::new(
                                 Parameters::new([Parameter::new(
-                                    Some(Name::new_static("o")),
                                     Some(Type::any()),
-                                    ParameterKind::PositionalOnly { default_ty: None },
+                                    ParameterKind::PositionalOnly {
+                                        name: Some(Name::new_static("o")),
+                                        default_ty: None,
+                                    },
                                 )]),
                                 Some(KnownClass::Type.to_instance(db)),
                             ),
                             Signature::new(
                                 Parameters::new([
                                     Parameter::new(
-                                        Some(Name::new_static("o")),
                                         Some(Type::any()),
-                                        ParameterKind::PositionalOnly { default_ty: None },
+                                        ParameterKind::PositionalOnly {
+                                            name: Some(Name::new_static("o")),
+                                            default_ty: None,
+                                        },
                                     ),
                                     Parameter::new(
-                                        Some(Name::new_static("bases")),
                                         Some(Type::any()),
-                                        ParameterKind::PositionalOnly { default_ty: None },
+                                        ParameterKind::PositionalOnly {
+                                            name: Some(Name::new_static("bases")),
+                                            default_ty: None,
+                                        },
                                     ),
                                     Parameter::new(
-                                        Some(Name::new_static("dict")),
                                         Some(Type::any()),
-                                        ParameterKind::PositionalOnly { default_ty: None },
+                                        ParameterKind::PositionalOnly {
+                                            name: Some(Name::new_static("dict")),
+                                            default_ty: None,
+                                        },
                                     ),
                                 ]),
                                 Some(KnownClass::Type.to_instance(db)),
