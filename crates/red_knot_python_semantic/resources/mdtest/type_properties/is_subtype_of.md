@@ -730,5 +730,20 @@ def mixed(a: int, /, b: int) -> None: ...
 static_assert(not is_subtype_of(CallableTypeFromFunction[variadic], CallableTypeFromFunction[mixed]))
 ```
 
+#### Empty
+
+When the supertype has an empty list of parameters, then the subtype can have any kind of parameters
+as long as they contain the default values for non-variadic parameters.
+
+```py
+from knot_extensions import CallableTypeFromFunction, is_subtype_of, static_assert
+
+def empty() -> None: ...
+def mixed(a: int = 1, /, b: int = 2, *args: int, c: int = 3, **kwargs: int) -> None: ...
+
+static_assert(is_subtype_of(CallableTypeFromFunction[mixed], CallableTypeFromFunction[empty]))
+static_assert(not is_subtype_of(CallableTypeFromFunction[empty], CallableTypeFromFunction[mixed]))
+```
+
 [special case for float and complex]: https://typing.readthedocs.io/en/latest/spec/special-types.html#special-cases-for-float-and-complex
 [typing documentation]: https://typing.readthedocs.io/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence

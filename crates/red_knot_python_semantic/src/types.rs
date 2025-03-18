@@ -1,10 +1,12 @@
-use std::hash::Hash;
+use std::collections::HashMap;
+use std::slice::Iter;
 use std::str::FromStr;
 
 use bitflags::bitflags;
 use call::{CallDunderError, CallError, CallErrorKind};
 use context::InferContext;
 use diagnostic::{INVALID_CONTEXT_MANAGER, NOT_ITERABLE};
+use itertools::EitherOrBoth;
 use ruff_db::files::File;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
@@ -4752,6 +4754,8 @@ impl<'db> GeneralCallableType<'db> {
         let self_signature = self.signature(db);
         let other_signature = other.signature(db);
 
+        // Check if `type1` is a subtype of `type2`. This is mainly to avoid `unwrap` calls
+        // scattered throughout the function.
         let is_subtype = |type1: Option<Type<'db>>, type2: Option<Type<'db>>| {
             // SAFETY: Subtype relation is only checked for fully static types.
             type1.unwrap().is_subtype_of(db, type2.unwrap())
@@ -4762,41 +4766,37 @@ impl<'db> GeneralCallableType<'db> {
             return false;
         }
 
-        let self_parameters = self_signature.parameters();
-        let other_parameters = other_signature.parameters();
-
-        if self_parameters.is_empty() && other_parameters.is_empty() {
+        if self_signature.parameters().is_empty() && other_signature.parameters().is_empty() {
             return true;
         }
 
-        let mut self_parameters_iter = self_parameters.iter();
-        let mut other_parameters_iter = other_parameters.iter();
-
-        let mut self_parameter = self_parameters_iter.next();
-        let mut other_parameter = other_parameters_iter.next();
+        let mut parameters = ParametersZip::new(
+            self_signature.parameters().as_slice(),
+            other_signature.parameters().as_slice(),
+        );
 
         // Type of the variadic parameter in `self`.
         let mut self_variadic = None;
 
         loop {
-            match (self_parameter, other_parameter) {
-                (None, None) => return true,
-                (Some(self_parameter), None) => match self_parameter.kind() {
-                    ParameterKind::PositionalOnly { default_ty } => {
-                        if default_ty.is_none() {
-                            return false;
-                        }
-                    }
-                    ParameterKind::PositionalOrKeyword { default_ty } => {
+            let Some(next_parameter) = parameters.next() else {
+                return true;
+            };
+
+            match next_parameter {
+                EitherOrBoth::Left(self_parameter) => match self_parameter.kind() {
+                    ParameterKind::PositionalOnly { default_ty }
+                    | ParameterKind::PositionalOrKeyword { default_ty }
+                    | ParameterKind::KeywordOnly { default_ty } => {
                         if default_ty.is_none() {
                             return false;
                         }
                     }
                     ParameterKind::Variadic => {}
-                    ParameterKind::KeywordOnly { .. } => {}
                     ParameterKind::KeywordVariadic => {}
                 },
-                (None, Some(other_parameter)) => match other_parameter.kind() {
+
+                EitherOrBoth::Right(other_parameter) => match other_parameter.kind() {
                     ParameterKind::PositionalOnly { .. } | ParameterKind::Variadic
                         if self_variadic.is_some() =>
                     {
@@ -4806,7 +4806,8 @@ impl<'db> GeneralCallableType<'db> {
                     }
                     _ => return false,
                 },
-                (Some(self_parameter), Some(other_parameter)) => {
+
+                EitherOrBoth::Both(self_parameter, other_parameter) => {
                     match (self_parameter.kind(), other_parameter.kind()) {
                         (
                             ParameterKind::PositionalOnly {
@@ -4831,31 +4832,10 @@ impl<'db> GeneralCallableType<'db> {
                         }
 
                         (
-                            ParameterKind::PositionalOnly { .. },
-                            ParameterKind::PositionalOrKeyword { .. },
-                        ) => return false,
-
-                        (ParameterKind::PositionalOnly { .. }, ParameterKind::Variadic) => {
-                            return false;
-                        }
-
-                        (
-                            ParameterKind::PositionalOnly { .. },
-                            ParameterKind::KeywordOnly { .. },
-                        ) => return false,
-
-                        (ParameterKind::PositionalOnly { .. }, ParameterKind::KeywordVariadic) => {
-                            return false;
-                        }
-
-                        (
                             ParameterKind::PositionalOrKeyword {
                                 default_ty: self_default,
                             },
                             ParameterKind::PositionalOrKeyword {
-                                default_ty: other_default,
-                            }
-                            | ParameterKind::KeywordOnly {
                                 default_ty: other_default,
                             },
                         ) => {
@@ -4874,92 +4854,200 @@ impl<'db> GeneralCallableType<'db> {
                             }
                         }
 
-                        (ParameterKind::PositionalOrKeyword { .. }, ParameterKind::Variadic) => {
-                            return false;
-                        }
-                        (
-                            ParameterKind::PositionalOrKeyword { .. },
-                            ParameterKind::KeywordVariadic,
-                        ) => {
-                            return false;
+                        (ParameterKind::Variadic, ParameterKind::PositionalOnly { .. }) => {
+                            self_variadic = self_parameter.annotated_type();
+                            if !is_subtype(other_parameter.annotated_type(), self_variadic) {
+                                return false;
+                            }
+                            loop {
+                                let Some(other_parameter) = parameters.peek_other() else {
+                                    break;
+                                };
+                                if !matches!(
+                                    other_parameter.kind(),
+                                    ParameterKind::PositionalOnly { .. } | ParameterKind::Variadic
+                                ) {
+                                    break;
+                                }
+                                if !is_subtype(other_parameter.annotated_type(), self_variadic) {
+                                    return false;
+                                }
+                                parameters.next_other();
+                            }
                         }
 
-                        (
-                            ParameterKind::Variadic,
-                            ParameterKind::Variadic | ParameterKind::PositionalOnly { .. },
-                        ) => {
+                        (ParameterKind::Variadic, ParameterKind::Variadic) => {
                             self_variadic = self_parameter.annotated_type();
                             if !is_subtype(other_parameter.annotated_type(), self_variadic) {
                                 return false;
                             }
                         }
 
-                        (ParameterKind::Variadic, ParameterKind::PositionalOrKeyword { .. }) => {
-                            return false;
-                        }
-                        (ParameterKind::Variadic, ParameterKind::KeywordOnly { .. }) => {
-                            return false;
-                        }
-                        (ParameterKind::Variadic, ParameterKind::KeywordVariadic) => {
-                            return false;
-                        }
-
+                        // Short circuit on certain combinations before breaking out of the loop.
                         (
-                            ParameterKind::KeywordOnly { .. },
                             ParameterKind::PositionalOnly { .. },
-                        ) => {}
-                        (
-                            ParameterKind::KeywordOnly { .. },
-                            ParameterKind::PositionalOrKeyword { .. },
-                        ) => {}
-                        (ParameterKind::KeywordOnly { .. }, ParameterKind::Variadic) => {}
-
-                        (ParameterKind::KeywordVariadic, ParameterKind::PositionalOnly { .. }) => {}
-                        (
-                            ParameterKind::KeywordVariadic,
-                            ParameterKind::PositionalOrKeyword { .. },
-                        ) => {}
-                        (ParameterKind::KeywordVariadic, ParameterKind::Variadic) => {}
+                            ParameterKind::KeywordOnly { .. } | ParameterKind::KeywordVariadic,
+                        ) => return false,
 
                         (_, ParameterKind::KeywordOnly { .. } | ParameterKind::KeywordVariadic) => {
                             break;
                         }
+
+                        _ => return false,
                     }
                 }
             }
-
-            self_parameter = self_parameters_iter.next();
-            other_parameter = other_parameters_iter.next();
         }
 
-        false
+        let (self_parameters, other_parameters) = parameters.into_remaining();
+
+        // Collect all the keyword-only parameters and the unmatched standard parameters.
+        let mut self_keywords = HashMap::new();
+        // Type of the variadic keyword parameter in `self`.
+        let mut self_keyword_variadic = None;
+
+        for &self_parameter in &self_parameters {
+            match self_parameter.kind() {
+                ParameterKind::KeywordOnly { .. } | ParameterKind::PositionalOrKeyword { .. } => {
+                    // SAFETY: Standard and keyword-only parameter names are guaranteed to be
+                    // present. It's only the positional-only parameter which might not contain a
+                    // name as it could represent a `typing.Callable` signature.
+                    self_keywords.insert(self_parameter.name().unwrap().clone(), self_parameter);
+                }
+                ParameterKind::KeywordVariadic => {
+                    self_keyword_variadic = self_parameter.annotated_type();
+                }
+                kind => unreachable!("Unhandled parameter kind from `self`: {:?}", kind),
+            }
+        }
+
+        for &other_parameter in &other_parameters {
+            match other_parameter.kind() {
+                ParameterKind::KeywordOnly {
+                    default_ty: other_default,
+                } => {
+                    if let Some(self_parameter) =
+                        self_keywords.remove(other_parameter.name().unwrap())
+                    {
+                        match self_parameter.kind() {
+                            ParameterKind::PositionalOrKeyword {
+                                default_ty: self_default,
+                            }
+                            | ParameterKind::KeywordOnly {
+                                default_ty: self_default,
+                            } => {
+                                if self_default.is_some() && other_default.is_none() {
+                                    return false;
+                                }
+                                if !is_subtype(
+                                    other_parameter.annotated_type(),
+                                    self_parameter.annotated_type(),
+                                ) {
+                                    return false;
+                                }
+                            }
+                            _ => unreachable!("`self_keywords` should only contain keyword-only or standard parameters"),
+                        }
+                    } else if let Some(self_keyword_variadic) = self_keyword_variadic {
+                        if !other_parameter
+                            .annotated_type()
+                            .unwrap()
+                            .is_subtype_of(db, self_keyword_variadic)
+                        {
+                            return false;
+                        }
+                    } else {
+                        return false;
+                    }
+                }
+                ParameterKind::KeywordVariadic => {
+                    let Some(self_keyword_variadic) = self_keyword_variadic else {
+                        // For a `self <: other` relationship, if `other` has a keyword variadic
+                        // parameter, `self` must also have a keyword variadic parameter.
+                        return false;
+                    };
+                    if !other_parameter
+                        .annotated_type()
+                        .unwrap()
+                        .is_subtype_of(db, self_keyword_variadic)
+                    {
+                        return false;
+                    }
+                }
+                kind => unreachable!("Unhandled parameter kind from `other`: {:?}", kind),
+            }
+        }
+
+        for (_, self_parameter) in self_keywords {
+            if self_parameter.default_type().is_none() {
+                return false;
+            }
+        }
+
+        true
     }
 }
 
-// struct PositionalParametersZipIter<'a, 'db> {
-//     self_iter: std::slice::Iter<'a, Parameter<'db>>,
-//     other_iter: std::slice::Iter<'a, Parameter<'db>>,
-// }
-//
-// impl<'a, 'db> Iterator for PositionalParametersZipIter<'a, 'db> {
-//     type Item = (&'a Parameter<'db>, &'a Parameter<'db>);
-//
-//     fn next(&mut self) -> Option<Self::Item> {
-//         loop {
-//             let self_param = self.self_iter.next()?;
-//             let other_param = self.other_iter.next()?;
-//
-//             if matches!(
-//                 other_param.kind(),
-//                 ParameterKind::KeywordOnly { .. } | ParameterKind::KeywordVariadic
-//             ) {
-//                 return None;
-//             }
-//
-//             return Some((self_param, other_param));
-//         }
-//     }
-// }
+#[derive(Debug)]
+struct ParametersZip<'a, 'db> {
+    current_self: Option<&'a Parameter<'db>>,
+    current_other: Option<&'a Parameter<'db>>,
+    iter_self: Iter<'a, Parameter<'db>>,
+    iter_other: Iter<'a, Parameter<'db>>,
+}
+
+impl<'a, 'db> ParametersZip<'a, 'db> {
+    fn new(parameters_self: &'a [Parameter<'db>], parameters_other: &'a [Parameter<'db>]) -> Self {
+        Self {
+            current_self: None,
+            current_other: None,
+            iter_self: parameters_self.iter(),
+            iter_other: parameters_other.iter(),
+        }
+    }
+
+    fn next_self(&mut self) -> Option<&'a Parameter<'db>> {
+        self.current_self = self.iter_self.next();
+        self.current_self
+    }
+
+    fn next_other(&mut self) -> Option<&'a Parameter<'db>> {
+        self.current_other = self.iter_other.next();
+        self.current_other
+    }
+
+    fn peek_other(&mut self) -> Option<&'a Parameter<'db>> {
+        self.iter_other.clone().next()
+    }
+
+    fn into_remaining(self) -> (Vec<&'a Parameter<'db>>, Vec<&'a Parameter<'db>>) {
+        (
+            self.current_self
+                .into_iter()
+                .chain(self.iter_self)
+                .collect(),
+            self.current_other
+                .into_iter()
+                .chain(self.iter_other)
+                .collect(),
+        )
+    }
+}
+
+impl<'a, 'db> Iterator for ParametersZip<'a, 'db> {
+    type Item = EitherOrBoth<&'a Parameter<'db>, &'a Parameter<'db>>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match (self.next_self(), self.next_other()) {
+            (Some(self_param), Some(other_param)) => {
+                Some(EitherOrBoth::Both(self_param, other_param))
+            }
+            (Some(self_param), None) => Some(EitherOrBoth::Left(self_param)),
+            (None, Some(other_param)) => Some(EitherOrBoth::Right(other_param)),
+            (None, None) => None,
+        }
+    }
+}
 
 /// A type that represents callable objects.
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, salsa::Update)]
