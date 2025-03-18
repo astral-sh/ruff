@@ -6164,23 +6164,21 @@ impl<'db> TypeInferenceBuilder<'db> {
                 self.infer_boolean_expression(bool_op);
                 self.report_invalid_type_expression(
                     expression,
-                    format_args!("Boolean operations like `and` and `or` are not allowed in type expressions"),
+                    format_args!("Boolean operations are not allowed in type expressions"),
                 )
             }
             ast::Expr::Named(named) => {
                 self.infer_named_expression(named);
                 self.report_invalid_type_expression(
                     expression,
-                    format_args!(
-                        "Named expressions like `foo := 1` are not allowed in type expressions"
-                    ),
+                    format_args!("Named expressions are not allowed in type expressions"),
                 )
             }
             ast::Expr::UnaryOp(unary) => {
                 self.infer_unary_expression(unary);
                 self.report_invalid_type_expression(
                     expression,
-                    format_args!("Unary operations like `not` are not allowed in type expressions"),
+                    format_args!("Unary operations are not allowed in type expressions"),
                 )
             }
             ast::Expr::Lambda(lambda_expression) => {
@@ -6272,7 +6270,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 self.infer_compare_expression(compare);
                 self.report_invalid_type_expression(
                     expression,
-                    format_args!("Comparisons like `1 < 2` are not allowed in type expressions"),
+                    format_args!("Comparisons are not allowed in type expressions"),
                 )
             }
             ast::Expr::Call(call_expr) => {
