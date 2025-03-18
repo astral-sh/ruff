@@ -11,13 +11,15 @@ use ruff_python_ast::{
 };
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
-use crate::error::{StarTupleKind, UnparenthesizedNamedExprKind};
+use crate::error::{FStringKind, StarTupleKind, UnparenthesizedNamedExprKind};
 use crate::parser::progress::ParserProgress;
 use crate::parser::{helpers, FunctionKind, Parser};
 use crate::string::{parse_fstring_literal_element, parse_string_literal, StringType};
 use crate::token::{TokenKind, TokenValue};
 use crate::token_set::TokenSet;
-use crate::{FStringErrorType, Mode, ParseErrorType, UnsupportedSyntaxErrorKind};
+use crate::{
+    FStringErrorType, Mode, ParseErrorType, UnsupportedSyntaxError, UnsupportedSyntaxErrorKind,
+};
 
 use super::{FStringElementsKind, Parenthesized, RecoveryContextKind};
 
@@ -1393,11 +1395,87 @@ impl<'src> Parser<'src> {
 
         self.expect(TokenKind::FStringEnd);
 
+        // test_ok pep701_f_string_py312
+        // # parse_options: {"target-version": "3.12"}
+        // f'Magic wand: { bag['wand'] }'     # nested quotes
+        // f"{'\n'.join(a)}"                  # escape sequence
+        // f'''A complex trick: {
+        //     bag['bag']                     # comment
+        // }'''
+        // f"{f"{f"{f"{f"{f"{1+1}"}"}"}"}"}"  # arbitrary nesting
+        // f"{f'''{"nested"} inner'''} outer" # nested (triple) quotes
+        // f"test {a \
+        //     } more"                        # line continuation
+
+        // test_ok pep701_f_string_py311
+        // # parse_options: {"target-version": "3.11"}
+        // f"outer {'# not a comment'}"
+        // f'outer {x:{"# not a comment"} }'
+        // f"""{f'''{f'{"# not a comment"}'}'''}"""
+        // f"""{f'''# before expression {f'# aro{f"#{1+1}#"}und #'}'''} # after expression"""
+        // f"escape outside of \t {expr}\n"
+        // f"test\"abcd"
+
+        // test_err pep701_f_string_py311
+        // # parse_options: {"target-version": "3.11"}
+        // f'Magic wand: { bag['wand'] }'     # nested quotes
+        // f"{'\n'.join(a)}"                  # escape sequence
+        // f'''A complex trick: {
+        //     bag['bag']                     # comment
+        // }'''
+        // f"{f"{f"{f"{f"{f"{1+1}"}"}"}"}"}"  # arbitrary nesting
+        // f"{f'''{"nested"} inner'''} outer" # nested (triple) quotes
+        // f"test {a \
+        //     } more"                        # line continuation
+        // f"""{f"""{x}"""}"""                # mark the whole triple quote
+        // f"{'\n'.join(['\t', '\v', '\r'])}"  # multiple escape sequences, multiple errors
+
+        let range = self.node_range(start);
+
+        if !self.options.target_version.supports_pep_701() {
+            let quote_bytes = flags.quote_str().as_bytes();
+            let quote_len = flags.quote_len();
+            for expr in elements.expressions() {
+                for slash_position in memchr::memchr_iter(b'\\', self.source[expr.range].as_bytes())
+                {
+                    let slash_position = TextSize::try_from(slash_position).unwrap();
+                    self.add_unsupported_syntax_error(
+                        UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::Backslash),
+                        TextRange::at(expr.range.start() + slash_position, '\\'.text_len()),
+                    );
+                }
+
+                if let Some(quote_position) =
+                    memchr::memmem::find(self.source[expr.range].as_bytes(), quote_bytes)
+                {
+                    let quote_position = TextSize::try_from(quote_position).unwrap();
+                    self.add_unsupported_syntax_error(
+                        UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::NestedQuote),
+                        TextRange::at(expr.range.start() + quote_position, quote_len),
+                    );
+                };
+            }
+
+            self.check_fstring_comments(range);
+        }
+
         ast::FString {
             elements,
-            range: self.node_range(start),
+            range,
             flags: ast::FStringFlags::from(flags),
         }
+    }
+
+    /// Check `range` for comment tokens and report an `UnsupportedSyntaxError` for each one found.
+    fn check_fstring_comments(&mut self, range: TextRange) {
+        self.unsupported_syntax_errors
+            .extend(self.tokens.in_range(range).iter().filter_map(|token| {
+                token.kind().is_comment().then_some(UnsupportedSyntaxError {
+                    kind: UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::Comment),
+                    range: token.range(),
+                    target_version: self.options.target_version,
+                })
+            }));
     }
 
     /// Parses a list of f-string elements.
