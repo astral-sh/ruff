@@ -60,12 +60,12 @@ def _(
     g: 1 or 2,  # error: [invalid-type-form] "Boolean operations are not allowed in type expressions"
     h: (foo := 1),  # error: [invalid-type-form] "Named expressions are not allowed in type expressions"
     i: not 1,  # error: [invalid-type-form] "Unary operations are not allowed in type expressions"
-    j: lambda: 1,  # error: [invalid-type-form] "Lambda expressions are not allowed in type expressions"
-    k: 1 if True else 2,  # error: [invalid-type-form] "If statements are not allowed in type expressions"
-    l: await 1,  # error: [invalid-type-form] "Await expressions are not allowed in type expressions"
-    m: (yield 1),  # error: [invalid-type-form] "Yield expressions are not allowed in type expressions"
-    n: (yield from [1]),  # error: [invalid-type-form] "Yield from expressions are not allowed in type expressions"
-    o: 1 < 2,  # error: [invalid-type-form] "Comparisons are not allowed in type expressions"
+    j: lambda: 1,  # error: [invalid-type-form] "`lambda` expressions are not allowed in type expressions"
+    k: 1 if True else 2,  # error: [invalid-type-form] "`if` expressions are not allowed in type expressions"
+    l: await 1,  # error: [invalid-type-form] "`await` expressions are not allowed in type expressions"
+    m: (yield 1),  # error: [invalid-type-form] "`yield` expressions are not allowed in type expressions"
+    n: (yield from [1]),  # error: [invalid-type-form] "`yield from` expressions are not allowed in type expressions"
+    o: 1 < 2,  # error: [invalid-type-form] "Comparison expressions are not allowed in type expressions"
     p: bar(),  # error: [invalid-type-form] "Function calls are not allowed in type expressions"
     q: int | f"foo",  # error: [invalid-type-form] "F-strings are not allowed in type expressions"
     r: [1, 2, 3][1:2],  # error: [invalid-type-form] "Slices are not allowed in type expressions"
@@ -90,12 +90,12 @@ def _(
 
 ```py
 def _(
-    a: {1: 2},  # error: [invalid-type-form] "Dictionaries are not allowed in type expressions"
-    b: {1, 2},  # error: [invalid-type-form] "Sets are not allowed in type expressions"
-    c: {k: v for k, v in [(1, 2)]},  # error: [invalid-type-form] "Dictionary comprehensions are not allowed in type expressions"
+    a: {1: 2},  # error: [invalid-type-form] "Dict literals are not allowed in type expressions"
+    b: {1, 2},  # error: [invalid-type-form] "Set literals are not allowed in type expressions"
+    c: {k: v for k, v in [(1, 2)]},  # error: [invalid-type-form] "Dict comprehensions are not allowed in type expressions"
     d: [k for k in [1, 2]],  # error: [invalid-type-form] "List comprehensions are not allowed in type expressions"
     e: {k for k in [1, 2]},  # error: [invalid-type-form] "Set comprehensions are not allowed in type expressions"
-    f: (k for k in [1, 2]),  # error: [invalid-type-form] "Generators are not allowed in type expressions"
+    f: (k for k in [1, 2]),  # error: [invalid-type-form] "Generator expressions are not allowed in type expressions"
 ):
     reveal_type(a)  # revealed: Unknown
     reveal_type(b)  # revealed: Unknown

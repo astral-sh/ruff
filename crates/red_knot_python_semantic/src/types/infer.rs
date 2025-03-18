@@ -6070,11 +6070,44 @@ impl<'db> TypeInferenceBuilder<'db> {
             // https://typing.readthedocs.io/en/latest/spec/annotations.html#string-annotations
             ast::Expr::StringLiteral(string) => self.infer_string_type_expression(string),
 
-            // TODO: an Ellipsis literal *on its own* does not have any meaning in annotation
-            // expressions, but is meaningful in the context of a number of special forms.
-            ast::Expr::EllipsisLiteral(_literal) => {
-                todo_type!("ellipsis literal in type expression")
+            ast::Expr::Subscript(subscript) => {
+                let ast::ExprSubscript {
+                    value,
+                    slice,
+                    ctx: _,
+                    range: _,
+                } = subscript;
+
+                let value_ty = self.infer_expression(value);
+
+                self.infer_subscript_type_expression_no_store(subscript, slice, value_ty)
             }
+
+            ast::Expr::BinOp(binary) => {
+                match binary.op {
+                    // PEP-604 unions are okay, e.g., `int | str`
+                    ast::Operator::BitOr => {
+                        let left_ty = self.infer_type_expression(&binary.left);
+                        let right_ty = self.infer_type_expression(&binary.right);
+                        UnionType::from_elements(self.db(), [left_ty, right_ty])
+                    }
+                    // anything else is an invalid annotation:
+                    _ => {
+                        self.infer_binary_expression(binary);
+                        Type::unknown()
+                    }
+                }
+            }
+
+            // Avoid inferring the types of invalid type expressions that have been parsed from a
+            // string annotation, as they are not present in the semantic index.
+            _ if self.deferred_state.in_string_annotation() => Type::unknown(),
+
+            // =====================================================================================
+            // Forms which are invalid in the context of annotation expressions: we infer their
+            // nested expressions as normal expressions, but the type of the top-level expression is
+            // always `Type::unknown` in these cases.
+            // =====================================================================================
 
             // TODO: add a subdiagnostic linking to type-expression grammar
             // and stating that it is only valid in `typing.Literal[]` or `typing.Annotated[]`
@@ -6118,48 +6151,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                 ),
             ),
 
-            ast::Expr::Subscript(subscript) => {
-                let ast::ExprSubscript {
-                    value,
-                    slice,
-                    ctx: _,
-                    range: _,
-                } = subscript;
-
-                let value_ty = self.infer_expression(value);
-
-                self.infer_subscript_type_expression_no_store(subscript, slice, value_ty)
-            }
-
-            ast::Expr::BinOp(binary) => {
-                match binary.op {
-                    // PEP-604 unions are okay, e.g., `int | str`
-                    ast::Operator::BitOr => {
-                        let left_ty = self.infer_type_expression(&binary.left);
-                        let right_ty = self.infer_type_expression(&binary.right);
-                        UnionType::from_elements(self.db(), [left_ty, right_ty])
-                    }
-                    // anything else is an invalid annotation:
-                    _ => {
-                        self.infer_binary_expression(binary);
-                        Type::unknown()
-                    }
-                }
-            }
-
-            // TODO PEP 646
-            ast::Expr::Starred(starred) => {
-                self.infer_starred_expression(starred);
-                todo_type!()
-            }
-
-            // Avoid inferring the types of invalid type expressions that have been parsed from a
-            // string annotation, as they are not present in the semantic index.
-            _ if self.deferred_state.in_string_annotation() => Type::unknown(),
-
-            // Forms which are invalid in the context of annotation expressions: we infer their
-            // nested expressions as normal expressions, but the type of the top-level expression is
-            // always `Type::unknown` in these cases.
             ast::Expr::BoolOp(bool_op) => {
                 self.infer_boolean_expression(bool_op);
                 self.report_invalid_type_expression(
@@ -6167,6 +6158,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     format_args!("Boolean operations are not allowed in type expressions"),
                 )
             }
+
             ast::Expr::Named(named) => {
                 self.infer_named_expression(named);
                 self.report_invalid_type_expression(
@@ -6174,6 +6166,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     format_args!("Named expressions are not allowed in type expressions"),
                 )
             }
+
             ast::Expr::UnaryOp(unary) => {
                 self.infer_unary_expression(unary);
                 self.report_invalid_type_expression(
@@ -6181,49 +6174,47 @@ impl<'db> TypeInferenceBuilder<'db> {
                     format_args!("Unary operations are not allowed in type expressions"),
                 )
             }
+
             ast::Expr::Lambda(lambda_expression) => {
                 self.infer_lambda_expression(lambda_expression);
                 self.report_invalid_type_expression(
                     expression,
-                    format_args!("Lambda expressions are not allowed in type expressions"),
+                    format_args!("`lambda` expressions are not allowed in type expressions"),
                 )
             }
+
             ast::Expr::If(if_expression) => {
                 self.infer_if_expression(if_expression);
                 self.report_invalid_type_expression(
                     expression,
-                    format_args!("If statements are not allowed in type expressions"),
+                    format_args!("`if` expressions are not allowed in type expressions"),
                 )
             }
+
             ast::Expr::Dict(dict) => {
                 self.infer_dict_expression(dict);
                 self.report_invalid_type_expression(
                     expression,
-                    format_args!("Dictionaries are not allowed in type expressions"),
+                    format_args!("Dict literals are not allowed in type expressions"),
                 )
             }
+
             ast::Expr::Set(set) => {
                 self.infer_set_expression(set);
                 self.report_invalid_type_expression(
                     expression,
-                    format_args!("Sets are not allowed in type expressions"),
+                    format_args!("Set literals are not allowed in type expressions"),
                 )
             }
-            ast::Expr::List(list) => {
-                self.infer_list_expression(list);
-                Type::unknown()
-            }
-            ast::Expr::Tuple(tuple) => {
-                self.infer_tuple_expression(tuple);
-                Type::unknown()
-            }
+
             ast::Expr::DictComp(dictcomp) => {
                 self.infer_dict_comprehension_expression(dictcomp);
                 self.report_invalid_type_expression(
                     expression,
-                    format_args!("Dictionary comprehensions are not allowed in type expressions"),
+                    format_args!("Dict comprehensions are not allowed in type expressions"),
                 )
             }
+
             ast::Expr::ListComp(listcomp) => {
                 self.infer_list_comprehension_expression(listcomp);
                 self.report_invalid_type_expression(
@@ -6231,6 +6222,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     format_args!("List comprehensions are not allowed in type expressions"),
                 )
             }
+
             ast::Expr::SetComp(setcomp) => {
                 self.infer_set_comprehension_expression(setcomp);
                 self.report_invalid_type_expression(
@@ -6238,41 +6230,47 @@ impl<'db> TypeInferenceBuilder<'db> {
                     format_args!("Set comprehensions are not allowed in type expressions"),
                 )
             }
+
             ast::Expr::Generator(generator) => {
                 self.infer_generator_expression(generator);
                 self.report_invalid_type_expression(
                     expression,
-                    format_args!("Generators are not allowed in type expressions"),
+                    format_args!("Generator expressions are not allowed in type expressions"),
                 )
             }
+
             ast::Expr::Await(await_expression) => {
                 self.infer_await_expression(await_expression);
                 self.report_invalid_type_expression(
                     expression,
-                    format_args!("Await expressions are not allowed in type expressions"),
+                    format_args!("`await` expressions are not allowed in type expressions"),
                 )
             }
+
             ast::Expr::Yield(yield_expression) => {
                 self.infer_yield_expression(yield_expression);
                 self.report_invalid_type_expression(
                     expression,
-                    format_args!("Yield expressions are not allowed in type expressions"),
+                    format_args!("`yield` expressions are not allowed in type expressions"),
                 )
             }
+
             ast::Expr::YieldFrom(yield_from) => {
                 self.infer_yield_from_expression(yield_from);
                 self.report_invalid_type_expression(
                     expression,
-                    format_args!("Yield from expressions are not allowed in type expressions"),
+                    format_args!("`yield from` expressions are not allowed in type expressions"),
                 )
             }
+
             ast::Expr::Compare(compare) => {
                 self.infer_compare_expression(compare);
                 self.report_invalid_type_expression(
                     expression,
-                    format_args!("Comparisons are not allowed in type expressions"),
+                    format_args!("Comparison expressions are not allowed in type expressions"),
                 )
             }
+
             ast::Expr::Call(call_expr) => {
                 self.infer_call_expression(call_expr);
                 self.report_invalid_type_expression(
@@ -6280,6 +6278,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     format_args!("Function calls are not allowed in type expressions"),
                 )
             }
+
             ast::Expr::FString(fstring) => {
                 self.infer_fstring_expression(fstring);
                 self.report_invalid_type_expression(
@@ -6287,6 +6286,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     format_args!("F-strings are not allowed in type expressions"),
                 )
             }
+
             ast::Expr::Slice(slice) => {
                 self.infer_slice_expression(slice);
                 self.report_invalid_type_expression(
@@ -6294,7 +6294,31 @@ impl<'db> TypeInferenceBuilder<'db> {
                     format_args!("Slices are not allowed in type expressions"),
                 )
             }
+
+            // =================================================================================
+            // Branches where we probably should emit diagnostics in some context, but don't yet
+            // =================================================================================
+
             ast::Expr::IpyEscapeCommand(_) => todo!("Implement Ipy escape command support"),
+
+            ast::Expr::EllipsisLiteral(_) => {
+                todo_type!("ellipsis literal in type expression")
+            }
+
+            ast::Expr::List(list) => {
+                self.infer_list_expression(list);
+                Type::unknown()
+            }
+
+            ast::Expr::Tuple(tuple) => {
+                self.infer_tuple_expression(tuple);
+                Type::unknown()
+            }
+
+            ast::Expr::Starred(starred) => {
+                self.infer_starred_expression(starred);
+                todo_type!("PEP 646")
+            }
         }
     }
 
