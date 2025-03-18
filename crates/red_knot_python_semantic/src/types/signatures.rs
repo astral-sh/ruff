@@ -513,6 +513,7 @@ pub(crate) struct Parameter<'db> {
     annotated_type: Option<Type<'db>>,
 
     kind: ParameterKind<'db>,
+    is_type_form: bool,
 }
 
 impl<'db> Parameter<'db> {
@@ -521,6 +522,7 @@ impl<'db> Parameter<'db> {
             name: None,
             annotated_type: None,
             kind: ParameterKind::PositionalOnly { default_type: None },
+            is_type_form: false,
         }
     }
 
@@ -529,6 +531,7 @@ impl<'db> Parameter<'db> {
             name: None,
             annotated_type: None,
             kind: ParameterKind::PositionalOrKeyword { default_type: None },
+            is_type_form: false,
         }
     }
 
@@ -537,6 +540,7 @@ impl<'db> Parameter<'db> {
             name: None,
             annotated_type: None,
             kind: ParameterKind::Variadic,
+            is_type_form: false,
         }
     }
 
@@ -545,6 +549,7 @@ impl<'db> Parameter<'db> {
             name: None,
             annotated_type: None,
             kind: ParameterKind::KeywordOnly { default_type: None },
+            is_type_form: false,
         }
     }
 
@@ -553,6 +558,7 @@ impl<'db> Parameter<'db> {
             name: None,
             annotated_type: None,
             kind: ParameterKind::KeywordVariadic,
+            is_type_form: false,
         }
     }
 
@@ -582,6 +588,11 @@ impl<'db> Parameter<'db> {
         self
     }
 
+    pub(crate) fn type_form(mut self) -> Self {
+        self.is_type_form = true;
+        self
+    }
+
     fn from_node_and_kind(
         db: &'db dyn Db,
         definition: Definition<'db>,
@@ -594,6 +605,7 @@ impl<'db> Parameter<'db> {
                 .annotation()
                 .map(|annotation| definition_expression_type(db, definition, annotation)),
             kind,
+            is_type_form: false,
         }
     }
 
@@ -791,6 +803,7 @@ mod tests {
             name: Some(name),
             annotated_type,
             kind: ParameterKind::PositionalOrKeyword { .. },
+            ..
         }] = &sig.parameters.value[..]
         else {
             panic!("expected one positional-or-keyword parameter");
@@ -825,6 +838,7 @@ mod tests {
             name: Some(name),
             annotated_type,
             kind: ParameterKind::PositionalOrKeyword { .. },
+            ..
         }] = &sig.parameters.value[..]
         else {
             panic!("expected one positional-or-keyword parameter");
@@ -859,10 +873,12 @@ mod tests {
             name: Some(a_name),
             annotated_type: a_annotated_ty,
             kind: ParameterKind::PositionalOrKeyword { .. },
+            ..
         }, Parameter {
             name: Some(b_name),
             annotated_type: b_annotated_ty,
             kind: ParameterKind::PositionalOrKeyword { .. },
+            ..
         }] = &sig.parameters.value[..]
         else {
             panic!("expected two positional-or-keyword parameters");
@@ -902,10 +918,12 @@ mod tests {
             name: Some(a_name),
             annotated_type: a_annotated_ty,
             kind: ParameterKind::PositionalOrKeyword { .. },
+            ..
         }, Parameter {
             name: Some(b_name),
             annotated_type: b_annotated_ty,
             kind: ParameterKind::PositionalOrKeyword { .. },
+            ..
         }] = &sig.parameters.value[..]
         else {
             panic!("expected two positional-or-keyword parameters");
