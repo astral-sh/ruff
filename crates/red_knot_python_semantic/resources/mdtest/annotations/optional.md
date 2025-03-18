@@ -45,3 +45,13 @@ def f():
     # revealed: int | None
     reveal_type(a)
 ```
+
+## Invalid
+
+```py
+from typing import Optional
+
+# error: [invalid-type-form] "`typing.Optional` requires at least one argument when used in a type expression"
+def f(x: Optional) -> None:
+    reveal_type(x)  # revealed: Unknown
+```

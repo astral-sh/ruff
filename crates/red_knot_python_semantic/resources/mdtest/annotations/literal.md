@@ -156,7 +156,7 @@ def f():
 ```py
 from typing import Literal
 
-# error: [invalid-type-form] "`Literal` requires at least one argument when used in a type expression"
+# error: [invalid-type-form] "`typing.Literal` requires at least one argument when used in a type expression"
 def _(x: Literal):
     reveal_type(x)  # revealed: Unknown
 ```

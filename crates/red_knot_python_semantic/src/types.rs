@@ -3256,10 +3256,6 @@ impl<'db> Type<'db> {
                 ],
                 fallback_type: Type::unknown(),
             }),
-            Type::KnownInstance(KnownInstanceType::Literal) => Err(InvalidTypeExpressionError {
-                invalid_expressions: smallvec::smallvec![InvalidTypeExpression::BareLiteral],
-                fallback_type: Type::unknown(),
-            }),
             Type::KnownInstance(KnownInstanceType::Unknown) => Ok(Type::unknown()),
             Type::KnownInstance(KnownInstanceType::AlwaysTruthy) => Ok(Type::AlwaysTruthy),
             Type::KnownInstance(KnownInstanceType::AlwaysFalsy) => Ok(Type::AlwaysFalsy),
@@ -3269,6 +3265,18 @@ impl<'db> Type<'db> {
                     GeneralCallableType::unknown(db),
                 )))
             }
+            Type::KnownInstance(
+                KnownInstanceType::Literal
+                | KnownInstanceType::Optional
+                | KnownInstanceType::Union
+                | KnownInstanceType::Protocol,
+            ) => Err(InvalidTypeExpressionError {
+                invalid_expressions: smallvec::smallvec![InvalidTypeExpression::InvalidBareType(
+                    *self
+                )],
+                fallback_type: Type::unknown(),
+            }),
+
             Type::KnownInstance(_) => Ok(todo_type!(
                 "Invalid or unsupported `KnownInstanceType` in `Type::to_type_expression`"
             )),
@@ -3542,8 +3550,8 @@ impl<'db> InvalidTypeExpressionError<'db> {
 enum InvalidTypeExpression<'db> {
     /// `x: Annotated` is invalid as an annotation
     BareAnnotated,
-    /// `x: Literal` is invalid as an annotation
-    BareLiteral,
+    /// Some types always require at least one argument when used in a type expression
+    InvalidBareType(Type<'db>),
     /// The `ClassVar` type qualifier was used in a type expression
     ClassVarInTypeExpression,
     /// The `Final` type qualifier was used in a type expression
@@ -3565,8 +3573,10 @@ impl<'db> InvalidTypeExpression<'db> {
                     InvalidTypeExpression::BareAnnotated => f.write_str(
                         "`Annotated` requires at least two arguments when used in an annotation or type expression"
                     ),
-                    InvalidTypeExpression::BareLiteral => f.write_str(
-                        "`Literal` requires at least one argument when used in a type expression"
+                    InvalidTypeExpression::InvalidBareType(ty) => write!(
+                        f,
+                        "`{ty}` requires at least one argument when used in a type expression",
+                        ty = ty.display(self.db)
                     ),
                     InvalidTypeExpression::ClassVarInTypeExpression => f.write_str(
                         "Type qualifier `typing.ClassVar` is not allowed in type expressions (only in annotation expressions)"
