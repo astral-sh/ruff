@@ -74,14 +74,18 @@ function Items({
           >
             <button
               onClick={() =>
-                onGoTo(diagnostic.start_location.row, diagnostic.start_location.column)
+                onGoTo(
+                  diagnostic.start_location.row,
+                  diagnostic.start_location.column,
+                )
               }
               className="w-full text-start"
             >
               {diagnostic.message}{" "}
               <span className="text-gray-500">
                 {diagnostic.code != null && `(${diagnostic.code})`} [Ln{" "}
-                {diagnostic.start_location.row}, Col {diagnostic.start_location.column}]
+                {diagnostic.start_location.row}, Col{" "}
+                {diagnostic.start_location.column}]
               </span>
             </button>
           </li>
