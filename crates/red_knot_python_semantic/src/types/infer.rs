@@ -2868,9 +2868,9 @@ impl<'db> TypeInferenceBuilder<'db> {
         let iterable = for_stmt.iterable();
         let name = for_stmt.name();
 
-        let iterable_ty = self.infer_standalone_expression(iterable);
+        let iterable_type = self.infer_standalone_expression(iterable);
 
-        let loop_var_value_ty = if for_stmt.is_async() {
+        let loop_var_value_type = if for_stmt.is_async() {
             todo_type!("async iterables/iterators")
         } else {
             match for_stmt.target() {
@@ -2882,15 +2882,15 @@ impl<'db> TypeInferenceBuilder<'db> {
                     let name_ast_id = name.scoped_expression_id(self.db(), self.scope());
                     unpacked.expression_type(name_ast_id)
                 }
-                TargetKind::Name => iterable_ty.try_iterate(self.db()).unwrap_or_else(|err| {
-                    err.report_diagnostic(&self.context, iterable_ty, iterable.into());
+                TargetKind::Name => iterable_type.try_iterate(self.db()).unwrap_or_else(|err| {
+                    err.report_diagnostic(&self.context, iterable_type, iterable.into());
                     err.fallback_element_type(self.db())
                 }),
             }
         };
 
-        self.store_expression_type(name, loop_var_value_ty);
-        self.add_binding(name.into(), definition, loop_var_value_ty);
+        self.store_expression_type(name, loop_var_value_type);
+        self.add_binding(name.into(), definition, loop_var_value_type);
     }
 
     fn infer_while_statement(&mut self, while_statement: &ast::StmtWhile) {
@@ -3669,7 +3669,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         // (2) We must *not* call `self.extend()` on the result of the type inference,
         //     because `ScopedExpressionId`s are only meaningful within their own scope, so
         //     we'd add types for random wrong expressions in the current scope
-        let iterable_ty = if is_first {
+        let iterable_type = if is_first {
             let lookup_scope = self
                 .index
                 .parent_scope_id(self.scope().file_scope_id(self.db()))
@@ -3681,21 +3681,21 @@ impl<'db> TypeInferenceBuilder<'db> {
             result.expression_type(iterable.scoped_expression_id(self.db(), self.scope()))
         };
 
-        let target_ty = if is_async {
+        let target_type = if is_async {
             // TODO: async iterables/iterators! -- Alex
             todo_type!("async iterables/iterators")
         } else {
-            iterable_ty.try_iterate(self.db()).unwrap_or_else(|err| {
-                err.report_diagnostic(&self.context, iterable_ty, iterable.into());
+            iterable_type.try_iterate(self.db()).unwrap_or_else(|err| {
+                err.report_diagnostic(&self.context, iterable_type, iterable.into());
                 err.fallback_element_type(self.db())
             })
         };
 
         self.types.expressions.insert(
             target.scoped_expression_id(self.db(), self.scope()),
-            target_ty,
+            target_type,
         );
-        self.add_binding(target.into(), definition, target_ty);
+        self.add_binding(target.into(), definition, target_type);
     }
 
     fn infer_named_expression(&mut self, named: &ast::ExprNamed) -> Type<'db> {
@@ -3985,9 +3985,9 @@ impl<'db> TypeInferenceBuilder<'db> {
             ctx: _,
         } = starred;
 
-        let iterable_ty = self.infer_expression(value);
-        iterable_ty.try_iterate(self.db()).unwrap_or_else(|err| {
-            err.report_diagnostic(&self.context, iterable_ty, value.as_ref().into());
+        let iterable_type = self.infer_expression(value);
+        iterable_type.try_iterate(self.db()).unwrap_or_else(|err| {
+            err.report_diagnostic(&self.context, iterable_type, value.as_ref().into());
             err.fallback_element_type(self.db())
         });
 
@@ -4004,9 +4004,9 @@ impl<'db> TypeInferenceBuilder<'db> {
     fn infer_yield_from_expression(&mut self, yield_from: &ast::ExprYieldFrom) -> Type<'db> {
         let ast::ExprYieldFrom { range: _, value } = yield_from;
 
-        let iterable_ty = self.infer_expression(value);
-        iterable_ty.try_iterate(self.db()).unwrap_or_else(|err| {
-            err.report_diagnostic(&self.context, iterable_ty, value.as_ref().into());
+        let iterable_type = self.infer_expression(value);
+        iterable_type.try_iterate(self.db()).unwrap_or_else(|err| {
+            err.report_diagnostic(&self.context, iterable_type, value.as_ref().into());
             err.fallback_element_type(self.db())
         });
 
