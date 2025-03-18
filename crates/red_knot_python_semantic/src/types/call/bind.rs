@@ -637,7 +637,8 @@ pub(crate) struct Binding<'db> {
     /// Return type of the call.
     return_ty: Type<'db>,
 
-    /// The formal parameter that each argument is matched with, in argument source order.
+    /// The formal parameter that each argument is matched with, in argument source order, or
+    /// `usize::MAX` if the argument was not matched to any parameter.
     argument_parameters: Box<[usize]>,
 
     /// Bound types for parameters, in parameter source order, or `None` if no argument was matched
