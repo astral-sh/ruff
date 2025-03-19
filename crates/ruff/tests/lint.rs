@@ -5491,3 +5491,47 @@ fn cookiecutter_globbing_no_project_root() -> Result<()> {
 
     Ok(())
 }
+
+/// Test that semantic syntax errors (1) are emitted, (2) are not cached, and (3) don't affect the
+/// reporting of normal diagnostics.
+#[test]
+fn semantic_syntax_errors() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    fs::write(tempdir.path().join("main.py"), "[(x := 1) for x in foo]")?;
+
+    let mut cmd = Command::new(get_cargo_bin(BIN_NAME));
+    // inline STDIN_BASE_OPTIONS to remove --no-cache
+    cmd.args(["check", "--output-format", "concise"])
+        .arg("--preview")
+        .arg("--quiet") // suppress `debug build without --no-cache` warnings
+        .current_dir(&tempdir);
+
+    assert_cmd_snapshot!(
+        cmd,
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    main.py:1:3: SyntaxError: assignment expression cannot rebind comprehension variable
+    main.py:1:20: F821 Undefined name `foo`
+
+    ----- stderr -----
+    "
+    );
+
+    // this should *not* be cached, like normal parse errors
+    assert_cmd_snapshot!(
+        cmd,
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    main.py:1:3: SyntaxError: assignment expression cannot rebind comprehension variable
+    main.py:1:20: F821 Undefined name `foo`
+
+    ----- stderr -----
+    "
+    );
+
+    Ok(())
+}
