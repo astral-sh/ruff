@@ -327,3 +327,6 @@ github-custom-job-permissions = { "build-docker" = { packages = "write", content
 install-updater = false
 # Path that installers should place binaries in
 install-path = ["$XDG_BIN_HOME/", "$XDG_DATA_HOME/../bin", "~/.local/bin"]
+# Temporarily allow changes to the `release` workflow, in which we pin actions
+# to a SHA instead of a tag (https://github.com/astral-sh/uv/issues/12253)
+allow-dirty = ["ci"]
