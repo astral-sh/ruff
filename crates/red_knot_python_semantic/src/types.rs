@@ -3610,7 +3610,8 @@ enum InvalidTypeExpression<'db> {
     ProtocolInTypeExpression,
     /// Type qualifiers are always invalid in type expressions
     TypeQualifier(Type<'db>),
-    /// Type qualifiers require exactly one argument and are invalid in type expressions
+    /// Type qualifiers that are invalid in type expressions,
+    /// and which would require exactly one argument even if they appeared in an annotation expression
     TypeQualifierRequiresOneArgument(Type<'db>),
     /// Some types are always invalid in type expressions
     InvalidType(Type<'db>),
