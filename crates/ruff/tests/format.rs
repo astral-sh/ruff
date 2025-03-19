@@ -585,21 +585,27 @@ if __name__ == "__main__":
 fn exit_non_zero_on_format() -> Result<()> {
     let tempdir = TempDir::new()?;
 
-    fs::write(
-        tempdir.path().join("main.py"),
-        r#"
+    let contents = r#"
 from test import say_hy
 
 if __name__ == "__main__":
     say_hy("dear Ruff contributor")
-"#,
-    )?;
+"#;
+
+    fs::write(tempdir.path().join("main.py"), contents)?;
+
+    let mut cmd = Command::new(get_cargo_bin(BIN_NAME));
+    cmd.current_dir(tempdir.path())
+        .args([
+            "format",
+            "--no-cache",
+            "--isolated",
+            "--exit-non-zero-on-format",
+        ])
+        .arg("main.py");
 
     // First format should exit with code 1 since the file needed formatting
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .current_dir(tempdir.path())
-        .args(["format", "--no-cache", "--isolated", "--exit-non-zero-on-format"])
-        .arg("main.py"), @r"
+    assert_cmd_snapshot!(cmd, @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -609,10 +615,40 @@ if __name__ == "__main__":
     ");
 
     // Second format should exit with code 0 since no files needed formatting
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .current_dir(tempdir.path())
-        .args(["format", "--no-cache", "--isolated", "--exit-non-zero-on-format"])
-        .arg("main.py"), @r"
+    assert_cmd_snapshot!(cmd, @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    1 file left unchanged
+
+    ----- stderr -----
+    ");
+
+    // Repeat the tests above with the --exit-non-zero-on-fix alias
+    fs::write(tempdir.path().join("main.py"), contents)?;
+
+    let mut cmd = Command::new(get_cargo_bin(BIN_NAME));
+    cmd.current_dir(tempdir.path())
+        .args([
+            "format",
+            "--no-cache",
+            "--isolated",
+            "--exit-non-zero-on-fix",
+        ])
+        .arg("main.py");
+
+    // First format should exit with code 1 since the file needed formatting
+    assert_cmd_snapshot!(cmd, @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    1 file reformatted
+
+    ----- stderr -----
+    ");
+
+    // Second format should exit with code 0 since no files needed formatting
+    assert_cmd_snapshot!(cmd, @r"
     success: true
     exit_code: 0
     ----- stdout -----
