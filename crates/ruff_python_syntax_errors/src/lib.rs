@@ -3,6 +3,8 @@
 //! This checker is not responsible for traversing the AST itself. Instead, its
 //! [`SyntaxChecker::enter_stmt`] method should be called on every node by a parent `Visitor`.
 
+use std::fmt::Display;
+
 use ruff_python_ast::{
     self as ast,
     name::Name,
@@ -34,8 +36,8 @@ impl SyntaxChecker {
         }
     }
 
-    pub fn finish(&self) -> impl Iterator<Item = &SyntaxError> {
-        self.errors.iter()
+    pub fn finish(self) -> Vec<SyntaxError> {
+        self.errors
     }
 }
 
@@ -46,14 +48,14 @@ pub struct SyntaxError {
     pub target_version: PythonVersion,
 }
 
-impl SyntaxError {
-    pub fn message(&self) -> String {
+impl Display for SyntaxError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.kind {
             SyntaxErrorKind::LateFutureImport => {
-                "__future__ imports must be at the top of the file".to_string()
+                f.write_str("__future__ imports must be at the top of the file")
             }
             SyntaxErrorKind::ReboundComprehensionVariable => {
-                "assignment expression cannot rebind comprehension variable".to_string()
+                f.write_str("assignment expression cannot rebind comprehension variable")
             }
         }
     }

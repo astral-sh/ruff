@@ -6,6 +6,7 @@ use std::path::Path;
 use anyhow::{anyhow, Result};
 use colored::Colorize;
 use itertools::Itertools;
+use ruff_python_syntax_errors::SyntaxError;
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::Diagnostic;
@@ -76,6 +77,9 @@ pub fn check_path(
 ) -> Vec<Message> {
     // Aggregate all diagnostics.
     let mut diagnostics = vec![];
+
+    // Aggregate all semantic syntax errors.
+    let mut semantic_syntax_errors = vec![];
 
     let tokens = parsed.tokens();
     let comment_ranges = indexer.comment_ranges();
@@ -148,7 +152,7 @@ pub fn check_path(
             let cell_offsets = source_kind.as_ipy_notebook().map(Notebook::cell_offsets);
             let notebook_index = source_kind.as_ipy_notebook().map(Notebook::index);
             if use_ast {
-                diagnostics.extend(check_ast(
+                let (new_diagnostics, new_semantic_syntax_errors) = check_ast(
                     parsed,
                     locator,
                     stylist,
@@ -162,7 +166,9 @@ pub fn check_path(
                     cell_offsets,
                     notebook_index,
                     target_version,
-                ));
+                );
+                diagnostics.extend(new_diagnostics);
+                semantic_syntax_errors.extend(new_semantic_syntax_errors);
             }
             if use_imports {
                 let import_diagnostics = check_imports(
@@ -331,6 +337,7 @@ pub fn check_path(
         diagnostics,
         parsed.errors(),
         syntax_errors,
+        &semantic_syntax_errors,
         path,
         locator,
         directives,
@@ -445,8 +452,8 @@ pub fn lint_only(
     );
 
     LinterResult {
+        has_syntax_error: messages.iter().any(Message::is_syntax_error),
         messages,
-        has_syntax_error: parsed.has_syntax_errors(),
     }
 }
 
@@ -455,6 +462,7 @@ fn diagnostics_to_messages(
     diagnostics: Vec<Diagnostic>,
     parse_errors: &[ParseError],
     unsupported_syntax_errors: &[UnsupportedSyntaxError],
+    semantic_syntax_errors: &[SyntaxError],
     path: &Path,
     locator: &Locator,
     directives: &Directives,
@@ -476,6 +484,11 @@ fn diagnostics_to_messages(
         .chain(unsupported_syntax_errors.iter().map(|syntax_error| {
             Message::from_unsupported_syntax_error(syntax_error, file.deref().clone())
         }))
+        .chain(
+            semantic_syntax_errors
+                .iter()
+                .map(|error| Message::from_semantic_syntax_error(error, file.deref().clone())),
+        )
         .chain(diagnostics.into_iter().map(|diagnostic| {
             let noqa_offset = directives.noqa_line_for.resolve(diagnostic.start());
             Message::from_diagnostic(diagnostic, file.deref().clone(), noqa_offset)
@@ -547,7 +560,7 @@ pub fn lint_fix<'a>(
         );
 
         if iterations == 0 {
-            is_valid_syntax = parsed.has_no_syntax_errors();
+            is_valid_syntax = !messages.iter().any(Message::is_syntax_error);
         } else {
             // If the source code was parseable on the first pass, but is no
             // longer parseable on a subsequent pass, then we've introduced a

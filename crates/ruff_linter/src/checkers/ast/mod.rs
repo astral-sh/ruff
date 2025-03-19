@@ -2684,7 +2684,7 @@ pub(crate) fn check_ast(
     cell_offsets: Option<&CellOffsets>,
     notebook_index: Option<&NotebookIndex>,
     target_version: PythonVersion,
-) -> Vec<Diagnostic> {
+) -> (Vec<Diagnostic>, Vec<SyntaxError>) {
     let module_path = package
         .map(PackageRoot::path)
         .and_then(|package| to_module_path(package, path));
@@ -2749,22 +2749,31 @@ pub(crate) fn check_ast(
     checker.analyze.scopes.push(ScopeId::global());
     analyze::deferred_scopes(&checker);
 
-    checker.report_diagnostics(
-        checker
-            .syntax_checker
-            .finish()
-            .filter_map(|error| try_diagnostic_from_syntax_error(error, &checker)),
-    );
+    let Checker {
+        diagnostics,
+        syntax_checker,
+        settings,
+        ..
+    } = checker;
 
-    checker.diagnostics.take()
-}
-
-fn try_diagnostic_from_syntax_error(error: &SyntaxError, checker: &Checker) -> Option<Diagnostic> {
-    match error.kind {
-        SyntaxErrorKind::LateFutureImport if checker.enabled(Rule::LateFutureImport) => {
-            Some(Diagnostic::new(LateFutureImport, error.range))
+    // partition the semantic syntax errors into Diagnostics and regular errors
+    let mut diagnostics = diagnostics.take();
+    let mut semantic_syntax_errors = Vec::new();
+    for semantic_syntax_error in syntax_checker.finish() {
+        match semantic_syntax_error.kind {
+            SyntaxErrorKind::LateFutureImport => {
+                if settings.rules.enabled(Rule::LateFutureImport) {
+                    diagnostics.push(Diagnostic::new(
+                        LateFutureImport,
+                        semantic_syntax_error.range,
+                    ));
+                }
+            }
+            SyntaxErrorKind::ReboundComprehensionVariable => {
+                semantic_syntax_errors.push(semantic_syntax_error);
+            }
         }
-        SyntaxErrorKind::LateFutureImport => None,
-        SyntaxErrorKind::ReboundComprehensionVariable => None,
     }
+
+    (diagnostics, semantic_syntax_errors)
 }

@@ -3,6 +3,7 @@ use std::collections::BTreeMap;
 use std::io::Write;
 use std::ops::Deref;
 
+use ruff_python_syntax_errors::SyntaxError;
 use rustc_hash::FxHashMap;
 
 pub use azure::AzureEmitter;
@@ -131,6 +132,18 @@ impl Message {
         Message::SyntaxError(SyntaxErrorMessage {
             message: format!("SyntaxError: {unsupported_syntax_error}"),
             range: unsupported_syntax_error.range,
+            file,
+        })
+    }
+
+    /// Create a [`Message`] from the given [`SyntaxError`].
+    pub fn from_semantic_syntax_error(
+        semantic_syntax_error: &SyntaxError,
+        file: SourceFile,
+    ) -> Message {
+        Message::SyntaxError(SyntaxErrorMessage {
+            message: format!("SyntaxError: {semantic_syntax_error}"),
+            range: semantic_syntax_error.range,
             file,
         })
     }
