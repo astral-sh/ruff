@@ -541,7 +541,7 @@ pub fn lint_fix<'a>(
     // As an escape hatch, bail after 100 iterations.
     let mut iterations = 0;
 
-    // Track whether the _initial_ source code is valid syntax.
+    // Track whether the _initial_ source code has no syntax errors.
     let mut has_no_syntax_errors = false;
 
     let target_version = settings.resolve_target_version(path);
