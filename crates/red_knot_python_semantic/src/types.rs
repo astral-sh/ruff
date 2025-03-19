@@ -3182,6 +3182,7 @@ impl<'db> Type<'db> {
                 };
                 Ok(ty)
             }
+
             Type::SubclassOf(_)
             | Type::BooleanLiteral(_)
             | Type::BytesLiteral(_)
@@ -3200,30 +3201,95 @@ impl<'db> Type<'db> {
                 fallback_type: Type::unknown(),
             }),
 
-            // We treat `typing.Type` exactly the same as `builtins.type`:
-            Type::KnownInstance(KnownInstanceType::Type) => Ok(KnownClass::Type.to_instance(db)),
-            Type::KnownInstance(KnownInstanceType::Tuple) => Ok(KnownClass::Tuple.to_instance(db)),
+            Type::KnownInstance(known_instance) => match known_instance {
+                KnownInstanceType::TypeAliasType(alias) => Ok(alias.value_type(db)),
+                KnownInstanceType::Never | KnownInstanceType::NoReturn => Ok(Type::Never),
+                KnownInstanceType::LiteralString => Ok(Type::LiteralString),
+                KnownInstanceType::Any => Ok(Type::any()),
+                KnownInstanceType::Unknown => Ok(Type::unknown()),
+                KnownInstanceType::AlwaysTruthy => Ok(Type::AlwaysTruthy),
+                KnownInstanceType::AlwaysFalsy => Ok(Type::AlwaysFalsy),
 
-            // Legacy `typing` aliases
-            Type::KnownInstance(KnownInstanceType::List) => Ok(KnownClass::List.to_instance(db)),
-            Type::KnownInstance(KnownInstanceType::Dict) => Ok(KnownClass::Dict.to_instance(db)),
-            Type::KnownInstance(KnownInstanceType::Set) => Ok(KnownClass::Set.to_instance(db)),
-            Type::KnownInstance(KnownInstanceType::FrozenSet) => {
-                Ok(KnownClass::FrozenSet.to_instance(db))
-            }
-            Type::KnownInstance(KnownInstanceType::ChainMap) => {
-                Ok(KnownClass::ChainMap.to_instance(db))
-            }
-            Type::KnownInstance(KnownInstanceType::Counter) => {
-                Ok(KnownClass::Counter.to_instance(db))
-            }
-            Type::KnownInstance(KnownInstanceType::DefaultDict) => {
-                Ok(KnownClass::DefaultDict.to_instance(db))
-            }
-            Type::KnownInstance(KnownInstanceType::Deque) => Ok(KnownClass::Deque.to_instance(db)),
-            Type::KnownInstance(KnownInstanceType::OrderedDict) => {
-                Ok(KnownClass::OrderedDict.to_instance(db))
-            }
+                // We treat `typing.Type` exactly the same as `builtins.type`:
+                KnownInstanceType::Type => Ok(KnownClass::Type.to_instance(db)),
+                KnownInstanceType::Tuple => Ok(KnownClass::Tuple.to_instance(db)),
+
+                // Legacy `typing` aliases
+                KnownInstanceType::List => Ok(KnownClass::List.to_instance(db)),
+                KnownInstanceType::Dict => Ok(KnownClass::Dict.to_instance(db)),
+                KnownInstanceType::Set => Ok(KnownClass::Set.to_instance(db)),
+                KnownInstanceType::FrozenSet => Ok(KnownClass::FrozenSet.to_instance(db)),
+                KnownInstanceType::ChainMap => Ok(KnownClass::ChainMap.to_instance(db)),
+                KnownInstanceType::Counter => Ok(KnownClass::Counter.to_instance(db)),
+                KnownInstanceType::DefaultDict => Ok(KnownClass::DefaultDict.to_instance(db)),
+                KnownInstanceType::Deque => Ok(KnownClass::Deque.to_instance(db)),
+                KnownInstanceType::OrderedDict => Ok(KnownClass::OrderedDict.to_instance(db)),
+
+                // TODO map this to a new `Type::TypeVar` variant
+                KnownInstanceType::TypeVar(_) => Ok(*self),
+
+                // TODO: Use an opt-in rule for a bare `Callable`
+                KnownInstanceType::Callable => Ok(Type::Callable(CallableType::General(
+                    GeneralCallableType::unknown(db),
+                ))),
+
+                KnownInstanceType::TypingSelf => Ok(todo_type!("Support for `typing.Self`")),
+                KnownInstanceType::TypeAlias => Ok(todo_type!("Support for `typing.TypeAlias`")),
+
+                KnownInstanceType::Protocol => Err(InvalidTypeExpressionError {
+                    invalid_expressions: smallvec::smallvec![InvalidTypeExpression::Protocol],
+                    fallback_type: Type::unknown(),
+                }),
+
+                KnownInstanceType::Literal
+                | KnownInstanceType::Union
+                | KnownInstanceType::Intersection => Err(InvalidTypeExpressionError {
+                    invalid_expressions: smallvec::smallvec![
+                        InvalidTypeExpression::RequiresArguments(*self)
+                    ],
+                    fallback_type: Type::unknown(),
+                }),
+
+                KnownInstanceType::Optional
+                | KnownInstanceType::Not
+                | KnownInstanceType::TypeOf
+                | KnownInstanceType::TypeIs
+                | KnownInstanceType::TypeGuard
+                | KnownInstanceType::Unpack
+                | KnownInstanceType::CallableTypeFromFunction => Err(InvalidTypeExpressionError {
+                    invalid_expressions: smallvec::smallvec![
+                        InvalidTypeExpression::RequiresOneArgument(*self)
+                    ],
+                    fallback_type: Type::unknown(),
+                }),
+
+                KnownInstanceType::Annotated | KnownInstanceType::Concatenate => {
+                    Err(InvalidTypeExpressionError {
+                        invalid_expressions: smallvec::smallvec![
+                            InvalidTypeExpression::RequiresTwoArguments(*self)
+                        ],
+                        fallback_type: Type::unknown(),
+                    })
+                }
+
+                KnownInstanceType::ClassVar | KnownInstanceType::Final => {
+                    Err(InvalidTypeExpressionError {
+                        invalid_expressions: smallvec::smallvec![
+                            InvalidTypeExpression::TypeQualifier(*known_instance)
+                        ],
+                        fallback_type: Type::unknown(),
+                    })
+                }
+
+                KnownInstanceType::ReadOnly
+                | KnownInstanceType::NotRequired
+                | KnownInstanceType::Required => Err(InvalidTypeExpressionError {
+                    invalid_expressions: smallvec::smallvec![
+                        InvalidTypeExpression::TypeQualifierRequiresOneArgument(*known_instance)
+                    ],
+                    fallback_type: Type::unknown(),
+                }),
+            },
 
             Type::Union(union) => {
                 let mut builder = UnionBuilder::new(db);
@@ -3249,85 +3315,13 @@ impl<'db> Type<'db> {
                     })
                 }
             }
+
             Type::Dynamic(_) => Ok(*self),
-            // TODO map this to a new `Type::TypeVar` variant
-            Type::KnownInstance(KnownInstanceType::TypeVar(_)) => Ok(*self),
-            Type::KnownInstance(KnownInstanceType::TypeAliasType(alias)) => {
-                Ok(alias.value_type(db))
-            }
-            Type::KnownInstance(KnownInstanceType::Never | KnownInstanceType::NoReturn) => {
-                Ok(Type::Never)
-            }
-            Type::KnownInstance(KnownInstanceType::LiteralString) => Ok(Type::LiteralString),
-            Type::KnownInstance(KnownInstanceType::Any) => Ok(Type::any()),
-            Type::KnownInstance(KnownInstanceType::Annotated) => Err(InvalidTypeExpressionError {
-                invalid_expressions: smallvec::smallvec![InvalidTypeExpression::BareAnnotated],
-                fallback_type: Type::unknown(),
-            }),
-            Type::KnownInstance(KnownInstanceType::ClassVar) => Err(InvalidTypeExpressionError {
-                invalid_expressions: smallvec::smallvec![
-                    InvalidTypeExpression::ClassVarInTypeExpression
-                ],
-                fallback_type: Type::unknown(),
-            }),
-            Type::KnownInstance(KnownInstanceType::Final) => Err(InvalidTypeExpressionError {
-                invalid_expressions: smallvec::smallvec![
-                    InvalidTypeExpression::FinalInTypeExpression
-                ],
-                fallback_type: Type::unknown(),
-            }),
-            Type::KnownInstance(KnownInstanceType::Unknown) => Ok(Type::unknown()),
-            Type::KnownInstance(KnownInstanceType::AlwaysTruthy) => Ok(Type::AlwaysTruthy),
-            Type::KnownInstance(KnownInstanceType::AlwaysFalsy) => Ok(Type::AlwaysFalsy),
-            Type::KnownInstance(KnownInstanceType::Callable) => {
-                // TODO: Use an opt-in rule for a bare `Callable`
-                Ok(Type::Callable(CallableType::General(
-                    GeneralCallableType::unknown(db),
-                )))
-            }
-            Type::KnownInstance(
-                KnownInstanceType::Literal
-                | KnownInstanceType::Union
-                | KnownInstanceType::Intersection,
-            ) => Err(InvalidTypeExpressionError {
-                invalid_expressions: smallvec::smallvec![InvalidTypeExpression::RequiresArguments(
-                    *self
-                )],
-                fallback_type: Type::unknown(),
-            }),
-            Type::KnownInstance(
-                KnownInstanceType::Optional
-                | KnownInstanceType::Not
-                | KnownInstanceType::TypeOf
-                | KnownInstanceType::CallableTypeFromFunction,
-            ) => Err(InvalidTypeExpressionError {
-                invalid_expressions: smallvec::smallvec![
-                    InvalidTypeExpression::RequiresOneArgument(*self)
-                ],
-                fallback_type: Type::unknown(),
-            }),
-            Type::KnownInstance(KnownInstanceType::Protocol) => Err(InvalidTypeExpressionError {
-                invalid_expressions: smallvec::smallvec![
-                    InvalidTypeExpression::ProtocolInTypeExpression
-                ],
-                fallback_type: Type::unknown(),
-            }),
-            Type::KnownInstance(
-                KnownInstanceType::TypingSelf
-                | KnownInstanceType::ReadOnly
-                | KnownInstanceType::TypeAlias
-                | KnownInstanceType::NotRequired
-                | KnownInstanceType::Concatenate
-                | KnownInstanceType::TypeIs
-                | KnownInstanceType::TypeGuard
-                | KnownInstanceType::Unpack
-                | KnownInstanceType::Required,
-            ) => Ok(todo_type!(
-                "Invalid or unsupported `KnownInstanceType` in `Type::to_type_expression`"
-            )),
+
             Type::Instance(_) => Ok(todo_type!(
                 "Invalid or unsupported `Instance` in `Type::to_type_expression`"
             )),
+
             Type::Intersection(_) => Ok(todo_type!("Type::Intersection.in_type_expression")),
         }
     }
@@ -3593,18 +3587,20 @@ impl<'db> InvalidTypeExpressionError<'db> {
 /// Enumeration of various types that are invalid in type-expression contexts
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 enum InvalidTypeExpression<'db> {
-    /// `x: Annotated` is invalid as an annotation
-    BareAnnotated,
-    /// Some types always require at least one argument when used in a type expression
-    RequiresArguments(Type<'db>),
     /// Some types always require exactly one argument when used in a type expression
     RequiresOneArgument(Type<'db>),
+    /// Some types always require at least one argument when used in a type expression
+    RequiresArguments(Type<'db>),
+    /// Some types always require at least two arguments when used in a type expression
+    RequiresTwoArguments(Type<'db>),
     /// The `Protocol` type is invalid in type expressions
-    ProtocolInTypeExpression,
-    /// The `ClassVar` type qualifier was used in a type expression
-    ClassVarInTypeExpression,
-    /// The `Final` type qualifier was used in a type expression
-    FinalInTypeExpression,
+    Protocol,
+    /// Type qualifiers are always invalid in *type expressions*,
+    /// but these ones are okay with 0 arguments in *annotation expressions*
+    TypeQualifier(KnownInstanceType<'db>),
+    /// Type qualifiers that are invalid in type expressions,
+    /// and which would require exactly one argument even if they appeared in an annotation expression
+    TypeQualifierRequiresOneArgument(KnownInstanceType<'db>),
     /// Some types are always invalid in type expressions
     InvalidType(Type<'db>),
 }
@@ -3619,26 +3615,33 @@ impl<'db> InvalidTypeExpression<'db> {
         impl std::fmt::Display for Display<'_> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 match self.error {
-                    InvalidTypeExpression::BareAnnotated => f.write_str(
-                        "`Annotated` requires at least two arguments when used in an annotation or type expression"
-                    ),
                     InvalidTypeExpression::RequiresOneArgument(ty) => write!(
                         f,
                         "`{ty}` requires exactly one argument when used in a type expression",
-                        ty = ty.display(self.db)),
+                        ty = ty.display(self.db)
+                    ),
                     InvalidTypeExpression::RequiresArguments(ty) => write!(
                         f,
                         "`{ty}` requires at least one argument when used in a type expression",
                         ty = ty.display(self.db)
                     ),
-                    InvalidTypeExpression::ProtocolInTypeExpression => f.write_str(
+                    InvalidTypeExpression::RequiresTwoArguments(ty) => write!(
+                        f,
+                        "`{ty}` requires at least two arguments when used in a type expression",
+                        ty = ty.display(self.db)
+                    ),
+                    InvalidTypeExpression::Protocol => f.write_str(
                         "`typing.Protocol` is not allowed in type expressions"
                     ),
-                    InvalidTypeExpression::ClassVarInTypeExpression => f.write_str(
-                        "Type qualifier `typing.ClassVar` is not allowed in type expressions (only in annotation expressions)"
+                    InvalidTypeExpression::TypeQualifier(qualifier) => write!(
+                        f,
+                        "Type qualifier `{q}` is not allowed in type expressions (only in annotation expressions)",
+                        q = qualifier.repr(self.db)
                     ),
-                    InvalidTypeExpression::FinalInTypeExpression => f.write_str(
-                        "Type qualifier `typing.Final` is not allowed in type expressions (only in annotation expressions)"
+                    InvalidTypeExpression::TypeQualifierRequiresOneArgument(qualifier) => write!(
+                        f,
+                        "Type qualifier `{q}` is not allowed in type expressions (only in annotation expressions, and only with exactly one argument)",
+                        q = qualifier.repr(self.db)
                     ),
                     InvalidTypeExpression::InvalidType(ty) => write!(
                         f,
