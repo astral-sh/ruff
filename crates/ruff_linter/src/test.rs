@@ -309,20 +309,8 @@ fn print_syntax_errors(
 }
 
 /// Print the [`Message::Diagnostic`]s in `messages`.
-fn print_diagnostics(messages: Vec<Message>, path: &Path, source: &SourceKind) -> String {
-    let filename = path.file_name().unwrap().to_string_lossy();
-    let source_file = SourceFileBuilder::new(filename.as_ref(), source.source_code()).finish();
-
-    let messages: Vec<_> = messages
-        .into_iter()
-        .filter_map(Message::into_diagnostic_message)
-        .map(|mut diagnostic| {
-            let noqa_start = diagnostic.range.start();
-            diagnostic.file = source_file.clone();
-            diagnostic.noqa_offset = noqa_start;
-            Message::Diagnostic(diagnostic)
-        })
-        .collect();
+fn print_diagnostics(mut messages: Vec<Message>, path: &Path, source: &SourceKind) -> String {
+    messages.retain(Message::is_diagnostic_message);
 
     if let Some(notebook) = source.as_ipy_notebook() {
         print_jupyter_messages(&messages, path, notebook)

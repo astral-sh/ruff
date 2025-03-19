@@ -149,6 +149,11 @@ impl Message {
         }
     }
 
+    /// Returns `true` if `self` is a diagnostic message.
+    pub const fn is_diagnostic_message(&self) -> bool {
+        matches!(self, Message::Diagnostic(_))
+    }
+
     /// Returns `true` if `self` is a syntax error message.
     pub const fn is_syntax_error(&self) -> bool {
         matches!(self, Message::SyntaxError(_))
