@@ -333,11 +333,17 @@ pub fn check_path(
         &[]
     };
 
+    let semantic_syntax_errors = if settings.preview.is_enabled() {
+        semantic_syntax_errors.as_slice()
+    } else {
+        &[]
+    };
+
     diagnostics_to_messages(
         diagnostics,
         parsed.errors(),
         syntax_errors,
-        &semantic_syntax_errors,
+        semantic_syntax_errors,
         path,
         locator,
         directives,
