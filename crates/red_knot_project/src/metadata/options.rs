@@ -108,6 +108,7 @@ impl Options {
                 .map(|python_path| {
                     PythonPath::SysPrefix(python_path.absolute(project_root, system))
                 })
+                .or(PythonPath::find_virtual_env())
                 .unwrap_or(PythonPath::KnownSitePackages(vec![])),
         }
     }

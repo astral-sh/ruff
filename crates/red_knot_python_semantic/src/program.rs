@@ -144,9 +144,23 @@ pub enum PythonPath {
     /// [`sys.prefix`]: https://docs.python.org/3/library/sys.html#sys.prefix
     SysPrefix(SystemPathBuf),
 
+    /// An environment was active e.g. via `VIRTUAL_ENV`
+    ActiveEnvironment(SystemPathBuf),
+
     /// Resolved site packages paths.
     ///
     /// This variant is mainly intended for testing where we want to skip resolving `site-packages`
     /// because it would unnecessarily complicate the test setup.
     KnownSitePackages(Vec<SystemPathBuf>),
+}
+
+impl PythonPath {
+    pub fn find_virtual_env() -> Option<Self> {
+        let virtual_env = std::env::var("VIRTUAL_ENV").ok();
+        if let Some(virtual_env) = virtual_env {
+            tracing::debug!("Found virtual environment at {:?}", virtual_env);
+            return Some(Self::ActiveEnvironment(SystemPathBuf::from(virtual_env)));
+        }
+        None
+    }
 }
