@@ -18,7 +18,7 @@ def f(*args: Unpack[Ts]) -> tuple[Unpack[Ts]]:
     # TODO: should understand the annotation
     reveal_type(args)  # revealed: tuple
 
-    reveal_type(Alias)  # revealed: @Todo(Invalid or unsupported `KnownInstanceType` in `Type::to_type_expression`)
+    reveal_type(Alias)  # revealed: @Todo(Support for `typing.TypeAlias`)
 
 def g() -> TypeGuard[int]: ...
 def h() -> TypeIs[int]: ...
@@ -35,7 +35,7 @@ def i(callback: Callable[Concatenate[int, P], R_co], *args: P.args, **kwargs: P.
 
 class Foo:
     def method(self, x: Self):
-        reveal_type(x)  # revealed: @Todo(Invalid or unsupported `KnownInstanceType` in `Type::to_type_expression`)
+        reveal_type(x)  # revealed: @Todo(Support for `typing.Self`)
 ```
 
 ## Inheritance

@@ -16,6 +16,9 @@ FINAL_C: Final[Annotated[int, "the annotation for FINAL_C"]] = 1
 FINAL_D: Final = 1
 FINAL_E: "Final[int]" = 1
 
+def _(x: Final[int]):
+    reveal_type(x)  # revealed: int
+
 reveal_type(FINAL_A)  # revealed: Literal[1]
 reveal_type(FINAL_B)  # revealed: Literal[1]
 reveal_type(FINAL_C)  # revealed: Literal[1]

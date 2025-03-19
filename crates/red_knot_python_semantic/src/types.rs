@@ -3260,22 +3260,23 @@ impl<'db> Type<'db> {
             }
             Type::KnownInstance(KnownInstanceType::LiteralString) => Ok(Type::LiteralString),
             Type::KnownInstance(KnownInstanceType::Any) => Ok(Type::any()),
-            Type::KnownInstance(KnownInstanceType::Annotated) => Err(InvalidTypeExpressionError {
-                invalid_expressions: smallvec::smallvec![InvalidTypeExpression::BareAnnotated],
-                fallback_type: Type::unknown(),
-            }),
-            Type::KnownInstance(KnownInstanceType::ClassVar) => Err(InvalidTypeExpressionError {
-                invalid_expressions: smallvec::smallvec![
-                    InvalidTypeExpression::ClassVarInTypeExpression
-                ],
-                fallback_type: Type::unknown(),
-            }),
-            Type::KnownInstance(KnownInstanceType::Final) => Err(InvalidTypeExpressionError {
-                invalid_expressions: smallvec::smallvec![
-                    InvalidTypeExpression::FinalInTypeExpression
-                ],
-                fallback_type: Type::unknown(),
-            }),
+
+            Type::KnownInstance(KnownInstanceType::Annotated | KnownInstanceType::Concatenate) => {
+                Err(InvalidTypeExpressionError {
+                    invalid_expressions: smallvec::smallvec![
+                        InvalidTypeExpression::RequiresTwoArguments(*self)
+                    ],
+                    fallback_type: Type::unknown(),
+                })
+            }
+            Type::KnownInstance(KnownInstanceType::ClassVar | KnownInstanceType::Final) => {
+                Err(InvalidTypeExpressionError {
+                    invalid_expressions: smallvec::smallvec![InvalidTypeExpression::TypeQualifier(
+                        *self
+                    )],
+                    fallback_type: Type::unknown(),
+                })
+            }
             Type::KnownInstance(KnownInstanceType::Unknown) => Ok(Type::unknown()),
             Type::KnownInstance(KnownInstanceType::AlwaysTruthy) => Ok(Type::AlwaysTruthy),
             Type::KnownInstance(KnownInstanceType::AlwaysFalsy) => Ok(Type::AlwaysFalsy),
@@ -3299,7 +3300,10 @@ impl<'db> Type<'db> {
                 KnownInstanceType::Optional
                 | KnownInstanceType::Not
                 | KnownInstanceType::TypeOf
-                | KnownInstanceType::CallableTypeFromFunction,
+                | KnownInstanceType::CallableTypeFromFunction
+                | KnownInstanceType::TypeIs
+                | KnownInstanceType::TypeGuard
+                | KnownInstanceType::Unpack,
             ) => Err(InvalidTypeExpressionError {
                 invalid_expressions: smallvec::smallvec![
                     InvalidTypeExpression::RequiresOneArgument(*self)
@@ -3313,18 +3317,21 @@ impl<'db> Type<'db> {
                 fallback_type: Type::unknown(),
             }),
             Type::KnownInstance(
-                KnownInstanceType::TypingSelf
-                | KnownInstanceType::ReadOnly
-                | KnownInstanceType::TypeAlias
+                KnownInstanceType::ReadOnly
                 | KnownInstanceType::NotRequired
-                | KnownInstanceType::Concatenate
-                | KnownInstanceType::TypeIs
-                | KnownInstanceType::TypeGuard
-                | KnownInstanceType::Unpack
                 | KnownInstanceType::Required,
-            ) => Ok(todo_type!(
-                "Invalid or unsupported `KnownInstanceType` in `Type::to_type_expression`"
-            )),
+            ) => Err(InvalidTypeExpressionError {
+                invalid_expressions: smallvec::smallvec![
+                    InvalidTypeExpression::TypeQualifierRequiresOneArgument(*self)
+                ],
+                fallback_type: Type::unknown(),
+            }),
+            Type::KnownInstance(KnownInstanceType::TypingSelf) => {
+                Ok(todo_type!("Support for `typing.Self`"))
+            }
+            Type::KnownInstance(KnownInstanceType::TypeAlias) => {
+                Ok(todo_type!("Support for `typing.TypeAlias`"))
+            }
             Type::Instance(_) => Ok(todo_type!(
                 "Invalid or unsupported `Instance` in `Type::to_type_expression`"
             )),
@@ -3593,18 +3600,18 @@ impl<'db> InvalidTypeExpressionError<'db> {
 /// Enumeration of various types that are invalid in type-expression contexts
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 enum InvalidTypeExpression<'db> {
-    /// `x: Annotated` is invalid as an annotation
-    BareAnnotated,
-    /// Some types always require at least one argument when used in a type expression
-    RequiresArguments(Type<'db>),
     /// Some types always require exactly one argument when used in a type expression
     RequiresOneArgument(Type<'db>),
+    /// Some types always require at least one argument when used in a type expression
+    RequiresArguments(Type<'db>),
+    /// Some types always require at least two arguments when used in a type expression
+    RequiresTwoArguments(Type<'db>),
     /// The `Protocol` type is invalid in type expressions
     ProtocolInTypeExpression,
-    /// The `ClassVar` type qualifier was used in a type expression
-    ClassVarInTypeExpression,
-    /// The `Final` type qualifier was used in a type expression
-    FinalInTypeExpression,
+    /// Type qualifiers are always invalid in type expressions
+    TypeQualifier(Type<'db>),
+    /// Type qualifiers require exactly one argument and are invalid in type expressions
+    TypeQualifierRequiresOneArgument(Type<'db>),
     /// Some types are always invalid in type expressions
     InvalidType(Type<'db>),
 }
@@ -3619,26 +3626,33 @@ impl<'db> InvalidTypeExpression<'db> {
         impl std::fmt::Display for Display<'_> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 match self.error {
-                    InvalidTypeExpression::BareAnnotated => f.write_str(
-                        "`Annotated` requires at least two arguments when used in an annotation or type expression"
-                    ),
                     InvalidTypeExpression::RequiresOneArgument(ty) => write!(
                         f,
                         "`{ty}` requires exactly one argument when used in a type expression",
-                        ty = ty.display(self.db)),
+                        ty = ty.display(self.db)
+                    ),
                     InvalidTypeExpression::RequiresArguments(ty) => write!(
                         f,
                         "`{ty}` requires at least one argument when used in a type expression",
                         ty = ty.display(self.db)
                     ),
+                    InvalidTypeExpression::RequiresTwoArguments(ty) => write!(
+                        f,
+                        "`{ty}` requires at least two arguments when used in a type expression",
+                        ty = ty.display(self.db)
+                    ),
                     InvalidTypeExpression::ProtocolInTypeExpression => f.write_str(
                         "`typing.Protocol` is not allowed in type expressions"
                     ),
-                    InvalidTypeExpression::ClassVarInTypeExpression => f.write_str(
-                        "Type qualifier `typing.ClassVar` is not allowed in type expressions (only in annotation expressions)"
+                    InvalidTypeExpression::TypeQualifier(ty) => write!(
+                        f,
+                        "Type qualifier `{ty}` is not allowed in type expressions (only in annotation expressions)",
+                        ty = ty.display(self.db)
                     ),
-                    InvalidTypeExpression::FinalInTypeExpression => f.write_str(
-                        "Type qualifier `typing.Final` is not allowed in type expressions (only in annotation expressions)"
+                    InvalidTypeExpression::TypeQualifierRequiresOneArgument(ty) => write!(
+                        f,
+                        "Type qualifier `{ty}` is not allowed in type expressions (only in annotation expressions, and only with exactly one argument)",
+                        ty = ty.display(self.db)
                     ),
                     InvalidTypeExpression::InvalidType(ty) => write!(
                         f,
