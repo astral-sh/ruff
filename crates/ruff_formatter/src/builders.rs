@@ -2782,7 +2782,7 @@ impl<Context> Format<Context> for GroupWithFlatWidthLimit<'_, Context> {
                 content,
                 width_limit: LineWidthLimit::Unlimited,
                 inherit_enclosing_limit: true,
-            } => f.write_fmt(Arguments::from(content)),
+            } => write!(f, [group(&Arguments::from(content))]),
 
             GroupWithFlatWidthLimit {
                 content,

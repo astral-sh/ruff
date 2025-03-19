@@ -1528,7 +1528,7 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
 
     fn fits_text(&mut self, text: Text, args: PrintElementArgs) -> Fits {
         fn exceeds_width(fits: &FitsMeasurer, args: PrintElementArgs) -> bool {
-            args.line_width_limit().fits(fits.state.line_width)
+            !args.line_width_limit().fits(fits.state.line_width)
                 && !args.measure_mode().allows_text_overflow()
         }
 
