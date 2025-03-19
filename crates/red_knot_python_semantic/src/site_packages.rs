@@ -9,6 +9,7 @@
 //! on Linux.)
 
 use std::fmt;
+use std::fmt::Display;
 use std::io;
 use std::num::NonZeroUsize;
 use std::ops::Deref;
@@ -64,7 +65,7 @@ impl VirtualEnvironment {
 
         let pyvenv_cfg = system
             .read_to_string(&pyvenv_cfg_path)
-            .map_err(SitePackagesDiscoveryError::NoPyvenvCfgFile)?;
+            .map_err(|io_err| SitePackagesDiscoveryError::NoPyvenvCfgFile(origin, io_err))?;
 
         let mut include_system_site_packages = false;
         let mut base_executable_home_path = None;
@@ -210,12 +211,12 @@ System site-packages will not be used for module resolution.",
 
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum SitePackagesDiscoveryError {
-    #[error("Invalid --python argument: `{0}` could not be canonicalized")]
-    VenvDirCanonicalizationError(SystemPathBuf, #[source] io::Error),
-    #[error("Invalid --python argument: `{0}` does not point to a directory on disk")]
-    VenvDirIsNotADirectory(SystemPathBuf),
-    #[error("--python points to a broken venv with no pyvenv.cfg file")]
-    NoPyvenvCfgFile(#[source] io::Error),
+    #[error("Invalid {1}: `{0}` could not be canonicalized")]
+    VenvDirCanonicalizationError(SystemPathBuf, SysPrefixPathOrigin, #[source] io::Error),
+    #[error("Invalid {1}: `{0}` does not point to a directory on disk")]
+    VenvDirIsNotADirectory(SystemPathBuf, SysPrefixPathOrigin),
+    #[error("{0}: points to a broken venv with no pyvenv.cfg file")]
+    NoPyvenvCfgFile(SysPrefixPathOrigin, #[source] io::Error),
     #[error("Failed to parse the pyvenv.cfg file at {0} because {1}")]
     PyvenvCfgParseError(SystemPathBuf, PyvenvCfgParseErrorKind),
     #[error("Failed to search the `lib` directory of the Python installation at {1} for `site-packages`")]
@@ -403,6 +404,7 @@ impl SysPrefixPath {
             .map_err(|io_err| {
                 SitePackagesDiscoveryError::VenvDirCanonicalizationError(
                     unvalidated_path.to_path_buf(),
+                    origin,
                     io_err,
                 )
             })?;
@@ -413,7 +415,10 @@ impl SysPrefixPath {
                 origin,
             })
             .ok_or_else(|| {
-                SitePackagesDiscoveryError::VenvDirIsNotADirectory(unvalidated_path.to_path_buf())
+                SitePackagesDiscoveryError::VenvDirIsNotADirectory(
+                    unvalidated_path.to_path_buf(),
+                    origin,
+                )
             })
     }
 
@@ -455,6 +460,16 @@ pub(crate) enum SysPrefixPathOrigin {
     PythonCliFlag,
     VirtualEnvVar,
     Derived,
+}
+
+impl Display for SysPrefixPathOrigin {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Self::PythonCliFlag => f.write_str("`--python` argument"),
+            Self::VirtualEnvVar => f.write_str("`VIRTUAL_ENV` environment variable"),
+            Self::Derived => f.write_str("derived `sys.prefix` path"),
+        }
+    }
 }
 
 /// The value given by the `home` key in `pyvenv.cfg` files.
@@ -793,7 +808,10 @@ mod tests {
             .unwrap();
         assert!(matches!(
             VirtualEnvironment::new("/.venv", SysPrefixPathOrigin::VirtualEnvVar, &system),
-            Err(SitePackagesDiscoveryError::NoPyvenvCfgFile(_))
+            Err(SitePackagesDiscoveryError::NoPyvenvCfgFile(
+                SysPrefixPathOrigin::VirtualEnvVar,
+                _
+            ))
         ));
     }
 
