@@ -3269,7 +3269,6 @@ impl<'db> Type<'db> {
                 KnownInstanceType::Literal
                 | KnownInstanceType::Optional
                 | KnownInstanceType::Union
-                | KnownInstanceType::Protocol
                 | KnownInstanceType::Not
                 | KnownInstanceType::Intersection
                 | KnownInstanceType::TypeOf
@@ -3278,6 +3277,12 @@ impl<'db> Type<'db> {
                 invalid_expressions: smallvec::smallvec![InvalidTypeExpression::InvalidBareType(
                     *self
                 )],
+                fallback_type: Type::unknown(),
+            }),
+            Type::KnownInstance(KnownInstanceType::Protocol) => Err(InvalidTypeExpressionError {
+                invalid_expressions: smallvec::smallvec![
+                    InvalidTypeExpression::ProtocolInTypeExpression
+                ],
                 fallback_type: Type::unknown(),
             }),
             Type::KnownInstance(
@@ -3565,6 +3570,8 @@ enum InvalidTypeExpression<'db> {
     BareAnnotated,
     /// Some types always require at least one argument when used in a type expression
     InvalidBareType(Type<'db>),
+    /// The `Protocol` type is invalid in type expressions
+    ProtocolInTypeExpression,
     /// The `ClassVar` type qualifier was used in a type expression
     ClassVarInTypeExpression,
     /// The `Final` type qualifier was used in a type expression
@@ -3590,6 +3597,9 @@ impl<'db> InvalidTypeExpression<'db> {
                         f,
                         "`{ty}` requires at least one argument when used in a type expression",
                         ty = ty.display(self.db)
+                    ),
+                    InvalidTypeExpression::ProtocolInTypeExpression => f.write_str(
+                        "`typing.Protocol` is not allowed in type expressions"
                     ),
                     InvalidTypeExpression::ClassVarInTypeExpression => f.write_str(
                         "Type qualifier `typing.ClassVar` is not allowed in type expressions (only in annotation expressions)"

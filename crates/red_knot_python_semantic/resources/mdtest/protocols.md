@@ -19,7 +19,7 @@ def _(some_int: int, some_literal_int: Literal[1], some_indexable: SupportsIndex
 ```py
 from typing import Protocol
 
-# error: [invalid-type-form] "`typing.Protocol` requires at least one argument when used in a type expression"
+# error: [invalid-type-form] "`typing.Protocol` is not allowed in type expressions"
 def f(x: Protocol) -> None:
     reveal_type(x)  # revealed: Unknown
 ```
