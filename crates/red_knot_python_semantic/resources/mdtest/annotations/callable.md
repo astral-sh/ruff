@@ -209,3 +209,5 @@ def _(c: Callable[[int], int]):
     # error: [unresolved-attribute] "Type `(int, /) -> int` has no attribute `__call__`"
     reveal_type(c.__call__)  # revealed: Unknown
 ```
+
+[gradual form]: https://typing.readthedocs.io/en/latest/spec/glossary.html#term-gradual-form
