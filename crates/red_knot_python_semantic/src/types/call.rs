@@ -4,7 +4,7 @@ use crate::Db;
 
 mod arguments;
 mod bind;
-pub(super) use arguments::{Argument, ArgumentForm, ArgumentKind, CallArguments};
+pub(super) use arguments::{Argument, CallArgumentTypes, CallArguments};
 pub(super) use bind::Bindings;
 
 /// Wraps a [`Bindings`] for an unsuccessful call with information about why the call was
@@ -12,10 +12,7 @@ pub(super) use bind::Bindings;
 ///
 /// The bindings are boxed so that we do not pass around large `Err` variants on the stack.
 #[derive(Debug, Clone)]
-pub(crate) struct CallError<'call, 'db>(
-    pub(crate) CallErrorKind,
-    pub(crate) Box<Bindings<'call, 'db>>,
-);
+pub(crate) struct CallError<'db>(pub(crate) CallErrorKind, pub(crate) Box<Bindings<'db>>);
 
 /// The reason why calling a type failed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -36,22 +33,22 @@ pub(crate) enum CallErrorKind {
 }
 
 #[derive(Debug, Clone)]
-pub(super) enum CallDunderError<'call, 'db> {
+pub(super) enum CallDunderError<'db> {
     /// The dunder attribute exists but it can't be called with the given arguments.
     ///
     /// This includes non-callable dunder attributes that are possibly unbound.
-    CallError(CallErrorKind, Box<Bindings<'call, 'db>>),
+    CallError(CallErrorKind, Box<Bindings<'db>>),
 
     /// The type has the specified dunder method and it is callable
     /// with the specified arguments without any binding errors
     /// but it is possibly unbound.
-    PossiblyUnbound(Box<Bindings<'call, 'db>>),
+    PossiblyUnbound(Box<Bindings<'db>>),
 
     /// The dunder method with the specified name is missing.
     MethodNotAvailable,
 }
 
-impl<'db> CallDunderError<'_, 'db> {
+impl<'db> CallDunderError<'db> {
     pub(super) fn return_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
         match self {
             Self::MethodNotAvailable | Self::CallError(CallErrorKind::NotCallable, _) => None,
@@ -65,8 +62,8 @@ impl<'db> CallDunderError<'_, 'db> {
     }
 }
 
-impl<'call, 'db> From<CallError<'call, 'db>> for CallDunderError<'call, 'db> {
-    fn from(CallError(kind, bindings): CallError<'call, 'db>) -> Self {
+impl<'db> From<CallError<'db>> for CallDunderError<'db> {
+    fn from(CallError(kind, bindings): CallError<'db>) -> Self {
         Self::CallError(kind, bindings)
     }
 }

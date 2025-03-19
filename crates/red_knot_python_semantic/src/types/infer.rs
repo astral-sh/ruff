@@ -61,7 +61,7 @@ use crate::symbol::{
     module_type_implicit_global_symbol, symbol, symbol_from_bindings, symbol_from_declarations,
     typing_extensions_symbol, Boundness, LookupError,
 };
-use crate::types::call::{Argument, ArgumentForm, Bindings, CallArguments, CallError};
+use crate::types::call::{Argument, Bindings, CallArgumentTypes, CallArguments, CallError};
 use crate::types::diagnostic::{
     report_implicit_return_type, report_invalid_arguments_to_annotated,
     report_invalid_arguments_to_callable, report_invalid_assignment,
@@ -79,8 +79,8 @@ use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     class::MetaclassErrorKind, todo_type, Class, DynamicType, FunctionType, InstanceType,
     IntersectionBuilder, IntersectionType, KnownClass, KnownFunction, KnownInstanceType,
-    MetaclassCandidate, Parameter, Parameters, SliceLiteralType, SubclassOfType, Symbol,
-    SymbolAndQualifiers, Truthiness, TupleType, Type, TypeAliasType, TypeAndQualifiers,
+    MetaclassCandidate, Parameter, ParameterForm, Parameters, SliceLiteralType, SubclassOfType,
+    Symbol, SymbolAndQualifiers, Truthiness, TupleType, Type, TypeAliasType, TypeAndQualifiers,
     TypeArrayDisplay, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarInstance, UnionBuilder,
     UnionType,
 };
@@ -1142,10 +1142,9 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         if let Some(arguments) = class.arguments.as_deref() {
             let call_arguments = Self::parse_arguments(arguments);
-            for argument in call_arguments.iter() {
-                argument.add_form(ArgumentForm::VALUE);
-            }
-            self.infer_argument_types(arguments, &call_arguments);
+            let mut call_argument_types = CallArgumentTypes::new(call_arguments);
+            let argument_forms = vec![Some(ParameterForm::Value); call_argument_types.len()];
+            self.infer_argument_types(arguments, &mut call_argument_types, &argument_forms);
         }
     }
 
@@ -2280,7 +2279,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         let successful_call = meta_dunder_set
                             .try_call(
                                 db,
-                                &CallArguments::positional([meta_attr_ty, object_ty, value_ty]),
+                                CallArgumentTypes::positional([meta_attr_ty, object_ty, value_ty]),
                             )
                             .is_ok();
 
@@ -2379,7 +2378,11 @@ impl<'db> TypeInferenceBuilder<'db> {
                             let successful_call = meta_dunder_set
                                 .try_call(
                                     db,
-                                    &CallArguments::positional([meta_attr_ty, object_ty, value_ty]),
+                                    CallArgumentTypes::positional([
+                                        meta_attr_ty,
+                                        object_ty,
+                                        value_ty,
+                                    ]),
                                 )
                                 .is_ok();
 
@@ -2787,7 +2790,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let call = target_type.try_call_dunder(
                     db,
                     op.in_place_dunder(),
-                    &CallArguments::positional([value_type]),
+                    CallArgumentTypes::positional([value_type]),
                 );
 
                 match call {
@@ -3236,22 +3239,22 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.infer_expression(expression)
     }
 
-    fn parse_arguments<'a>(arguments: &'a ast::Arguments) -> CallArguments<'a, 'db> {
+    fn parse_arguments(arguments: &ast::Arguments) -> CallArguments<'_> {
         arguments
             .arguments_source_order()
             .map(|arg_or_keyword| {
                 match arg_or_keyword {
                     ast::ArgOrKeyword::Arg(arg) => match arg {
-                        ast::Expr::Starred(ast::ExprStarred { .. }) => Argument::variadic(),
+                        ast::Expr::Starred(ast::ExprStarred { .. }) => Argument::Variadic,
                         // TODO diagnostic if after a keyword argument
-                        _ => Argument::positional(),
+                        _ => Argument::Positional,
                     },
                     ast::ArgOrKeyword::Keyword(ast::Keyword { arg, .. }) => {
                         if let Some(arg) = arg {
-                            Argument::keyword(&arg.id)
+                            Argument::Keyword(&arg.id)
                         } else {
                             // TODO diagnostic if not last
-                            Argument::keywords()
+                            Argument::Keywords
                         }
                     }
                 }
@@ -3259,37 +3262,45 @@ impl<'db> TypeInferenceBuilder<'db> {
             .collect()
     }
 
-    fn infer_argument_types<'a>(
+    fn infer_argument_types(
         &mut self,
-        ast_arguments: &'a ast::Arguments,
-        arguments: &CallArguments<'a, 'db>,
+        ast_arguments: &ast::Arguments,
+        argument_types: &mut CallArgumentTypes<'_, 'db>,
+        argument_forms: &[Option<ParameterForm>],
     ) {
-        for (arg_or_keyword, argument) in
-            ast_arguments.arguments_source_order().zip(arguments.iter())
+        for ((arg_or_keyword, (_, argument)), form) in ast_arguments
+            .arguments_source_order()
+            .zip(argument_types.iter_mut())
+            .zip(argument_forms)
         {
             match arg_or_keyword {
                 ast::ArgOrKeyword::Arg(arg) => match arg {
                     ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
-                        self.infer_argument_type(value, argument);
-                        self.store_expression_type(arg, argument.argument_type());
+                        self.infer_argument_type(value, argument, *form);
+                        self.store_expression_type(arg, *argument);
                     }
-                    _ => self.infer_argument_type(arg, argument),
+                    _ => self.infer_argument_type(arg, argument, *form),
                 },
                 ast::ArgOrKeyword::Keyword(ast::Keyword { value, .. }) => {
-                    self.infer_argument_type(value, argument);
+                    self.infer_argument_type(value, argument, *form);
                 }
             }
         }
     }
 
-    fn infer_argument_type<'a>(&mut self, ast_argument: &ast::Expr, argument: &Argument<'a, 'db>) {
-        if argument.form().is_empty() || argument.form().contains(ArgumentForm::VALUE) {
-            let ty = self.infer_expression(ast_argument);
-            argument.set_argument_type(ty);
-        }
-        if argument.form().contains(ArgumentForm::TYPE_FORM) {
-            let ty = self.infer_type_expression(ast_argument);
-            argument.set_type_form_type(ty);
+    fn infer_argument_type(
+        &mut self,
+        ast_argument: &ast::Expr,
+        argument: &mut Type<'db>,
+        form: Option<ParameterForm>,
+    ) {
+        match form {
+            None | Some(ParameterForm::Value) => {
+                *argument = self.infer_expression(ast_argument);
+            }
+            Some(ParameterForm::Type) => {
+                *argument = self.infer_type_expression(ast_argument);
+            }
         }
     }
 
@@ -3854,13 +3865,18 @@ impl<'db> TypeInferenceBuilder<'db> {
         // We don't call `Type::try_call`, because we want to perform type inference on the
         // arguments after matching them to parameters, but before checking that the argument types
         // are assignable to any parameter annotations.
-        let call_arguments = Self::parse_arguments(arguments);
+        let mut call_arguments = Self::parse_arguments(arguments);
         let function_type = self.infer_expression(func);
         let signatures = function_type.signatures(self.db());
-        let bindings = Bindings::match_parameters(signatures, &call_arguments);
-        self.infer_argument_types(arguments, &call_arguments);
+        let bindings = Bindings::match_parameters(signatures, &mut call_arguments);
+        let mut call_argument_types = CallArgumentTypes::new(call_arguments);
+        self.infer_argument_types(
+            arguments,
+            &mut call_argument_types,
+            &bindings.argument_forms,
+        );
 
-        match bindings.check_types(self.db()) {
+        match bindings.check_types(self.db(), &mut call_argument_types) {
             Ok(bindings) => {
                 for binding in &bindings {
                     let Some(known_function) = binding
@@ -4349,7 +4365,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 match operand_type.try_call_dunder(
                     self.db(),
                     unary_dunder_method,
-                    &CallArguments::none(),
+                    CallArgumentTypes::none(),
                 ) {
                     Ok(outcome) => outcome.return_type(self.db()),
                     Err(e) => {
@@ -4631,7 +4647,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             .try_call_dunder(
                                 self.db(),
                                 reflected_dunder,
-                                &CallArguments::positional([left_ty]),
+                                CallArgumentTypes::positional([left_ty]),
                             )
                             .map(|outcome| outcome.return_type(self.db()))
                             .or_else(|_| {
@@ -4639,7 +4655,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                     .try_call_dunder(
                                         self.db(),
                                         op.dunder(),
-                                        &CallArguments::positional([right_ty]),
+                                        CallArgumentTypes::positional([right_ty]),
                                     )
                                     .map(|outcome| outcome.return_type(self.db()))
                             })
@@ -4651,7 +4667,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     .try_call_dunder(
                         self.db(),
                         op.dunder(),
-                        &CallArguments::positional([right_ty]),
+                        CallArgumentTypes::positional([right_ty]),
                     )
                     .map(|outcome| outcome.return_type(self.db()))
                     .ok();
@@ -4664,7 +4680,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             .try_call_dunder(
                                 self.db(),
                                 op.reflected_dunder(),
-                                &CallArguments::positional([left_ty]),
+                                CallArgumentTypes::positional([left_ty]),
                             )
                             .map(|outcome| outcome.return_type(self.db()))
                             .ok()
@@ -5315,7 +5331,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     .try_call_dunder(
                         db,
                         op.dunder(),
-                        &CallArguments::positional([Type::Instance(right)]),
+                        CallArgumentTypes::positional([Type::Instance(right)]),
                     )
                     .map(|outcome| outcome.return_type(db))
                     .ok()
@@ -5364,7 +5380,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                 contains_dunder
                     .try_call(
                         db,
-                        &CallArguments::positional([Type::Instance(right), Type::Instance(left)]),
+                        CallArgumentTypes::positional([
+                            Type::Instance(right),
+                            Type::Instance(left),
+                        ]),
                     )
                     .map(|bindings| bindings.return_type(db))
                     .ok()
@@ -5635,7 +5654,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 match value_ty.try_call_dunder(
                     self.db(),
                     "__getitem__",
-                    &CallArguments::positional([slice_ty]),
+                    CallArgumentTypes::positional([slice_ty]),
                 ) {
                     Ok(outcome) => return outcome.return_type(self.db()),
                     Err(err @ CallDunderError::PossiblyUnbound { .. }) => {
@@ -5697,7 +5716,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                             match ty.try_call(
                                 self.db(),
-                                &CallArguments::positional([value_ty, slice_ty]),
+                                CallArgumentTypes::positional([value_ty, slice_ty]),
                             ) {
                                 Ok(bindings) => return bindings.return_type(self.db()),
                                 Err(CallError(_, bindings)) => {

@@ -518,7 +518,7 @@ pub(crate) struct Parameter<'db> {
     annotated_type: Option<Type<'db>>,
 
     kind: ParameterKind<'db>,
-    pub(crate) is_type_form: bool,
+    pub(crate) form: ParameterForm,
 }
 
 impl<'db> Parameter<'db> {
@@ -529,7 +529,7 @@ impl<'db> Parameter<'db> {
                 name,
                 default_type: None,
             },
-            is_type_form: false,
+            form: ParameterForm::Value,
         }
     }
 
@@ -540,7 +540,7 @@ impl<'db> Parameter<'db> {
                 name,
                 default_type: None,
             },
-            is_type_form: false,
+            form: ParameterForm::Value,
         }
     }
 
@@ -548,7 +548,7 @@ impl<'db> Parameter<'db> {
         Self {
             annotated_type: None,
             kind: ParameterKind::Variadic { name },
-            is_type_form: false,
+            form: ParameterForm::Value,
         }
     }
 
@@ -559,7 +559,7 @@ impl<'db> Parameter<'db> {
                 name,
                 default_type: None,
             },
-            is_type_form: false,
+            form: ParameterForm::Value,
         }
     }
 
@@ -567,7 +567,7 @@ impl<'db> Parameter<'db> {
         Self {
             annotated_type: None,
             kind: ParameterKind::KeywordVariadic { name },
-            is_type_form: false,
+            form: ParameterForm::Value,
         }
     }
 
@@ -589,7 +589,7 @@ impl<'db> Parameter<'db> {
     }
 
     pub(crate) fn type_form(mut self) -> Self {
-        self.is_type_form = true;
+        self.form = ParameterForm::Type;
         self
     }
 
@@ -604,7 +604,7 @@ impl<'db> Parameter<'db> {
                 .annotation()
                 .map(|annotation| definition_expression_type(db, definition, annotation)),
             kind,
-            is_type_form: false,
+            form: ParameterForm::Value,
         }
     }
 
@@ -722,6 +722,13 @@ pub(crate) enum ParameterKind<'db> {
         /// Parameter name.
         name: Name,
     },
+}
+
+/// Whether a parameter is used as a value or a type form.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub(crate) enum ParameterForm {
+    Value,
+    Type,
 }
 
 #[cfg(test)]

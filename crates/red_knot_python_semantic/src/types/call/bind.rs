@@ -6,16 +6,17 @@
 use smallvec::SmallVec;
 
 use super::{
-    ArgumentForm, ArgumentKind, CallArguments, CallError, CallErrorKind, CallableSignature,
+    Argument, CallArgumentTypes, CallArguments, CallError, CallErrorKind, CallableSignature,
     InferContext, Signature, Signatures, Type,
 };
 use crate::db::Db;
 use crate::symbol::{Boundness, Symbol};
 use crate::types::diagnostic::{
-    CALL_NON_CALLABLE, INVALID_ARGUMENT_TYPE, MISSING_ARGUMENT, NO_MATCHING_OVERLOAD,
-    PARAMETER_ALREADY_ASSIGNED, TOO_MANY_POSITIONAL_ARGUMENTS, UNKNOWN_ARGUMENT,
+    CALL_NON_CALLABLE, CONFLICTING_ARGUMENT_FORMS, INVALID_ARGUMENT_TYPE, MISSING_ARGUMENT,
+    NO_MATCHING_OVERLOAD, PARAMETER_ALREADY_ASSIGNED, TOO_MANY_POSITIONAL_ARGUMENTS,
+    UNKNOWN_ARGUMENT,
 };
-use crate::types::signatures::Parameter;
+use crate::types::signatures::{Parameter, ParameterForm};
 use crate::types::{
     todo_type, BoundMethodType, CallableType, ClassLiteralType, KnownClass, KnownFunction,
     KnownInstanceType, UnionType,
@@ -29,14 +30,21 @@ use ruff_text_size::Ranged;
 ///
 /// It's guaranteed that the wrapped bindings have no errors.
 #[derive(Debug, Clone)]
-pub(crate) struct Bindings<'call, 'db> {
+pub(crate) struct Bindings<'db> {
     signatures: Signatures<'db>,
     /// By using `SmallVec`, we avoid an extra heap allocation for the common case of a non-union
     /// type.
-    elements: SmallVec<[CallableBinding<'call, 'db>; 1]>,
+    elements: SmallVec<[CallableBinding<'db>; 1]>,
+
+    /// Whether each argument will be used as a value and/or a type form in this call.
+    ///
+    /// TODO: We will eventually infer completely different argument types for each signature, once
+    /// we are able to use the annotated parameter types as type contexts for that inference. At
+    /// that point, this field will move down into `CallBinding` or `Binding`.
+    pub(crate) argument_forms: Box<[Option<ParameterForm>]>,
 }
 
-impl<'call, 'db> Bindings<'call, 'db> {
+impl<'db> Bindings<'db> {
     /// Binds the arguments of a call site against a signature.
     ///
     /// The returned bindings provide the return type of the call, the bound types for all
@@ -44,16 +52,20 @@ impl<'call, 'db> Bindings<'call, 'db> {
     /// overload (if any).
     pub(crate) fn match_parameters(
         signatures: Signatures<'db>,
-        arguments: &CallArguments<'call, 'db>,
+        arguments: &mut CallArguments<'_>,
     ) -> Self {
-        let elements: SmallVec<[CallableBinding<'call, 'db>; 1]> = signatures
+        let mut argument_forms = vec![None; arguments.len()];
+        let elements: SmallVec<[CallableBinding<'db>; 1]> = signatures
             .iter()
-            .map(|signature| CallableBinding::match_parameters(signature, arguments.clone()))
+            .map(|signature| {
+                CallableBinding::match_parameters(signature, arguments, &mut argument_forms)
+            })
             .collect();
 
         Bindings {
             signatures,
             elements,
+            argument_forms: argument_forms.into(),
         }
     }
 
@@ -62,9 +74,13 @@ impl<'call, 'db> Bindings<'call, 'db> {
     /// The returned bindings provide the return type of the call, the bound types for all
     /// parameters, and any errors resulting from binding the call, all for each union element and
     /// overload (if any).
-    pub(crate) fn check_types(mut self, db: &'db dyn Db) -> Result<Self, CallError<'call, 'db>> {
+    pub(crate) fn check_types(
+        mut self,
+        db: &'db dyn Db,
+        argument_types: &mut CallArgumentTypes<'_, 'db>,
+    ) -> Result<Self, CallError<'db>> {
         for (signature, element) in self.signatures.iter().zip(&mut self.elements) {
-            element.check_types(db, signature);
+            element.check_types(db, signature, argument_types);
         }
 
         self.evaluate_special_cases(db);
@@ -435,18 +451,18 @@ impl<'call, 'db> Bindings<'call, 'db> {
     }
 }
 
-impl<'a, 'call, 'db> IntoIterator for &'a Bindings<'call, 'db> {
-    type Item = &'a CallableBinding<'call, 'db>;
-    type IntoIter = std::slice::Iter<'a, CallableBinding<'call, 'db>>;
+impl<'a, 'db> IntoIterator for &'a Bindings<'db> {
+    type Item = &'a CallableBinding<'db>;
+    type IntoIter = std::slice::Iter<'a, CallableBinding<'db>>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.elements.iter()
     }
 }
 
-impl<'a, 'call, 'db> IntoIterator for &'a mut Bindings<'call, 'db> {
-    type Item = &'a mut CallableBinding<'call, 'db>;
-    type IntoIter = std::slice::IterMut<'a, CallableBinding<'call, 'db>>;
+impl<'a, 'db> IntoIterator for &'a mut Bindings<'db> {
+    type Item = &'a mut CallableBinding<'db>;
+    type IntoIter = std::slice::IterMut<'a, CallableBinding<'db>>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.elements.iter_mut()
@@ -469,11 +485,10 @@ impl<'a, 'call, 'db> IntoIterator for &'a mut Bindings<'call, 'db> {
 ///
 /// [overloads]: https://github.com/python/typing/pull/1839
 #[derive(Debug, Clone)]
-pub(crate) struct CallableBinding<'call, 'db> {
+pub(crate) struct CallableBinding<'db> {
     pub(crate) callable_type: Type<'db>,
     pub(crate) signature_type: Type<'db>,
     pub(crate) dunder_call_is_possibly_unbound: bool,
-    arguments: CallArguments<'call, 'db>,
 
     /// The bindings of each overload of this callable. Will be empty if the type is not callable.
     ///
@@ -482,15 +497,16 @@ pub(crate) struct CallableBinding<'call, 'db> {
     overloads: SmallVec<[Binding<'db>; 1]>,
 }
 
-impl<'call, 'db> CallableBinding<'call, 'db> {
+impl<'db> CallableBinding<'db> {
     fn match_parameters(
         signature: &CallableSignature<'db>,
-        mut arguments: CallArguments<'call, 'db>,
+        arguments: &mut CallArguments<'_>,
+        argument_forms: &mut [Option<ParameterForm>],
     ) -> Self {
         // If this callable is a bound method, prepend the self instance onto the arguments list
         // before checking.
-        if let Some(bound_type) = signature.bound_type {
-            arguments = arguments.with_self(bound_type);
+        if signature.bound_type.is_some() {
+            arguments.push_self();
         }
 
         // TODO: This checks every overload. In the proposed more detailed call checking spec [1],
@@ -501,20 +517,39 @@ impl<'call, 'db> CallableBinding<'call, 'db> {
         // [1] https://github.com/python/typing/pull/1839
         let overloads = signature
             .into_iter()
-            .map(|signature| Binding::match_parameters(signature, &arguments))
+            .map(|signature| Binding::match_parameters(signature, arguments, argument_forms))
             .collect();
-        CallableBinding {
+        let binding = CallableBinding {
             callable_type: signature.callable_type,
             signature_type: signature.signature_type,
             dunder_call_is_possibly_unbound: signature.dunder_call_is_possibly_unbound,
-            arguments,
             overloads,
+        };
+
+        if signature.bound_type.is_some() {
+            arguments.pop_self();
         }
+        binding
     }
 
-    fn check_types(&mut self, db: &'db dyn Db, signature: &CallableSignature<'db>) {
+    fn check_types(
+        &mut self,
+        db: &'db dyn Db,
+        signature: &CallableSignature<'db>,
+        argument_types: &mut CallArgumentTypes<'_, 'db>,
+    ) {
+        // If this callable is a bound method, prepend the self instance onto the arguments list
+        // before checking.
+        if let Some(self_type) = signature.bound_type {
+            argument_types.push_self(self_type);
+        }
+
         for (signature, overload) in signature.iter().zip(&mut self.overloads) {
-            overload.check_types(db, signature, &self.arguments);
+            overload.check_types(db, signature, argument_types);
+        }
+
+        if signature.bound_type.is_some() {
+            argument_types.pop_self();
         }
     }
 
@@ -650,7 +685,11 @@ pub(crate) struct Binding<'db> {
 }
 
 impl<'db> Binding<'db> {
-    fn match_parameters(signature: &Signature<'db>, arguments: &CallArguments<'_, 'db>) -> Self {
+    fn match_parameters(
+        signature: &Signature<'db>,
+        arguments: &CallArguments<'_>,
+        argument_forms: &mut [Option<ParameterForm>],
+    ) -> Self {
         let parameters = signature.parameters();
         // The parameter that each argument is matched with.
         let mut argument_parameters = vec![usize::MAX; arguments.len()];
@@ -672,9 +711,9 @@ impl<'db> Binding<'db> {
             }
         };
         for (argument_index, argument) in arguments.iter().enumerate() {
-            let (index, parameter, positional) = match argument.kind() {
-                ArgumentKind::Positional | ArgumentKind::Synthetic => {
-                    if matches!(argument.kind(), ArgumentKind::Synthetic) {
+            let (index, parameter, positional) = match argument {
+                Argument::Positional | Argument::Synthetic => {
+                    if matches!(argument, Argument::Synthetic) {
                         num_synthetic_args += 1;
                     }
                     let Some((index, parameter)) = parameters
@@ -689,7 +728,7 @@ impl<'db> Binding<'db> {
                     next_positional += 1;
                     (index, parameter, !parameter.is_variadic())
                 }
-                ArgumentKind::Keyword(name) => {
+                Argument::Keyword(name) => {
                     let Some((index, parameter)) = parameters
                         .keyword_by_name(name)
                         .or_else(|| parameters.keyword_variadic())
@@ -703,15 +742,21 @@ impl<'db> Binding<'db> {
                     (index, parameter, false)
                 }
 
-                ArgumentKind::Variadic | ArgumentKind::Keywords => {
+                Argument::Variadic | Argument::Keywords => {
                     // TODO
                     continue;
                 }
             };
-            if parameter.is_type_form {
-                argument.add_form(ArgumentForm::TYPE_FORM);
-            } else {
-                argument.add_form(ArgumentForm::VALUE);
+            if !matches!(argument, Argument::Synthetic) {
+                if let Some(existing) =
+                    argument_forms[argument_index - num_synthetic_args].replace(parameter.form)
+                {
+                    if existing != parameter.form {
+                        errors.push(BindingError::ConflictingArgumentForms {
+                            argument_index: get_argument_index(argument_index, num_synthetic_args),
+                        });
+                    }
+                }
             }
             if parameter_matched[index] {
                 if !parameter.is_variadic() && !parameter.is_keyword_variadic() {
@@ -767,7 +812,7 @@ impl<'db> Binding<'db> {
         &mut self,
         db: &'db dyn Db,
         signature: &Signature<'db>,
-        arguments: &CallArguments<'_, 'db>,
+        argument_types: &CallArgumentTypes<'_, 'db>,
     ) {
         let parameters = signature.parameters();
         let mut num_synthetic_args = 0;
@@ -782,8 +827,8 @@ impl<'db> Binding<'db> {
                 None
             }
         };
-        for (argument_index, argument) in arguments.iter().enumerate() {
-            if matches!(argument.kind(), ArgumentKind::Synthetic) {
+        for (argument_index, (argument, argument_type)) in argument_types.iter().enumerate() {
+            if matches!(argument, Argument::Synthetic) {
                 num_synthetic_args += 1;
             }
             let parameter_index = self.argument_parameters[argument_index];
@@ -793,32 +838,25 @@ impl<'db> Binding<'db> {
                 continue;
             }
             let parameter = &parameters[parameter_index];
-            let argument_ty = if parameter.is_type_form {
-                argument.type_form_type()
-            } else {
-                argument.argument_type()
-            };
             if let Some(expected_ty) = parameter.annotated_type() {
-                if !argument_ty.is_assignable_to(db, expected_ty) {
-                    let positional = matches!(
-                        argument.kind(),
-                        ArgumentKind::Positional | ArgumentKind::Synthetic
-                    ) && !parameter.is_variadic();
+                if !argument_type.is_assignable_to(db, expected_ty) {
+                    let positional = matches!(argument, Argument::Positional | Argument::Synthetic)
+                        && !parameter.is_variadic();
                     self.errors.push(BindingError::InvalidArgumentType {
                         parameter: ParameterContext::new(parameter, parameter_index, positional),
                         argument_index: get_argument_index(argument_index, num_synthetic_args),
                         expected_ty,
-                        provided_ty: argument_ty,
+                        provided_ty: argument_type,
                     });
                 }
             }
             // We still update the actual type of the parameter in this binding to match the
             // argument, even if the argument type is not assignable to the expected parameter
             // type.
-            if let Some(existing) = self.parameter_tys[parameter_index].replace(argument_ty) {
+            if let Some(existing) = self.parameter_tys[parameter_index].replace(argument_type) {
                 // We already verified in `match_parameters` that we only match multiple arguments
                 // with variadic parameters.
-                let union = UnionType::from_elements(db, [existing, argument_ty]);
+                let union = UnionType::from_elements(db, [existing, argument_type]);
                 self.parameter_tys[parameter_index] = Some(union);
             }
         }
@@ -974,6 +1012,8 @@ pub(crate) enum BindingError<'db> {
         argument_index: Option<usize>,
         parameter: ParameterContext,
     },
+    /// An argument is used as both a value and a type form
+    ConflictingArgumentForms { argument_index: Option<usize> },
 }
 
 impl<'db> BindingError<'db> {
@@ -1118,6 +1158,21 @@ impl<'db> BindingError<'db> {
                         "Multiple values provided for parameter {parameter}{}",
                         if let Some(CallableDescription { kind, name }) = callable_description {
                             format!(" of {kind} `{name}`")
+                        } else {
+                            String::new()
+                        }
+                    ),
+                );
+            }
+
+            Self::ConflictingArgumentForms { argument_index } => {
+                context.report_lint(
+                    &CONFLICTING_ARGUMENT_FORMS,
+                    Self::get_node(node, *argument_index),
+                    format_args!(
+                        "Argument is used as both a value and a type form in call{}",
+                        if let Some(CallableDescription { kind, name }) = callable_description {
+                            format!(" to {kind} `{name}`")
                         } else {
                             String::new()
                         }

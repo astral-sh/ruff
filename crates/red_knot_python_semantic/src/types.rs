@@ -30,13 +30,13 @@ use crate::semantic_index::symbol::ScopeId;
 use crate::semantic_index::{imported_modules, semantic_index};
 use crate::suppression::check_suppressions;
 use crate::symbol::{imported_symbol, Boundness, Symbol, SymbolAndQualifiers};
-use crate::types::call::{Bindings, CallArguments};
+use crate::types::call::{Bindings, CallArgumentTypes};
 use crate::types::class_base::ClassBase;
 use crate::types::diagnostic::{INVALID_TYPE_FORM, UNSUPPORTED_BOOL_CONVERSION};
 use crate::types::infer::infer_unpack_types;
 use crate::types::mro::{Mro, MroError, MroIterator};
 pub(crate) use crate::types::narrow::infer_narrowing_constraint;
-use crate::types::signatures::{Parameter, Parameters};
+use crate::types::signatures::{Parameter, ParameterForm, Parameters};
 use crate::{Db, FxOrderSet, Module, Program};
 pub(crate) use class::{Class, ClassLiteralType, InstanceType, KnownClass, KnownInstanceType};
 
@@ -1689,7 +1689,7 @@ impl<'db> Type<'db> {
 
         if let Symbol::Type(descr_get, descr_get_boundness) = descr_get {
             let return_ty = descr_get
-                .try_call(db, &CallArguments::positional([self, instance, owner]))
+                .try_call(db, CallArgumentTypes::positional([self, instance, owner]))
                 .map(|bindings| {
                     if descr_get_boundness == Boundness::Bound {
                         bindings.return_type(db)
@@ -2028,28 +2028,28 @@ impl<'db> Type<'db> {
                     InstanceFallbackShadowsNonDataDescriptor::No,
                 );
 
-                let custom_getattr_result =
-                    || {
-                        // Typeshed has a fake `__getattr__` on `types.ModuleType` to help out with dynamic imports.
-                        // We explicitly hide it here to prevent arbitrary attributes from being available on modules.
-                        if self.into_instance().is_some_and(|instance| {
-                            instance.class.is_known(db, KnownClass::ModuleType)
-                        }) {
-                            return Symbol::Unbound.into();
-                        }
+                let custom_getattr_result = || {
+                    // Typeshed has a fake `__getattr__` on `types.ModuleType` to help out with dynamic imports.
+                    // We explicitly hide it here to prevent arbitrary attributes from being available on modules.
+                    if self
+                        .into_instance()
+                        .is_some_and(|instance| instance.class.is_known(db, KnownClass::ModuleType))
+                    {
+                        return Symbol::Unbound.into();
+                    }
 
-                        self.try_call_dunder(
-                            db,
-                            "__getattr__",
-                            &CallArguments::positional([Type::StringLiteral(
-                                StringLiteralType::new(db, Box::from(name.as_str())),
-                            )]),
-                        )
-                        .map(|outcome| Symbol::bound(outcome.return_type(db)))
-                        // TODO: Handle call errors here.
-                        .unwrap_or(Symbol::Unbound)
-                        .into()
-                    };
+                    self.try_call_dunder(
+                        db,
+                        "__getattr__",
+                        CallArgumentTypes::positional([Type::StringLiteral(
+                            StringLiteralType::new(db, Box::from(name.as_str())),
+                        )]),
+                    )
+                    .map(|outcome| Symbol::bound(outcome.return_type(db)))
+                    // TODO: Handle call errors here.
+                    .unwrap_or(Symbol::Unbound)
+                    .into()
+                };
 
                 match result {
                     member @ SymbolAndQualifiers {
@@ -2162,7 +2162,7 @@ impl<'db> Type<'db> {
                         }
                     };
 
-                    match self.try_call_dunder(db, "__bool__", &CallArguments::none()) {
+                    match self.try_call_dunder(db, "__bool__", CallArgumentTypes::none()) {
                         Ok(outcome) => {
                             let return_type = outcome.return_type(db);
                             if !return_type.is_assignable_to(db, KnownClass::Bool.to_instance(db)) {
@@ -2300,7 +2300,7 @@ impl<'db> Type<'db> {
             return usize_len.try_into().ok().map(Type::IntLiteral);
         }
 
-        let return_ty = match self.try_call_dunder(db, "__len__", &CallArguments::none()) {
+        let return_ty = match self.try_call_dunder(db, "__len__", CallArgumentTypes::none()) {
             Ok(bindings) => bindings.return_type(db),
             Err(CallDunderError::PossiblyUnbound(bindings)) => bindings.return_type(db),
 
@@ -2660,32 +2660,34 @@ impl<'db> Type<'db> {
     /// You get back a [`Bindings`] for both successful and unsuccessful calls.
     /// It contains information about which formal parameters each argument was matched to,
     /// and about any errors matching arguments and parameters.
-    fn try_call<'call>(
+    fn try_call(
         self,
         db: &'db dyn Db,
-        arguments: &CallArguments<'call, 'db>,
-    ) -> Result<Bindings<'call, 'db>, CallError<'call, 'db>> {
+        mut argument_types: CallArgumentTypes<'_, 'db>,
+    ) -> Result<Bindings<'db>, CallError<'db>> {
         let signatures = self.signatures(db);
-        Bindings::match_parameters(signatures, arguments).check_types(db)
+        Bindings::match_parameters(signatures, &mut argument_types)
+            .check_types(db, &mut argument_types)
     }
 
     /// Look up a dunder method on the meta-type of `self` and call it.
     ///
     /// Returns an `Err` if the dunder method can't be called,
     /// or the given arguments are not valid.
-    fn try_call_dunder<'call>(
+    fn try_call_dunder(
         self,
         db: &'db dyn Db,
         name: &str,
-        arguments: &CallArguments<'call, 'db>,
-    ) -> Result<Bindings<'call, 'db>, CallDunderError<'call, 'db>> {
+        mut argument_types: CallArgumentTypes<'_, 'db>,
+    ) -> Result<Bindings<'db>, CallDunderError<'db>> {
         match self
             .member_lookup_with_policy(db, name.into(), MemberLookupPolicy::NoInstanceFallback)
             .symbol
         {
             Symbol::Type(dunder_callable, boundness) => {
                 let signatures = dunder_callable.signatures(db);
-                let bindings = Bindings::match_parameters(signatures, arguments).check_types(db)?;
+                let bindings = Bindings::match_parameters(signatures, &mut argument_types)
+                    .check_types(db, &mut argument_types)?;
                 if boundness == Boundness::PossiblyUnbound {
                     return Err(CallDunderError::PossiblyUnbound(Box::new(bindings)));
                 }
@@ -2712,7 +2714,7 @@ impl<'db> Type<'db> {
     /// for y in x:
     ///     pass
     /// ```
-    fn try_iterate<'call>(self, db: &'db dyn Db) -> Result<Type<'db>, IterationError<'call, 'db>> {
+    fn try_iterate(self, db: &'db dyn Db) -> Result<Type<'db>, IterationError<'db>> {
         if let Type::Tuple(tuple_type) = self {
             return Ok(UnionType::from_elements(db, tuple_type.elements(db)));
         }
@@ -2721,19 +2723,19 @@ impl<'db> Type<'db> {
             self.try_call_dunder(
                 db,
                 "__getitem__",
-                &CallArguments::positional([KnownClass::Int.to_instance(db)]),
+                CallArgumentTypes::positional([KnownClass::Int.to_instance(db)]),
             )
             .map(|dunder_getitem_outcome| dunder_getitem_outcome.return_type(db))
         };
 
         let try_call_dunder_next_on_iterator = |iterator: Type<'db>| {
             iterator
-                .try_call_dunder(db, "__next__", &CallArguments::none())
+                .try_call_dunder(db, "__next__", CallArgumentTypes::none())
                 .map(|dunder_next_outcome| dunder_next_outcome.return_type(db))
         };
 
         let dunder_iter_result = self
-            .try_call_dunder(db, "__iter__", &CallArguments::none())
+            .try_call_dunder(db, "__iter__", CallArgumentTypes::none())
             .map(|dunder_iter_outcome| dunder_iter_outcome.return_type(db));
 
         match dunder_iter_result {
@@ -2816,15 +2818,12 @@ impl<'db> Type<'db> {
     /// with x as y:
     ///     pass
     /// ```
-    fn try_enter<'call>(
-        self,
-        db: &'db dyn Db,
-    ) -> Result<Type<'db>, ContextManagerError<'call, 'db>> {
-        let enter = self.try_call_dunder(db, "__enter__", &CallArguments::none());
+    fn try_enter(self, db: &'db dyn Db) -> Result<Type<'db>, ContextManagerError<'db>> {
+        let enter = self.try_call_dunder(db, "__enter__", CallArgumentTypes::none());
         let exit = self.try_call_dunder(
             db,
             "__exit__",
-            &CallArguments::positional([Type::none(db), Type::none(db), Type::none(db)]),
+            CallArgumentTypes::positional([Type::none(db), Type::none(db), Type::none(db)]),
         );
 
         // TODO: Make use of Protocols when we support it (the manager be assignable to `contextlib.AbstractContextManager`).
@@ -3385,19 +3384,19 @@ pub enum TypeVarBoundOrConstraints<'db> {
 
 /// Error returned if a type is not (or may not be) a context manager.
 #[derive(Debug)]
-enum ContextManagerError<'call, 'db> {
-    Enter(CallDunderError<'call, 'db>),
+enum ContextManagerError<'db> {
+    Enter(CallDunderError<'db>),
     Exit {
         enter_return_type: Type<'db>,
-        exit_error: CallDunderError<'call, 'db>,
+        exit_error: CallDunderError<'db>,
     },
     EnterAndExit {
-        enter_error: CallDunderError<'call, 'db>,
-        exit_error: CallDunderError<'call, 'db>,
+        enter_error: CallDunderError<'db>,
+        exit_error: CallDunderError<'db>,
     },
 }
 
-impl<'call, 'db> ContextManagerError<'call, 'db> {
+impl<'db> ContextManagerError<'db> {
     fn fallback_enter_type(&self, db: &'db dyn Db) -> Type<'db> {
         self.enter_type(db).unwrap_or(Type::unknown())
     }
@@ -3431,8 +3430,7 @@ impl<'call, 'db> ContextManagerError<'call, 'db> {
         context_expression_type: Type<'db>,
         context_expression_node: ast::AnyNodeRef,
     ) {
-        let format_call_dunder_error = |call_dunder_error: &CallDunderError<'call, 'db>,
-                                        name: &str| {
+        let format_call_dunder_error = |call_dunder_error: &CallDunderError<'db>, name: &str| {
             match call_dunder_error {
                 CallDunderError::MethodNotAvailable => format!("it does not implement `{name}`"),
                 CallDunderError::PossiblyUnbound(_) => {
@@ -3447,9 +3445,9 @@ impl<'call, 'db> ContextManagerError<'call, 'db> {
             }
         };
 
-        let format_call_dunder_errors = |error_a: &CallDunderError<'call, 'db>,
+        let format_call_dunder_errors = |error_a: &CallDunderError<'db>,
                                          name_a: &str,
-                                         error_b: &CallDunderError<'call, 'db>,
+                                         error_b: &CallDunderError<'db>,
                                          name_b: &str| {
             match (error_a, error_b) {
                 (CallDunderError::PossiblyUnbound(_), CallDunderError::PossiblyUnbound(_)) => {
@@ -3496,10 +3494,10 @@ impl<'call, 'db> ContextManagerError<'call, 'db> {
 
 /// Error returned if a type is not (or may not be) iterable.
 #[derive(Debug)]
-enum IterationError<'call, 'db> {
+enum IterationError<'db> {
     /// The object being iterated over has a bound `__iter__` method,
     /// but calling it with the expected arguments results in an error.
-    IterCallError(CallErrorKind, Box<Bindings<'call, 'db>>),
+    IterCallError(CallErrorKind, Box<Bindings<'db>>),
 
     /// The object being iterated over has a bound `__iter__` method that can be called
     /// with the expected types, but it returns an object that is not a valid iterator.
@@ -3508,7 +3506,7 @@ enum IterationError<'call, 'db> {
         iterator: Type<'db>,
         /// The error we encountered when we tried to call `__next__` on the type
         /// returned by `__iter__`
-        dunder_next_error: CallDunderError<'call, 'db>,
+        dunder_next_error: CallDunderError<'db>,
     },
 
     /// The object being iterated over has a bound `__iter__` method that returns a
@@ -3520,18 +3518,18 @@ enum IterationError<'call, 'db> {
         /// (The iterator being the type returned by the `__iter__` method on the iterable.)
         dunder_next_return: Type<'db>,
         /// The error we encountered when we tried to call `__getitem__` on the iterable.
-        dunder_getitem_error: CallDunderError<'call, 'db>,
+        dunder_getitem_error: CallDunderError<'db>,
     },
 
     /// The object being iterated over doesn't have an `__iter__` method.
     /// It also either doesn't have a `__getitem__` method to fall back to,
     /// or calling the `__getitem__` method returns some kind of error.
     UnboundIterAndGetitemError {
-        dunder_getitem_error: CallDunderError<'call, 'db>,
+        dunder_getitem_error: CallDunderError<'db>,
     },
 }
 
-impl<'db> IterationError<'_, 'db> {
+impl<'db> IterationError<'db> {
     fn fallback_element_type(&self, db: &'db dyn Db) -> Type<'db> {
         self.element_type(db).unwrap_or(Type::unknown())
     }
@@ -3545,7 +3543,7 @@ impl<'db> IterationError<'_, 'db> {
 
             Self::IterCallError(_, dunder_iter_bindings) => dunder_iter_bindings
                 .return_type(db)
-                .try_call_dunder(db, "__next__", &CallArguments::none())
+                .try_call_dunder(db, "__next__", CallArgumentTypes::none())
                 .map(|dunder_next_outcome| Some(dunder_next_outcome.return_type(db)))
                 .unwrap_or_else(|dunder_next_call_error| dunder_next_call_error.return_type(db)),
 
