@@ -529,7 +529,7 @@ pub struct FormatCommand {
     pub range: Option<FormatRange>,
 
     /// Exit with a non-zero status code if any files were modified via format, even if all files were formatted successfully.
-    #[arg(long, help_heading = "Miscellaneous")]
+    #[arg(long, help_heading = "Miscellaneous", alias = "exit-non-zero-on-fix")]
     pub exit_non_zero_on_format: bool,
 }
 
