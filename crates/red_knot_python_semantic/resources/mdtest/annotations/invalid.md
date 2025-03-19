@@ -96,6 +96,7 @@ def _(
     d: [k for k in [1, 2]],  # error: [invalid-type-form] "List comprehensions are not allowed in type expressions"
     e: {k for k in [1, 2]},  # error: [invalid-type-form] "Set comprehensions are not allowed in type expressions"
     f: (k for k in [1, 2]),  # error: [invalid-type-form] "Generator expressions are not allowed in type expressions"
+    g: [int, str],  # error: [invalid-type-form] "List literals are not allowed in this context in a type expression"
 ):
     reveal_type(a)  # revealed: Unknown
     reveal_type(b)  # revealed: Unknown
@@ -103,4 +104,5 @@ def _(
     reveal_type(d)  # revealed: Unknown
     reveal_type(e)  # revealed: Unknown
     reveal_type(f)  # revealed: Unknown
+    reveal_type(g)  # revealed: Unknown
 ```
