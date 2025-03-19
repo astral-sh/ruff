@@ -9,25 +9,26 @@ use anyhow::Result;
 use itertools::Itertools;
 use log::warn;
 
-use ruff_diagnostics::{Diagnostic, Edit};
+use ruff_diagnostics::Edit;
 use ruff_python_trivia::{indentation_at_offset, CommentRanges, Cursor};
 use ruff_source_file::{LineEnding, LineRanges};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::codes::NoqaCode;
 use crate::fs::relativize_path;
+use crate::message::Message;
 use crate::registry::{AsRule, Rule, RuleSet};
 use crate::rule_redirects::get_redirect_target;
 use crate::Locator;
 
-/// Generates an array of edits that matches the length of `diagnostics`.
+/// Generates an array of edits that matches the length of `messages`.
 /// Each potential edit in the array is paired, in order, with the associated diagnostic.
 /// Each edit will add a `noqa` comment to the appropriate line in the source to hide
 /// the diagnostic. These edits may conflict with each other and should not be applied
 /// simultaneously.
 pub fn generate_noqa_edits(
     path: &Path,
-    diagnostics: &[Diagnostic],
+    messages: &[Message],
     locator: &Locator,
     comment_ranges: &CommentRanges,
     external: &[String],
@@ -37,7 +38,7 @@ pub fn generate_noqa_edits(
     let file_directives = FileNoqaDirectives::extract(locator, comment_ranges, external, path);
     let exemption = FileExemption::from(&file_directives);
     let directives = NoqaDirectives::from_commented_ranges(comment_ranges, external, path, locator);
-    let comments = find_noqa_comments(diagnostics, locator, &exemption, &directives, noqa_line_for);
+    let comments = find_noqa_comments(messages, locator, &exemption, &directives, noqa_line_for);
     build_noqa_edits_by_diagnostic(comments, locator, line_ending)
 }
 
@@ -699,10 +700,10 @@ impl Display for LexicalError {
 
 impl Error for LexicalError {}
 
-/// Adds noqa comments to suppress all diagnostics of a file.
+/// Adds noqa comments to suppress all messages of a file.
 pub(crate) fn add_noqa(
     path: &Path,
-    diagnostics: &[Diagnostic],
+    messages: &[Message],
     locator: &Locator,
     comment_ranges: &CommentRanges,
     external: &[String],
@@ -711,7 +712,7 @@ pub(crate) fn add_noqa(
 ) -> Result<usize> {
     let (count, output) = add_noqa_inner(
         path,
-        diagnostics,
+        messages,
         locator,
         comment_ranges,
         external,
@@ -725,7 +726,7 @@ pub(crate) fn add_noqa(
 
 fn add_noqa_inner(
     path: &Path,
-    diagnostics: &[Diagnostic],
+    messages: &[Message],
     locator: &Locator,
     comment_ranges: &CommentRanges,
     external: &[String],
@@ -740,7 +741,7 @@ fn add_noqa_inner(
 
     let directives = NoqaDirectives::from_commented_ranges(comment_ranges, external, path, locator);
 
-    let comments = find_noqa_comments(diagnostics, locator, &exemption, &directives, noqa_line_for);
+    let comments = find_noqa_comments(messages, locator, &exemption, &directives, noqa_line_for);
 
     let edits = build_noqa_edits_by_line(comments, locator, line_ending);
 
@@ -776,7 +777,7 @@ fn build_noqa_edits_by_diagnostic(
                 if let Some(noqa_edit) = generate_noqa_edit(
                     comment.directive,
                     comment.line,
-                    RuleSet::from_rule(comment.diagnostic.kind.rule()),
+                    RuleSet::from_rule(comment.rule),
                     locator,
                     line_ending,
                 ) {
@@ -812,7 +813,7 @@ fn build_noqa_edits_by_line<'a>(
             offset,
             matches
                 .into_iter()
-                .map(|NoqaComment { diagnostic, .. }| diagnostic.kind.rule())
+                .map(|NoqaComment { rule, .. }| rule)
                 .collect(),
             locator,
             line_ending,
@@ -825,22 +826,27 @@ fn build_noqa_edits_by_line<'a>(
 
 struct NoqaComment<'a> {
     line: TextSize,
-    diagnostic: &'a Diagnostic,
+    rule: Rule,
     directive: Option<&'a Directive<'a>>,
 }
 
 fn find_noqa_comments<'a>(
-    diagnostics: &'a [Diagnostic],
+    messages: &'a [Message],
     locator: &'a Locator,
     exemption: &'a FileExemption,
     directives: &'a NoqaDirectives,
     noqa_line_for: &NoqaMapping,
 ) -> Vec<Option<NoqaComment<'a>>> {
-    // List of noqa comments, ordered to match up with `diagnostics`
+    // List of noqa comments, ordered to match up with `messages`
     let mut comments_by_line: Vec<Option<NoqaComment<'a>>> = vec![];
 
     // Mark any non-ignored diagnostics.
-    for diagnostic in diagnostics {
+    for message in messages {
+        let Message::Diagnostic(diagnostic) = message else {
+            comments_by_line.push(None);
+            continue;
+        };
+
         match &exemption {
             FileExemption::All(_) => {
                 // If the file is exempted, don't add any noqa directives.
@@ -876,7 +882,9 @@ fn find_noqa_comments<'a>(
             }
         }
 
-        let noqa_offset = noqa_line_for.resolve(diagnostic.start());
+        let noqa_offset = noqa_line_for.resolve(diagnostic.range.start());
+
+        let rule = diagnostic.kind.rule();
 
         // Or ignored by the directive itself?
         if let Some(directive_line) = directives.find_line_with_directive(noqa_offset) {
@@ -886,11 +894,10 @@ fn find_noqa_comments<'a>(
                     continue;
                 }
                 directive @ Directive::Codes(codes) => {
-                    let rule = diagnostic.kind.rule();
                     if !codes.includes(rule) {
                         comments_by_line.push(Some(NoqaComment {
                             line: directive_line.start(),
-                            diagnostic,
+                            rule,
                             directive: Some(directive),
                         }));
                     }
@@ -902,7 +909,7 @@ fn find_noqa_comments<'a>(
         // There's no existing noqa directive that suppresses the diagnostic.
         comments_by_line.push(Some(NoqaComment {
             line: locator.line_start(noqa_offset),
-            diagnostic,
+            rule,
             directive: None,
         }));
     }
@@ -1209,9 +1216,10 @@ mod tests {
 
     use ruff_diagnostics::{Diagnostic, Edit};
     use ruff_python_trivia::CommentRanges;
-    use ruff_source_file::LineEnding;
-    use ruff_text_size::{TextLen, TextRange, TextSize};
+    use ruff_source_file::{LineEnding, SourceFileBuilder};
+    use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
+    use crate::message::Message;
     use crate::noqa::{
         add_noqa_inner, lex_codes, lex_file_exemption, lex_inline_noqa, Directive, LexicalError,
         NoqaLexerOutput, NoqaMapping,
@@ -1234,6 +1242,17 @@ mod tests {
                 assert_eq!(&source[code.range], code.code);
             }
         }
+    }
+
+    /// Create a [`Message`] with a placeholder filename and rule code from `diagnostic`.
+    fn message_from_diagnostic(
+        diagnostic: Diagnostic,
+        path: impl AsRef<Path>,
+        source: &str,
+    ) -> Message {
+        let noqa_offset = diagnostic.start();
+        let file = SourceFileBuilder::new(path.as_ref().to_string_lossy(), source).finish();
+        Message::from_diagnostic(diagnostic, file, noqa_offset)
     }
 
     #[test]
@@ -2816,18 +2835,19 @@ mod tests {
         assert_eq!(count, 0);
         assert_eq!(output, format!("{contents}"));
 
-        let diagnostics = [Diagnostic::new(
+        let messages = [Diagnostic::new(
             UnusedVariable {
                 name: "x".to_string(),
             },
             TextRange::new(TextSize::from(0), TextSize::from(0)),
-        )];
+        )]
+        .map(|d| message_from_diagnostic(d, path, contents));
 
         let contents = "x = 1";
         let noqa_line_for = NoqaMapping::default();
         let (count, output) = add_noqa_inner(
             path,
-            &diagnostics,
+            &messages,
             &Locator::new(contents),
             &CommentRanges::default(),
             &[],
@@ -2837,7 +2857,7 @@ mod tests {
         assert_eq!(count, 1);
         assert_eq!(output, "x = 1  # noqa: F841\n");
 
-        let diagnostics = [
+        let messages = [
             Diagnostic::new(
                 AmbiguousVariableName("x".to_string()),
                 TextRange::new(TextSize::from(0), TextSize::from(0)),
@@ -2848,14 +2868,15 @@ mod tests {
                 },
                 TextRange::new(TextSize::from(0), TextSize::from(0)),
             ),
-        ];
+        ]
+        .map(|d| message_from_diagnostic(d, path, contents));
         let contents = "x = 1  # noqa: E741\n";
         let noqa_line_for = NoqaMapping::default();
         let comment_ranges =
             CommentRanges::new(vec![TextRange::new(TextSize::from(7), TextSize::from(19))]);
         let (count, output) = add_noqa_inner(
             path,
-            &diagnostics,
+            &messages,
             &Locator::new(contents),
             &comment_ranges,
             &[],
@@ -2865,7 +2886,7 @@ mod tests {
         assert_eq!(count, 1);
         assert_eq!(output, "x = 1  # noqa: E741, F841\n");
 
-        let diagnostics = [
+        let messages = [
             Diagnostic::new(
                 AmbiguousVariableName("x".to_string()),
                 TextRange::new(TextSize::from(0), TextSize::from(0)),
@@ -2876,14 +2897,15 @@ mod tests {
                 },
                 TextRange::new(TextSize::from(0), TextSize::from(0)),
             ),
-        ];
+        ]
+        .map(|d| message_from_diagnostic(d, path, contents));
         let contents = "x = 1  # noqa";
         let noqa_line_for = NoqaMapping::default();
         let comment_ranges =
             CommentRanges::new(vec![TextRange::new(TextSize::from(7), TextSize::from(13))]);
         let (count, output) = add_noqa_inner(
             path,
-            &diagnostics,
+            &messages,
             &Locator::new(contents),
             &comment_ranges,
             &[],
@@ -2907,14 +2929,15 @@ print(
 )
 "#;
         let noqa_line_for = [TextRange::new(8.into(), 68.into())].into_iter().collect();
-        let diagnostics = [Diagnostic::new(
+        let messages = [Diagnostic::new(
             PrintfStringFormatting,
             TextRange::new(12.into(), 79.into()),
-        )];
+        )]
+        .map(|d| message_from_diagnostic(d, path, source));
         let comment_ranges = CommentRanges::default();
         let edits = generate_noqa_edits(
             path,
-            &diagnostics,
+            &messages,
             &Locator::new(source),
             &comment_ranges,
             &[],
@@ -2938,15 +2961,16 @@ print(
 foo;
 bar =
 ";
-        let diagnostics = [Diagnostic::new(
+        let messages = [Diagnostic::new(
             UselessSemicolon,
             TextRange::new(4.into(), 5.into()),
-        )];
+        )]
+        .map(|d| message_from_diagnostic(d, path, source));
         let noqa_line_for = NoqaMapping::default();
         let comment_ranges = CommentRanges::default();
         let edits = generate_noqa_edits(
             path,
-            &diagnostics,
+            &messages,
             &Locator::new(source),
             &comment_ranges,
             &[],

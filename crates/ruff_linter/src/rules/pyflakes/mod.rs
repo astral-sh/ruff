@@ -22,6 +22,7 @@ mod tests {
     use ruff_text_size::Ranged;
 
     use crate::linter::check_path;
+    use crate::message::Message;
     use crate::registry::{AsRule, Linter, Rule};
     use crate::rules::isort;
     use crate::rules::pyflakes;
@@ -757,7 +758,7 @@ mod tests {
             &locator,
             &indexer,
         );
-        let mut diagnostics = check_path(
+        let mut messages = check_path(
             Path::new("<filename>"),
             None,
             &locator,
@@ -771,9 +772,10 @@ mod tests {
             &parsed,
             settings.unresolved_target_version,
         );
-        diagnostics.sort_by_key(Ranged::start);
-        let actual = diagnostics
+        messages.sort_by_key(Ranged::start);
+        let actual = messages
             .iter()
+            .filter_map(Message::as_diagnostic_message)
             .map(|diagnostic| diagnostic.kind.rule())
             .collect::<Vec<_>>();
         assert_eq!(actual, expected);

@@ -17,11 +17,11 @@ export default function Diagnostics({
   const diagnostics = useMemo(() => {
     const sorted = [...unsorted];
     sorted.sort((a, b) => {
-      if (a.location.row === b.location.row) {
-        return a.location.column - b.location.column;
+      if (a.start_location.row === b.start_location.row) {
+        return a.start_location.column - b.start_location.column;
       }
 
-      return a.location.row - b.location.row;
+      return a.start_location.row - b.start_location.row;
     });
 
     return sorted;
@@ -70,18 +70,22 @@ function Items({
       {diagnostics.map((diagnostic, index) => {
         return (
           <li
-            key={`${diagnostic.location.row}:${diagnostic.location.column}-${diagnostic.code ?? index}`}
+            key={`${diagnostic.start_location.row}:${diagnostic.start_location.column}-${diagnostic.code ?? index}`}
           >
             <button
               onClick={() =>
-                onGoTo(diagnostic.location.row, diagnostic.location.column)
+                onGoTo(
+                  diagnostic.start_location.row,
+                  diagnostic.start_location.column,
+                )
               }
               className="w-full text-start"
             >
               {diagnostic.message}{" "}
               <span className="text-gray-500">
                 {diagnostic.code != null && `(${diagnostic.code})`} [Ln{" "}
-                {diagnostic.location.row}, Col {diagnostic.location.column}]
+                {diagnostic.start_location.row}, Col{" "}
+                {diagnostic.start_location.column}]
               </span>
             </button>
           </li>

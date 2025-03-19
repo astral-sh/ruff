@@ -9,12 +9,13 @@ use crate::{
     session::DocumentQuery,
     PositionEncoding, DIAGNOSTIC_NAME,
 };
-use ruff_diagnostics::{Applicability, Diagnostic, DiagnosticKind, Edit, Fix};
-use ruff_linter::package::PackageRoot;
+use ruff_diagnostics::{Applicability, DiagnosticKind, Edit, Fix};
 use ruff_linter::{
     directives::{extract_directives, Flags},
     generate_noqa_edits,
     linter::check_path,
+    message::{DiagnosticMessage, Message, SyntaxErrorMessage},
+    package::PackageRoot,
     packaging::detect_package_root,
     registry::AsRule,
     settings::flags,
@@ -24,7 +25,7 @@ use ruff_linter::{
 use ruff_notebook::Notebook;
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
-use ruff_python_parser::{ParseError, ParseOptions, UnsupportedSyntaxError};
+use ruff_python_parser::ParseOptions;
 use ruff_source_file::LineIndex;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -120,7 +121,7 @@ pub(crate) fn check(
     let directives = extract_directives(parsed.tokens(), Flags::all(), &locator, &indexer);
 
     // Generate checks.
-    let diagnostics = check_path(
+    let messages = check_path(
         &query.virtual_file_path(),
         package,
         &locator,
@@ -137,7 +138,7 @@ pub(crate) fn check(
 
     let noqa_edits = generate_noqa_edits(
         &query.virtual_file_path(),
-        &diagnostics,
+        &messages,
         &locator,
         indexer.comment_ranges(),
         &settings.linter.external,
@@ -159,51 +160,31 @@ pub(crate) fn check(
             .or_default();
     }
 
-    let lsp_diagnostics = diagnostics
-        .into_iter()
-        .zip(noqa_edits)
-        .map(|(diagnostic, noqa_edit)| {
-            to_lsp_diagnostic(
-                diagnostic,
-                noqa_edit,
-                &source_kind,
-                locator.to_index(),
-                encoding,
-            )
-        });
-
-    let unsupported_syntax_errors = if settings.linter.preview.is_enabled() {
-        parsed.unsupported_syntax_errors()
-    } else {
-        &[]
-    };
-
-    let lsp_diagnostics = lsp_diagnostics.chain(
-        show_syntax_errors
-            .then(|| {
-                parsed
-                    .errors()
-                    .iter()
-                    .map(|parse_error| {
-                        parse_error_to_lsp_diagnostic(
-                            parse_error,
-                            &source_kind,
-                            locator.to_index(),
-                            encoding,
-                        )
-                    })
-                    .chain(unsupported_syntax_errors.iter().map(|error| {
-                        unsupported_syntax_error_to_lsp_diagnostic(
-                            error,
-                            &source_kind,
-                            locator.to_index(),
-                            encoding,
-                        )
-                    }))
-            })
+    let lsp_diagnostics =
+        messages
             .into_iter()
-            .flatten(),
-    );
+            .zip(noqa_edits)
+            .filter_map(|(message, noqa_edit)| match message {
+                Message::Diagnostic(diagnostic_message) => Some(to_lsp_diagnostic(
+                    diagnostic_message,
+                    noqa_edit,
+                    &source_kind,
+                    locator.to_index(),
+                    encoding,
+                )),
+                Message::SyntaxError(syntax_error_message) => {
+                    if show_syntax_errors {
+                        Some(syntax_error_to_lsp_diagnostic(
+                            syntax_error_message,
+                            &source_kind,
+                            locator.to_index(),
+                            encoding,
+                        ))
+                    } else {
+                        None
+                    }
+                }
+            });
 
     if let Some(notebook) = query.as_notebook() {
         for (index, diagnostic) in lsp_diagnostics {
@@ -260,13 +241,13 @@ pub(crate) fn fixes_for_diagnostics(
 /// Generates an LSP diagnostic with an associated cell index for the diagnostic to go in.
 /// If the source kind is a text document, the cell index will always be `0`.
 fn to_lsp_diagnostic(
-    diagnostic: Diagnostic,
+    diagnostic: DiagnosticMessage,
     noqa_edit: Option<Edit>,
     source_kind: &SourceKind,
     index: &LineIndex,
     encoding: PositionEncoding,
 ) -> (usize, lsp_types::Diagnostic) {
-    let Diagnostic {
+    let DiagnosticMessage {
         kind,
         range: diagnostic_range,
         fix,
@@ -339,8 +320,8 @@ fn to_lsp_diagnostic(
     )
 }
 
-fn parse_error_to_lsp_diagnostic(
-    parse_error: &ParseError,
+fn syntax_error_to_lsp_diagnostic(
+    syntax_error: SyntaxErrorMessage,
     source_kind: &SourceKind,
     index: &LineIndex,
     encoding: PositionEncoding,
@@ -349,7 +330,7 @@ fn parse_error_to_lsp_diagnostic(
     let cell: usize;
 
     if let Some(notebook_index) = source_kind.as_ipy_notebook().map(Notebook::index) {
-        NotebookRange { cell, range } = parse_error.location.to_notebook_range(
+        NotebookRange { cell, range } = syntax_error.range.to_notebook_range(
             source_kind.source_code(),
             index,
             notebook_index,
@@ -357,46 +338,7 @@ fn parse_error_to_lsp_diagnostic(
         );
     } else {
         cell = usize::default();
-        range = parse_error
-            .location
-            .to_range(source_kind.source_code(), index, encoding);
-    }
-
-    (
-        cell,
-        lsp_types::Diagnostic {
-            range,
-            severity: Some(lsp_types::DiagnosticSeverity::ERROR),
-            tags: None,
-            code: None,
-            code_description: None,
-            source: Some(DIAGNOSTIC_NAME.into()),
-            message: format!("SyntaxError: {}", &parse_error.error),
-            related_information: None,
-            data: None,
-        },
-    )
-}
-
-fn unsupported_syntax_error_to_lsp_diagnostic(
-    unsupported_syntax_error: &UnsupportedSyntaxError,
-    source_kind: &SourceKind,
-    index: &LineIndex,
-    encoding: PositionEncoding,
-) -> (usize, lsp_types::Diagnostic) {
-    let range: lsp_types::Range;
-    let cell: usize;
-
-    if let Some(notebook_index) = source_kind.as_ipy_notebook().map(Notebook::index) {
-        NotebookRange { cell, range } = unsupported_syntax_error.range.to_notebook_range(
-            source_kind.source_code(),
-            index,
-            notebook_index,
-            encoding,
-        );
-    } else {
-        cell = usize::default();
-        range = unsupported_syntax_error
+        range = syntax_error
             .range
             .to_range(source_kind.source_code(), index, encoding);
     }
@@ -410,7 +352,7 @@ fn unsupported_syntax_error_to_lsp_diagnostic(
             code: None,
             code_description: None,
             source: Some(DIAGNOSTIC_NAME.into()),
-            message: format!("SyntaxError: {unsupported_syntax_error}"),
+            message: syntax_error.message,
             related_information: None,
             data: None,
         },
