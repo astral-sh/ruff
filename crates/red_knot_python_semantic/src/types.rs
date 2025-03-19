@@ -4989,7 +4989,11 @@ impl<'db> GeneralCallableType<'db> {
         let mut self_keywords = HashMap::new();
 
         // Type of the variadic keyword parameter in `self`.
-        let mut self_keyword_variadic = None;
+        //
+        // This is a nested option where the outer option represents the presence of a keyword
+        // variadic parameter in `self` and the inner option represents the annotated type of the
+        // keyword variadic parameter.
+        let mut self_keyword_variadic: Option<Option<Type<'db>>> = None;
 
         for self_parameter in self_parameters {
             match self_parameter.kind() {
@@ -4998,7 +5002,7 @@ impl<'db> GeneralCallableType<'db> {
                     self_keywords.insert(name.clone(), self_parameter);
                 }
                 ParameterKind::KeywordVariadic { .. } => {
-                    self_keyword_variadic = self_parameter.annotated_type();
+                    self_keyword_variadic = Some(self_parameter.annotated_type());
                 }
                 ParameterKind::PositionalOnly { .. } => {
                     // These are the unmatched positional-only parameters in `self` from the
@@ -5041,11 +5045,8 @@ impl<'db> GeneralCallableType<'db> {
                                 "`self_keywords` should only contain keyword-only or standard parameters"
                             ),
                         }
-                    } else if let Some(self_keyword_variadic) = self_keyword_variadic {
-                        if !other_parameter
-                            .annotated_type()
-                            .unwrap()
-                            .is_subtype_of(db, self_keyword_variadic)
+                    } else if let Some(self_keyword_variadic_type) = self_keyword_variadic {
+                        if !is_subtype(other_parameter.annotated_type(), self_keyword_variadic_type)
                         {
                             return false;
                         }
@@ -5054,16 +5055,12 @@ impl<'db> GeneralCallableType<'db> {
                     }
                 }
                 ParameterKind::KeywordVariadic { .. } => {
-                    let Some(self_keyword_variadic) = self_keyword_variadic else {
+                    let Some(self_keyword_variadic_type) = self_keyword_variadic else {
                         // For a `self <: other` relationship, if `other` has a keyword variadic
                         // parameter, `self` must also have a keyword variadic parameter.
                         return false;
                     };
-                    if !other_parameter
-                        .annotated_type()
-                        .unwrap()
-                        .is_subtype_of(db, self_keyword_variadic)
-                    {
+                    if !is_subtype(other_parameter.annotated_type(), self_keyword_variadic_type) {
                         return false;
                     }
                 }
