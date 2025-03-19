@@ -40,7 +40,7 @@ class Foo:
 
 ## Type expressions
 
-One thing that is supported is error messages for using type qualifiers in type expressions.
+One thing that is supported is error messages for using special forms in type expressions.
 
 ```py
 from typing_extensions import Unpack, TypeGuard, TypeIs, Concatenate
