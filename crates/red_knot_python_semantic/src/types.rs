@@ -3267,16 +3267,23 @@ impl<'db> Type<'db> {
             }
             Type::KnownInstance(
                 KnownInstanceType::Literal
-                | KnownInstanceType::Optional
                 | KnownInstanceType::Union
+                | KnownInstanceType::Intersection,
+            ) => Err(InvalidTypeExpressionError {
+                invalid_expressions: smallvec::smallvec![
+                    InvalidTypeExpression::BareSpecialFormAtLeastOne(*self)
+                ],
+                fallback_type: Type::unknown(),
+            }),
+            Type::KnownInstance(
+                KnownInstanceType::Optional
                 | KnownInstanceType::Not
-                | KnownInstanceType::Intersection
                 | KnownInstanceType::TypeOf
                 | KnownInstanceType::CallableTypeFromFunction,
             ) => Err(InvalidTypeExpressionError {
-                invalid_expressions: smallvec::smallvec![InvalidTypeExpression::InvalidBareType(
-                    *self
-                )],
+                invalid_expressions: smallvec::smallvec![
+                    InvalidTypeExpression::BareSpecialFormExactlyOne(*self)
+                ],
                 fallback_type: Type::unknown(),
             }),
             Type::KnownInstance(KnownInstanceType::Protocol) => Err(InvalidTypeExpressionError {
@@ -3569,7 +3576,9 @@ enum InvalidTypeExpression<'db> {
     /// `x: Annotated` is invalid as an annotation
     BareAnnotated,
     /// Some types always require at least one argument when used in a type expression
-    InvalidBareType(Type<'db>),
+    BareSpecialFormAtLeastOne(Type<'db>),
+    /// Some types always require exactly one argument when used in a type expression
+    BareSpecialFormExactlyOne(Type<'db>),
     /// The `Protocol` type is invalid in type expressions
     ProtocolInTypeExpression,
     /// The `ClassVar` type qualifier was used in a type expression
@@ -3593,7 +3602,11 @@ impl<'db> InvalidTypeExpression<'db> {
                     InvalidTypeExpression::BareAnnotated => f.write_str(
                         "`Annotated` requires at least two arguments when used in an annotation or type expression"
                     ),
-                    InvalidTypeExpression::InvalidBareType(ty) => write!(
+                    InvalidTypeExpression::BareSpecialFormExactlyOne(ty) => write!(
+                        f,
+                        "`{ty}` requires exactly one argument when used in a type expression",
+                        ty = ty.display(self.db)),
+                    InvalidTypeExpression::BareSpecialFormAtLeastOne(ty) => write!(
                         f,
                         "`{ty}` requires at least one argument when used in a type expression",
                         ty = ty.display(self.db)

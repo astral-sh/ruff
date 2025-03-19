@@ -859,7 +859,7 @@ def f(x: Intersection) -> None:
 ```py
 from knot_extensions import Not
 
-# error: [invalid-type-form] "`knot_extensions.Not` requires at least one argument when used in a type expression"
+# error: [invalid-type-form] "`knot_extensions.Not` requires exactly one argument when used in a type expression"
 def f(x: Not) -> None:
     reveal_type(x)  # revealed: Unknown
 ```
