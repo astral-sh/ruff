@@ -71,9 +71,16 @@ impl<'a, 'db> CallArgumentTypes<'a, 'db> {
     }
 
     /// Create a new [`CallArgumentTypes`] to store the inferred types of the arguments in a
-    /// [`CallArguments`]. Each argument starts off with an inferred type of [`Type::unknown`].
-    pub(crate) fn new(arguments: CallArguments<'a>) -> Self {
-        let types = vec![Type::unknown(); arguments.len()].into();
+    /// [`CallArguments`]. Uses the provided callback to infer each argument type.
+    pub(crate) fn new<F>(arguments: CallArguments<'a>, mut f: F) -> Self
+    where
+        F: FnMut(usize, Argument<'a>) -> Type<'db>,
+    {
+        let types = arguments
+            .iter()
+            .enumerate()
+            .map(|(idx, argument)| f(idx, argument))
+            .collect();
         Self { arguments, types }
     }
 
@@ -90,16 +97,8 @@ impl<'a, 'db> CallArgumentTypes<'a, 'db> {
         self.types.pop_front();
     }
 
-    pub(crate) fn len(&self) -> usize {
-        self.types.len()
-    }
-
     pub(crate) fn iter(&self) -> impl Iterator<Item = (Argument<'a>, Type<'db>)> + '_ {
         self.arguments.iter().zip(self.types.iter().copied())
-    }
-
-    pub(crate) fn iter_mut(&mut self) -> impl Iterator<Item = (Argument<'a>, &mut Type<'db>)> + '_ {
-        self.arguments.iter().zip(&mut self.types)
     }
 }
 

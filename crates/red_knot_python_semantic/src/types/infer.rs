@@ -1142,9 +1142,8 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         if let Some(arguments) = class.arguments.as_deref() {
             let call_arguments = Self::parse_arguments(arguments);
-            let mut call_argument_types = CallArgumentTypes::new(call_arguments);
-            let argument_forms = vec![Some(ParameterForm::Value); call_argument_types.len()];
-            self.infer_argument_types(arguments, &mut call_argument_types, &argument_forms);
+            let argument_forms = vec![Some(ParameterForm::Value); call_arguments.len()];
+            self.infer_argument_types(arguments, call_arguments, &argument_forms);
         }
     }
 
@@ -3262,45 +3261,41 @@ impl<'db> TypeInferenceBuilder<'db> {
             .collect()
     }
 
-    fn infer_argument_types(
+    fn infer_argument_types<'a>(
         &mut self,
         ast_arguments: &ast::Arguments,
-        argument_types: &mut CallArgumentTypes<'_, 'db>,
+        arguments: CallArguments<'a>,
         argument_forms: &[Option<ParameterForm>],
-    ) {
-        for ((arg_or_keyword, (_, argument)), form) in ast_arguments
-            .arguments_source_order()
-            .zip(argument_types.iter_mut())
-            .zip(argument_forms)
-        {
+    ) -> CallArgumentTypes<'a, 'db> {
+        let mut ast_arguments = ast_arguments.arguments_source_order();
+        CallArgumentTypes::new(arguments, |index, _| {
+            let arg_or_keyword = ast_arguments
+                .next()
+                .expect("argument lists should have consistent lengths");
             match arg_or_keyword {
                 ast::ArgOrKeyword::Arg(arg) => match arg {
                     ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
-                        self.infer_argument_type(value, argument, *form);
-                        self.store_expression_type(arg, *argument);
+                        let ty = self.infer_argument_type(value, argument_forms[index]);
+                        self.store_expression_type(arg, ty);
+                        ty
                     }
-                    _ => self.infer_argument_type(arg, argument, *form),
+                    _ => self.infer_argument_type(arg, argument_forms[index]),
                 },
                 ast::ArgOrKeyword::Keyword(ast::Keyword { value, .. }) => {
-                    self.infer_argument_type(value, argument, *form);
+                    self.infer_argument_type(value, argument_forms[index])
                 }
             }
-        }
+        })
     }
 
     fn infer_argument_type(
         &mut self,
         ast_argument: &ast::Expr,
-        argument: &mut Type<'db>,
         form: Option<ParameterForm>,
-    ) {
+    ) -> Type<'db> {
         match form {
-            None | Some(ParameterForm::Value) => {
-                *argument = self.infer_expression(ast_argument);
-            }
-            Some(ParameterForm::Type) => {
-                *argument = self.infer_type_expression(ast_argument);
-            }
+            None | Some(ParameterForm::Value) => self.infer_expression(ast_argument),
+            Some(ParameterForm::Type) => self.infer_type_expression(ast_argument),
         }
     }
 
@@ -3869,12 +3864,8 @@ impl<'db> TypeInferenceBuilder<'db> {
         let function_type = self.infer_expression(func);
         let signatures = function_type.signatures(self.db());
         let bindings = Bindings::match_parameters(signatures, &mut call_arguments);
-        let mut call_argument_types = CallArgumentTypes::new(call_arguments);
-        self.infer_argument_types(
-            arguments,
-            &mut call_argument_types,
-            &bindings.argument_forms,
-        );
+        let mut call_argument_types =
+            self.infer_argument_types(arguments, call_arguments, &bindings.argument_forms);
 
         match bindings.check_types(self.db(), &mut call_argument_types) {
             Ok(bindings) => {
