@@ -1217,7 +1217,7 @@ mod tests {
     use ruff_diagnostics::{Diagnostic, Edit};
     use ruff_python_trivia::CommentRanges;
     use ruff_source_file::{LineEnding, SourceFileBuilder};
-    use ruff_text_size::{TextLen, TextRange, TextSize};
+    use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
     use crate::message::Message;
     use crate::noqa::{
@@ -1245,12 +1245,14 @@ mod tests {
     }
 
     /// Create a [`Message`] with a placeholder filename and rule code from `diagnostic`.
-    fn message_from_diagnostic(diagnostic: Diagnostic) -> Message {
-        Message::from_diagnostic(
-            diagnostic,
-            SourceFileBuilder::new("<filename>", "<code>").finish(),
-            TextSize::default(),
-        )
+    fn message_from_diagnostic(
+        diagnostic: Diagnostic,
+        path: impl AsRef<Path>,
+        source: &str,
+    ) -> Message {
+        let noqa_offset = diagnostic.start();
+        let file = SourceFileBuilder::new(path.as_ref().to_string_lossy(), source).finish();
+        Message::from_diagnostic(diagnostic, file, noqa_offset)
     }
 
     #[test]
@@ -2839,7 +2841,7 @@ mod tests {
             },
             TextRange::new(TextSize::from(0), TextSize::from(0)),
         )]
-        .map(message_from_diagnostic);
+        .map(|d| message_from_diagnostic(d, path, contents));
 
         let contents = "x = 1";
         let noqa_line_for = NoqaMapping::default();
@@ -2867,7 +2869,7 @@ mod tests {
                 TextRange::new(TextSize::from(0), TextSize::from(0)),
             ),
         ]
-        .map(message_from_diagnostic);
+        .map(|d| message_from_diagnostic(d, path, contents));
         let contents = "x = 1  # noqa: E741\n";
         let noqa_line_for = NoqaMapping::default();
         let comment_ranges =
@@ -2896,7 +2898,7 @@ mod tests {
                 TextRange::new(TextSize::from(0), TextSize::from(0)),
             ),
         ]
-        .map(message_from_diagnostic);
+        .map(|d| message_from_diagnostic(d, path, contents));
         let contents = "x = 1  # noqa";
         let noqa_line_for = NoqaMapping::default();
         let comment_ranges =
@@ -2931,7 +2933,7 @@ print(
             PrintfStringFormatting,
             TextRange::new(12.into(), 79.into()),
         )]
-        .map(message_from_diagnostic);
+        .map(|d| message_from_diagnostic(d, path, source));
         let comment_ranges = CommentRanges::default();
         let edits = generate_noqa_edits(
             path,
@@ -2963,7 +2965,7 @@ bar =
             UselessSemicolon,
             TextRange::new(4.into(), 5.into()),
         )]
-        .map(message_from_diagnostic);
+        .map(|d| message_from_diagnostic(d, path, source));
         let noqa_line_for = NoqaMapping::default();
         let comment_ranges = CommentRanges::default();
         let edits = generate_noqa_edits(
