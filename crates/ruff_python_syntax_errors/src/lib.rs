@@ -1,7 +1,8 @@
 //! [`SyntaxChecker`] for AST-based syntax errors.
 //!
 //! This checker is not responsible for traversing the AST itself. Instead, its
-//! [`SyntaxChecker::enter_stmt`] method should be called on every node by a parent `Visitor`.
+//! [`SyntaxChecker::enter_stmt`] and [`SyntaxChecker::enter_expr`] methods should be called in a
+//! parent `Visitor`'s `visit_stmt` and `visit_expr` methods, respectively.
 
 use std::fmt::Display;
 
@@ -63,6 +64,19 @@ impl Display for SyntaxError {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SyntaxErrorKind {
+    /// Represents the use of a `__future__` import after the beginning of a file.
+    ///
+    /// ## Examples
+    ///
+    /// ```python
+    /// from pathlib import Path
+    ///
+    /// from __future__ import annotations
+    /// ```
+    ///
+    /// This corresponds to the [`late-future-import`] (`F404`) rule in ruff.
+    ///
+    /// [`late-future-import`]: https://docs.astral.sh/ruff/rules/late-future-import/
     LateFutureImport,
 
     /// Represents the rebinding of the iteration variable of a list, set, or dict comprehension or
