@@ -3608,7 +3608,8 @@ enum InvalidTypeExpression<'db> {
     RequiresTwoArguments(Type<'db>),
     /// The `Protocol` type is invalid in type expressions
     ProtocolInTypeExpression,
-    /// Type qualifiers are always invalid in type expressions
+    /// Type qualifiers are always invalid in *type expressions*,
+    /// but these ones are okay with 0 arguments in *annotation expressions*
     TypeQualifier(Type<'db>),
     /// Type qualifiers that are invalid in type expressions,
     /// and which would require exactly one argument even if they appeared in an annotation expression
