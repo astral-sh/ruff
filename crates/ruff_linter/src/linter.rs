@@ -541,8 +541,11 @@ pub fn lint_fix<'a>(
     // As an escape hatch, bail after 100 iterations.
     let mut iterations = 0;
 
-    // Track whether the _initial_ source code has no syntax errors.
-    let mut has_no_syntax_errors = false;
+    // Track whether the _initial_ source code has valid syntax.
+    let mut has_valid_syntax = false;
+
+    // Track whether the _initial_ source code has no unsupported syntax errors.
+    let mut has_no_unsupported_syntax_errors = false;
 
     let target_version = settings.resolve_target_version(path);
 
@@ -585,12 +588,13 @@ pub fn lint_fix<'a>(
         );
 
         if iterations == 0 {
-            has_no_syntax_errors = parsed.has_no_syntax_errors();
+            has_valid_syntax = parsed.has_valid_syntax();
+            has_no_unsupported_syntax_errors = parsed.unsupported_syntax_errors().is_empty();
         } else {
-            // If the source code was parseable on the first pass, but is no
-            // longer parseable on a subsequent pass, then we've introduced a
+            // If the source code had no syntax errors on the first pass, but
+            // does on a subsequent pass, then we've introduced a
             // syntax error. Return the original code.
-            if has_no_syntax_errors {
+            if has_valid_syntax && has_no_unsupported_syntax_errors {
                 if let Some(error) = parsed.errors().first() {
                     report_fix_syntax_error(
                         path,
@@ -631,8 +635,8 @@ pub fn lint_fix<'a>(
         return Ok(FixerResult {
             result: LinterResult {
                 messages,
-                has_valid_syntax: parsed.has_valid_syntax(),
-                has_no_unsupported_syntax_errors: parsed.unsupported_syntax_errors().is_empty(),
+                has_valid_syntax,
+                has_no_unsupported_syntax_errors,
             },
             transformed,
             fixed,
