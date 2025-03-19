@@ -45,10 +45,16 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Determine merge base
+        id: merge_base
+        run: |
+          sha=$(git merge-base HEAD origin/${{ github.event.pull_request.base.ref || 'main' }})
+          echo "sha=${sha}" >> "$GITHUB_OUTPUT"
+
       - name: Check if the parser code changed
         id: check_parser
         run: |
-          if git diff --quiet ${{ github.event.pull_request.base.sha || 'origin/main' }}...HEAD -- ':Cargo.toml' ':Cargo.lock' ':crates/ruff_python_trivia/**' ':crates/ruff_source_file/**' ':crates/ruff_text_size/**' ':crates/ruff_python_ast/**' ':crates/ruff_python_parser/**' ':python/py-fuzzer/**' ':.github/workflows/ci.yaml'; then
+          if git diff --quiet ${{ steps.merge_base.outputs.sha }}...HEAD -- ':Cargo.toml' ':Cargo.lock' ':crates/ruff_python_trivia/**' ':crates/ruff_source_file/**' ':crates/ruff_text_size/**' ':crates/ruff_python_ast/**' ':crates/ruff_python_parser/**' ':python/py-fuzzer/**' ':.github/workflows/ci.yaml'; then
               echo "changed=false" >> "$GITHUB_OUTPUT"
           else
               echo "changed=true" >> "$GITHUB_OUTPUT"
@@ -57,7 +63,7 @@ jobs:
       - name: Check if the linter code changed
         id: check_linter
         run: |
-          if git diff --quiet ${{ github.event.pull_request.base.sha || 'origin/main' }}...HEAD -- ':Cargo.toml' ':Cargo.lock' ':crates/**' ':!crates/red_knot*/**' ':!crates/ruff_python_formatter/**' ':!crates/ruff_formatter/**' ':!crates/ruff_dev/**' ':!crates/ruff_db/**' ':scripts/*' ':python/**' ':.github/workflows/ci.yaml'; then
+          if git diff --quiet ${{ steps.merge_base.outputs.sha }}...HEAD -- ':Cargo.toml' ':Cargo.lock' ':crates/**' ':!crates/red_knot*/**' ':!crates/ruff_python_formatter/**' ':!crates/ruff_formatter/**' ':!crates/ruff_dev/**' ':!crates/ruff_db/**' ':scripts/*' ':python/**' ':.github/workflows/ci.yaml'; then
               echo "changed=false" >> "$GITHUB_OUTPUT"
           else
               echo "changed=true" >> "$GITHUB_OUTPUT"
@@ -66,7 +72,7 @@ jobs:
       - name: Check if the formatter code changed
         id: check_formatter
         run: |
-          if git diff --quiet ${{ github.event.pull_request.base.sha || 'origin/main' }}...HEAD -- ':Cargo.toml' ':Cargo.lock' ':crates/ruff_python_formatter/**' ':crates/ruff_formatter/**' ':crates/ruff_python_trivia/**' ':crates/ruff_python_ast/**' ':crates/ruff_source_file/**' ':crates/ruff_python_index/**' ':crates/ruff_python_index/**' ':crates/ruff_text_size/**' ':crates/ruff_python_parser/**' ':scripts/*' ':python/**' ':.github/workflows/ci.yaml'; then
+          if git diff --quiet ${{ steps.merge_base.outputs.sha }}...HEAD -- ':Cargo.toml' ':Cargo.lock' ':crates/ruff_python_formatter/**' ':crates/ruff_formatter/**' ':crates/ruff_python_trivia/**' ':crates/ruff_python_ast/**' ':crates/ruff_source_file/**' ':crates/ruff_python_index/**' ':crates/ruff_python_index/**' ':crates/ruff_text_size/**' ':crates/ruff_python_parser/**' ':scripts/*' ':python/**' ':.github/workflows/ci.yaml'; then
               echo "changed=false" >> "$GITHUB_OUTPUT"
           else
               echo "changed=true" >> "$GITHUB_OUTPUT"
@@ -75,7 +81,7 @@ jobs:
       - name: Check if the fuzzer code changed
         id: check_fuzzer
         run: |
-          if git diff --quiet ${{ github.event.pull_request.base.sha || 'origin/main' }}...HEAD -- ':Cargo.toml' ':Cargo.lock' ':fuzz/fuzz_targets/**' ':.github/workflows/ci.yaml'; then
+          if git diff --quiet ${{ steps.merge_base.outputs.sha }}...HEAD -- ':Cargo.toml' ':Cargo.lock' ':fuzz/fuzz_targets/**' ':.github/workflows/ci.yaml'; then
               echo "changed=false" >> "$GITHUB_OUTPUT"
           else
               echo "changed=true" >> "$GITHUB_OUTPUT"
@@ -84,7 +90,7 @@ jobs:
       - name: Check if there was any code related change
         id: check_code
         run: |
-          if git diff --quiet ${{ github.event.pull_request.base.sha || 'origin/main' }}...HEAD -- ':**/*' ':!**/*.md' ':crates/red_knot_python_semantic/resources/mdtest/**/*.md' ':!docs/**' ':!assets/**' ':.github/workflows/ci.yaml'; then
+          if git diff --quiet ${{ steps.merge_base.outputs.sha }}...HEAD -- ':**/*' ':!**/*.md' ':crates/red_knot_python_semantic/resources/mdtest/**/*.md' ':!docs/**' ':!assets/**' ':.github/workflows/ci.yaml'; then
               echo "changed=false" >> "$GITHUB_OUTPUT"
           else
               echo "changed=true" >> "$GITHUB_OUTPUT"
@@ -93,7 +99,7 @@ jobs:
       - name: Check if there was any playground related change
         id: check_playground
         run: |
-          if git diff --quiet ${{ github.event.pull_request.base.sha || 'origin/main' }}...HEAD -- ':playground/**'; then
+          if git diff --quiet ${{ steps.merge_base.outputs.sha }}...HEAD -- ':playground/**'; then
               echo "changed=false" >> "$GITHUB_OUTPUT"
           else
               echo "changed=true" >> "$GITHUB_OUTPUT"
