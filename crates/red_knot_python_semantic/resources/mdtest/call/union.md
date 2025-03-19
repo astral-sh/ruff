@@ -166,6 +166,7 @@ def _(flag: bool):
 
 ```py
 from knot_extensions import is_fully_static
+
 def _(flag: bool):
     if flag:
         f = repr
