@@ -94,15 +94,6 @@ pub enum SyntaxErrorKind {
     ReboundComprehensionVariable,
 }
 
-impl SyntaxErrorKind {
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            SyntaxErrorKind::LateFutureImport => "late-future-import",
-            SyntaxErrorKind::ReboundComprehensionVariable => "rebound-comprehension-variable",
-        }
-    }
-}
-
 impl SyntaxChecker {
     fn check_stmt(&mut self, stmt: &ast::Stmt) {
         if let Stmt::ImportFrom(StmtImportFrom { range, module, .. }) = stmt {
