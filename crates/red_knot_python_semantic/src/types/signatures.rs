@@ -617,11 +617,6 @@ impl<'db> Parameter<'db> {
         }
     }
 
-    /// Returns the kind of the parameter which will contain the default type if any.
-    pub(crate) fn kind(&self) -> &ParameterKind<'db> {
-        &self.kind
-    }
-
     /// Display name of the parameter, if it has one.
     pub(crate) fn display_name(&self) -> Option<ast::name::Name> {
         self.name().map(|name| match self.kind {
