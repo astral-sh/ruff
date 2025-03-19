@@ -11,7 +11,7 @@ pub(super) use bind::Bindings;
 /// unsuccessful.
 ///
 /// The bindings are boxed so that we do not pass around large `Err` variants on the stack.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub(crate) struct CallError<'db>(pub(crate) CallErrorKind, pub(crate) Box<Bindings<'db>>);
 
 /// The reason why calling a type failed.
@@ -32,7 +32,7 @@ pub(crate) enum CallErrorKind {
     PossiblyNotCallable,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub(super) enum CallDunderError<'db> {
     /// The dunder attribute exists but it can't be called with the given arguments.
     ///

@@ -29,7 +29,7 @@ use ruff_text_size::Ranged;
 /// compatible with _all_ of the types in the union for the call to be valid.
 ///
 /// It's guaranteed that the wrapped bindings have no errors.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub(crate) struct Bindings<'db> {
     signatures: Signatures<'db>,
     /// By using `SmallVec`, we avoid an extra heap allocation for the common case of a non-union
@@ -484,7 +484,7 @@ impl<'a, 'db> IntoIterator for &'a mut Bindings<'db> {
 /// overloads, we store this error information for each overload.
 ///
 /// [overloads]: https://github.com/python/typing/pull/1839
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub(crate) struct CallableBinding<'db> {
     pub(crate) callable_type: Type<'db>,
     pub(crate) signature_type: Type<'db>,
@@ -667,7 +667,7 @@ impl<'db> CallableBinding<'db> {
 }
 
 /// Binding information for one of the overloads of a callable.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub(crate) struct Binding<'db> {
     /// Return type of the call.
     return_ty: Type<'db>,
