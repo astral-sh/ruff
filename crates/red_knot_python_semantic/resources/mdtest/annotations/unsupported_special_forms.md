@@ -38,6 +38,25 @@ class Foo:
         reveal_type(x)  # revealed: @Todo(Support for `typing.Self`)
 ```
 
+## Type expressions
+
+One thing that is supported is error messages for using type qualifiers in type expressions.
+
+```py
+from typing_extensions import Self, Unpack, TypeGuard, TypeIs, Concatenate
+
+def _(
+    a: Unpack,  # error: [invalid-type-form] "`typing.Unpack` requires exactly one argument when used in a type expression"
+    b: TypeGuard,  # error: [invalid-type-form] "`typing.TypeGuard` requires exactly one argument when used in a type expression"
+    c: TypeIs,  # error: [invalid-type-form] "`typing.TypeIs` requires exactly one argument when used in a type expression"
+    d: Concatenate,  # error: [invalid-type-form] "`typing.Concatenate` requires at least two arguments when used in a type expression"
+) -> None:
+    reveal_type(a)  # revealed: Unknown
+    reveal_type(b)  # revealed: Unknown
+    reveal_type(c)  # revealed: Unknown
+    reveal_type(d)  # revealed: Unknown
+```
+
 ## Inheritance
 
 You can't inherit from most of these. `typing.Callable` is an exception.
