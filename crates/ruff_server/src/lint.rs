@@ -172,14 +172,18 @@ pub(crate) fn check(
                     locator.to_index(),
                     encoding,
                 )),
-                Message::SyntaxError(syntax_error_message) => show_syntax_errors.then(|| {
-                    syntax_error_to_lsp_diagnostic(
-                        syntax_error_message,
-                        &source_kind,
-                        locator.to_index(),
-                        encoding,
-                    )
-                }),
+                Message::SyntaxError(syntax_error_message) => {
+                    if show_syntax_errors {
+                        Some(syntax_error_to_lsp_diagnostic(
+                            syntax_error_message,
+                            &source_kind,
+                            locator.to_index(),
+                            encoding,
+                        ))
+                    } else {
+                        None
+                    }
+                }
             });
 
     if let Some(notebook) = query.as_notebook() {
