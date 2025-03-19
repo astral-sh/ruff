@@ -674,7 +674,7 @@ pub(crate) struct Binding<'db> {
 
     /// The formal parameter that each argument is matched with, in argument source order, or
     /// `usize::MAX` if the argument was not matched to any parameter.
-    argument_parameters: Box<[usize]>,
+    argument_parameters: Box<[Option<usize>]>,
 
     /// Bound types for parameters, in parameter source order, or `None` if no argument was matched
     /// to that parameter.
@@ -692,7 +692,7 @@ impl<'db> Binding<'db> {
     ) -> Self {
         let parameters = signature.parameters();
         // The parameter that each argument is matched with.
-        let mut argument_parameters = vec![usize::MAX; arguments.len()];
+        let mut argument_parameters = vec![None; arguments.len()];
         // Whether each parameter has been matched with an argument.
         let mut parameter_matched = vec![false; parameters.len()];
         let mut errors = vec![];
@@ -766,7 +766,7 @@ impl<'db> Binding<'db> {
                     });
                 }
             }
-            argument_parameters[argument_index] = index;
+            argument_parameters[argument_index] = Some(index);
             parameter_matched[index] = true;
         }
         if let Some(first_excess_argument_index) = first_excess_positional {
@@ -831,12 +831,11 @@ impl<'db> Binding<'db> {
             if matches!(argument, Argument::Synthetic) {
                 num_synthetic_args += 1;
             }
-            let parameter_index = self.argument_parameters[argument_index];
-            if parameter_index == usize::MAX {
+            let Some(parameter_index) = self.argument_parameters[argument_index] else {
                 // There was an error with argument when matching parameters, so don't bother
                 // type-checking it.
                 continue;
-            }
+            };
             let parameter = &parameters[parameter_index];
             if let Some(expected_ty) = parameter.annotated_type() {
                 if !argument_type.is_assignable_to(db, expected_ty) {
