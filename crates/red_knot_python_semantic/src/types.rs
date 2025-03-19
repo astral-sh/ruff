@@ -887,6 +887,11 @@ impl<'db> Type<'db> {
                 }
             }
 
+            (
+                Type::Callable(CallableType::General(self_callable)),
+                Type::Callable(CallableType::General(target_callable)),
+            ) => self_callable.is_assignable_to(db, target_callable),
+
             // TODO other types containing gradual forms (e.g. generics containing Any/Unknown)
             _ => self.is_subtype_of(db, target),
         }
@@ -4747,8 +4752,32 @@ impl<'db> GeneralCallableType<'db> {
             })
     }
 
+    /// Return `true` if `self` is assignable to `other`.
+    pub(crate) fn is_assignable_to(self, db: &'db dyn Db, other: Self) -> bool {
+        self.is_assignable_to_impl(db, other, |type1, type2| {
+            // In the context of a callable type, the `None` variant represents an `Unknown` type.
+            type1
+                .unwrap_or(Type::unknown())
+                .is_assignable_to(db, type2.unwrap_or(Type::unknown()))
+        })
+    }
+
     /// Return `true` if `self` is a subtype of `other`.
     pub(crate) fn is_subtype_of(self, db: &'db dyn Db, other: Self) -> bool {
+        self.is_assignable_to_impl(db, other, |type1, type2| {
+            // SAFETY: Subtype relation is only checked for fully static types.
+            type1.unwrap().is_subtype_of(db, type2.unwrap())
+        })
+    }
+
+    /// Implementation for the [`is_assignable_to`] and [`is_subtype_of`] for callable types.
+    ///
+    /// [`is_assignable_to`]: Self::is_assignable_to
+    /// [`is_subtype_of`]: Self::is_subtype_of
+    fn is_assignable_to_impl<F>(self, db: &'db dyn Db, other: Self, check_types: F) -> bool
+    where
+        F: Fn(Option<Type<'db>>, Option<Type<'db>>) -> bool,
+    {
         /// A helper struct to zip two slices of parameters together that provides control over the
         /// two iterators individually. It also keeps track of the current parameter in each
         /// iterator.
@@ -4813,16 +4842,15 @@ impl<'db> GeneralCallableType<'db> {
         let self_signature = self.signature(db);
         let other_signature = other.signature(db);
 
-        // Check if `type1` is a subtype of `type2`. This is mainly to avoid `unwrap` calls
-        // scattered throughout the function.
-        let is_subtype = |type1: Option<Type<'db>>, type2: Option<Type<'db>>| {
-            // SAFETY: Subtype relation is only checked for fully static types.
-            type1.unwrap().is_subtype_of(db, type2.unwrap())
-        };
-
         // Return types are covariant.
-        if !is_subtype(self_signature.return_ty, other_signature.return_ty) {
+        if !check_types(self_signature.return_ty, other_signature.return_ty) {
             return false;
+        }
+
+        if self_signature.parameters().is_gradual() || other_signature.parameters().is_gradual() {
+            // If either of the parameter lists contains a gradual form (`...`), then it is
+            // assignable / subtype to and from any other callable type.
+            return true;
         }
 
         let mut parameters = ParametersZip {
@@ -4882,7 +4910,7 @@ impl<'db> GeneralCallableType<'db> {
                             if self_default.is_none() && other_default.is_some() {
                                 return false;
                             }
-                            if !is_subtype(
+                            if !check_types(
                                 other_parameter.annotated_type(),
                                 self_parameter.annotated_type(),
                             ) {
@@ -4907,7 +4935,7 @@ impl<'db> GeneralCallableType<'db> {
                             if self_default.is_none() && other_default.is_some() {
                                 return false;
                             }
-                            if !is_subtype(
+                            if !check_types(
                                 other_parameter.annotated_type(),
                                 self_parameter.annotated_type(),
                             ) {
@@ -4916,7 +4944,7 @@ impl<'db> GeneralCallableType<'db> {
                         }
 
                         (ParameterKind::Variadic { .. }, ParameterKind::PositionalOnly { .. }) => {
-                            if !is_subtype(
+                            if !check_types(
                                 other_parameter.annotated_type(),
                                 self_parameter.annotated_type(),
                             ) {
@@ -4946,7 +4974,7 @@ impl<'db> GeneralCallableType<'db> {
                                     // variadic parameter and is deferred to the next iteration.
                                     break;
                                 }
-                                if !is_subtype(
+                                if !check_types(
                                     other_parameter.annotated_type(),
                                     self_parameter.annotated_type(),
                                 ) {
@@ -4957,7 +4985,7 @@ impl<'db> GeneralCallableType<'db> {
                         }
 
                         (ParameterKind::Variadic { .. }, ParameterKind::Variadic { .. }) => {
-                            if !is_subtype(
+                            if !check_types(
                                 other_parameter.annotated_type(),
                                 self_parameter.annotated_type(),
                             ) {
@@ -5035,7 +5063,7 @@ impl<'db> GeneralCallableType<'db> {
                                 if self_default.is_none() && other_default.is_some() {
                                     return false;
                                 }
-                                if !is_subtype(
+                                if !check_types(
                                     other_parameter.annotated_type(),
                                     self_parameter.annotated_type(),
                                 ) {
@@ -5047,8 +5075,10 @@ impl<'db> GeneralCallableType<'db> {
                             ),
                         }
                     } else if let Some(self_keyword_variadic_type) = self_keyword_variadic {
-                        if !is_subtype(other_parameter.annotated_type(), self_keyword_variadic_type)
-                        {
+                        if !check_types(
+                            other_parameter.annotated_type(),
+                            self_keyword_variadic_type,
+                        ) {
                             return false;
                         }
                     } else {
@@ -5061,7 +5091,7 @@ impl<'db> GeneralCallableType<'db> {
                         // parameter, `self` must also have a keyword variadic parameter.
                         return false;
                     };
-                    if !is_subtype(other_parameter.annotated_type(), self_keyword_variadic_type) {
+                    if !check_types(other_parameter.annotated_type(), self_keyword_variadic_type) {
                         return false;
                     }
                 }

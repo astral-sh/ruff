@@ -393,4 +393,87 @@ static_assert(is_assignable_to(Never, type[str]))
 static_assert(is_assignable_to(Never, type[Any]))
 ```
 
+## Callable
+
+The examples provided below are only a subset of the possible cases and include the ones with
+gradual types. The cases with fully static types and using different combinations of parameter kinds
+are covered in the [subtyping tests](./is_subtype_of.md#callable).
+
+### Return type
+
+```py
+from knot_extensions import CallableTypeFromFunction, Unknown, static_assert, is_assignable_to
+from typing import Any, Callable
+
+static_assert(is_assignable_to(Callable[[], Any], Callable[[], int]))
+static_assert(is_assignable_to(Callable[[], int], Callable[[], Any]))
+
+static_assert(is_assignable_to(Callable[[], int], Callable[[], float]))
+static_assert(not is_assignable_to(Callable[[], float], Callable[[], int]))
+```
+
+The return types should be checked even if the parameter types uses gradual form (`...`).
+
+```py
+static_assert(is_assignable_to(Callable[..., int], Callable[..., float]))
+static_assert(not is_assignable_to(Callable[..., float], Callable[..., int]))
+```
+
+And, if there is no return type, the return type is `Unknown`.
+
+```py
+static_assert(is_assignable_to(Callable[[], Unknown], Callable[[], int]))
+static_assert(is_assignable_to(Callable[[], int], Callable[[], Unknown]))
+```
+
+### Parameter types
+
+A `Callable` which uses the gradual form (`...`) for the parameter types is consistent with any
+input signature.
+
+```py
+from knot_extensions import CallableTypeFromFunction, static_assert, is_assignable_to
+from typing import Any, Callable
+
+static_assert(is_assignable_to(Callable[[], None], Callable[..., None]))
+static_assert(is_assignable_to(Callable[..., None], Callable[..., None]))
+static_assert(is_assignable_to(Callable[[int, float, str], None], Callable[..., None]))
+```
+
+Even if it includes any other parameter kinds.
+
+```py
+def positional_only(a: int, b: int, /) -> None: ...
+def positional_or_keyword(a: int, b: int) -> None: ...
+def variadic(*args: int) -> None: ...
+def keyword_only(*, a: int, b: int) -> None: ...
+def keyword_variadic(**kwargs: int) -> None: ...
+def mixed(a: int, /, b: int, *args: int, c: int, **kwargs: int) -> None: ...
+
+static_assert(is_assignable_to(CallableTypeFromFunction[positional_only], Callable[..., None]))
+static_assert(is_assignable_to(CallableTypeFromFunction[positional_or_keyword], Callable[..., None]))
+static_assert(is_assignable_to(CallableTypeFromFunction[variadic], Callable[..., None]))
+static_assert(is_assignable_to(CallableTypeFromFunction[keyword_only], Callable[..., None]))
+static_assert(is_assignable_to(CallableTypeFromFunction[keyword_variadic], Callable[..., None]))
+static_assert(is_assignable_to(CallableTypeFromFunction[mixed], Callable[..., None]))
+```
+
+And, even if the parameters are unannotated.
+
+```py
+def positional_only(a, b, /) -> None: ...
+def positional_or_keyword(a, b) -> None: ...
+def variadic(*args) -> None: ...
+def keyword_only(*, a, b) -> None: ...
+def keyword_variadic(**kwargs) -> None: ...
+def mixed(a, /, b, *args, c, **kwargs) -> None: ...
+
+static_assert(is_assignable_to(CallableTypeFromFunction[positional_only], Callable[..., None]))
+static_assert(is_assignable_to(CallableTypeFromFunction[positional_or_keyword], Callable[..., None]))
+static_assert(is_assignable_to(CallableTypeFromFunction[variadic], Callable[..., None]))
+static_assert(is_assignable_to(CallableTypeFromFunction[keyword_only], Callable[..., None]))
+static_assert(is_assignable_to(CallableTypeFromFunction[keyword_variadic], Callable[..., None]))
+static_assert(is_assignable_to(CallableTypeFromFunction[mixed], Callable[..., None]))
+```
+
 [typing documentation]: https://typing.readthedocs.io/en/latest/spec/concepts.html#the-assignable-to-or-consistent-subtyping-relation
