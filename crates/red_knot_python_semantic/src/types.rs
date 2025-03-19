@@ -4981,9 +4981,8 @@ impl<'db> GeneralCallableType<'db> {
             }
         }
 
-        // At this point, the remaining parameters in `other` are keyword-only parameters or
-        // keyword variadic parameters. But, `self` could contain any unmatched positional
-        // parameters.
+        // At this point, the remaining parameters in `other` are keyword-only or keyword variadic.
+        // But, `self` could contain any unmatched positional parameters.
         let (self_parameters, other_parameters) = parameters.into_remaining();
 
         // Collect all the keyword-only parameters and the unmatched standard parameters.
@@ -5001,12 +5000,14 @@ impl<'db> GeneralCallableType<'db> {
                 ParameterKind::KeywordVariadic { .. } => {
                     self_keyword_variadic = self_parameter.annotated_type();
                 }
-                ParameterKind::PositionalOnly { .. } | ParameterKind::Variadic { .. } => {
-                    // These are the unmatched parameters in `self` from the above loop. They
-                    // cannot be matched against any parameter in `other` so the subtype relation
-                    // is invalid.
+                ParameterKind::PositionalOnly { .. } => {
+                    // These are the unmatched positional-only parameters in `self` from the
+                    // previous loop. They cannot be matched against any parameter in `other` which
+                    // only contains keyword-only and keyword-variadic parameters so the subtype
+                    // relation is invalid.
                     return false;
                 }
+                ParameterKind::Variadic { .. } => {}
             }
         }
 
