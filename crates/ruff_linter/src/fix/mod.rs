@@ -173,7 +173,11 @@ mod tests {
     use crate::Locator;
 
     #[allow(deprecated)]
-    fn create_diagnostics(edit: impl IntoIterator<Item = Edit>) -> Vec<DiagnosticMessage> {
+    fn create_diagnostics(
+        filename: &str,
+        source: &str,
+        edit: impl IntoIterator<Item = Edit>,
+    ) -> Vec<DiagnosticMessage> {
         edit.into_iter()
             .map(|edit| DiagnosticMessage {
                 // The choice of rule here is arbitrary.
@@ -181,7 +185,7 @@ mod tests {
                 range: edit.range(),
                 fix: Some(Fix::safe_edit(edit)),
                 parent: None,
-                file: SourceFileBuilder::new("<filename>", "<code>").finish(),
+                file: SourceFileBuilder::new(filename, source).finish(),
                 noqa_offset: TextSize::default(),
             })
             .collect()
@@ -190,7 +194,7 @@ mod tests {
     #[test]
     fn empty_file() {
         let locator = Locator::new(r"");
-        let diagnostics = create_diagnostics([]);
+        let diagnostics = create_diagnostics("<filename>", locator.contents(), []);
         let FixResult {
             code,
             fixes,
@@ -211,10 +215,14 @@ print("hello world")
 "#
             .trim(),
         );
-        let diagnostics = create_diagnostics([Edit::insertion(
-            "import sys\n".to_string(),
-            TextSize::new(10),
-        )]);
+        let diagnostics = create_diagnostics(
+            "<filename>",
+            locator.contents(),
+            [Edit::insertion(
+                "import sys\n".to_string(),
+                TextSize::new(10),
+            )],
+        );
         let FixResult {
             code,
             fixes,
@@ -249,11 +257,15 @@ class A(object):
 "
             .trim(),
         );
-        let diagnostics = create_diagnostics([Edit::replacement(
-            "Bar".to_string(),
-            TextSize::new(8),
-            TextSize::new(14),
-        )]);
+        let diagnostics = create_diagnostics(
+            "<filename>",
+            locator.contents(),
+            [Edit::replacement(
+                "Bar".to_string(),
+                TextSize::new(8),
+                TextSize::new(14),
+            )],
+        );
         let FixResult {
             code,
             fixes,
@@ -286,7 +298,11 @@ class A(object):
 "
             .trim(),
         );
-        let diagnostics = create_diagnostics([Edit::deletion(TextSize::new(7), TextSize::new(15))]);
+        let diagnostics = create_diagnostics(
+            "<filename>",
+            locator.contents(),
+            [Edit::deletion(TextSize::new(7), TextSize::new(15))],
+        );
         let FixResult {
             code,
             fixes,
@@ -319,10 +335,14 @@ class A(object, object, object):
 "
             .trim(),
         );
-        let diagnostics = create_diagnostics([
-            Edit::deletion(TextSize::from(8), TextSize::from(16)),
-            Edit::deletion(TextSize::from(22), TextSize::from(30)),
-        ]);
+        let diagnostics = create_diagnostics(
+            "<filename>",
+            locator.contents(),
+            [
+                Edit::deletion(TextSize::from(8), TextSize::from(16)),
+                Edit::deletion(TextSize::from(22), TextSize::from(30)),
+            ],
+        );
         let FixResult {
             code,
             fixes,
@@ -358,10 +378,14 @@ class A(object):
 "
             .trim(),
         );
-        let diagnostics = create_diagnostics([
-            Edit::deletion(TextSize::from(7), TextSize::from(15)),
-            Edit::replacement("ignored".to_string(), TextSize::from(9), TextSize::from(11)),
-        ]);
+        let diagnostics = create_diagnostics(
+            "<filename>",
+            locator.contents(),
+            [
+                Edit::deletion(TextSize::from(7), TextSize::from(15)),
+                Edit::replacement("ignored".to_string(), TextSize::from(9), TextSize::from(11)),
+            ],
+        );
         let FixResult {
             code,
             fixes,
