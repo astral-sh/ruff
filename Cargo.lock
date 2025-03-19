@@ -3155,6 +3155,7 @@ dependencies = [
  "bstr",
  "compact_str 0.9.0",
  "insta",
+ "itertools 0.14.0",
  "memchr",
  "ruff_annotate_snippets",
  "ruff_python_ast",

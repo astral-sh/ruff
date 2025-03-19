@@ -6,12 +6,13 @@
 
 use std::fmt::Display;
 
+use itertools::Itertools;
 use ruff_python_ast::{
     self as ast,
     visitor::{walk_expr, Visitor},
     Expr, PythonVersion, Stmt, StmtExpr, StmtImportFrom,
 };
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 
 #[derive(Debug)]
 pub struct SemanticSyntaxChecker {
@@ -53,11 +54,45 @@ impl SemanticSyntaxChecker {
         });
     }
 
-    fn check_stmt<Ctx: SemanticSyntaxContext>(&self, stmt: &ast::Stmt, ctx: &Ctx) {
+    fn check_stmt<Ctx: SemanticSyntaxContext>(&mut self, stmt: &ast::Stmt, ctx: &Ctx) {
         if let Stmt::ImportFrom(StmtImportFrom { range, module, .. }) = stmt {
             if self.seen_futures_boundary && matches!(module.as_deref(), Some("__future__")) {
                 Self::add_error(ctx, SemanticSyntaxErrorKind::LateFutureImport, *range);
             }
+        }
+
+        Self::duplicate_type_parameter_name(stmt, ctx);
+    }
+
+    fn duplicate_type_parameter_name<Ctx: SemanticSyntaxContext>(stmt: &ast::Stmt, ctx: &Ctx) {
+        let (Stmt::FunctionDef(ast::StmtFunctionDef { type_params, .. })
+        | Stmt::ClassDef(ast::StmtClassDef { type_params, .. })
+        | Stmt::TypeAlias(ast::StmtTypeAlias { type_params, .. })) = stmt
+        else {
+            return;
+        };
+
+        let Some(type_params) = type_params else {
+            return;
+        };
+
+        for type_param in type_params
+            .iter()
+            .rev()
+            .sorted_by_key(|t| &t.name().id)
+            .dedup_by_with_count(|t1, t2| t1.name().id == t2.name().id)
+            .filter_map(|(count, type_param)| if count > 1 { Some(type_param) } else { None })
+        {
+            // test_err duplicate_type_parameter_names
+            // type Alias[T, T] = ...
+            // def f[T, T](t: T): ...
+            // class C[T, T]: ...
+            // type Alias[T, U: str, V: (str, bytes), *Ts, **P, T = default] = ...
+            Self::add_error(
+                ctx,
+                SemanticSyntaxErrorKind::DuplicateTypeParameter,
+                type_param.range(),
+            );
         }
     }
 
@@ -168,6 +203,9 @@ impl Display for SemanticSyntaxError {
             SemanticSyntaxErrorKind::ReboundComprehensionVariable => {
                 f.write_str("assignment expression cannot rebind comprehension variable")
             }
+            SemanticSyntaxErrorKind::DuplicateTypeParameter => {
+                f.write_str("duplicate type parameter")
+            }
         }
     }
 }
@@ -202,6 +240,18 @@ pub enum SemanticSyntaxErrorKind {
     /// ((a := 0) for a in range(0))
     /// ```
     ReboundComprehensionVariable,
+
+    /// Represents a duplicate type parameter name in a function definition, class definition, or
+    /// type alias statement.
+    ///
+    /// ## Examples
+    ///
+    /// ```python
+    /// type Alias[T, T] = ...
+    /// def f[T, T](t: T): ...
+    /// class C[T, T]: ...
+    /// ```
+    DuplicateTypeParameter,
 }
 
 /// Searches for the first named expression (`x := y`) rebinding one of the `iteration_variables` in
