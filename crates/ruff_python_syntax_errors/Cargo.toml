@@ -1,6 +1,6 @@
 [package]
 name = "ruff_python_syntax_errors"
-version = "0.9.5"
+version = "0.0.0"
 publish = false
 authors = { workspace = true }
 edition = { workspace = true }
