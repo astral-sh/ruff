@@ -1,4 +1,5 @@
 use super::context::InferContext;
+use crate::declare_lint;
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
 use crate::suppression::FileSuppressionId;
 use crate::types::string_annotation::{
@@ -7,7 +8,6 @@ use crate::types::string_annotation::{
     RAW_STRING_TYPE_ANNOTATION,
 };
 use crate::types::{ClassLiteralType, KnownInstanceType, Type};
-use crate::{declare_lint, Db};
 use ruff_db::diagnostic::{
     DiagnosticId, OldDiagnosticTrait, OldSecondaryDiagnosticMessage, Severity, Span,
 };
@@ -1238,9 +1238,8 @@ pub(crate) fn report_base_with_incompatible_slots(context: &InferContext, node: 
     );
 }
 
-pub(crate) fn report_invalid_arguments_to_annotated<'db>(
-    db: &'db dyn Db,
-    context: &InferContext<'db>,
+pub(crate) fn report_invalid_arguments_to_annotated(
+    context: &InferContext,
     subscript: &ast::ExprSubscript,
 ) {
     context.report_lint(
@@ -1248,14 +1247,13 @@ pub(crate) fn report_invalid_arguments_to_annotated<'db>(
         subscript,
         format_args!(
             "Special form `{}` expected at least 2 arguments (one type and at least one metadata element)",
-            KnownInstanceType::Annotated.repr(db)
+            KnownInstanceType::Annotated.repr(context.db())
         ),
     );
 }
 
-pub(crate) fn report_invalid_arguments_to_callable<'db>(
-    db: &'db dyn Db,
-    context: &InferContext<'db>,
+pub(crate) fn report_invalid_arguments_to_callable(
+    context: &InferContext,
     subscript: &ast::ExprSubscript,
 ) {
     context.report_lint(
@@ -1263,7 +1261,7 @@ pub(crate) fn report_invalid_arguments_to_callable<'db>(
         subscript,
         format_args!(
             "Special form `{}` expected exactly two arguments (parameter types and return type)",
-            KnownInstanceType::Callable.repr(db)
+            KnownInstanceType::Callable.repr(context.db())
         ),
     );
 }

@@ -5915,11 +5915,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         }) = slice
                         {
                             if arguments.len() < 2 {
-                                report_invalid_arguments_to_annotated(
-                                    self.db(),
-                                    &self.context,
-                                    subscript,
-                                );
+                                report_invalid_arguments_to_annotated(&self.context, subscript);
                             }
 
                             if let [inner_annotation, metadata @ ..] = &arguments[..] {
@@ -5937,11 +5933,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 TypeAndQualifiers::unknown()
                             }
                         } else {
-                            report_invalid_arguments_to_annotated(
-                                self.db(),
-                                &self.context,
-                                subscript,
-                            );
+                            report_invalid_arguments_to_annotated(&self.context, subscript);
                             self.infer_annotation_expression_impl(slice)
                         }
                     }
@@ -6527,6 +6519,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         subscript: &ast::ExprSubscript,
         known_instance: KnownInstanceType,
     ) -> Type<'db> {
+        let db = self.db();
         let arguments_slice = &*subscript.slice;
         match known_instance {
             KnownInstanceType::Annotated => {
@@ -6534,7 +6527,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     elts: arguments, ..
                 }) = arguments_slice
                 else {
-                    report_invalid_arguments_to_annotated(self.db(), &self.context, subscript);
+                    report_invalid_arguments_to_annotated(&self.context, subscript);
 
                     // `Annotated[]` with less than two arguments is an error at runtime.
                     // However, we still treat `Annotated[T]` as `T` here for the purpose of
@@ -6544,7 +6537,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 };
 
                 if arguments.len() < 2 {
-                    report_invalid_arguments_to_annotated(self.db(), &self.context, subscript);
+                    report_invalid_arguments_to_annotated(&self.context, subscript);
                 }
 
                 let [type_expr, metadata @ ..] = &arguments[..] else {
@@ -6580,12 +6573,12 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
             KnownInstanceType::Optional => {
                 let param_type = self.infer_type_expression(arguments_slice);
-                UnionType::from_elements(self.db(), [param_type, Type::none(self.db())])
+                UnionType::from_elements(db, [param_type, Type::none(db)])
             }
             KnownInstanceType::Union => match arguments_slice {
                 ast::Expr::Tuple(t) => {
                     let union_ty = UnionType::from_elements(
-                        self.db(),
+                        db,
                         t.iter().map(|elt| self.infer_type_expression(elt)),
                     );
                     self.store_expression_type(arguments_slice, union_ty);
@@ -6606,7 +6599,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     elts: arguments, ..
                 }) = arguments_slice
                 else {
-                    report_invalid_arguments_to_callable(self.db(), &self.context, subscript);
+                    report_invalid_arguments_to_callable(&self.context, subscript);
 
                     // If it's not a tuple, defer it to inferring the parameter types which could
                     // return an `Err` if the expression is invalid in that position. In which
@@ -6617,7 +6610,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                     let callable_type =
                         Type::Callable(CallableType::General(GeneralCallableType::new(
-                            self.db(),
+                            db,
                             Signature::new(parameters, Some(Type::unknown())),
                         )));
 
@@ -6629,27 +6622,21 @@ impl<'db> TypeInferenceBuilder<'db> {
                 };
 
                 let [first_argument, second_argument] = arguments.as_slice() else {
-                    report_invalid_arguments_to_callable(self.db(), &self.context, subscript);
+                    report_invalid_arguments_to_callable(&self.context, subscript);
                     self.infer_type_expression(arguments_slice);
-                    return Type::Callable(CallableType::General(GeneralCallableType::unknown(
-                        self.db(),
-                    )));
+                    return Type::Callable(CallableType::General(GeneralCallableType::unknown(db)));
                 };
 
                 let Ok(parameters) = self.infer_callable_parameter_types(first_argument) else {
                     self.infer_type_expression(arguments_slice);
-                    return Type::Callable(CallableType::General(GeneralCallableType::unknown(
-                        self.db(),
-                    )));
+                    return Type::Callable(CallableType::General(GeneralCallableType::unknown(db)));
                 };
 
                 let return_type = self.infer_type_expression(second_argument);
 
-                let callable_type =
-                    Type::Callable(CallableType::General(GeneralCallableType::new(
-                        self.db(),
-                        Signature::new(parameters, Some(return_type)),
-                    )));
+                let callable_type = Type::Callable(CallableType::General(
+                    GeneralCallableType::new(db, Signature::new(parameters, Some(return_type))),
+                ));
 
                 // `Signature` / `Parameters` are not a `Type` variant, so we're storing
                 // the outer callable type on the these expressions instead.
@@ -6667,14 +6654,14 @@ impl<'db> TypeInferenceBuilder<'db> {
                         subscript,
                         format_args!(
                             "Special form `{}` expected exactly one type parameter",
-                            known_instance.repr(self.db())
+                            known_instance.repr(db)
                         ),
                     );
                     Type::unknown()
                 }
                 _ => {
                     let argument_type = self.infer_type_expression(arguments_slice);
-                    argument_type.negate(self.db())
+                    argument_type.negate(db)
                 }
             },
             KnownInstanceType::Intersection => {
@@ -6684,7 +6671,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 };
 
                 elements
-                    .fold(IntersectionBuilder::new(self.db()), |builder, element| {
+                    .fold(IntersectionBuilder::new(db), |builder, element| {
                         builder.add_positive(self.infer_type_expression(element))
                     })
                     .build()
@@ -6696,7 +6683,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         subscript,
                         format_args!(
                             "Special form `{}` expected exactly one type parameter",
-                            known_instance.repr(self.db())
+                            known_instance.repr(db)
                         ),
                     );
                     Type::unknown()
@@ -6714,7 +6701,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         subscript,
                         format_args!(
                             "Special form `{}` expected exactly one type parameter",
-                            known_instance.repr(self.db())
+                            known_instance.repr(db)
                         ),
                     );
                     Type::unknown()
@@ -6727,52 +6714,52 @@ impl<'db> TypeInferenceBuilder<'db> {
                             arguments_slice,
                             format_args!(
                                 "Expected the first argument to `{}` to be a function literal, but got `{}`",
-                                known_instance.repr(self.db()),
-                                argument_type.display(self.db())
+                                known_instance.repr(db),
+                                argument_type.display(db)
                             ),
                         );
                         return Type::unknown();
                     };
-                    function_type.into_callable_type(self.db())
+                    function_type.into_callable_type(db)
                 }
             },
 
             // TODO: Generics
             KnownInstanceType::ChainMap => {
                 self.infer_type_expression(arguments_slice);
-                KnownClass::ChainMap.to_instance(self.db())
+                KnownClass::ChainMap.to_instance(db)
             }
             KnownInstanceType::OrderedDict => {
                 self.infer_type_expression(arguments_slice);
-                KnownClass::OrderedDict.to_instance(self.db())
+                KnownClass::OrderedDict.to_instance(db)
             }
             KnownInstanceType::Dict => {
                 self.infer_type_expression(arguments_slice);
-                KnownClass::Dict.to_instance(self.db())
+                KnownClass::Dict.to_instance(db)
             }
             KnownInstanceType::List => {
                 self.infer_type_expression(arguments_slice);
-                KnownClass::List.to_instance(self.db())
+                KnownClass::List.to_instance(db)
             }
             KnownInstanceType::DefaultDict => {
                 self.infer_type_expression(arguments_slice);
-                KnownClass::DefaultDict.to_instance(self.db())
+                KnownClass::DefaultDict.to_instance(db)
             }
             KnownInstanceType::Counter => {
                 self.infer_type_expression(arguments_slice);
-                KnownClass::Counter.to_instance(self.db())
+                KnownClass::Counter.to_instance(db)
             }
             KnownInstanceType::Set => {
                 self.infer_type_expression(arguments_slice);
-                KnownClass::Set.to_instance(self.db())
+                KnownClass::Set.to_instance(db)
             }
             KnownInstanceType::FrozenSet => {
                 self.infer_type_expression(arguments_slice);
-                KnownClass::FrozenSet.to_instance(self.db())
+                KnownClass::FrozenSet.to_instance(db)
             }
             KnownInstanceType::Deque => {
                 self.infer_type_expression(arguments_slice);
-                KnownClass::Deque.to_instance(self.db())
+                KnownClass::Deque.to_instance(db)
             }
 
             KnownInstanceType::ReadOnly => {
@@ -6789,7 +6776,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     subscript,
                     format_args!(
                         "Type qualifier `{}` is not allowed in type expressions (only in annotation expressions)",
-                        known_instance.repr(self.db())
+                        known_instance.repr(db)
                     ),
                 );
                 self.infer_type_expression(arguments_slice)
@@ -6828,7 +6815,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     subscript,
                     format_args!(
                         "Type `{}` expected no type parameter",
-                        known_instance.repr(self.db())
+                        known_instance.repr(db)
                     ),
                 );
                 Type::unknown()
@@ -6841,7 +6828,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     subscript,
                     format_args!(
                         "Special form `{}` expected no type parameter",
-                        known_instance.repr(self.db())
+                        known_instance.repr(db)
                     ),
                 );
                 Type::unknown()
@@ -6852,7 +6839,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     subscript,
                     format_args!(
                         "Type `{}` expected no type parameter. Did you mean to use `Literal[...]` instead?",
-                        known_instance.repr(self.db())
+                        known_instance.repr(db)
                     ),
                 );
                 Type::unknown()
