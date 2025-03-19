@@ -1,5 +1,8 @@
 use crate::{
-    semantic_index::{ast_ids::ScopedExpressionId, expression::Expression},
+    semantic_index::{
+        ast_ids::ScopedExpressionId, expression::Expression, symbol::ScopeId,
+        use_def::ScopedDefinitionId,
+    },
     unpack::Unpack,
 };
 
@@ -34,4 +37,23 @@ pub(crate) enum AttributeAssignment<'db> {
     },
 }
 
-pub(crate) type AttributeAssignments<'db> = FxHashMap<Name, Vec<AttributeAssignment<'db>>>;
+impl<'db> AttributeAssignment<'db> {
+    pub(crate) fn scope(&self, db: &'db dyn crate::Db) -> ScopeId<'db> {
+        match self {
+            AttributeAssignment::Annotated { annotation } => annotation.scope(db),
+            AttributeAssignment::Unannotated { value } => value.scope(db),
+            AttributeAssignment::Iterable { iterable } => iterable.scope(db),
+            AttributeAssignment::ContextManager { context_manager } => context_manager.scope(db),
+            AttributeAssignment::Unpack { unpack, .. } => unpack.scope(db),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, salsa::Update)]
+pub(crate) struct AttributeAssignmentWithDefinitionId<'db> {
+    pub(crate) assignment: AttributeAssignment<'db>,
+    pub(crate) definition_id: ScopedDefinitionId,
+}
+
+pub(crate) type AttributeAssignments<'db> =
+    FxHashMap<Name, Vec<AttributeAssignmentWithDefinitionId<'db>>>;

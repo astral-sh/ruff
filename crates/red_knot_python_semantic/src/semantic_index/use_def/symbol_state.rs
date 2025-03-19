@@ -56,7 +56,7 @@ use crate::semantic_index::visibility_constraints::{
 /// A newtype-index for a definition in a particular scope.
 #[newtype_index]
 #[derive(Ord, PartialOrd)]
-pub(super) struct ScopedDefinitionId;
+pub(crate) struct ScopedDefinitionId;
 
 impl ScopedDefinitionId {
     /// A special ID that is used to describe an implicit start-of-scope state. When

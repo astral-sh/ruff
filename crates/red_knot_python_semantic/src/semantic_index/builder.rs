@@ -14,7 +14,9 @@ use crate::ast_node_ref::AstNodeRef;
 use crate::module_name::ModuleName;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::ast_ids::AstIdsBuilder;
-use crate::semantic_index::attribute_assignment::{AttributeAssignment, AttributeAssignments};
+use crate::semantic_index::attribute_assignment::{
+    AttributeAssignment, AttributeAssignmentWithDefinitionId, AttributeAssignments,
+};
 use crate::semantic_index::definition::{
     AssignmentDefinitionNodeRef, ComprehensionDefinitionNodeRef, Definition, DefinitionCategory,
     DefinitionNodeKey, DefinitionNodeRef, ExceptHandlerDefinitionNodeRef, ForStmtDefinitionNodeRef,
@@ -30,7 +32,7 @@ use crate::semantic_index::symbol::{
     SymbolTableBuilder,
 };
 use crate::semantic_index::use_def::{
-    EagerBindingsKey, FlowSnapshot, ScopedEagerBindingsId, UseDefMapBuilder,
+    EagerBindingsKey, FlowSnapshot, ScopedDefinitionId, ScopedEagerBindingsId, UseDefMapBuilder,
 };
 use crate::semantic_index::visibility_constraints::{
     ScopedVisibilityConstraintId, VisibilityConstraintsBuilder,
@@ -83,6 +85,7 @@ pub(super) struct SemanticIndexBuilder<'db> {
     scopes: IndexVec<FileScopeId, Scope>,
     scope_ids_by_scope: IndexVec<FileScopeId, ScopeId<'db>>,
     symbol_tables: IndexVec<FileScopeId, SymbolTableBuilder>,
+    instance_attribute_tables: IndexVec<FileScopeId, SymbolTableBuilder>,
     ast_ids: IndexVec<FileScopeId, AstIdsBuilder>,
     use_def_maps: IndexVec<FileScopeId, UseDefMapBuilder<'db>>,
     scopes_by_node: FxHashMap<NodeWithScopeKey, FileScopeId>,
@@ -110,6 +113,7 @@ impl<'db> SemanticIndexBuilder<'db> {
 
             scopes: IndexVec::new(),
             symbol_tables: IndexVec::new(),
+            instance_attribute_tables: IndexVec::new(),
             ast_ids: IndexVec::new(),
             scope_ids_by_scope: IndexVec::new(),
             use_def_maps: IndexVec::new(),
@@ -199,6 +203,8 @@ impl<'db> SemanticIndexBuilder<'db> {
 
         let file_scope_id = self.scopes.push(scope);
         self.symbol_tables.push(SymbolTableBuilder::default());
+        self.instance_attribute_tables
+            .push(SymbolTableBuilder::default());
         self.use_def_maps.push(UseDefMapBuilder::default());
         let ast_id_scope = self.ast_ids.push(AstIdsBuilder::default());
 
@@ -292,6 +298,11 @@ impl<'db> SemanticIndexBuilder<'db> {
         &mut self.symbol_tables[scope_id]
     }
 
+    fn current_attribute_table(&mut self) -> &mut SymbolTableBuilder {
+        let scope_id = self.current_scope();
+        &mut self.instance_attribute_tables[scope_id]
+    }
+
     fn current_use_def_map_mut(&mut self) -> &mut UseDefMapBuilder<'db> {
         let scope_id = self.current_scope();
         &mut self.use_def_maps[scope_id]
@@ -328,6 +339,14 @@ impl<'db> SemanticIndexBuilder<'db> {
         let (symbol_id, added) = self.current_symbol_table().add_symbol(name);
         if added {
             self.current_use_def_map_mut().add_symbol(symbol_id);
+        }
+        symbol_id
+    }
+
+    fn add_attribute(&mut self, name: Name) -> ScopedSymbolId {
+        let (symbol_id, added) = self.current_attribute_table().add_symbol(name);
+        if added {
+            self.current_use_def_map_mut().add_attribute(symbol_id);
         }
         symbol_id
     }
@@ -391,6 +410,11 @@ impl<'db> SemanticIndexBuilder<'db> {
         self.try_node_context_stack_manager = try_node_stack_manager;
 
         definition
+    }
+
+    fn add_attribute_definition(&mut self, symbol: ScopedSymbolId) -> ScopedDefinitionId {
+        let use_def = self.current_use_def_map_mut();
+        use_def.record_attribute_binding(symbol)
     }
 
     fn record_expression_narrowing_constraint(
@@ -534,6 +558,12 @@ impl<'db> SemanticIndexBuilder<'db> {
                     == self.current_first_parameter_name;
 
             if accessed_object_refers_to_first_parameter {
+                let symbol = self.add_attribute(attr.id().clone());
+                let definition_id = self.add_attribute_definition(symbol);
+                let attribute_assignment = AttributeAssignmentWithDefinitionId {
+                    assignment: attribute_assignment,
+                    definition_id,
+                };
                 self.attribute_assignments
                     .entry(class_body_scope)
                     .or_default()
@@ -789,6 +819,12 @@ impl<'db> SemanticIndexBuilder<'db> {
             .map(|builder| Arc::new(builder.finish()))
             .collect();
 
+        let mut instance_attribute_tables: IndexVec<_, _> = self
+            .instance_attribute_tables
+            .into_iter()
+            .map(|builder| Arc::new(builder.finish()))
+            .collect();
+
         let mut use_def_maps: IndexVec<_, _> = self
             .use_def_maps
             .into_iter()
@@ -803,6 +839,7 @@ impl<'db> SemanticIndexBuilder<'db> {
 
         self.scopes.shrink_to_fit();
         symbol_tables.shrink_to_fit();
+        instance_attribute_tables.shrink_to_fit();
         use_def_maps.shrink_to_fit();
         ast_ids.shrink_to_fit();
         self.scopes_by_expression.shrink_to_fit();
@@ -814,6 +851,7 @@ impl<'db> SemanticIndexBuilder<'db> {
 
         SemanticIndex {
             symbol_tables,
+            instance_attribute_tables,
             scopes: self.scopes,
             definitions_by_node: self.definitions_by_node,
             expressions_by_node: self.expressions_by_node,
