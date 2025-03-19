@@ -855,10 +855,10 @@ from knot_extensions import Intersection, Not
 def f(x: Intersection) -> None:
     reveal_type(x)  # revealed: Unknown
 
-
 # error: [invalid-type-form] "`knot_extensions.Not` requires exactly one argument when used in a type expression"
 def f(x: Not) -> None:
     reveal_type(x)  # revealed: Unknown
+```
 
 [complement laws]: https://en.wikipedia.org/wiki/Complement_(set_theory)
 [de morgan's laws]: https://en.wikipedia.org/wiki/De_Morgan%27s_laws
