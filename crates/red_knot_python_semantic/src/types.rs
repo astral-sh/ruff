@@ -3270,9 +3270,9 @@ impl<'db> Type<'db> {
                 | KnownInstanceType::Union
                 | KnownInstanceType::Intersection,
             ) => Err(InvalidTypeExpressionError {
-                invalid_expressions: smallvec::smallvec![
-                    InvalidTypeExpression::BareSpecialFormAtLeastOne(*self)
-                ],
+                invalid_expressions: smallvec::smallvec![InvalidTypeExpression::RequiresArguments(
+                    *self
+                )],
                 fallback_type: Type::unknown(),
             }),
             Type::KnownInstance(
@@ -3282,7 +3282,7 @@ impl<'db> Type<'db> {
                 | KnownInstanceType::CallableTypeFromFunction,
             ) => Err(InvalidTypeExpressionError {
                 invalid_expressions: smallvec::smallvec![
-                    InvalidTypeExpression::BareSpecialFormExactlyOne(*self)
+                    InvalidTypeExpression::RequiresOneArgument(*self)
                 ],
                 fallback_type: Type::unknown(),
             }),
@@ -3576,9 +3576,9 @@ enum InvalidTypeExpression<'db> {
     /// `x: Annotated` is invalid as an annotation
     BareAnnotated,
     /// Some types always require at least one argument when used in a type expression
-    BareSpecialFormAtLeastOne(Type<'db>),
+    RequiresArguments(Type<'db>),
     /// Some types always require exactly one argument when used in a type expression
-    BareSpecialFormExactlyOne(Type<'db>),
+    RequiresOneArgument(Type<'db>),
     /// The `Protocol` type is invalid in type expressions
     ProtocolInTypeExpression,
     /// The `ClassVar` type qualifier was used in a type expression
@@ -3602,11 +3602,11 @@ impl<'db> InvalidTypeExpression<'db> {
                     InvalidTypeExpression::BareAnnotated => f.write_str(
                         "`Annotated` requires at least two arguments when used in an annotation or type expression"
                     ),
-                    InvalidTypeExpression::BareSpecialFormExactlyOne(ty) => write!(
+                    InvalidTypeExpression::RequiresOneArgument(ty) => write!(
                         f,
                         "`{ty}` requires exactly one argument when used in a type expression",
                         ty = ty.display(self.db)),
-                    InvalidTypeExpression::BareSpecialFormAtLeastOne(ty) => write!(
+                    InvalidTypeExpression::RequiresArguments(ty) => write!(
                         f,
                         "`{ty}` requires at least one argument when used in a type expression",
                         ty = ty.display(self.db)
