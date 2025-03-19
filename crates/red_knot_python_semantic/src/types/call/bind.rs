@@ -42,6 +42,8 @@ pub(crate) struct Bindings<'db> {
     /// we are able to use the annotated parameter types as type contexts for that inference. At
     /// that point, this field will move down into `CallBinding` or `Binding`.
     pub(crate) argument_forms: Box<[Option<ParameterForm>]>,
+
+    conflicting_forms: Box<[bool]>,
 }
 
 impl<'db> Bindings<'db> {
@@ -55,10 +57,16 @@ impl<'db> Bindings<'db> {
         arguments: &mut CallArguments<'_>,
     ) -> Self {
         let mut argument_forms = vec![None; arguments.len()];
+        let mut conflicting_forms = vec![false; arguments.len()];
         let elements: SmallVec<[CallableBinding<'db>; 1]> = signatures
             .iter()
             .map(|signature| {
-                CallableBinding::match_parameters(signature, arguments, &mut argument_forms)
+                CallableBinding::match_parameters(
+                    signature,
+                    arguments,
+                    &mut argument_forms,
+                    &mut conflicting_forms,
+                )
             })
             .collect();
 
@@ -66,6 +74,7 @@ impl<'db> Bindings<'db> {
             signatures,
             elements,
             argument_forms: argument_forms.into(),
+            conflicting_forms: conflicting_forms.into(),
         }
     }
 
@@ -103,6 +112,11 @@ impl<'db> Bindings<'db> {
         let mut all_ok = true;
         let mut any_binding_error = false;
         let mut all_not_callable = true;
+        if self.conflicting_forms.contains(&true) {
+            all_ok = false;
+            any_binding_error = true;
+            all_not_callable = false;
+        }
         for binding in &self.elements {
             let result = binding.as_result();
             all_ok &= result.is_ok();
@@ -160,6 +174,16 @@ impl<'db> Bindings<'db> {
                 ),
             );
             return;
+        }
+
+        for (index, conflicting_form) in self.conflicting_forms.iter().enumerate() {
+            if *conflicting_form {
+                context.report_lint(
+                    &CONFLICTING_ARGUMENT_FORMS,
+                    BindingError::get_node(node, Some(index)),
+                    format_args!("Argument is used as both a value and a type form in call"),
+                );
+            }
         }
 
         // TODO: We currently only report errors for the first union element. Ideally, we'd report
@@ -502,6 +526,7 @@ impl<'db> CallableBinding<'db> {
         signature: &CallableSignature<'db>,
         arguments: &mut CallArguments<'_>,
         argument_forms: &mut [Option<ParameterForm>],
+        conflicting_forms: &mut [bool],
     ) -> Self {
         // If this callable is a bound method, prepend the self instance onto the arguments list
         // before checking.
@@ -517,7 +542,9 @@ impl<'db> CallableBinding<'db> {
         // [1] https://github.com/python/typing/pull/1839
         let overloads = signature
             .into_iter()
-            .map(|signature| Binding::match_parameters(signature, arguments, argument_forms))
+            .map(|signature| {
+                Binding::match_parameters(signature, arguments, argument_forms, conflicting_forms)
+            })
             .collect();
         let binding = CallableBinding {
             callable_type: signature.callable_type,
@@ -689,6 +716,7 @@ impl<'db> Binding<'db> {
         signature: &Signature<'db>,
         arguments: &CallArguments<'_>,
         argument_forms: &mut [Option<ParameterForm>],
+        conflicting_forms: &mut [bool],
     ) -> Self {
         let parameters = signature.parameters();
         // The parameter that each argument is matched with.
@@ -752,9 +780,7 @@ impl<'db> Binding<'db> {
                     argument_forms[argument_index - num_synthetic_args].replace(parameter.form)
                 {
                     if existing != parameter.form {
-                        errors.push(BindingError::ConflictingArgumentForms {
-                            argument_index: get_argument_index(argument_index, num_synthetic_args),
-                        });
+                        conflicting_forms[argument_index - num_synthetic_args] = true;
                     }
                 }
             }
@@ -1011,8 +1037,6 @@ pub(crate) enum BindingError<'db> {
         argument_index: Option<usize>,
         parameter: ParameterContext,
     },
-    /// An argument is used as both a value and a type form
-    ConflictingArgumentForms { argument_index: Option<usize> },
 }
 
 impl<'db> BindingError<'db> {
@@ -1157,21 +1181,6 @@ impl<'db> BindingError<'db> {
                         "Multiple values provided for parameter {parameter}{}",
                         if let Some(CallableDescription { kind, name }) = callable_description {
                             format!(" of {kind} `{name}`")
-                        } else {
-                            String::new()
-                        }
-                    ),
-                );
-            }
-
-            Self::ConflictingArgumentForms { argument_index } => {
-                context.report_lint(
-                    &CONFLICTING_ARGUMENT_FORMS,
-                    Self::get_node(node, *argument_index),
-                    format_args!(
-                        "Argument is used as both a value and a type form in call{}",
-                        if let Some(CallableDescription { kind, name }) = callable_description {
-                            format!(" to {kind} `{name}`")
                         } else {
                             String::new()
                         }

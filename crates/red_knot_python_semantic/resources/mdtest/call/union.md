@@ -171,6 +171,6 @@ def _(flag: bool):
         f = repr
     else:
         f = is_fully_static
-    # error: [conflicting-argument-forms] "Argument is used as both a value and a type form in call to function `is_fully_static`"
-    reveal_type(f(int))  # revealed: str | bool
+    # error: [conflicting-argument-forms] "Argument is used as both a value and a type form in call"
+    reveal_type(f(int))  # revealed: str | Literal[True]
 ```
