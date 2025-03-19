@@ -43,7 +43,7 @@ class Foo:
 One thing that is supported is error messages for using type qualifiers in type expressions.
 
 ```py
-from typing_extensions import Self, Unpack, TypeGuard, TypeIs, Concatenate
+from typing_extensions import Unpack, TypeGuard, TypeIs, Concatenate
 
 def _(
     a: Unpack,  # error: [invalid-type-form] "`typing.Unpack` requires exactly one argument when used in a type expression"
