@@ -45,7 +45,7 @@ pub(crate) fn shebang_missing_python(
     range: TextRange,
     shebang: &ShebangDirective,
 ) -> Option<Diagnostic> {
-    if shebang.contains("python") || shebang.contains("pytest") {
+    if shebang.contains("python") || shebang.contains("pytest") || shebang.contains("uv run") {
         return None;
     }
 
