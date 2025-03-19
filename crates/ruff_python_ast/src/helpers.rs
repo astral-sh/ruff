@@ -1622,10 +1622,10 @@ mod tests {
         });
         let type_alias = Stmt::TypeAlias(StmtTypeAlias {
             name: Box::new(name.clone()),
-            type_params: Some(TypeParams {
+            type_params: Some(Box::new(TypeParams {
                 type_params: vec![type_var_one, type_var_two],
                 range: TextRange::default(),
-            }),
+            })),
             value: Box::new(constant_three.clone()),
             range: TextRange::default(),
         });

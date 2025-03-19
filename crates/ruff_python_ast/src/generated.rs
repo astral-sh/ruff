@@ -6494,7 +6494,7 @@ pub struct StmtDelete {
 pub struct StmtTypeAlias {
     pub range: ruff_text_size::TextRange,
     pub name: Box<Expr>,
-    pub type_params: Option<crate::TypeParams>,
+    pub type_params: Option<Box<crate::TypeParams>>,
     pub value: Box<Expr>,
 }
 
