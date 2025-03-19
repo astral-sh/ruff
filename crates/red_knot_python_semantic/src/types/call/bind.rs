@@ -83,7 +83,7 @@ impl<'db> Bindings<'db> {
             element.check_types(db, signature, argument_types);
         }
 
-        self.evaluate_special_cases(db);
+        self.evaluate_known_cases(db);
 
         // In order of precedence:
         //
@@ -172,7 +172,7 @@ impl<'db> Bindings<'db> {
 
     /// Evaluates the return type of certain known callables, where we have special-case logic to
     /// determine the return type in a way that isn't directly expressible in the type system.
-    fn evaluate_special_cases(&mut self, db: &'db dyn Db) {
+    fn evaluate_known_cases(&mut self, db: &'db dyn Db) {
         // Each special case listed here should have a corresponding clause in `Type::signatures`.
         for binding in &mut self.elements {
             let binding_type = binding.callable_type;
