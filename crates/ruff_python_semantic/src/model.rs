@@ -1965,11 +1965,6 @@ impl<'a> SemanticModel<'a> {
         self.flags.intersects(SemanticModelFlags::IMPORT_BOUNDARY)
     }
 
-    /// Return `true` if the model has traverse past the `__future__` import boundary.
-    pub const fn seen_futures_boundary(&self) -> bool {
-        self.flags.intersects(SemanticModelFlags::FUTURES_BOUNDARY)
-    }
-
     /// Return `true` if the model has traversed past the module docstring boundary.
     pub const fn seen_module_docstring_boundary(&self) -> bool {
         self.flags
@@ -2338,21 +2333,6 @@ bitflags! {
         /// ```
         const IMPORT_BOUNDARY = 1 << 13;
 
-        /// The model has traversed past the `__future__` import boundary.
-        ///
-        /// For example, the model could be visiting `x` in:
-        /// ```python
-        /// from __future__ import annotations
-        ///
-        /// import os
-        ///
-        /// x: int = 1
-        /// ```
-        ///
-        /// Python considers it a syntax error to import from `__future__` after
-        /// any other non-`__future__`-importing statements.
-        const FUTURES_BOUNDARY = 1 << 14;
-
         /// The model is in a file that has `from __future__ import annotations`
         /// at the top of the module.
         ///
@@ -2364,10 +2344,10 @@ bitflags! {
         /// def f(x: int) -> int:
         ///   ...
         /// ```
-        const FUTURE_ANNOTATIONS = 1 << 15;
+        const FUTURE_ANNOTATIONS = 1 << 14;
 
         /// The model is in a Python stub file (i.e., a `.pyi` file).
-        const STUB_FILE = 1 << 16;
+        const STUB_FILE = 1 << 15;
 
         /// `__future__`-style type annotations are enabled in this model.
         /// That could be because it's a stub file,
@@ -2383,7 +2363,7 @@ bitflags! {
         ///
         /// x: int = 1
         /// ```
-        const MODULE_DOCSTRING_BOUNDARY = 1 << 17;
+        const MODULE_DOCSTRING_BOUNDARY = 1 << 16;
 
         /// The model is in a (deferred) [type parameter definition].
         ///
@@ -2407,7 +2387,7 @@ bitflags! {
         /// not when we "pass by" it when initially traversing the source tree.
         ///
         /// [type parameter definition]: https://docs.python.org/3/reference/executionmodel.html#annotation-scopes
-        const TYPE_PARAM_DEFINITION = 1 << 18;
+        const TYPE_PARAM_DEFINITION = 1 << 17;
 
         /// The model is in a named expression assignment.
         ///
@@ -2415,7 +2395,7 @@ bitflags! {
         /// ```python
         /// if (x := 1): ...
         /// ```
-        const NAMED_EXPRESSION_ASSIGNMENT = 1 << 19;
+        const NAMED_EXPRESSION_ASSIGNMENT = 1 << 18;
 
         /// The model is in a docstring as described in [PEP 257].
         ///
@@ -2436,7 +2416,7 @@ bitflags! {
         /// ```
         ///
         /// [PEP 257]: https://peps.python.org/pep-0257/#what-is-a-docstring
-        const PEP_257_DOCSTRING = 1 << 20;
+        const PEP_257_DOCSTRING = 1 << 19;
 
         /// The model is visiting the r.h.s. of a module-level `__all__` definition.
         ///
@@ -2448,7 +2428,7 @@ bitflags! {
         /// __all__ = ("bar",)
         /// __all__ += ("baz,")
         /// ```
-        const DUNDER_ALL_DEFINITION = 1 << 21;
+        const DUNDER_ALL_DEFINITION = 1 << 20;
 
         /// The model is in an f-string replacement field.
         ///
@@ -2457,7 +2437,7 @@ bitflags! {
         /// ```python
         /// f"first {x} second {y}"
         /// ```
-        const F_STRING_REPLACEMENT_FIELD = 1 << 22;
+        const F_STRING_REPLACEMENT_FIELD = 1 << 21;
 
         /// The model is visiting the bases tuple of a class.
         ///
@@ -2467,11 +2447,11 @@ bitflags! {
         /// class Baz(Foo, Bar):
         ///     pass
         /// ```
-        const CLASS_BASE = 1 << 23;
+        const CLASS_BASE = 1 << 22;
 
         /// The model is visiting a class base that was initially deferred
         /// while traversing the AST. (This only happens in stub files.)
-        const DEFERRED_CLASS_BASE = 1 << 24;
+        const DEFERRED_CLASS_BASE = 1 << 23;
 
         /// The model is in an attribute docstring.
         ///
@@ -2496,7 +2476,7 @@ bitflags! {
         /// static-analysis tools.
         ///
         /// [PEP 257]: https://peps.python.org/pep-0257/#what-is-a-docstring
-        const ATTRIBUTE_DOCSTRING = 1 << 25;
+        const ATTRIBUTE_DOCSTRING = 1 << 24;
 
         /// The model is in the value expression of a [PEP 613] explicit type alias.
         ///
@@ -2508,7 +2488,7 @@ bitflags! {
         /// ```
         ///
         /// [PEP 613]: https://peps.python.org/pep-0613/
-        const ANNOTATED_TYPE_ALIAS = 1 << 27;
+        const ANNOTATED_TYPE_ALIAS = 1 << 25;
 
         /// The model is in the value expression of a [PEP 695] type statement.
         ///
@@ -2518,7 +2498,7 @@ bitflags! {
         /// ```
         ///
         /// [PEP 695]: https://peps.python.org/pep-0695/#generic-type-alias
-        const DEFERRED_TYPE_ALIAS = 1 << 28;
+        const DEFERRED_TYPE_ALIAS = 1 << 26;
 
         /// The model is visiting an `assert` statement.
         ///
@@ -2526,7 +2506,7 @@ bitflags! {
         /// ```python
         /// assert (y := x**2) > 42, y
         /// ```
-        const ASSERT_STATEMENT = 1 << 29;
+        const ASSERT_STATEMENT = 1 << 27;
 
         /// The model is in a [`@no_type_check`] context.
         ///
@@ -2543,7 +2523,7 @@ bitflags! {
         ///
         /// [no_type_check]: https://docs.python.org/3/library/typing.html#typing.no_type_check
         /// [#13824]: https://github.com/astral-sh/ruff/issues/13824
-        const NO_TYPE_CHECK = 1 << 30;
+        const NO_TYPE_CHECK = 1 << 28;
 
         /// The context is in any type annotation.
         const ANNOTATION = Self::TYPING_ONLY_ANNOTATION.bits() | Self::RUNTIME_EVALUATED_ANNOTATION.bits() | Self::RUNTIME_REQUIRED_ANNOTATION.bits();

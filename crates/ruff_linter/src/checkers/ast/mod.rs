@@ -558,17 +558,13 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     {
                         self.semantic.flags |= SemanticModelFlags::FUTURE_ANNOTATIONS;
                     }
-                } else {
-                    self.semantic.flags |= SemanticModelFlags::FUTURES_BOUNDARY;
                 }
             }
             Stmt::Import(_) => {
                 self.semantic.flags |= SemanticModelFlags::MODULE_DOCSTRING_BOUNDARY;
-                self.semantic.flags |= SemanticModelFlags::FUTURES_BOUNDARY;
             }
             _ => {
                 self.semantic.flags |= SemanticModelFlags::MODULE_DOCSTRING_BOUNDARY;
-                self.semantic.flags |= SemanticModelFlags::FUTURES_BOUNDARY;
                 if !(self.semantic.seen_import_boundary()
                     || stmt.is_ipy_escape_command_stmt()
                     || helpers::is_assignment_to_a_dunder(stmt)
