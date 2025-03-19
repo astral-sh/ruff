@@ -110,12 +110,12 @@ pub(crate) fn bit_count(checker: &Checker, call: &ExprCall) {
         return;
     }
 
-    // Extract, e.g., `x` in `bin(x)`.
     // If is a starred expression, it returns.
-    let literal_text = match arg {
-        Expr::Starred(_) => return,
-        _ => checker.locator().slice(arg),
-    };
+    if arg.is_starred_expr() {
+        return;
+    }
+    // Extract, e.g., `x` in `bin(x)`.
+    let literal_text = checker.locator().slice(arg);
 
     // If we're calling a method on an integer, or an expression with lower precedence, parenthesize
     // it.
