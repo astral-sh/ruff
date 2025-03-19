@@ -3311,9 +3311,7 @@ impl<'db> Type<'db> {
                 fallback_type: Type::unknown(),
             }),
             Type::KnownInstance(KnownInstanceType::Protocol) => Err(InvalidTypeExpressionError {
-                invalid_expressions: smallvec::smallvec![
-                    InvalidTypeExpression::ProtocolInTypeExpression
-                ],
+                invalid_expressions: smallvec::smallvec![InvalidTypeExpression::Protocol],
                 fallback_type: Type::unknown(),
             }),
             Type::KnownInstance(
@@ -3607,7 +3605,7 @@ enum InvalidTypeExpression<'db> {
     /// Some types always require at least two arguments when used in a type expression
     RequiresTwoArguments(Type<'db>),
     /// The `Protocol` type is invalid in type expressions
-    ProtocolInTypeExpression,
+    Protocol,
     /// Type qualifiers are always invalid in *type expressions*,
     /// but these ones are okay with 0 arguments in *annotation expressions*
     TypeQualifier(Type<'db>),
@@ -3643,7 +3641,7 @@ impl<'db> InvalidTypeExpression<'db> {
                         "`{ty}` requires at least two arguments when used in a type expression",
                         ty = ty.display(self.db)
                     ),
-                    InvalidTypeExpression::ProtocolInTypeExpression => f.write_str(
+                    InvalidTypeExpression::Protocol => f.write_str(
                         "`typing.Protocol` is not allowed in type expressions"
                     ),
                     InvalidTypeExpression::TypeQualifier(ty) => write!(
