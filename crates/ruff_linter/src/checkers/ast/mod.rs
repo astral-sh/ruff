@@ -2777,9 +2777,12 @@ pub(crate) fn check_ast(
                     ));
                 }
             }
-            SemanticSyntaxErrorKind::ReboundComprehensionVariable => {
+            SemanticSyntaxErrorKind::ReboundComprehensionVariable
+                if settings.preview.is_enabled() =>
+            {
                 semantic_syntax_errors.push(semantic_syntax_error);
             }
+            SemanticSyntaxErrorKind::ReboundComprehensionVariable => {}
         }
     }
 
