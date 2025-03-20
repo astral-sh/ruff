@@ -13,6 +13,8 @@ We support inference for all Python's binary operators: `+`, `-`, `*`, `@`, `/`,
 `<<`, `>>`, `&`, `^`, and `|`.
 
 ```py
+from __future__ import annotations
+
 class A:
     def __add__(self, other) -> A:
         return self
@@ -75,6 +77,8 @@ reveal_type(A() | B())  # revealed: A
 We also support inference for reflected operations:
 
 ```py
+from __future__ import annotations
+
 class A:
     def __radd__(self, other) -> A:
         return self
@@ -156,6 +160,8 @@ In general, if the left-hand side defines `__add__` and the right-hand side defi
 the right-hand side is not a subtype of the left-hand side, `lhs.__add__` will take precedence:
 
 ```py
+from __future__ import annotations
+
 class A:
     def __add__(self, other: B) -> int:
         return 42
@@ -236,6 +242,8 @@ strictly-speaking "accepts" any other object without raising an exception -- it 
 well.
 
 ```py
+from __future__ import annotations
+
 class A:
     def __sub__(self, other: A) -> A:
         return A()
@@ -299,6 +307,8 @@ When we have a literal type for one operand, we're able to fall back to the inst
 its instance super-type.
 
 ```py
+from __future__ import annotations
+
 class A:
     def __add__(self, other) -> A:
         return self
@@ -432,6 +442,8 @@ the unreflected dunder of the left-hand operand. For context, see
 [this mailing list discussion](https://mail.python.org/archives/list/python-dev@python.org/thread/7NZUCODEAPQFMRFXYRMGJXDSIS3WJYIV/).
 
 ```py
+from __future__ import annotations
+
 class Foo:
     def __radd__(self, other: Foo) -> Foo:
         return self

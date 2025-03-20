@@ -1195,6 +1195,26 @@ pub(super) fn report_unresolved_reference(context: &InferContext, expr_name_node
     );
 }
 
+pub(super) fn report_non_deferred_self_reference(
+    context: &InferContext,
+    expr_name_node: &ast::ExprName,
+) {
+    let ast::ExprName { id, .. } = expr_name_node;
+
+    let name_span = Span::from(context.file()).with_range(expr_name_node.range());
+
+    context.report_lint_with_secondary_messages(
+        &UNRESOLVED_REFERENCE,
+        expr_name_node,
+        format_args!("Name `{id}` used when not defined"),
+        vec![OldSecondaryDiagnosticMessage::new(
+            name_span,
+            "In order to use a type annotation of the class itself in the scope of the class definition, \
+            escape it with a string or use `from __future__ import annotations`",
+        )],
+    );
+}
+
 pub(super) fn report_invalid_exception_caught(context: &InferContext, node: &ast::Expr, ty: Type) {
     context.report_lint(
         &INVALID_EXCEPTION_CAUGHT,

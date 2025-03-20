@@ -94,9 +94,9 @@ use super::context::{InNoTypeCheck, InferContext, WithDiagnostics};
 use super::diagnostic::{
     report_index_out_of_bounds, report_invalid_exception_caught, report_invalid_exception_cause,
     report_invalid_exception_raised, report_invalid_type_checking_constant,
-    report_non_subscriptable, report_possibly_unresolved_reference, report_slice_step_size_zero,
-    report_unresolved_reference, INVALID_METACLASS, STATIC_ASSERT_ERROR, SUBCLASS_OF_FINAL_CLASS,
-    TYPE_ASSERTION_FAILURE,
+    report_non_deferred_self_reference, report_non_subscriptable,
+    report_possibly_unresolved_reference, report_slice_step_size_zero, report_unresolved_reference,
+    INVALID_METACLASS, STATIC_ASSERT_ERROR, SUBCLASS_OF_FINAL_CLASS, TYPE_ASSERTION_FAILURE,
 };
 use super::slots::check_class_slots;
 use super::string_annotation::{
@@ -5881,6 +5881,32 @@ impl<'db> TypeInferenceBuilder<'db> {
             ast::Expr::Name(name) => match name.ctx {
                 ast::ExprContext::Load => {
                     let name_expr_ty = self.infer_name_expression(name);
+
+                    if !self.in_stub()
+                        && !self.deferred_state.in_string_annotation()
+                        && !self.index.has_future_annotations()
+                    {
+                        let db = self.db();
+                        let file = self.file();
+                        if let Some(class_node) = self.scope().node(db).as_class() {
+                            let body_scope = self
+                                .index
+                                .node_scope(NodeWithScopeRef::Class(class_node))
+                                .to_scope_id(db, file);
+
+                            let maybe_known_class =
+                                KnownClass::try_from_file_and_name(db, file, &class_node.name);
+
+                            let class =
+                                Class::new(db, &class_node.name.id, body_scope, maybe_known_class);
+                            let class_ty = Type::class_literal(class);
+
+                            if class_ty.is_equivalent_to(db, name_expr_ty) {
+                                report_non_deferred_self_reference(&self.context, name);
+                            }
+                        }
+                    }
+
                     match name_expr_ty {
                         Type::KnownInstance(KnownInstanceType::ClassVar) => {
                             TypeAndQualifiers::new(Type::unknown(), TypeQualifiers::CLASS_VAR)

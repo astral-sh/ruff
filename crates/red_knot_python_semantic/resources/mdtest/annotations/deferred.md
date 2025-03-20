@@ -45,3 +45,40 @@ class Foo: ...
 
 reveal_type(get_foo())  # revealed: Foo
 ```
+
+## Deferred self-reference annotations in a class definition
+
+```py
+from __future__ import annotations
+
+class Bar:
+    this: Bar
+
+    def f(self: "Bar"):
+        reveal_type(self)  # revealed: Bar
+
+    def g(self: Bar):
+        reveal_type(self)  # revealed: Bar
+
+    def h(self) -> Bar:
+        _: Bar = self
+        return self
+```
+
+## Non-deferred self-reference annotations in a class definition
+
+```py
+class Bar:
+    # error: [unresolved-reference]
+    this: Bar
+
+    def f(self: "Bar"):
+        reveal_type(self)  # revealed: Bar
+    # error: [unresolved-reference]
+    def g(self: Bar):
+        reveal_type(self)  # revealed: Bar
+    # error: [unresolved-reference]
+    def h(self) -> Bar:
+        _: Bar = self
+        return self
+```
