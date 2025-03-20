@@ -27,7 +27,7 @@ use std::path::Path;
 use itertools::Itertools;
 use log::debug;
 use ruff_python_syntax_errors::{
-    SemanticSyntaxChecker, SemanticSyntaxError, SemanticSyntaxErrorKind,
+    SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError, SemanticSyntaxErrorKind,
 };
 use rustc_hash::{FxHashMap, FxHashSet};
 
@@ -522,9 +522,15 @@ impl<'a> Checker<'a> {
     }
 }
 
+impl SemanticSyntaxContext for Checker<'_> {
+    fn seen_docstring_boundary(&self) -> bool {
+        self.semantic.seen_module_docstring_boundary()
+    }
+}
+
 impl<'a> Visitor<'a> for Checker<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
-        self.syntax_checker.visit_stmt(stmt);
+        self.syntax_checker.visit_stmt(stmt, self);
 
         // Step 0: Pre-processing
         self.semantic.push_node(stmt);

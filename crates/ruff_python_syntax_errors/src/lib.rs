@@ -4,7 +4,7 @@
 //! [`SyntaxChecker::enter_stmt`] and [`SyntaxChecker::enter_expr`] methods should be called in a
 //! parent `Visitor`'s `visit_stmt` and `visit_expr` methods, respectively.
 
-use std::fmt::Display;
+use std::{cell::RefCell, fmt::Display};
 
 use ruff_python_ast::{
     self as ast,
@@ -13,30 +13,51 @@ use ruff_python_ast::{
 };
 use ruff_text_size::TextRange;
 
+struct CheckerState {
+    /// these could be grouped into a bitflags struct like `SemanticModel`
+    seen_futures_boundary: bool,
+}
+
 pub struct SemanticSyntaxChecker {
     /// The target Python version for detecting backwards-incompatible syntax
     /// changes.
     python_version: PythonVersion,
-    /// The cumulative set of syntax errors found when visiting the source AST.
-    errors: Vec<SemanticSyntaxError>,
 
-    /// these could be grouped into a bitflags struct like `SemanticModel`
-    seen_futures_boundary: bool,
-    seen_docstring_boundary: bool,
+    /// The cumulative set of syntax errors found when visiting the source AST.
+    errors: RefCell<Vec<SemanticSyntaxError>>,
+
+    state: RefCell<CheckerState>,
 }
 
 impl SemanticSyntaxChecker {
     pub fn new(python_version: PythonVersion) -> Self {
         Self {
             python_version,
-            errors: Vec::new(),
-            seen_futures_boundary: false,
-            seen_docstring_boundary: false,
+            errors: RefCell::new(Vec::new()),
+            state: RefCell::new(CheckerState {
+                seen_futures_boundary: false,
+            }),
         }
     }
 
     pub fn finish(self) -> Vec<SemanticSyntaxError> {
-        self.errors
+        self.errors.into_inner()
+    }
+
+    fn seen_futures_boundary(&self) -> bool {
+        self.state.borrow().seen_futures_boundary
+    }
+
+    fn set_seen_futures_boundary(&self, seen_futures_boundary: bool) {
+        self.state.borrow_mut().seen_futures_boundary = seen_futures_boundary;
+    }
+
+    fn add_error(&self, kind: SemanticSyntaxErrorKind, range: TextRange) {
+        self.errors.borrow_mut().push(SemanticSyntaxError {
+            kind,
+            range,
+            python_version: self.python_version,
+        });
     }
 }
 
@@ -92,37 +113,33 @@ pub enum SemanticSyntaxErrorKind {
     ReboundComprehensionVariable,
 }
 
+pub trait SemanticSyntaxContext {
+    /// Returns `true` if a module's docstring boundary has been passed.
+    fn seen_docstring_boundary(&self) -> bool;
+}
+
 impl SemanticSyntaxChecker {
-    fn check_stmt(&mut self, stmt: &ast::Stmt) {
+    fn check_stmt(&self, stmt: &ast::Stmt) {
         if let Stmt::ImportFrom(StmtImportFrom { range, module, .. }) = stmt {
-            if self.seen_futures_boundary && matches!(module.as_deref(), Some("__future__")) {
-                self.errors.push(SemanticSyntaxError {
-                    kind: SemanticSyntaxErrorKind::LateFutureImport,
-                    range: *range,
-                    python_version: self.python_version,
-                });
+            if self.seen_futures_boundary() && matches!(module.as_deref(), Some("__future__")) {
+                self.add_error(SemanticSyntaxErrorKind::LateFutureImport, *range);
             }
         }
     }
 
-    pub fn visit_stmt(&mut self, stmt: &ast::Stmt) {
+    pub fn visit_stmt<Ctx: SemanticSyntaxContext>(&self, stmt: &ast::Stmt, ctx: &Ctx) {
         // update internal state
         match stmt {
             Stmt::Expr(StmtExpr { value, .. })
-                if !self.seen_docstring_boundary && value.is_string_literal_expr() =>
-            {
-                self.seen_docstring_boundary = true;
-            }
+                if !ctx.seen_docstring_boundary() && value.is_string_literal_expr() => {}
             Stmt::ImportFrom(StmtImportFrom { module, .. }) => {
-                self.seen_docstring_boundary = true;
                 // Allow __future__ imports until we see a non-__future__ import.
                 if !matches!(module.as_deref(), Some("__future__")) {
-                    self.seen_futures_boundary = true;
+                    self.set_seen_futures_boundary(true);
                 }
             }
             _ => {
-                self.seen_docstring_boundary = true;
-                self.seen_futures_boundary = true;
+                self.set_seen_futures_boundary(true);
             }
         }
 
@@ -169,11 +186,7 @@ impl SemanticSyntaxChecker {
         // TODO(brent) with multiple diagnostic ranges, we could mark both the named expr (current)
         // and the name expr being rebound
         for range in rebound_variables {
-            self.errors.push(SemanticSyntaxError {
-                kind: SemanticSyntaxErrorKind::ReboundComprehensionVariable,
-                range,
-                python_version: self.python_version,
-            });
+            self.add_error(SemanticSyntaxErrorKind::ReboundComprehensionVariable, range);
         }
     }
 }
@@ -211,15 +224,21 @@ mod tests {
     use ruff_python_trivia::textwrap::dedent;
     use test_case::test_case;
 
-    use crate::{SemanticSyntaxChecker, SemanticSyntaxError};
+    use crate::{SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError};
 
     struct TestVisitor {
         checker: SemanticSyntaxChecker,
     }
 
+    impl SemanticSyntaxContext for TestVisitor {
+        fn seen_docstring_boundary(&self) -> bool {
+            false
+        }
+    }
+
     impl Visitor<'_> for TestVisitor {
         fn visit_stmt(&mut self, stmt: &ruff_python_ast::Stmt) {
-            self.checker.visit_stmt(stmt);
+            self.checker.visit_stmt(stmt, self);
             ruff_python_ast::visitor::walk_stmt(self, stmt);
         }
 
@@ -242,7 +261,7 @@ mod tests {
             visitor.visit_stmt(stmt);
         }
 
-        visitor.checker.errors
+        visitor.checker.finish()
     }
 
     #[test_case("[(a := 0) for a in range(0)]", "listcomp")]
