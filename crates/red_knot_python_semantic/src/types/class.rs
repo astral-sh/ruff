@@ -1108,13 +1108,10 @@ impl<'db> KnownClass {
             | Self::MethodWrapperType
             | Self::WrapperDescriptorType => KnownModule::Types,
             Self::NoneType => KnownModule::Typeshed,
-            Self::SpecialForm
-            | Self::TypeVar
-            | Self::ParamSpec
-            | Self::TypeVarTuple
-            | Self::StdlibAlias
-            | Self::SupportsIndex => KnownModule::Typing,
-            Self::TypeAliasType => KnownModule::TypingExtensions,
+            Self::SpecialForm | Self::TypeVar | Self::StdlibAlias | Self::SupportsIndex => {
+                KnownModule::Typing
+            }
+            Self::TypeAliasType | Self::TypeVar | Self::ParamSpec => KnownModule::TypingExtensions,
             Self::NoDefaultType => {
                 let python_version = Program::get(db).python_version(db);
 
