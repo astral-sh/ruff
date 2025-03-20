@@ -524,7 +524,7 @@ impl<'a> Checker<'a> {
 
 impl<'a> Visitor<'a> for Checker<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
-        self.syntax_checker.enter_stmt(stmt);
+        self.syntax_checker.visit_stmt(stmt);
 
         // Step 0: Pre-processing
         self.semantic.push_node(stmt);
@@ -1137,7 +1137,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
     }
 
     fn visit_expr(&mut self, expr: &'a Expr) {
-        self.syntax_checker.enter_expr(expr);
+        self.syntax_checker.visit_expr(expr);
 
         // Step 0: Pre-processing
         if self.source_type.is_stub()

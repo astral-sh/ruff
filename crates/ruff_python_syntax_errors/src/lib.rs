@@ -107,7 +107,7 @@ impl SemanticSyntaxChecker {
         }
     }
 
-    pub fn enter_stmt(&mut self, stmt: &ast::Stmt) {
+    pub fn visit_stmt(&mut self, stmt: &ast::Stmt) {
         // update internal state
         match stmt {
             Stmt::Expr(StmtExpr { value, .. })
@@ -132,7 +132,7 @@ impl SemanticSyntaxChecker {
         self.check_stmt(stmt);
     }
 
-    pub fn enter_expr(&mut self, expr: &Expr) {
+    pub fn visit_expr(&mut self, expr: &Expr) {
         match expr {
             Expr::ListComp(ast::ExprListComp {
                 elt, generators, ..
@@ -220,12 +220,12 @@ mod tests {
 
     impl Visitor<'_> for TestVisitor {
         fn visit_stmt(&mut self, stmt: &ruff_python_ast::Stmt) {
-            self.checker.enter_stmt(stmt);
+            self.checker.visit_stmt(stmt);
             ruff_python_ast::visitor::walk_stmt(self, stmt);
         }
 
         fn visit_expr(&mut self, expr: &ruff_python_ast::Expr) {
-            self.checker.enter_expr(expr);
+            self.checker.visit_expr(expr);
             ruff_python_ast::visitor::walk_expr(self, expr);
         }
     }
