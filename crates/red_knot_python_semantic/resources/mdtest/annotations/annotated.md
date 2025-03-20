@@ -73,12 +73,10 @@ Inheriting from `Annotated[T, ...]` is equivalent to inheriting from `T` itself.
 ```py
 from typing_extensions import Annotated
 
-# TODO: False positive
-# error: [invalid-base]
 class C(Annotated[int, "foo"]): ...
 
 # TODO: Should be `tuple[Literal[C], Literal[int], Literal[object]]`
-reveal_type(C.__mro__)  # revealed: tuple[Literal[C], Unknown, Literal[object]]
+reveal_type(C.__mro__)  # revealed: tuple[Literal[C], @Todo(Inference of subscript on special form), Literal[object]]
 ```
 
 ### Not parameterized
