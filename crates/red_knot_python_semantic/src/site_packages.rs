@@ -376,14 +376,13 @@ fn site_packages_directory_from_sys_prefix(
 ///
 /// [`sys.prefix`]: https://docs.python.org/3/library/sys.html#sys.prefix
 #[derive(Debug, PartialEq, Eq, Clone)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub(crate) struct SysPrefixPath {
     inner: SystemPathBuf,
     origin: SysPrefixPathOrigin,
 }
 
 impl SysPrefixPath {
-    pub(crate) fn new(
+    fn new(
         unvalidated_path: impl AsRef<SystemPath>,
         origin: SysPrefixPathOrigin,
         system: &dyn System,
