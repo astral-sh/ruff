@@ -57,7 +57,7 @@ pub(crate) struct CallArgumentTypes<'a, 'db> {
 impl<'a, 'db> CallArgumentTypes<'a, 'db> {
     /// Create a [`CallArgumentTypes`] with no arguments.
     pub(crate) fn none() -> Self {
-        let arguments = CallArguments(VecDeque::default());
+        let arguments = CallArguments::default();
         let types = VecDeque::default();
         Self { arguments, types }
     }
