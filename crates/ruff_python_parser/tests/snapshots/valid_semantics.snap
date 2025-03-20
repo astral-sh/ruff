@@ -1,0 +1,5 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/semantic/ok/non_rebound_comprehension_variable.py
+---
+[a := 0 for x in range(0)]

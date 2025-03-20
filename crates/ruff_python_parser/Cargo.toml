@@ -36,7 +36,6 @@ anyhow = { workspace = true }
 insta = { workspace = true, features = ["glob"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
-test-case = { workspace = true }
 walkdir = { workspace = true }
 
 [lints]

@@ -192,6 +192,19 @@ impl SemanticSyntaxChecker {
         comprehensions: &[ast::Comprehension],
         ctx: &Ctx,
     ) {
+        // test_err rebound_comprehension_variable
+        // [(a := 0) for a in range(0)]
+        // {(a := 0) for a in range(0)}
+        // {(a := 0): val for a in range(0)}
+        // {key: (a := 0) for a in range(0)}
+        // ((a := 0) for a in range(0))
+        // [[(a := 0)] for a in range(0)]
+        // [(a := 0) for b in range (0) for a in range(0)]
+        // [(a := 0) for a in range (0) for b in range(0)]
+        // [((a := 0), (b := 1)) for a in range (0) for b in range(0)]
+
+        // test_ok non_rebound_comprehension_variable
+        // [a := 0 for x in range(0)]
         let rebound_variables = {
             let mut visitor = ReboundComprehensionVisitor {
                 comprehensions,
@@ -234,75 +247,5 @@ impl Visitor<'_> for ReboundComprehensionVisitor<'_> {
             };
         }
         walk_expr(self, expr);
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::path::Path;
-
-    use insta::assert_debug_snapshot;
-    use ruff_python_ast::{visitor::Visitor, PySourceType, PythonVersion};
-    use ruff_python_trivia::textwrap::dedent;
-    use test_case::test_case;
-
-    use super::{SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError};
-
-    struct TestVisitor {
-        checker: SemanticSyntaxChecker,
-    }
-
-    impl SemanticSyntaxContext for TestVisitor {
-        fn seen_docstring_boundary(&self) -> bool {
-            false
-        }
-
-        fn python_version(&self) -> PythonVersion {
-            PythonVersion::default()
-        }
-    }
-
-    impl Visitor<'_> for TestVisitor {
-        fn visit_stmt(&mut self, stmt: &ruff_python_ast::Stmt) {
-            self.checker.visit_stmt(stmt, self);
-            ruff_python_ast::visitor::walk_stmt(self, stmt);
-        }
-
-        fn visit_expr(&mut self, expr: &ruff_python_ast::Expr) {
-            self.checker.visit_expr(expr, self);
-            ruff_python_ast::visitor::walk_expr(self, expr);
-        }
-    }
-
-    /// Run [`check_syntax`] on a snippet of Python code.
-    fn test_snippet(contents: &str) -> Vec<SemanticSyntaxError> {
-        let path = Path::new("<filename>");
-        let source_type = PySourceType::from(path);
-        let parsed = crate::parse_unchecked_source(&dedent(contents), source_type);
-        let mut visitor = TestVisitor {
-            checker: SemanticSyntaxChecker::new(),
-        };
-
-        for stmt in parsed.suite() {
-            visitor.visit_stmt(stmt);
-        }
-
-        visitor.checker.finish()
-    }
-
-    #[test_case("[(a := 0) for a in range(0)]", "listcomp")]
-    #[test_case("{(a := 0) for a in range(0)}", "setcomp")]
-    #[test_case("{(a := 0): val for a in range(0)}", "dictcomp_key")]
-    #[test_case("{key: (a := 0) for a in range(0)}", "dictcomp_val")]
-    #[test_case("((a := 0) for a in range(0))", "generator")]
-    #[test_case("[[(a := 0)] for a in range(0)]", "nested_listcomp_expr")]
-    #[test_case("[(a := 0) for b in range (0) for a in range(0)]", "nested_listcomp")]
-    #[test_case("[(a := 0) for a in range (0) for b in range(0)]", "nested_listcomp2")]
-    #[test_case(
-        "[((a := 0), (b := 1)) for a in range (0) for b in range(0)]",
-        "double_listcomp"
-    )]
-    fn rebound_comprehension_variable(contents: &str, name: &str) {
-        assert_debug_snapshot!(name, test_snippet(contents));
     }
 }

@@ -3165,7 +3165,6 @@ dependencies = [
  "serde",
  "serde_json",
  "static_assertions",
- "test-case",
  "unicode-ident",
  "unicode-normalization",
  "unicode_names2",

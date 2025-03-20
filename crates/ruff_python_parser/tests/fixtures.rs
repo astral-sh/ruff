@@ -5,7 +5,9 @@ use std::path::Path;
 
 use ruff_annotate_snippets::{Level, Renderer, Snippet};
 use ruff_python_ast::visitor::source_order::{walk_module, SourceOrderVisitor, TraversalSignal};
+use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{AnyNodeRef, Mod, PythonVersion};
+use ruff_python_parser::semantic_errors::{SemanticSyntaxChecker, SemanticSyntaxContext};
 use ruff_python_parser::{parse_unchecked, Mode, ParseErrorType, ParseOptions, Token};
 use ruff_source_file::{LineIndex, OneIndexed, SourceCode};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
@@ -28,6 +30,24 @@ fn inline_ok() {
 #[test]
 fn inline_err() {
     insta::glob!("../resources/inline", "err/**/*.py", test_invalid_syntax);
+}
+
+#[test]
+fn inline_semantic_ok() {
+    insta::glob!(
+        "../resources/inline/semantic",
+        "ok/**/*.py",
+        test_valid_semantics
+    );
+}
+
+#[test]
+fn inline_semantic_err() {
+    insta::glob!(
+        "../resources/inline/semantic",
+        "err/**/*.py",
+        test_invalid_semantics
+    );
 }
 
 /// Asserts that the parser generates no syntax errors for a valid program.
@@ -136,6 +156,123 @@ fn test_invalid_syntax(input_path: &Path) {
     }
 
     for error in parsed.unsupported_syntax_errors() {
+        writeln!(
+            &mut output,
+            "{}\n",
+            CodeFrame {
+                range: error.range,
+                error: &ParseErrorType::OtherError(error.to_string()),
+                source_code: &source_code,
+            }
+        )
+        .unwrap();
+    }
+
+    insta::with_settings!({
+        omit_expression => true,
+        input_file => input_path,
+        prepend_module_to_snapshot => false,
+    }, {
+        insta::assert_snapshot!(output);
+    });
+}
+
+fn test_valid_semantics(input_path: &Path) {
+    let source = fs::read_to_string(input_path).expect("Expected test file to exist");
+    let options = extract_options(&source).unwrap_or_else(|| {
+        ParseOptions::from(Mode::Module).with_target_version(PythonVersion::latest())
+    });
+    let parsed = parse_unchecked(&source, options);
+
+    assert!(
+        parsed.has_no_syntax_errors(),
+        "Expected no syntax errors from the parser"
+    );
+
+    validate_tokens(parsed.tokens(), source.text_len(), input_path);
+    validate_ast(parsed.syntax(), source.text_len(), input_path);
+
+    let parsed = parsed.try_into_module().expect("Parsed with Mode::Module");
+
+    let mut visitor = TestVisitor {
+        checker: SemanticSyntaxChecker::new(),
+    };
+
+    for stmt in parsed.suite() {
+        visitor.visit_stmt(stmt);
+    }
+
+    let semantic_syntax_errors = visitor.checker.finish();
+
+    if !semantic_syntax_errors.is_empty() {
+        let mut message = "Expected no semantic syntax errors for a valid program:\n".to_string();
+
+        let line_index = LineIndex::from_source_text(&source);
+        let source_code = SourceCode::new(&source, &line_index);
+
+        for error in semantic_syntax_errors {
+            writeln!(
+                &mut message,
+                "{}\n",
+                CodeFrame {
+                    range: error.range,
+                    error: &ParseErrorType::OtherError(error.to_string()),
+                    source_code: &source_code,
+                }
+            )
+            .unwrap();
+        }
+
+        panic!("{input_path:?}: {message}");
+    }
+
+    insta::with_settings!({
+        omit_expression => true,
+        input_file => input_path,
+        prepend_module_to_snapshot => false,
+    }, {
+        insta::assert_snapshot!(source);
+    });
+}
+
+fn test_invalid_semantics(input_path: &Path) {
+    let source = fs::read_to_string(input_path).expect("Expected test file to exist");
+    let options = extract_options(&source).unwrap_or_else(|| {
+        ParseOptions::from(Mode::Module).with_target_version(PythonVersion::latest())
+    });
+    let parsed = parse_unchecked(&source, options);
+
+    assert!(
+        parsed.has_no_syntax_errors(),
+        "Expected no syntax errors from the parser"
+    );
+
+    validate_tokens(parsed.tokens(), source.text_len(), input_path);
+    validate_ast(parsed.syntax(), source.text_len(), input_path);
+
+    let parsed = parsed.try_into_module().expect("Parsed with Mode::Module");
+
+    let mut visitor = TestVisitor {
+        checker: SemanticSyntaxChecker::new(),
+    };
+
+    for stmt in parsed.suite() {
+        visitor.visit_stmt(stmt);
+    }
+
+    let semantic_syntax_errors = visitor.checker.finish();
+
+    assert!(
+        !semantic_syntax_errors.is_empty(),
+        "Expected at least one semantic syntax error for a program containing syntax errors"
+    );
+
+    let mut output = String::new();
+
+    let line_index = LineIndex::from_source_text(&source);
+    let source_code = SourceCode::new(&source, &line_index);
+
+    for error in semantic_syntax_errors {
         writeln!(
             &mut output,
             "{}\n",
@@ -391,5 +528,31 @@ impl<'ast> SourceOrderVisitor<'ast> for ValidateAstVisitor<'ast> {
         self.parents.pop().expect("Expected tree to be balanced");
 
         self.previous = Some(node);
+    }
+}
+
+struct TestVisitor {
+    checker: SemanticSyntaxChecker,
+}
+
+impl SemanticSyntaxContext for TestVisitor {
+    fn seen_docstring_boundary(&self) -> bool {
+        false
+    }
+
+    fn python_version(&self) -> PythonVersion {
+        PythonVersion::default()
+    }
+}
+
+impl Visitor<'_> for TestVisitor {
+    fn visit_stmt(&mut self, stmt: &ruff_python_ast::Stmt) {
+        self.checker.visit_stmt(stmt, self);
+        ruff_python_ast::visitor::walk_stmt(self, stmt);
+    }
+
+    fn visit_expr(&mut self, expr: &ruff_python_ast::Expr) {
+        self.checker.visit_expr(expr, self);
+        ruff_python_ast::visitor::walk_expr(self, expr);
     }
 }
