@@ -2640,8 +2640,7 @@ impl<'db> Type<'db> {
                                 Parameter::keyword_only(Name::new_static("default"))
                                     .type_form()
                                     .with_annotated_type(Type::any())
-                                    // TODO: ellipsis or typing.NoDefault
-                                    .with_default_type(Type::none(db)),
+                                    .with_default_type(KnownClass::NoneType.to_instance(db)),
                                 Parameter::keyword_only(Name::new_static("contravariant"))
                                     .with_annotated_type(KnownClass::Bool.to_instance(db))
                                     .with_default_type(Type::BooleanLiteral(false)),
