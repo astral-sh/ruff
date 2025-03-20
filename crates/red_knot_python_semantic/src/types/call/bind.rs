@@ -295,43 +295,41 @@ impl<'db> Bindings<'db> {
                                 }
 
                                 [_, Some(Type::KnownInstance(KnownInstanceType::TypeVar(typevar))), Some(Type::ClassLiteral(ClassLiteralType { class }))]
-                                    if class.is_known(db, KnownClass::TypeVar)
-                                        && function.name(db) == "__name__" =>
+                                    if class.is_known(db, KnownClass::TypeVar) =>
                                 {
-                                    overload.set_return_type(Type::string_literal(
-                                        db,
-                                        typevar.name(db),
-                                    ));
-                                }
+                                    match function.name(db).as_str() {
+                                        "__name__" => {
+                                            overload.set_return_type(Type::string_literal(
+                                                db,
+                                                typevar.name(db),
+                                            ));
+                                        }
 
-                                [_, Some(Type::KnownInstance(KnownInstanceType::TypeVar(typevar))), Some(Type::ClassLiteral(ClassLiteralType { class }))]
-                                    if class.is_known(db, KnownClass::TypeVar)
-                                        && function.name(db) == "__bound__" =>
-                                {
-                                    overload.set_return_type(
-                                        typevar.upper_bound(db).unwrap_or_else(|| Type::none(db)),
-                                    );
-                                }
+                                        "__bound__" => {
+                                            overload.set_return_type(
+                                                typevar
+                                                    .upper_bound(db)
+                                                    .unwrap_or_else(|| Type::none(db)),
+                                            );
+                                        }
 
-                                [_, Some(Type::KnownInstance(KnownInstanceType::TypeVar(typevar))), Some(Type::ClassLiteral(ClassLiteralType { class }))]
-                                    if class.is_known(db, KnownClass::TypeVar)
-                                        && function.name(db) == "__constraints__" =>
-                                {
-                                    overload.set_return_type(TupleType::from_elements(
-                                        db,
-                                        typevar.constraints(db).into_iter().flatten(),
-                                    ));
-                                }
+                                        "__constraints__" => {
+                                            overload.set_return_type(TupleType::from_elements(
+                                                db,
+                                                typevar.constraints(db).into_iter().flatten(),
+                                            ));
+                                        }
 
-                                [_, Some(Type::KnownInstance(KnownInstanceType::TypeVar(typevar))), Some(Type::ClassLiteral(ClassLiteralType { class }))]
-                                    if class.is_known(db, KnownClass::TypeVar)
-                                        && function.name(db) == "__default__" =>
-                                {
-                                    overload.set_return_type(
-                                        typevar.default_ty(db).unwrap_or_else(|| {
-                                            KnownClass::NoDefaultType.to_instance(db)
-                                        }),
-                                    );
+                                        "__default__" => {
+                                            overload.set_return_type(
+                                                typevar.default_ty(db).unwrap_or_else(|| {
+                                                    KnownClass::NoDefaultType.to_instance(db)
+                                                }),
+                                            );
+                                        }
+
+                                        _ => {}
+                                    }
                                 }
 
                                 [_, Some(_), _]
