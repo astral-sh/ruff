@@ -215,7 +215,7 @@ pub(crate) enum SitePackagesDiscoveryError {
     VenvDirCanonicalizationError(SystemPathBuf, SysPrefixPathOrigin, #[source] io::Error),
     #[error("Invalid {1}: `{0}` does not point to a directory on disk")]
     VenvDirIsNotADirectory(SystemPathBuf, SysPrefixPathOrigin),
-    #[error("{0}: points to a broken venv with no pyvenv.cfg file")]
+    #[error("{0} points to a broken venv with no pyvenv.cfg file")]
     NoPyvenvCfgFile(SysPrefixPathOrigin, #[source] io::Error),
     #[error("Failed to parse the pyvenv.cfg file at {0} because {1}")]
     PyvenvCfgParseError(SystemPathBuf, PyvenvCfgParseErrorKind),
