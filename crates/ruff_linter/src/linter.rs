@@ -44,9 +44,9 @@ pub struct LinterResult {
     /// Flag indicating that the parsed source code does not contain any
     /// [`ParseError`]s
     has_valid_syntax: bool,
-    /// Flag indicating that the parsed source code does not contain any
-    /// [`UnsupportedSyntaxError`]s
-    has_no_unsupported_syntax_errors: bool,
+    /// Flag indicating that the parsed source code does not contain any [`ParseError`]s,
+    /// [`UnsupportedSyntaxError`]s, or [`SyntaxError`]s.
+    has_no_syntax_errors: bool,
 }
 
 impl LinterResult {
@@ -63,7 +63,7 @@ impl LinterResult {
     ///
     /// See [`LinterResult::has_valid_syntax`] for a version specific to [`ParseError`]s.
     pub fn has_no_syntax_errors(&self) -> bool {
-        self.has_valid_syntax() && self.has_no_unsupported_syntax_errors
+        self.has_valid_syntax() && self.has_no_syntax_errors
     }
 
     /// Returns `true` if the parsed source code is valid i.e., it has no [`ParseError`]s.
@@ -496,7 +496,7 @@ pub fn lint_only(
 
     LinterResult {
         has_valid_syntax: parsed.has_valid_syntax(),
-        has_no_unsupported_syntax_errors: messages.iter().any(Message::is_syntax_error),
+        has_no_syntax_errors: !messages.iter().any(Message::is_syntax_error),
         messages,
     }
 }
@@ -655,7 +655,7 @@ pub fn lint_fix<'a>(
             result: LinterResult {
                 messages,
                 has_valid_syntax,
-                has_no_unsupported_syntax_errors,
+                has_no_syntax_errors: has_no_unsupported_syntax_errors,
             },
             transformed,
             fixed,
