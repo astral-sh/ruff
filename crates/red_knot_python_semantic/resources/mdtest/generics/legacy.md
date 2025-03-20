@@ -60,7 +60,20 @@ T = TypeVar("T")
 T = TypeVar("T")
 ```
 
-### Type variable constraints
+### Type variables with an upper bound
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T", bound=int)
+reveal_type(T.__bound__)  # revealed: int
+reveal_type(T.__constraints__)  # revealed: tuple[()]
+
+S = TypeVar("S")
+reveal_type(S.__bound__)  # revealed: None
+```
+
+### Type variables with constraints
 
 ```py
 from typing import TypeVar

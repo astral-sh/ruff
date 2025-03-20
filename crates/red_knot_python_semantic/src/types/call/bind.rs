@@ -306,6 +306,15 @@ impl<'db> Bindings<'db> {
 
                                 [_, Some(Type::KnownInstance(KnownInstanceType::TypeVar(typevar))), Some(Type::ClassLiteral(ClassLiteralType { class }))]
                                     if class.is_known(db, KnownClass::TypeVar)
+                                        && function.name(db) == "__bound__" =>
+                                {
+                                    overload.set_return_type(
+                                        typevar.upper_bound(db).unwrap_or_else(|| Type::none(db)),
+                                    );
+                                }
+
+                                [_, Some(Type::KnownInstance(KnownInstanceType::TypeVar(typevar))), Some(Type::ClassLiteral(ClassLiteralType { class }))]
+                                    if class.is_known(db, KnownClass::TypeVar)
                                         && function.name(db) == "__constraints__" =>
                                 {
                                     overload.set_return_type(TupleType::from_elements(
