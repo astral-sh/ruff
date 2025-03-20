@@ -19,10 +19,6 @@ struct CheckerState {
 }
 
 pub struct SemanticSyntaxChecker {
-    /// The target Python version for detecting backwards-incompatible syntax
-    /// changes.
-    python_version: PythonVersion,
-
     /// The cumulative set of syntax errors found when visiting the source AST.
     errors: RefCell<Vec<SemanticSyntaxError>>,
 
@@ -30,9 +26,8 @@ pub struct SemanticSyntaxChecker {
 }
 
 impl SemanticSyntaxChecker {
-    pub fn new(python_version: PythonVersion) -> Self {
+    pub fn new() -> Self {
         Self {
-            python_version,
             errors: RefCell::new(Vec::new()),
             state: RefCell::new(CheckerState {
                 seen_futures_boundary: false,
@@ -52,12 +47,23 @@ impl SemanticSyntaxChecker {
         self.state.borrow_mut().seen_futures_boundary = seen_futures_boundary;
     }
 
-    fn add_error(&self, kind: SemanticSyntaxErrorKind, range: TextRange) {
+    fn add_error(
+        &self,
+        kind: SemanticSyntaxErrorKind,
+        range: TextRange,
+        python_version: PythonVersion,
+    ) {
         self.errors.borrow_mut().push(SemanticSyntaxError {
             kind,
             range,
-            python_version: self.python_version,
+            python_version,
         });
+    }
+}
+
+impl Default for SemanticSyntaxChecker {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -116,13 +122,20 @@ pub enum SemanticSyntaxErrorKind {
 pub trait SemanticSyntaxContext {
     /// Returns `true` if a module's docstring boundary has been passed.
     fn seen_docstring_boundary(&self) -> bool;
+
+    /// The target Python version for detecting backwards-incompatible syntax changes.
+    fn python_version(&self) -> PythonVersion;
 }
 
 impl SemanticSyntaxChecker {
-    fn check_stmt(&self, stmt: &ast::Stmt) {
+    fn check_stmt<Ctx: SemanticSyntaxContext>(&self, stmt: &ast::Stmt, ctx: &Ctx) {
         if let Stmt::ImportFrom(StmtImportFrom { range, module, .. }) = stmt {
             if self.seen_futures_boundary() && matches!(module.as_deref(), Some("__future__")) {
-                self.add_error(SemanticSyntaxErrorKind::LateFutureImport, *range);
+                self.add_error(
+                    SemanticSyntaxErrorKind::LateFutureImport,
+                    *range,
+                    ctx.python_version(),
+                );
             }
         }
     }
@@ -144,10 +157,10 @@ impl SemanticSyntaxChecker {
         }
 
         // check for errors
-        self.check_stmt(stmt);
+        self.check_stmt(stmt, ctx);
     }
 
-    pub fn visit_expr(&mut self, expr: &Expr) {
+    pub fn visit_expr<Ctx: SemanticSyntaxContext>(&self, expr: &Expr, ctx: &Ctx) {
         match expr {
             Expr::ListComp(ast::ExprListComp {
                 elt, generators, ..
@@ -157,15 +170,15 @@ impl SemanticSyntaxChecker {
             })
             | Expr::Generator(ast::ExprGenerator {
                 elt, generators, ..
-            }) => self.check_generator_expr(elt, generators),
+            }) => self.check_generator_expr(elt, generators, ctx),
             Expr::DictComp(ast::ExprDictComp {
                 key,
                 value,
                 generators,
                 ..
             }) => {
-                self.check_generator_expr(key, generators);
-                self.check_generator_expr(value, generators);
+                self.check_generator_expr(key, generators, ctx);
+                self.check_generator_expr(value, generators, ctx);
             }
             _ => {}
         }
@@ -173,7 +186,12 @@ impl SemanticSyntaxChecker {
 
     /// Add a [`SyntaxErrorKind::ReboundComprehensionVariable`] if `expr` rebinds an iteration
     /// variable in `generators`.
-    fn check_generator_expr(&mut self, expr: &Expr, comprehensions: &[ast::Comprehension]) {
+    fn check_generator_expr<Ctx: SemanticSyntaxContext>(
+        &self,
+        expr: &Expr,
+        comprehensions: &[ast::Comprehension],
+        ctx: &Ctx,
+    ) {
         let rebound_variables = {
             let mut visitor = ReboundComprehensionVisitor {
                 comprehensions,
@@ -186,7 +204,11 @@ impl SemanticSyntaxChecker {
         // TODO(brent) with multiple diagnostic ranges, we could mark both the named expr (current)
         // and the name expr being rebound
         for range in rebound_variables {
-            self.add_error(SemanticSyntaxErrorKind::ReboundComprehensionVariable, range);
+            self.add_error(
+                SemanticSyntaxErrorKind::ReboundComprehensionVariable,
+                range,
+                ctx.python_version(),
+            );
         }
     }
 }
@@ -234,6 +256,10 @@ mod tests {
         fn seen_docstring_boundary(&self) -> bool {
             false
         }
+
+        fn python_version(&self) -> PythonVersion {
+            PythonVersion::default()
+        }
     }
 
     impl Visitor<'_> for TestVisitor {
@@ -243,18 +269,18 @@ mod tests {
         }
 
         fn visit_expr(&mut self, expr: &ruff_python_ast::Expr) {
-            self.checker.visit_expr(expr);
+            self.checker.visit_expr(expr, self);
             ruff_python_ast::visitor::walk_expr(self, expr);
         }
     }
 
     /// Run [`check_syntax`] on a snippet of Python code.
-    fn test_snippet(contents: &str, python_version: PythonVersion) -> Vec<SemanticSyntaxError> {
+    fn test_snippet(contents: &str) -> Vec<SemanticSyntaxError> {
         let path = Path::new("<filename>");
         let source_type = PySourceType::from(path);
         let parsed = ruff_python_parser::parse_unchecked_source(&dedent(contents), source_type);
         let mut visitor = TestVisitor {
-            checker: SemanticSyntaxChecker::new(python_version),
+            checker: SemanticSyntaxChecker::new(),
         };
 
         for stmt in parsed.suite() {
@@ -277,6 +303,6 @@ mod tests {
         "double_listcomp"
     )]
     fn rebound_comprehension_variable(contents: &str, name: &str) {
-        assert_debug_snapshot!(name, test_snippet(contents, PythonVersion::default()));
+        assert_debug_snapshot!(name, test_snippet(contents));
     }
 }

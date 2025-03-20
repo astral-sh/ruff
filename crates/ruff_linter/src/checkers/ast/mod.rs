@@ -279,7 +279,7 @@ impl<'a> Checker<'a> {
             last_stmt_end: TextSize::default(),
             docstring_state: DocstringState::default(),
             target_version,
-            syntax_checker: SemanticSyntaxChecker::new(target_version),
+            syntax_checker: SemanticSyntaxChecker::new(),
         }
     }
 }
@@ -525,6 +525,10 @@ impl<'a> Checker<'a> {
 impl SemanticSyntaxContext for Checker<'_> {
     fn seen_docstring_boundary(&self) -> bool {
         self.semantic.seen_module_docstring_boundary()
+    }
+
+    fn python_version(&self) -> PythonVersion {
+        self.target_version
     }
 }
 
@@ -1143,7 +1147,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
     }
 
     fn visit_expr(&mut self, expr: &'a Expr) {
-        self.syntax_checker.visit_expr(expr);
+        self.syntax_checker.visit_expr(expr, self);
 
         // Step 0: Pre-processing
         if self.source_type.is_stub()
