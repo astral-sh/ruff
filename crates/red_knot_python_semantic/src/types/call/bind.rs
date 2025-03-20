@@ -530,33 +530,32 @@ impl<'db> CallableBinding<'db> {
     ) -> Self {
         // If this callable is a bound method, prepend the self instance onto the arguments list
         // before checking.
-        if signature.bound_type.is_some() {
-            arguments.push_self();
-        }
+        arguments.with_self(signature.bound_type, |arguments| {
+            // TODO: This checks every overload. In the proposed more detailed call checking spec [1],
+            // arguments are checked for arity first, and are only checked for type assignability against
+            // the matching overloads. Make sure to implement that as part of separating call binding into
+            // two phases.
+            //
+            // [1] https://github.com/python/typing/pull/1839
+            let overloads = signature
+                .into_iter()
+                .map(|signature| {
+                    Binding::match_parameters(
+                        signature,
+                        arguments,
+                        argument_forms,
+                        conflicting_forms,
+                    )
+                })
+                .collect();
 
-        // TODO: This checks every overload. In the proposed more detailed call checking spec [1],
-        // arguments are checked for arity first, and are only checked for type assignability against
-        // the matching overloads. Make sure to implement that as part of separating call binding into
-        // two phases.
-        //
-        // [1] https://github.com/python/typing/pull/1839
-        let overloads = signature
-            .into_iter()
-            .map(|signature| {
-                Binding::match_parameters(signature, arguments, argument_forms, conflicting_forms)
-            })
-            .collect();
-        let binding = CallableBinding {
-            callable_type: signature.callable_type,
-            signature_type: signature.signature_type,
-            dunder_call_is_possibly_unbound: signature.dunder_call_is_possibly_unbound,
-            overloads,
-        };
-
-        if signature.bound_type.is_some() {
-            arguments.pop_self();
-        }
-        binding
+            CallableBinding {
+                callable_type: signature.callable_type,
+                signature_type: signature.signature_type,
+                dunder_call_is_possibly_unbound: signature.dunder_call_is_possibly_unbound,
+                overloads,
+            }
+        })
     }
 
     fn check_types(
@@ -567,17 +566,11 @@ impl<'db> CallableBinding<'db> {
     ) {
         // If this callable is a bound method, prepend the self instance onto the arguments list
         // before checking.
-        if let Some(self_type) = signature.bound_type {
-            argument_types.push_self(self_type);
-        }
-
-        for (signature, overload) in signature.iter().zip(&mut self.overloads) {
-            overload.check_types(db, signature, argument_types);
-        }
-
-        if signature.bound_type.is_some() {
-            argument_types.pop_self();
-        }
+        argument_types.with_self(signature.bound_type, |argument_types| {
+            for (signature, overload) in signature.iter().zip(&mut self.overloads) {
+                overload.check_types(db, signature, argument_types);
+            }
+        });
     }
 
     fn as_result(&self) -> Result<(), CallErrorKind> {

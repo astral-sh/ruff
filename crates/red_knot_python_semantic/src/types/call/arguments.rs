@@ -8,15 +8,21 @@ use super::Type;
 pub(crate) struct CallArguments<'a>(VecDeque<Argument<'a>>);
 
 impl<'a> CallArguments<'a> {
-    /// Push an extra synthetic argument (for a `self` or `cls` parameter) to the front of this
-    /// argument list.
-    pub(crate) fn push_self(&mut self) {
-        self.0.push_front(Argument::Synthetic);
-    }
-
-    /// Pop the extra synthetic argument from the front of this argument list.
-    pub(crate) fn pop_self(&mut self) {
-        self.0.pop_front();
+    /// Invoke a function with an optional extra synthetic argument (for a `self` or `cls`
+    /// parameter) prepended to the front of this argument list. (If `bound_self` is none, the
+    /// function is invoked with the unmodified argument list.)
+    pub(crate) fn with_self<'db, F, R>(&mut self, bound_self: Option<Type<'db>>, f: F) -> R
+    where
+        F: FnOnce(&mut Self) -> R,
+    {
+        if bound_self.is_some() {
+            self.0.push_front(Argument::Synthetic);
+        }
+        let result = f(self);
+        if bound_self.is_some() {
+            self.0.pop_front();
+        }
+        result
     }
 
     pub(crate) fn len(&self) -> usize {
@@ -84,17 +90,23 @@ impl<'a, 'db> CallArgumentTypes<'a, 'db> {
         Self { arguments, types }
     }
 
-    /// Push an extra synthetic argument (for a `self` or `cls` parameter) to the front of this
-    /// argument list.
-    pub(crate) fn push_self(&mut self, self_type: Type<'db>) {
-        self.arguments.push_self();
-        self.types.push_front(self_type);
-    }
-
-    /// Pop the extra synthetic argument from the front of this argument list.
-    pub(crate) fn pop_self(&mut self) {
-        self.arguments.pop_self();
-        self.types.pop_front();
+    /// Invoke a function with an optional extra synthetic argument (for a `self` or `cls`
+    /// parameter) prepended to the front of this argument list. (If `bound_self` is none, the
+    /// function is invoked with the unmodified argument list.)
+    pub(crate) fn with_self<F, R>(&mut self, bound_self: Option<Type<'db>>, f: F) -> R
+    where
+        F: FnOnce(&mut Self) -> R,
+    {
+        if let Some(bound_self) = bound_self {
+            self.arguments.0.push_front(Argument::Synthetic);
+            self.types.push_front(bound_self);
+        }
+        let result = f(self);
+        if bound_self.is_some() {
+            self.arguments.0.pop_front();
+            self.types.pop_front();
+        }
+        result
     }
 
     pub(crate) fn iter(&self) -> impl Iterator<Item = (Argument<'a>, Type<'db>)> + '_ {
