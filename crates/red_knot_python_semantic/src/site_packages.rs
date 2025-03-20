@@ -378,11 +378,19 @@ fn site_packages_directory_from_sys_prefix(
 #[derive(Debug, PartialEq, Eq, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SysPrefixPath {
-    pub(crate) inner: SystemPathBuf,
-    pub(crate) origin: SysPrefixPathOrigin,
+    inner: SystemPathBuf,
+    origin: SysPrefixPathOrigin,
 }
 
 impl SysPrefixPath {
+    pub(crate) fn inner(&self) -> &SystemPath {
+        &self.inner
+    }
+
+    pub(crate) fn origin(&self) -> SysPrefixPathOrigin {
+        self.origin
+    }
+
     pub(crate) fn new(
         unvalidated_path: impl AsRef<SystemPath>,
         origin: SysPrefixPathOrigin,

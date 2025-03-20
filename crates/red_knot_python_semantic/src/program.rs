@@ -154,20 +154,19 @@ pub enum PythonPath {
 
 impl PythonPath {
     pub fn find_virtual_env(system: &dyn System) -> Option<Self> {
-        let virtual_env = std::env::var("VIRTUAL_ENV").ok();
-        if let Some(virtual_env) = virtual_env {
-            tracing::debug!("Found virtual environment at {:?}", virtual_env);
-            return SysPrefixPath::new(virtual_env, SysPrefixPathOrigin::VirtualEnvVar, system)
-                .map(Self::SysPrefix)
-                .ok();
-        }
-        None
+        let virtual_env = std::env::var("VIRTUAL_ENV").ok()?;
+        tracing::debug!(
+            "Found virtual environment at {:?} from `VIRTUAL_ENV` environment variable",
+            virtual_env
+        );
+        SysPrefixPath::new(virtual_env, SysPrefixPathOrigin::VirtualEnvVar, system)
+            .ok()
+            .map(Self::SysPrefix)
     }
 
-    pub fn from_cli_flag(path: SystemPathBuf) -> Self {
-        Self::SysPrefix(SysPrefixPath {
-            inner: path,
-            origin: SysPrefixPathOrigin::PythonCliFlag,
-        })
+    pub fn from_cli_flag(path: SystemPathBuf, system: &dyn System) -> Option<Self> {
+        SysPrefixPath::new(path, SysPrefixPathOrigin::PythonCliFlag, system)
+            .ok()
+            .map(Self::SysPrefix)
     }
 }
