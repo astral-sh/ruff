@@ -470,6 +470,44 @@ impl<'db> Bindings<'db> {
                         }
                     }
 
+                    Some(KnownClass::TypeVar) => {
+                        let [Some(name), constraints, bound, default, _contravariant, _covariant, _infer_variance] =
+                            overload.parameter_types()
+                        else {
+                            continue;
+                        };
+
+                        // TODO: TypeVar can only be called when the result is immediately
+                        // assigned to a variable. Ideally we would use the `name` from the
+                        // lvalue of this assignment instead of constructing a new one.
+                        let Some(name) = name.into_string_literal() else {
+                            continue;
+                        };
+                        let name = ast::name::Name::new(name.value(db));
+
+                        let bound_or_constraint = match (bound, constraints) {
+                            (Some(bound), None) => {
+                                Some(TypeVarBoundOrConstraints::UpperBound(*bound))
+                            }
+
+                            (None, Some(constraints)) => {
+                                // XXX
+                                eprintln!("===> constraints {}", constraints.display(db));
+                                None
+                            }
+
+                            // TODO: Emit a diagnostic that TypeVar cannot be both bounded and
+                            // constrained
+                            (Some(_), Some(_)) => continue,
+
+                            (None, None) => None,
+                        };
+
+                        overload.set_return_type(Type::KnownInstance(KnownInstanceType::TypeVar(
+                            TypeVarInstance::new(db, name, bound_or_constraint, *default),
+                        )));
+                    }
+
                     _ => {}
                 },
 

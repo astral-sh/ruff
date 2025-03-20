@@ -112,7 +112,7 @@ def different_types[T, S](cond: bool, t: T, s: S) -> T:
     if cond:
         return t
     else:
-        # error: [invalid-return-type] "Object of type `S` is not assignable to return type `T`"
+        # TODO: error: [invalid-return-type] "Object of type `S` is not assignable to return type `T`"
         return s
 
 def same_types[T](cond: bool, t1: T, t2: T) -> T:

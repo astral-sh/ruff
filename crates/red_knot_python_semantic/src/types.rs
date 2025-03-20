@@ -2642,6 +2642,15 @@ impl<'db> Type<'db> {
                                     .with_annotated_type(Type::any())
                                     // TODO: ellipsis or typing.NoDefault
                                     .with_default_type(Type::none(db)),
+                                Parameter::keyword_only(Name::new_static("contravariant"))
+                                    .with_annotated_type(KnownClass::Bool.to_instance(db))
+                                    .with_default_type(Type::BooleanLiteral(false)),
+                                Parameter::keyword_only(Name::new_static("covariant"))
+                                    .with_annotated_type(KnownClass::Bool.to_instance(db))
+                                    .with_default_type(Type::BooleanLiteral(false)),
+                                Parameter::keyword_only(Name::new_static("infer_variance"))
+                                    .with_annotated_type(KnownClass::Bool.to_instance(db))
+                                    .with_default_type(Type::BooleanLiteral(false)),
                             ]),
                             Some(KnownClass::TypeVar.to_instance(db)),
                         ),

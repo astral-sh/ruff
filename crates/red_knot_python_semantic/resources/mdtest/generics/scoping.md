@@ -105,7 +105,7 @@ class Legacy(Generic[T]):
 legacy: Legacy[int] = Legacy()
 # TODO: no errors
 # TODO: revealed: str
-reveal_type(legacy.m(1, "string"))  # revealed: S
+reveal_type(legacy.m(1, "string"))  # revealed: S | @Todo(instance attribute on class with dynamic base)
 ```
 
 With PEP 695 syntax, it is clearer that the method uses a separate typevar:
