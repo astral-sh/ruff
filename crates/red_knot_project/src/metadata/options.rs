@@ -108,7 +108,7 @@ impl Options {
                 .map(|python_path| {
                     PythonPath::from_cli_flag(python_path.absolute(project_root, system))
                 })
-                .or(PythonPath::find_virtual_env(system))
+                .or_else(|| PythonPath::find_virtual_env(system))
                 .unwrap_or(PythonPath::KnownSitePackages(vec![])),
         }
     }
