@@ -114,7 +114,7 @@ mod stable {
     // A fully static type `T` is a subtype of itself.
     type_property_test!(
         subtype_of_is_reflexive, db,
-        forall (t: AnyTy), t.is_fully_static(db) => t.is_subtype_of(db, t)
+        forall (t: FullyStaticTy), t.is_subtype_of(db, t)
     );
 
     // `S <: T` and `T <: U` implies that `S <: U`.
@@ -186,7 +186,7 @@ mod stable {
     // And for fully static types, they should also be subtypes of `object`
     type_property_test!(
         all_fully_static_types_subtype_of_object, db,
-        forall (t: AnyTy), t.is_fully_static(db) => t.is_subtype_of(db, Type::object(db))
+        forall (t: FullyStaticTy), t.is_subtype_of(db, Type::object(db))
     );
 
     // Never should be assignable to every type
@@ -280,9 +280,8 @@ mod flaky {
     // flaky at least in part because of https://github.com/astral-sh/ruff/issues/15513
     type_property_test!(
         intersection_equivalence_not_order_dependent, db,
-        forall (s: AnyTy, t: AnyTy, u: AnyTy),
-            s.is_fully_static(db) && t.is_fully_static(db) && u.is_fully_static(db)
-            => [s, t, u]
+        forall (s: FullyStaticTy, t: FullyStaticTy, u: FullyStaticTy),
+            [s, t, u]
                 .into_iter()
                 .permutations(3)
                 .map(|trio_of_types| intersection(db, trio_of_types))
