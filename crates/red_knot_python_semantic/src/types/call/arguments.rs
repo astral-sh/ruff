@@ -11,7 +11,7 @@ impl<'a> CallArguments<'a> {
     /// Invoke a function with an optional extra synthetic argument (for a `self` or `cls`
     /// parameter) prepended to the front of this argument list. (If `bound_self` is none, the
     /// function is invoked with the unmodified argument list.)
-    pub(crate) fn with_self<'db, F, R>(&mut self, bound_self: Option<Type<'db>>, f: F) -> R
+    pub(crate) fn with_self<F, R>(&mut self, bound_self: Option<Type<'_>>, f: F) -> R
     where
         F: FnOnce(&mut Self) -> R,
     {
