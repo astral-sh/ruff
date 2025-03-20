@@ -829,6 +829,8 @@ pub enum KnownClass {
     StdlibAlias,
     SpecialForm,
     TypeVar,
+    ParamSpec,
+    TypeVarTuple,
     TypeAliasType,
     NoDefaultType,
     // TODO: This can probably be removed when we have support for protocols
@@ -869,6 +871,8 @@ impl<'db> KnownClass {
             | Self::VersionInfo
             | Self::TypeAliasType
             | Self::TypeVar
+            | Self::ParamSpec
+            | Self::TypeVarTuple
             | Self::WrapperDescriptorType
             | Self::MethodWrapperType => Truthiness::AlwaysTrue,
 
@@ -935,6 +939,8 @@ impl<'db> KnownClass {
             Self::NoneType => "NoneType",
             Self::SpecialForm => "_SpecialForm",
             Self::TypeVar => "TypeVar",
+            Self::ParamSpec => "ParamSpec",
+            Self::TypeVarTuple => "TypeVarTuple",
             Self::TypeAliasType => "TypeAliasType",
             Self::NoDefaultType => "_NoDefaultType",
             Self::SupportsIndex => "SupportsIndex",
@@ -1102,9 +1108,12 @@ impl<'db> KnownClass {
             | Self::MethodWrapperType
             | Self::WrapperDescriptorType => KnownModule::Types,
             Self::NoneType => KnownModule::Typeshed,
-            Self::SpecialForm | Self::TypeVar | Self::StdlibAlias | Self::SupportsIndex => {
-                KnownModule::Typing
-            }
+            Self::SpecialForm
+            | Self::TypeVar
+            | Self::ParamSpec
+            | Self::TypeVarTuple
+            | Self::StdlibAlias
+            | Self::SupportsIndex => KnownModule::Typing,
             Self::TypeAliasType => KnownModule::TypingExtensions,
             Self::NoDefaultType => {
                 let python_version = Program::get(db).python_version(db);
@@ -1177,7 +1186,9 @@ impl<'db> KnownClass {
             | KnownClass::OrderedDict
             | KnownClass::SupportsIndex
             | KnownClass::StdlibAlias
-            | KnownClass::TypeVar => false,
+            | KnownClass::TypeVar
+            | KnownClass::ParamSpec
+            | KnownClass::TypeVarTuple => false,
         }
     }
 
@@ -1226,7 +1237,9 @@ impl<'db> KnownClass {
             | Self::BaseException
             | Self::BaseExceptionGroup
             | Self::Classmethod
-            | Self::TypeVar => false,
+            | Self::TypeVar
+            | Self::ParamSpec
+            | Self::TypeVarTuple => false,
         }
     }
 
@@ -1266,6 +1279,8 @@ impl<'db> KnownClass {
             "WrapperDescriptorType" => Self::WrapperDescriptorType,
             "TypeAliasType" => Self::TypeAliasType,
             "TypeVar" => Self::TypeVar,
+            "ParamSpec" => Self::ParamSpec,
+            "TypeVarTuple" => Self::TypeVarTuple,
             "ChainMap" => Self::ChainMap,
             "Counter" => Self::Counter,
             "defaultdict" => Self::DefaultDict,
@@ -1327,9 +1342,13 @@ impl<'db> KnownClass {
             | Self::MethodWrapperType
             | Self::WrapperDescriptorType => module == self.canonical_module(db),
             Self::NoneType => matches!(module, KnownModule::Typeshed | KnownModule::Types),
-            Self::SpecialForm | Self::TypeVar | Self::TypeAliasType | Self::NoDefaultType | Self::SupportsIndex => {
-                matches!(module, KnownModule::Typing | KnownModule::TypingExtensions)
-            }
+            Self::SpecialForm
+            | Self::TypeVar
+            | Self::TypeAliasType
+            | Self::NoDefaultType
+            | Self::SupportsIndex
+            | Self::ParamSpec
+            | Self::TypeVarTuple => matches!(module, KnownModule::Typing | KnownModule::TypingExtensions),
         }
     }
 }

@@ -3318,9 +3318,23 @@ impl<'db> Type<'db> {
 
             Type::Dynamic(_) => Ok(*self),
 
-            Type::Instance(_) => Ok(todo_type!(
-                "Invalid or unsupported `Instance` in `Type::to_type_expression`"
-            )),
+            Type::Instance(InstanceType { class }) => match class.known(db) {
+                Some(KnownClass::TypeVar) => Ok(todo_type!(
+                    "Support for `typing.TypeVar` instances in type expressions"
+                )),
+                Some(KnownClass::ParamSpec) => Ok(todo_type!(
+                    "Support for `typing.ParamSpec` instances in type expressions"
+                )),
+                Some(KnownClass::TypeVarTuple) => Ok(todo_type!(
+                    "Support for `typing.TypeVarTuple` instances in type expressions"
+                )),
+                _ => Err(InvalidTypeExpressionError {
+                    invalid_expressions: smallvec::smallvec![InvalidTypeExpression::InvalidType(
+                        *self
+                    )],
+                    fallback_type: Type::unknown(),
+                }),
+            },
 
             Type::Intersection(_) => Ok(todo_type!("Type::Intersection.in_type_expression")),
         }
