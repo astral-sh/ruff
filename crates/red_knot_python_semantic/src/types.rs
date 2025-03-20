@@ -5064,10 +5064,9 @@ impl<'db> GeneralCallableType<'db> {
                         return false;
                     }
                 }
-                kind => {
-                    // TODO: Maybe we should just return `false` here instead of panicking in case
-                    // the AST is invalid?
-                    unreachable!("Unhandled parameter kind from `other`: {:?}", kind);
+                _ => {
+                    // This can only occur in case of a syntax error.
+                    return false;
                 }
             }
         }

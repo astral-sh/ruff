@@ -564,7 +564,8 @@ static_assert(not is_subtype_of(CallableTypeFromFunction[int_without_default], C
 static_assert(not is_subtype_of(CallableTypeFromFunction[empty], CallableTypeFromFunction[int_with_default]))
 ```
 
-The subtype can include as many positional-only parameters as long as they have the default value:
+The subtype can include any number of positional-only parameters as long as they have the default
+value:
 
 ```py
 def multi_param(a: float = 1, b: int = 2, c: str = "3", /) -> None: ...
@@ -736,7 +737,7 @@ static_assert(not is_subtype_of(CallableTypeFromFunction[multi_standard], Callab
 
 #### Standard with variadic
 
-A standard parameter in the supertype cannot be substituted with a variadic or keyword-variadic
+A variadic or keyword-variadic parameter in the supertype cannot be substituted with a standard
 parameter in the subtype.
 
 ```py
@@ -793,14 +794,27 @@ static_assert(is_subtype_of(CallableTypeFromFunction[variadic], CallableTypeFrom
 static_assert(is_subtype_of(CallableTypeFromFunction[variadic], CallableTypeFromFunction[positional_variadic]))
 ```
 
-This is valid only for positional-only parameters, not any other parameter kind:
+#### Variadic with other kinds
+
+Variadic parameter in a subtype can only be used to match against an unmatched positional-only
+parameters from the supertype, not any other parameter kind.
 
 ```py
-# Parameter 1 is matched with the one at the same position, parameter 2 is unmatched so uses the
-# variadic parameter but the standard parameter `c` remains and cannot be matched.
-def mixed(a: int, b: float, /, c: int) -> None: ...
+from knot_extensions import CallableTypeFromFunction, is_subtype_of, static_assert
 
-static_assert(not is_subtype_of(CallableTypeFromFunction[variadic], CallableTypeFromFunction[mixed]))
+def variadic(*args: int) -> None: ...
+
+# Both positional-only parameters are unmatched so uses the variadic parameter but the other
+# parameter `c` remains and cannot be matched.
+def standard(a: int, b: float, /, c: int) -> None: ...
+
+# Similarly, for other kinds
+def keyword_only(a: int, /, *, b: int) -> None: ...
+def keyword_variadic(a: int, /, **kwargs: int) -> None: ...
+
+static_assert(not is_subtype_of(CallableTypeFromFunction[variadic], CallableTypeFromFunction[standard]))
+static_assert(not is_subtype_of(CallableTypeFromFunction[variadic], CallableTypeFromFunction[keyword_only]))
+static_assert(not is_subtype_of(CallableTypeFromFunction[variadic], CallableTypeFromFunction[keyword_variadic]))
 ```
 
 #### Keyword-only
