@@ -58,7 +58,17 @@ jobs:
         env:
           MERGE_BASE: ${{ steps.merge_base.outputs.sha }}
         run: |
-          if git diff --quiet "${MERGE_BASE}...HEAD" -- ':Cargo.toml' ':Cargo.lock' ':crates/ruff_python_trivia/**' ':crates/ruff_source_file/**' ':crates/ruff_text_size/**' ':crates/ruff_python_ast/**' ':crates/ruff_python_parser/**' ':python/py-fuzzer/**' ':.github/workflows/ci.yaml'; then
+          if git diff --quiet "${MERGE_BASE}...HEAD" -- \
+            ':Cargo.toml' \
+            ':Cargo.lock' \
+            ':crates/ruff_python_trivia/**' \
+            ':crates/ruff_source_file/**' \
+            ':crates/ruff_text_size/**' \
+            ':crates/ruff_python_ast/**' \
+            ':crates/ruff_python_parser/**' \
+            ':python/py-fuzzer/**' \
+            ':.github/workflows/ci.yaml' \
+          ; then
               echo "changed=false" >> "$GITHUB_OUTPUT"
           else
               echo "changed=true" >> "$GITHUB_OUTPUT"
@@ -69,7 +79,18 @@ jobs:
         env:
           MERGE_BASE: ${{ steps.merge_base.outputs.sha }}
         run: |
-          if git diff --quiet "${MERGE_BASE}...HEAD" -- ':Cargo.toml' ':Cargo.lock' ':crates/**' ':!crates/red_knot*/**' ':!crates/ruff_python_formatter/**' ':!crates/ruff_formatter/**' ':!crates/ruff_dev/**' ':!crates/ruff_db/**' ':scripts/*' ':python/**' ':.github/workflows/ci.yaml'; then
+          if git diff --quiet "${MERGE_BASE}...HEAD" -- ':Cargo.toml' \
+            ':Cargo.lock' \
+            ':crates/**' \
+            ':!crates/red_knot*/**' \
+            ':!crates/ruff_python_formatter/**' \
+            ':!crates/ruff_formatter/**' \
+            ':!crates/ruff_dev/**' \
+            ':!crates/ruff_db/**' \
+            ':scripts/*' \
+            ':python/**' \
+            ':.github/workflows/ci.yaml' \
+          ; then
               echo "changed=false" >> "$GITHUB_OUTPUT"
           else
               echo "changed=true" >> "$GITHUB_OUTPUT"
@@ -80,7 +101,21 @@ jobs:
         env:
           MERGE_BASE: ${{ steps.merge_base.outputs.sha }}
         run: |
-          if git diff --quiet "${MERGE_BASE}...HEAD" -- ':Cargo.toml' ':Cargo.lock' ':crates/ruff_python_formatter/**' ':crates/ruff_formatter/**' ':crates/ruff_python_trivia/**' ':crates/ruff_python_ast/**' ':crates/ruff_source_file/**' ':crates/ruff_python_index/**' ':crates/ruff_python_index/**' ':crates/ruff_text_size/**' ':crates/ruff_python_parser/**' ':scripts/*' ':python/**' ':.github/workflows/ci.yaml'; then
+          if git diff --quiet "${MERGE_BASE}...HEAD" -- ':Cargo.toml' \
+            ':Cargo.lock' \
+            ':crates/ruff_python_formatter/**' \
+            ':crates/ruff_formatter/**' \
+            ':crates/ruff_python_trivia/**' \
+            ':crates/ruff_python_ast/**' \
+            ':crates/ruff_source_file/**' \
+            ':crates/ruff_python_index/**' \
+            ':crates/ruff_python_index/**' \
+            ':crates/ruff_text_size/**' \
+            ':crates/ruff_python_parser/**' \
+            ':scripts/*' \
+            ':python/**' \
+            ':.github/workflows/ci.yaml' \
+          ; then
               echo "changed=false" >> "$GITHUB_OUTPUT"
           else
               echo "changed=true" >> "$GITHUB_OUTPUT"
@@ -91,7 +126,11 @@ jobs:
         env:
           MERGE_BASE: ${{ steps.merge_base.outputs.sha }}
         run: |
-          if git diff --quiet "${MERGE_BASE}...HEAD" -- ':Cargo.toml' ':Cargo.lock' ':fuzz/fuzz_targets/**' ':.github/workflows/ci.yaml'; then
+          if git diff --quiet "${MERGE_BASE}...HEAD" -- ':Cargo.toml' \
+            ':Cargo.lock' \
+            ':fuzz/fuzz_targets/**' \
+            ':.github/workflows/ci.yaml' \
+          ; then
               echo "changed=false" >> "$GITHUB_OUTPUT"
           else
               echo "changed=true" >> "$GITHUB_OUTPUT"
@@ -102,7 +141,13 @@ jobs:
         env:
           MERGE_BASE: ${{ steps.merge_base.outputs.sha }}
         run: |
-          if git diff --quiet "${MERGE_BASE}...HEAD" -- ':**/*' ':!**/*.md' ':crates/red_knot_python_semantic/resources/mdtest/**/*.md' ':!docs/**' ':!assets/**' ':.github/workflows/ci.yaml'; then
+          if git diff --quiet "${MERGE_BASE}...HEAD" -- ':**/*' \
+            ':!**/*.md' \
+            ':crates/red_knot_python_semantic/resources/mdtest/**/*.md' \
+            ':!docs/**' \
+            ':!assets/**' \
+            ':.github/workflows/ci.yaml' \
+          ; then
               echo "changed=false" >> "$GITHUB_OUTPUT"
           else
               echo "changed=true" >> "$GITHUB_OUTPUT"
@@ -113,7 +158,9 @@ jobs:
         env:
           MERGE_BASE: ${{ steps.merge_base.outputs.sha }}
         run: |
-          if git diff --quiet "${MERGE_BASE}...HEAD" -- ':playground/**'; then
+          if git diff --quiet "${MERGE_BASE}...HEAD" -- \
+            ':playground/**' \
+          ; then
               echo "changed=false" >> "$GITHUB_OUTPUT"
           else
               echo "changed=true" >> "$GITHUB_OUTPUT"
