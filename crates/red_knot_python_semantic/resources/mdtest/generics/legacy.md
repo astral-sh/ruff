@@ -19,6 +19,9 @@ in newer Python releases.
 from typing import TypeVar
 
 T = TypeVar("T")
+reveal_type(type(T))  # revealed: Literal[TypeVar]
+reveal_type(T)  # revealed: T
+reveal_type(T.__name__)  # revealed: Literal["T"]
 ```
 
 ### Directly assigned to a variable
@@ -55,6 +58,15 @@ T = TypeVar("T")
 
 # TODO: error
 T = TypeVar("T")
+```
+
+### Type variable constraints
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T", int, str)
+reveal_type(T.__constraints__)  # revealed: tuple[int, str]
 ```
 
 ### Cannot have only one constraint

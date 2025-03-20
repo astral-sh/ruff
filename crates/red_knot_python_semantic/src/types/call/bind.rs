@@ -19,7 +19,7 @@ use crate::types::diagnostic::{
 use crate::types::signatures::{Parameter, ParameterForm};
 use crate::types::{
     todo_type, BoundMethodType, CallableType, ClassLiteralType, KnownClass, KnownFunction,
-    KnownInstanceType, UnionType,
+    KnownInstanceType, TupleType, TypeVarBoundOrConstraints, TypeVarInstance, UnionType,
 };
 use ruff_db::diagnostic::{OldSecondaryDiagnosticMessage, Span};
 use ruff_python_ast as ast;
@@ -97,7 +97,7 @@ impl<'db> Bindings<'db> {
             element.check_types(db, signature, argument_types);
         }
 
-        self.evaluate_known_cases(db);
+        self.evaluate_known_cases(db, argument_types);
 
         // In order of precedence:
         //
@@ -201,7 +201,11 @@ impl<'db> Bindings<'db> {
 
     /// Evaluates the return type of certain known callables, where we have special-case logic to
     /// determine the return type in a way that isn't directly expressible in the type system.
-    fn evaluate_known_cases(&mut self, db: &'db dyn Db) {
+    fn evaluate_known_cases(
+        &mut self,
+        db: &'db dyn Db,
+        argument_types: &CallArgumentTypes<'_, 'db>,
+    ) {
         // Each special case listed here should have a corresponding clause in `Type::signatures`.
         for binding in &mut self.elements {
             let binding_type = binding.callable_type;
@@ -297,6 +301,16 @@ impl<'db> Bindings<'db> {
                                     overload.set_return_type(Type::string_literal(
                                         db,
                                         typevar.name(db),
+                                    ));
+                                }
+
+                                [_, Some(Type::KnownInstance(KnownInstanceType::TypeVar(typevar))), Some(Type::ClassLiteral(ClassLiteralType { class }))]
+                                    if class.is_known(db, KnownClass::TypeVar)
+                                        && function.name(db) == "__constraints__" =>
+                                {
+                                    overload.set_return_type(TupleType::from_elements(
+                                        db,
+                                        typevar.constraints(db).into_iter().flatten(),
                                     ));
                                 }
 
@@ -491,9 +505,13 @@ impl<'db> Bindings<'db> {
                             }
 
                             (None, Some(constraints)) => {
-                                // XXX
-                                eprintln!("===> constraints {}", constraints.display(db));
-                                None
+                                Some(TypeVarBoundOrConstraints::Constraints(TupleType::new(
+                                    db,
+                                    overload
+                                        .arguments_for_parameter(argument_types, 1)
+                                        .map(|(_, ty)| ty)
+                                        .collect::<Box<_>>(),
+                                )))
                             }
 
                             // TODO: Emit a diagnostic that TypeVar cannot be both bounded and
@@ -933,6 +951,20 @@ impl<'db> Binding<'db> {
 
     pub(crate) fn parameter_types(&self) -> &[Option<Type<'db>>] {
         &self.parameter_tys
+    }
+
+    pub(crate) fn arguments_for_parameter<'a>(
+        &'a self,
+        argument_types: &'a CallArgumentTypes<'a, 'db>,
+        parameter_index: usize,
+    ) -> impl Iterator<Item = (Argument<'a>, Type<'db>)> + 'a {
+        argument_types
+            .iter()
+            .zip(&self.argument_parameters)
+            .filter(move |(_, argument_parameter)| {
+                argument_parameter.is_some_and(|ap| ap == parameter_index)
+            })
+            .map(|(arg_and_type, _)| arg_and_type)
     }
 
     fn report_diagnostics(
