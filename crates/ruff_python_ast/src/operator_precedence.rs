@@ -28,8 +28,10 @@ pub enum OperatorPrecedence {
     /// Precedence of comparisons (`<`, `<=`, `>`, `>=`, `!=`, `==`),
     /// memberships (`in`, `not in`) and identity tests (`is`, `is not`).
     ComparisonsMembershipIdentity,
-    /// Precedence of bitwise `|` and `^` operators.
-    BitXorOr,
+    /// Precedence of bitwise `|` operator.
+    BitOr,
+    /// Precedence of bitwise `^` operator.
+    BitXor,
     /// Precedence of bitwise `&` operator.
     BitAnd,
     /// Precedence of left and right shift expressions (`<<`, `>>`).
@@ -159,7 +161,8 @@ impl From<Operator> for OperatorPrecedence {
             Operator::LShift | Operator::RShift => Self::LeftRightShift,
             // Bitwise operations: &, ^, |
             Operator::BitAnd => Self::BitAnd,
-            Operator::BitXor | Operator::BitOr => Self::BitXorOr,
+            Operator::BitXor => Self::BitXor,
+            Operator::BitOr => Self::BitOr,
             // Exponentiation **
             Operator::Pow => Self::Exponent,
         }

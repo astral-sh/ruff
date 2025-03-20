@@ -18,7 +18,7 @@ def f(*args: Unpack[Ts]) -> tuple[Unpack[Ts]]:
     # TODO: should understand the annotation
     reveal_type(args)  # revealed: tuple
 
-    reveal_type(Alias)  # revealed: @Todo(Invalid or unsupported `KnownInstanceType` in `Type::to_type_expression`)
+    reveal_type(Alias)  # revealed: @Todo(Support for `typing.TypeAlias`)
 
 def g() -> TypeGuard[int]: ...
 def h() -> TypeIs[int]: ...
@@ -35,7 +35,26 @@ def i(callback: Callable[Concatenate[int, P], R_co], *args: P.args, **kwargs: P.
 
 class Foo:
     def method(self, x: Self):
-        reveal_type(x)  # revealed: @Todo(Invalid or unsupported `KnownInstanceType` in `Type::to_type_expression`)
+        reveal_type(x)  # revealed: @Todo(Support for `typing.Self`)
+```
+
+## Type expressions
+
+One thing that is supported is error messages for using special forms in type expressions.
+
+```py
+from typing_extensions import Unpack, TypeGuard, TypeIs, Concatenate
+
+def _(
+    a: Unpack,  # error: [invalid-type-form] "`typing.Unpack` requires exactly one argument when used in a type expression"
+    b: TypeGuard,  # error: [invalid-type-form] "`typing.TypeGuard` requires exactly one argument when used in a type expression"
+    c: TypeIs,  # error: [invalid-type-form] "`typing.TypeIs` requires exactly one argument when used in a type expression"
+    d: Concatenate,  # error: [invalid-type-form] "`typing.Concatenate` requires at least two arguments when used in a type expression"
+) -> None:
+    reveal_type(a)  # revealed: Unknown
+    reveal_type(b)  # revealed: Unknown
+    reveal_type(c)  # revealed: Unknown
+    reveal_type(d)  # revealed: Unknown
 ```
 
 ## Inheritance
