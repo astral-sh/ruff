@@ -1,5 +1,46 @@
 # Changelog
 
+## 0.11.1
+
+### Preview features
+
+- \[`airflow`\] Add `chain`, `chain_linear` and `cross_downstream` for `AIR302` ([#16647](https://github.com/astral-sh/ruff/pull/16647))
+- [syntax-errors] Improve error message and range for pre-PEP-614 decorator syntax errors ([#16581](https://github.com/astral-sh/ruff/pull/16581))
+- [syntax-errors] PEP 701 f-strings before Python 3.12 ([#16543](https://github.com/astral-sh/ruff/pull/16543))
+- [syntax-errors] Parenthesized context managers before Python 3.9 ([#16523](https://github.com/astral-sh/ruff/pull/16523))
+- [syntax-errors] Star annotations before Python 3.11 ([#16545](https://github.com/astral-sh/ruff/pull/16545))
+- [syntax-errors] Star expression in index before Python 3.11 ([#16544](https://github.com/astral-sh/ruff/pull/16544))
+- [syntax-errors] Unparenthesized assignment expressions in sets and indexes ([#16404](https://github.com/astral-sh/ruff/pull/16404))
+
+### Bug fixes
+
+- Server: Allow `FixAll` action in presence of version-specific syntax errors ([#16848](https://github.com/astral-sh/ruff/pull/16848))
+- \[`flake8-bandit`\] Allow raw strings in `suspicious-mark-safe-usage` (`S308`) #16702 ([#16770](https://github.com/astral-sh/ruff/pull/16770))
+- \[`refurb`\] Avoid panicking `unwrap` in `verbose-decimal-constructor` (`FURB157`) ([#16777](https://github.com/astral-sh/ruff/pull/16777))
+- \[`refurb`\] Fix starred expressions fix (`FURB161`) ([#16550](https://github.com/astral-sh/ruff/pull/16550))
+- [ruff] Fix `--statistics` reporting for unsafe fixes ([#16756](https://github.com/astral-sh/ruff/pull/16756))
+
+### Rule changes
+
+- \[`flake8-executable`\] Add pytest and uv run to help message for `shebang-missing-python` (`EXE003`) ([#16855](https://github.com/astral-sh/ruff/pull/16855))
+- \[`flake8-executables`\] Allow `uv run` in shebang line for `shebang-missing-python` (`EXE003`) ([#16849](https://github.com/astral-sh/ruff/pull/16849))
+
+### CLI
+
+- Add --exit-non-zero-on-format ([#16009](https://github.com/astral-sh/ruff/pull/16009))
+
+### Documentation
+
+- Update Ruff tutorial to avoid non-existent fix in `__init__.py` ([#16818](https://github.com/astral-sh/ruff/pull/16818))
+- \[`flake8-gettext`\] Swap `format-` and `printf-in-get-text-func-call` examples (`INT002`, `INT003`) ([#16769](https://github.com/astral-sh/ruff/pull/16769))
+
+### Other changes
+
+- [playground] Extract shared components ([#16819](https://github.com/astral-sh/ruff/pull/16819))
+- [playground] Upgrade dependencies ([#16825](https://github.com/astral-sh/ruff/pull/16825))
+- [red-knot] Add missing space between error message and lint code in playground ([#16840](https://github.com/astral-sh/ruff/pull/16840))
+- [refactor] Convert playground to an NPM workspace ([#16806](https://github.com/astral-sh/ruff/pull/16806))
+
 ## 0.11.0
 
 This is a follow-up to release 0.10.0. Because of a mistake in the release process, the `requires-python` inference changes were not included in that release. Ruff 0.11.0 now includes this change as well as the stabilization of the preview behavior for `PGH004`.
@@ -56,7 +97,7 @@ See also, the "Remapped rules" section which may result in disabled rules.
 
 - **More robust noqa parsing** ([#16483](https://github.com/astral-sh/ruff/pull/16483))
 
-    The syntax for both file-level and in-line suppression comments has been unified and made more robust to certain errors. In most cases, this will result in more suppression comments being read by Ruff, but there are a few instances where previously read comments will now log an error to the user instead. Please refer to the documentation on [_Error suppression_](https://docs.astral.sh/ruff/linter/#error-suppression) for the full specification.
+    The syntax for both file-level and in-line suppression comments has been unified and made more robust to certain errors. In most cases, this will result in more suppression comments being read by Ruff, but there are a few instances where previously read comments will now log an error to the user instead. Please refer to the documentation on [*Error suppression*](https://docs.astral.sh/ruff/linter/#error-suppression) for the full specification.
 
 - **Avoid unnecessary parentheses around with statements with a single context manager and a trailing comment** ([#14005](https://github.com/astral-sh/ruff/pull/14005))
 
@@ -1468,7 +1509,7 @@ The following fixes have been stabilized:
 
 ## 0.5.6
 
-Ruff 0.5.6 automatically enables linting and formatting of notebooks in _preview mode_.
+Ruff 0.5.6 automatically enables linting and formatting of notebooks in *preview mode*.
 You can opt-out of this behavior by adding `*.ipynb` to the `extend-exclude` setting.
 
 ```toml
@@ -2221,7 +2262,7 @@ To setup `ruff server` with your editor, refer to the [README.md](https://github
 
 ### Server
 
-_This section is devoted to updates for our new language server, written in Rust._
+*This section is devoted to updates for our new language server, written in Rust.*
 
 - Enable ruff-specific source actions ([#10916](https://github.com/astral-sh/ruff/pull/10916))
 - Refreshes diagnostics for open files when file configuration is changed ([#10988](https://github.com/astral-sh/ruff/pull/10988))
@@ -3628,7 +3669,7 @@ Read Ruff's new [versioning policy](https://docs.astral.sh/ruff/versioning/).
 - \[`refurb`\] Add `single-item-membership-test` (`FURB171`) ([#7815](https://github.com/astral-sh/ruff/pull/7815))
 - \[`pylint`\] Add `and-or-ternary` (`R1706`) ([#7811](https://github.com/astral-sh/ruff/pull/7811))
 
-_New rules are added in [preview](https://docs.astral.sh/ruff/preview/)._
+*New rules are added in [preview](https://docs.astral.sh/ruff/preview/).*
 
 ### Configuration
 
