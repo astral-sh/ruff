@@ -5,12 +5,12 @@
 ### Preview features
 
 - \[`airflow`\] Add `chain`, `chain_linear` and `cross_downstream` for `AIR302` ([#16647](https://github.com/astral-sh/ruff/pull/16647))
-- [syntax-errors] Improve error message and range for pre-PEP-614 decorator syntax errors ([#16581](https://github.com/astral-sh/ruff/pull/16581))
-- [syntax-errors] PEP 701 f-strings before Python 3.12 ([#16543](https://github.com/astral-sh/ruff/pull/16543))
-- [syntax-errors] Parenthesized context managers before Python 3.9 ([#16523](https://github.com/astral-sh/ruff/pull/16523))
-- [syntax-errors] Star annotations before Python 3.11 ([#16545](https://github.com/astral-sh/ruff/pull/16545))
-- [syntax-errors] Star expression in index before Python 3.11 ([#16544](https://github.com/astral-sh/ruff/pull/16544))
-- [syntax-errors] Unparenthesized assignment expressions in sets and indexes ([#16404](https://github.com/astral-sh/ruff/pull/16404))
+- \[syntax-errors\] Improve error message and range for pre-PEP-614 decorator syntax errors ([#16581](https://github.com/astral-sh/ruff/pull/16581))
+- \[syntax-errors\] PEP 701 f-strings before Python 3.12 ([#16543](https://github.com/astral-sh/ruff/pull/16543))
+- \[syntax-errors\] Parenthesized context managers before Python 3.9 ([#16523](https://github.com/astral-sh/ruff/pull/16523))
+- \[syntax-errors\] Star annotations before Python 3.11 ([#16545](https://github.com/astral-sh/ruff/pull/16545))
+- \[syntax-errors\] Star expression in index before Python 3.11 ([#16544](https://github.com/astral-sh/ruff/pull/16544))
+- \[syntax-errors\] Unparenthesized assignment expressions in sets and indexes ([#16404](https://github.com/astral-sh/ruff/pull/16404))
 
 ### Bug fixes
 
@@ -18,28 +18,20 @@
 - \[`flake8-bandit`\] Allow raw strings in `suspicious-mark-safe-usage` (`S308`) #16702 ([#16770](https://github.com/astral-sh/ruff/pull/16770))
 - \[`refurb`\] Avoid panicking `unwrap` in `verbose-decimal-constructor` (`FURB157`) ([#16777](https://github.com/astral-sh/ruff/pull/16777))
 - \[`refurb`\] Fix starred expressions fix (`FURB161`) ([#16550](https://github.com/astral-sh/ruff/pull/16550))
-- [ruff] Fix `--statistics` reporting for unsafe fixes ([#16756](https://github.com/astral-sh/ruff/pull/16756))
+- Fix `--statistics` reporting for unsafe fixes ([#16756](https://github.com/astral-sh/ruff/pull/16756))
 
 ### Rule changes
 
-- \[`flake8-executable`\] Add pytest and uv run to help message for `shebang-missing-python` (`EXE003`) ([#16855](https://github.com/astral-sh/ruff/pull/16855))
-- \[`flake8-executables`\] Allow `uv run` in shebang line for `shebang-missing-python` (`EXE003`) ([#16849](https://github.com/astral-sh/ruff/pull/16849))
+- \[`flake8-executables`\] Allow `uv run` in shebang line for `shebang-missing-python` (`EXE003`) ([#16849](https://github.com/astral-sh/ruff/pull/16849),[#16855](https://github.com/astral-sh/ruff/pull/16855))
 
 ### CLI
 
-- Add --exit-non-zero-on-format ([#16009](https://github.com/astral-sh/ruff/pull/16009))
+- Add `--exit-non-zero-on-format` ([#16009](https://github.com/astral-sh/ruff/pull/16009))
 
 ### Documentation
 
 - Update Ruff tutorial to avoid non-existent fix in `__init__.py` ([#16818](https://github.com/astral-sh/ruff/pull/16818))
 - \[`flake8-gettext`\] Swap `format-` and `printf-in-get-text-func-call` examples (`INT002`, `INT003`) ([#16769](https://github.com/astral-sh/ruff/pull/16769))
-
-### Other changes
-
-- [playground] Extract shared components ([#16819](https://github.com/astral-sh/ruff/pull/16819))
-- [playground] Upgrade dependencies ([#16825](https://github.com/astral-sh/ruff/pull/16825))
-- [red-knot] Add missing space between error message and lint code in playground ([#16840](https://github.com/astral-sh/ruff/pull/16840))
-- [refactor] Convert playground to an NPM workspace ([#16806](https://github.com/astral-sh/ruff/pull/16806))
 
 ## 0.11.0
 
