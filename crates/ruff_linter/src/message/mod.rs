@@ -136,7 +136,7 @@ impl Message {
         })
     }
 
-    /// Create a [`Message`] from the given [`SyntaxError`].
+    /// Create a [`Message`] from the given [`SemanticSyntaxError`].
     pub fn from_semantic_syntax_error(
         semantic_syntax_error: &SemanticSyntaxError,
         file: SourceFile,

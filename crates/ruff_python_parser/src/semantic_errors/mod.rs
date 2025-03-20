@@ -1,8 +1,8 @@
-//! [`SyntaxChecker`] for AST-based syntax errors.
+//! [`SemanticSyntaxChecker`] for AST-based syntax errors.
 //!
 //! This checker is not responsible for traversing the AST itself. Instead, its
-//! [`SyntaxChecker::enter_stmt`] and [`SyntaxChecker::enter_expr`] methods should be called in a
-//! parent `Visitor`'s `visit_stmt` and `visit_expr` methods, respectively.
+//! [`SemanticSyntaxChecker::visit_stmt`] and [`SemanticSyntaxChecker::visit_expr`] methods should
+//! be called in a parent `Visitor`'s `visit_stmt` and `visit_expr` methods, respectively.
 
 use std::{cell::RefCell, fmt::Display};
 
