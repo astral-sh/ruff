@@ -176,37 +176,33 @@ pub fn check_path(
 
     // Run the AST-based rules only if there are no syntax errors.
     if parsed.has_valid_syntax() {
-        let use_ast = settings
-            .rules
-            .iter_enabled()
-            .any(|rule_code| rule_code.lint_source().is_ast());
+        let cell_offsets = source_kind.as_ipy_notebook().map(Notebook::cell_offsets);
+        let notebook_index = source_kind.as_ipy_notebook().map(Notebook::index);
+
+        let (new_diagnostics, new_semantic_syntax_errors) = check_ast(
+            parsed,
+            locator,
+            stylist,
+            indexer,
+            &directives.noqa_line_for,
+            settings,
+            noqa,
+            path,
+            package,
+            source_type,
+            cell_offsets,
+            notebook_index,
+            target_version,
+        );
+        diagnostics.extend(new_diagnostics);
+        semantic_syntax_errors.extend(new_semantic_syntax_errors);
+
         let use_imports = !directives.isort.skip_file
             && settings
                 .rules
                 .iter_enabled()
                 .any(|rule_code| rule_code.lint_source().is_imports());
-        if use_ast || use_imports || use_doc_lines {
-            let cell_offsets = source_kind.as_ipy_notebook().map(Notebook::cell_offsets);
-            let notebook_index = source_kind.as_ipy_notebook().map(Notebook::index);
-            if use_ast {
-                let (new_diagnostics, new_semantic_syntax_errors) = check_ast(
-                    parsed,
-                    locator,
-                    stylist,
-                    indexer,
-                    &directives.noqa_line_for,
-                    settings,
-                    noqa,
-                    path,
-                    package,
-                    source_type,
-                    cell_offsets,
-                    notebook_index,
-                    target_version,
-                );
-                diagnostics.extend(new_diagnostics);
-                semantic_syntax_errors.extend(new_semantic_syntax_errors);
-            }
+        if use_imports || use_doc_lines {
             if use_imports {
                 let import_diagnostics = check_imports(
                     parsed,
