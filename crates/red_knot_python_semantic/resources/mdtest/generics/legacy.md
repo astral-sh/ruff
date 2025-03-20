@@ -67,6 +67,9 @@ from typing import TypeVar
 
 T = TypeVar("T", int, str)
 reveal_type(T.__constraints__)  # revealed: tuple[int, str]
+
+S = TypeVar("S")
+reveal_type(S.__constraints__)  # revealed: tuple[()]
 ```
 
 ### Cannot have only one constraint

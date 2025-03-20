@@ -81,7 +81,7 @@ class C[T]:
 c: C[int] = C()
 c.m1(1)
 c.m2(1)
-# TODO: error: [invalid-argument-type] "Object of type `Literal["string"]` cannot be assigned to parameter 2 (`x`) of bound method `m2`; expected type `T`"
+# TODO: expected type `int`
 c.m2("string")
 ```
 
@@ -103,7 +103,6 @@ class Legacy(Generic[T]):
         return y
 
 legacy: Legacy[int] = Legacy()
-# TODO: no errors
 # TODO: revealed: str
 reveal_type(legacy.m(1, "string"))  # revealed: S | @Todo(instance attribute on class with dynamic base)
 ```

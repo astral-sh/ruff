@@ -504,7 +504,7 @@ impl<'db> Bindings<'db> {
                                 Some(TypeVarBoundOrConstraints::UpperBound(*bound))
                             }
 
-                            (None, Some(constraints)) => {
+                            (None, Some(_constraints)) => {
                                 Some(TypeVarBoundOrConstraints::Constraints(TupleType::new(
                                     db,
                                     overload
