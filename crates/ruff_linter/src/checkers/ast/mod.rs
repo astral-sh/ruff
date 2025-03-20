@@ -26,7 +26,9 @@ use std::path::Path;
 
 use itertools::Itertools;
 use log::debug;
-use ruff_python_syntax_errors::{SyntaxChecker, SyntaxError, SyntaxErrorKind};
+use ruff_python_syntax_errors::{
+    SemanticSyntaxChecker, SemanticSyntaxError, SemanticSyntaxErrorKind,
+};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_diagnostics::{Diagnostic, IsolationLevel};
@@ -229,7 +231,7 @@ pub(crate) struct Checker<'a> {
     target_version: PythonVersion,
 
     #[allow(clippy::struct_field_names)]
-    syntax_checker: SyntaxChecker,
+    syntax_checker: SemanticSyntaxChecker,
 }
 
 impl<'a> Checker<'a> {
@@ -277,7 +279,7 @@ impl<'a> Checker<'a> {
             last_stmt_end: TextSize::default(),
             docstring_state: DocstringState::default(),
             target_version,
-            syntax_checker: SyntaxChecker::new(target_version),
+            syntax_checker: SemanticSyntaxChecker::new(target_version),
         }
     }
 }
@@ -2680,7 +2682,7 @@ pub(crate) fn check_ast(
     cell_offsets: Option<&CellOffsets>,
     notebook_index: Option<&NotebookIndex>,
     target_version: PythonVersion,
-) -> (Vec<Diagnostic>, Vec<SyntaxError>) {
+) -> (Vec<Diagnostic>, Vec<SemanticSyntaxError>) {
     let module_path = package
         .map(PackageRoot::path)
         .and_then(|package| to_module_path(package, path));
@@ -2757,7 +2759,7 @@ pub(crate) fn check_ast(
     let mut semantic_syntax_errors = Vec::new();
     for semantic_syntax_error in syntax_checker.finish() {
         match semantic_syntax_error.kind {
-            SyntaxErrorKind::LateFutureImport => {
+            SemanticSyntaxErrorKind::LateFutureImport => {
                 if settings.rules.enabled(Rule::LateFutureImport) {
                     diagnostics.push(Diagnostic::new(
                         LateFutureImport,
@@ -2765,7 +2767,7 @@ pub(crate) fn check_ast(
                     ));
                 }
             }
-            SyntaxErrorKind::ReboundComprehensionVariable => {
+            SemanticSyntaxErrorKind::ReboundComprehensionVariable => {
                 semantic_syntax_errors.push(semantic_syntax_error);
             }
         }

@@ -15,19 +15,19 @@ use ruff_python_ast::{
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashSet;
 
-pub struct SyntaxChecker {
+pub struct SemanticSyntaxChecker {
     /// The target Python version for detecting backwards-incompatible syntax
     /// changes.
     target_version: PythonVersion,
     /// The cumulative set of syntax errors found when visiting the source AST.
-    errors: Vec<SyntaxError>,
+    errors: Vec<SemanticSyntaxError>,
 
     /// these could be grouped into a bitflags struct like `SemanticModel`
     seen_futures_boundary: bool,
     seen_docstring_boundary: bool,
 }
 
-impl SyntaxChecker {
+impl SemanticSyntaxChecker {
     pub fn new(target_version: PythonVersion) -> Self {
         Self {
             target_version,
@@ -37,25 +37,25 @@ impl SyntaxChecker {
         }
     }
 
-    pub fn finish(self) -> Vec<SyntaxError> {
+    pub fn finish(self) -> Vec<SemanticSyntaxError> {
         self.errors
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct SyntaxError {
-    pub kind: SyntaxErrorKind,
+pub struct SemanticSyntaxError {
+    pub kind: SemanticSyntaxErrorKind,
     pub range: TextRange,
     pub target_version: PythonVersion,
 }
 
-impl Display for SyntaxError {
+impl Display for SemanticSyntaxError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.kind {
-            SyntaxErrorKind::LateFutureImport => {
+            SemanticSyntaxErrorKind::LateFutureImport => {
                 f.write_str("__future__ imports must be at the top of the file")
             }
-            SyntaxErrorKind::ReboundComprehensionVariable => {
+            SemanticSyntaxErrorKind::ReboundComprehensionVariable => {
                 f.write_str("assignment expression cannot rebind comprehension variable")
             }
         }
@@ -63,7 +63,7 @@ impl Display for SyntaxError {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum SyntaxErrorKind {
+pub enum SemanticSyntaxErrorKind {
     /// Represents the use of a `__future__` import after the beginning of a file.
     ///
     /// ## Examples
@@ -94,12 +94,12 @@ pub enum SyntaxErrorKind {
     ReboundComprehensionVariable,
 }
 
-impl SyntaxChecker {
+impl SemanticSyntaxChecker {
     fn check_stmt(&mut self, stmt: &ast::Stmt) {
         if let Stmt::ImportFrom(StmtImportFrom { range, module, .. }) = stmt {
             if self.seen_futures_boundary && matches!(module.as_deref(), Some("__future__")) {
-                self.errors.push(SyntaxError {
-                    kind: SyntaxErrorKind::LateFutureImport,
+                self.errors.push(SemanticSyntaxError {
+                    kind: SemanticSyntaxErrorKind::LateFutureImport,
                     range: *range,
                     target_version: self.target_version,
                 });
@@ -174,8 +174,8 @@ impl SyntaxChecker {
         // TODO(brent) with multiple diagnostic ranges, we could mark both the named expr (current)
         // and the name expr being rebound
         if let Some(range) = rebound_variable {
-            self.errors.push(SyntaxError {
-                kind: SyntaxErrorKind::ReboundComprehensionVariable,
+            self.errors.push(SemanticSyntaxError {
+                kind: SemanticSyntaxErrorKind::ReboundComprehensionVariable,
                 range,
                 target_version: self.target_version,
             });
@@ -213,10 +213,10 @@ mod tests {
     use ruff_python_trivia::textwrap::dedent;
     use test_case::test_case;
 
-    use crate::{SyntaxChecker, SyntaxError};
+    use crate::{SemanticSyntaxChecker, SemanticSyntaxError};
 
     struct TestVisitor {
-        checker: SyntaxChecker,
+        checker: SemanticSyntaxChecker,
     }
 
     impl Visitor<'_> for TestVisitor {
@@ -232,12 +232,12 @@ mod tests {
     }
 
     /// Run [`check_syntax`] on a snippet of Python code.
-    fn test_snippet(contents: &str, target_version: PythonVersion) -> Vec<SyntaxError> {
+    fn test_snippet(contents: &str, target_version: PythonVersion) -> Vec<SemanticSyntaxError> {
         let path = Path::new("<filename>");
         let source_type = PySourceType::from(path);
         let parsed = ruff_python_parser::parse_unchecked_source(&dedent(contents), source_type);
         let mut visitor = TestVisitor {
-            checker: SyntaxChecker::new(target_version),
+            checker: SemanticSyntaxChecker::new(target_version),
         };
 
         for stmt in parsed.suite() {

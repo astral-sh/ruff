@@ -6,7 +6,7 @@ use std::path::Path;
 use anyhow::{anyhow, Result};
 use colored::Colorize;
 use itertools::Itertools;
-use ruff_python_syntax_errors::SyntaxError;
+use ruff_python_syntax_errors::SemanticSyntaxError;
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::Diagnostic;
@@ -506,7 +506,7 @@ fn diagnostics_to_messages(
     diagnostics: Vec<Diagnostic>,
     parse_errors: &[ParseError],
     unsupported_syntax_errors: &[UnsupportedSyntaxError],
-    semantic_syntax_errors: &[SyntaxError],
+    semantic_syntax_errors: &[SemanticSyntaxError],
     path: &Path,
     locator: &Locator,
     directives: &Directives,

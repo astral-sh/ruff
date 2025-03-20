@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use std::io::Write;
 use std::ops::Deref;
 
-use ruff_python_syntax_errors::SyntaxError;
+use ruff_python_syntax_errors::SemanticSyntaxError;
 use rustc_hash::FxHashMap;
 
 pub use azure::AzureEmitter;
@@ -138,7 +138,7 @@ impl Message {
 
     /// Create a [`Message`] from the given [`SyntaxError`].
     pub fn from_semantic_syntax_error(
-        semantic_syntax_error: &SyntaxError,
+        semantic_syntax_error: &SemanticSyntaxError,
         file: SourceFile,
     ) -> Message {
         Message::SyntaxError(SyntaxErrorMessage {
