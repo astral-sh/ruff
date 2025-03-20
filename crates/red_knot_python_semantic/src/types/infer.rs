@@ -5631,6 +5631,11 @@ impl<'db> TypeInferenceBuilder<'db> {
             (Type::KnownInstance(KnownInstanceType::Protocol), _) => {
                 Type::Dynamic(DynamicType::TodoProtocol)
             }
+            (Type::KnownInstance(known_instance), _)
+                if known_instance.class().is_special_form() =>
+            {
+                todo_type!("Inference of subscript on special form")
+            }
             (value_ty, slice_ty) => {
                 // If the class defines `__getitem__`, return its return type.
                 //
