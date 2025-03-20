@@ -1111,12 +1111,10 @@ impl<'db> KnownClass {
             | Self::MethodWrapperType
             | Self::WrapperDescriptorType => KnownModule::Types,
             Self::NoneType => KnownModule::Typeshed,
-            Self::SpecialForm
-            | Self::TypeVar
-            | Self::StdlibAlias
-            | Self::SupportsIndex
-            | Self::NewType => KnownModule::Typing,
-            Self::TypeAliasType | Self::TypeVarTuple | Self::ParamSpec => {
+            Self::SpecialForm | Self::TypeVar | Self::StdlibAlias | Self::SupportsIndex => {
+                KnownModule::Typing
+            }
+            Self::TypeAliasType | Self::TypeVarTuple | Self::ParamSpec | Self::NewType => {
                 KnownModule::TypingExtensions
             }
             Self::NoDefaultType => {
@@ -1283,6 +1281,7 @@ impl<'db> KnownClass {
             "MethodType" => Self::MethodType,
             "MethodWrapperType" => Self::MethodWrapperType,
             "WrapperDescriptorType" => Self::WrapperDescriptorType,
+            "NewType" => Self::NewType,
             "TypeAliasType" => Self::TypeAliasType,
             "TypeVar" => Self::TypeVar,
             "ParamSpec" => Self::ParamSpec,
