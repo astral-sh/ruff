@@ -159,21 +159,21 @@ impl SemanticSyntaxChecker {
     /// Add a [`SyntaxErrorKind::ReboundComprehensionVariable`] if `expr` rebinds an iteration
     /// variable in `generators`.
     fn check_generator_expr(&mut self, expr: &Expr, generators: &[ast::Comprehension]) {
-        let rebound_variable = {
+        let rebound_variables = {
             let mut visitor = ReboundComprehensionVisitor {
                 iteration_variables: generators
                     .iter()
                     .filter_map(|gen| gen.target.as_name_expr().map(|name| &name.id))
                     .collect(),
-                rebound_variable: None,
+                rebound_variables: Vec::new(),
             };
             visitor.visit_expr(expr);
-            visitor.rebound_variable
+            visitor.rebound_variables
         };
 
         // TODO(brent) with multiple diagnostic ranges, we could mark both the named expr (current)
         // and the name expr being rebound
-        if let Some(range) = rebound_variable {
+        for range in rebound_variables {
             self.errors.push(SemanticSyntaxError {
                 kind: SemanticSyntaxErrorKind::ReboundComprehensionVariable,
                 range,
@@ -187,7 +187,7 @@ impl SemanticSyntaxChecker {
 /// a comprehension or generator expression.
 struct ReboundComprehensionVisitor<'a> {
     iteration_variables: FxHashSet<&'a Name>,
-    rebound_variable: Option<TextRange>,
+    rebound_variables: Vec<TextRange>,
 }
 
 impl Visitor<'_> for ReboundComprehensionVisitor<'_> {
@@ -195,8 +195,7 @@ impl Visitor<'_> for ReboundComprehensionVisitor<'_> {
         if let Expr::Named(ast::ExprNamed { target, .. }) = expr {
             if let Expr::Name(ast::ExprName { id, range, .. }) = &**target {
                 if self.iteration_variables.contains(id) {
-                    self.rebound_variable = Some(*range);
-                    return;
+                    self.rebound_variables.push(*range);
                 }
             };
         }
@@ -255,6 +254,10 @@ mod tests {
     #[test_case("[[(a := 0)] for a in range(0)]", "nested_listcomp_expr")]
     #[test_case("[(a := 0) for b in range (0) for a in range(0)]", "nested_listcomp")]
     #[test_case("[(a := 0) for a in range (0) for b in range(0)]", "nested_listcomp2")]
+    #[test_case(
+        "[((a := 0), (b := 1)) for a in range (0) for b in range(0)]",
+        "double_listcomp"
+    )]
     fn rebound_comprehension_variable(contents: &str, name: &str) {
         assert_debug_snapshot!(name, test_snippet(contents, PythonVersion::default()));
     }
