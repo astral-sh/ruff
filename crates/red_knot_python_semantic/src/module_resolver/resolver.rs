@@ -228,7 +228,7 @@ impl SearchPaths {
                 //  than the one resolved in the program settings because it indicates
                 //  that the `target-version` is incorrectly configured or that the
                 //  venv is out of date.
-                VirtualEnvironment::new(sys_prefix.inner.clone(), sys_prefix.origin, system)
+                VirtualEnvironment::new(&sys_prefix.inner, sys_prefix.origin, system)
                     .and_then(|venv| venv.site_packages_directories(system))?
             }
 
