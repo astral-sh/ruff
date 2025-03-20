@@ -323,6 +323,17 @@ impl<'db> Bindings<'db> {
                                     ));
                                 }
 
+                                [_, Some(Type::KnownInstance(KnownInstanceType::TypeVar(typevar))), Some(Type::ClassLiteral(ClassLiteralType { class }))]
+                                    if class.is_known(db, KnownClass::TypeVar)
+                                        && function.name(db) == "__default__" =>
+                                {
+                                    overload.set_return_type(
+                                        typevar.default_ty(db).unwrap_or_else(|| {
+                                            KnownClass::NoDefaultType.to_instance(db)
+                                        }),
+                                    );
+                                }
+
                                 [_, Some(_), _]
                                     if function
                                         .has_known_class_decorator(db, KnownClass::Property) =>

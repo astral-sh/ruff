@@ -60,6 +60,27 @@ T = TypeVar("T")
 T = TypeVar("T")
 ```
 
+### Type variables with a default
+
+Note that the `__default__` property is only available in Python ≥3.13.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T", default=int)
+reveal_type(T.__default__)  # revealed: int
+reveal_type(T.__bound__)  # revealed: None
+reveal_type(T.__constraints__)  # revealed: tuple[()]
+
+S = TypeVar("S")
+reveal_type(S.__default__)  # revealed: NoDefault
+```
+
 ### Type variables with an upper bound
 
 ```py
