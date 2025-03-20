@@ -105,10 +105,14 @@ impl Options {
             src_roots,
             custom_typeshed: typeshed.map(|path| path.absolute(project_root, system)),
             python_path: python
-                .and_then(|python_path| {
-                    PythonPath::from_cli_flag(python_path.absolute(project_root, system), system)
+                .map(|python_path| {
+                    PythonPath::from_cli_flag(python_path.absolute(project_root, system))
                 })
-                .or_else(|| PythonPath::find_virtual_env(system))
+                .or_else(|| {
+                    std::env::var("VIRTUAL_ENV")
+                        .ok()
+                        .map(PythonPath::from_virtual_env_var)
+                })
                 .unwrap_or_else(|| PythonPath::KnownSitePackages(vec![])),
         }
     }

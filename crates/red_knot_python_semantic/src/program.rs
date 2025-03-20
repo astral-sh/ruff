@@ -1,10 +1,10 @@
 use crate::module_resolver::SearchPaths;
 use crate::python_platform::PythonPlatform;
-use crate::site_packages::{SysPrefixPath, SysPrefixPathOrigin};
+use crate::site_packages::SysPrefixPathOrigin;
 use crate::Db;
 
 use anyhow::Context;
-use ruff_db::system::{System, SystemPath, SystemPathBuf};
+use ruff_db::system::{SystemPath, SystemPathBuf};
 use ruff_python_ast::PythonVersion;
 use salsa::Durability;
 use salsa::Setter;
@@ -143,7 +143,7 @@ pub enum PythonPath {
     /// `/opt/homebrew/lib/python3.X/site-packages`.
     ///
     /// [`sys.prefix`]: https://docs.python.org/3/library/sys.html#sys.prefix
-    SysPrefix(SysPrefixPath),
+    SysPrefix(SystemPathBuf, SysPrefixPathOrigin),
 
     /// Resolved site packages paths.
     ///
@@ -153,20 +153,11 @@ pub enum PythonPath {
 }
 
 impl PythonPath {
-    pub fn find_virtual_env(system: &dyn System) -> Option<Self> {
-        let virtual_env = std::env::var("VIRTUAL_ENV").ok()?;
-        tracing::debug!(
-            "Found virtual environment at {:?} from `VIRTUAL_ENV` environment variable",
-            virtual_env
-        );
-        SysPrefixPath::new(virtual_env, SysPrefixPathOrigin::VirtualEnvVar, system)
-            .ok()
-            .map(Self::SysPrefix)
+    pub fn from_virtual_env_var(path: impl Into<SystemPathBuf>) -> Self {
+        Self::SysPrefix(path.into(), SysPrefixPathOrigin::VirtualEnvVar)
     }
 
-    pub fn from_cli_flag(path: SystemPathBuf, system: &dyn System) -> Option<Self> {
-        SysPrefixPath::new(path, SysPrefixPathOrigin::PythonCliFlag, system)
-            .ok()
-            .map(Self::SysPrefix)
+    pub fn from_cli_flag(path: SystemPathBuf) -> Self {
+        Self::SysPrefix(path, SysPrefixPathOrigin::PythonCliFlag)
     }
 }

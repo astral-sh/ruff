@@ -223,12 +223,12 @@ impl SearchPaths {
         static_paths.push(stdlib_path);
 
         let site_packages_paths = match python_path {
-            PythonPath::SysPrefix(sys_prefix) => {
+            PythonPath::SysPrefix(sys_prefix, origin) => {
                 // TODO: We may want to warn here if the venv's python version is older
                 //  than the one resolved in the program settings because it indicates
                 //  that the `target-version` is incorrectly configured or that the
                 //  venv is out of date.
-                VirtualEnvironment::new(sys_prefix.inner(), sys_prefix.origin(), system)
+                VirtualEnvironment::new(sys_prefix, *origin, system)
                     .and_then(|venv| venv.site_packages_directories(system))?
             }
 
