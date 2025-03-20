@@ -4576,34 +4576,47 @@ impl<'db> GeneralCallableType<'db> {
         }
 
         for (self_parameter, other_parameter) in self_parameters.iter().zip(other_parameters) {
-            if self_parameter.name() != other_parameter.name() {
-                return false;
-            }
-
-            if self_parameter.default_type().is_some() != other_parameter.default_type().is_some() {
-                return false;
-            }
-
-            if !matches!(
-                (self_parameter.kind(), other_parameter.kind()),
+            match (self_parameter.kind(), other_parameter.kind()) {
                 (
-                    ParameterKind::PositionalOnly { .. },
-                    ParameterKind::PositionalOnly { .. }
-                ) | (
-                    ParameterKind::PositionalOrKeyword { .. },
-                    ParameterKind::PositionalOrKeyword { .. }
-                ) | (
-                    ParameterKind::Variadic { .. },
-                    ParameterKind::Variadic { .. }
-                ) | (
-                    ParameterKind::KeywordOnly { .. },
-                    ParameterKind::KeywordOnly { .. }
-                ) | (
-                    ParameterKind::KeywordVariadic { .. },
-                    ParameterKind::KeywordVariadic { .. }
-                )
-            ) {
-                return false;
+                    ParameterKind::PositionalOnly {
+                        default_ty: self_default,
+                        ..
+                    },
+                    ParameterKind::PositionalOnly {
+                        default_ty: other_default,
+                        ..
+                    },
+                ) if self_default.is_some() == other_default.is_some() => {}
+
+                (
+                    ParameterKind::PositionalOrKeyword {
+                        name: self_name,
+                        default_ty: self_default,
+                    },
+                    ParameterKind::PositionalOrKeyword {
+                        name: other_name,
+                        default_ty: other_default,
+                    },
+                ) if self_default.is_some() == other_default.is_some()
+                    && self_name == other_name => {}
+
+                (ParameterKind::Variadic { .. }, ParameterKind::Variadic { .. }) => {}
+
+                (
+                    ParameterKind::KeywordOnly {
+                        name: self_name,
+                        default_ty: self_default,
+                    },
+                    ParameterKind::KeywordOnly {
+                        name: other_name,
+                        default_ty: other_default,
+                    },
+                ) if self_default.is_some() == other_default.is_some()
+                    && self_name == other_name => {}
+
+                (ParameterKind::KeywordVariadic { .. }, ParameterKind::KeywordVariadic { .. }) => {}
+
+                _ => return false,
             }
 
             if !is_equivalent(

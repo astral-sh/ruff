@@ -130,10 +130,29 @@ other callable should also have a default value.
 from knot_extensions import CallableTypeFromFunction, is_equivalent_to, static_assert
 from typing import Callable
 
-def c1(a: int, /, b: float, c: bool = False, *args: int, d: int = 1, e: str, **kwargs: float) -> None: ...
-def c2(a: int, /, b: float, c: bool = True, *args: int, d: int = 2, e: str, **kwargs: float) -> None: ...
+def f1(a: int = 1) -> None: ...
+def f2(a: int = 2) -> None: ...
 
-static_assert(is_equivalent_to(CallableTypeFromFunction[c1], CallableTypeFromFunction[c2]))
+static_assert(is_equivalent_to(CallableTypeFromFunction[f1], CallableTypeFromFunction[f2]))
+```
+
+The names of the positional-only, variadic and keyword-variadic parameters does not need to be the
+same.
+
+```py
+def f3(a1: int, /, *args1: int, **kwargs2: int) -> None: ...
+def f4(a2: int, /, *args2: int, **kwargs1: int) -> None: ...
+
+static_assert(is_equivalent_to(CallableTypeFromFunction[f3], CallableTypeFromFunction[f4]))
+```
+
+Putting it all together, the following two callables are equivalent:
+
+```py
+def f5(a1: int, /, b: float, c: bool = False, *args1: int, d: int = 1, e: str, **kwargs1: float) -> None: ...
+def f6(a2: int, /, b: float, c: bool = True, *args2: int, d: int = 2, e: str, **kwargs2: float) -> None: ...
+
+static_assert(is_equivalent_to(CallableTypeFromFunction[f5], CallableTypeFromFunction[f6]))
 ```
 
 ### Not equivalent
