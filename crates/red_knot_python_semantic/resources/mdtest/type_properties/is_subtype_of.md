@@ -276,8 +276,8 @@ static_assert(is_subtype_of(Never, AlwaysFalsy))
 ### `AlwaysTruthy` and `AlwaysFalsy`
 
 ```py
-from knot_extensions import AlwaysTruthy, AlwaysFalsy, is_subtype_of, static_assert
-from typing import Literal
+from knot_extensions import AlwaysTruthy, AlwaysFalsy, Intersection, Not, is_subtype_of, static_assert
+from typing_extensions import Literal, LiteralString
 
 static_assert(is_subtype_of(Literal[1], AlwaysTruthy))
 static_assert(is_subtype_of(Literal[0], AlwaysFalsy))
@@ -290,6 +290,28 @@ static_assert(not is_subtype_of(Literal[0], AlwaysTruthy))
 
 static_assert(not is_subtype_of(str, AlwaysTruthy))
 static_assert(not is_subtype_of(str, AlwaysFalsy))
+
+# TODO: No errors
+# error: [static-assert-error]
+static_assert(is_subtype_of(bool, Literal[False] | AlwaysTruthy))
+# error: [static-assert-error]
+static_assert(is_subtype_of(bool, Literal[True] | AlwaysFalsy))
+# error: [static-assert-error]
+static_assert(is_subtype_of(LiteralString, Literal[""] | AlwaysTruthy))
+static_assert(not is_subtype_of(Literal[True] | AlwaysFalsy, Literal[False] | AlwaysTruthy))
+
+# TODO: No errors
+# The condition `is_subtype_of(T & U, U)` must still be satisfied after the following transformations:
+# `LiteralString & AlwaysTruthy` -> `LiteralString & ~Literal[""]`
+# error: [static-assert-error]
+static_assert(is_subtype_of(Intersection[LiteralString, Not[Literal[""]]], AlwaysTruthy))
+# error: [static-assert-error]
+static_assert(is_subtype_of(Intersection[LiteralString, Not[Literal["", "a"]]], AlwaysTruthy))
+# `LiteralString & ~AlwaysFalsy` -> `LiteralString & ~Literal[""]`
+# error: [static-assert-error]
+static_assert(is_subtype_of(Intersection[LiteralString, Not[Literal[""]]], Not[AlwaysFalsy]))
+# error: [static-assert-error]
+static_assert(is_subtype_of(Intersection[LiteralString, Not[Literal["", "a"]]], Not[AlwaysFalsy]))
 ```
 
 ### Module literals
