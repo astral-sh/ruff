@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use std::io::Write;
 use std::ops::Deref;
 
-use ruff_python_syntax_errors::SemanticSyntaxError;
+use ruff_python_parser::semantic_errors::SemanticSyntaxError;
 use rustc_hash::FxHashMap;
 
 pub use azure::AzureEmitter;

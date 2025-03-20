@@ -3001,7 +3001,6 @@ dependencies = [
  "ruff_python_parser",
  "ruff_python_semantic",
  "ruff_python_stdlib",
- "ruff_python_syntax_errors",
  "ruff_python_trivia",
  "ruff_source_file",
  "ruff_text_size",
@@ -3166,6 +3165,7 @@ dependencies = [
  "serde",
  "serde_json",
  "static_assertions",
+ "test-case",
  "unicode-ident",
  "unicode-normalization",
  "unicode_names2",
@@ -3207,18 +3207,6 @@ version = "0.0.0"
 dependencies = [
  "bitflags 2.9.0",
  "unicode-ident",
-]
-
-[[package]]
-name = "ruff_python_syntax_errors"
-version = "0.0.0"
-dependencies = [
- "insta",
- "ruff_python_ast",
- "ruff_python_parser",
- "ruff_python_trivia",
- "ruff_text_size",
- "test-case",
 ]
 
 [[package]]

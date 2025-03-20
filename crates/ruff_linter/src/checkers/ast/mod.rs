@@ -26,7 +26,7 @@ use std::path::Path;
 
 use itertools::Itertools;
 use log::debug;
-use ruff_python_syntax_errors::{
+use ruff_python_parser::semantic_errors::{
     SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError, SemanticSyntaxErrorKind,
 };
 use rustc_hash::{FxHashMap, FxHashSet};

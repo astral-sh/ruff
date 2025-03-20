@@ -1,0 +1,14 @@
+---
+source: crates/ruff_python_parser/src/semantic_errors/mod.rs
+expression: test_snippet(contents)
+---
+[
+    SemanticSyntaxError {
+        kind: ReboundComprehensionVariable,
+        range: 3..4,
+        python_version: PythonVersion {
+            major: 3,
+            minor: 9,
+        },
+    },
+]

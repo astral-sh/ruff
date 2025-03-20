@@ -246,7 +246,7 @@ mod tests {
     use ruff_python_trivia::textwrap::dedent;
     use test_case::test_case;
 
-    use crate::{SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError};
+    use super::{SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError};
 
     struct TestVisitor {
         checker: SemanticSyntaxChecker,
@@ -278,7 +278,7 @@ mod tests {
     fn test_snippet(contents: &str) -> Vec<SemanticSyntaxError> {
         let path = Path::new("<filename>");
         let source_type = PySourceType::from(path);
-        let parsed = ruff_python_parser::parse_unchecked_source(&dedent(contents), source_type);
+        let parsed = crate::parse_unchecked_source(&dedent(contents), source_type);
         let mut visitor = TestVisitor {
             checker: SemanticSyntaxChecker::new(),
         };
