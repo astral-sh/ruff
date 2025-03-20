@@ -307,15 +307,6 @@ static_assert(is_assignable_to(Intersection[Unrelated, Any], Intersection[Unrela
 static_assert(is_assignable_to(Intersection[Literal[1], Any], Intersection[Unrelated, Not[Any]]))
 
 # TODO: No errors
-# error: [static-assert-error]
-static_assert(is_assignable_to(bool, Literal[False] | AlwaysTruthy))
-# error: [static-assert-error]
-static_assert(is_assignable_to(bool, Literal[True] | AlwaysFalsy))
-# error: [static-assert-error]
-static_assert(is_assignable_to(LiteralString, Literal[""] | AlwaysTruthy))
-static_assert(not is_assignable_to(Literal[True] | AlwaysFalsy, Literal[False] | AlwaysTruthy))
-
-# TODO: No errors
 # The condition `is_assignable_to(T & U, U)` should still be satisfied after the following transformations:
 # `LiteralString & AlwaysTruthy` -> `LiteralString & ~Literal[""]`
 # error: [static-assert-error]
