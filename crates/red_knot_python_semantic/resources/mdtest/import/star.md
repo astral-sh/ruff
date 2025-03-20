@@ -162,6 +162,32 @@ reveal_type(X)  # revealed: Unknown
 reveal_type(Y)  # revealed: Unknown
 ```
 
+### Relative `*` imports
+
+Relative `*` imports are also supported by Python:
+
+`a/__init__.py`:
+
+```py
+```
+
+`a/foo.py`:
+
+```py
+X: bool = True
+```
+
+`a/bar.py`:
+
+```py
+# TODO should not error
+from .a import *  # error: [unresolved-import]
+
+# TODO should not error, should reveal `bool`
+# error: [unresolved-reference]
+reveal_type(X)  # revealed: Unknown
+```
+
 ## Star imports with `__all__`
 
 If a module `x` contains `__all__`, only symbols included in `x.__all__` are imported by
@@ -414,6 +440,16 @@ import collections.abc
 reveal_type(collections.abc.Sequence)  # revealed: Unknown
 # error: [unresolved-attribute]
 reveal_type(collections.abc.Callable)  # revealed: Unknown
+```
+
+## Invalid `*` imports
+
+### Unresolved module
+
+If the module is unresolved, we emit a diagnostic just like for any other unresolved import:
+
+```py
+from foo import *  # error: [unresolved-import]
 ```
 
 [typing spec]: https://typing.python.org/en/latest/spec/distributing.html#library-interface-public-and-private-symbols
