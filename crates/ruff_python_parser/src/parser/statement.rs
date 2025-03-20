@@ -2959,13 +2959,26 @@ impl<'src> Parser<'src> {
                             // # parse_options: {"target-version": "3.11"}
                             // def foo(*args: *Ts): ...
 
+                            // test_ok param_with_star_annotation_py310
+                            // # parse_options: {"target-version": "3.10"}
+                            // # regression tests for https://github.com/astral-sh/ruff/issues/16874
+                            // # starred parameters are fine, just not the annotation
+                            // from typing import Annotated, Literal
+                            // def foo(*args: Ts): ...
+                            // def foo(*x: Literal["this should allow arbitrary strings"]): ...
+                            // def foo(*x: Annotated[str, "this should allow arbitrary strings"]): ...
+                            // def foo(*args: str, **kwds: int): ...
+                            // def union(*x: A | B): ...
+
                             // test_err param_with_star_annotation_py310
                             // # parse_options: {"target-version": "3.10"}
                             // def foo(*args: *Ts): ...
-                            self.add_unsupported_syntax_error(
-                                UnsupportedSyntaxErrorKind::StarAnnotation,
-                                parsed_expr.range(),
-                            );
+                            if parsed_expr.is_starred_expr() {
+                                self.add_unsupported_syntax_error(
+                                    UnsupportedSyntaxErrorKind::StarAnnotation,
+                                    parsed_expr.range(),
+                                );
+                            }
 
                             parsed_expr
                         }
