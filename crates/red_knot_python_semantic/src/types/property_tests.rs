@@ -311,3 +311,17 @@ mod flaky {
             !s.is_disjoint_from(db, union(db, [s, t])) && !t.is_disjoint_from(db, union(db, [s, t]))
     );
 }
+
+mod ensure_rules {
+    use crate::types::property_tests::arbitrary::{FullyStaticTy, SingletonTy};
+
+    type_property_test!(
+        fully_static_types, db,
+        forall (t: FullyStaticTy), t.is_fully_static(db)
+    );
+
+    type_property_test!(
+        singleton_types, db,
+        forall (t: SingletonTy), t.is_singleton(db)
+    );
+}
