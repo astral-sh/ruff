@@ -613,25 +613,18 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         }
 
         // airflow.datasets
-        ["airflow", "Dataset"] => Replacement::Name("airflow.sdk.definitions.asset.Asset"),
+        ["airflow", "Dataset"] | ["airflow", "datasets", "Dataset"] => {
+            Replacement::Name("airflow.sdk.Asset")
+        }
         ["airflow", "datasets", "DatasetAliasEvent"] => Replacement::None,
-        ["airflow", "datasets", "Dataset"] => {
-            Replacement::Name("airflow.sdk.definitions.asset.Asset")
-        }
-        ["airflow", "datasets", "DatasetAlias"] => {
-            Replacement::Name("airflow.sdk.definitions.asset.AssetAlias")
-        }
-        ["airflow", "datasets", "DatasetAll"] => {
-            Replacement::Name("airflow.sdk.definitions.asset.AssetAll")
-        }
-        ["airflow", "datasets", "DatasetAny"] => {
-            Replacement::Name("airflow.sdk.definitions.asset.AssetAny")
-        }
+        ["airflow", "datasets", "DatasetAlias"] => Replacement::Name("airflow.sdk.AssetAlias"),
+        ["airflow", "datasets", "DatasetAll"] => Replacement::Name("airflow.sdk.AssetAll"),
+        ["airflow", "datasets", "DatasetAny"] => Replacement::Name("airflow.sdk.AssetAny"),
         ["airflow", "datasets", "expand_alias_to_datasets"] => {
-            Replacement::Name("airflow.sdk.definitions.asset.expand_alias_to_assets")
+            Replacement::Name("airflow.sdk.expand_alias_to_assets")
         }
         ["airflow", "datasets", "metadata", "Metadata"] => {
-            Replacement::Name("airflow.sdk.definitions.asset.metadata.Metadata")
+            Replacement::Name("airflow.sdk.Metadata")
         }
 
         // airflow.datasets.manager
