@@ -1,7 +1,6 @@
 use crate::module_resolver::SearchPaths;
 use crate::python_platform::PythonPlatform;
-use crate::site_packages::SysPrefixPath;
-use crate::site_packages::SysPrefixPathOrigin;
+use crate::site_packages::{SysPrefixPath, SysPrefixPathOrigin};
 use crate::Db;
 
 use anyhow::Context;
