@@ -1111,7 +1111,9 @@ impl<'db> KnownClass {
             Self::SpecialForm | Self::TypeVar | Self::StdlibAlias | Self::SupportsIndex => {
                 KnownModule::Typing
             }
-            Self::TypeAliasType | Self::TypeVar | Self::ParamSpec => KnownModule::TypingExtensions,
+            Self::TypeAliasType | Self::TypeVarTuple | Self::ParamSpec => {
+                KnownModule::TypingExtensions
+            }
             Self::NoDefaultType => {
                 let python_version = Program::get(db).python_version(db);
 
