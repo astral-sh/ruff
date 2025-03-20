@@ -8,12 +8,10 @@ use std::fmt::Display;
 
 use ruff_python_ast::{
     self as ast,
-    name::Name,
     visitor::{walk_expr, Visitor},
     Expr, PythonVersion, Stmt, StmtExpr, StmtImportFrom,
 };
 use ruff_text_size::TextRange;
-use rustc_hash::FxHashSet;
 
 pub struct SemanticSyntaxChecker {
     /// The target Python version for detecting backwards-incompatible syntax
@@ -158,13 +156,10 @@ impl SemanticSyntaxChecker {
 
     /// Add a [`SyntaxErrorKind::ReboundComprehensionVariable`] if `expr` rebinds an iteration
     /// variable in `generators`.
-    fn check_generator_expr(&mut self, expr: &Expr, generators: &[ast::Comprehension]) {
+    fn check_generator_expr(&mut self, expr: &Expr, comprehensions: &[ast::Comprehension]) {
         let rebound_variables = {
             let mut visitor = ReboundComprehensionVisitor {
-                iteration_variables: generators
-                    .iter()
-                    .filter_map(|gen| gen.target.as_name_expr().map(|name| &name.id))
-                    .collect(),
+                comprehensions,
                 rebound_variables: Vec::new(),
             };
             visitor.visit_expr(expr);
@@ -186,7 +181,7 @@ impl SemanticSyntaxChecker {
 /// Searches for the first named expression (`x := y`) rebinding one of the `iteration_variables` in
 /// a comprehension or generator expression.
 struct ReboundComprehensionVisitor<'a> {
-    iteration_variables: FxHashSet<&'a Name>,
+    comprehensions: &'a [ast::Comprehension],
     rebound_variables: Vec<TextRange>,
 }
 
@@ -194,7 +189,11 @@ impl Visitor<'_> for ReboundComprehensionVisitor<'_> {
     fn visit_expr(&mut self, expr: &Expr) {
         if let Expr::Named(ast::ExprNamed { target, .. }) = expr {
             if let Expr::Name(ast::ExprName { id, range, .. }) = &**target {
-                if self.iteration_variables.contains(id) {
+                if self.comprehensions.iter().any(|comp| {
+                    comp.target
+                        .as_name_expr()
+                        .is_some_and(|name| name.id == *id)
+                }) {
                     self.rebound_variables.push(*range);
                 }
             };

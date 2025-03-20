@@ -18,8 +18,6 @@ ruff_python_parser = { workspace = true }
 ruff_python_trivia = { workspace = true }
 ruff_text_size = { workspace = true }
 
-rustc-hash = { workspace = true }
-
 [dev-dependencies]
 insta = { workspace = true, features = ["filters", "json", "redactions"] }
 test-case = { workspace = true }
