@@ -1,4 +1,4 @@
-use ruff_formatter::{write, FormatResult};
+use ruff_formatter::{format_args, write, FormatResult};
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::ExprListComp;
 
@@ -16,26 +16,24 @@ impl FormatNodeRule<ExprListComp> for FormatExprListComp {
             generators,
         } = item;
 
-        let comments = f.context().comments().clone();
-        let dangling = comments.dangling(item);
-
-        let inner_content = format_with(|f| {
-            write!(f, [group(&elt.format()), soft_line_break_or_space()])?;
-
+        let joined = format_with(|f| {
             f.join_with(soft_line_break_or_space())
                 .entries(generators.iter().formatted())
                 .finish()
         });
 
+        let comments = f.context().comments().clone();
+        let dangling = comments.dangling(item);
+
         write!(
             f,
             [parenthesized(
                 "[",
-                &group_with_flat_width_limit(
-                    &inner_content,
+                &group(&width_limit_if_flat(
+                    &format_args!(group(&elt.format()), soft_line_break_or_space(), &joined),
                     f.options().list_comprehension_width_limit().into(),
                     true,
-                ),
+                )),
                 "]"
             )
             .with_dangling_comments(dangling)]

@@ -10,8 +10,7 @@ use crate::format_element::tag::{Condition, Tag};
 use crate::prelude::tag::{DedentMode, GroupMode, LabelId};
 use crate::prelude::*;
 use crate::{
-    format_args, write, Argument, Arguments, FormatContext, FormatOptions, GroupId, LineWidthLimit,
-    TextSize,
+    write, Argument, Arguments, FormatContext, FormatOptions, GroupId, LineWidthLimit, TextSize,
 };
 use crate::{Buffer, VecBuffer};
 
@@ -2756,12 +2755,12 @@ impl<Context> std::fmt::Debug for WithLineWidthLimit<'_, Context> {
 }
 
 #[inline]
-pub fn group_with_flat_width_limit<Context>(
+pub fn width_limit_if_flat<Context>(
     content: &impl Format<Context>,
     width_limit: LineWidthLimit,
     inherit_enclosing_limit: bool,
-) -> GroupWithFlatWidthLimit<Context> {
-    GroupWithFlatWidthLimit {
+) -> WidthLimitIfFlat<Context> {
+    WidthLimitIfFlat {
         content: Argument::new(content),
         width_limit,
         inherit_enclosing_limit,
@@ -2769,35 +2768,35 @@ pub fn group_with_flat_width_limit<Context>(
 }
 
 #[derive(Copy, Clone)]
-pub struct GroupWithFlatWidthLimit<'a, Context> {
+pub struct WidthLimitIfFlat<'a, Context> {
     content: Argument<'a, Context>,
     width_limit: LineWidthLimit,
     inherit_enclosing_limit: bool,
 }
 
-impl<Context> Format<Context> for GroupWithFlatWidthLimit<'_, Context> {
+impl<Context> Format<Context> for WidthLimitIfFlat<'_, Context> {
     fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
         match self {
-            GroupWithFlatWidthLimit {
+            WidthLimitIfFlat {
                 content,
                 width_limit: LineWidthLimit::Unlimited,
                 inherit_enclosing_limit: true,
-            } => write!(f, [group(&Arguments::from(content))]),
+            } => write!(f, [Arguments::from(content)]),
 
-            GroupWithFlatWidthLimit {
+            WidthLimitIfFlat {
                 content,
                 width_limit,
                 inherit_enclosing_limit,
             } => write!(
                 f,
-                [group(&format_args![
+                [
                     &if_group_fits_on_line(&with_line_width_limit(
                         &Arguments::from(content),
                         *width_limit,
                         *inherit_enclosing_limit,
                     )),
-                    &if_group_breaks(&Arguments::from(&self.content)),
-                ])]
+                    &if_group_breaks(&Arguments::from(content)),
+                ]
             ),
         }
     }

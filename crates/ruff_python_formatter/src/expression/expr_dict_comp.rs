@@ -34,31 +34,29 @@ impl FormatNodeRule<ExprDictComp> for FormatExprDictComp {
         let (open_parenthesis_comments, key_value_comments) =
             dangling.split_at(dangling.partition_point(|comment| comment.end() < key.start()));
 
-        let inner_content = format_with(|f| {
-            write!(f, [group(&key.format()), token(":")])?;
-
-            if key_value_comments.is_empty() {
-                space().fmt(f)?;
-            } else {
-                dangling_comments(key_value_comments).fmt(f)?;
-            }
-
-            write!(f, [value.format(), soft_line_break_or_space()])?;
-
-            f.join_with(soft_line_break_or_space())
-                .entries(generators.iter().formatted())
-                .finish()
-        });
-
         write!(
             f,
             [parenthesized(
                 "{",
-                &group_with_flat_width_limit(
-                    &inner_content,
+                &group(&width_limit_if_flat(
+                    &format_with(|f| {
+                        write!(f, [group(&key.format()), token(":")])?;
+
+                        if key_value_comments.is_empty() {
+                            space().fmt(f)?;
+                        } else {
+                            dangling_comments(key_value_comments).fmt(f)?;
+                        }
+
+                        write!(f, [value.format(), soft_line_break_or_space()])?;
+
+                        f.join_with(soft_line_break_or_space())
+                            .entries(generators.iter().formatted())
+                            .finish()
+                    }),
                     f.options().dict_comprehension_width_limit().into(),
                     true,
-                ),
+                )),
                 "}"
             )
             .with_dangling_comments(open_parenthesis_comments)]
