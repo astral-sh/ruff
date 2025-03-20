@@ -47,11 +47,16 @@ pub(crate) struct Bindings<'db> {
 }
 
 impl<'db> Bindings<'db> {
-    /// Binds the arguments of a call site against a signature.
+    /// Match the arguments of a call site against the parameters of a collection of possibly
+    /// unioned, possibly overloaded signatures.
     ///
-    /// The returned bindings provide the return type of the call, the bound types for all
-    /// parameters, and any errors resulting from binding the call, all for each union element and
-    /// overload (if any).
+    /// The returned bindings tell you which parameter (in each signature) each argument was
+    /// matched against. You can then perform type inference on each argument with extra context
+    /// about the expected parameter types. (You do this by creating a [`CallArgumentTypes`] object
+    /// from the `arguments` that you match against.)
+    ///
+    /// Once you have argument types available, you can call [`check_types`][Self::check_types] to
+    /// verify that each argument type is assignable to the corresponding parameter type.
     pub(crate) fn match_parameters(
         signatures: Signatures<'db>,
         arguments: &mut CallArguments<'_>,
@@ -78,9 +83,13 @@ impl<'db> Bindings<'db> {
         }
     }
 
-    /// Binds the arguments of a call site against a signature.
+    /// Verify that the type of each argument is assignable to type of the parameter that it was
+    /// matched to.
     ///
-    /// The returned bindings provide the return type of the call, the bound types for all
+    /// You must provide an `argument_types` that was created from the same `arguments` that you
+    /// provided to [`match_parameters`][Self::match_parameters].
+    ///
+    /// We update the bindings to include the return type of the call, the bound types for all
     /// parameters, and any errors resulting from binding the call, all for each union element and
     /// overload (if any).
     pub(crate) fn check_types(
