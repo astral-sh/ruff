@@ -16,7 +16,7 @@ use ruff_text_size::TextRange;
 pub struct SemanticSyntaxChecker {
     /// The target Python version for detecting backwards-incompatible syntax
     /// changes.
-    target_version: PythonVersion,
+    python_version: PythonVersion,
     /// The cumulative set of syntax errors found when visiting the source AST.
     errors: Vec<SemanticSyntaxError>,
 
@@ -26,9 +26,9 @@ pub struct SemanticSyntaxChecker {
 }
 
 impl SemanticSyntaxChecker {
-    pub fn new(target_version: PythonVersion) -> Self {
+    pub fn new(python_version: PythonVersion) -> Self {
         Self {
-            target_version,
+            python_version,
             errors: Vec::new(),
             seen_futures_boundary: false,
             seen_docstring_boundary: false,
@@ -44,7 +44,7 @@ impl SemanticSyntaxChecker {
 pub struct SemanticSyntaxError {
     pub kind: SemanticSyntaxErrorKind,
     pub range: TextRange,
-    pub target_version: PythonVersion,
+    pub python_version: PythonVersion,
 }
 
 impl Display for SemanticSyntaxError {
@@ -99,7 +99,7 @@ impl SemanticSyntaxChecker {
                 self.errors.push(SemanticSyntaxError {
                     kind: SemanticSyntaxErrorKind::LateFutureImport,
                     range: *range,
-                    target_version: self.target_version,
+                    python_version: self.python_version,
                 });
             }
         }
@@ -172,7 +172,7 @@ impl SemanticSyntaxChecker {
             self.errors.push(SemanticSyntaxError {
                 kind: SemanticSyntaxErrorKind::ReboundComprehensionVariable,
                 range,
-                target_version: self.target_version,
+                python_version: self.python_version,
             });
         }
     }
@@ -230,12 +230,12 @@ mod tests {
     }
 
     /// Run [`check_syntax`] on a snippet of Python code.
-    fn test_snippet(contents: &str, target_version: PythonVersion) -> Vec<SemanticSyntaxError> {
+    fn test_snippet(contents: &str, python_version: PythonVersion) -> Vec<SemanticSyntaxError> {
         let path = Path::new("<filename>");
         let source_type = PySourceType::from(path);
         let parsed = ruff_python_parser::parse_unchecked_source(&dedent(contents), source_type);
         let mut visitor = TestVisitor {
-            checker: SemanticSyntaxChecker::new(target_version),
+            checker: SemanticSyntaxChecker::new(python_version),
         };
 
         for stmt in parsed.suite() {

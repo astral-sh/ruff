@@ -6,7 +6,7 @@ expression: "test_snippet(contents, PythonVersion::default())"
     SemanticSyntaxError {
         kind: ReboundComprehensionVariable,
         range: 3..4,
-        target_version: PythonVersion {
+        python_version: PythonVersion {
             major: 3,
             minor: 9,
         },
@@ -14,7 +14,7 @@ expression: "test_snippet(contents, PythonVersion::default())"
     SemanticSyntaxError {
         kind: ReboundComprehensionVariable,
         range: 13..14,
-        target_version: PythonVersion {
+        python_version: PythonVersion {
             major: 3,
             minor: 9,
         },
