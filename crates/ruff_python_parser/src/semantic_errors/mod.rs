@@ -107,19 +107,6 @@ impl SemanticSyntaxChecker {
         comprehensions: &[ast::Comprehension],
         ctx: &Ctx,
     ) {
-        // test_err rebound_comprehension_variable
-        // [(a := 0) for a in range(0)]
-        // {(a := 0) for a in range(0)}
-        // {(a := 0): val for a in range(0)}
-        // {key: (a := 0) for a in range(0)}
-        // ((a := 0) for a in range(0))
-        // [[(a := 0)] for a in range(0)]
-        // [(a := 0) for b in range (0) for a in range(0)]
-        // [(a := 0) for a in range (0) for b in range(0)]
-        // [((a := 0), (b := 1)) for a in range (0) for b in range(0)]
-
-        // test_ok non_rebound_comprehension_variable
-        // [a := 0 for x in range(0)]
         let rebound_variables = {
             let mut visitor = ReboundComprehensionVisitor {
                 comprehensions,
@@ -132,6 +119,19 @@ impl SemanticSyntaxChecker {
         // TODO(brent) with multiple diagnostic ranges, we could mark both the named expr (current)
         // and the name expr being rebound
         for range in rebound_variables {
+            // test_err rebound_comprehension_variable
+            // [(a := 0) for a in range(0)]
+            // {(a := 0) for a in range(0)}
+            // {(a := 0): val for a in range(0)}
+            // {key: (a := 0) for a in range(0)}
+            // ((a := 0) for a in range(0))
+            // [[(a := 0)] for a in range(0)]
+            // [(a := 0) for b in range (0) for a in range(0)]
+            // [(a := 0) for a in range (0) for b in range(0)]
+            // [((a := 0), (b := 1)) for a in range (0) for b in range(0)]
+
+            // test_ok non_rebound_comprehension_variable
+            // [a := 0 for x in range(0)]
             Self::add_error(
                 ctx,
                 SemanticSyntaxErrorKind::ReboundComprehensionVariable,
