@@ -59,11 +59,8 @@ impl<'db> InferContext<'db> {
         self.db
     }
 
-    pub(crate) fn extend<T>(&mut self, other: &T)
-    where
-        T: WithDiagnostics,
-    {
-        self.diagnostics.get_mut().extend(other.diagnostics());
+    pub(crate) fn extend(&mut self, other: &TypeCheckDiagnostics) {
+        self.diagnostics.get_mut().extend(other);
     }
 
     /// Reports a lint located at `ranged`.
@@ -222,8 +219,4 @@ pub(crate) enum InNoTypeCheck {
 
     /// The inference is known to be in an `@no_type_check` decorated function.
     Yes,
-}
-
-pub(crate) trait WithDiagnostics {
-    fn diagnostics(&self) -> &TypeCheckDiagnostics;
 }
