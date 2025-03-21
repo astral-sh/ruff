@@ -7,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/inline/err/duplicate_type_parame
 ```
 Module(
     ModModule {
-        range: 0..133,
+        range: 0..169,
         body: [
             TypeAlias(
                 StmtTypeAlias {
@@ -317,6 +317,78 @@ Module(
                     ),
                 },
             ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 133..154,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("f"),
+                        range: 137..138,
+                    },
+                    type_params: Some(
+                        TypeParams {
+                            range: 138..147,
+                            type_params: [
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        range: 139..140,
+                                        name: Identifier {
+                                            id: Name("T"),
+                                            range: 139..140,
+                                        },
+                                        bound: None,
+                                        default: None,
+                                    },
+                                ),
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        range: 142..143,
+                                        name: Identifier {
+                                            id: Name("T"),
+                                            range: 142..143,
+                                        },
+                                        bound: None,
+                                        default: None,
+                                    },
+                                ),
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        range: 145..146,
+                                        name: Identifier {
+                                            id: Name("T"),
+                                            range: 145..146,
+                                        },
+                                        bound: None,
+                                        default: None,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    parameters: Parameters {
+                        range: 147..149,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 151..154,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 151..154,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
         ],
     },
 )
@@ -346,6 +418,7 @@ Module(
 3 | class C[T, T]: ...
   |            ^ Syntax Error: duplicate type parameter
 4 | type Alias[T, U: str, V: (str, bytes), *Ts, **P, T = default] = ...
+5 | def f[T, T, T](): ...  # two errors
   |
 
 
@@ -354,4 +427,21 @@ Module(
 3 | class C[T, T]: ...
 4 | type Alias[T, U: str, V: (str, bytes), *Ts, **P, T = default] = ...
   |                                                  ^^^^^^^^^^^ Syntax Error: duplicate type parameter
+5 | def f[T, T, T](): ...  # two errors
+  |
+
+
+  |
+3 | class C[T, T]: ...
+4 | type Alias[T, U: str, V: (str, bytes), *Ts, **P, T = default] = ...
+5 | def f[T, T, T](): ...  # two errors
+  |          ^ Syntax Error: duplicate type parameter
+  |
+
+
+  |
+3 | class C[T, T]: ...
+4 | type Alias[T, U: str, V: (str, bytes), *Ts, **P, T = default] = ...
+5 | def f[T, T, T](): ...  # two errors
+  |             ^ Syntax Error: duplicate type parameter
   |
