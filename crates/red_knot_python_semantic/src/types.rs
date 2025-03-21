@@ -2340,6 +2340,10 @@ impl<'db> Type<'db> {
     /// [`CallErrorKind::NotCallable`].
     fn signatures(self, db: &'db dyn Db) -> Signatures<'db> {
         match self {
+            Type::Callable(CallableType::General(callable)) => Signatures::single(
+                CallableSignature::single(self, callable.signature(db).clone()),
+            ),
+
             Type::Callable(CallableType::BoundMethod(bound_method)) => {
                 let signature = bound_method.function(db).signature(db);
                 let signature = CallableSignature::single(self, signature.clone())
