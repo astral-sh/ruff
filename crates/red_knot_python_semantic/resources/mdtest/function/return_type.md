@@ -66,9 +66,16 @@ class Baz(Bar):
     # error: [invalid-return-type]
     def f(self) -> int: ...
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 class Qux(Protocol[T]):
+    # TODO: no error
+    # error: [invalid-return-type]
+    def f(self) -> int: ...
+
+t = (Protocol, int)
+
+class Lorem(t[0]):
     def f(self) -> int: ...
 ```
 
@@ -88,6 +95,12 @@ class Bar[T](ABC):
     def f(self) -> int: ...
     @abstractmethod
     def g[T](self, x: T) -> T: ...
+
+# error: [invalid-return-type]
+def f() -> int: ...
+
+@abstractmethod  # Semantically meaningless, accepted nevertheless
+def g() -> int: ...
 ```
 
 ### In overload

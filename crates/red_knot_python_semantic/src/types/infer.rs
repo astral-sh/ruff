@@ -1233,11 +1233,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                 };
 
                 node_ref.bases().iter().any(|base| {
-                    let base = match base {
-                        ast::Expr::Subscript(subscript) => &subscript.value,
-                        _ => base,
-                    };
-
                     matches!(
                         self.file_expression_type(base),
                         Type::KnownInstance(KnownInstanceType::Protocol)
