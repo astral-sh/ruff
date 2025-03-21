@@ -2046,13 +2046,17 @@ impl<'db> Type<'db> {
                 );
 
                 let custom_getattr_result = || {
-                    // Typeshed has a fake `__getattr__` on `types.ModuleType` to help out with dynamic imports.
-                    // We explicitly hide it here to prevent arbitrary attributes from being available on modules.
-                    if self
-                        .into_instance()
-                        .is_some_and(|instance| instance.class.is_known(db, KnownClass::ModuleType))
-                    {
-                        return Symbol::Unbound.into();
+                    if let Some(instance) = self.into_instance() {
+                        match instance.class.known(db) {
+                            // Typeshed has a fake `__getattr__` on `types.ModuleType` to help out with dynamic imports.
+                            // We explicitly hide it here to prevent arbitrary attributes from being available on modules.
+                            Some(KnownClass::ModuleType) => return Symbol::Unbound.into(),
+
+                            // TODO: For now we are treating a TypeVar as Any.
+                            Some(KnownClass::TypeVar) => return Symbol::bound(Type::any()).into(),
+
+                            _ => {}
+                        }
                     }
 
                     self.try_call_dunder(
