@@ -926,9 +926,6 @@ where
                     self.visit_decorator(decorator);
                 }
 
-                let symbol = self.add_symbol(class.name.id.clone());
-                self.add_definition(symbol, class);
-
                 self.with_type_params(
                     NodeWithScopeRef::ClassTypeParameters(class),
                     class.type_params.as_deref(),
@@ -943,6 +940,10 @@ where
                         builder.pop_scope()
                     },
                 );
+
+                // In Python runtime semantics, a class is registered after its scope is evaluated.
+                let symbol = self.add_symbol(class.name.id.clone());
+                self.add_definition(symbol, class);
             }
             ast::Stmt::TypeAlias(type_alias) => {
                 let symbol = self.add_symbol(
