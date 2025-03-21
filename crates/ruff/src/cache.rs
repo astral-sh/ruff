@@ -353,6 +353,7 @@ impl FileCache {
                             fix: msg.fix.clone(),
                             file: file.clone(),
                             noqa_offset: msg.noqa_offset,
+                            parent: msg.parent,
                         })
                     })
                     .collect()
@@ -445,6 +446,7 @@ impl LintCacheData {
                 CacheMessage {
                     kind: msg.kind.clone(),
                     range: msg.range,
+                    parent: msg.parent,
                     fix: msg.fix.clone(),
                     noqa_offset: msg.noqa_offset,
                 }
@@ -465,6 +467,7 @@ pub(super) struct CacheMessage {
     kind: DiagnosticKind,
     /// Range into the message's [`FileCache::source`].
     range: TextRange,
+    parent: Option<TextSize>,
     fix: Option<Fix>,
     noqa_offset: TextSize,
 }
@@ -702,7 +705,10 @@ mod tests {
             .unwrap();
         }
 
-        assert_eq!(expected_diagnostics, got_diagnostics);
+        assert_eq!(
+            expected_diagnostics, got_diagnostics,
+            "left == {expected_diagnostics:#?}, right == {got_diagnostics:#?}",
+        );
     }
 
     #[test]

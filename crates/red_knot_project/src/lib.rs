@@ -195,7 +195,8 @@ impl Project {
                 let project_span = project_span.clone();
 
                 scope.spawn(move |_| {
-                    let check_file_span = tracing::debug_span!(parent: &project_span, "check_file", file=%file.path(&db));
+                    let check_file_span =
+                        tracing::debug_span!(parent: &project_span, "check_file", ?file);
                     let _entered = check_file_span.entered();
 
                     let file_diagnostics = check_file_impl(&db, file);
@@ -325,7 +326,7 @@ impl Project {
         self.files(db).contains(&file)
     }
 
-    #[tracing::instrument(level = "debug", skip(db))]
+    #[tracing::instrument(level = "debug", skip(self, db))]
     pub fn remove_file(self, db: &mut dyn Db, file: File) {
         tracing::debug!(
             "Removing file `{}` from project `{}`",

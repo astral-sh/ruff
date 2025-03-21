@@ -49,6 +49,25 @@
   },
   "additionalProperties": false,
   "definitions": {
+    "DiagnosticFormat": {
+      "description": "The diagnostic output format.",
+      "oneOf": [
+        {
+          "description": "The default full mode will print \"pretty\" diagnostics.\n\nThat is, color will be used when printing to a `tty`. Moreover, diagnostic messages may include additional context and annotations on the input to help understand the message.",
+          "type": "string",
+          "enum": [
+            "full"
+          ]
+        },
+        {
+          "description": "Print diagnostics in a concise mode.\n\nThis will guarantee that each diagnostic is printed on a single line. Only the most important or primary aspects of the diagnostic are included. Contextual information is dropped.\n\nThis may use color when printing to a `tty`.",
+          "type": "string",
+          "enum": [
+            "concise"
+          ]
+        }
+      ]
+    },
     "EnvironmentOptions": {
       "type": "object",
       "properties": {
@@ -215,6 +234,16 @@
           "title": "detects calls to possibly unbound methods",
           "description": "## What it does\nChecks for calls to possibly unbound methods.\n\nTODO #14889",
           "default": "warn",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "conflicting-argument-forms": {
+          "title": "detects when an argument is used as both a value and a type form in a call",
+          "description": "## What it does\nChecks whether an argument is used as both a value and a type form in a call",
+          "default": "error",
           "oneOf": [
             {
               "$ref": "#/definitions/Level"
@@ -747,6 +776,17 @@
           "type": [
             "boolean",
             "null"
+          ]
+        },
+        "output-format": {
+          "description": "The format to use for printing diagnostic messages.\n\nDefaults to `full`.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/DiagnosticFormat"
+            },
+            {
+              "type": "null"
+            }
           ]
         }
       },

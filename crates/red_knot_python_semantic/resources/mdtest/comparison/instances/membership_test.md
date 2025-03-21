@@ -191,7 +191,7 @@ It may also be more appropriate to use `unsupported-operator` as the error code.
 
 ```py
 class NotBoolable:
-    __bool__ = 3
+    __bool__: int = 3
 
 class WithContains:
     def __contains__(self, item) -> NotBoolable:

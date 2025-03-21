@@ -1,4 +1,5 @@
 use super::context::InferContext;
+use crate::declare_lint;
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
 use crate::suppression::FileSuppressionId;
 use crate::types::string_annotation::{
@@ -7,7 +8,6 @@ use crate::types::string_annotation::{
     RAW_STRING_TYPE_ANNOTATION,
 };
 use crate::types::{ClassLiteralType, KnownInstanceType, Type};
-use crate::{declare_lint, Db};
 use ruff_db::diagnostic::{
     DiagnosticId, OldDiagnosticTrait, OldSecondaryDiagnosticMessage, Severity, Span,
 };
@@ -24,6 +24,7 @@ use std::sync::Arc;
 pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&CALL_NON_CALLABLE);
     registry.register_lint(&CALL_POSSIBLY_UNBOUND_METHOD);
+    registry.register_lint(&CONFLICTING_ARGUMENT_FORMS);
     registry.register_lint(&CONFLICTING_DECLARATIONS);
     registry.register_lint(&CONFLICTING_METACLASS);
     registry.register_lint(&CYCLIC_CLASS_DEFINITION);
@@ -103,6 +104,16 @@ declare_lint! {
         summary: "detects calls to possibly unbound methods",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Warn,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks whether an argument is used as both a value and a type form in a call
+    pub(crate) static CONFLICTING_ARGUMENT_FORMS = {
+        summary: "detects when an argument is used as both a value and a type form in a call",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
     }
 }
 
@@ -1169,6 +1180,22 @@ pub(super) fn report_possibly_unresolved_reference(
     );
 }
 
+pub(super) fn report_possibly_unbound_attribute(
+    context: &InferContext,
+    target: &ast::ExprAttribute,
+    attribute: &str,
+    object_ty: Type,
+) {
+    context.report_lint(
+        &POSSIBLY_UNBOUND_ATTRIBUTE,
+        target,
+        format_args!(
+            "Attribute `{attribute}` on type `{}` is possibly unbound",
+            object_ty.display(context.db()),
+        ),
+    );
+}
+
 pub(super) fn report_unresolved_reference(context: &InferContext, expr_name_node: &ast::ExprName) {
     let ast::ExprName { id, .. } = expr_name_node;
 
@@ -1222,9 +1249,8 @@ pub(crate) fn report_base_with_incompatible_slots(context: &InferContext, node: 
     );
 }
 
-pub(crate) fn report_invalid_arguments_to_annotated<'db>(
-    db: &'db dyn Db,
-    context: &InferContext<'db>,
+pub(crate) fn report_invalid_arguments_to_annotated(
+    context: &InferContext,
     subscript: &ast::ExprSubscript,
 ) {
     context.report_lint(
@@ -1232,14 +1258,13 @@ pub(crate) fn report_invalid_arguments_to_annotated<'db>(
         subscript,
         format_args!(
             "Special form `{}` expected at least 2 arguments (one type and at least one metadata element)",
-            KnownInstanceType::Annotated.repr(db)
+            KnownInstanceType::Annotated.repr(context.db())
         ),
     );
 }
 
-pub(crate) fn report_invalid_arguments_to_callable<'db>(
-    db: &'db dyn Db,
-    context: &InferContext<'db>,
+pub(crate) fn report_invalid_arguments_to_callable(
+    context: &InferContext,
     subscript: &ast::ExprSubscript,
 ) {
     context.report_lint(
@@ -1247,7 +1272,7 @@ pub(crate) fn report_invalid_arguments_to_callable<'db>(
         subscript,
         format_args!(
             "Special form `{}` expected exactly two arguments (parameter types and return type)",
-            KnownInstanceType::Callable.repr(db)
+            KnownInstanceType::Callable.repr(context.db())
         ),
     );
 }

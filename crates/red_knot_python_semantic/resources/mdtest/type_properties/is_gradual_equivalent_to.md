@@ -42,12 +42,16 @@ static_assert(is_gradual_equivalent_to(str | int, int | str))
 static_assert(
     is_gradual_equivalent_to(Intersection[str, int, Not[bytes], Not[None]], Intersection[int, str, Not[None], Not[bytes]])
 )
-# TODO: `~type[Any]` shoudld be gradually equivalent to `~type[Unknown]`
-# error: [static-assert-error]
 static_assert(is_gradual_equivalent_to(Intersection[str | int, Not[type[Any]]], Intersection[int | str, Not[type[Unknown]]]))
 
 static_assert(not is_gradual_equivalent_to(str | int, int | str | bytes))
 static_assert(not is_gradual_equivalent_to(str | int | bytes, int | str | dict))
+
+# TODO: No errors
+# error: [static-assert-error]
+static_assert(is_gradual_equivalent_to(Unknown, Unknown | Any))
+# error: [static-assert-error]
+static_assert(is_gradual_equivalent_to(Unknown, Intersection[Unknown, Any]))
 ```
 
 ## Tuples

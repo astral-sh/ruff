@@ -355,7 +355,7 @@ def compute_chained_comparison():
 
 ```py
 class NotBoolable:
-    __bool__ = 5
+    __bool__: int = 5
 
 class Comparable:
     def __lt__(self, other) -> NotBoolable:
@@ -387,7 +387,7 @@ class A:
         return NotBoolable()
 
 class NotBoolable:
-    __bool__ = None
+    __bool__: None = None
 
 # error: [unsupported-bool-conversion]
 (A(),) == (A(),)

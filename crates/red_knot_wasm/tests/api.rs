@@ -2,7 +2,7 @@
 
 use wasm_bindgen_test::wasm_bindgen_test;
 
-use red_knot_wasm::{PythonVersion, Settings, Workspace};
+use red_knot_wasm::{Position, PythonVersion, Settings, Workspace};
 
 #[wasm_bindgen_test]
 fn check() {
@@ -17,17 +17,17 @@ fn check() {
 
     let result = workspace.check().expect("Check to succeed");
 
+    assert_eq!(result.len(), 1);
+
+    let diagnostic = &result[0];
+
+    assert_eq!(diagnostic.id(), "lint:unresolved-import");
     assert_eq!(
-        result,
-        vec![
-            "\
-error: lint:unresolved-import
- --> /test.py:1:8
-  |
-1 | import random22
-  |        ^^^^^^^^ Cannot resolve import `random22`
-  |
-",
-        ],
+        diagnostic.to_range(&workspace).unwrap().start,
+        Position {
+            line: 0,
+            character: 7
+        }
     );
+    assert_eq!(diagnostic.message(), "Cannot resolve import `random22`");
 }

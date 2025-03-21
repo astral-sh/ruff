@@ -24,36 +24,31 @@ jobs:
     env:
       CF_API_TOKEN_EXISTS: ${{ secrets.CF_API_TOKEN != '' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
         with:
           persist-credentials: false
       - name: "Install Rust toolchain"
         run: rustup target add wasm32-unknown-unknown
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@cdca7365b2dadb8aad0a33bc7601856ffabcc48e # v4
         with:
-          node-version: 20
+          node-version: 22
           cache: "npm"
           cache-dependency-path: playground/package-lock.json
-      - uses: jetli/wasm-pack-action@v0.4.0
-        with:
-          version: v0.13.1
-      - uses: jetli/wasm-bindgen-action@v0.2.0
-      - name: "Run wasm-pack"
-        run: wasm-pack build --target web --out-dir ../../playground/src/pkg crates/ruff_wasm
+      - uses: jetli/wasm-bindgen-action@20b33e20595891ab1a0ed73145d8a21fc96e7c29 # v0.2.0
       - name: "Install Node dependencies"
         run: npm ci
         working-directory: playground
       - name: "Run TypeScript checks"
         run: npm run check
         working-directory: playground
-      - name: "Build JavaScript bundle"
-        run: npm run build
+      - name: "Build Ruff playground"
+        run: npm run build --workspace ruff-playground
         working-directory: playground
       - name: "Deploy to Cloudflare Pages"
         if: ${{ env.CF_API_TOKEN_EXISTS == 'true' }}
-        uses: cloudflare/wrangler-action@v3.14.0
+        uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65 # v3.14.1
         with:
           apiToken: ${{ secrets.CF_API_TOKEN }}
           accountId: ${{ secrets.CF_ACCOUNT_ID }}
           # `github.head_ref` is only set during pull requests and for manual runs or tags we use `main` to deploy to production
-          command: pages deploy playground/dist --project-name=ruff-playground --branch ${{ github.head_ref || 'main' }} --commit-hash ${GITHUB_SHA}
+          command: pages deploy playground/ruff/dist --project-name=ruff-playground --branch ${{ github.head_ref || 'main' }} --commit-hash ${GITHUB_SHA}

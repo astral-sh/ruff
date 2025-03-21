@@ -50,6 +50,8 @@ pub(crate) struct CheckCommand {
 
     /// Path to the Python installation from which Red Knot resolves type information and third-party dependencies.
     ///
+    /// If not specified, Red Knot will look at the `VIRTUAL_ENV` environment variable.
+    ///
     /// Red Knot will search in the path's `site-packages` directories for type information and
     /// third-party imports.
     ///
@@ -74,6 +76,14 @@ pub(crate) struct CheckCommand {
 
     #[clap(flatten)]
     pub(crate) rules: RulesArg,
+
+    /// The format to use for printing diagnostic messages.
+    #[arg(long)]
+    pub(crate) output_format: Option<OutputFormat>,
+
+    /// Control when colored output is used.
+    #[arg(long, value_name = "WHEN")]
+    pub(crate) color: Option<TerminalColor>,
 
     /// Use exit code 1 if there are any warning-level diagnostics.
     #[arg(long, conflicts_with = "exit_zero", default_missing_value = "true", num_args=0..1)]
@@ -117,6 +127,9 @@ impl CheckCommand {
                 ..EnvironmentOptions::default()
             }),
             terminal: Some(TerminalOptions {
+                output_format: self
+                    .output_format
+                    .map(|output_format| RangedValue::cli(output_format.into())),
                 error_on_warning: self.error_on_warning,
             }),
             rules,
@@ -210,4 +223,47 @@ impl clap::Args for RulesArg {
     fn augment_args_for_update(cmd: clap::Command) -> clap::Command {
         Self::augment_args(cmd)
     }
+}
+
+/// The diagnostic output format.
+#[derive(Copy, Clone, Hash, Debug, PartialEq, Eq, PartialOrd, Ord, Default, clap::ValueEnum)]
+pub enum OutputFormat {
+    /// Print diagnostics verbosely, with context and helpful hints.
+    ///
+    /// Diagnostic messages may include additional context and
+    /// annotations on the input to help understand the message.
+    #[default]
+    #[value(name = "full")]
+    Full,
+    /// Print diagnostics concisely, one per line.
+    ///
+    /// This will guarantee that each diagnostic is printed on
+    /// a single line. Only the most important or primary aspects
+    /// of the diagnostic are included. Contextual information is
+    /// dropped.
+    #[value(name = "concise")]
+    Concise,
+}
+
+impl From<OutputFormat> for ruff_db::diagnostic::DiagnosticFormat {
+    fn from(format: OutputFormat) -> ruff_db::diagnostic::DiagnosticFormat {
+        match format {
+            OutputFormat::Full => Self::Full,
+            OutputFormat::Concise => Self::Concise,
+        }
+    }
+}
+
+/// Control when colored output is used.
+#[derive(Copy, Clone, Hash, Debug, PartialEq, Eq, PartialOrd, Ord, Default, clap::ValueEnum)]
+pub(crate) enum TerminalColor {
+    /// Display colors if the output goes to an interactive terminal.
+    #[default]
+    Auto,
+
+    /// Always display colors.
+    Always,
+
+    /// Never display colors.
+    Never,
 }

@@ -1,15 +1,12 @@
 use std::borrow::Cow;
 
-use ruff_annotate_snippets::{
-    Annotation as AnnotateAnnotation, Level as AnnotateLevel, Message as AnnotateMessage,
-    Renderer as AnnotateRenderer, Snippet as AnnotateSnippet,
-};
 use ruff_python_parser::ParseError;
-use ruff_source_file::{OneIndexed, SourceCode};
-use ruff_text_size::TextRange;
 
 use crate::{
-    diagnostic::{DiagnosticId, DisplayDiagnosticConfig, Severity, Span},
+    diagnostic::{
+        Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, DisplayDiagnosticConfig, Severity,
+        Span, SubDiagnostic,
+    },
     files::File,
     source::{line_index, source_text},
     Db,
@@ -74,158 +71,81 @@ pub struct OldDisplayDiagnostic<'db, 'diag, 'config> {
 
 impl std::fmt::Display for OldDisplayDiagnostic<'_, '_, '_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let render = |f: &mut std::fmt::Formatter, message| {
-            let renderer = if self.config.color {
-                AnnotateRenderer::styled()
-            } else {
-                AnnotateRenderer::plain()
+        if matches!(self.config.format, DiagnosticFormat::Concise) {
+            match self.diagnostic.severity() {
+                Severity::Info => f.write_str("info")?,
+                Severity::Warning => f.write_str("warning")?,
+                Severity::Error => f.write_str("error")?,
+                Severity::Fatal => f.write_str("fatal")?,
             }
-            .cut_indicator("…");
-            let rendered = renderer.render(message);
-            writeln!(f, "{rendered}")
-        };
-        let Some(span) = self.diagnostic.span() else {
-            // NOTE: This is pretty sub-optimal. It doesn't render well. We
-            // really want a snippet, but without a `File`, we can't really
-            // render anything. It looks like this case currently happens
-            // for configuration errors. It looks like we can probably
-            // produce a snippet for this if it comes from a file, but if
-            // it comes from the CLI, I'm not quite sure exactly what to
-            // do. ---AG
-            let msg = format!("{}: {}", self.diagnostic.id(), self.diagnostic.message());
-            return render(f, self.diagnostic.severity().to_annotate().title(&msg));
-        };
 
-        let mut message = Message::new(self.diagnostic.severity(), self.diagnostic.id());
-        message.add_snippet(Snippet::new(
-            self.db,
-            self.diagnostic.severity(),
-            &span,
-            &self.diagnostic.message(),
-        ));
+            write!(f, "[{rule}]", rule = self.diagnostic.id())?;
+            if let Some(span) = self.diagnostic.span() {
+                write!(f, " {path}", path = span.file().path(self.db))?;
+                if let Some(range) = span.range() {
+                    let index = line_index(self.db, span.file());
+                    let source = source_text(self.db, span.file());
+                    let start = index.source_location(range.start(), &source);
+                    write!(f, ":{line}:{col}", line = start.row, col = start.column)?;
+                }
+                write!(f, ":")?;
+            }
+            return write!(f, " {message}", message = self.diagnostic.message());
+        }
+
+        let mut diag = match self.diagnostic.span() {
+            None => {
+                // NOTE: This is pretty sub-optimal. It doesn't render well. We
+                // really want a snippet, but without a `File`, we can't really
+                // render anything. It looks like this case currently happens
+                // for configuration errors. It looks like we can probably
+                // produce a snippet for this if it comes from a file, but if
+                // it comes from the CLI, I'm not quite sure exactly what to
+                // do. ---AG
+                Diagnostic::new(
+                    self.diagnostic.id(),
+                    self.diagnostic.severity(),
+                    self.diagnostic.message(),
+                )
+            }
+            Some(span) => {
+                let mut diag =
+                    Diagnostic::new(self.diagnostic.id(), self.diagnostic.severity(), "");
+                diag.annotate(Annotation::primary(span).message(self.diagnostic.message()));
+                diag
+            }
+        };
         for secondary_msg in self.diagnostic.secondary_messages() {
-            message.add_snippet(Snippet::new(
-                self.db,
-                Severity::Info,
-                &secondary_msg.span,
-                &secondary_msg.message,
-            ));
-        }
-        render(f, message.to_annotate())
-    }
-}
-
-#[derive(Debug)]
-struct Message {
-    level: AnnotateLevel,
-    title: String,
-    snippets: Vec<Snippet>,
-}
-
-#[derive(Debug)]
-struct Snippet {
-    source: String,
-    origin: String,
-    line_start: usize,
-    annotation: Option<Annotation>,
-}
-
-#[derive(Debug)]
-struct Annotation {
-    level: AnnotateLevel,
-    span: TextRange,
-    label: String,
-}
-
-impl Message {
-    fn new(severity: Severity, id: DiagnosticId) -> Message {
-        Message {
-            level: severity.to_annotate(),
-            title: id.to_string(),
-            snippets: vec![],
-        }
-    }
-
-    fn add_snippet(&mut self, snippet: Snippet) {
-        self.snippets.push(snippet);
-    }
-
-    fn to_annotate(&self) -> AnnotateMessage<'_> {
-        self.level
-            .title(&self.title)
-            .snippets(self.snippets.iter().map(|snippet| snippet.to_annotate()))
-    }
-}
-
-impl Snippet {
-    fn new(db: &'_ dyn Db, severity: Severity, span: &Span, message: &str) -> Snippet {
-        let origin = span.file.path(db).to_string();
-        let source_text = source_text(db, span.file);
-        let Some(range) = span.range else {
-            return Snippet {
-                source: source_text.to_string(),
-                origin,
-                line_start: 1,
-                annotation: None,
-            };
-        };
-
-        // The bits below are a simplified copy from
-        // `crates/ruff_linter/src/message/text.rs`.
-        let index = line_index(db, span.file);
-        let source_code = SourceCode::new(source_text.as_str(), &index);
-
-        let content_start_index = source_code.line_index(range.start());
-        let mut start_index = content_start_index.saturating_sub(2);
-        // Trim leading empty lines.
-        while start_index < content_start_index {
-            if !source_code.line_text(start_index).trim().is_empty() {
-                break;
-            }
-            start_index = start_index.saturating_add(1);
+            // Secondary messages carry one span and a message
+            // attached to that span. Since we also want them to
+            // appear after the primary diagnostic, we encode them as
+            // sub-diagnostics.
+            //
+            // Moreover, since we only have one message, we attach it
+            // to the annotation and leave the sub-diagnostic message
+            // empty. This leads to somewhat awkward rendering, but
+            // the way to fix that is to migrate Red Knot to the more
+            // expressive `Diagnostic` API.
+            let mut sub = SubDiagnostic::new(Severity::Info, "");
+            sub.annotate(
+                Annotation::secondary(secondary_msg.span.clone()).message(&secondary_msg.message),
+            );
+            diag.sub(sub);
         }
 
-        let content_end_index = source_code.line_index(range.end());
-        let mut end_index = content_end_index
-            .saturating_add(2)
-            .min(OneIndexed::from_zero_indexed(index.line_count()));
-        // Trim trailing empty lines.
-        while end_index > content_end_index {
-            if !source_code.line_text(end_index).trim().is_empty() {
-                break;
-            }
-            end_index = end_index.saturating_sub(1);
-        }
-
-        // Slice up the code frame and adjust our range.
-        let start_offset = source_code.line_start(start_index);
-        let end_offset = source_code.line_end(end_index);
-        let frame = source_code.slice(TextRange::new(start_offset, end_offset));
-        let range = range - start_offset;
-
-        Snippet {
-            source: frame.to_string(),
-            origin,
-            line_start: start_index.get(),
-            annotation: Some(Annotation {
-                level: severity.to_annotate(),
-                span: range,
-                label: message.to_string(),
-            }),
-        }
-    }
-
-    fn to_annotate(&self) -> AnnotateSnippet<'_> {
-        AnnotateSnippet::source(&self.source)
-            .origin(&self.origin)
-            .line_start(self.line_start)
-            .annotations(self.annotation.as_ref().map(|a| a.to_annotate()))
-    }
-}
-
-impl Annotation {
-    fn to_annotate(&self) -> AnnotateAnnotation<'_> {
-        self.level.span(self.span.into()).label(&self.label)
+        // The main way to print a `Diagnostic` is via its `print`
+        // method, which specifically goes to a `std::io::Write` in
+        // order to strongly suggest that it is actually emitted
+        // somewhere. We should probably make callers use *that* API
+        // instead of this `Display` impl, but for now, we keep the API
+        // the same and write to a `Vec<u8>` under the covers.
+        let mut buf = vec![];
+        // OK because printing to a `Vec<u8>` will never return an error.
+        diag.print(self.db, self.config, &mut buf)
+            .map_err(|_| std::fmt::Error)?;
+        // OK because diagnostic rendering will always emit valid UTF-8.
+        let string = String::from_utf8(buf).map_err(|_| std::fmt::Error)?;
+        write!(f, "{string}")
     }
 }
 

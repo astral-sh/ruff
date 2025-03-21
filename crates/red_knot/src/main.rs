@@ -4,7 +4,7 @@ use std::process::{ExitCode, Termination};
 use anyhow::Result;
 use std::sync::Mutex;
 
-use crate::args::{Args, CheckCommand, Command};
+use crate::args::{Args, CheckCommand, Command, TerminalColor};
 use crate::logging::setup_tracing;
 use anyhow::{anyhow, Context};
 use clap::Parser;
@@ -76,9 +76,13 @@ pub(crate) fn version() -> Result<()> {
 }
 
 fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
+    set_colored_override(args.color);
+
     let verbosity = args.verbosity.level();
     countme::enable(verbosity.is_trace());
     let _guard = setup_tracing(verbosity)?;
+
+    tracing::debug!("Version: {}", version::version());
 
     // The base path to which all CLI arguments are relative to.
     let cwd = {
@@ -255,15 +259,16 @@ impl MainLoop {
                     result,
                     revision: check_revision,
                 } => {
+                    let terminal_settings = db.project().settings(db).terminal();
                     let display_config = DisplayDiagnosticConfig::default()
+                        .format(terminal_settings.output_format)
                         .color(colored::control::SHOULD_COLORIZE.should_colorize());
 
-                    let min_error_severity =
-                        if db.project().settings(db).terminal().error_on_warning {
-                            Severity::Warning
-                        } else {
-                            Severity::Error
-                        };
+                    let min_error_severity = if terminal_settings.error_on_warning {
+                        Severity::Warning
+                    } else {
+                        Severity::Error
+                    };
 
                     if check_revision == revision {
                         if db.project().files(db).is_empty() {
@@ -359,4 +364,22 @@ enum MainLoopMessage {
     },
     ApplyChanges(Vec<watch::ChangeEvent>),
     Exit,
+}
+
+fn set_colored_override(color: Option<TerminalColor>) {
+    let Some(color) = color else {
+        return;
+    };
+
+    match color {
+        TerminalColor::Auto => {
+            colored::control::unset_override();
+        }
+        TerminalColor::Always => {
+            colored::control::set_override(true);
+        }
+        TerminalColor::Never => {
+            colored::control::set_override(false);
+        }
+    }
 }

@@ -48,7 +48,7 @@ info: revealed-type
 11 | # error: [not-iterable]
 12 | for x in Iterable():
 13 |     reveal_type(x)  # revealed: int
-   |     -------------- info: Revealed type is `int`
+   |     ^^^^^^^^^^^^^^ Revealed type is `int`
    |
 
 ```

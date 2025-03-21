@@ -223,14 +223,15 @@ impl SearchPaths {
         static_paths.push(stdlib_path);
 
         let site_packages_paths = match python_path {
-            PythonPath::SysPrefix(sys_prefix) => {
+            PythonPath::SysPrefix(sys_prefix, origin) => {
                 // TODO: We may want to warn here if the venv's python version is older
                 //  than the one resolved in the program settings because it indicates
                 //  that the `target-version` is incorrectly configured or that the
                 //  venv is out of date.
-                VirtualEnvironment::new(sys_prefix, system)
+                VirtualEnvironment::new(sys_prefix, *origin, system)
                     .and_then(|venv| venv.site_packages_directories(system))?
             }
+
             PythonPath::KnownSitePackages(paths) => paths
                 .iter()
                 .map(|path| canonicalize(path, system))
@@ -534,7 +535,7 @@ impl<'db> Iterator for PthFileIterator<'db> {
 /// A thin wrapper around `ModuleName` to make it a Salsa ingredient.
 ///
 /// This is needed because Salsa requires that all query arguments are salsa ingredients.
-#[salsa::interned]
+#[salsa::interned(debug)]
 struct ModuleNameIngredient<'db> {
     #[return_ref]
     pub(super) name: ModuleName,
@@ -604,14 +605,29 @@ fn resolve_name(db: &dyn Db, name: &ModuleName) -> Option<(SearchPath, File, Mod
 /// resolving modules.
 fn resolve_file_module(module: &ModulePath, resolver_state: &ResolverContext) -> Option<File> {
     // Stubs have precedence over source files
-    module
+    let file = module
         .with_pyi_extension()
         .to_file(resolver_state)
         .or_else(|| {
             module
                 .with_py_extension()
                 .and_then(|path| path.to_file(resolver_state))
-        })
+        })?;
+
+    // For system files, test if the path has the correct casing.
+    // We can skip this step for vendored files or virtual files because
+    // those file systems are case sensitive (we wouldn't get to this point).
+    if let Some(path) = file.path(resolver_state.db).as_system_path() {
+        let system = resolver_state.db.system();
+        if !system.case_sensitivity().is_case_sensitive()
+            && !system
+                .path_exists_case_sensitive(path, module.search_path().as_system_path().unwrap())
+        {
+            return None;
+        }
+    }
+
+    Some(file)
 }
 
 fn resolve_package<'a, 'db, I>(
@@ -1841,5 +1857,73 @@ not_a_directory
         // second `site-packages` directory
         let a_module = resolve_module(&db, &a_module_name).unwrap();
         assert_eq!(a_module.file().path(&db), &system_site_packages_location);
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn case_sensitive_resolution_with_symlinked_directory() -> anyhow::Result<()> {
+        use anyhow::Context;
+        use ruff_db::system::OsSystem;
+
+        let temp_dir = tempfile::TempDir::new()?;
+        let root = SystemPathBuf::from_path_buf(
+            temp_dir
+                .path()
+                .canonicalize()
+                .context("Failed to canonicalized path")?,
+        )
+        .expect("UTF8 path for temp dir");
+
+        let mut db = TestDb::new();
+
+        let src = root.join("src");
+        let a_package_target = root.join("a-package");
+        let a_src = src.join("a");
+
+        db.use_system(OsSystem::new(&root));
+
+        db.write_file(
+            a_package_target.join("__init__.py"),
+            "class Foo: x: int = 4",
+        )
+        .context("Failed to write `a-package/__init__.py`")?;
+
+        db.write_file(src.join("main.py"), "print('Hy')")
+            .context("Failed to write `main.py`")?;
+
+        // The symlink triggers the slow-path in the `OsSystem`'s `exists_path_case_sensitive`
+        // code because canonicalizing the path for `a/__init__.py` results in `a-package/__init__.py`
+        std::os::unix::fs::symlink(a_package_target.as_std_path(), a_src.as_std_path())
+            .context("Failed to symlink `src/a` to `a-package`")?;
+
+        Program::from_settings(
+            &db,
+            ProgramSettings {
+                python_version: PythonVersion::default(),
+                python_platform: PythonPlatform::default(),
+                search_paths: SearchPathSettings {
+                    extra_paths: vec![],
+                    src_roots: vec![src],
+                    custom_typeshed: None,
+                    python_path: PythonPath::KnownSitePackages(vec![]),
+                },
+            },
+        )
+        .expect("Valid program settings");
+
+        // Now try to resolve the module `A` (note the capital `A` instead of `a`).
+        let a_module_name = ModuleName::new_static("A").unwrap();
+        assert_eq!(resolve_module(&db, &a_module_name), None);
+
+        // Now lookup the same module using the lowercase `a` and it should resolve to the file in the system site-packages
+        let a_module_name = ModuleName::new_static("a").unwrap();
+        let a_module = resolve_module(&db, &a_module_name).expect("a.py to resolve");
+        assert!(a_module
+            .file()
+            .path(&db)
+            .as_str()
+            .ends_with("src/a/__init__.py"),);
+
+        Ok(())
     }
 }

@@ -13,15 +13,16 @@ reveal_type(cast("str", True))  # revealed: str
 
 reveal_type(cast(int | str, 1))  # revealed: int | str
 
+reveal_type(cast(val="foo", typ=int))  # revealed: int
+
 # error: [invalid-type-form]
 reveal_type(cast(Literal, True))  # revealed: Unknown
 
-# TODO: These should be errors
-cast(1)
-cast(str)
-cast(str, b"ar", "foo")
+# error: [invalid-type-form]
+reveal_type(cast(1, True))  # revealed: Unknown
 
-# TODO: Either support keyword arguments properly,
-# or give a comprehensible error message saying they're unsupported
-cast(val="foo", typ=int)  # error: [unresolved-reference] "Name `foo` used when not defined"
+# error: [missing-argument] "No argument provided for required parameter `val` of function `cast`"
+cast(str)
+# error: [too-many-positional-arguments] "Too many positional arguments to function `cast`: expected 2, got 3"
+cast(str, b"ar", "foo")
 ```

@@ -1,5 +1,6 @@
 use std::cmp::Ordering;
 
+use crate::db::Db;
 use crate::types::CallableType;
 
 use super::{
@@ -11,8 +12,9 @@ use super::{
 /// in an [`crate::types::IntersectionType`] or a [`crate::types::UnionType`] in order for them
 /// to be compared for equivalence.
 ///
-/// Two unions with equal sets of elements will only compare equal if they have their element sets
-/// ordered the same way.
+/// Two intersections are compared lexicographically. Element types in the intersection must
+/// already be sorted. Two unions are never compared in this function because DNF does not permit
+/// nested unions.
 ///
 /// ## Why not just implement [`Ord`] on [`Type`]?
 ///
@@ -20,7 +22,11 @@ use super::{
 /// create here is not user-facing. However, it doesn't really "make sense" for `Type` to implement
 /// [`Ord`] in terms of the semantics. There are many different ways in which you could plausibly
 /// sort a list of types; this is only one (somewhat arbitrary, at times) possible ordering.
-pub(super) fn union_elements_ordering<'db>(left: &Type<'db>, right: &Type<'db>) -> Ordering {
+pub(super) fn union_or_intersection_elements_ordering<'db>(
+    db: &'db dyn Db,
+    left: &Type<'db>,
+    right: &Type<'db>,
+) -> Ordering {
     if left == right {
         return Ordering::Equal;
     }
@@ -83,7 +89,11 @@ pub(super) fn union_elements_ordering<'db>(left: &Type<'db>, right: &Type<'db>) 
         (Type::Callable(CallableType::General(_)), _) => Ordering::Less,
         (_, Type::Callable(CallableType::General(_))) => Ordering::Greater,
 
-        (Type::Tuple(left), Type::Tuple(right)) => left.cmp(right),
+        (Type::Tuple(left), Type::Tuple(right)) => {
+            debug_assert_eq!(*left, left.with_sorted_unions_and_intersections(db));
+            debug_assert_eq!(*right, right.with_sorted_unions_and_intersections(db));
+            left.cmp(right)
+        }
         (Type::Tuple(_), _) => Ordering::Less,
         (_, Type::Tuple(_)) => Ordering::Greater,
 
@@ -264,11 +274,44 @@ pub(super) fn union_elements_ordering<'db>(left: &Type<'db>, right: &Type<'db>) 
         (Type::Dynamic(_), _) => Ordering::Less,
         (_, Type::Dynamic(_)) => Ordering::Greater,
 
-        (Type::Union(left), Type::Union(right)) => left.cmp(right),
-        (Type::Union(_), _) => Ordering::Less,
-        (_, Type::Union(_)) => Ordering::Greater,
+        (Type::Union(_), _) | (_, Type::Union(_)) => {
+            unreachable!("our type representation does not permit nested unions");
+        }
 
-        (Type::Intersection(left), Type::Intersection(right)) => left.cmp(right),
+        (Type::Intersection(left), Type::Intersection(right)) => {
+            debug_assert_eq!(*left, left.to_sorted_intersection(db));
+            debug_assert_eq!(*right, right.to_sorted_intersection(db));
+
+            if left == right {
+                return Ordering::Equal;
+            }
+
+            // Lexicographically compare the elements of the two unequal intersections.
+            let left_positive = left.positive(db);
+            let right_positive = right.positive(db);
+            if left_positive.len() != right_positive.len() {
+                return left_positive.len().cmp(&right_positive.len());
+            }
+            let left_negative = left.negative(db);
+            let right_negative = right.negative(db);
+            if left_negative.len() != right_negative.len() {
+                return left_negative.len().cmp(&right_negative.len());
+            }
+            for (left, right) in left_positive.iter().zip(right_positive) {
+                let ordering = union_or_intersection_elements_ordering(db, left, right);
+                if ordering != Ordering::Equal {
+                    return ordering;
+                }
+            }
+            for (left, right) in left_negative.iter().zip(right_negative) {
+                let ordering = union_or_intersection_elements_ordering(db, left, right);
+                if ordering != Ordering::Equal {
+                    return ordering;
+                }
+            }
+
+            unreachable!("Two equal intersections that both have sorted elements should share the same Salsa ID")
+        }
     }
 }
 

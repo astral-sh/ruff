@@ -22,7 +22,7 @@ use crate::Db;
 /// for determining if a query result is unchanged.
 #[salsa::tracked(return_ref, no_eq)]
 pub fn parsed_module(db: &dyn Db, file: File) -> ParsedModule {
-    let _span = tracing::trace_span!("parsed_module", file = %file.path(db)).entered();
+    let _span = tracing::trace_span!("parsed_module", ?file).entered();
 
     let source = source_text(db, file);
     let path = file.path(db);

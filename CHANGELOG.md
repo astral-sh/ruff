@@ -1,12 +1,49 @@
 # Changelog
 
-## 0.10.0
+## 0.11.2
 
-Check out the [blog post](https://astral.sh/blog/ruff-v0.10.0) for a migration guide and overview of the changes!
+### Preview features
+
+- [syntax-errors] Fix false-positive syntax errors emitted for annotations on variadic parameters before Python 3.11 ([#16878](https://github.com/astral-sh/ruff/pull/16878))
+
+## 0.11.1
+
+### Preview features
+
+- \[`airflow`\] Add `chain`, `chain_linear` and `cross_downstream` for `AIR302` ([#16647](https://github.com/astral-sh/ruff/pull/16647))
+- [syntax-errors] Improve error message and range for pre-PEP-614 decorator syntax errors ([#16581](https://github.com/astral-sh/ruff/pull/16581))
+- [syntax-errors] PEP 701 f-strings before Python 3.12 ([#16543](https://github.com/astral-sh/ruff/pull/16543))
+- [syntax-errors] Parenthesized context managers before Python 3.9 ([#16523](https://github.com/astral-sh/ruff/pull/16523))
+- [syntax-errors] Star annotations before Python 3.11 ([#16545](https://github.com/astral-sh/ruff/pull/16545))
+- [syntax-errors] Star expression in index before Python 3.11 ([#16544](https://github.com/astral-sh/ruff/pull/16544))
+- [syntax-errors] Unparenthesized assignment expressions in sets and indexes ([#16404](https://github.com/astral-sh/ruff/pull/16404))
+
+### Bug fixes
+
+- Server: Allow `FixAll` action in presence of version-specific syntax errors ([#16848](https://github.com/astral-sh/ruff/pull/16848))
+- \[`flake8-bandit`\] Allow raw strings in `suspicious-mark-safe-usage` (`S308`) #16702 ([#16770](https://github.com/astral-sh/ruff/pull/16770))
+- \[`refurb`\] Avoid panicking `unwrap` in `verbose-decimal-constructor` (`FURB157`) ([#16777](https://github.com/astral-sh/ruff/pull/16777))
+- \[`refurb`\] Fix starred expressions fix (`FURB161`) ([#16550](https://github.com/astral-sh/ruff/pull/16550))
+- Fix `--statistics` reporting for unsafe fixes ([#16756](https://github.com/astral-sh/ruff/pull/16756))
+
+### Rule changes
+
+- \[`flake8-executables`\] Allow `uv run` in shebang line for `shebang-missing-python` (`EXE003`) ([#16849](https://github.com/astral-sh/ruff/pull/16849),[#16855](https://github.com/astral-sh/ruff/pull/16855))
+
+### CLI
+
+- Add `--exit-non-zero-on-format` ([#16009](https://github.com/astral-sh/ruff/pull/16009))
+
+### Documentation
+
+- Update Ruff tutorial to avoid non-existent fix in `__init__.py` ([#16818](https://github.com/astral-sh/ruff/pull/16818))
+- \[`flake8-gettext`\] Swap `format-` and `printf-in-get-text-func-call` examples (`INT002`, `INT003`) ([#16769](https://github.com/astral-sh/ruff/pull/16769))
+
+## 0.11.0
+
+This is a follow-up to release 0.10.0. Because of a mistake in the release process, the `requires-python` inference changes were not included in that release. Ruff 0.11.0 now includes this change as well as the stabilization of the preview behavior for `PGH004`.
 
 ### Breaking changes
-
-See also, the "Remapped rules" section which may result in disabled rules.
 
 - **Changes to how the Python version is inferred when a `target-version` is not specified** ([#16319](https://github.com/astral-sh/ruff/pull/16319))
 
@@ -29,13 +66,36 @@ See also, the "Remapped rules" section which may result in disabled rules.
         search for the closest `pyproject.toml` in the parent directories and use its
         `requires-python` setting.
 
+### Stabilization
+
+The following behaviors have been stabilized:
+
+- [`blanket-noqa`](https://docs.astral.sh/ruff/rules/blanket-noqa/) (`PGH004`): Also detect blanked file-level noqa comments (and not just line level comments).
+
+### Preview features
+
+- [syntax-errors] Tuple unpacking in `for` statement iterator clause before Python 3.9 ([#16558](https://github.com/astral-sh/ruff/pull/16558))
+
+## 0.10.0
+
+Check out the [blog post](https://astral.sh/blog/ruff-v0.10.0) for a migration guide and overview of the changes!
+
+### Breaking changes
+
+See also, the "Remapped rules" section which may result in disabled rules.
+
+- **Changes to how the Python version is inferred when a `target-version` is not specified** ([#16319](https://github.com/astral-sh/ruff/pull/16319))
+
+    Because of a mistake in the release process, the `requires-python` inference changes are not included in this release and instead shipped as part of 0.11.0.
+    You can find a description of this change in the 0.11.0 section.
+
 - **Updated `TYPE_CHECKING` behavior** ([#16669](https://github.com/astral-sh/ruff/pull/16669))
 
     Previously, Ruff only recognized typechecking blocks that tested the `typing.TYPE_CHECKING` symbol. Now, Ruff recognizes any local variable named `TYPE_CHECKING`. This release also removes support for the legacy `if 0:` and `if False:` typechecking checks. Use a local `TYPE_CHECKING` variable instead.
 
 - **More robust noqa parsing** ([#16483](https://github.com/astral-sh/ruff/pull/16483))
 
-    The syntax for both file-level and in-line suppression comments has been unified and made more robust to certain errors. In most cases, this will result in more suppression comments being read by Ruff, but there are a few instances where previously read comments will now log an error to the user instead. Please refer to the documentation on [_Error suppression_](https://docs.astral.sh/ruff/linter/#error-suppression) for the full specification.
+    The syntax for both file-level and in-line suppression comments has been unified and made more robust to certain errors. In most cases, this will result in more suppression comments being read by Ruff, but there are a few instances where previously read comments will now log an error to the user instead. Please refer to the documentation on [*Error suppression*](https://docs.astral.sh/ruff/linter/#error-suppression) for the full specification.
 
 - **Avoid unnecessary parentheses around with statements with a single context manager and a trailing comment** ([#14005](https://github.com/astral-sh/ruff/pull/14005))
 
@@ -86,7 +146,6 @@ The following behaviors have been stabilized:
 
 - [`bad-staticmethod-argument`](https://docs.astral.sh/ruff/rules/bad-staticmethod-argument/) (`PLW0211`) [`invalid-first-argument-name-for-class-method`](https://docs.astral.sh/ruff/rules/invalid-first-argument-name-for-class-method/) (`N804`): `__new__` methods are now no longer flagged by `invalid-first-argument-name-for-class-method` (`N804`) but instead by `bad-staticmethod-argument` (`PLW0211`)
 - [`bad-str-strip-call`](https://docs.astral.sh/ruff/rules/bad-str-strip-call/) (`PLE1310`): The rule now applies to objects which are known to have type `str` or `bytes`.
-- [`blanket-noqa`](https://docs.astral.sh/ruff/rules/blanket-noqa/) (`PGH004`): Also detect blanked file-level noqa comments (and not just line level comments).
 - [`custom-type-var-for-self`](https://docs.astral.sh/ruff/rules/custom-type-var-for-self/) (`PYI019`): More accurate detection of custom `TypeVars` replaceable by `Self`. The range of the diagnostic is now the full function header rather than just the return annotation.
 - [`invalid-argument-name`](https://docs.astral.sh/ruff/rules/invalid-argument-name/) (`N803`): Ignore argument names of functions decorated with `typing.override`
 - [`invalid-envvar-default`](https://docs.astral.sh/ruff/rules/invalid-envvar-default/) (`PLW1508`): Detect default value arguments to `os.environ.get` with invalid type.
@@ -1448,7 +1507,7 @@ The following fixes have been stabilized:
 
 ## 0.5.6
 
-Ruff 0.5.6 automatically enables linting and formatting of notebooks in _preview mode_.
+Ruff 0.5.6 automatically enables linting and formatting of notebooks in *preview mode*.
 You can opt-out of this behavior by adding `*.ipynb` to the `extend-exclude` setting.
 
 ```toml
@@ -2201,7 +2260,7 @@ To setup `ruff server` with your editor, refer to the [README.md](https://github
 
 ### Server
 
-_This section is devoted to updates for our new language server, written in Rust._
+*This section is devoted to updates for our new language server, written in Rust.*
 
 - Enable ruff-specific source actions ([#10916](https://github.com/astral-sh/ruff/pull/10916))
 - Refreshes diagnostics for open files when file configuration is changed ([#10988](https://github.com/astral-sh/ruff/pull/10988))
@@ -3608,7 +3667,7 @@ Read Ruff's new [versioning policy](https://docs.astral.sh/ruff/versioning/).
 - \[`refurb`\] Add `single-item-membership-test` (`FURB171`) ([#7815](https://github.com/astral-sh/ruff/pull/7815))
 - \[`pylint`\] Add `and-or-ternary` (`R1706`) ([#7811](https://github.com/astral-sh/ruff/pull/7811))
 
-_New rules are added in [preview](https://docs.astral.sh/ruff/preview/)._
+*New rules are added in [preview](https://docs.astral.sh/ruff/preview/).*
 
 ### Configuration
 

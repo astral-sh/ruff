@@ -9,10 +9,14 @@ pub use crate::diagnostic::old::{
     OldDiagnosticTrait, OldDisplayDiagnostic, OldParseDiagnostic, OldSecondaryDiagnosticMessage,
 };
 use crate::files::File;
+use crate::Db;
+
+use self::render::{DisplayDiagnostic, FileResolver};
 
 // This module should not be exported. We are planning to migrate off
 // the APIs in this module.
 mod old;
+mod render;
 
 /// A collection of information that can be rendered into a diagnostic.
 ///
@@ -98,6 +102,59 @@ impl Diagnostic {
     /// using a method like [`Diagnostic::info`] may be more convenient.
     pub fn sub(&mut self, sub: SubDiagnostic) {
         self.inner.subs.push(sub);
+    }
+
+    /// Print this diagnostic to the given writer.
+    ///
+    /// This also marks the diagnostic as having been printed. If a
+    /// diagnostic is not rendered this way, then it will panic when
+    /// it's dropped when `debug_assertions` is enabled.
+    ///
+    /// # Defuses panics
+    ///
+    /// When `debug_assertions` is enabled and a `Diagnostic` does
+    /// _not_ have this method called, then its `Drop` implementation
+    /// will panic. The intent of this panic is to avoid mistakes where
+    /// a diagnostic is created and then never printed. That is usually
+    /// indicative of a bug.
+    ///
+    /// # Errors
+    ///
+    /// This is guaranteed to only return an error if the underlying
+    /// writer given returns an error. Otherwise, the formatting of
+    /// diagnostics themselves is infallible.
+    pub fn print(
+        &mut self,
+        db: &dyn Db,
+        config: &DisplayDiagnosticConfig,
+        mut wtr: impl std::io::Write,
+    ) -> std::io::Result<()> {
+        let resolver = FileResolver::new(db);
+        let display = DisplayDiagnostic::new(&resolver, config, self);
+        let result = writeln!(wtr, "{display}");
+        // NOTE: This is called specifically even if
+        // `writeln!` fails. The reasoning here is that
+        // the `Drop` impl panicking is meant as a guard
+        // against *programmers* forgetting to print a
+        // diagnostic. We should not punish them if they
+        // remember to do that when the operation itself
+        // failed for some reason. ---AG
+        self.printed();
+        result
+    }
+
+    /// Mark this diagnostic as having been printed.
+    ///
+    /// If a diagnostic has not been marked as printed before being dropped,
+    /// then its `Drop` implementation will panic in debug mode.
+    pub(crate) fn printed(&mut self) {
+        #[cfg(debug_assertions)]
+        {
+            self.inner.printed = true;
+            for sub in &mut self.inner.subs {
+                sub.printed();
+            }
+        }
     }
 }
 
@@ -186,6 +243,17 @@ impl SubDiagnostic {
     /// have no annotations.
     pub fn annotate(&mut self, ann: Annotation) {
         self.inner.annotations.push(ann);
+    }
+
+    /// Mark this sub-diagnostic as having been printed.
+    ///
+    /// If a sub-diagnostic has not been marked as printed before being
+    /// dropped, then its `Drop` implementation will panic in debug mode.
+    #[cfg(debug_assertions)]
+    pub(crate) fn printed(&mut self) {
+        {
+            self.inner.printed = true;
+        }
     }
 }
 
@@ -516,17 +584,78 @@ impl Severity {
 }
 
 /// Configuration for rendering diagnostics.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct DisplayDiagnosticConfig {
+    /// The format to use for diagnostic rendering.
+    ///
+    /// This uses the "full" format by default.
+    format: DiagnosticFormat,
     /// Whether to enable colors or not.
     ///
     /// Disabled by default.
     color: bool,
+    /// The number of non-empty lines to show around each snippet.
+    ///
+    /// NOTE: It seems like making this a property of rendering *could*
+    /// be wrong. In particular, I have a suspicion that we may want
+    /// more granular control over this, perhaps based on the kind of
+    /// diagnostic or even the snippet itself. But I chose to put this
+    /// here for now as the most "sensible" place for it to live until
+    /// we had more concrete use cases. ---AG
+    context: usize,
 }
 
 impl DisplayDiagnosticConfig {
+    /// Whether to enable concise diagnostic output or not.
+    pub fn format(self, format: DiagnosticFormat) -> DisplayDiagnosticConfig {
+        DisplayDiagnosticConfig { format, ..self }
+    }
+
     /// Whether to enable colors or not.
     pub fn color(self, yes: bool) -> DisplayDiagnosticConfig {
-        DisplayDiagnosticConfig { color: yes }
+        DisplayDiagnosticConfig { color: yes, ..self }
     }
+
+    /// Set the number of contextual lines to show around each snippet.
+    pub fn context(self, lines: usize) -> DisplayDiagnosticConfig {
+        DisplayDiagnosticConfig {
+            context: lines,
+            ..self
+        }
+    }
+}
+
+impl Default for DisplayDiagnosticConfig {
+    fn default() -> DisplayDiagnosticConfig {
+        DisplayDiagnosticConfig {
+            format: DiagnosticFormat::default(),
+            color: false,
+            context: 2,
+        }
+    }
+}
+
+/// The diagnostic output format.
+#[derive(Copy, Clone, Debug, Default, Eq, Hash, PartialEq, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "kebab-case"))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub enum DiagnosticFormat {
+    /// The default full mode will print "pretty" diagnostics.
+    ///
+    /// That is, color will be used when printing to a `tty`.
+    /// Moreover, diagnostic messages may include additional
+    /// context and annotations on the input to help understand
+    /// the message.
+    #[default]
+    Full,
+    /// Print diagnostics in a concise mode.
+    ///
+    /// This will guarantee that each diagnostic is printed on
+    /// a single line. Only the most important or primary aspects
+    /// of the diagnostic are included. Contextual information is
+    /// dropped.
+    ///
+    /// This may use color when printing to a `tty`.
+    Concise,
 }

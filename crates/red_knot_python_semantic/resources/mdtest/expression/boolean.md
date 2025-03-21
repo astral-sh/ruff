@@ -121,7 +121,7 @@ if NotBoolable():
 
 ```py
 class NotBoolable:
-    __bool__ = None
+    __bool__: None = None
 
 # error: [unsupported-bool-conversion] "Boolean conversion is unsupported for type `NotBoolable`; its `__bool__` method isn't callable"
 if NotBoolable():
@@ -133,9 +133,9 @@ if NotBoolable():
 ```py
 def test(cond: bool):
     class NotBoolable:
-        __bool__ = None if cond else 3
+        __bool__: int | None = None if cond else 3
 
-    # error: [unsupported-bool-conversion] "Boolean conversion is unsupported for type `NotBoolable`; it incorrectly implements `__bool__`"
+    # error: [unsupported-bool-conversion] "Boolean conversion is unsupported for type `NotBoolable`; its `__bool__` method isn't callable"
     if NotBoolable():
         ...
 ```
@@ -145,7 +145,7 @@ def test(cond: bool):
 ```py
 def test(cond: bool):
     class NotBoolable:
-        __bool__ = None
+        __bool__: None = None
 
     a = 10 if cond else NotBoolable()
 

@@ -59,9 +59,8 @@ impl ProjectDatabase {
         self.with_db(|db| db.project().check(db))
     }
 
+    #[tracing::instrument(level = "debug", skip(self))]
     pub fn check_file(&self, file: File) -> Result<Vec<Box<dyn OldDiagnosticTrait>>, Cancelled> {
-        let _span = tracing::debug_span!("check_file", file=%file.path(self)).entered();
-
         self.with_db(|db| self.project().check_file(db, file))
     }
 

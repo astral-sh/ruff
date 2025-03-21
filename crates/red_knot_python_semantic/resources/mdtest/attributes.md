@@ -818,40 +818,74 @@ def _(flag: bool):
     if flag:
         class C1:
             x = 1
+            y: int = 1
 
     else:
         class C1:
             x = 2
+            y: int | str = "b"
 
     reveal_type(C1.x)  # revealed: Unknown | Literal[1, 2]
+    reveal_type(C1.y)  # revealed: int | str
+
+    C1.y = 100
+    # error: [invalid-assignment] "Object of type `Literal["problematic"]` is not assignable to attribute `y` on type `Literal[C1, C1]`"
+    C1.y = "problematic"
 
     class C2:
         if flag:
             x = 3
+            y: int = 3
         else:
             x = 4
+            y: int | str = "d"
 
     reveal_type(C2.x)  # revealed: Unknown | Literal[3, 4]
+    reveal_type(C2.y)  # revealed: int | str
+
+    C2.y = 100
+    # error: [invalid-assignment] "Object of type `None` is not assignable to attribute `y` of type `int | str`"
+    C2.y = None
+    # TODO: should be an error, needs more sophisticated union handling in `validate_attribute_assignment`
+    C2.y = "problematic"
 
     if flag:
         class Meta3(type):
             x = 5
+            y: int = 5
 
     else:
         class Meta3(type):
             x = 6
+            y: int | str = "f"
 
     class C3(metaclass=Meta3): ...
     reveal_type(C3.x)  # revealed: Unknown | Literal[5, 6]
+    reveal_type(C3.y)  # revealed: int | str
+
+    C3.y = 100
+    # error: [invalid-assignment] "Object of type `None` is not assignable to attribute `y` of type `int | str`"
+    C3.y = None
+    # TODO: should be an error, needs more sophisticated union handling in `validate_attribute_assignment`
+    C3.y = "problematic"
 
     class Meta4(type):
         if flag:
             x = 7
+            y: int = 7
         else:
             x = 8
+            y: int | str = "h"
 
     class C4(metaclass=Meta4): ...
     reveal_type(C4.x)  # revealed: Unknown | Literal[7, 8]
+    reveal_type(C4.y)  # revealed: int | str
+
+    C4.y = 100
+    # error: [invalid-assignment] "Object of type `None` is not assignable to attribute `y` of type `int | str`"
+    C4.y = None
+    # TODO: should be an error, needs more sophisticated union handling in `validate_attribute_assignment`
+    C4.y = "problematic"
 ```
 
 ## Unions with possibly unbound paths
@@ -875,8 +909,14 @@ def _(flag1: bool, flag2: bool):
     # error: [possibly-unbound-attribute] "Attribute `x` on type `Literal[C1, C2, C3]` is possibly unbound"
     reveal_type(C.x)  # revealed: Unknown | Literal[1, 3]
 
+    # error: [invalid-assignment] "Object of type `Literal[100]` is not assignable to attribute `x` on type `Literal[C1, C2, C3]`"
+    C.x = 100
+
     # error: [possibly-unbound-attribute] "Attribute `x` on type `C1 | C2 | C3` is possibly unbound"
     reveal_type(C().x)  # revealed: Unknown | Literal[1, 3]
+
+    # error: [invalid-assignment] "Object of type `Literal[100]` is not assignable to attribute `x` on type `C1 | C2 | C3`"
+    C().x = 100
 ```
 
 ### Possibly-unbound within a class
@@ -901,10 +941,16 @@ def _(flag: bool, flag1: bool, flag2: bool):
     # error: [possibly-unbound-attribute] "Attribute `x` on type `Literal[C1, C2, C3]` is possibly unbound"
     reveal_type(C.x)  # revealed: Unknown | Literal[1, 2, 3]
 
+    # error: [possibly-unbound-attribute]
+    C.x = 100
+
     # Note: we might want to consider ignoring possibly-unbound diagnostics for instance attributes eventually,
     # see the "Possibly unbound/undeclared instance attribute" section below.
     # error: [possibly-unbound-attribute] "Attribute `x` on type `C1 | C2 | C3` is possibly unbound"
     reveal_type(C().x)  # revealed: Unknown | Literal[1, 2, 3]
+
+    # error: [possibly-unbound-attribute]
+    C().x = 100
 ```
 
 ### Possibly-unbound within gradual types
@@ -922,6 +968,9 @@ def _(flag: bool):
             x: int
 
     reveal_type(Derived().x)  # revealed: int | Any
+
+    Derived().x = 1
+    Derived().x = "a"
 ```
 
 ### Attribute possibly unbound on a subclass but not on a superclass
@@ -936,8 +985,10 @@ def _(flag: bool):
             x = 2
 
     reveal_type(Bar.x)  # revealed: Unknown | Literal[2, 1]
+    Bar.x = 3
 
     reveal_type(Bar().x)  # revealed: Unknown | Literal[2, 1]
+    Bar().x = 3
 ```
 
 ### Attribute possibly unbound on a subclass and on a superclass
@@ -956,7 +1007,13 @@ def _(flag: bool):
     reveal_type(Bar.x)  # revealed: Unknown | Literal[2, 1]
 
     # error: [possibly-unbound-attribute]
+    Bar.x = 3
+
+    # error: [possibly-unbound-attribute]
     reveal_type(Bar().x)  # revealed: Unknown | Literal[2, 1]
+
+    # error: [possibly-unbound-attribute]
+    Bar().x = 3
 ```
 
 ### Possibly unbound/undeclared instance attribute
@@ -975,6 +1032,9 @@ def _(flag: bool):
 
     # error: [possibly-unbound-attribute]
     reveal_type(Foo().x)  # revealed: int | Unknown
+
+    # error: [possibly-unbound-attribute]
+    Foo().x = 1
 ```
 
 #### Possibly unbound
@@ -989,6 +1049,9 @@ def _(flag: bool):
     # Emitting a diagnostic in a case like this is not something we support, and it's unclear
     # if we ever will (or want to)
     reveal_type(Foo().x)  # revealed: Unknown | Literal[1]
+
+    # Same here
+    Foo().x = 2
 ```
 
 ### Unions with all paths unbound
@@ -1003,6 +1066,11 @@ def _(flag: bool):
 
     # error: [unresolved-attribute] "Type `Literal[C1, C2]` has no attribute `x`"
     reveal_type(C.x)  # revealed: Unknown
+
+    # TODO: This should ideally be a `unresolved-attribute` error. We need better union
+    # handling in `validate_attribute_assignment` for this.
+    # error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to attribute `x` on type `Literal[C1, C2]`"
+    C.x = 1
 ```
 
 ## Inherited class attributes
@@ -1017,6 +1085,8 @@ class B(A): ...
 class C(B): ...
 
 reveal_type(C.X)  # revealed: Unknown | Literal["foo"]
+
+C.X = "bar"
 ```
 
 ### Multiple inheritance
@@ -1040,6 +1110,8 @@ reveal_type(A.__mro__)
 
 # `E` is earlier in the MRO than `F`, so we should use the type of `E.X`
 reveal_type(A.X)  # revealed: Unknown | Literal[42]
+
+A.X = 100
 ```
 
 ## Intersections of attributes
@@ -1057,9 +1129,13 @@ class B: ...
 def _(a_and_b: Intersection[A, B]):
     reveal_type(a_and_b.x)  # revealed: int
 
+    a_and_b.x = 2
+
 # Same for class objects
 def _(a_and_b: Intersection[type[A], type[B]]):
     reveal_type(a_and_b.x)  # revealed: int
+
+    a_and_b.x = 2
 ```
 
 ### Attribute available on both elements
@@ -1069,6 +1145,7 @@ from knot_extensions import Intersection
 
 class P: ...
 class Q: ...
+class R(P, Q): ...
 
 class A:
     x: P = P()
@@ -1078,10 +1155,12 @@ class B:
 
 def _(a_and_b: Intersection[A, B]):
     reveal_type(a_and_b.x)  # revealed: P & Q
+    a_and_b.x = R()
 
 # Same for class objects
 def _(a_and_b: Intersection[type[A], type[B]]):
     reveal_type(a_and_b.x)  # revealed: P & Q
+    a_and_b.x = R()
 ```
 
 ### Possible unboundness
@@ -1091,6 +1170,7 @@ from knot_extensions import Intersection
 
 class P: ...
 class Q: ...
+class R(P, Q): ...
 
 def _(flag: bool):
     class A1:
@@ -1102,10 +1182,16 @@ def _(flag: bool):
     def inner1(a_and_b: Intersection[A1, B1]):
         # error: [possibly-unbound-attribute]
         reveal_type(a_and_b.x)  # revealed: P
+
+        # error: [possibly-unbound-attribute]
+        a_and_b.x = R()
     # Same for class objects
     def inner1_class(a_and_b: Intersection[type[A1], type[B1]]):
         # error: [possibly-unbound-attribute]
         reveal_type(a_and_b.x)  # revealed: P
+
+        # error: [possibly-unbound-attribute]
+        a_and_b.x = R()
 
     class A2:
         if flag:
@@ -1116,6 +1202,11 @@ def _(flag: bool):
 
     def inner2(a_and_b: Intersection[A2, B1]):
         reveal_type(a_and_b.x)  # revealed: P & Q
+
+        # TODO: this should not be an error, we need better intersection
+        # handling in `validate_attribute_assignment` for this
+        # error: [possibly-unbound-attribute]
+        a_and_b.x = R()
     # Same for class objects
     def inner2_class(a_and_b: Intersection[type[A2], type[B1]]):
         reveal_type(a_and_b.x)  # revealed: P & Q
@@ -1131,10 +1222,16 @@ def _(flag: bool):
     def inner3(a_and_b: Intersection[A3, B3]):
         # error: [possibly-unbound-attribute]
         reveal_type(a_and_b.x)  # revealed: P & Q
+
+        # error: [possibly-unbound-attribute]
+        a_and_b.x = R()
     # Same for class objects
     def inner3_class(a_and_b: Intersection[type[A3], type[B3]]):
         # error: [possibly-unbound-attribute]
         reveal_type(a_and_b.x)  # revealed: P & Q
+
+        # error: [possibly-unbound-attribute]
+        a_and_b.x = R()
 
     class A4: ...
     class B4: ...
@@ -1142,10 +1239,16 @@ def _(flag: bool):
     def inner4(a_and_b: Intersection[A4, B4]):
         # error: [unresolved-attribute]
         reveal_type(a_and_b.x)  # revealed: Unknown
+
+        # error: [invalid-assignment]
+        a_and_b.x = R()
     # Same for class objects
     def inner4_class(a_and_b: Intersection[type[A4], type[B4]]):
         # error: [unresolved-attribute]
         reveal_type(a_and_b.x)  # revealed: Unknown
+
+        # error: [invalid-assignment]
+        a_and_b.x = R()
 ```
 
 ### Intersection of implicit instance attributes

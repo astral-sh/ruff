@@ -1,2 +1,5 @@
 **.md
-pkg
+ruff/dist
+ruff/ruff_wasm
+knot/dist
+knot/red_knot_wasm

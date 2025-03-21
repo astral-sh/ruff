@@ -22,7 +22,7 @@ use crate::Db;
 /// * a return type of a cross-module query
 /// * a field of a type that is a return type of a cross-module query
 /// * an argument of a cross-module query
-#[salsa::tracked]
+#[salsa::tracked(debug)]
 pub struct Definition<'db> {
     /// The file in which the definition occurs.
     pub(crate) file: File,

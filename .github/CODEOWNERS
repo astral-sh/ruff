@@ -18,6 +18,7 @@
 /python/py-fuzzer/ @AlexWaygood
 
 # red-knot
-/crates/red_knot* @carljm @MichaReiser @AlexWaygood @sharkdp
-/crates/ruff_db/ @carljm @MichaReiser @AlexWaygood @sharkdp
-/scripts/knot_benchmark/ @carljm @MichaReiser @AlexWaygood @sharkdp
+/crates/red_knot* @carljm @MichaReiser @AlexWaygood @sharkdp @dcreager
+/crates/ruff_db/ @carljm @MichaReiser @AlexWaygood @sharkdp @dcreager
+/scripts/knot_benchmark/ @carljm @MichaReiser @AlexWaygood @sharkdp @dcreager
+/crates/red_knot_python_semantic @carljm @AlexWaygood @sharkdp @dcreager

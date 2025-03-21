@@ -1,6 +1,8 @@
 # Breaking Changes
 
-## 0.10.0
+## 0.11.0
+
+This is a follow-up to release 0.10.0. Because of a mistake in the release process, the `requires-python` inference changes were not included in that release. Ruff 0.11.0 now includes this change as well as the stabilization of the preview behavior for `PGH004`.
 
 - **Changes to how the Python version is inferred when a `target-version` is not specified** ([#16319](https://github.com/astral-sh/ruff/pull/16319))
 
@@ -22,6 +24,13 @@
         `[tool.ruff]` section) in the directory of the file being checked, Ruff will
         search for the closest `pyproject.toml` in the parent directories and use its
         `requires-python` setting.
+
+## 0.10.0
+
+- **Changes to how the Python version is inferred when a `target-version` is not specified** ([#16319](https://github.com/astral-sh/ruff/pull/16319))
+
+    Because of a mistake in the release process, the `requires-python` inference changes are not included in this release and instead shipped as part of 0.11.0.
+    You can find a description of this change in the 0.11.0 section.
 
 - **Updated `TYPE_CHECKING` behavior** ([#16669](https://github.com/astral-sh/ruff/pull/16669))
 

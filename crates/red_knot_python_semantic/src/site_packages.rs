@@ -9,6 +9,7 @@
 //! on Linux.)
 
 use std::fmt;
+use std::fmt::Display;
 use std::io;
 use std::num::NonZeroUsize;
 use std::ops::Deref;
@@ -43,23 +44,28 @@ pub(crate) struct VirtualEnvironment {
 impl VirtualEnvironment {
     pub(crate) fn new(
         path: impl AsRef<SystemPath>,
+        origin: SysPrefixPathOrigin,
         system: &dyn System,
     ) -> SitePackagesDiscoveryResult<Self> {
-        Self::new_impl(path.as_ref(), system)
+        Self::new_impl(path.as_ref(), origin, system)
     }
 
-    fn new_impl(path: &SystemPath, system: &dyn System) -> SitePackagesDiscoveryResult<Self> {
+    fn new_impl(
+        path: &SystemPath,
+        origin: SysPrefixPathOrigin,
+        system: &dyn System,
+    ) -> SitePackagesDiscoveryResult<Self> {
         fn pyvenv_cfg_line_number(index: usize) -> NonZeroUsize {
             index.checked_add(1).and_then(NonZeroUsize::new).unwrap()
         }
 
-        let venv_path = SysPrefixPath::new(path, system)?;
+        let venv_path = SysPrefixPath::new(path, origin, system)?;
         let pyvenv_cfg_path = venv_path.join("pyvenv.cfg");
         tracing::debug!("Attempting to parse virtual environment metadata at '{pyvenv_cfg_path}'");
 
         let pyvenv_cfg = system
             .read_to_string(&pyvenv_cfg_path)
-            .map_err(SitePackagesDiscoveryError::NoPyvenvCfgFile)?;
+            .map_err(|io_err| SitePackagesDiscoveryError::NoPyvenvCfgFile(origin, io_err))?;
 
         let mut include_system_site_packages = false;
         let mut base_executable_home_path = None;
@@ -205,12 +211,12 @@ System site-packages will not be used for module resolution.",
 
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum SitePackagesDiscoveryError {
-    #[error("Invalid --python argument: `{0}` could not be canonicalized")]
-    VenvDirCanonicalizationError(SystemPathBuf, #[source] io::Error),
-    #[error("Invalid --python argument: `{0}` does not point to a directory on disk")]
-    VenvDirIsNotADirectory(SystemPathBuf),
-    #[error("--python points to a broken venv with no pyvenv.cfg file")]
-    NoPyvenvCfgFile(#[source] io::Error),
+    #[error("Invalid {1}: `{0}` could not be canonicalized")]
+    VenvDirCanonicalizationError(SystemPathBuf, SysPrefixPathOrigin, #[source] io::Error),
+    #[error("Invalid {1}: `{0}` does not point to a directory on disk")]
+    VenvDirIsNotADirectory(SystemPathBuf, SysPrefixPathOrigin),
+    #[error("{0} points to a broken venv with no pyvenv.cfg file")]
+    NoPyvenvCfgFile(SysPrefixPathOrigin, #[source] io::Error),
     #[error("Failed to parse the pyvenv.cfg file at {0} because {1}")]
     PyvenvCfgParseError(SystemPathBuf, PyvenvCfgParseErrorKind),
     #[error("Failed to search the `lib` directory of the Python installation at {1} for `site-packages`")]
@@ -370,18 +376,23 @@ fn site_packages_directory_from_sys_prefix(
 ///
 /// [`sys.prefix`]: https://docs.python.org/3/library/sys.html#sys.prefix
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub(crate) struct SysPrefixPath(SystemPathBuf);
+pub(crate) struct SysPrefixPath {
+    inner: SystemPathBuf,
+    origin: SysPrefixPathOrigin,
+}
 
 impl SysPrefixPath {
     fn new(
         unvalidated_path: impl AsRef<SystemPath>,
+        origin: SysPrefixPathOrigin,
         system: &dyn System,
     ) -> SitePackagesDiscoveryResult<Self> {
-        Self::new_impl(unvalidated_path.as_ref(), system)
+        Self::new_impl(unvalidated_path.as_ref(), origin, system)
     }
 
     fn new_impl(
         unvalidated_path: &SystemPath,
+        origin: SysPrefixPathOrigin,
         system: &dyn System,
     ) -> SitePackagesDiscoveryResult<Self> {
         // It's important to resolve symlinks here rather than simply making the path absolute,
@@ -392,14 +403,21 @@ impl SysPrefixPath {
             .map_err(|io_err| {
                 SitePackagesDiscoveryError::VenvDirCanonicalizationError(
                     unvalidated_path.to_path_buf(),
+                    origin,
                     io_err,
                 )
             })?;
         system
             .is_directory(&canonicalized)
-            .then_some(Self(canonicalized))
+            .then_some(Self {
+                inner: canonicalized,
+                origin,
+            })
             .ok_or_else(|| {
-                SitePackagesDiscoveryError::VenvDirIsNotADirectory(unvalidated_path.to_path_buf())
+                SitePackagesDiscoveryError::VenvDirIsNotADirectory(
+                    unvalidated_path.to_path_buf(),
+                    origin,
+                )
             })
     }
 
@@ -408,9 +426,15 @@ impl SysPrefixPath {
         // the parent of a canonicalised path that is known to exist
         // is guaranteed to be a directory.
         if cfg!(target_os = "windows") {
-            Some(Self(path.to_path_buf()))
+            Some(Self {
+                inner: path.to_path_buf(),
+                origin: SysPrefixPathOrigin::Derived,
+            })
         } else {
-            path.parent().map(|path| Self(path.to_path_buf()))
+            path.parent().map(|path| Self {
+                inner: path.to_path_buf(),
+                origin: SysPrefixPathOrigin::Derived,
+            })
         }
     }
 }
@@ -419,13 +443,31 @@ impl Deref for SysPrefixPath {
     type Target = SystemPath;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.inner
     }
 }
 
 impl fmt::Display for SysPrefixPath {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "`sys.prefix` path `{}`", self.0)
+        write!(f, "`sys.prefix` path `{}`", self.inner)
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum SysPrefixPathOrigin {
+    PythonCliFlag,
+    VirtualEnvVar,
+    Derived,
+}
+
+impl Display for SysPrefixPathOrigin {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Self::PythonCliFlag => f.write_str("`--python` argument"),
+            Self::VirtualEnvVar => f.write_str("`VIRTUAL_ENV` environment variable"),
+            Self::Derived => f.write_str("derived `sys.prefix` path"),
+        }
     }
 }
 
@@ -584,11 +626,19 @@ mod tests {
 
         fn test(self) {
             let venv_path = self.build_mock_venv();
-            let venv = VirtualEnvironment::new(venv_path.clone(), &self.system).unwrap();
+            let venv = VirtualEnvironment::new(
+                venv_path.clone(),
+                SysPrefixPathOrigin::VirtualEnvVar,
+                &self.system,
+            )
+            .unwrap();
 
             assert_eq!(
                 venv.venv_path,
-                SysPrefixPath(self.system.canonicalize_path(&venv_path).unwrap())
+                SysPrefixPath {
+                    inner: self.system.canonicalize_path(&venv_path).unwrap(),
+                    origin: SysPrefixPathOrigin::VirtualEnvVar,
+                }
             );
             assert_eq!(venv.include_system_site_packages, self.system_site_packages);
 
@@ -730,7 +780,7 @@ mod tests {
     fn reject_venv_that_does_not_exist() {
         let system = TestSystem::default();
         assert!(matches!(
-            VirtualEnvironment::new("/.venv", &system),
+            VirtualEnvironment::new("/.venv", SysPrefixPathOrigin::VirtualEnvVar, &system),
             Err(SitePackagesDiscoveryError::VenvDirCanonicalizationError(..))
         ));
     }
@@ -743,7 +793,7 @@ mod tests {
             .write_file_all("/.venv", "")
             .unwrap();
         assert!(matches!(
-            VirtualEnvironment::new("/.venv", &system),
+            VirtualEnvironment::new("/.venv", SysPrefixPathOrigin::VirtualEnvVar, &system),
             Err(SitePackagesDiscoveryError::VenvDirIsNotADirectory(..))
         ));
     }
@@ -756,8 +806,11 @@ mod tests {
             .create_directory_all("/.venv")
             .unwrap();
         assert!(matches!(
-            VirtualEnvironment::new("/.venv", &system),
-            Err(SitePackagesDiscoveryError::NoPyvenvCfgFile(_))
+            VirtualEnvironment::new("/.venv", SysPrefixPathOrigin::VirtualEnvVar, &system),
+            Err(SitePackagesDiscoveryError::NoPyvenvCfgFile(
+                SysPrefixPathOrigin::VirtualEnvVar,
+                _
+            ))
         ));
     }
 
@@ -769,7 +822,8 @@ mod tests {
         memory_fs
             .write_file_all(&pyvenv_cfg_path, "home = bar = /.venv/bin")
             .unwrap();
-        let venv_result = VirtualEnvironment::new("/.venv", &system);
+        let venv_result =
+            VirtualEnvironment::new("/.venv", SysPrefixPathOrigin::VirtualEnvVar, &system);
         assert!(matches!(
             venv_result,
             Err(SitePackagesDiscoveryError::PyvenvCfgParseError(
@@ -788,7 +842,8 @@ mod tests {
         memory_fs
             .write_file_all(&pyvenv_cfg_path, "home =")
             .unwrap();
-        let venv_result = VirtualEnvironment::new("/.venv", &system);
+        let venv_result =
+            VirtualEnvironment::new("/.venv", SysPrefixPathOrigin::VirtualEnvVar, &system);
         assert!(matches!(
             venv_result,
             Err(SitePackagesDiscoveryError::PyvenvCfgParseError(
@@ -807,7 +862,8 @@ mod tests {
         memory_fs
             .write_file_all(&pyvenv_cfg_path, "= whatever")
             .unwrap();
-        let venv_result = VirtualEnvironment::new("/.venv", &system);
+        let venv_result =
+            VirtualEnvironment::new("/.venv", SysPrefixPathOrigin::VirtualEnvVar, &system);
         assert!(matches!(
             venv_result,
             Err(SitePackagesDiscoveryError::PyvenvCfgParseError(
@@ -824,7 +880,8 @@ mod tests {
         let memory_fs = system.memory_file_system();
         let pyvenv_cfg_path = SystemPathBuf::from("/.venv/pyvenv.cfg");
         memory_fs.write_file_all(&pyvenv_cfg_path, "").unwrap();
-        let venv_result = VirtualEnvironment::new("/.venv", &system);
+        let venv_result =
+            VirtualEnvironment::new("/.venv", SysPrefixPathOrigin::VirtualEnvVar, &system);
         assert!(matches!(
             venv_result,
             Err(SitePackagesDiscoveryError::PyvenvCfgParseError(
@@ -843,7 +900,8 @@ mod tests {
         memory_fs
             .write_file_all(&pyvenv_cfg_path, "home = foo")
             .unwrap();
-        let venv_result = VirtualEnvironment::new("/.venv", &system);
+        let venv_result =
+            VirtualEnvironment::new("/.venv", SysPrefixPathOrigin::VirtualEnvVar, &system);
         assert!(matches!(
             venv_result,
             Err(SitePackagesDiscoveryError::PyvenvCfgParseError(

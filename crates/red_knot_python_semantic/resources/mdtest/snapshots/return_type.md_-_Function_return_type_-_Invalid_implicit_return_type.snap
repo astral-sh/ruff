@@ -50,10 +50,11 @@ error: lint:invalid-return-type
 5 |
 6 | # error: [invalid-return-type]
   |
- ::: /src/mdtest_snippet.py:1:12
+info
+ --> /src/mdtest_snippet.py:1:12
   |
 1 | def f() -> None:
-  |            ---- info: Return type is declared here as `None`
+  |            ---- Return type is declared here as `None`
 2 |     if False:
 3 |         # error: [invalid-return-type]
   |

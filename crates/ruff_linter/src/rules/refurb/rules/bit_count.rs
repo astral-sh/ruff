@@ -110,6 +110,10 @@ pub(crate) fn bit_count(checker: &Checker, call: &ExprCall) {
         return;
     }
 
+    // If is a starred expression, it returns.
+    if arg.is_starred_expr() {
+        return;
+    }
     // Extract, e.g., `x` in `bin(x)`.
     let literal_text = checker.locator().slice(arg);
 

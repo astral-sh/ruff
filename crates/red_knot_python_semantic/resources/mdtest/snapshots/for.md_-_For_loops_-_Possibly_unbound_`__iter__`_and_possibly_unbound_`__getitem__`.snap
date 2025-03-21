@@ -53,7 +53,7 @@ info: revealed-type
 16 |     # error: [not-iterable]
 17 |     for x in Iterable():
 18 |         reveal_type(x)  # revealed: int | bytes
-   |         -------------- info: Revealed type is `int | bytes`
+   |         ^^^^^^^^^^^^^^ Revealed type is `int | bytes`
    |
 
 ```

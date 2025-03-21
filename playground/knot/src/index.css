@@ -1,0 +1,123 @@
+@import "tailwindcss";
+@source "../../shared/";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+  --color-ayu-accent: #ffac2f;
+
+  --color-ayu-background: #f8f9fa;
+  --color-ayu-background-dark: #0b0e14;
+
+  --color-black: #261230;
+  --color-white: #ffffff;
+  --color-radiate: #d7ff64;
+  --color-flare: #6340ac;
+  --color-rock: #78876e;
+  --color-galaxy: #261230;
+  --color-space: #30173d;
+  --color-comet: #6f5d6f;
+  --color-cosmic: #de5fe9;
+  --color-sun: #ffac2f;
+  --color-electron: #46ebe1;
+  --color-aurora: #46eb74;
+  --color-constellation: #5f6de9;
+  --color-neutron: #cff3cf;
+  --color-proton: #f6afbc;
+  --color-nebula: #cdcbfb;
+  --color-supernova: #f1aff6;
+  --color-starlight: #f4f4f1;
+  --color-lunar: #fbf2fc;
+  --color-asteroid: #e3cee3;
+  --color-crater: #f0dfdf;
+
+  --font-heading:
+    Alliance Platt, system-ui, -apple-system, Segoe UI, Roboto, Helvetica,
+    Arial, monospace, Apple Color Emoji, Segoe UI Emoji;
+  --font-body:
+    Alliance Text, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial,
+    sans-serif, Apple Color Emoji, Segoe UI Emoji;
+  --font-mono: Roboto Mono;
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 1.875rem;
+  --text-4xl: 2.25rem;
+  --text-5xl: 3rem;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body,
+html,
+#root {
+  margin: 0;
+  height: 100%;
+  width: 100%;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.shadow-copied {
+  --tw-shadow: 0 0 0 1px var(--color-white), inset 0 0 0 1px var(--color-white);
+  --tw-shadow-colored:
+    0 0 0 1px var(--tw-shadow-color), inset 0 0 0 1px var(--tw-shadow-color);
+
+  box-shadow:
+    var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000),
+    var(--tw-shadow);
+}
+
+@font-face {
+  font-family: "Alliance Text";
+  src:
+    url("https://static.astral.sh/fonts/Alliance-TextRegular.woff2")
+      format("woff2"),
+    url("https://static.astral.sh/fonts/Alliance-TextRegular.woff")
+      format("woff");
+  font-weight: normal;
+  font-style: normal;
+  font-display: block;
+}
+
+@font-face {
+  font-family: "Alliance Text";
+  src:
+    url("https://static.astral.sh/fonts/Alliance-TextMedium.woff2")
+      format("woff2"),
+    url("https://static.astral.sh/fonts/Alliance-TextMedium.woff")
+      format("woff");
+  font-weight: 500;
+  font-style: normal;
+  font-display: block;
+}
+
+@font-face {
+  font-family: "Alliance Platt";
+  src:
+    url("https://static.astral.sh/fonts/Alliance-PlattMedium.woff2")
+      format("woff2"),
+    url("https://static.astral.sh/fonts/Alliance-PlattMedium.woff")
+      format("woff");
+  font-weight: 500;
+  font-style: normal;
+  font-display: block;
+}
+
+@font-face {
+  font-family: "Alliance Platt";
+  src:
+    url("https://static.astral.sh/fonts/Alliance-PlattRegular.woff2")
+      format("woff2"),
+    url("https://static.astral.sh/fonts/Alliance-PlattRegular.woff")
+      format("woff");
+  font-weight: normal;
+  font-style: normal;
+  font-display: block;
+}

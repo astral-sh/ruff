@@ -4,15 +4,16 @@ In-browser playground for Ruff. Available [https://play.ruff.rs/](https://play.r
 
 ## Getting started
 
-In order to build the WASM module install [`wasm-pack`](https://rustwasm.github.io/wasm-pack/).
+Install the NPM dependencies with `npm install`, and run, and run the development server with
+`npm start --workspace ruff-playground` or `npm start --workspace knot-playground`.
+You may need to restart the server after making changes to Ruff or Red Knot to re-build the WASM
+module.
 
-Next, build the WASM module by running `npm run build:wasm` (release build) or `npm run dev:wasm` (debug build) from the `./playground` directory.
-
-Finally, install TypeScript dependencies with `npm install`, and run the development server with `npm run dev`.
-
-To run the datastore, which is based on [Workers KV](https://developers.cloudflare.com/workers/runtime-apis/kv/),
+To run the datastore, which is based
+on [Workers KV](https://developers.cloudflare.com/workers/runtime-apis/kv/),
 install the [Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/install-and-update/),
-then run `npx wrangler dev --local` from the `./playground/api` directory. Note that the datastore is
+then run `npx wrangler dev --local` from the `./playground/api` directory. Note that the datastore
+is
 only required to generate shareable URLs for code snippets. The development datastore does not
 require Cloudflare authentication or login, but in turn only persists data locally.
 
@@ -23,8 +24,17 @@ The playground is implemented as a single-page React application powered by
 [Monaco](https://github.com/microsoft/monaco-editor).
 
 The playground stores state in `localStorage`, but supports persisting code snippets to
-a persistent datastore based on [Workers KV](https://developers.cloudflare.com/workers/runtime-apis/kv/)
-and exposed via a [Cloudflare Worker](https://developers.cloudflare.com/workers/learning/how-workers-works/).
+a persistent datastore based
+on [Workers KV](https://developers.cloudflare.com/workers/runtime-apis/kv/)
+and exposed via
+a [Cloudflare Worker](https://developers.cloudflare.com/workers/learning/how-workers-works/).
 
 The playground design is originally based on [Tailwind Play](https://play.tailwindcss.com/), with
 additional inspiration from the [Biome Playground](https://biomejs.dev/playground/).
+
+## Known issues
+
+### Stack overflows
+
+If you see stack overflows in the playground, build the WASM module in release mode:
+`npm run --workspace knot-playground build:wasm`.

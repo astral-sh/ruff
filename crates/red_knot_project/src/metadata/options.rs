@@ -2,7 +2,7 @@ use crate::metadata::value::{RangedValue, RelativePathBuf, ValueSource, ValueSou
 use crate::Db;
 use red_knot_python_semantic::lint::{GetLintError, Level, LintSource, RuleSelection};
 use red_knot_python_semantic::{ProgramSettings, PythonPath, PythonPlatform, SearchPathSettings};
-use ruff_db::diagnostic::{DiagnosticId, OldDiagnosticTrait, Severity, Span};
+use ruff_db::diagnostic::{DiagnosticFormat, DiagnosticId, OldDiagnosticTrait, Severity, Span};
 use ruff_db::files::system_path_to_file;
 use ruff_db::system::{System, SystemPath};
 use ruff_macros::Combine;
@@ -106,9 +106,14 @@ impl Options {
             custom_typeshed: typeshed.map(|path| path.absolute(project_root, system)),
             python_path: python
                 .map(|python_path| {
-                    PythonPath::SysPrefix(python_path.absolute(project_root, system))
+                    PythonPath::from_cli_flag(python_path.absolute(project_root, system))
                 })
-                .unwrap_or(PythonPath::KnownSitePackages(vec![])),
+                .or_else(|| {
+                    std::env::var("VIRTUAL_ENV")
+                        .ok()
+                        .map(PythonPath::from_virtual_env_var)
+                })
+                .unwrap_or_else(|| PythonPath::KnownSitePackages(vec![])),
         }
     }
 
@@ -120,6 +125,11 @@ impl Options {
 
         if let Some(terminal) = self.terminal.as_ref() {
             settings.set_terminal(TerminalSettings {
+                output_format: terminal
+                    .output_format
+                    .as_deref()
+                    .copied()
+                    .unwrap_or_default(),
                 error_on_warning: terminal.error_on_warning.unwrap_or_default(),
             });
         }
@@ -277,6 +287,11 @@ impl FromIterator<(RangedValue<String>, RangedValue<Level>)> for Rules {
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct TerminalOptions {
+    /// The format to use for printing diagnostic messages.
+    ///
+    /// Defaults to `full`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub output_format: Option<RangedValue<DiagnosticFormat>>,
     /// Use exit code 1 if there are any warning-level diagnostics.
     ///
     /// Defaults to `false`.

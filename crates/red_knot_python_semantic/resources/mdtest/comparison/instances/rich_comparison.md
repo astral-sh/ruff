@@ -355,7 +355,7 @@ element) of a chained comparison.
 
 ```py
 class NotBoolable:
-    __bool__ = 3
+    __bool__: int = 3
 
 class Comparable:
     def __lt__(self, item) -> NotBoolable:

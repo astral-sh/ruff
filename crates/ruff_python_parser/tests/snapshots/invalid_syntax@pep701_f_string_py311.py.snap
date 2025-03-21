@@ -1,0 +1,929 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/pep701_f_string_py311.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..549,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 44..74,
+                    value: FString(
+                        ExprFString {
+                            range: 44..74,
+                            value: FStringValue {
+                                inner: Single(
+                                    FString(
+                                        FString {
+                                            range: 44..74,
+                                            elements: [
+                                                Literal(
+                                                    FStringLiteralElement {
+                                                        range: 46..58,
+                                                        value: "Magic wand: ",
+                                                    },
+                                                ),
+                                                Expression(
+                                                    FStringExpressionElement {
+                                                        range: 58..73,
+                                                        expression: Subscript(
+                                                            ExprSubscript {
+                                                                range: 60..71,
+                                                                value: Name(
+                                                                    ExprName {
+                                                                        range: 60..63,
+                                                                        id: Name("bag"),
+                                                                        ctx: Load,
+                                                                    },
+                                                                ),
+                                                                slice: StringLiteral(
+                                                                    ExprStringLiteral {
+                                                                        range: 64..70,
+                                                                        value: StringLiteralValue {
+                                                                            inner: Single(
+                                                                                StringLiteral {
+                                                                                    range: 64..70,
+                                                                                    value: "wand",
+                                                                                    flags: StringLiteralFlags {
+                                                                                        quote_style: Single,
+                                                                                        prefix: Empty,
+                                                                                        triple_quoted: false,
+                                                                                    },
+                                                                                },
+                                                                            ),
+                                                                        },
+                                                                    },
+                                                                ),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                        debug_text: None,
+                                                        conversion: None,
+                                                        format_spec: None,
+                                                    },
+                                                ),
+                                            ],
+                                            flags: FStringFlags {
+                                                quote_style: Single,
+                                                prefix: Regular,
+                                                triple_quoted: false,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 95..112,
+                    value: FString(
+                        ExprFString {
+                            range: 95..112,
+                            value: FStringValue {
+                                inner: Single(
+                                    FString(
+                                        FString {
+                                            range: 95..112,
+                                            elements: [
+                                                Expression(
+                                                    FStringExpressionElement {
+                                                        range: 97..111,
+                                                        expression: Call(
+                                                            ExprCall {
+                                                                range: 98..110,
+                                                                func: Attribute(
+                                                                    ExprAttribute {
+                                                                        range: 98..107,
+                                                                        value: StringLiteral(
+                                                                            ExprStringLiteral {
+                                                                                range: 98..102,
+                                                                                value: StringLiteralValue {
+                                                                                    inner: Single(
+                                                                                        StringLiteral {
+                                                                                            range: 98..102,
+                                                                                            value: "\n",
+                                                                                            flags: StringLiteralFlags {
+                                                                                                quote_style: Single,
+                                                                                                prefix: Empty,
+                                                                                                triple_quoted: false,
+                                                                                            },
+                                                                                        },
+                                                                                    ),
+                                                                                },
+                                                                            },
+                                                                        ),
+                                                                        attr: Identifier {
+                                                                            id: Name("join"),
+                                                                            range: 103..107,
+                                                                        },
+                                                                        ctx: Load,
+                                                                    },
+                                                                ),
+                                                                arguments: Arguments {
+                                                                    range: 107..110,
+                                                                    args: [
+                                                                        Name(
+                                                                            ExprName {
+                                                                                range: 108..109,
+                                                                                id: Name("a"),
+                                                                                ctx: Load,
+                                                                            },
+                                                                        ),
+                                                                    ],
+                                                                    keywords: [],
+                                                                },
+                                                            },
+                                                        ),
+                                                        debug_text: None,
+                                                        conversion: None,
+                                                        format_spec: None,
+                                                    },
+                                                ),
+                                            ],
+                                            flags: FStringFlags {
+                                                quote_style: Double,
+                                                prefix: Regular,
+                                                triple_quoted: false,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 148..220,
+                    value: FString(
+                        ExprFString {
+                            range: 148..220,
+                            value: FStringValue {
+                                inner: Single(
+                                    FString(
+                                        FString {
+                                            range: 148..220,
+                                            elements: [
+                                                Literal(
+                                                    FStringLiteralElement {
+                                                        range: 152..169,
+                                                        value: "A complex trick: ",
+                                                    },
+                                                ),
+                                                Expression(
+                                                    FStringExpressionElement {
+                                                        range: 169..217,
+                                                        expression: Subscript(
+                                                            ExprSubscript {
+                                                                range: 175..185,
+                                                                value: Name(
+                                                                    ExprName {
+                                                                        range: 175..178,
+                                                                        id: Name("bag"),
+                                                                        ctx: Load,
+                                                                    },
+                                                                ),
+                                                                slice: StringLiteral(
+                                                                    ExprStringLiteral {
+                                                                        range: 179..184,
+                                                                        value: StringLiteralValue {
+                                                                            inner: Single(
+                                                                                StringLiteral {
+                                                                                    range: 179..184,
+                                                                                    value: "bag",
+                                                                                    flags: StringLiteralFlags {
+                                                                                        quote_style: Single,
+                                                                                        prefix: Empty,
+                                                                                        triple_quoted: false,
+                                                                                    },
+                                                                                },
+                                                                            ),
+                                                                        },
+                                                                    },
+                                                                ),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                        debug_text: None,
+                                                        conversion: None,
+                                                        format_spec: None,
+                                                    },
+                                                ),
+                                            ],
+                                            flags: FStringFlags {
+                                                quote_style: Single,
+                                                prefix: Regular,
+                                                triple_quoted: true,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 221..254,
+                    value: FString(
+                        ExprFString {
+                            range: 221..254,
+                            value: FStringValue {
+                                inner: Single(
+                                    FString(
+                                        FString {
+                                            range: 221..254,
+                                            elements: [
+                                                Expression(
+                                                    FStringExpressionElement {
+                                                        range: 223..253,
+                                                        expression: FString(
+                                                            ExprFString {
+                                                                range: 224..252,
+                                                                value: FStringValue {
+                                                                    inner: Single(
+                                                                        FString(
+                                                                            FString {
+                                                                                range: 224..252,
+                                                                                elements: [
+                                                                                    Expression(
+                                                                                        FStringExpressionElement {
+                                                                                            range: 226..251,
+                                                                                            expression: FString(
+                                                                                                ExprFString {
+                                                                                                    range: 227..250,
+                                                                                                    value: FStringValue {
+                                                                                                        inner: Single(
+                                                                                                            FString(
+                                                                                                                FString {
+                                                                                                                    range: 227..250,
+                                                                                                                    elements: [
+                                                                                                                        Expression(
+                                                                                                                            FStringExpressionElement {
+                                                                                                                                range: 229..249,
+                                                                                                                                expression: FString(
+                                                                                                                                    ExprFString {
+                                                                                                                                        range: 230..248,
+                                                                                                                                        value: FStringValue {
+                                                                                                                                            inner: Single(
+                                                                                                                                                FString(
+                                                                                                                                                    FString {
+                                                                                                                                                        range: 230..248,
+                                                                                                                                                        elements: [
+                                                                                                                                                            Expression(
+                                                                                                                                                                FStringExpressionElement {
+                                                                                                                                                                    range: 232..247,
+                                                                                                                                                                    expression: FString(
+                                                                                                                                                                        ExprFString {
+                                                                                                                                                                            range: 233..246,
+                                                                                                                                                                            value: FStringValue {
+                                                                                                                                                                                inner: Single(
+                                                                                                                                                                                    FString(
+                                                                                                                                                                                        FString {
+                                                                                                                                                                                            range: 233..246,
+                                                                                                                                                                                            elements: [
+                                                                                                                                                                                                Expression(
+                                                                                                                                                                                                    FStringExpressionElement {
+                                                                                                                                                                                                        range: 235..245,
+                                                                                                                                                                                                        expression: FString(
+                                                                                                                                                                                                            ExprFString {
+                                                                                                                                                                                                                range: 236..244,
+                                                                                                                                                                                                                value: FStringValue {
+                                                                                                                                                                                                                    inner: Single(
+                                                                                                                                                                                                                        FString(
+                                                                                                                                                                                                                            FString {
+                                                                                                                                                                                                                                range: 236..244,
+                                                                                                                                                                                                                                elements: [
+                                                                                                                                                                                                                                    Expression(
+                                                                                                                                                                                                                                        FStringExpressionElement {
+                                                                                                                                                                                                                                            range: 238..243,
+                                                                                                                                                                                                                                            expression: BinOp(
+                                                                                                                                                                                                                                                ExprBinOp {
+                                                                                                                                                                                                                                                    range: 239..242,
+                                                                                                                                                                                                                                                    left: NumberLiteral(
+                                                                                                                                                                                                                                                        ExprNumberLiteral {
+                                                                                                                                                                                                                                                            range: 239..240,
+                                                                                                                                                                                                                                                            value: Int(
+                                                                                                                                                                                                                                                                1,
+                                                                                                                                                                                                                                                            ),
+                                                                                                                                                                                                                                                        },
+                                                                                                                                                                                                                                                    ),
+                                                                                                                                                                                                                                                    op: Add,
+                                                                                                                                                                                                                                                    right: NumberLiteral(
+                                                                                                                                                                                                                                                        ExprNumberLiteral {
+                                                                                                                                                                                                                                                            range: 241..242,
+                                                                                                                                                                                                                                                            value: Int(
+                                                                                                                                                                                                                                                                1,
+                                                                                                                                                                                                                                                            ),
+                                                                                                                                                                                                                                                        },
+                                                                                                                                                                                                                                                    ),
+                                                                                                                                                                                                                                                },
+                                                                                                                                                                                                                                            ),
+                                                                                                                                                                                                                                            debug_text: None,
+                                                                                                                                                                                                                                            conversion: None,
+                                                                                                                                                                                                                                            format_spec: None,
+                                                                                                                                                                                                                                        },
+                                                                                                                                                                                                                                    ),
+                                                                                                                                                                                                                                ],
+                                                                                                                                                                                                                                flags: FStringFlags {
+                                                                                                                                                                                                                                    quote_style: Double,
+                                                                                                                                                                                                                                    prefix: Regular,
+                                                                                                                                                                                                                                    triple_quoted: false,
+                                                                                                                                                                                                                                },
+                                                                                                                                                                                                                            },
+                                                                                                                                                                                                                        ),
+                                                                                                                                                                                                                    ),
+                                                                                                                                                                                                                },
+                                                                                                                                                                                                            },
+                                                                                                                                                                                                        ),
+                                                                                                                                                                                                        debug_text: None,
+                                                                                                                                                                                                        conversion: None,
+                                                                                                                                                                                                        format_spec: None,
+                                                                                                                                                                                                    },
+                                                                                                                                                                                                ),
+                                                                                                                                                                                            ],
+                                                                                                                                                                                            flags: FStringFlags {
+                                                                                                                                                                                                quote_style: Double,
+                                                                                                                                                                                                prefix: Regular,
+                                                                                                                                                                                                triple_quoted: false,
+                                                                                                                                                                                            },
+                                                                                                                                                                                        },
+                                                                                                                                                                                    ),
+                                                                                                                                                                                ),
+                                                                                                                                                                            },
+                                                                                                                                                                        },
+                                                                                                                                                                    ),
+                                                                                                                                                                    debug_text: None,
+                                                                                                                                                                    conversion: None,
+                                                                                                                                                                    format_spec: None,
+                                                                                                                                                                },
+                                                                                                                                                            ),
+                                                                                                                                                        ],
+                                                                                                                                                        flags: FStringFlags {
+                                                                                                                                                            quote_style: Double,
+                                                                                                                                                            prefix: Regular,
+                                                                                                                                                            triple_quoted: false,
+                                                                                                                                                        },
+                                                                                                                                                    },
+                                                                                                                                                ),
+                                                                                                                                            ),
+                                                                                                                                        },
+                                                                                                                                    },
+                                                                                                                                ),
+                                                                                                                                debug_text: None,
+                                                                                                                                conversion: None,
+                                                                                                                                format_spec: None,
+                                                                                                                            },
+                                                                                                                        ),
+                                                                                                                    ],
+                                                                                                                    flags: FStringFlags {
+                                                                                                                        quote_style: Double,
+                                                                                                                        prefix: Regular,
+                                                                                                                        triple_quoted: false,
+                                                                                                                    },
+                                                                                                                },
+                                                                                                            ),
+                                                                                                        ),
+                                                                                                    },
+                                                                                                },
+                                                                                            ),
+                                                                                            debug_text: None,
+                                                                                            conversion: None,
+                                                                                            format_spec: None,
+                                                                                        },
+                                                                                    ),
+                                                                                ],
+                                                                                flags: FStringFlags {
+                                                                                    quote_style: Double,
+                                                                                    prefix: Regular,
+                                                                                    triple_quoted: false,
+                                                                                },
+                                                                            },
+                                                                        ),
+                                                                    ),
+                                                                },
+                                                            },
+                                                        ),
+                                                        debug_text: None,
+                                                        conversion: None,
+                                                        format_spec: None,
+                                                    },
+                                                ),
+                                            ],
+                                            flags: FStringFlags {
+                                                quote_style: Double,
+                                                prefix: Regular,
+                                                triple_quoted: false,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 276..310,
+                    value: FString(
+                        ExprFString {
+                            range: 276..310,
+                            value: FStringValue {
+                                inner: Single(
+                                    FString(
+                                        FString {
+                                            range: 276..310,
+                                            elements: [
+                                                Expression(
+                                                    FStringExpressionElement {
+                                                        range: 278..303,
+                                                        expression: FString(
+                                                            ExprFString {
+                                                                range: 279..302,
+                                                                value: FStringValue {
+                                                                    inner: Single(
+                                                                        FString(
+                                                                            FString {
+                                                                                range: 279..302,
+                                                                                elements: [
+                                                                                    Expression(
+                                                                                        FStringExpressionElement {
+                                                                                            range: 283..293,
+                                                                                            expression: StringLiteral(
+                                                                                                ExprStringLiteral {
+                                                                                                    range: 284..292,
+                                                                                                    value: StringLiteralValue {
+                                                                                                        inner: Single(
+                                                                                                            StringLiteral {
+                                                                                                                range: 284..292,
+                                                                                                                value: "nested",
+                                                                                                                flags: StringLiteralFlags {
+                                                                                                                    quote_style: Double,
+                                                                                                                    prefix: Empty,
+                                                                                                                    triple_quoted: false,
+                                                                                                                },
+                                                                                                            },
+                                                                                                        ),
+                                                                                                    },
+                                                                                                },
+                                                                                            ),
+                                                                                            debug_text: None,
+                                                                                            conversion: None,
+                                                                                            format_spec: None,
+                                                                                        },
+                                                                                    ),
+                                                                                    Literal(
+                                                                                        FStringLiteralElement {
+                                                                                            range: 293..299,
+                                                                                            value: " inner",
+                                                                                        },
+                                                                                    ),
+                                                                                ],
+                                                                                flags: FStringFlags {
+                                                                                    quote_style: Single,
+                                                                                    prefix: Regular,
+                                                                                    triple_quoted: true,
+                                                                                },
+                                                                            },
+                                                                        ),
+                                                                    ),
+                                                                },
+                                                            },
+                                                        ),
+                                                        debug_text: None,
+                                                        conversion: None,
+                                                        format_spec: None,
+                                                    },
+                                                ),
+                                                Literal(
+                                                    FStringLiteralElement {
+                                                        range: 303..309,
+                                                        value: " outer",
+                                                    },
+                                                ),
+                                            ],
+                                            flags: FStringFlags {
+                                                quote_style: Double,
+                                                prefix: Regular,
+                                                triple_quoted: false,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 336..359,
+                    value: FString(
+                        ExprFString {
+                            range: 336..359,
+                            value: FStringValue {
+                                inner: Single(
+                                    FString(
+                                        FString {
+                                            range: 336..359,
+                                            elements: [
+                                                Literal(
+                                                    FStringLiteralElement {
+                                                        range: 338..343,
+                                                        value: "test ",
+                                                    },
+                                                ),
+                                                Expression(
+                                                    FStringExpressionElement {
+                                                        range: 343..353,
+                                                        expression: Name(
+                                                            ExprName {
+                                                                range: 344..345,
+                                                                id: Name("a"),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                        debug_text: None,
+                                                        conversion: None,
+                                                        format_spec: None,
+                                                    },
+                                                ),
+                                                Literal(
+                                                    FStringLiteralElement {
+                                                        range: 353..358,
+                                                        value: " more",
+                                                    },
+                                                ),
+                                            ],
+                                            flags: FStringFlags {
+                                                quote_style: Double,
+                                                prefix: Regular,
+                                                triple_quoted: false,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 403..422,
+                    value: FString(
+                        ExprFString {
+                            range: 403..422,
+                            value: FStringValue {
+                                inner: Single(
+                                    FString(
+                                        FString {
+                                            range: 403..422,
+                                            elements: [
+                                                Expression(
+                                                    FStringExpressionElement {
+                                                        range: 407..419,
+                                                        expression: FString(
+                                                            ExprFString {
+                                                                range: 408..418,
+                                                                value: FStringValue {
+                                                                    inner: Single(
+                                                                        FString(
+                                                                            FString {
+                                                                                range: 408..418,
+                                                                                elements: [
+                                                                                    Expression(
+                                                                                        FStringExpressionElement {
+                                                                                            range: 412..415,
+                                                                                            expression: Name(
+                                                                                                ExprName {
+                                                                                                    range: 413..414,
+                                                                                                    id: Name("x"),
+                                                                                                    ctx: Load,
+                                                                                                },
+                                                                                            ),
+                                                                                            debug_text: None,
+                                                                                            conversion: None,
+                                                                                            format_spec: None,
+                                                                                        },
+                                                                                    ),
+                                                                                ],
+                                                                                flags: FStringFlags {
+                                                                                    quote_style: Double,
+                                                                                    prefix: Regular,
+                                                                                    triple_quoted: true,
+                                                                                },
+                                                                            },
+                                                                        ),
+                                                                    ),
+                                                                },
+                                                            },
+                                                        ),
+                                                        debug_text: None,
+                                                        conversion: None,
+                                                        format_spec: None,
+                                                    },
+                                                ),
+                                            ],
+                                            flags: FStringFlags {
+                                                quote_style: Double,
+                                                prefix: Regular,
+                                                triple_quoted: true,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 468..502,
+                    value: FString(
+                        ExprFString {
+                            range: 468..502,
+                            value: FStringValue {
+                                inner: Single(
+                                    FString(
+                                        FString {
+                                            range: 468..502,
+                                            elements: [
+                                                Expression(
+                                                    FStringExpressionElement {
+                                                        range: 470..501,
+                                                        expression: Call(
+                                                            ExprCall {
+                                                                range: 471..500,
+                                                                func: Attribute(
+                                                                    ExprAttribute {
+                                                                        range: 471..480,
+                                                                        value: StringLiteral(
+                                                                            ExprStringLiteral {
+                                                                                range: 471..475,
+                                                                                value: StringLiteralValue {
+                                                                                    inner: Single(
+                                                                                        StringLiteral {
+                                                                                            range: 471..475,
+                                                                                            value: "\n",
+                                                                                            flags: StringLiteralFlags {
+                                                                                                quote_style: Single,
+                                                                                                prefix: Empty,
+                                                                                                triple_quoted: false,
+                                                                                            },
+                                                                                        },
+                                                                                    ),
+                                                                                },
+                                                                            },
+                                                                        ),
+                                                                        attr: Identifier {
+                                                                            id: Name("join"),
+                                                                            range: 476..480,
+                                                                        },
+                                                                        ctx: Load,
+                                                                    },
+                                                                ),
+                                                                arguments: Arguments {
+                                                                    range: 480..500,
+                                                                    args: [
+                                                                        List(
+                                                                            ExprList {
+                                                                                range: 481..499,
+                                                                                elts: [
+                                                                                    StringLiteral(
+                                                                                        ExprStringLiteral {
+                                                                                            range: 482..486,
+                                                                                            value: StringLiteralValue {
+                                                                                                inner: Single(
+                                                                                                    StringLiteral {
+                                                                                                        range: 482..486,
+                                                                                                        value: "\t",
+                                                                                                        flags: StringLiteralFlags {
+                                                                                                            quote_style: Single,
+                                                                                                            prefix: Empty,
+                                                                                                            triple_quoted: false,
+                                                                                                        },
+                                                                                                    },
+                                                                                                ),
+                                                                                            },
+                                                                                        },
+                                                                                    ),
+                                                                                    StringLiteral(
+                                                                                        ExprStringLiteral {
+                                                                                            range: 488..492,
+                                                                                            value: StringLiteralValue {
+                                                                                                inner: Single(
+                                                                                                    StringLiteral {
+                                                                                                        range: 488..492,
+                                                                                                        value: "\u{b}",
+                                                                                                        flags: StringLiteralFlags {
+                                                                                                            quote_style: Single,
+                                                                                                            prefix: Empty,
+                                                                                                            triple_quoted: false,
+                                                                                                        },
+                                                                                                    },
+                                                                                                ),
+                                                                                            },
+                                                                                        },
+                                                                                    ),
+                                                                                    StringLiteral(
+                                                                                        ExprStringLiteral {
+                                                                                            range: 494..498,
+                                                                                            value: StringLiteralValue {
+                                                                                                inner: Single(
+                                                                                                    StringLiteral {
+                                                                                                        range: 494..498,
+                                                                                                        value: "\r",
+                                                                                                        flags: StringLiteralFlags {
+                                                                                                            quote_style: Single,
+                                                                                                            prefix: Empty,
+                                                                                                            triple_quoted: false,
+                                                                                                        },
+                                                                                                    },
+                                                                                                ),
+                                                                                            },
+                                                                                        },
+                                                                                    ),
+                                                                                ],
+                                                                                ctx: Load,
+                                                                            },
+                                                                        ),
+                                                                    ],
+                                                                    keywords: [],
+                                                                },
+                                                            },
+                                                        ),
+                                                        debug_text: None,
+                                                        conversion: None,
+                                                        format_spec: None,
+                                                    },
+                                                ),
+                                            ],
+                                            flags: FStringFlags {
+                                                quote_style: Double,
+                                                prefix: Regular,
+                                                triple_quoted: false,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Unsupported Syntax Errors
+
+  |
+1 | # parse_options: {"target-version": "3.11"}
+2 | f'Magic wand: { bag['wand'] }'     # nested quotes
+  |                     ^ Syntax Error: Cannot reuse outer quote character in f-strings on Python 3.11 (syntax was added in Python 3.12)
+3 | f"{'\n'.join(a)}"                  # escape sequence
+4 | f'''A complex trick: {
+  |
+
+
+  |
+1 | # parse_options: {"target-version": "3.11"}
+2 | f'Magic wand: { bag['wand'] }'     # nested quotes
+3 | f"{'\n'.join(a)}"                  # escape sequence
+  |     ^ Syntax Error: Cannot use an escape sequence (backslash) in f-strings on Python 3.11 (syntax was added in Python 3.12)
+4 | f'''A complex trick: {
+5 |     bag['bag']                     # comment
+  |
+
+
+  |
+3 | f"{'\n'.join(a)}"                  # escape sequence
+4 | f'''A complex trick: {
+5 |     bag['bag']                     # comment
+  |                                    ^^^^^^^^^ Syntax Error: Cannot use comments in f-strings on Python 3.11 (syntax was added in Python 3.12)
+6 | }'''
+7 | f"{f"{f"{f"{f"{f"{1+1}"}"}"}"}"}"  # arbitrary nesting
+  |
+
+
+  |
+5 |     bag['bag']                     # comment
+6 | }'''
+7 | f"{f"{f"{f"{f"{f"{1+1}"}"}"}"}"}"  # arbitrary nesting
+  |                 ^ Syntax Error: Cannot reuse outer quote character in f-strings on Python 3.11 (syntax was added in Python 3.12)
+8 | f"{f'''{"nested"} inner'''} outer" # nested (triple) quotes
+9 | f"test {a \
+  |
+
+
+  |
+5 |     bag['bag']                     # comment
+6 | }'''
+7 | f"{f"{f"{f"{f"{f"{1+1}"}"}"}"}"}"  # arbitrary nesting
+  |              ^ Syntax Error: Cannot reuse outer quote character in f-strings on Python 3.11 (syntax was added in Python 3.12)
+8 | f"{f'''{"nested"} inner'''} outer" # nested (triple) quotes
+9 | f"test {a \
+  |
+
+
+  |
+5 |     bag['bag']                     # comment
+6 | }'''
+7 | f"{f"{f"{f"{f"{f"{1+1}"}"}"}"}"}"  # arbitrary nesting
+  |           ^ Syntax Error: Cannot reuse outer quote character in f-strings on Python 3.11 (syntax was added in Python 3.12)
+8 | f"{f'''{"nested"} inner'''} outer" # nested (triple) quotes
+9 | f"test {a \
+  |
+
+
+  |
+5 |     bag['bag']                     # comment
+6 | }'''
+7 | f"{f"{f"{f"{f"{f"{1+1}"}"}"}"}"}"  # arbitrary nesting
+  |        ^ Syntax Error: Cannot reuse outer quote character in f-strings on Python 3.11 (syntax was added in Python 3.12)
+8 | f"{f'''{"nested"} inner'''} outer" # nested (triple) quotes
+9 | f"test {a \
+  |
+
+
+  |
+5 |     bag['bag']                     # comment
+6 | }'''
+7 | f"{f"{f"{f"{f"{f"{1+1}"}"}"}"}"}"  # arbitrary nesting
+  |     ^ Syntax Error: Cannot reuse outer quote character in f-strings on Python 3.11 (syntax was added in Python 3.12)
+8 | f"{f'''{"nested"} inner'''} outer" # nested (triple) quotes
+9 | f"test {a \
+  |
+
+
+   |
+ 6 | }'''
+ 7 | f"{f"{f"{f"{f"{f"{1+1}"}"}"}"}"}"  # arbitrary nesting
+ 8 | f"{f'''{"nested"} inner'''} outer" # nested (triple) quotes
+   |         ^ Syntax Error: Cannot reuse outer quote character in f-strings on Python 3.11 (syntax was added in Python 3.12)
+ 9 | f"test {a \
+10 |     } more"                        # line continuation
+   |
+
+
+   |
+ 7 | f"{f"{f"{f"{f"{f"{1+1}"}"}"}"}"}"  # arbitrary nesting
+ 8 | f"{f'''{"nested"} inner'''} outer" # nested (triple) quotes
+ 9 | f"test {a \
+   |           ^ Syntax Error: Cannot use an escape sequence (backslash) in f-strings on Python 3.11 (syntax was added in Python 3.12)
+10 |     } more"                        # line continuation
+11 | f"""{f"""{x}"""}"""                # mark the whole triple quote
+   |
+
+
+   |
+ 9 | f"test {a \
+10 |     } more"                        # line continuation
+11 | f"""{f"""{x}"""}"""                # mark the whole triple quote
+   |       ^^^ Syntax Error: Cannot reuse outer quote character in f-strings on Python 3.11 (syntax was added in Python 3.12)
+12 | f"{'\n'.join(['\t', '\v', '\r'])}"  # multiple escape sequences, multiple errors
+   |
+
+
+   |
+10 |     } more"                        # line continuation
+11 | f"""{f"""{x}"""}"""                # mark the whole triple quote
+12 | f"{'\n'.join(['\t', '\v', '\r'])}"  # multiple escape sequences, multiple errors
+   |     ^ Syntax Error: Cannot use an escape sequence (backslash) in f-strings on Python 3.11 (syntax was added in Python 3.12)
+   |
+
+
+   |
+10 |     } more"                        # line continuation
+11 | f"""{f"""{x}"""}"""                # mark the whole triple quote
+12 | f"{'\n'.join(['\t', '\v', '\r'])}"  # multiple escape sequences, multiple errors
+   |                ^ Syntax Error: Cannot use an escape sequence (backslash) in f-strings on Python 3.11 (syntax was added in Python 3.12)
+   |
+
+
+   |
+10 |     } more"                        # line continuation
+11 | f"""{f"""{x}"""}"""                # mark the whole triple quote
+12 | f"{'\n'.join(['\t', '\v', '\r'])}"  # multiple escape sequences, multiple errors
+   |                      ^ Syntax Error: Cannot use an escape sequence (backslash) in f-strings on Python 3.11 (syntax was added in Python 3.12)
+   |
+
+
+   |
+10 |     } more"                        # line continuation
+11 | f"""{f"""{x}"""}"""                # mark the whole triple quote
+12 | f"{'\n'.join(['\t', '\v', '\r'])}"  # multiple escape sequences, multiple errors
+   |                            ^ Syntax Error: Cannot use an escape sequence (backslash) in f-strings on Python 3.11 (syntax was added in Python 3.12)
+   |

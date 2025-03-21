@@ -31,12 +31,13 @@ error: lint:invalid-argument-type
 3 |
 4 | def foo(x: int) -> int:
   |
- ::: /src/mdtest_snippet.py:4:9
+info
+ --> /src/mdtest_snippet.py:4:9
   |
 2 |     foo("hello")  # error: [invalid-argument-type]
 3 |
 4 | def foo(x: int) -> int:
-  |         ------ info: parameter declared in function definition here
+  |         ------ parameter declared in function definition here
 5 |     return x * x
   |
 

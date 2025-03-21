@@ -224,7 +224,6 @@ pub(crate) fn check_noqa(
             &noqa_directives,
             locator,
             &file_noqa_directives,
-            settings.preview,
         );
     }
 

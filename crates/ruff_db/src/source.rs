@@ -159,7 +159,7 @@ pub enum SourceTextError {
 /// Computes the [`LineIndex`] for `file`.
 #[salsa::tracked]
 pub fn line_index(db: &dyn Db, file: File) -> LineIndex {
-    let _span = tracing::trace_span!("line_index", file = ?file).entered();
+    let _span = tracing::trace_span!("line_index", ?file).entered();
 
     let source = source_text(db, file);
 
