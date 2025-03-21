@@ -35,74 +35,6 @@ impl SemanticSyntaxChecker {
     }
 }
 
-impl Default for SemanticSyntaxChecker {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct SemanticSyntaxError {
-    pub kind: SemanticSyntaxErrorKind,
-    pub range: TextRange,
-    pub python_version: PythonVersion,
-}
-
-impl Display for SemanticSyntaxError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.kind {
-            SemanticSyntaxErrorKind::LateFutureImport => {
-                f.write_str("__future__ imports must be at the top of the file")
-            }
-            SemanticSyntaxErrorKind::ReboundComprehensionVariable => {
-                f.write_str("assignment expression cannot rebind comprehension variable")
-            }
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum SemanticSyntaxErrorKind {
-    /// Represents the use of a `__future__` import after the beginning of a file.
-    ///
-    /// ## Examples
-    ///
-    /// ```python
-    /// from pathlib import Path
-    ///
-    /// from __future__ import annotations
-    /// ```
-    ///
-    /// This corresponds to the [`late-future-import`] (`F404`) rule in ruff.
-    ///
-    /// [`late-future-import`]: https://docs.astral.sh/ruff/rules/late-future-import/
-    LateFutureImport,
-
-    /// Represents the rebinding of the iteration variable of a list, set, or dict comprehension or
-    /// a generator expression.
-    ///
-    /// ## Examples
-    ///
-    /// ```python
-    /// [(a := 0) for a in range(0)]
-    /// {(a := 0) for a in range(0)}
-    /// {(a := 0): val for a in range(0)}
-    /// {key: (a := 0) for a in range(0)}
-    /// ((a := 0) for a in range(0))
-    /// ```
-    ReboundComprehensionVariable,
-}
-
-pub trait SemanticSyntaxContext {
-    /// Returns `true` if a module's docstring boundary has been passed.
-    fn seen_docstring_boundary(&self) -> bool;
-
-    /// The target Python version for detecting backwards-incompatible syntax changes.
-    fn python_version(&self) -> PythonVersion;
-
-    fn report_semantic_error(&self, error: SemanticSyntaxError);
-}
-
 impl SemanticSyntaxChecker {
     fn add_error<Ctx: SemanticSyntaxContext>(
         context: &Ctx,
@@ -209,6 +141,64 @@ impl SemanticSyntaxChecker {
     }
 }
 
+impl Default for SemanticSyntaxChecker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct SemanticSyntaxError {
+    pub kind: SemanticSyntaxErrorKind,
+    pub range: TextRange,
+    pub python_version: PythonVersion,
+}
+
+impl Display for SemanticSyntaxError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.kind {
+            SemanticSyntaxErrorKind::LateFutureImport => {
+                f.write_str("__future__ imports must be at the top of the file")
+            }
+            SemanticSyntaxErrorKind::ReboundComprehensionVariable => {
+                f.write_str("assignment expression cannot rebind comprehension variable")
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum SemanticSyntaxErrorKind {
+    /// Represents the use of a `__future__` import after the beginning of a file.
+    ///
+    /// ## Examples
+    ///
+    /// ```python
+    /// from pathlib import Path
+    ///
+    /// from __future__ import annotations
+    /// ```
+    ///
+    /// This corresponds to the [`late-future-import`] (`F404`) rule in ruff.
+    ///
+    /// [`late-future-import`]: https://docs.astral.sh/ruff/rules/late-future-import/
+    LateFutureImport,
+
+    /// Represents the rebinding of the iteration variable of a list, set, or dict comprehension or
+    /// a generator expression.
+    ///
+    /// ## Examples
+    ///
+    /// ```python
+    /// [(a := 0) for a in range(0)]
+    /// {(a := 0) for a in range(0)}
+    /// {(a := 0): val for a in range(0)}
+    /// {key: (a := 0) for a in range(0)}
+    /// ((a := 0) for a in range(0))
+    /// ```
+    ReboundComprehensionVariable,
+}
+
 /// Searches for the first named expression (`x := y`) rebinding one of the `iteration_variables` in
 /// a comprehension or generator expression.
 struct ReboundComprehensionVisitor<'a> {
@@ -231,6 +221,16 @@ impl Visitor<'_> for ReboundComprehensionVisitor<'_> {
         }
         walk_expr(self, expr);
     }
+}
+
+pub trait SemanticSyntaxContext {
+    /// Returns `true` if a module's docstring boundary has been passed.
+    fn seen_docstring_boundary(&self) -> bool;
+
+    /// The target Python version for detecting backwards-incompatible syntax changes.
+    fn python_version(&self) -> PythonVersion;
+
+    fn report_semantic_error(&self, error: SemanticSyntaxError);
 }
 
 #[derive(Default)]
