@@ -2,6 +2,13 @@ use ruff_index::{newtype_index, IndexVec};
 use ruff_python_ast::Stmt;
 use smallvec::SmallVec;
 
+/// Returns the control flow graph associated to an array of statements
+pub fn build_cfg<'stmt>(stmts: &'stmt [Stmt]) -> CFG<'stmt> {
+    let mut builder = CFGBuilder::with_capacity(stmts.len());
+    builder.process_stmts(stmts);
+    builder.finish()
+}
+
 /// Control flow graph
 #[derive(Debug)]
 pub struct CFG<'stmt> {
@@ -85,4 +92,53 @@ impl Edges {
 pub enum Condition {
     /// Unconditional edge
     Always,
+}
+
+struct CFGBuilder<'stmt> {
+    /// Control flow graph under construction
+    cfg: CFG<'stmt>,
+    /// Current basic block index
+    current: BlockId,
+    /// Exit block index for current control flow
+    exit: BlockId,
+}
+
+impl<'stmt> CFGBuilder<'stmt> {
+    fn with_capacity(capacity: usize) -> Self {
+        let mut blocks = IndexVec::with_capacity(capacity);
+        let initial = blocks.push(BlockData {
+            kind: BlockKind::Start,
+            ..BlockData::default()
+        });
+        let terminal = blocks.push(BlockData {
+            kind: BlockKind::Terminal,
+            ..BlockData::default()
+        });
+
+        Self {
+            cfg: CFG {
+                blocks,
+                initial,
+                terminal,
+            },
+            current: initial,
+            exit: terminal,
+        }
+    }
+
+    fn process_stmts(&mut self, stmts: &'stmt [Stmt]) {
+        todo!()
+    }
+
+    fn finish(self) -> CFG<'stmt> {
+        self.cfg
+    }
+
+    fn current(&self) -> BlockId {
+        self.current
+    }
+
+    fn exit(&self) -> BlockId {
+        self.exit
+    }
 }
