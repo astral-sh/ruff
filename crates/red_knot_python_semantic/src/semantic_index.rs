@@ -29,6 +29,7 @@ pub mod definition;
 pub mod expression;
 mod narrowing_constraints;
 pub(crate) mod predicate;
+mod re_exports;
 pub mod symbol;
 mod use_def;
 mod visibility_constraints;
