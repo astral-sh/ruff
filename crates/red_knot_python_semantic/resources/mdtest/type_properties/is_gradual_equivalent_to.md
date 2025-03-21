@@ -94,7 +94,7 @@ static_assert(is_gradual_equivalent_to(CallableTypeFromFunction[f1], Callable[[]
 And, similarly for parameters with no annotations.
 
 ```py
-def f2(a, b) -> None:
+def f2(a, b, /) -> None:
     return
 
 static_assert(is_gradual_equivalent_to(CallableTypeFromFunction[f2], Callable[[Any, Any], None]))
