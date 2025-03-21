@@ -4,7 +4,7 @@
 
 ### Preview features
 
-- [syntax-errors] Fix star annotations before Python 3.11 ([#16878](https://github.com/astral-sh/ruff/pull/16878))
+- [syntax-errors] Fix false-positive syntax errors emitted for annotations on variadic parameters before Python 3.11 ([#16878](https://github.com/astral-sh/ruff/pull/16878))
 
 ## 0.11.1
 
