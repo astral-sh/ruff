@@ -554,7 +554,7 @@ pub fn lint_fix<'a>(
     let mut has_valid_syntax = false;
 
     // Track whether the _initial_ source code has no unsupported syntax errors.
-    let mut has_no_unsupported_syntax_errors = false;
+    let mut has_no_syntax_errors = false;
 
     let target_version = settings.resolve_target_version(path);
 
@@ -598,12 +598,12 @@ pub fn lint_fix<'a>(
 
         if iterations == 0 {
             has_valid_syntax = parsed.has_valid_syntax();
-            has_no_unsupported_syntax_errors = !messages.iter().any(Message::is_syntax_error);
+            has_no_syntax_errors = !messages.iter().any(Message::is_syntax_error);
         } else {
             // If the source code had no syntax errors on the first pass, but
             // does on a subsequent pass, then we've introduced a
             // syntax error. Return the original code.
-            if has_valid_syntax && has_no_unsupported_syntax_errors {
+            if has_valid_syntax && has_no_syntax_errors {
                 if let Some(error) = parsed.errors().first() {
                     report_fix_syntax_error(
                         path,
@@ -645,7 +645,7 @@ pub fn lint_fix<'a>(
             result: LinterResult {
                 messages,
                 has_valid_syntax,
-                has_no_syntax_errors: has_no_unsupported_syntax_errors,
+                has_no_syntax_errors,
             },
             transformed,
             fixed,
