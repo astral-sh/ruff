@@ -76,7 +76,12 @@ impl FormatNodeRule<ExprIf> for FormatExprIf {
         });
 
         match self.layout {
-            ExprIfLayout::Default => in_parentheses_only_group(&inner).fmt(f),
+            ExprIfLayout::Default => in_parentheses_only_group(&with_line_width_limit(
+                &inner,
+                f.options().if_expression_flat_width_limit().into(),
+                true,
+            ))
+            .fmt(f),
             ExprIfLayout::Nested => inner.fmt(f),
         }
     }

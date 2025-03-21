@@ -19,3 +19,10 @@ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa((a for a in a(10)))
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(all(a for a in a(10)))
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa((abcd for abcd in a(10) if abcd > 5))
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(all(abcd for abcd in a(10) if abcd > 5))
+
+x = a if b else c
+x = a if b else c if d else e
+x = aaaaaaa if bbbbbbbbb else ccccccccc
+x = aaaaaaa if bbbbbbbbb else ccccccccc if ddddddddd else eeeeeeeee
+fffffffffffffffffffffff(a if b else c)
+fffffffffffffffffffffff(aaaaaaaaa if bbbbbbbbb else ccccccccc)
