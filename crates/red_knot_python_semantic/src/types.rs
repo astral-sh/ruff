@@ -2477,6 +2477,10 @@ impl<'db> Type<'db> {
                 Signatures::single(signature)
             }
 
+            Type::Callable(CallableType::General(callable)) => Signatures::single(
+                CallableSignature::single(self, callable.signature(db).clone()),
+            ),
+
             Type::FunctionLiteral(function_type) => Signatures::single(CallableSignature::single(
                 self,
                 function_type.signature(db).clone(),
