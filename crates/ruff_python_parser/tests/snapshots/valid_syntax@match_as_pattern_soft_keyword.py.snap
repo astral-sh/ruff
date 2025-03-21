@@ -1,18 +1,17 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/ok/match_as_pattern_soft_keyword.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
-        range: 0..69,
+        range: 0..91,
         body: [
             Match(
                 StmtMatch {
-                    range: 0..68,
+                    range: 0..29,
                     subject: Name(
                         ExprName {
                             range: 6..9,
@@ -49,16 +48,30 @@ Module(
                                 ),
                             ],
                         },
+                    ],
+                },
+            ),
+            Match(
+                StmtMatch {
+                    range: 30..60,
+                    subject: Name(
+                        ExprName {
+                            range: 36..39,
+                            id: Name("foo"),
+                            ctx: Load,
+                        },
+                    ),
+                    cases: [
                         MatchCase {
-                            range: 34..49,
+                            range: 45..60,
                             pattern: MatchAs(
                                 PatternMatchAs {
-                                    range: 39..44,
+                                    range: 50..55,
                                     pattern: None,
                                     name: Some(
                                         Identifier {
                                             id: Name("match"),
-                                            range: 39..44,
+                                            range: 50..55,
                                         },
                                     ),
                                 },
@@ -67,26 +80,40 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        range: 46..49,
+                                        range: 57..60,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                range: 46..49,
+                                                range: 57..60,
                                             },
                                         ),
                                     },
                                 ),
                             ],
                         },
+                    ],
+                },
+            ),
+            Match(
+                StmtMatch {
+                    range: 61..90,
+                    subject: Name(
+                        ExprName {
+                            range: 67..70,
+                            id: Name("foo"),
+                            ctx: Load,
+                        },
+                    ),
+                    cases: [
                         MatchCase {
-                            range: 54..68,
+                            range: 76..90,
                             pattern: MatchAs(
                                 PatternMatchAs {
-                                    range: 59..63,
+                                    range: 81..85,
                                     pattern: None,
                                     name: Some(
                                         Identifier {
                                             id: Name("type"),
-                                            range: 59..63,
+                                            range: 81..85,
                                         },
                                     ),
                                 },
@@ -95,10 +122,10 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        range: 65..68,
+                                        range: 87..90,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                range: 65..68,
+                                                range: 87..90,
                                             },
                                         ),
                                     },
