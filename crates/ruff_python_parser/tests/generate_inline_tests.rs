@@ -22,34 +22,12 @@ fn project_root() -> PathBuf {
 
 #[test]
 fn generate_inline_tests() -> Result<()> {
-    let parser_dir = project_root().join("crates/ruff_python_parser/src/parser");
+    let parser_dir = project_root().join("crates/ruff_python_parser/src/");
     let tests = TestCollection::try_from(parser_dir.as_path())?;
 
     let mut test_files = TestFiles::default();
     test_files += install_tests(&tests.ok, "crates/ruff_python_parser/resources/inline/ok")?;
     test_files += install_tests(&tests.err, "crates/ruff_python_parser/resources/inline/err")?;
-
-    if !test_files.is_empty() {
-        anyhow::bail!("{}", test_files);
-    }
-
-    Ok(())
-}
-
-#[test]
-fn generate_inline_tests_semantic() -> Result<()> {
-    let parser_dir = project_root().join("crates/ruff_python_parser/src/semantic_errors");
-    let tests = TestCollection::try_from(parser_dir.as_path())?;
-
-    let mut test_files = TestFiles::default();
-    test_files += install_tests(
-        &tests.ok,
-        "crates/ruff_python_parser/resources/inline/semantic/ok",
-    )?;
-    test_files += install_tests(
-        &tests.err,
-        "crates/ruff_python_parser/resources/inline/semantic/err",
-    )?;
 
     if !test_files.is_empty() {
         anyhow::bail!("{}", test_files);
