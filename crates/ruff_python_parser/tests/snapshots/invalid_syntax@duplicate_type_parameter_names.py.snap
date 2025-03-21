@@ -7,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/inline/err/duplicate_type_parame
 ```
 Module(
     ModModule {
-        range: 0..169,
+        range: 0..261,
         body: [
             TypeAlias(
                 StmtTypeAlias {
@@ -389,6 +389,126 @@ Module(
                     ],
                 },
             ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 169..188,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("f"),
+                        range: 173..174,
+                    },
+                    type_params: Some(
+                        TypeParams {
+                            range: 174..181,
+                            type_params: [
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        range: 175..176,
+                                        name: Identifier {
+                                            id: Name("T"),
+                                            range: 175..176,
+                                        },
+                                        bound: None,
+                                        default: None,
+                                    },
+                                ),
+                                TypeVarTuple(
+                                    TypeParamTypeVarTuple {
+                                        range: 178..180,
+                                        name: Identifier {
+                                            id: Name("T"),
+                                            range: 179..180,
+                                        },
+                                        default: None,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    parameters: Parameters {
+                        range: 181..183,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 185..188,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 185..188,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 218..238,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("f"),
+                        range: 222..223,
+                    },
+                    type_params: Some(
+                        TypeParams {
+                            range: 223..231,
+                            type_params: [
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        range: 224..225,
+                                        name: Identifier {
+                                            id: Name("T"),
+                                            range: 224..225,
+                                        },
+                                        bound: None,
+                                        default: None,
+                                    },
+                                ),
+                                ParamSpec(
+                                    TypeParamParamSpec {
+                                        range: 227..230,
+                                        name: Identifier {
+                                            id: Name("T"),
+                                            range: 229..230,
+                                        },
+                                        default: None,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    parameters: Parameters {
+                        range: 231..233,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 235..238,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 235..238,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
         ],
     },
 )
@@ -428,6 +548,7 @@ Module(
 4 | type Alias[T, U: str, V: (str, bytes), *Ts, **P, T = default] = ...
   |                                                  ^^^^^^^^^^^ Syntax Error: duplicate type parameter
 5 | def f[T, T, T](): ...  # two errors
+6 | def f[T, *T](): ...    # star is still duplicate
   |
 
 
@@ -436,6 +557,8 @@ Module(
 4 | type Alias[T, U: str, V: (str, bytes), *Ts, **P, T = default] = ...
 5 | def f[T, T, T](): ...  # two errors
   |          ^ Syntax Error: duplicate type parameter
+6 | def f[T, *T](): ...    # star is still duplicate
+7 | def f[T, **T](): ...   # as is double star
   |
 
 
@@ -444,4 +567,23 @@ Module(
 4 | type Alias[T, U: str, V: (str, bytes), *Ts, **P, T = default] = ...
 5 | def f[T, T, T](): ...  # two errors
   |             ^ Syntax Error: duplicate type parameter
+6 | def f[T, *T](): ...    # star is still duplicate
+7 | def f[T, **T](): ...   # as is double star
+  |
+
+
+  |
+4 | type Alias[T, U: str, V: (str, bytes), *Ts, **P, T = default] = ...
+5 | def f[T, T, T](): ...  # two errors
+6 | def f[T, *T](): ...    # star is still duplicate
+  |          ^^ Syntax Error: duplicate type parameter
+7 | def f[T, **T](): ...   # as is double star
+  |
+
+
+  |
+5 | def f[T, T, T](): ...  # two errors
+6 | def f[T, *T](): ...    # star is still duplicate
+7 | def f[T, **T](): ...   # as is double star
+  |          ^^^ Syntax Error: duplicate type parameter
   |
