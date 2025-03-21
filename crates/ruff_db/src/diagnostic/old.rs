@@ -61,6 +61,12 @@ impl OldSecondaryDiagnosticMessage {
             message: message.into(),
         }
     }
+
+    pub fn to_sub_diagnostic(&self) -> SubDiagnostic {
+        let mut sub = SubDiagnostic::new(Severity::Info, "");
+        sub.annotate(Annotation::secondary(self.span.clone()).message(&self.message));
+        sub
+    }
 }
 
 pub struct OldDisplayDiagnostic<'db, 'diag, 'config> {
@@ -126,11 +132,7 @@ impl std::fmt::Display for OldDisplayDiagnostic<'_, '_, '_> {
             // empty. This leads to somewhat awkward rendering, but
             // the way to fix that is to migrate Red Knot to the more
             // expressive `Diagnostic` API.
-            let mut sub = SubDiagnostic::new(Severity::Info, "");
-            sub.annotate(
-                Annotation::secondary(secondary_msg.span.clone()).message(&secondary_msg.message),
-            );
-            diag.sub(sub);
+            diag.sub(secondary_msg.to_sub_diagnostic());
         }
 
         // The main way to print a `Diagnostic` is via its `print`
