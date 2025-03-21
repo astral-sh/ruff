@@ -88,7 +88,7 @@ use crate::util::subscript::{PyIndex, PySlice};
 use crate::Db;
 
 use super::class_base::ClassBase;
-use super::context::{InNoTypeCheck, InferContext, WithDiagnostics};
+use super::context::{InNoTypeCheck, InferContext};
 use super::diagnostic::{
     report_index_out_of_bounds, report_invalid_exception_caught, report_invalid_exception_cause,
     report_invalid_exception_raised, report_invalid_type_checking_constant,
@@ -439,12 +439,6 @@ impl<'db> TypeInference<'db> {
     }
 }
 
-impl WithDiagnostics for TypeInference<'_> {
-    fn diagnostics(&self) -> &TypeCheckDiagnostics {
-        &self.diagnostics
-    }
-}
-
 /// Whether the intersection type is on the left or right side of the comparison.
 #[derive(Debug, Clone, Copy)]
 enum IntersectionOn {
@@ -567,7 +561,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             .extend(inference.declarations.iter());
         self.types.expressions.extend(inference.expressions.iter());
         self.types.deferred.extend(inference.deferred.iter());
-        self.context.extend(inference);
+        self.context.extend(inference.diagnostics());
     }
 
     fn file(&self) -> File {
@@ -1863,7 +1857,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     let unpacked = infer_unpack_types(self.db(), unpack);
                     let name_ast_id = name.scoped_expression_id(self.db(), self.scope());
                     if unpack_position == UnpackPosition::First {
-                        self.context.extend(unpacked);
+                        self.context.extend(unpacked.diagnostics());
                     }
                     unpacked.expression_type(name_ast_id)
                 }
@@ -2673,7 +2667,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 // Only copy the diagnostics if this is the first assignment to avoid duplicating the
                 // unpack assignments.
                 if unpack_position == UnpackPosition::First {
-                    self.context.extend(unpacked);
+                    self.context.extend(unpacked.diagnostics());
                 }
 
                 let name_ast_id = name.scoped_expression_id(self.db(), self.scope());
@@ -2973,7 +2967,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 TargetKind::Sequence(unpack_position, unpack) => {
                     let unpacked = infer_unpack_types(self.db(), unpack);
                     if unpack_position == UnpackPosition::First {
-                        self.context.extend(unpacked);
+                        self.context.extend(unpacked.diagnostics());
                     }
                     let name_ast_id = name.scoped_expression_id(self.db(), self.scope());
                     unpacked.expression_type(name_ast_id)
