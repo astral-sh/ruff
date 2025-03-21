@@ -974,7 +974,7 @@ impl<'src> Parser<'src> {
 
         ast::StmtTypeAlias {
             name: Box::new(name),
-            type_params,
+            type_params: type_params.map(Box::new),
             value: Box::new(value.expr),
             range: self.node_range(start),
         }
