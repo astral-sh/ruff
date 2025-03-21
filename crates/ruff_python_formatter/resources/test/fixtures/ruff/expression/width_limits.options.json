@@ -1,0 +1,8 @@
+[
+  {
+    "list_comprehension_width_limit": 20,
+    "dict_comprehension_width_limit": 20,
+    "set_comprehension_width_limit": 20,
+    "generator_expression_width_limit": 20
+  }
+]

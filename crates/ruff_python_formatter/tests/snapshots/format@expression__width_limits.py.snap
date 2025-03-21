@@ -1,0 +1,178 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/width_limits.py
+---
+## Input
+```python
+[a for a in range(10)]
+[abcd for abcd in range(10) if abcd > 5]
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa([a for a in range(10)])
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa([abcd for abcd in range(10) if abcd > 5])
+
+{a: a for a in f(10)}
+{abcd: abcd for abcd in f(10) if abcd > 5}
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa({a: a for a in f(10)})
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa({abcd: abcd for abcd in f(10) if abcd > 5})
+
+{a for a in a(10)}
+{abcd for abcd in a(10) if abcd > 5}
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa({a for a in a(10)})
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa({abcd for abcd in a(10) if abcd > 5})
+
+(a for a in a(10))
+(abcd for abcd in a(10) if abcd > 5)
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa((a for a in a(10)))
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(all(a for a in a(10)))
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa((abcd for abcd in a(10) if abcd > 5))
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(all(abcd for abcd in a(10) if abcd > 5))
+```
+
+## Outputs
+### Output 1
+```
+indent-style               = space
+line-width                 = 88
+indent-width               = 4
+quote-style                = Double
+line-ending                = LineFeed
+magic-trailing-comma       = Respect
+docstring-code             = Disabled
+docstring-code-line-width  = "dynamic"
+preview                    = Disabled
+target_version             = 3.9
+source_type                = Python
+```
+
+```python
+[a for a in range(10)]
+[
+    abcd
+    for abcd in range(10)
+    if abcd > 5
+]
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa([a for a in range(10)])
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(
+    [
+        abcd
+        for abcd in range(10)
+        if abcd > 5
+    ]
+)
+
+{a: a for a in f(10)}
+{
+    abcd: abcd
+    for abcd in f(10)
+    if abcd > 5
+}
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa({a: a for a in f(10)})
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(
+    {
+        abcd: abcd
+        for abcd in f(10)
+        if abcd > 5
+    }
+)
+
+{a for a in a(10)}
+{
+    abcd
+    for abcd in a(10)
+    if abcd > 5
+}
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa({a for a in a(10)})
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(
+    {
+        abcd
+        for abcd in a(10)
+        if abcd > 5
+    }
+)
+
+(a for a in a(10))
+(
+    abcd
+    for abcd in a(10)
+    if abcd > 5
+)
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa((a for a in a(10)))
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(all(a for a in a(10)))
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(
+    (
+        abcd
+        for abcd in a(10)
+        if abcd > 5
+    )
+)
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(
+    all(
+        abcd
+        for abcd in a(10)
+        if abcd > 5
+    )
+)
+```
+
+
+#### Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -5,13 +5,11 @@
+     if abcd > 5
+ ]
+ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa([a for a in range(10)])
+-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(
+-    [
+-        abcd
+-        for abcd in range(10)
+-        if abcd > 5
+-    ]
+-)
++aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa([
++    abcd
++    for abcd in range(10)
++    if abcd > 5
++])
+ 
+ {a: a for a in f(10)}
+ {
+@@ -20,13 +18,11 @@
+     if abcd > 5
+ }
+ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa({a: a for a in f(10)})
+-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(
+-    {
+-        abcd: abcd
+-        for abcd in f(10)
+-        if abcd > 5
+-    }
+-)
++aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa({
++    abcd: abcd
++    for abcd in f(10)
++    if abcd > 5
++})
+ 
+ {a for a in a(10)}
+ {
+@@ -35,13 +31,11 @@
+     if abcd > 5
+ }
+ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa({a for a in a(10)})
+-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(
+-    {
+-        abcd
+-        for abcd in a(10)
+-        if abcd > 5
+-    }
+-)
++aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa({
++    abcd
++    for abcd in a(10)
++    if abcd > 5
++})
+ 
+ (a for a in a(10))
+ (
+```
