@@ -17,7 +17,6 @@ use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 use std::borrow::Cow;
 use std::fmt::Formatter;
-use std::ops::Deref;
 use std::sync::Arc;
 
 /// Registers all known type check lints.
@@ -985,19 +984,15 @@ impl TypeCheckDiagnostics {
         self.used_suppressions.shrink_to_fit();
         self.diagnostics.shrink_to_fit();
     }
+
+    pub fn iter(&self) -> std::slice::Iter<'_, Arc<TypeCheckDiagnostic>> {
+        self.diagnostics.iter()
+    }
 }
 
 impl std::fmt::Debug for TypeCheckDiagnostics {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         self.diagnostics.fmt(f)
-    }
-}
-
-impl Deref for TypeCheckDiagnostics {
-    type Target = [std::sync::Arc<TypeCheckDiagnostic>];
-
-    fn deref(&self) -> &Self::Target {
-        &self.diagnostics
     }
 }
 
