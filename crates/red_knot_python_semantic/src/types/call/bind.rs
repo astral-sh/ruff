@@ -37,10 +37,6 @@ pub(crate) struct Bindings<'db> {
     elements: SmallVec<[CallableBinding<'db>; 1]>,
 
     /// Whether each argument will be used as a value and/or a type form in this call.
-    ///
-    /// TODO: We will eventually infer completely different argument types for each signature, once
-    /// we are able to use the annotated parameter types as type contexts for that inference. At
-    /// that point, this field will move down into `CallBinding` or `Binding`.
     pub(crate) argument_forms: Box<[Option<ParameterForm>]>,
 
     conflicting_forms: Box<[bool]>,
