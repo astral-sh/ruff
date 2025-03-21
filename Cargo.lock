@@ -2598,6 +2598,7 @@ dependencies = [
  "lsp-server",
  "lsp-types",
  "red_knot_project",
+ "red_knot_python_semantic",
  "ruff_db",
  "ruff_notebook",
  "ruff_python_ast",
@@ -2607,6 +2608,7 @@ dependencies = [
  "serde",
  "serde_json",
  "shellexpand",
+ "smallvec",
  "tracing",
  "tracing-subscriber",
 ]

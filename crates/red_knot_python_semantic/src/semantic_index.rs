@@ -45,7 +45,7 @@ type SymbolMap = hashbrown::HashMap<ScopedSymbolId, (), FxBuildHasher>;
 ///
 /// Prefer using [`symbol_table`] when working with symbols from a single scope.
 #[salsa::tracked(return_ref, no_eq)]
-pub(crate) fn semantic_index(db: &dyn Db, file: File) -> SemanticIndex<'_> {
+pub fn semantic_index(db: &dyn Db, file: File) -> SemanticIndex<'_> {
     let _span = tracing::trace_span!("semantic_index", ?file).entered();
 
     let parsed = parsed_module(db.upcast(), file);

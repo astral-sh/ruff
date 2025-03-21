@@ -1,21 +1,21 @@
 use std::fmt;
 use std::sync::Arc;
 
-use countme::Count;
-use dashmap::mapref::entry::Entry;
-pub use file_root::{FileRoot, FileRootKind};
-pub use path::FilePath;
-use ruff_notebook::{Notebook, NotebookError};
-use ruff_python_ast::PySourceType;
-use salsa::plumbing::AsId;
-use salsa::{Durability, Setter};
-
 use crate::file_revision::FileRevision;
 use crate::files::file_root::FileRoots;
 use crate::files::private::FileStatus;
 use crate::system::{SystemPath, SystemPathBuf, SystemVirtualPath, SystemVirtualPathBuf};
 use crate::vendored::{VendoredPath, VendoredPathBuf};
 use crate::{vendored, Db, FxDashMap};
+use countme::Count;
+use dashmap::mapref::entry::Entry;
+pub use file_root::{FileRoot, FileRootKind};
+pub use path::FilePath;
+use ruff_notebook::{Notebook, NotebookError};
+use ruff_python_ast::PySourceType;
+use ruff_text_size::{Ranged, TextRange};
+use salsa::plumbing::AsId;
+use salsa::{Durability, Setter};
 
 mod file_root;
 mod path;
@@ -509,6 +509,30 @@ impl fmt::Display for FileError {
 }
 
 impl std::error::Error for FileError {}
+
+/// Range with its corresponding file.
+#[derive(Debug, Copy, Clone)]
+pub struct FileRange {
+    file: File,
+    range: TextRange,
+}
+
+impl FileRange {
+    pub const fn new(file: File, range: TextRange) -> Self {
+        Self { file, range }
+    }
+
+    pub const fn file(&self) -> File {
+        self.file
+    }
+}
+
+impl Ranged for FileRange {
+    #[inline]
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
 
 #[cfg(test)]
 mod tests {

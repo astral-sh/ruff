@@ -8,6 +8,8 @@ pub(crate) struct ResolvedClientCapabilities {
     pub(crate) document_changes: bool,
     pub(crate) workspace_refresh: bool,
     pub(crate) pull_diagnostics: bool,
+    /// Whether `textDocument.declaration.linkSupport` is `true`
+    pub(crate) declaration_link_support: bool,
 }
 
 impl ResolvedClientCapabilities {
@@ -36,6 +38,12 @@ impl ResolvedClientCapabilities {
             .and_then(|workspace_edit| workspace_edit.document_changes)
             .unwrap_or_default();
 
+        let declaration_link_support = client_capabilities
+            .text_document
+            .as_ref()
+            .and_then(|document| document.declaration?.link_support)
+            .unwrap_or_default();
+
         let workspace_refresh = true;
 
         // TODO(jane): Once the bug involving workspace.diagnostic(s) deserialization has been fixed,
@@ -62,6 +70,7 @@ impl ResolvedClientCapabilities {
             document_changes,
             workspace_refresh,
             pull_diagnostics,
+            declaration_link_support,
         }
     }
 }
