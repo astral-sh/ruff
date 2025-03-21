@@ -57,13 +57,18 @@ def f() -> int:
 ### In Protocol
 
 ```py
-from typing import Protocol
+from typing import Protocol, TypeVar
 
 class Bar(Protocol):
     def f(self) -> int: ...
 
 class Baz(Bar):
     # error: [invalid-return-type]
+    def f(self) -> int: ...
+
+T = TypeVar('T')
+
+class Qux(Protocol[T]):
     def f(self) -> int: ...
 ```
 
@@ -73,6 +78,12 @@ class Baz(Bar):
 from abc import ABC, abstractmethod
 
 class Foo(ABC):
+    @abstractmethod
+    def f(self) -> int: ...
+    @abstractmethod
+    def g[T](self, x: T) -> T: ...
+
+class Bar[T](ABC):
     @abstractmethod
     def f(self) -> int: ...
     @abstractmethod

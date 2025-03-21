@@ -1221,19 +1221,23 @@ impl<'db> TypeInferenceBuilder<'db> {
             });
 
             let class_inherits_protocol_directly = (|| -> bool {
-                let current_scope = self.scope().scope(self.db());
+                let current_scope_id = self.scope().file_scope_id(self.db());
+                let current_scope = self.index.scope(current_scope_id);
                 let Some(parent_scope_id) = current_scope.parent() else {
                     return false;
                 };
-                let parent_scope = parent_scope_id
-                    .to_scope_id(self.db(), self.file())
-                    .scope(self.db());
+                let parent_scope = self.index.scope(parent_scope_id);
 
                 let NodeWithScopeKind::Class(node_ref) = parent_scope.node() else {
                     return false;
                 };
 
                 node_ref.bases().iter().any(|base| {
+                    let base = match base {
+                        ast::Expr::Subscript(subscript) => &subscript.value,
+                        _ => base,
+                    };
+
                     matches!(
                         self.file_expression_type(base),
                         Type::KnownInstance(KnownInstanceType::Protocol)
