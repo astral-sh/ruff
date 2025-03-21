@@ -2,12 +2,14 @@ use std::fmt;
 
 use drop_bomb::DebugDropBomb;
 use ruff_db::{
-    diagnostic::{DiagnosticId, OldSecondaryDiagnosticMessage, Severity},
+    diagnostic::{
+        Annotation, Diagnostic, DiagnosticId, OldSecondaryDiagnosticMessage, Severity, Span,
+    },
     files::File,
 };
 use ruff_text_size::{Ranged, TextRange};
 
-use super::{binding_type, Type, TypeCheckDiagnostic, TypeCheckDiagnostics};
+use super::{binding_type, Type, TypeCheckDiagnostics};
 
 use crate::semantic_index::symbol::ScopeId;
 use crate::{
@@ -147,14 +149,13 @@ impl<'db> InferContext<'db> {
         //   returns a rule selector for a given file that respects the package's settings,
         //   any global pragma comments in the file, and any per-file-ignores.
 
-        self.diagnostics.borrow_mut().push(TypeCheckDiagnostic {
-            file: self.file,
-            id,
-            message: message.to_string(),
-            range: ranged.range(),
-            severity,
-            secondary_messages,
-        });
+        let mut diag = Diagnostic::new(id, severity, "");
+        for secondary_msg in &secondary_messages {
+            diag.sub(secondary_msg.to_sub_diagnostic());
+        }
+        let span = Span::from(self.file).with_range(ranged.range());
+        diag.annotate(Annotation::primary(span).message(message));
+        self.diagnostics.borrow_mut().push(diag);
     }
 
     pub(super) fn set_in_no_type_check(&mut self, no_type_check: InNoTypeCheck) {

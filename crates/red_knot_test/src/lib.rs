@@ -6,14 +6,15 @@ use config::SystemKind;
 use parser as test_parser;
 use red_knot_python_semantic::types::check_types;
 use red_knot_python_semantic::{Program, ProgramSettings, PythonPath, SearchPathSettings};
-use ruff_db::diagnostic::{DisplayDiagnosticConfig, OldDiagnosticTrait, OldParseDiagnostic};
+use ruff_db::diagnostic::{create_parse_diagnostic, Diagnostic, DisplayDiagnosticConfig};
 use ruff_db::files::{system_path_to_file, File};
 use ruff_db::panic::catch_unwind;
 use ruff_db::parsed::parsed_module;
 use ruff_db::system::{DbWithWritableSystem as _, SystemPath, SystemPathBuf};
 use ruff_db::testing::{setup_logging, setup_logging_with_filter};
 use ruff_source_file::{LineIndex, OneIndexed};
-use std::fmt::Write;
+use std::fmt::Write as _;
+use std::io::Write as _;
 
 mod assertion;
 mod config;
@@ -220,15 +221,10 @@ fn run_test(
         .filter_map(|test_file| {
             let parsed = parsed_module(db, test_file.file);
 
-            let mut diagnostics: Vec<Box<_>> = parsed
+            let mut diagnostics: Vec<Diagnostic> = parsed
                 .errors()
                 .iter()
-                .cloned()
-                .map(|error| {
-                    let diagnostic: Box<dyn OldDiagnosticTrait> =
-                        Box::new(OldParseDiagnostic::new(test_file.file, error));
-                    diagnostic
-                })
+                .map(|error| create_parse_diagnostic(test_file.file, error))
                 .collect();
 
             let type_diagnostics = match catch_unwind(|| check_types(db, test_file.file)) {
@@ -258,19 +254,15 @@ fn run_test(
                     });
                 }
             };
-            diagnostics.extend(type_diagnostics.into_iter().map(|diagnostic| {
-                let diagnostic: Box<dyn OldDiagnosticTrait> = Box::new((*diagnostic).clone());
-                diagnostic
-            }));
+            diagnostics.extend(type_diagnostics.into_iter().cloned());
 
-            let failure =
-                match matcher::match_file(db, test_file.file, diagnostics.iter().map(|d| &**d)) {
-                    Ok(()) => None,
-                    Err(line_failures) => Some(FileFailures {
-                        backtick_offsets: test_file.backtick_offsets,
-                        by_line: line_failures,
-                    }),
-                };
+            let failure = match matcher::match_file(db, test_file.file, &diagnostics) {
+                Ok(()) => None,
+                Err(line_failures) => Some(FileFailures {
+                    backtick_offsets: test_file.backtick_offsets,
+                    by_line: line_failures,
+                }),
+            };
             if test.should_snapshot_diagnostics() {
                 snapshot_diagnostics.extend(diagnostics);
             }
@@ -324,15 +316,15 @@ struct TestFile {
     backtick_offsets: Vec<BacktickOffsets>,
 }
 
-fn create_diagnostic_snapshot<D: OldDiagnosticTrait>(
+fn create_diagnostic_snapshot(
     db: &mut db::Db,
     relative_fixture_path: &Utf8Path,
     test: &parser::MarkdownTest,
-    diagnostics: impl IntoIterator<Item = D>,
+    diagnostics: impl IntoIterator<Item = Diagnostic>,
 ) -> String {
     let display_config = DisplayDiagnosticConfig::default().color(false);
 
-    let mut snapshot = String::new();
+    let mut snapshot = Vec::new();
     writeln!(snapshot).unwrap();
     writeln!(snapshot, "---").unwrap();
     writeln!(snapshot, "mdtest name: {}", test.name()).unwrap();
@@ -368,8 +360,8 @@ fn create_diagnostic_snapshot<D: OldDiagnosticTrait>(
             writeln!(snapshot).unwrap();
         }
         writeln!(snapshot, "```").unwrap();
-        writeln!(snapshot, "{}", diag.display(db, &display_config)).unwrap();
+        diag.print(db, &display_config, &mut snapshot).unwrap();
         writeln!(snapshot, "```").unwrap();
     }
-    snapshot
+    String::from_utf8(snapshot).unwrap()
 }

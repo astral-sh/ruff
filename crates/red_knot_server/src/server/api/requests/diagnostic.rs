@@ -72,10 +72,10 @@ fn compute_diagnostics(snapshot: &DocumentSnapshot, db: &ProjectDatabase) -> Vec
 
 fn to_lsp_diagnostic(
     db: &dyn Db,
-    diagnostic: &dyn ruff_db::diagnostic::OldDiagnosticTrait,
+    diagnostic: &ruff_db::diagnostic::Diagnostic,
     encoding: crate::PositionEncoding,
 ) -> Diagnostic {
-    let range = if let Some(span) = diagnostic.span() {
+    let range = if let Some(span) = diagnostic.primary_span() {
         let index = line_index(db.upcast(), span.file());
         let source = source_text(db.upcast(), span.file());
 
@@ -99,7 +99,7 @@ fn to_lsp_diagnostic(
         code: Some(NumberOrString::String(diagnostic.id().to_string())),
         code_description: None,
         source: Some("red-knot".into()),
-        message: diagnostic.message().into_owned(),
+        message: diagnostic.primary_message().to_string(),
         related_information: None,
         data: None,
     }
