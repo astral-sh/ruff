@@ -14,6 +14,10 @@ class C:
     Employee = NamedTuple('Employee', [('name', str), ('id', int)])
     Point2D = TypedDict('Point2D', {'in': int, 'x-y': int})
 
+    # Pattern-matching assignment
+    match lower:
+        case int(fN): ...  # N815
+
 
 class D(TypedDict):
     lower: int

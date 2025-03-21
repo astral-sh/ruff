@@ -31,3 +31,11 @@ N815.py:11:5: N815 Variable `mixed_Case` in class scope should not be mixedCase
 12 |     myObj1 = collections.namedtuple("MyObj1", ["a", "b"])
 13 |     myObj2 = namedtuple("MyObj2", ["a", "b"])
    |
+
+N815.py:19:18: N815 Variable `fN` in class scope should not be mixedCase
+   |
+17 |     # Pattern-matching assignment
+18 |     match lower:
+19 |         case int(fN): ...  # N815
+   |                  ^^ N815
+   |
