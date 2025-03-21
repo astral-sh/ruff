@@ -2788,7 +2788,5 @@ pub(crate) fn check_ast(
         ..
     } = checker;
 
-    // partition the semantic syntax errors into Diagnostics and regular errors
-
     (diagnostics.into_inner(), semantic_errors.into_inner())
 }
