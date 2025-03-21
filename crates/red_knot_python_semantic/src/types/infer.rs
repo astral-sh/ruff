@@ -3150,6 +3150,15 @@ impl<'db> TypeInferenceBuilder<'db> {
             asname: _,
         } = alias;
 
+        if name == "*" {
+            self.add_declaration_with_binding(
+                alias.into(),
+                definition,
+                &DeclaredAndInferredType::AreTheSame(Type::Never),
+            );
+            return;
+        }
+
         // First try loading the requested attribute from the module.
         if let Symbol::Type(ty, boundness) = module_ty.member(self.db(), &name.id).symbol {
             if boundness == Boundness::PossiblyUnbound {
