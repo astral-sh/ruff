@@ -25,14 +25,6 @@ impl SemanticSyntaxChecker {
             seen_futures_boundary: false,
         }
     }
-
-    fn seen_futures_boundary(&self) -> bool {
-        self.seen_futures_boundary
-    }
-
-    fn set_seen_futures_boundary(&mut self, seen_futures_boundary: bool) {
-        self.seen_futures_boundary = seen_futures_boundary;
-    }
 }
 
 impl SemanticSyntaxChecker {
@@ -50,7 +42,7 @@ impl SemanticSyntaxChecker {
 
     fn check_stmt<Ctx: SemanticSyntaxContext>(&self, stmt: &ast::Stmt, ctx: &Ctx) {
         if let Stmt::ImportFrom(StmtImportFrom { range, module, .. }) = stmt {
-            if self.seen_futures_boundary() && matches!(module.as_deref(), Some("__future__")) {
+            if self.seen_futures_boundary && matches!(module.as_deref(), Some("__future__")) {
                 Self::add_error(ctx, SemanticSyntaxErrorKind::LateFutureImport, *range);
             }
         }
@@ -64,11 +56,11 @@ impl SemanticSyntaxChecker {
             Stmt::ImportFrom(StmtImportFrom { module, .. }) => {
                 // Allow __future__ imports until we see a non-__future__ import.
                 if !matches!(module.as_deref(), Some("__future__")) {
-                    self.set_seen_futures_boundary(true);
+                    self.seen_futures_boundary = true;
                 }
             }
             _ => {
-                self.set_seen_futures_boundary(true);
+                self.seen_futures_boundary = true;
             }
         }
 
