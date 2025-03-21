@@ -101,8 +101,8 @@ reveal_type(lambda a=lambda x, y: 0: 2)  # revealed: (a=(x, y) -> Unknown) -> Un
 
 ## Assignment
 
-This does not enumerate all combinations of parameter kinds as that should be covered by the [subtype
-tests for callable types](./../type_properties/is_subtype_of.md#callable).
+This does not enumerate all combinations of parameter kinds as that should be covered by the
+[subtype tests for callable types](./../type_properties/is_subtype_of.md#callable).
 
 ```py
 from typing import Callable
