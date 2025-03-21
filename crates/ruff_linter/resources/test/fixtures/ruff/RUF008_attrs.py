@@ -3,6 +3,7 @@ from typing import ClassVar, Sequence
 
 import attr
 from attr import s
+import attrs
 from attrs import define, frozen
 
 KNOWINGLY_MUTABLE_DEFAULT = []
@@ -15,6 +16,7 @@ class A:
     without_annotation = []
     correct_code: list[int] = KNOWINGLY_MUTABLE_DEFAULT
     perfectly_fine: list[int] = field(default_factory=list)
+    mutable_default_in_field: list[int] = attrs.field(default=[])
     class_variable: typing.ClassVar[list[int]] = []
 
 
@@ -25,6 +27,7 @@ class B:
     without_annotation = []
     correct_code: list[int] = KNOWINGLY_MUTABLE_DEFAULT
     perfectly_fine: list[int] = field(default_factory=list)
+    mutable_default_in_field: list[int] = attrs.field(default=[])
     class_variable: ClassVar[list[int]] = []
 
 
@@ -35,6 +38,7 @@ class C:
     without_annotation = []
     correct_code: list[int] = KNOWINGLY_MUTABLE_DEFAULT
     perfectly_fine: list[int] = field(default_factory=list)
+    mutable_default_in_field: list[int] = attrs.field(default=[])
     class_variable: ClassVar[list[int]] = []
 
 @s
@@ -44,4 +48,5 @@ class D:
     without_annotation = []
     correct_code: list[int] = KNOWINGLY_MUTABLE_DEFAULT
     perfectly_fine: list[int] = field(default_factory=list)
+    mutable_default_in_field: list[int] = attrs.field(default=[])
     class_variable: ClassVar[list[int]] = []
