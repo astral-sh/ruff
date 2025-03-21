@@ -4325,11 +4325,44 @@ impl<'db> GeneralCallableType<'db> {
             .is_some_and(|return_type| return_type.is_fully_static(db))
     }
 
+    /// Return `true` if `self` has exactly the same set of possible static materializations as
+    /// `other` (if `self` represents the same set of possible sets of possible runtime objects as
+    /// `other`).
+    pub(crate) fn is_gradual_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+        self.is_equivalent_to_impl(db, other, |self_type, other_type| {
+            self_type
+                .unwrap_or(Type::unknown())
+                .is_gradual_equivalent_to(db, other_type.unwrap_or(Type::unknown()))
+        })
+    }
+
     /// Return `true` if `self` represents the exact same set of possible runtime objects as `other`.
     pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+        self.is_equivalent_to_impl(db, other, |self_type, other_type| {
+            match (self_type, other_type) {
+                (Some(self_type), Some(other_type)) => self_type.is_equivalent_to(db, other_type),
+                // We need the catch-all case here because it's not guaranteed that this is a fully
+                // static type.
+                _ => false,
+            }
+        })
+    }
+
+    /// Implementation for the [`is_equivalent_to`] and [`is_gradual_equivalent_to`] for callable
+    /// types.
+    ///
+    /// [`is_equivalent_to`]: Self::is_equivalent_to
+    /// [`is_gradual_equivalent_to`]: Self::is_gradual_equivalent_to
+    fn is_equivalent_to_impl<F>(self, db: &'db dyn Db, other: Self, check_types: F) -> bool
+    where
+        F: Fn(Option<Type<'db>>, Option<Type<'db>>) -> bool,
+    {
         let self_signature = self.signature(db);
         let other_signature = other.signature(db);
 
+        // N.B. We don't need to explicitly check for the use of gradual form (`...`) in the
+        // parameters because it is internally represented by adding `*Any` and `**Any` to the
+        // parameter list.
         let self_parameters = self_signature.parameters();
         let other_parameters = other_signature.parameters();
 
@@ -4337,20 +4370,7 @@ impl<'db> GeneralCallableType<'db> {
             return false;
         }
 
-        if self_parameters.is_gradual() || other_parameters.is_gradual() {
-            return false;
-        }
-
-        // Check equivalence relationship between two optional types. If either of them is `None`,
-        // then it is not a fully static type which means it's not equivalent either.
-        let is_equivalent = |self_type: Option<Type<'db>>, other_type: Option<Type<'db>>| match (
-            self_type, other_type,
-        ) {
-            (Some(self_type), Some(other_type)) => self_type.is_equivalent_to(db, other_type),
-            _ => false,
-        };
-
-        if !is_equivalent(self_signature.return_ty, other_signature.return_ty) {
+        if !check_types(self_signature.return_ty, other_signature.return_ty) {
             return false;
         }
 
@@ -4398,7 +4418,7 @@ impl<'db> GeneralCallableType<'db> {
                 _ => return false,
             }
 
-            if !is_equivalent(
+            if !check_types(
                 self_parameter.annotated_type(),
                 other_parameter.annotated_type(),
             ) {
@@ -4407,48 +4427,6 @@ impl<'db> GeneralCallableType<'db> {
         }
 
         true
-    }
-
-    /// Return `true` if `self` has exactly the same set of possible static materializations as
-    /// `other` (if `self` represents the same set of possible sets of possible runtime objects as
-    /// `other`).
-    pub(crate) fn is_gradual_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
-        let self_signature = self.signature(db);
-        let other_signature = other.signature(db);
-
-        if self_signature.parameters().len() != other_signature.parameters().len() {
-            return false;
-        }
-
-        // Check gradual equivalence between the two optional types. In the context of a callable
-        // type, the `None` type represents an `Unknown` type.
-        let are_optional_types_gradually_equivalent =
-            |self_type: Option<Type<'db>>, other_type: Option<Type<'db>>| {
-                self_type
-                    .unwrap_or(Type::unknown())
-                    .is_gradual_equivalent_to(db, other_type.unwrap_or(Type::unknown()))
-            };
-
-        if !are_optional_types_gradually_equivalent(
-            self_signature.return_ty,
-            other_signature.return_ty,
-        ) {
-            return false;
-        }
-
-        // N.B. We don't need to explicitly check for the use of gradual form (`...`) in the
-        // parameters because it is internally represented by adding `*Any` and `**Any` to the
-        // parameter list.
-        self_signature
-            .parameters()
-            .iter()
-            .zip(other_signature.parameters().iter())
-            .all(|(self_param, other_param)| {
-                are_optional_types_gradually_equivalent(
-                    self_param.annotated_type(),
-                    other_param.annotated_type(),
-                )
-            })
     }
 
     /// Return `true` if `self` is assignable to `other`.
@@ -4462,6 +4440,10 @@ impl<'db> GeneralCallableType<'db> {
     }
 
     /// Return `true` if `self` is a subtype of `other`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `self` or `other` is not a fully static type.
     pub(crate) fn is_subtype_of(self, db: &'db dyn Db, other: Self) -> bool {
         self.is_assignable_to_impl(db, other, |type1, type2| {
             // SAFETY: Subtype relation is only checked for fully static types.
