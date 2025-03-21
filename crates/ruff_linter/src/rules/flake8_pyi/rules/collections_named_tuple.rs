@@ -24,7 +24,7 @@ use crate::checkers::ast::Checker;
 /// ```pyi
 /// from collections import namedtuple
 ///
-/// person = namedtuple("Person", ["name", "age"])
+/// Person = namedtuple("Person", ["name", "age"])
 /// ```
 ///
 /// Use instead:
