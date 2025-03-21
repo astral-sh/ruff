@@ -15,7 +15,20 @@ use ruff_text_size::TextRange;
 
 #[derive(Debug)]
 pub struct SemanticSyntaxChecker {
-    /// these could be grouped into a bitflags struct like `SemanticModel`
+    /// The checker has traversed past the `__future__` import boundary.
+    ///
+    /// For example, the checker could be visiting `x` in:
+    ///
+    /// ```python
+    /// from __future__ import annotations
+    ///
+    /// import os
+    ///
+    /// x: int = 1
+    /// ```
+    ///
+    /// Python considers it a syntax error to import from `__future__` after any other
+    /// non-`__future__`-importing statements.
     seen_futures_boundary: bool,
 }
 
