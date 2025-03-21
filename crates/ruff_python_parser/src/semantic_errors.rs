@@ -76,6 +76,10 @@ impl SemanticSyntaxChecker {
             return;
         };
 
+        if type_params.len() < 2 {
+            return;
+        }
+
         for type_param in type_params
             .iter()
             .rev()
