@@ -525,6 +525,23 @@ def write_anynoderef(out: list[str], ast: Ast) -> None:
             }
         """)
 
+        out.append(f"""
+            impl<'a> AnyNodeRef<'a> {{
+                pub fn as_{to_snake_case(group.ref_enum_ty)}(self) -> Option<{group.ref_enum_ty}<'a>> {{
+                    match self {{
+        """)
+        for node in group.nodes:
+            out.append(
+                f"Self::{node.name}(node) => Some({group.ref_enum_ty}::{node.variant}(node)),"
+            )
+        out.append("""
+                        _ => None,
+                    }
+                }
+            }
+        """)
+
+
     for node in ast.all_nodes:
         out.append(f"""
             impl<'a> From<&'a {node.ty}> for AnyNodeRef<'a> {{
@@ -564,7 +581,7 @@ def write_anynoderef(out: list[str], ast: Ast) -> None:
 
     out.append("""
         impl<'a> AnyNodeRef<'a> {
-            pub fn visit_preorder<'b, V>(self, visitor: &mut V)
+            pub fn visit_source_order<'b, V>(self, visitor: &mut V)
             where
                 V: crate::visitor::source_order::SourceOrderVisitor<'b> + ?Sized,
                 'a: 'b,

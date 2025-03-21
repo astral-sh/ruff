@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
 use anyhow::Context;
-pub use edit::{DocumentKey, NotebookDocument, PositionEncoding, TextDocument};
+pub use document::{DocumentKey, NotebookDocument, PositionEncoding, TextDocument};
 pub use session::{ClientSettings, DocumentQuery, DocumentSnapshot, Session};
 use std::num::NonZeroUsize;
 
@@ -10,8 +10,10 @@ use crate::server::Server;
 #[macro_use]
 mod message;
 
-mod edit;
+mod document;
+mod find_node;
 mod logging;
+mod semantic;
 mod server;
 mod session;
 mod system;

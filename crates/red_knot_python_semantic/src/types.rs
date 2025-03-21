@@ -7,7 +7,7 @@ use call::{CallDunderError, CallError, CallErrorKind};
 use context::InferContext;
 use diagnostic::{INVALID_CONTEXT_MANAGER, NOT_ITERABLE};
 use itertools::EitherOrBoth;
-use ruff_db::files::File;
+use ruff_db::files::{File, FileRange};
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ruff_text_size::{Ranged, TextRange};
@@ -40,7 +40,8 @@ use crate::types::mro::{Mro, MroError, MroIterator};
 pub(crate) use crate::types::narrow::infer_narrowing_constraint;
 use crate::types::signatures::{Parameter, ParameterKind, Parameters};
 use crate::{Db, FxOrderSet, Module, Program};
-pub(crate) use class::{Class, ClassLiteralType, InstanceType, KnownClass, KnownInstanceType};
+pub(crate) use class::{Class, KnownClass};
+pub use class::{ClassLiteralType, InstanceType, KnownInstanceType};
 
 mod builder;
 mod call;
@@ -3705,6 +3706,9 @@ pub struct TypeVarInstance<'db> {
     #[return_ref]
     name: ast::name::Name,
 
+    /// The type var's definition
+    definition: Definition<'db>,
+
     /// The upper bound or constraint on the type of this TypeVar
     bound_or_constraints: Option<TypeVarBoundOrConstraints<'db>>,
 
@@ -3713,6 +3717,11 @@ pub struct TypeVarInstance<'db> {
 }
 
 impl<'db> TypeVarInstance<'db> {
+    pub fn range(self, db: &dyn Db) -> FileRange {
+        let definition = self.definition(db);
+        FileRange::new(definition.file(db), definition.kind(db).target_range())
+    }
+
     #[allow(unused)]
     pub(crate) fn upper_bound(self, db: &'db dyn Db) -> Option<Type<'db>> {
         if let Some(TypeVarBoundOrConstraints::UpperBound(ty)) = self.bound_or_constraints(db) {
@@ -4380,6 +4389,21 @@ impl<'db> FunctionType<'db> {
             db,
             self.signature(db).clone(),
         )))
+    }
+
+    /// Returns the [`FileRange`] of the function's name.
+    pub fn focus_range(self, db: &dyn Db) -> FileRange {
+        FileRange::new(
+            self.body_scope(db).file(db),
+            self.body_scope(db).node(db).expect_function().name.range,
+        )
+    }
+
+    pub fn full_range(self, db: &dyn Db) -> FileRange {
+        FileRange::new(
+            self.body_scope(db).file(db),
+            self.body_scope(db).node(db).expect_function().range,
+        )
     }
 
     /// Typed externally-visible signature for this function.
@@ -5298,6 +5322,10 @@ impl<'db> UnionType<'db> {
         transform_fn: impl FnMut(&Type<'db>) -> Type<'db>,
     ) -> Type<'db> {
         Self::from_elements(db, self.elements(db).iter().map(transform_fn))
+    }
+
+    pub fn iter(&self, db: &'db dyn Db) -> std::slice::Iter<Type<'db>> {
+        self.elements(db).iter()
     }
 
     pub(crate) fn map_with_boundness(

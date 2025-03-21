@@ -9,7 +9,7 @@ use lsp_server::Message;
 use lsp_types::{
     ClientCapabilities, DiagnosticOptions, DiagnosticServerCapabilities, MessageType,
     ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
-    Url,
+    TypeDefinitionProviderCapability, Url,
 };
 
 use self::connection::{Connection, ConnectionInitializer};
@@ -220,6 +220,7 @@ impl Server {
                     ..Default::default()
                 },
             )),
+            type_definition_provider: Some(TypeDefinitionProviderCapability::Simple(true)),
             ..Default::default()
         }
     }
