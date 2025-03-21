@@ -60,7 +60,9 @@ def f() -> int:
 from typing import Protocol
 
 class Bar(Protocol):
-    # TODO: no error
+    def f(self) -> int: ...
+
+class Baz(Bar):
     # error: [invalid-return-type]
     def f(self) -> int: ...
 ```
@@ -72,11 +74,8 @@ from abc import ABC, abstractmethod
 
 class Foo(ABC):
     @abstractmethod
-    # TODO: no error
-    # error: [invalid-return-type]
     def f(self) -> int: ...
     @abstractmethod
-    # error: [invalid-return-type]
     def g[T](self, x: T) -> T: ...
 ```
 

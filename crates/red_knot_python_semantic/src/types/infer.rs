@@ -1207,15 +1207,41 @@ impl<'db> TypeInferenceBuilder<'db> {
                     _ => false,
                 }
             }
-            let is_overload = function.decorator_list.iter().any(|decorator| {
+
+            let is_overload_or_abstract = function.decorator_list.iter().any(|decorator| {
                 let decorator_type = self.file_expression_type(&decorator.expression);
 
-                decorator_type
-                    .into_function_literal()
-                    .is_some_and(|f| f.is_known(self.db(), KnownFunction::Overload))
+                match decorator_type {
+                    Type::FunctionLiteral(function) => matches!(
+                        function.known(self.db()),
+                        Some(KnownFunction::Overload | KnownFunction::AbstractMethod)
+                    ),
+                    _ => false,
+                }
             });
-            // TODO: Protocol / abstract methods can have empty bodies
-            if (self.in_stub() || is_overload)
+
+            let class_inherits_protocol_directly = (|| -> bool {
+                let current_scope = self.scope().scope(self.db());
+                let Some(parent_scope_id) = current_scope.parent() else {
+                    return false;
+                };
+                let parent_scope = parent_scope_id
+                    .to_scope_id(self.db(), self.file())
+                    .scope(self.db());
+
+                let NodeWithScopeKind::Class(node_ref) = parent_scope.node() else {
+                    return false;
+                };
+
+                node_ref.bases().iter().any(|base| {
+                    matches!(
+                        self.file_expression_type(base),
+                        Type::KnownInstance(KnownInstanceType::Protocol)
+                    )
+                })
+            })();
+
+            if (self.in_stub() || is_overload_or_abstract || class_inherits_protocol_directly)
                 && self.return_types_and_ranges.is_empty()
                 && is_stub_suite(&function.body)
             {
