@@ -161,3 +161,17 @@ def _(flag: bool):
     reveal_type(repr("string"))  # revealed: Literal["'string'"]
     reveal_type(f("string"))  # revealed: Literal["string", "'string'"]
 ```
+
+## Cannot use an argument as both a value and a type form
+
+```py
+from knot_extensions import is_fully_static
+
+def _(flag: bool):
+    if flag:
+        f = repr
+    else:
+        f = is_fully_static
+    # error: [conflicting-argument-forms] "Argument is used as both a value and a type form in call"
+    reveal_type(f(int))  # revealed: str | Literal[True]
+```

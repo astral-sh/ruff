@@ -24,6 +24,7 @@ use std::sync::Arc;
 pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&CALL_NON_CALLABLE);
     registry.register_lint(&CALL_POSSIBLY_UNBOUND_METHOD);
+    registry.register_lint(&CONFLICTING_ARGUMENT_FORMS);
     registry.register_lint(&CONFLICTING_DECLARATIONS);
     registry.register_lint(&CONFLICTING_METACLASS);
     registry.register_lint(&CYCLIC_CLASS_DEFINITION);
@@ -103,6 +104,16 @@ declare_lint! {
         summary: "detects calls to possibly unbound methods",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Warn,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks whether an argument is used as both a value and a type form in a call
+    pub(crate) static CONFLICTING_ARGUMENT_FORMS = {
+        summary: "detects when an argument is used as both a value and a type form in a call",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
     }
 }
 
