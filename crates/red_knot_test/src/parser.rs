@@ -507,7 +507,10 @@ impl<'s> Parser<'s> {
                             self.process_code_block(
                                 lang,
                                 code,
-                                BacktickOffsets(backtick_offset_start, backtick_offset_end),
+                                BacktickOffsets(
+                                    self.line_index(backtick_offset_start),
+                                    self.line_index(backtick_offset_end),
+                                ),
                             )?;
                         } else {
                             let code_block_start = self.cursor.token_len();
@@ -750,6 +753,10 @@ impl<'s> Parser<'s> {
     /// Retrieves the current offset of the cursor within the source code.
     fn offset(&self) -> TextSize {
         self.source_len - self.cursor.text_len()
+    }
+
+    fn line_index(&self, char_index: TextSize) -> TextSize {
+        TextSize::new(self.source.count_lines(TextRange::up_to(char_index)))
     }
 }
 
@@ -1222,7 +1229,7 @@ mod tests {
         let err = super::parse("file.md", &source).expect_err("Should fail to parse");
         assert_eq!(
             err.to_string(),
-            "File extension of test file path `a.py` in test `Accidental stub` does not match language specified `pyi` of code block at line 5"
+            "File extension of test file path `a.py` in test `Accidental stub` does not match language specified `pyi` of code block at line `5`"
         );
     }
 
