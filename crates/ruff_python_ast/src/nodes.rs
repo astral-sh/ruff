@@ -2244,12 +2244,19 @@ impl Pattern {
     ///
     /// [irrefutable pattern]: https://peps.python.org/pep-0634/#irrefutable-case-blocks
     pub fn is_irrefutable(&self) -> bool {
+        self.irrefutable_range().is_some()
+    }
+
+    pub fn irrefutable_range(&self) -> Option<TextRange> {
         match self {
-            Pattern::MatchAs(PatternMatchAs { pattern: None, .. }) => true,
+            Pattern::MatchAs(PatternMatchAs { pattern, range, .. }) => match pattern {
+                Some(pattern) => pattern.irrefutable_range(),
+                None => Some(*range),
+            },
             Pattern::MatchOr(PatternMatchOr { patterns, .. }) => {
-                patterns.iter().any(Pattern::is_irrefutable)
+                patterns.iter().find_map(Pattern::irrefutable_range)
             }
-            _ => false,
+            _ => None,
         }
     }
 
