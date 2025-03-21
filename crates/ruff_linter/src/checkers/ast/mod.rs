@@ -232,6 +232,7 @@ pub(crate) struct Checker<'a> {
 
     #[allow(clippy::struct_field_names)]
     syntax_checker: SemanticSyntaxChecker,
+    semantic_errors: RefCell<Vec<SemanticSyntaxError>>,
 }
 
 impl<'a> Checker<'a> {
@@ -280,6 +281,7 @@ impl<'a> Checker<'a> {
             docstring_state: DocstringState::default(),
             target_version,
             syntax_checker: SemanticSyntaxChecker::new(),
+            semantic_errors: RefCell::default(),
         }
     }
 }
@@ -520,6 +522,12 @@ impl<'a> Checker<'a> {
     pub(crate) const fn target_version(&self) -> PythonVersion {
         self.target_version
     }
+
+    fn with_semantic_checker(&mut self, f: impl FnOnce(&mut SemanticSyntaxChecker, &Checker)) {
+        let mut checker = std::mem::take(&mut self.syntax_checker);
+        f(&mut checker, self);
+        self.syntax_checker = checker;
+    }
 }
 
 impl SemanticSyntaxContext for Checker<'_> {
@@ -530,11 +538,27 @@ impl SemanticSyntaxContext for Checker<'_> {
     fn python_version(&self) -> PythonVersion {
         self.target_version
     }
+
+    fn report_semantic_error(&self, error: SemanticSyntaxError) {
+        match error.kind {
+            SemanticSyntaxErrorKind::LateFutureImport => {
+                if self.settings.rules.enabled(Rule::LateFutureImport) {
+                    self.report_diagnostic(Diagnostic::new(LateFutureImport, error.range));
+                }
+            }
+            SemanticSyntaxErrorKind::ReboundComprehensionVariable
+                if self.settings.preview.is_enabled() =>
+            {
+                self.semantic_errors.borrow_mut().push(error);
+            }
+            SemanticSyntaxErrorKind::ReboundComprehensionVariable => {}
+        }
+    }
 }
 
 impl<'a> Visitor<'a> for Checker<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
-        self.syntax_checker.visit_stmt(stmt, self);
+        self.with_semantic_checker(|semantic, context| semantic.visit_stmt(stmt, context));
 
         // Step 0: Pre-processing
         self.semantic.push_node(stmt);
@@ -1147,7 +1171,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
     }
 
     fn visit_expr(&mut self, expr: &'a Expr) {
-        self.syntax_checker.visit_expr(expr, self);
+        self.with_semantic_checker(|semantic, context| semantic.visit_expr(expr, context));
 
         // Step 0: Pre-processing
         if self.source_type.is_stub()
@@ -2759,32 +2783,11 @@ pub(crate) fn check_ast(
 
     let Checker {
         diagnostics,
-        syntax_checker,
-        settings,
+        semantic_errors,
         ..
     } = checker;
 
     // partition the semantic syntax errors into Diagnostics and regular errors
-    let mut diagnostics = diagnostics.take();
-    let mut semantic_syntax_errors = Vec::new();
-    for semantic_syntax_error in syntax_checker.finish() {
-        match semantic_syntax_error.kind {
-            SemanticSyntaxErrorKind::LateFutureImport => {
-                if settings.rules.enabled(Rule::LateFutureImport) {
-                    diagnostics.push(Diagnostic::new(
-                        LateFutureImport,
-                        semantic_syntax_error.range,
-                    ));
-                }
-            }
-            SemanticSyntaxErrorKind::ReboundComprehensionVariable
-                if settings.preview.is_enabled() =>
-            {
-                semantic_syntax_errors.push(semantic_syntax_error);
-            }
-            SemanticSyntaxErrorKind::ReboundComprehensionVariable => {}
-        }
-    }
 
-    (diagnostics, semantic_syntax_errors)
+    (diagnostics.into_inner(), semantic_errors.into_inner())
 }

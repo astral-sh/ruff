@@ -4,7 +4,7 @@
 //! [`SemanticSyntaxChecker::visit_stmt`] and [`SemanticSyntaxChecker::visit_expr`] methods should
 //! be called in a parent `Visitor`'s `visit_stmt` and `visit_expr` methods, respectively.
 
-use std::{cell::RefCell, fmt::Display};
+use std::fmt::Display;
 
 use ruff_python_ast::{
     self as ast,
@@ -13,51 +13,25 @@ use ruff_python_ast::{
 };
 use ruff_text_size::TextRange;
 
-struct CheckerState {
+#[derive(Debug)]
+pub struct SemanticSyntaxChecker {
     /// these could be grouped into a bitflags struct like `SemanticModel`
     seen_futures_boundary: bool,
-}
-
-pub struct SemanticSyntaxChecker {
-    /// The cumulative set of syntax errors found when visiting the source AST.
-    errors: RefCell<Vec<SemanticSyntaxError>>,
-
-    state: RefCell<CheckerState>,
 }
 
 impl SemanticSyntaxChecker {
     pub fn new() -> Self {
         Self {
-            errors: RefCell::new(Vec::new()),
-            state: RefCell::new(CheckerState {
-                seen_futures_boundary: false,
-            }),
+            seen_futures_boundary: false,
         }
     }
 
-    pub fn finish(self) -> Vec<SemanticSyntaxError> {
-        self.errors.into_inner()
-    }
-
     fn seen_futures_boundary(&self) -> bool {
-        self.state.borrow().seen_futures_boundary
+        self.seen_futures_boundary
     }
 
-    fn set_seen_futures_boundary(&self, seen_futures_boundary: bool) {
-        self.state.borrow_mut().seen_futures_boundary = seen_futures_boundary;
-    }
-
-    fn add_error(
-        &self,
-        kind: SemanticSyntaxErrorKind,
-        range: TextRange,
-        python_version: PythonVersion,
-    ) {
-        self.errors.borrow_mut().push(SemanticSyntaxError {
-            kind,
-            range,
-            python_version,
-        });
+    fn set_seen_futures_boundary(&mut self, seen_futures_boundary: bool) {
+        self.seen_futures_boundary = seen_futures_boundary;
     }
 }
 
@@ -125,22 +99,32 @@ pub trait SemanticSyntaxContext {
 
     /// The target Python version for detecting backwards-incompatible syntax changes.
     fn python_version(&self) -> PythonVersion;
+
+    fn report_semantic_error(&self, error: SemanticSyntaxError);
 }
 
 impl SemanticSyntaxChecker {
+    fn add_error<Ctx: SemanticSyntaxContext>(
+        context: &Ctx,
+        kind: SemanticSyntaxErrorKind,
+        range: TextRange,
+    ) {
+        context.report_semantic_error(SemanticSyntaxError {
+            kind,
+            range,
+            python_version: context.python_version(),
+        });
+    }
+
     fn check_stmt<Ctx: SemanticSyntaxContext>(&self, stmt: &ast::Stmt, ctx: &Ctx) {
         if let Stmt::ImportFrom(StmtImportFrom { range, module, .. }) = stmt {
             if self.seen_futures_boundary() && matches!(module.as_deref(), Some("__future__")) {
-                self.add_error(
-                    SemanticSyntaxErrorKind::LateFutureImport,
-                    *range,
-                    ctx.python_version(),
-                );
+                Self::add_error(ctx, SemanticSyntaxErrorKind::LateFutureImport, *range);
             }
         }
     }
 
-    pub fn visit_stmt<Ctx: SemanticSyntaxContext>(&self, stmt: &ast::Stmt, ctx: &Ctx) {
+    pub fn visit_stmt<Ctx: SemanticSyntaxContext>(&mut self, stmt: &ast::Stmt, ctx: &Ctx) {
         // update internal state
         match stmt {
             Stmt::Expr(StmtExpr { value, .. })
@@ -160,7 +144,7 @@ impl SemanticSyntaxChecker {
         self.check_stmt(stmt, ctx);
     }
 
-    pub fn visit_expr<Ctx: SemanticSyntaxContext>(&self, expr: &Expr, ctx: &Ctx) {
+    pub fn visit_expr<Ctx: SemanticSyntaxContext>(&mut self, expr: &Expr, ctx: &Ctx) {
         match expr {
             Expr::ListComp(ast::ExprListComp {
                 elt, generators, ..
@@ -170,15 +154,15 @@ impl SemanticSyntaxChecker {
             })
             | Expr::Generator(ast::ExprGenerator {
                 elt, generators, ..
-            }) => self.check_generator_expr(elt, generators, ctx),
+            }) => Self::check_generator_expr(elt, generators, ctx),
             Expr::DictComp(ast::ExprDictComp {
                 key,
                 value,
                 generators,
                 ..
             }) => {
-                self.check_generator_expr(key, generators, ctx);
-                self.check_generator_expr(value, generators, ctx);
+                Self::check_generator_expr(key, generators, ctx);
+                Self::check_generator_expr(value, generators, ctx);
             }
             _ => {}
         }
@@ -187,7 +171,6 @@ impl SemanticSyntaxChecker {
     /// Add a [`SyntaxErrorKind::ReboundComprehensionVariable`] if `expr` rebinds an iteration
     /// variable in `generators`.
     fn check_generator_expr<Ctx: SemanticSyntaxContext>(
-        &self,
         expr: &Expr,
         comprehensions: &[ast::Comprehension],
         ctx: &Ctx,
@@ -217,10 +200,10 @@ impl SemanticSyntaxChecker {
         // TODO(brent) with multiple diagnostic ranges, we could mark both the named expr (current)
         // and the name expr being rebound
         for range in rebound_variables {
-            self.add_error(
+            Self::add_error(
+                ctx,
                 SemanticSyntaxErrorKind::ReboundComprehensionVariable,
                 range,
-                ctx.python_version(),
             );
         }
     }
@@ -247,5 +230,39 @@ impl Visitor<'_> for ReboundComprehensionVisitor<'_> {
             };
         }
         walk_expr(self, expr);
+    }
+}
+
+#[derive(Default)]
+pub struct SemanticSyntaxCheckerVisitor<Ctx> {
+    checker: SemanticSyntaxChecker,
+    context: Ctx,
+}
+
+impl<Ctx> SemanticSyntaxCheckerVisitor<Ctx> {
+    pub fn new(context: Ctx) -> Self {
+        Self {
+            checker: SemanticSyntaxChecker::new(),
+            context,
+        }
+    }
+
+    pub fn into_context(self) -> Ctx {
+        self.context
+    }
+}
+
+impl<Ctx> Visitor<'_> for SemanticSyntaxCheckerVisitor<Ctx>
+where
+    Ctx: SemanticSyntaxContext,
+{
+    fn visit_stmt(&mut self, stmt: &'_ Stmt) {
+        self.checker.visit_stmt(stmt, &self.context);
+        ruff_python_ast::visitor::walk_stmt(self, stmt);
+    }
+
+    fn visit_expr(&mut self, expr: &'_ Expr) {
+        self.checker.visit_expr(expr, &self.context);
+        ruff_python_ast::visitor::walk_expr(self, expr);
     }
 }
