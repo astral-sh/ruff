@@ -898,6 +898,10 @@ impl<'db> Type<'db> {
                 left.is_equivalent_to(db, right)
             }
             (Type::Tuple(left), Type::Tuple(right)) => left.is_equivalent_to(db, right),
+            (
+                Type::Callable(CallableType::General(left)),
+                Type::Callable(CallableType::General(right)),
+            ) => left.is_equivalent_to(db, right),
             _ => self == other && self.is_fully_static(db) && other.is_fully_static(db),
         }
     }
@@ -4362,10 +4366,8 @@ impl<'db> FunctionType<'db> {
 
     /// Convert the `FunctionType` into a [`Type::Callable`].
     ///
-    /// Returns `None` if the function is overloaded. This powers the `CallableTypeFromFunction`
-    /// special form from the `knot_extensions` module.
+    /// This powers the `CallableTypeFromFunction` special form from the `knot_extensions` module.
     pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> Type<'db> {
-        // TODO: Add support for overloaded callables
         Type::Callable(CallableType::General(GeneralCallableType::new(
             db,
             self.signature(db).clone(),
@@ -4609,6 +4611,90 @@ impl<'db> GeneralCallableType<'db> {
         signature
             .return_ty
             .is_some_and(|return_type| return_type.is_fully_static(db))
+    }
+
+    /// Return `true` if `self` represents the exact same set of possible runtime objects as `other`.
+    pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+        let self_signature = self.signature(db);
+        let other_signature = other.signature(db);
+
+        let self_parameters = self_signature.parameters();
+        let other_parameters = other_signature.parameters();
+
+        if self_parameters.len() != other_parameters.len() {
+            return false;
+        }
+
+        if self_parameters.is_gradual() || other_parameters.is_gradual() {
+            return false;
+        }
+
+        // Check equivalence relationship between two optional types. If either of them is `None`,
+        // then it is not a fully static type which means it's not equivalent either.
+        let is_equivalent = |self_type: Option<Type<'db>>, other_type: Option<Type<'db>>| match (
+            self_type, other_type,
+        ) {
+            (Some(self_type), Some(other_type)) => self_type.is_equivalent_to(db, other_type),
+            _ => false,
+        };
+
+        if !is_equivalent(self_signature.return_ty, other_signature.return_ty) {
+            return false;
+        }
+
+        for (self_parameter, other_parameter) in self_parameters.iter().zip(other_parameters) {
+            match (self_parameter.kind(), other_parameter.kind()) {
+                (
+                    ParameterKind::PositionalOnly {
+                        default_ty: self_default,
+                        ..
+                    },
+                    ParameterKind::PositionalOnly {
+                        default_ty: other_default,
+                        ..
+                    },
+                ) if self_default.is_some() == other_default.is_some() => {}
+
+                (
+                    ParameterKind::PositionalOrKeyword {
+                        name: self_name,
+                        default_ty: self_default,
+                    },
+                    ParameterKind::PositionalOrKeyword {
+                        name: other_name,
+                        default_ty: other_default,
+                    },
+                ) if self_default.is_some() == other_default.is_some()
+                    && self_name == other_name => {}
+
+                (ParameterKind::Variadic { .. }, ParameterKind::Variadic { .. }) => {}
+
+                (
+                    ParameterKind::KeywordOnly {
+                        name: self_name,
+                        default_ty: self_default,
+                    },
+                    ParameterKind::KeywordOnly {
+                        name: other_name,
+                        default_ty: other_default,
+                    },
+                ) if self_default.is_some() == other_default.is_some()
+                    && self_name == other_name => {}
+
+                (ParameterKind::KeywordVariadic { .. }, ParameterKind::KeywordVariadic { .. }) => {}
+
+                _ => return false,
+            }
+
+            if !is_equivalent(
+                self_parameter.annotated_type(),
+                other_parameter.annotated_type(),
+            ) {
+                return false;
+            }
+        }
+
+        true
     }
 
     /// Return `true` if `self` has exactly the same set of possible static materializations as
