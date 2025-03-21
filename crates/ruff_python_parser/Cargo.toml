@@ -20,7 +20,6 @@ ruff_text_size = { workspace = true }
 bitflags = { workspace = true }
 bstr = { workspace = true }
 compact_str = { workspace = true }
-itertools = { workspace = true }
 memchr = { workspace = true }
 rustc-hash = { workspace = true }
 static_assertions = { workspace = true }

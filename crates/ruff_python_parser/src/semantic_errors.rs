@@ -6,7 +6,6 @@
 
 use std::fmt::Display;
 
-use itertools::Itertools;
 use ruff_python_ast::{
     self as ast,
     visitor::{walk_expr, Visitor},
@@ -80,23 +79,23 @@ impl SemanticSyntaxChecker {
             return;
         }
 
-        for type_param in type_params
-            .iter()
-            .rev()
-            .sorted_by_key(|t| &t.name().id)
-            .dedup_by_with_count(|t1, t2| t1.name().id == t2.name().id)
-            .filter_map(|(count, type_param)| if count > 1 { Some(type_param) } else { None })
-        {
-            // test_err duplicate_type_parameter_names
-            // type Alias[T, T] = ...
-            // def f[T, T](t: T): ...
-            // class C[T, T]: ...
-            // type Alias[T, U: str, V: (str, bytes), *Ts, **P, T = default] = ...
-            Self::add_error(
-                ctx,
-                SemanticSyntaxErrorKind::DuplicateTypeParameter,
-                type_param.range(),
-            );
+        for (i, type_param) in type_params.iter().enumerate() {
+            if type_params
+                .iter()
+                .take(i)
+                .any(|t| t.name().id == type_param.name().id)
+            {
+                // test_err duplicate_type_parameter_names
+                // type Alias[T, T] = ...
+                // def f[T, T](t: T): ...
+                // class C[T, T]: ...
+                // type Alias[T, U: str, V: (str, bytes), *Ts, **P, T = default] = ...
+                Self::add_error(
+                    ctx,
+                    SemanticSyntaxErrorKind::DuplicateTypeParameter,
+                    type_param.range(),
+                );
+            }
         }
     }
 
