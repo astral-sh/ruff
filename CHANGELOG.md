@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.11.2
+
+### Preview features
+
+- [syntax-errors] Fix false-positive syntax errors emitted for annotations on variadic parameters before Python 3.11 ([#16878](https://github.com/astral-sh/ruff/pull/16878))
+
 ## 0.11.1
 
 ### Preview features
