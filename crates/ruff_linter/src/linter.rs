@@ -45,7 +45,7 @@ pub struct LinterResult {
     /// [`ParseError`]s
     has_valid_syntax: bool,
     /// Flag indicating that the parsed source code does not contain any [`ParseError`]s,
-    /// [`UnsupportedSyntaxError`]s, or [`SyntaxError`]s.
+    /// [`UnsupportedSyntaxError`]s, or [`SemanticSyntaxError`]s.
     has_no_syntax_errors: bool,
 }
 
