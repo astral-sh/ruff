@@ -58,7 +58,7 @@ impl FormatNodeRule<ExprGenerator> for FormatExprGenerator {
                 f,
                 [width_limit_if_flat(
                     &format_args!(group(&elt.format()), soft_line_break_or_space(), &joined),
-                    f.options().generator_expression_width_limit().into(),
+                    f.options().generator_expression_flat_width_limit().into(),
                     true,
                 )]
             )
@@ -69,7 +69,7 @@ impl FormatNodeRule<ExprGenerator> for FormatExprGenerator {
                     "(",
                     &group(&width_limit_if_flat(
                         &format_args!(group(&elt.format()), soft_line_break_or_space(), &joined),
-                        f.options().generator_expression_width_limit().into(),
+                        f.options().generator_expression_flat_width_limit().into(),
                         true,
                     )),
                     ")"

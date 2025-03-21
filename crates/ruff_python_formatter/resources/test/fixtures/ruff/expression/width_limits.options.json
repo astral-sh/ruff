@@ -4,5 +4,9 @@
     "dict_comprehension_width_limit": 20,
     "set_comprehension_width_limit": 20,
     "generator_expression_width_limit": 20
+    "list_comprehension_flat_width_limit": 30,
+    "dict_comprehension_flat_width_limit": 30,
+    "set_comprehension_flat_width_limit": 30,
+    "generator_expression_flat_width_limit": 30,
   }
 ]

@@ -54,7 +54,7 @@ impl FormatNodeRule<ExprDictComp> for FormatExprDictComp {
                             .entries(generators.iter().formatted())
                             .finish()
                     }),
-                    f.options().dict_comprehension_width_limit().into(),
+                    f.options().dict_comprehension_flat_width_limit().into(),
                     true,
                 )),
                 "}"

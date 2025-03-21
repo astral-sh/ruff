@@ -60,17 +60,19 @@ pub struct PyFormatOptions {
     /// is enabled.
     docstring_code_line_width: DocstringCodeLineWidth,
 
-    /// Print list comprehensions in the expanded form if the flt form would exceed the given width.
-    list_comprehension_width_limit: FlatExpressionExpandWidth,
+    /// Print list comprehensions in the expanded form if the flat form would exceed the given width.
+    list_comprehension_flat_width_limit: FlatExpressionExpandWidth,
 
-    /// Print dict comprehensions in the expanded form if the flt form would exceed the given width.
-    dict_comprehension_width_limit: FlatExpressionExpandWidth,
+    /// Print dict comprehensions in the expanded form if the flat form would exceed the given width.
+    dict_comprehension_flat_width_limit: FlatExpressionExpandWidth,
 
-    /// Print set comprehensions in the expanded form if the flt form would exceed the given width.
-    set_comprehension_width_limit: FlatExpressionExpandWidth,
+    /// Print set comprehensions in the expanded form if the flat form would exceed the given width.
+    set_comprehension_flat_width_limit: FlatExpressionExpandWidth,
 
     /// Print generator expressions in the expanded form if the flt form would exceed the given width.
     generator_expression_width_limit: FlatExpressionExpandWidth,
+    /// Print generator expressions in the expanded form if the flat form would exceed the given width.
+    generator_expression_flat_width_limit: FlatExpressionExpandWidth,
 
     /// Whether preview style formatting is enabled or not
     preview: PreviewMode,
@@ -106,6 +108,10 @@ impl Default for PyFormatOptions {
             dict_comprehension_width_limit: FlatExpressionExpandWidth::default(),
             set_comprehension_width_limit: FlatExpressionExpandWidth::default(),
             generator_expression_width_limit: FlatExpressionExpandWidth::default(),
+            list_comprehension_flat_width_limit: FlatExpressionExpandWidth::default(),
+            dict_comprehension_flat_width_limit: FlatExpressionExpandWidth::default(),
+            set_comprehension_flat_width_limit: FlatExpressionExpandWidth::default(),
+            generator_expression_flat_width_limit: FlatExpressionExpandWidth::default(),
             preview: PreviewMode::default(),
         }
     }
@@ -156,16 +162,20 @@ impl PyFormatOptions {
         self.docstring_code_line_width
     }
 
-    pub const fn list_comprehension_width_limit(&self) -> FlatExpressionExpandWidth {
-        self.list_comprehension_width_limit
+    pub const fn list_comprehension_flat_width_limit(&self) -> FlatExpressionExpandWidth {
+        self.list_comprehension_flat_width_limit
     }
 
-    pub const fn dict_comprehension_width_limit(&self) -> FlatExpressionExpandWidth {
-        self.dict_comprehension_width_limit
+    pub const fn dict_comprehension_flat_width_limit(&self) -> FlatExpressionExpandWidth {
+        self.dict_comprehension_flat_width_limit
     }
 
-    pub const fn set_comprehension_width_limit(&self) -> FlatExpressionExpandWidth {
-        self.set_comprehension_width_limit
+    pub const fn set_comprehension_flat_width_limit(&self) -> FlatExpressionExpandWidth {
+        self.set_comprehension_flat_width_limit
+    }
+
+    pub const fn generator_expression_flat_width_limit(&self) -> FlatExpressionExpandWidth {
+        self.generator_expression_flat_width_limit
     }
 
     pub const fn generator_expression_width_limit(&self) -> FlatExpressionExpandWidth {
@@ -231,29 +241,41 @@ impl PyFormatOptions {
     }
 
     #[must_use]
-    pub fn with_list_comprehension_width_limit(mut self, width: FlatExpressionExpandWidth) -> Self {
-        self.list_comprehension_width_limit = width;
+    pub fn with_list_comprehension_flat_width_limit(
+        mut self,
+        width: FlatExpressionExpandWidth,
+    ) -> Self {
+        self.list_comprehension_flat_width_limit = width;
         self
     }
 
     #[must_use]
-    pub fn with_dict_comprehension_width_limit(mut self, width: FlatExpressionExpandWidth) -> Self {
-        self.dict_comprehension_width_limit = width;
+    pub fn with_dict_comprehension_flat_width_limit(
+        mut self,
+        width: FlatExpressionExpandWidth,
+    ) -> Self {
+        self.dict_comprehension_flat_width_limit = width;
         self
     }
 
     #[must_use]
     pub fn with_set_comprehension_width_limit(mut self, width: FlatExpressionExpandWidth) -> Self {
         self.set_comprehension_width_limit = width;
+    pub fn with_set_comprehension_flat_width_limit(
+        mut self,
+        width: FlatExpressionExpandWidth,
+    ) -> Self {
+        self.set_comprehension_flat_width_limit = width;
         self
     }
 
     #[must_use]
-    pub fn with_generator_expression_width_limit(
+    pub fn with_generator_expression_flat_width_limit(
         mut self,
         width: FlatExpressionExpandWidth,
     ) -> Self {
         self.generator_expression_width_limit = width;
+        self.generator_expression_flat_width_limit = width;
         self
     }
 

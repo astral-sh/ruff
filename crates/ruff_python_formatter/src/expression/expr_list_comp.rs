@@ -31,7 +31,7 @@ impl FormatNodeRule<ExprListComp> for FormatExprListComp {
                 "[",
                 &group(&width_limit_if_flat(
                     &format_args!(group(&elt.format()), soft_line_break_or_space(), &joined),
-                    f.options().list_comprehension_width_limit().into(),
+                    f.options().list_comprehension_flat_width_limit().into(),
                     true,
                 )),
                 "]"
