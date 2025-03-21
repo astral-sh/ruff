@@ -663,6 +663,7 @@ to the fact that `bool` is a `@final` class at runtime that cannot be subclassed
 
 ```py
 from knot_extensions import Intersection, Not, AlwaysTruthy, AlwaysFalsy
+from typing_extensions import Literal
 
 class P: ...
 
@@ -686,6 +687,19 @@ def f(
     reveal_type(f)  # revealed: Never
     reveal_type(g)  # revealed: Never
     reveal_type(h)  # revealed: Never
+
+def never(
+    a: Intersection[Intersection[AlwaysFalsy, Not[Literal[False]]], bool],
+    b: Intersection[Intersection[AlwaysTruthy, Not[Literal[True]]], bool],
+    c: Intersection[Intersection[Literal[True], Not[AlwaysTruthy]], bool],
+    d: Intersection[Intersection[Literal[False], Not[AlwaysFalsy]], bool],
+):
+    # TODO: This should be `Never`
+    reveal_type(a)  # revealed: Literal[True]
+    # TODO: This should be `Never`
+    reveal_type(b)  # revealed: Literal[False]
+    reveal_type(c)  # revealed: Never
+    reveal_type(d)  # revealed: Never
 ```
 
 ## Simplification of `LiteralString`, `AlwaysTruthy` and `AlwaysFalsy`
@@ -844,6 +858,20 @@ def mixed(
     reveal_type(i2)  # revealed: Any & Unknown
     reveal_type(i3)  # revealed: Any & Unknown
     reveal_type(i4)  # revealed: Any & Unknown
+```
+
+## Invalid
+
+```py
+from knot_extensions import Intersection, Not
+
+# error: [invalid-type-form] "`knot_extensions.Intersection` requires at least one argument when used in a type expression"
+def f(x: Intersection) -> None:
+    reveal_type(x)  # revealed: Unknown
+
+# error: [invalid-type-form] "`knot_extensions.Not` requires exactly one argument when used in a type expression"
+def f(x: Not) -> None:
+    reveal_type(x)  # revealed: Unknown
 ```
 
 [complement laws]: https://en.wikipedia.org/wiki/Complement_(set_theory)

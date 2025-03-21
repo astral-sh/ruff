@@ -124,7 +124,7 @@ class RuffCodeActionProvider implements CodeActionProvider {
     range: Range,
   ): languages.ProviderResult<languages.CodeActionList> {
     const actions = this.diagnostics
-      .filter((check) => range.startLineNumber === check.location.row)
+      .filter((check) => range.startLineNumber === check.start_location.row)
       .filter(({ fix }) => fix)
       .map((check) => ({
         title: check.fix
@@ -173,8 +173,8 @@ function updateMarkers(monaco: Monaco, diagnostics: Array<Diagnostic>) {
     model,
     "owner",
     diagnostics.map((diagnostic) => ({
-      startLineNumber: diagnostic.location.row,
-      startColumn: diagnostic.location.column,
+      startLineNumber: diagnostic.start_location.row,
+      startColumn: diagnostic.start_location.column,
       endLineNumber: diagnostic.end_location.row,
       endColumn: diagnostic.end_location.column,
       message: diagnostic.code

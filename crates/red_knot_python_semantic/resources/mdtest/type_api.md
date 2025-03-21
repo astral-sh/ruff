@@ -392,6 +392,10 @@ def type_of_annotation() -> None:
 
 # error: "Special form `knot_extensions.TypeOf` expected exactly one type parameter"
 t: TypeOf[int, str, bytes]
+
+# error: [invalid-type-form] "`knot_extensions.TypeOf` requires exactly one argument when used in a type expression"
+def f(x: TypeOf) -> None:
+    reveal_type(x)  # revealed: Unknown
 ```
 
 ## `CallableTypeFromFunction`
@@ -418,6 +422,10 @@ def f3(x: int, y: str) -> None:
 c1: CallableTypeFromFunction[f1, f2]
 # error: [invalid-type-form] "Expected the first argument to `knot_extensions.CallableTypeFromFunction` to be a function literal, but got `Literal[int]`"
 c2: CallableTypeFromFunction[int]
+
+# error: [invalid-type-form] "`knot_extensions.CallableTypeFromFunction` requires exactly one argument when used in a type expression"
+def f(x: CallableTypeFromFunction) -> None:
+    reveal_type(x)  # revealed: Unknown
 ```
 
 Using it in annotation to reveal the signature of the function:

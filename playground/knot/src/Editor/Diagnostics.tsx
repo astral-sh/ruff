@@ -88,7 +88,7 @@ function Items({
             >
               {diagnostic.message()}
               <span className="text-gray-500">
-                {id != null && `(${id})`} [Ln {startLine}, Col {startColumn}]
+                {id != null && ` (${id})`} [Ln {startLine}, Col {startColumn}]
               </span>
             </button>
           </li>

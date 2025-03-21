@@ -528,6 +528,10 @@ pub struct FormatCommand {
     /// The option can only be used when formatting a single file. Range formatting of notebooks is unsupported.
     #[clap(long, help_heading = "Editor options", verbatim_doc_comment)]
     pub range: Option<FormatRange>,
+
+    /// Exit with a non-zero status code if any files were modified via format, even if all files were formatted successfully.
+    #[arg(long, help_heading = "Miscellaneous", alias = "exit-non-zero-on-fix")]
+    pub exit_non_zero_on_format: bool,
 }
 
 #[derive(Copy, Clone, Debug, clap::Parser)]
@@ -763,6 +767,7 @@ impl FormatCommand {
             no_cache: self.no_cache,
             stdin_filename: self.stdin_filename,
             range: self.range,
+            exit_non_zero_on_format: self.exit_non_zero_on_format,
         };
 
         let cli_overrides = ExplicitConfigOverrides {
@@ -1047,6 +1052,7 @@ pub struct FormatArguments {
     pub files: Vec<PathBuf>,
     pub stdin_filename: Option<PathBuf>,
     pub range: Option<FormatRange>,
+    pub exit_non_zero_on_format: bool,
 }
 
 /// A text range specified by line and column numbers.

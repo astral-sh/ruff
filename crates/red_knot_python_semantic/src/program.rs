@@ -1,5 +1,6 @@
 use crate::module_resolver::SearchPaths;
 use crate::python_platform::PythonPlatform;
+use crate::site_packages::SysPrefixPathOrigin;
 use crate::Db;
 
 use anyhow::Context;
@@ -142,11 +143,21 @@ pub enum PythonPath {
     /// `/opt/homebrew/lib/python3.X/site-packages`.
     ///
     /// [`sys.prefix`]: https://docs.python.org/3/library/sys.html#sys.prefix
-    SysPrefix(SystemPathBuf),
+    SysPrefix(SystemPathBuf, SysPrefixPathOrigin),
 
     /// Resolved site packages paths.
     ///
     /// This variant is mainly intended for testing where we want to skip resolving `site-packages`
     /// because it would unnecessarily complicate the test setup.
     KnownSitePackages(Vec<SystemPathBuf>),
+}
+
+impl PythonPath {
+    pub fn from_virtual_env_var(path: impl Into<SystemPathBuf>) -> Self {
+        Self::SysPrefix(path.into(), SysPrefixPathOrigin::VirtualEnvVar)
+    }
+
+    pub fn from_cli_flag(path: SystemPathBuf) -> Self {
+        Self::SysPrefix(path, SysPrefixPathOrigin::PythonCliFlag)
+    }
 }

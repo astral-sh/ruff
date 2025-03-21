@@ -1,10 +1,12 @@
-use std::hash::Hash;
+use std::collections::HashMap;
+use std::slice::Iter;
 use std::str::FromStr;
 
 use bitflags::bitflags;
 use call::{CallDunderError, CallError, CallErrorKind};
 use context::InferContext;
 use diagnostic::{INVALID_CONTEXT_MANAGER, NOT_ITERABLE};
+use itertools::EitherOrBoth;
 use ruff_db::files::File;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
@@ -654,8 +656,14 @@ impl<'db> Type<'db> {
                     .is_subtype_of(db, target)
             }
 
+            (
+                Type::Callable(CallableType::General(self_callable)),
+                Type::Callable(CallableType::General(other_callable)),
+            ) => self_callable.is_subtype_of(db, other_callable),
+
             (Type::Callable(CallableType::General(_)), _) => {
-                // TODO: Implement subtyping for general callable types
+                // TODO: Implement subtyping between general callable types and other types like
+                // function literals, bound methods, class literals, `type[]`, etc.)
                 false
             }
 
@@ -898,6 +906,10 @@ impl<'db> Type<'db> {
                 left.is_equivalent_to(db, right)
             }
             (Type::Tuple(left), Type::Tuple(right)) => left.is_equivalent_to(db, right),
+            (
+                Type::Callable(CallableType::General(left)),
+                Type::Callable(CallableType::General(right)),
+            ) => left.is_equivalent_to(db, right),
             _ => self == other && self.is_fully_static(db) && other.is_fully_static(db),
         }
     }
@@ -2906,6 +2918,7 @@ impl<'db> Type<'db> {
                 };
                 Ok(ty)
             }
+
             Type::SubclassOf(_)
             | Type::BooleanLiteral(_)
             | Type::BytesLiteral(_)
@@ -2924,30 +2937,95 @@ impl<'db> Type<'db> {
                 fallback_type: Type::unknown(),
             }),
 
-            // We treat `typing.Type` exactly the same as `builtins.type`:
-            Type::KnownInstance(KnownInstanceType::Type) => Ok(KnownClass::Type.to_instance(db)),
-            Type::KnownInstance(KnownInstanceType::Tuple) => Ok(KnownClass::Tuple.to_instance(db)),
+            Type::KnownInstance(known_instance) => match known_instance {
+                KnownInstanceType::TypeAliasType(alias) => Ok(alias.value_type(db)),
+                KnownInstanceType::Never | KnownInstanceType::NoReturn => Ok(Type::Never),
+                KnownInstanceType::LiteralString => Ok(Type::LiteralString),
+                KnownInstanceType::Any => Ok(Type::any()),
+                KnownInstanceType::Unknown => Ok(Type::unknown()),
+                KnownInstanceType::AlwaysTruthy => Ok(Type::AlwaysTruthy),
+                KnownInstanceType::AlwaysFalsy => Ok(Type::AlwaysFalsy),
 
-            // Legacy `typing` aliases
-            Type::KnownInstance(KnownInstanceType::List) => Ok(KnownClass::List.to_instance(db)),
-            Type::KnownInstance(KnownInstanceType::Dict) => Ok(KnownClass::Dict.to_instance(db)),
-            Type::KnownInstance(KnownInstanceType::Set) => Ok(KnownClass::Set.to_instance(db)),
-            Type::KnownInstance(KnownInstanceType::FrozenSet) => {
-                Ok(KnownClass::FrozenSet.to_instance(db))
-            }
-            Type::KnownInstance(KnownInstanceType::ChainMap) => {
-                Ok(KnownClass::ChainMap.to_instance(db))
-            }
-            Type::KnownInstance(KnownInstanceType::Counter) => {
-                Ok(KnownClass::Counter.to_instance(db))
-            }
-            Type::KnownInstance(KnownInstanceType::DefaultDict) => {
-                Ok(KnownClass::DefaultDict.to_instance(db))
-            }
-            Type::KnownInstance(KnownInstanceType::Deque) => Ok(KnownClass::Deque.to_instance(db)),
-            Type::KnownInstance(KnownInstanceType::OrderedDict) => {
-                Ok(KnownClass::OrderedDict.to_instance(db))
-            }
+                // We treat `typing.Type` exactly the same as `builtins.type`:
+                KnownInstanceType::Type => Ok(KnownClass::Type.to_instance(db)),
+                KnownInstanceType::Tuple => Ok(KnownClass::Tuple.to_instance(db)),
+
+                // Legacy `typing` aliases
+                KnownInstanceType::List => Ok(KnownClass::List.to_instance(db)),
+                KnownInstanceType::Dict => Ok(KnownClass::Dict.to_instance(db)),
+                KnownInstanceType::Set => Ok(KnownClass::Set.to_instance(db)),
+                KnownInstanceType::FrozenSet => Ok(KnownClass::FrozenSet.to_instance(db)),
+                KnownInstanceType::ChainMap => Ok(KnownClass::ChainMap.to_instance(db)),
+                KnownInstanceType::Counter => Ok(KnownClass::Counter.to_instance(db)),
+                KnownInstanceType::DefaultDict => Ok(KnownClass::DefaultDict.to_instance(db)),
+                KnownInstanceType::Deque => Ok(KnownClass::Deque.to_instance(db)),
+                KnownInstanceType::OrderedDict => Ok(KnownClass::OrderedDict.to_instance(db)),
+
+                // TODO map this to a new `Type::TypeVar` variant
+                KnownInstanceType::TypeVar(_) => Ok(*self),
+
+                // TODO: Use an opt-in rule for a bare `Callable`
+                KnownInstanceType::Callable => Ok(Type::Callable(CallableType::General(
+                    GeneralCallableType::unknown(db),
+                ))),
+
+                KnownInstanceType::TypingSelf => Ok(todo_type!("Support for `typing.Self`")),
+                KnownInstanceType::TypeAlias => Ok(todo_type!("Support for `typing.TypeAlias`")),
+
+                KnownInstanceType::Protocol => Err(InvalidTypeExpressionError {
+                    invalid_expressions: smallvec::smallvec![InvalidTypeExpression::Protocol],
+                    fallback_type: Type::unknown(),
+                }),
+
+                KnownInstanceType::Literal
+                | KnownInstanceType::Union
+                | KnownInstanceType::Intersection => Err(InvalidTypeExpressionError {
+                    invalid_expressions: smallvec::smallvec![
+                        InvalidTypeExpression::RequiresArguments(*self)
+                    ],
+                    fallback_type: Type::unknown(),
+                }),
+
+                KnownInstanceType::Optional
+                | KnownInstanceType::Not
+                | KnownInstanceType::TypeOf
+                | KnownInstanceType::TypeIs
+                | KnownInstanceType::TypeGuard
+                | KnownInstanceType::Unpack
+                | KnownInstanceType::CallableTypeFromFunction => Err(InvalidTypeExpressionError {
+                    invalid_expressions: smallvec::smallvec![
+                        InvalidTypeExpression::RequiresOneArgument(*self)
+                    ],
+                    fallback_type: Type::unknown(),
+                }),
+
+                KnownInstanceType::Annotated | KnownInstanceType::Concatenate => {
+                    Err(InvalidTypeExpressionError {
+                        invalid_expressions: smallvec::smallvec![
+                            InvalidTypeExpression::RequiresTwoArguments(*self)
+                        ],
+                        fallback_type: Type::unknown(),
+                    })
+                }
+
+                KnownInstanceType::ClassVar | KnownInstanceType::Final => {
+                    Err(InvalidTypeExpressionError {
+                        invalid_expressions: smallvec::smallvec![
+                            InvalidTypeExpression::TypeQualifier(*known_instance)
+                        ],
+                        fallback_type: Type::unknown(),
+                    })
+                }
+
+                KnownInstanceType::ReadOnly
+                | KnownInstanceType::NotRequired
+                | KnownInstanceType::Required => Err(InvalidTypeExpressionError {
+                    invalid_expressions: smallvec::smallvec![
+                        InvalidTypeExpression::TypeQualifierRequiresOneArgument(*known_instance)
+                    ],
+                    fallback_type: Type::unknown(),
+                }),
+            },
 
             Type::Union(union) => {
                 let mut builder = UnionBuilder::new(db);
@@ -2973,52 +3051,33 @@ impl<'db> Type<'db> {
                     })
                 }
             }
+
             Type::Dynamic(_) => Ok(*self),
-            // TODO map this to a new `Type::TypeVar` variant
-            Type::KnownInstance(KnownInstanceType::TypeVar(_)) => Ok(*self),
-            Type::KnownInstance(KnownInstanceType::TypeAliasType(alias)) => {
-                Ok(alias.value_type(db))
-            }
-            Type::KnownInstance(KnownInstanceType::Never | KnownInstanceType::NoReturn) => {
-                Ok(Type::Never)
-            }
-            Type::KnownInstance(KnownInstanceType::LiteralString) => Ok(Type::LiteralString),
-            Type::KnownInstance(KnownInstanceType::Any) => Ok(Type::any()),
-            Type::KnownInstance(KnownInstanceType::Annotated) => Err(InvalidTypeExpressionError {
-                invalid_expressions: smallvec::smallvec![InvalidTypeExpression::BareAnnotated],
-                fallback_type: Type::unknown(),
-            }),
-            Type::KnownInstance(KnownInstanceType::ClassVar) => Err(InvalidTypeExpressionError {
-                invalid_expressions: smallvec::smallvec![
-                    InvalidTypeExpression::ClassVarInTypeExpression
-                ],
-                fallback_type: Type::unknown(),
-            }),
-            Type::KnownInstance(KnownInstanceType::Final) => Err(InvalidTypeExpressionError {
-                invalid_expressions: smallvec::smallvec![
-                    InvalidTypeExpression::FinalInTypeExpression
-                ],
-                fallback_type: Type::unknown(),
-            }),
-            Type::KnownInstance(KnownInstanceType::Literal) => Err(InvalidTypeExpressionError {
-                invalid_expressions: smallvec::smallvec![InvalidTypeExpression::BareLiteral],
-                fallback_type: Type::unknown(),
-            }),
-            Type::KnownInstance(KnownInstanceType::Unknown) => Ok(Type::unknown()),
-            Type::KnownInstance(KnownInstanceType::AlwaysTruthy) => Ok(Type::AlwaysTruthy),
-            Type::KnownInstance(KnownInstanceType::AlwaysFalsy) => Ok(Type::AlwaysFalsy),
-            Type::KnownInstance(KnownInstanceType::Callable) => {
-                // TODO: Use an opt-in rule for a bare `Callable`
-                Ok(Type::Callable(CallableType::General(
-                    GeneralCallableType::unknown(db),
-                )))
-            }
-            Type::KnownInstance(_) => Ok(todo_type!(
-                "Invalid or unsupported `KnownInstanceType` in `Type::to_type_expression`"
-            )),
-            Type::Instance(_) => Ok(todo_type!(
-                "Invalid or unsupported `Instance` in `Type::to_type_expression`"
-            )),
+
+            Type::Instance(InstanceType { class }) => match class.known(db) {
+                Some(KnownClass::TypeVar) => Ok(todo_type!(
+                    "Support for `typing.TypeVar` instances in type expressions"
+                )),
+                Some(KnownClass::ParamSpec) => Ok(todo_type!(
+                    "Support for `typing.ParamSpec` instances in type expressions"
+                )),
+                Some(KnownClass::TypeVarTuple) => Ok(todo_type!(
+                    "Support for `typing.TypeVarTuple` instances in type expressions"
+                )),
+                Some(KnownClass::NewType) => Ok(todo_type!(
+                    "Support for `typing.NewType` instances in type expressions"
+                )),
+                Some(KnownClass::GenericAlias) => Ok(todo_type!(
+                    "Support for `typing.GenericAlias` instances in type expressions"
+                )),
+                _ => Err(InvalidTypeExpressionError {
+                    invalid_expressions: smallvec::smallvec![InvalidTypeExpression::InvalidType(
+                        *self
+                    )],
+                    fallback_type: Type::unknown(),
+                }),
+            },
+
             Type::Intersection(_) => Ok(todo_type!("Type::Intersection.in_type_expression")),
         }
     }
@@ -3284,14 +3343,20 @@ impl<'db> InvalidTypeExpressionError<'db> {
 /// Enumeration of various types that are invalid in type-expression contexts
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 enum InvalidTypeExpression<'db> {
-    /// `x: Annotated` is invalid as an annotation
-    BareAnnotated,
-    /// `x: Literal` is invalid as an annotation
-    BareLiteral,
-    /// The `ClassVar` type qualifier was used in a type expression
-    ClassVarInTypeExpression,
-    /// The `Final` type qualifier was used in a type expression
-    FinalInTypeExpression,
+    /// Some types always require exactly one argument when used in a type expression
+    RequiresOneArgument(Type<'db>),
+    /// Some types always require at least one argument when used in a type expression
+    RequiresArguments(Type<'db>),
+    /// Some types always require at least two arguments when used in a type expression
+    RequiresTwoArguments(Type<'db>),
+    /// The `Protocol` type is invalid in type expressions
+    Protocol,
+    /// Type qualifiers are always invalid in *type expressions*,
+    /// but these ones are okay with 0 arguments in *annotation expressions*
+    TypeQualifier(KnownInstanceType<'db>),
+    /// Type qualifiers that are invalid in type expressions,
+    /// and which would require exactly one argument even if they appeared in an annotation expression
+    TypeQualifierRequiresOneArgument(KnownInstanceType<'db>),
     /// Some types are always invalid in type expressions
     InvalidType(Type<'db>),
 }
@@ -3306,17 +3371,33 @@ impl<'db> InvalidTypeExpression<'db> {
         impl std::fmt::Display for Display<'_> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 match self.error {
-                    InvalidTypeExpression::BareAnnotated => f.write_str(
-                        "`Annotated` requires at least two arguments when used in an annotation or type expression"
+                    InvalidTypeExpression::RequiresOneArgument(ty) => write!(
+                        f,
+                        "`{ty}` requires exactly one argument when used in a type expression",
+                        ty = ty.display(self.db)
                     ),
-                    InvalidTypeExpression::BareLiteral => f.write_str(
-                        "`Literal` requires at least one argument when used in a type expression"
+                    InvalidTypeExpression::RequiresArguments(ty) => write!(
+                        f,
+                        "`{ty}` requires at least one argument when used in a type expression",
+                        ty = ty.display(self.db)
                     ),
-                    InvalidTypeExpression::ClassVarInTypeExpression => f.write_str(
-                        "Type qualifier `typing.ClassVar` is not allowed in type expressions (only in annotation expressions)"
+                    InvalidTypeExpression::RequiresTwoArguments(ty) => write!(
+                        f,
+                        "`{ty}` requires at least two arguments when used in a type expression",
+                        ty = ty.display(self.db)
                     ),
-                    InvalidTypeExpression::FinalInTypeExpression => f.write_str(
-                        "Type qualifier `typing.Final` is not allowed in type expressions (only in annotation expressions)"
+                    InvalidTypeExpression::Protocol => f.write_str(
+                        "`typing.Protocol` is not allowed in type expressions"
+                    ),
+                    InvalidTypeExpression::TypeQualifier(qualifier) => write!(
+                        f,
+                        "Type qualifier `{q}` is not allowed in type expressions (only in annotation expressions)",
+                        q = qualifier.repr(self.db)
+                    ),
+                    InvalidTypeExpression::TypeQualifierRequiresOneArgument(qualifier) => write!(
+                        f,
+                        "Type qualifier `{q}` is not allowed in type expressions (only in annotation expressions, and only with exactly one argument)",
+                        q = qualifier.repr(self.db)
                     ),
                     InvalidTypeExpression::InvalidType(ty) => write!(
                         f,
@@ -4017,10 +4098,8 @@ impl<'db> FunctionType<'db> {
 
     /// Convert the `FunctionType` into a [`Type::Callable`].
     ///
-    /// Returns `None` if the function is overloaded. This powers the `CallableTypeFromFunction`
-    /// special form from the `knot_extensions` module.
+    /// This powers the `CallableTypeFromFunction` special form from the `knot_extensions` module.
     pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> Type<'db> {
-        // TODO: Add support for overloaded callables
         Type::Callable(CallableType::General(GeneralCallableType::new(
             db,
             self.signature(db).clone(),
@@ -4237,6 +4316,90 @@ impl<'db> GeneralCallableType<'db> {
             .is_some_and(|return_type| return_type.is_fully_static(db))
     }
 
+    /// Return `true` if `self` represents the exact same set of possible runtime objects as `other`.
+    pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+        let self_signature = self.signature(db);
+        let other_signature = other.signature(db);
+
+        let self_parameters = self_signature.parameters();
+        let other_parameters = other_signature.parameters();
+
+        if self_parameters.len() != other_parameters.len() {
+            return false;
+        }
+
+        if self_parameters.is_gradual() || other_parameters.is_gradual() {
+            return false;
+        }
+
+        // Check equivalence relationship between two optional types. If either of them is `None`,
+        // then it is not a fully static type which means it's not equivalent either.
+        let is_equivalent = |self_type: Option<Type<'db>>, other_type: Option<Type<'db>>| match (
+            self_type, other_type,
+        ) {
+            (Some(self_type), Some(other_type)) => self_type.is_equivalent_to(db, other_type),
+            _ => false,
+        };
+
+        if !is_equivalent(self_signature.return_ty, other_signature.return_ty) {
+            return false;
+        }
+
+        for (self_parameter, other_parameter) in self_parameters.iter().zip(other_parameters) {
+            match (self_parameter.kind(), other_parameter.kind()) {
+                (
+                    ParameterKind::PositionalOnly {
+                        default_ty: self_default,
+                        ..
+                    },
+                    ParameterKind::PositionalOnly {
+                        default_ty: other_default,
+                        ..
+                    },
+                ) if self_default.is_some() == other_default.is_some() => {}
+
+                (
+                    ParameterKind::PositionalOrKeyword {
+                        name: self_name,
+                        default_ty: self_default,
+                    },
+                    ParameterKind::PositionalOrKeyword {
+                        name: other_name,
+                        default_ty: other_default,
+                    },
+                ) if self_default.is_some() == other_default.is_some()
+                    && self_name == other_name => {}
+
+                (ParameterKind::Variadic { .. }, ParameterKind::Variadic { .. }) => {}
+
+                (
+                    ParameterKind::KeywordOnly {
+                        name: self_name,
+                        default_ty: self_default,
+                    },
+                    ParameterKind::KeywordOnly {
+                        name: other_name,
+                        default_ty: other_default,
+                    },
+                ) if self_default.is_some() == other_default.is_some()
+                    && self_name == other_name => {}
+
+                (ParameterKind::KeywordVariadic { .. }, ParameterKind::KeywordVariadic { .. }) => {}
+
+                _ => return false,
+            }
+
+            if !is_equivalent(
+                self_parameter.annotated_type(),
+                other_parameter.annotated_type(),
+            ) {
+                return false;
+            }
+        }
+
+        true
+    }
+
     /// Return `true` if `self` has exactly the same set of possible static materializations as
     /// `other` (if `self` represents the same set of possible sets of possible runtime objects as
     /// `other`).
@@ -4277,6 +4440,342 @@ impl<'db> GeneralCallableType<'db> {
                     other_param.annotated_type(),
                 )
             })
+    }
+
+    /// Return `true` if `self` is a subtype of `other`.
+    pub(crate) fn is_subtype_of(self, db: &'db dyn Db, other: Self) -> bool {
+        /// A helper struct to zip two slices of parameters together that provides control over the
+        /// two iterators individually. It also keeps track of the current parameter in each
+        /// iterator.
+        struct ParametersZip<'a, 'db> {
+            current_self: Option<&'a Parameter<'db>>,
+            current_other: Option<&'a Parameter<'db>>,
+            iter_self: Iter<'a, Parameter<'db>>,
+            iter_other: Iter<'a, Parameter<'db>>,
+        }
+
+        impl<'a, 'db> ParametersZip<'a, 'db> {
+            /// Move to the next parameter in both the `self` and `other` parameter iterators,
+            /// [`None`] if both iterators are exhausted.
+            fn next(&mut self) -> Option<EitherOrBoth<&'a Parameter<'db>, &'a Parameter<'db>>> {
+                match (self.next_self(), self.next_other()) {
+                    (Some(self_param), Some(other_param)) => {
+                        Some(EitherOrBoth::Both(self_param, other_param))
+                    }
+                    (Some(self_param), None) => Some(EitherOrBoth::Left(self_param)),
+                    (None, Some(other_param)) => Some(EitherOrBoth::Right(other_param)),
+                    (None, None) => None,
+                }
+            }
+
+            /// Move to the next parameter in the `self` parameter iterator, [`None`] if the
+            /// iterator is exhausted.
+            fn next_self(&mut self) -> Option<&'a Parameter<'db>> {
+                self.current_self = self.iter_self.next();
+                self.current_self
+            }
+
+            /// Move to the next parameter in the `other` parameter iterator, [`None`] if the
+            /// iterator is exhausted.
+            fn next_other(&mut self) -> Option<&'a Parameter<'db>> {
+                self.current_other = self.iter_other.next();
+                self.current_other
+            }
+
+            /// Peek at the next parameter in the `other` parameter iterator without consuming it.
+            fn peek_other(&mut self) -> Option<&'a Parameter<'db>> {
+                self.iter_other.clone().next()
+            }
+
+            /// Consumes the `ParametersZip` and returns a two-element tuple containing the
+            /// remaining parameters in the `self` and `other` iterators respectively.
+            ///
+            /// The returned iterators starts with the current parameter, if any, followed by the
+            /// remaining parameters in the respective iterators.
+            fn into_remaining(
+                self,
+            ) -> (
+                impl Iterator<Item = &'a Parameter<'db>>,
+                impl Iterator<Item = &'a Parameter<'db>>,
+            ) {
+                (
+                    self.current_self.into_iter().chain(self.iter_self),
+                    self.current_other.into_iter().chain(self.iter_other),
+                )
+            }
+        }
+
+        let self_signature = self.signature(db);
+        let other_signature = other.signature(db);
+
+        // Check if `type1` is a subtype of `type2`. This is mainly to avoid `unwrap` calls
+        // scattered throughout the function.
+        let is_subtype = |type1: Option<Type<'db>>, type2: Option<Type<'db>>| {
+            // SAFETY: Subtype relation is only checked for fully static types.
+            type1.unwrap().is_subtype_of(db, type2.unwrap())
+        };
+
+        // Return types are covariant.
+        if !is_subtype(self_signature.return_ty, other_signature.return_ty) {
+            return false;
+        }
+
+        let mut parameters = ParametersZip {
+            current_self: None,
+            current_other: None,
+            iter_self: self_signature.parameters().iter(),
+            iter_other: other_signature.parameters().iter(),
+        };
+
+        loop {
+            let Some(next_parameter) = parameters.next() else {
+                // All parameters have been checked or both the parameter lists were empty. In
+                // either case, `self` is a subtype of `other`.
+                return true;
+            };
+
+            match next_parameter {
+                EitherOrBoth::Left(self_parameter) => match self_parameter.kind() {
+                    ParameterKind::PositionalOnly { default_ty, .. }
+                    | ParameterKind::PositionalOrKeyword { default_ty, .. }
+                    | ParameterKind::KeywordOnly { default_ty, .. } => {
+                        // For `self <: other` to be valid, if there are no more parameters in
+                        // `other`, then the non-variadic parameters in `self` must have a default
+                        // value.
+                        if default_ty.is_none() {
+                            return false;
+                        }
+                    }
+                    ParameterKind::Variadic { .. } | ParameterKind::KeywordVariadic { .. } => {
+                        // Variadic parameters don't have any restrictions in this context, so
+                        // we'll just continue to the next parameter set.
+                    }
+                },
+
+                EitherOrBoth::Right(_) => {
+                    // If there are more parameters in `other` than in `self`, then `self` is not a
+                    // subtype of `other`.
+                    return false;
+                }
+
+                EitherOrBoth::Both(self_parameter, other_parameter) => {
+                    match (self_parameter.kind(), other_parameter.kind()) {
+                        (
+                            ParameterKind::PositionalOnly {
+                                default_ty: self_default,
+                                ..
+                            }
+                            | ParameterKind::PositionalOrKeyword {
+                                default_ty: self_default,
+                                ..
+                            },
+                            ParameterKind::PositionalOnly {
+                                default_ty: other_default,
+                                ..
+                            },
+                        ) => {
+                            if self_default.is_none() && other_default.is_some() {
+                                return false;
+                            }
+                            if !is_subtype(
+                                other_parameter.annotated_type(),
+                                self_parameter.annotated_type(),
+                            ) {
+                                return false;
+                            }
+                        }
+
+                        (
+                            ParameterKind::PositionalOrKeyword {
+                                name: self_name,
+                                default_ty: self_default,
+                            },
+                            ParameterKind::PositionalOrKeyword {
+                                name: other_name,
+                                default_ty: other_default,
+                            },
+                        ) => {
+                            if self_name != other_name {
+                                return false;
+                            }
+                            // The following checks are the same as positional-only parameters.
+                            if self_default.is_none() && other_default.is_some() {
+                                return false;
+                            }
+                            if !is_subtype(
+                                other_parameter.annotated_type(),
+                                self_parameter.annotated_type(),
+                            ) {
+                                return false;
+                            }
+                        }
+
+                        (ParameterKind::Variadic { .. }, ParameterKind::PositionalOnly { .. }) => {
+                            if !is_subtype(
+                                other_parameter.annotated_type(),
+                                self_parameter.annotated_type(),
+                            ) {
+                                return false;
+                            }
+
+                            // We've reached a variadic parameter in `self` which means there can
+                            // be no more positional parameters after this in a valid AST. But, the
+                            // current parameter in `other` is a positional-only which means there
+                            // can be more positional parameters after this which could be either
+                            // more positional-only parameters, standard parameters or a variadic
+                            // parameter.
+                            //
+                            // So, any remaining positional parameters in `other` would need to be
+                            // checked against the variadic parameter in `self`. This loop does
+                            // that by only moving the `other` iterator forward.
+                            loop {
+                                let Some(other_parameter) = parameters.peek_other() else {
+                                    break;
+                                };
+                                if !matches!(
+                                    other_parameter.kind(),
+                                    ParameterKind::PositionalOnly { .. }
+                                        | ParameterKind::Variadic { .. }
+                                ) {
+                                    // Any other parameter kind cannot be checked against a
+                                    // variadic parameter and is deferred to the next iteration.
+                                    break;
+                                }
+                                if !is_subtype(
+                                    other_parameter.annotated_type(),
+                                    self_parameter.annotated_type(),
+                                ) {
+                                    return false;
+                                }
+                                parameters.next_other();
+                            }
+                        }
+
+                        (ParameterKind::Variadic { .. }, ParameterKind::Variadic { .. }) => {
+                            if !is_subtype(
+                                other_parameter.annotated_type(),
+                                self_parameter.annotated_type(),
+                            ) {
+                                return false;
+                            }
+                        }
+
+                        (
+                            _,
+                            ParameterKind::KeywordOnly { .. }
+                            | ParameterKind::KeywordVariadic { .. },
+                        ) => {
+                            // Keyword parameters are not considered in this loop as the order of
+                            // parameters is not important for them and so they are checked by
+                            // doing name-based lookups.
+                            break;
+                        }
+
+                        _ => return false,
+                    }
+                }
+            }
+        }
+
+        // At this point, the remaining parameters in `other` are keyword-only or keyword variadic.
+        // But, `self` could contain any unmatched positional parameters.
+        let (self_parameters, other_parameters) = parameters.into_remaining();
+
+        // Collect all the keyword-only parameters and the unmatched standard parameters.
+        let mut self_keywords = HashMap::new();
+
+        // Type of the variadic keyword parameter in `self`.
+        //
+        // This is a nested option where the outer option represents the presence of a keyword
+        // variadic parameter in `self` and the inner option represents the annotated type of the
+        // keyword variadic parameter.
+        let mut self_keyword_variadic: Option<Option<Type<'db>>> = None;
+
+        for self_parameter in self_parameters {
+            match self_parameter.kind() {
+                ParameterKind::KeywordOnly { name, .. }
+                | ParameterKind::PositionalOrKeyword { name, .. } => {
+                    self_keywords.insert(name.clone(), self_parameter);
+                }
+                ParameterKind::KeywordVariadic { .. } => {
+                    self_keyword_variadic = Some(self_parameter.annotated_type());
+                }
+                ParameterKind::PositionalOnly { .. } => {
+                    // These are the unmatched positional-only parameters in `self` from the
+                    // previous loop. They cannot be matched against any parameter in `other` which
+                    // only contains keyword-only and keyword-variadic parameters so the subtype
+                    // relation is invalid.
+                    return false;
+                }
+                ParameterKind::Variadic { .. } => {}
+            }
+        }
+
+        for other_parameter in other_parameters {
+            match other_parameter.kind() {
+                ParameterKind::KeywordOnly {
+                    name: other_name,
+                    default_ty: other_default,
+                } => {
+                    if let Some(self_parameter) = self_keywords.remove(other_name) {
+                        match self_parameter.kind() {
+                            ParameterKind::PositionalOrKeyword {
+                                default_ty: self_default,
+                                ..
+                            }
+                            | ParameterKind::KeywordOnly {
+                                default_ty: self_default,
+                                ..
+                            } => {
+                                if self_default.is_none() && other_default.is_some() {
+                                    return false;
+                                }
+                                if !is_subtype(
+                                    other_parameter.annotated_type(),
+                                    self_parameter.annotated_type(),
+                                ) {
+                                    return false;
+                                }
+                            }
+                            _ => unreachable!(
+                                "`self_keywords` should only contain keyword-only or standard parameters"
+                            ),
+                        }
+                    } else if let Some(self_keyword_variadic_type) = self_keyword_variadic {
+                        if !is_subtype(other_parameter.annotated_type(), self_keyword_variadic_type)
+                        {
+                            return false;
+                        }
+                    } else {
+                        return false;
+                    }
+                }
+                ParameterKind::KeywordVariadic { .. } => {
+                    let Some(self_keyword_variadic_type) = self_keyword_variadic else {
+                        // For a `self <: other` relationship, if `other` has a keyword variadic
+                        // parameter, `self` must also have a keyword variadic parameter.
+                        return false;
+                    };
+                    if !is_subtype(other_parameter.annotated_type(), self_keyword_variadic_type) {
+                        return false;
+                    }
+                }
+                _ => {
+                    // This can only occur in case of a syntax error.
+                    return false;
+                }
+            }
+        }
+
+        // If there are still unmatched keyword parameters from `self`, then they should be
+        // optional otherwise the subtype relation is invalid.
+        for (_, self_parameter) in self_keywords {
+            if self_parameter.default_type().is_none() {
+                return false;
+            }
+        }
+
+        true
     }
 }
 

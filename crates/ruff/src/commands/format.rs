@@ -214,7 +214,11 @@ pub(crate) fn format(
     match mode {
         FormatMode::Write => {
             if errors.is_empty() {
-                Ok(ExitStatus::Success)
+                if cli.exit_non_zero_on_format && results.any_formatted() {
+                    Ok(ExitStatus::Failure)
+                } else {
+                    Ok(ExitStatus::Success)
+                }
             } else {
                 Ok(ExitStatus::Error)
             }

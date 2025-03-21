@@ -9,7 +9,7 @@ use anyhow::Result;
 use itertools::Itertools;
 use rustc_hash::FxHashMap;
 
-use ruff_diagnostics::{Applicability, Diagnostic, FixAvailability};
+use ruff_diagnostics::{Applicability, FixAvailability};
 use ruff_notebook::Notebook;
 #[cfg(not(fuzzing))]
 use ruff_notebook::NotebookError;
@@ -19,7 +19,6 @@ use ruff_python_index::Indexer;
 use ruff_python_parser::{ParseError, ParseOptions};
 use ruff_python_trivia::textwrap::dedent;
 use ruff_source_file::SourceFileBuilder;
-use ruff_text_size::Ranged;
 
 use crate::fix::{fix_file, FixResult};
 use crate::linter::check_path;
@@ -124,7 +123,7 @@ pub(crate) fn test_contents<'a>(
         &locator,
         &indexer,
     );
-    let diagnostics = check_path(
+    let messages = check_path(
         path,
         path.parent()
             .and_then(|parent| detect_package_root(parent, &settings.namespace_packages))
@@ -148,25 +147,22 @@ pub(crate) fn test_contents<'a>(
 
     let mut transformed = Cow::Borrowed(source_kind);
 
-    if diagnostics
-        .iter()
-        .any(|diagnostic| diagnostic.fix.is_some())
-    {
-        let mut diagnostics = diagnostics.clone();
+    if messages.iter().any(|message| message.fix().is_some()) {
+        let mut messages = messages.clone();
 
         while let Some(FixResult {
             code: fixed_contents,
             source_map,
             ..
         }) = fix_file(
-            &diagnostics,
+            &messages,
             &Locator::new(transformed.source_code()),
             UnsafeFixes::Enabled,
         ) {
             if iterations < max_iterations() {
                 iterations += 1;
             } else {
-                let output = print_diagnostics(diagnostics, path, &transformed);
+                let output = print_diagnostics(messages, path, &transformed);
 
                 panic!(
                     "Failed to converge after {} iterations. This likely \
@@ -192,7 +188,7 @@ pub(crate) fn test_contents<'a>(
                 &indexer,
             );
 
-            let fixed_diagnostics = check_path(
+            let fixed_messages = check_path(
                 path,
                 None,
                 &locator,
@@ -209,7 +205,7 @@ pub(crate) fn test_contents<'a>(
 
             if parsed.has_invalid_syntax() && !source_has_errors {
                 // Previous fix introduced a syntax error, abort
-                let fixes = print_diagnostics(diagnostics, path, source_kind);
+                let fixes = print_diagnostics(messages, path, source_kind);
                 let syntax_errors =
                     print_syntax_errors(parsed.errors(), path, &locator, &transformed);
 
@@ -224,7 +220,7 @@ Source with applied fixes:
                 );
             }
 
-            diagnostics = fixed_diagnostics;
+            messages = fixed_messages;
         }
     }
 
@@ -234,9 +230,10 @@ Source with applied fixes:
     )
     .finish();
 
-    let messages = diagnostics
+    let messages = messages
         .into_iter()
-        .map(|diagnostic| {
+        .filter_map(Message::into_diagnostic_message)
+        .map(|mut diagnostic| {
             let rule = diagnostic.kind.rule();
             let fixable = diagnostic.fix.as_ref().is_some_and(|fix| {
                 matches!(
@@ -277,9 +274,10 @@ Either ensure you always emit a fix or change `Violation::FIX_AVAILABILITY` to e
             );
 
             // Not strictly necessary but adds some coverage for this code path
-            let noqa = directives.noqa_line_for.resolve(diagnostic.start());
+            diagnostic.noqa_offset = directives.noqa_line_for.resolve(diagnostic.range.start());
+            diagnostic.file = source_code.clone();
 
-            Message::from_diagnostic(diagnostic, source_code.clone(), noqa)
+            Message::Diagnostic(diagnostic)
         })
         .chain(parsed.errors().iter().map(|parse_error| {
             Message::from_parse_error(parse_error, &locator, source_code.clone())
@@ -310,18 +308,9 @@ fn print_syntax_errors(
     }
 }
 
-fn print_diagnostics(diagnostics: Vec<Diagnostic>, path: &Path, source: &SourceKind) -> String {
-    let filename = path.file_name().unwrap().to_string_lossy();
-    let source_file = SourceFileBuilder::new(filename.as_ref(), source.source_code()).finish();
-
-    let messages: Vec<_> = diagnostics
-        .into_iter()
-        .map(|diagnostic| {
-            let noqa_start = diagnostic.start();
-
-            Message::from_diagnostic(diagnostic, source_file.clone(), noqa_start)
-        })
-        .collect();
+/// Print the [`Message::Diagnostic`]s in `messages`.
+fn print_diagnostics(mut messages: Vec<Message>, path: &Path, source: &SourceKind) -> String {
+    messages.retain(Message::is_diagnostic_message);
 
     if let Some(notebook) = source.as_ipy_notebook() {
         print_jupyter_messages(&messages, path, notebook)

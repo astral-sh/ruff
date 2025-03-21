@@ -654,6 +654,11 @@ impl<'db> Parameter<'db> {
         self.annotated_type
     }
 
+    /// Kind of the parameter.
+    pub(crate) fn kind(&self) -> &ParameterKind<'db> {
+        &self.kind
+    }
+
     /// Name of the parameter (if it has one).
     pub(crate) fn name(&self) -> Option<&ast::name::Name> {
         match &self.kind {

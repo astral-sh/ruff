@@ -20,3 +20,5 @@ count = 0xA.bit_count()  # OK
 count = 0o12.bit_count()  # OK
 count = (0x10 + 0x1000).bit_count()  # OK
 count = ten().bit_count()  # OK
+count = bin(*[123]).count("1")  # OK
+count = bin(*(123)).count("1")  # OK
