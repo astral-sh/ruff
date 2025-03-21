@@ -87,7 +87,7 @@ pub(super) struct SemanticIndexBuilder<'db> {
     use_def_maps: IndexVec<FileScopeId, UseDefMapBuilder<'db>>,
     scopes_by_node: FxHashMap<NodeWithScopeKey, FileScopeId>,
     scopes_by_expression: FxHashMap<ExpressionNodeKey, FileScopeId>,
-    definitions_by_node: FxHashMap<DefinitionNodeKey, Definition<'db>>,
+    definitions_by_node: FxHashMap<DefinitionNodeKey, smallvec::SmallVec<[Definition<'db>; 1]>>,
     expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
     imported_modules: FxHashSet<ModuleName>,
     attribute_assignments: FxHashMap<FileScopeId, AttributeAssignments<'db>>,
@@ -367,7 +367,7 @@ impl<'db> SemanticIndexBuilder<'db> {
 
         let existing_definition = self
             .definitions_by_node
-            .insert(definition_node.key(), definition);
+            .insert(definition_node.key(), smallvec::smallvec![definition]);
         debug_assert_eq!(existing_definition, None);
 
         if category.is_binding() {
@@ -767,9 +767,10 @@ impl<'db> SemanticIndexBuilder<'db> {
         // Insert a mapping from the inner Parameter node to the same definition. This
         // ensures that calling `HasType::inferred_type` on the inner parameter returns
         // a valid type (and doesn't panic)
-        let existing_definition = self
-            .definitions_by_node
-            .insert((&parameter.parameter).into(), definition);
+        let existing_definition = self.definitions_by_node.insert(
+            (&parameter.parameter).into(),
+            smallvec::smallvec![definition],
+        );
         debug_assert_eq!(existing_definition, None);
     }
 
@@ -990,6 +991,12 @@ where
                 }
             }
             ast::Stmt::ImportFrom(node) => {
+                if node.names.len() == 1 && node.names.iter().any(|alias| alias.name.id == "*") {
+                    let symbol = self.add_symbol(Name::new_static("*"));
+                    self.add_definition(symbol, DefinitionNodeRef::ImportStar(node));
+                    return;
+                }
+
                 for (alias_index, alias) in node.names.iter().enumerate() {
                     let (symbol_name, is_reexported) = if let Some(asname) = &alias.asname {
                         (&asname.id, asname.id == alias.name.id)

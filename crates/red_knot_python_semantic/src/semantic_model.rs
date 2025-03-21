@@ -149,8 +149,9 @@ macro_rules! impl_binding_has_ty {
             #[inline]
             fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
                 let index = semantic_index(model.db, model.file);
-                let binding = index.definition(self);
-                binding_type(model.db, binding)
+                let definitions = index.definition(self);
+                debug_assert_eq!(definitions.len(), 1);
+                binding_type(model.db, definitions[0])
             }
         }
     };
@@ -158,9 +159,20 @@ macro_rules! impl_binding_has_ty {
 
 impl_binding_has_ty!(ast::StmtFunctionDef);
 impl_binding_has_ty!(ast::StmtClassDef);
-impl_binding_has_ty!(ast::Alias);
 impl_binding_has_ty!(ast::Parameter);
 impl_binding_has_ty!(ast::ParameterWithDefault);
+
+impl HasType for ast::Alias {
+    fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
+        if &self.name == "*" {
+            return Type::Never;
+        }
+        let index = semantic_index(model.db, model.file);
+        let definitions = index.definition(self);
+        debug_assert_eq!(definitions.len(), 1);
+        binding_type(model.db, definitions[0])
+    }
+}
 
 #[cfg(test)]
 mod tests {

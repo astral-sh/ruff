@@ -130,7 +130,11 @@ impl<'db> Class<'db> {
         tracing::trace!("Class::explicit_bases_query: {}", self.name(db));
         let class_stmt = self.node(db);
 
-        let class_definition = semantic_index(db, self.file(db)).definition(class_stmt);
+        let class_definitions = semantic_index(db, self.file(db)).definition(class_stmt);
+
+        debug_assert_eq!(class_definitions.len(), 1);
+
+        let class_definition = class_definitions[0];
 
         class_stmt
             .bases()
@@ -160,12 +164,13 @@ impl<'db> Class<'db> {
         if class_stmt.decorator_list.is_empty() {
             return Box::new([]);
         }
-        let class_definition = semantic_index(db, self.file(db)).definition(class_stmt);
+        let class_definitions = semantic_index(db, self.file(db)).definition(class_stmt);
+        debug_assert_eq!(class_definitions.len(), 1);
         class_stmt
             .decorator_list
             .iter()
             .map(|decorator_node| {
-                definition_expression_type(db, class_definition, &decorator_node.expression)
+                definition_expression_type(db, class_definitions[0], &decorator_node.expression)
             })
             .collect()
     }
@@ -224,8 +229,9 @@ impl<'db> Class<'db> {
             .as_ref()?
             .find_keyword("metaclass")?
             .value;
-        let class_definition = semantic_index(db, self.file(db)).definition(class_stmt);
-        let metaclass_ty = definition_expression_type(db, class_definition, metaclass_node);
+        let definitions = semantic_index(db, self.file(db)).definition(class_stmt);
+        debug_assert_eq!(definitions.len(), 1);
+        let metaclass_ty = definition_expression_type(db, definitions[0], metaclass_node);
         Some(metaclass_ty)
     }
 

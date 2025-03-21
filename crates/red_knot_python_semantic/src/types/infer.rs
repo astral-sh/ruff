@@ -887,6 +887,13 @@ impl<'db> TypeInferenceBuilder<'db> {
                     definition,
                 );
             }
+            DefinitionKind::StarImport(import) => {
+                self.infer_import_from_definition(
+                    import.node(),
+                    &import.node().names[0],
+                    definition,
+                );
+            }
             DefinitionKind::Assignment(assignment) => {
                 self.infer_assignment_definition(assignment, definition);
             }
@@ -1293,9 +1300,9 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn infer_definition(&mut self, node: impl Into<DefinitionNodeKey>) {
-        let definition = self.index.definition(node);
-        let result = infer_definition_types(self.db(), definition);
-        self.extend(result);
+        for definition in self.index.definition(node) {
+            self.extend(infer_definition_types(self.db(), *definition));
+        }
     }
 
     fn infer_function_definition_statement(&mut self, function: &ast::StmtFunctionDef) {
@@ -3731,10 +3738,11 @@ impl<'db> TypeInferenceBuilder<'db> {
     fn infer_named_expression(&mut self, named: &ast::ExprNamed) -> Type<'db> {
         // See https://peps.python.org/pep-0572/#differences-between-assignment-expressions-and-assignment-statements
         if named.target.is_name_expr() {
-            let definition = self.index.definition(named);
-            let result = infer_definition_types(self.db(), definition);
+            let definitions = self.index.definition(named);
+            debug_assert_eq!(definitions.len(), 1);
+            let result = infer_definition_types(self.db(), definitions[0]);
             self.extend(result);
-            result.binding_type(definition)
+            result.binding_type(definitions[0])
         } else {
             // For syntactically invalid targets, we still need to run type inference:
             self.infer_expression(&named.target);

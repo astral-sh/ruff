@@ -56,6 +56,7 @@ impl<'db> Definition<'db> {
 pub(crate) enum DefinitionNodeRef<'a> {
     Import(ImportDefinitionNodeRef<'a>),
     ImportFrom(ImportFromDefinitionNodeRef<'a>),
+    ImportStar(&'a ast::StmtImportFrom),
     For(ForStmtDefinitionNodeRef<'a>),
     Function(&'a ast::StmtFunctionDef),
     Class(&'a ast::StmtClassDef),
@@ -253,6 +254,7 @@ impl<'db> DefinitionNodeRef<'db> {
                 alias: AstNodeRef::new(parsed, alias),
                 is_reexported,
             }),
+
             DefinitionNodeRef::ImportFrom(ImportFromDefinitionNodeRef {
                 node,
                 alias_index,
@@ -262,6 +264,9 @@ impl<'db> DefinitionNodeRef<'db> {
                 alias_index,
                 is_reexported,
             }),
+            DefinitionNodeRef::ImportStar(node) => {
+                DefinitionKind::StarImport(AstNodeRef::new(parsed, node))
+            }
             DefinitionNodeRef::Function(function) => {
                 DefinitionKind::Function(AstNodeRef::new(parsed, function))
             }
@@ -376,6 +381,10 @@ impl<'db> DefinitionNodeRef<'db> {
                 alias_index,
                 is_reexported: _,
             }) => (&node.names[alias_index]).into(),
+            Self::ImportStar(ast::StmtImportFrom { names, .. }) => {
+                debug_assert_eq!(names.len(), 1);
+                (&names[0]).into()
+            }
             Self::Function(node) => node.into(),
             Self::Class(node) => node.into(),
             Self::TypeAlias(node) => node.into(),
@@ -463,6 +472,7 @@ impl DefinitionCategory {
 pub enum DefinitionKind<'db> {
     Import(ImportDefinitionKind),
     ImportFrom(ImportFromDefinitionKind),
+    StarImport(AstNodeRef<ast::StmtImportFrom>),
     Function(AstNodeRef<ast::StmtFunctionDef>),
     Class(AstNodeRef<ast::StmtClassDef>),
     TypeAlias(AstNodeRef<ast::StmtTypeAlias>),
@@ -502,6 +512,7 @@ impl DefinitionKind<'_> {
         match self {
             DefinitionKind::Import(import) => import.alias().range(),
             DefinitionKind::ImportFrom(import) => import.alias().range(),
+            DefinitionKind::StarImport(import) => import.node().range(),
             DefinitionKind::Function(function) => function.name.range(),
             DefinitionKind::Class(class) => class.name.range(),
             DefinitionKind::TypeAlias(type_alias) => type_alias.name.range(),
@@ -531,6 +542,7 @@ impl DefinitionKind<'_> {
             | DefinitionKind::TypeAlias(_)
             | DefinitionKind::Import(_)
             | DefinitionKind::ImportFrom(_)
+            | DefinitionKind::StarImport(_)
             | DefinitionKind::TypeVar(_)
             | DefinitionKind::ParamSpec(_)
             | DefinitionKind::TypeVarTuple(_) => DefinitionCategory::DeclarationAndBinding,

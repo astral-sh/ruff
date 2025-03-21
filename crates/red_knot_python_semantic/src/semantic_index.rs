@@ -137,7 +137,7 @@ pub(crate) struct SemanticIndex<'db> {
     scopes_by_expression: FxHashMap<ExpressionNodeKey, FileScopeId>,
 
     /// Map from a node creating a definition to its definition.
-    definitions_by_node: FxHashMap<DefinitionNodeKey, Definition<'db>>,
+    definitions_by_node: FxHashMap<DefinitionNodeKey, smallvec::SmallVec<[Definition<'db>; 1]>>,
 
     /// Map from a standalone expression to its [`Expression`] ingredient.
     expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
@@ -256,8 +256,8 @@ impl<'db> SemanticIndex<'db> {
     pub(crate) fn definition(
         &self,
         definition_key: impl Into<DefinitionNodeKey>,
-    ) -> Definition<'db> {
-        self.definitions_by_node[&definition_key.into()]
+    ) -> &smallvec::SmallVec<[Definition<'db>; 1]> {
+        &self.definitions_by_node[&definition_key.into()]
     }
 
     /// Returns the [`Expression`] ingredient for an expression node.
