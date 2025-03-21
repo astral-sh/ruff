@@ -98,7 +98,6 @@ class Bar[T](ABC):
 
 # error: [invalid-return-type]
 def f() -> int: ...
-
 @abstractmethod  # Semantically meaningless, accepted nevertheless
 def g() -> int: ...
 ```
