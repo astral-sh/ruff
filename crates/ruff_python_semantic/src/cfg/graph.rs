@@ -57,6 +57,8 @@ struct BlockData<'stmt> {
 pub(crate) enum BlockKind {
     #[default]
     Generic,
+    Start,
+    Terminal,
 }
 
 /// Holds a collection of edges. Each edge is determined by:
