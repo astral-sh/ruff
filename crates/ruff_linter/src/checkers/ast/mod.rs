@@ -227,11 +227,12 @@ pub(crate) struct Checker<'a> {
     last_stmt_end: TextSize,
     /// A state describing if a docstring is expected or not.
     docstring_state: DocstringState,
-    /// The target [`PythonVersion`] for version-dependent checks
+    /// The target [`PythonVersion`] for version-dependent checks.
     target_version: PythonVersion,
-
+    /// Helper visitor for detecting semantic syntax errors.
     #[allow(clippy::struct_field_names)]
-    syntax_checker: SemanticSyntaxChecker,
+    semantic_checker: SemanticSyntaxChecker,
+    /// Errors collected by the `semantic_checker`.
     semantic_errors: RefCell<Vec<SemanticSyntaxError>>,
 }
 
@@ -280,7 +281,7 @@ impl<'a> Checker<'a> {
             last_stmt_end: TextSize::default(),
             docstring_state: DocstringState::default(),
             target_version,
-            syntax_checker: SemanticSyntaxChecker::new(),
+            semantic_checker: SemanticSyntaxChecker::new(),
             semantic_errors: RefCell::default(),
         }
     }
@@ -524,9 +525,9 @@ impl<'a> Checker<'a> {
     }
 
     fn with_semantic_checker(&mut self, f: impl FnOnce(&mut SemanticSyntaxChecker, &Checker)) {
-        let mut checker = std::mem::take(&mut self.syntax_checker);
+        let mut checker = std::mem::take(&mut self.semantic_checker);
         f(&mut checker, self);
-        self.syntax_checker = checker;
+        self.semantic_checker = checker;
     }
 }
 
