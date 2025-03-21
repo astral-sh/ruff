@@ -15,8 +15,7 @@ X: bool = True
 `b.py`:
 
 ```py
-# TODO: should not error
-from a import *  # error: [unresolved-import]
+from a import *
 
 # TODO: should not error, should be `bool`
 # error: [unresolved-reference]
@@ -39,8 +38,7 @@ X: bool = True
 X = 42
 reveal_type(X)  # revealed: Literal[42]
 
-# TODO: should not error
-from a import *  # error: [unresolved-import]
+from a import *
 
 # TODO: should reveal `bool`
 reveal_type(X)  # revealed: Literal[42]
@@ -57,8 +55,7 @@ X: bool = True
 `b.py`:
 
 ```py
-# TODO: should not error
-from a import *  # error: [unresolved-import]
+from a import *
 
 # TODO: should not error, should reveal `bool`
 # error: [unresolved-reference]
@@ -79,8 +76,7 @@ X: bool = True
 `b.py`:
 
 ```py
-# TODO: should not error
-from a import *  # error: [unresolved-import]
+from a import *
 ```
 
 `c.py`:
@@ -116,8 +112,7 @@ Y: bool = False
 `c.pyi`:
 
 ```pyi
-# TODO: should not error
-from a import *  # error: [unresolved-import]
+from a import *
 from b import Y
 ```
 
@@ -143,8 +138,7 @@ X = (Y := 3) + 4
 `b.py`:
 
 ```py
-# TODO: should not error
-from a import *  # error: [unresolved-import]
+from a import *
 
 # TODO should not error, should reveal `Literal[7] | Unknown`
 # error: [unresolved-reference]
@@ -173,8 +167,7 @@ Y: bool = True
 `b.py`:
 
 ```py
-# TODO: should not error
-from a import *  # error: [unresolved-import]
+from a import *
 
 # These errors are correct:
 #
@@ -217,8 +210,7 @@ from a import X
 `c.py`:
 
 ```py
-# TODO: should not error
-from b import *  # error: [unresolved-import]
+from b import *
 
 # TODO: this is a false positive, but we could consider a different opt-in diagnostic
 # (see prose commentary above)
@@ -247,8 +239,7 @@ from a import X
 `c.py`:
 
 ```py
-# TODO: should not error
-from b import *  # error: [unresolved-import]
+from b import *
 
 # This error is correct, as `X` is not considered re-exported from module `b`:
 #
@@ -277,8 +268,7 @@ else:
 `b.py`:
 
 ```py
-# TODO should not error
-from a import *  # error: [unresolved-import]
+from a import *
 
 # TODO should not error, should reveal `bool`
 # error: [unresolved-reference]
@@ -306,8 +296,7 @@ X: bool = True
 `a/bar.py`:
 
 ```py
-# TODO should not error
-from .a import *  # error: [unresolved-import]
+from .foo import *
 
 # TODO should not error, should reveal `bool`
 # error: [unresolved-reference]
@@ -338,8 +327,7 @@ Y: bool = False
 `b.py`:
 
 ```py
-# TODO should not error
-from a import *  # error: [unresolved-import]
+from a import *
 
 # TODO none of these should error, should all reveal `bool`
 # error: [unresolved-reference]
@@ -373,8 +361,7 @@ Y: bool = False
 `b.py`:
 
 ```py
-# TODO should not error
-from a import *  # error: [unresolved-import]
+from a import *
 
 # TODO should not error, should reveal `bool`
 # error: [unresolved-reference]
@@ -396,13 +383,11 @@ FOO: bool = True
 __all__ = ["FOO"]
 ```
 
-`b.py`
+`b.py`:
 
 ```py
 import a
-
-# TODO should not error
-from a import *  # error: [unresolved-import]
+from a import *
 
 __all__ = ["A"]
 __all__ += ["B"]
@@ -422,8 +407,7 @@ F: bool = False
 `c.py`:
 
 ```py
-# TODO should not error
-from b import *  # error: [unresolved-import]
+from b import *
 
 # TODO none of these should error, they should all reveal `bool`
 # error: [unresolved-reference]
@@ -461,8 +445,7 @@ B: bool = True
 `b.py`:
 
 ```py
-# TODO should not error
-from a import *  # error: [unresolved-import]
+from a import *
 
 # TODO should not error, should reveal `bool`
 # error: [unresolved-reference]
@@ -495,8 +478,7 @@ a = 42
 `b.py`:
 
 ```py
-# TODO even if emiting a diagnostic here is desirable, this is an incorrect error message
-# error: [unresolved-import] "Module `a` has no member `*`"
+# TODO we should consider emitting a diagnostic here (see prose description above)
 from a import *  # fails with `AttributeError: module 'foo' has no attribute 'b'` at runtime
 ```
 
@@ -524,8 +506,7 @@ __all__ = [f()]
 `b.py`:
 
 ```py
-# TODO: should not error
-from a import *  # error: [unresolved-import]
+from a import *
 
 # TODO: we should avoid both errors here.
 #
@@ -564,8 +545,7 @@ else:
 `b.py`:
 
 ```py
-# TODO should not error
-from a import *  # error: [unresolved-import]
+from a import *
 
 # TODO neither should error, both should be `bool`
 # error: [unresolved-reference]
@@ -603,8 +583,7 @@ else:
 `b.py`:
 
 ```py
-# TODO should not error
-from a import *  # error: [unresolved-import]
+from a import *
 
 # TODO neither should error, both should be `bool`
 # error: [unresolved-reference]
@@ -640,9 +619,8 @@ __all__ = []
 `c.py`:
 
 ```py
-# TODO: should not error for either import statement:
-from a import *  # error: [unresolved-import]
-from b import *  # error: [unresolved-import]
+from a import *
+from b import *
 
 # error: [unresolved-reference]
 reveal_type(X)  # revealed: Unknown
@@ -673,8 +651,7 @@ __all__ = ["X"]
 `c.py`:
 
 ```py
-# TODO: should not error
-from b import *  # error: [unresolved-import]
+from b import *
 
 # TODO: should not error, should reveal `bool`
 # error: [unresolved-reference]
@@ -708,7 +685,8 @@ reveal_type(collections.abc.Callable)  # revealed: Unknown
 If the module is unresolved, we emit a diagnostic just like for any other unresolved import:
 
 ```py
-from foo import *  # error: [unresolved-import]
+# TODO: not a great error message
+from foo import *  # error: [unresolved-import] "Cannot resolve import `foo`"
 ```
 
 ### Nested scope
@@ -726,9 +704,8 @@ X: bool = True
 
 ```py
 def f():
-    # TODO: it's correct for us to raise an error here, but the error code and error message are incorrect.
-    # It should be a syntax errror (tracked by https://github.com/astral-sh/ruff/issues/11934)
-    from a import *  # error: [unresolved-import] "Module `a` has no member `*`"
+    # TODO: we should emit a syntax errror here (tracked by https://github.com/astral-sh/ruff/issues/11934)
+    from a import *
 
     # error: [unresolved-reference]
     reveal_type(X)  # revealed: Unknown
