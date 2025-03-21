@@ -131,6 +131,12 @@ impl OperatorPrecedence {
     pub fn from_expr(expr: &Expr) -> Self {
         Self::from(&ExprRef::from(expr))
     }
+
+    /// Returns `true` if the precedence is right-associative i.e., the operations are evaluated
+    /// from right to left.
+    pub fn is_right_associative(self) -> bool {
+        matches!(self, OperatorPrecedence::Exponent)
+    }
 }
 
 impl From<&Expr> for OperatorPrecedence {
@@ -174,6 +180,15 @@ impl From<BoolOp> for OperatorPrecedence {
         match operator {
             BoolOp::And => Self::And,
             BoolOp::Or => Self::Or,
+        }
+    }
+}
+
+impl From<UnaryOp> for OperatorPrecedence {
+    fn from(unary_op: UnaryOp) -> Self {
+        match unary_op {
+            UnaryOp::UAdd | UnaryOp::USub | UnaryOp::Invert => Self::PosNegBitNot,
+            UnaryOp::Not => Self::Not,
         }
     }
 }
