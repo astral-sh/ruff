@@ -38,7 +38,7 @@ use crate::types::diagnostic::{INVALID_TYPE_FORM, UNSUPPORTED_BOOL_CONVERSION};
 use crate::types::infer::infer_unpack_types;
 use crate::types::mro::{Mro, MroError, MroIterator};
 pub(crate) use crate::types::narrow::infer_narrowing_constraint;
-use crate::types::signatures::{Parameter, ParameterForm, Parameters};
+use crate::types::signatures::{Parameter, ParameterForm, ParameterKind, Parameters};
 use crate::{Db, FxOrderSet, Module, Program};
 pub(crate) use class::{Class, ClassLiteralType, InstanceType, KnownClass, KnownInstanceType};
 
@@ -4349,11 +4349,11 @@ impl<'db> GeneralCallableType<'db> {
             match (self_parameter.kind(), other_parameter.kind()) {
                 (
                     ParameterKind::PositionalOnly {
-                        default_ty: self_default,
+                        default_type: self_default,
                         ..
                     },
                     ParameterKind::PositionalOnly {
-                        default_ty: other_default,
+                        default_type: other_default,
                         ..
                     },
                 ) if self_default.is_some() == other_default.is_some() => {}
@@ -4361,11 +4361,11 @@ impl<'db> GeneralCallableType<'db> {
                 (
                     ParameterKind::PositionalOrKeyword {
                         name: self_name,
-                        default_ty: self_default,
+                        default_type: self_default,
                     },
                     ParameterKind::PositionalOrKeyword {
                         name: other_name,
-                        default_ty: other_default,
+                        default_type: other_default,
                     },
                 ) if self_default.is_some() == other_default.is_some()
                     && self_name == other_name => {}
@@ -4375,11 +4375,11 @@ impl<'db> GeneralCallableType<'db> {
                 (
                     ParameterKind::KeywordOnly {
                         name: self_name,
-                        default_ty: self_default,
+                        default_type: self_default,
                     },
                     ParameterKind::KeywordOnly {
                         name: other_name,
-                        default_ty: other_default,
+                        default_type: other_default,
                     },
                 ) if self_default.is_some() == other_default.is_some()
                     && self_name == other_name => {}
@@ -4536,13 +4536,13 @@ impl<'db> GeneralCallableType<'db> {
 
             match next_parameter {
                 EitherOrBoth::Left(self_parameter) => match self_parameter.kind() {
-                    ParameterKind::PositionalOnly { default_ty, .. }
-                    | ParameterKind::PositionalOrKeyword { default_ty, .. }
-                    | ParameterKind::KeywordOnly { default_ty, .. } => {
+                    ParameterKind::PositionalOnly { default_type, .. }
+                    | ParameterKind::PositionalOrKeyword { default_type, .. }
+                    | ParameterKind::KeywordOnly { default_type, .. } => {
                         // For `self <: other` to be valid, if there are no more parameters in
                         // `other`, then the non-variadic parameters in `self` must have a default
                         // value.
-                        if default_ty.is_none() {
+                        if default_type.is_none() {
                             return false;
                         }
                     }
@@ -4562,15 +4562,15 @@ impl<'db> GeneralCallableType<'db> {
                     match (self_parameter.kind(), other_parameter.kind()) {
                         (
                             ParameterKind::PositionalOnly {
-                                default_ty: self_default,
+                                default_type: self_default,
                                 ..
                             }
                             | ParameterKind::PositionalOrKeyword {
-                                default_ty: self_default,
+                                default_type: self_default,
                                 ..
                             },
                             ParameterKind::PositionalOnly {
-                                default_ty: other_default,
+                                default_type: other_default,
                                 ..
                             },
                         ) => {
@@ -4588,11 +4588,11 @@ impl<'db> GeneralCallableType<'db> {
                         (
                             ParameterKind::PositionalOrKeyword {
                                 name: self_name,
-                                default_ty: self_default,
+                                default_type: self_default,
                             },
                             ParameterKind::PositionalOrKeyword {
                                 name: other_name,
-                                default_ty: other_default,
+                                default_type: other_default,
                             },
                         ) => {
                             if self_name != other_name {
@@ -4715,16 +4715,16 @@ impl<'db> GeneralCallableType<'db> {
             match other_parameter.kind() {
                 ParameterKind::KeywordOnly {
                     name: other_name,
-                    default_ty: other_default,
+                    default_type: other_default,
                 } => {
                     if let Some(self_parameter) = self_keywords.remove(other_name) {
                         match self_parameter.kind() {
                             ParameterKind::PositionalOrKeyword {
-                                default_ty: self_default,
+                                default_type: self_default,
                                 ..
                             }
                             | ParameterKind::KeywordOnly {
-                                default_ty: self_default,
+                                default_type: self_default,
                                 ..
                             } => {
                                 if self_default.is_none() && other_default.is_some() {
