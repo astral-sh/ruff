@@ -119,6 +119,54 @@ impl Diagnostic {
         let display = DisplayDiagnostic::new(&resolver, config, self);
         writeln!(wtr, "{display}")
     }
+
+    /// Returns the identifier for this diagnostic.
+    pub fn id(&self) -> DiagnosticId {
+        self.inner.id
+    }
+
+    /// Returns the primary message for this diagnostic.
+    ///
+    /// A diagnostic always has a message, but it may be empty.
+    pub fn primary_message(&self) -> &str {
+        if !self.inner.message.is_empty() {
+            return &self.inner.message;
+        }
+        // FIXME: As a special case, while we're migrating Red Knot
+        // to the new diagnostic data model, we'll look for a primary
+        // message from the primary annotation. This is because most
+        // Red Knot diagnostics are created with an empty diagnostic
+        // message and instead attach the message to the annotation.
+        // Fixing this will require touching basically every diagnostic
+        // in Red Knot, so we do it this way for now to match the old
+        // semantics. ---AG
+        self.primary_annotation()
+            .and_then(|ann| ann.message.as_deref())
+            .unwrap_or_default()
+    }
+
+    /// Returns the severity of this diagnostic.
+    ///
+    /// Note that this may be different than the severity of sub-diagnostics.
+    pub fn severity(&self) -> Severity {
+        self.inner.severity
+    }
+
+    /// Returns the "primary" annotation of this diagnostic if one exists.
+    ///
+    /// When there are multiple primary annotation, then the first one that was
+    /// added to this diagnostic is returned.
+    pub fn primary_annotation(&self) -> Option<&Annotation> {
+        self.inner.annotations.iter().find(|ann| ann.is_primary)
+    }
+
+    /// Returns the "primary" span of this diagnostic if one exists.
+    ///
+    /// When there are multiple primary spans, then the first one that was
+    /// added to this diagnostic is returned.
+    pub fn primary_span(&self) -> Option<Span> {
+        self.primary_annotation().map(|ann| ann.span.clone())
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -563,4 +611,17 @@ pub enum DiagnosticFormat {
     ///
     /// This may use color when printing to a `tty`.
     Concise,
+}
+
+/// Creates a `Diagnostic` from a parse error.
+///
+/// This should _probably_ be a method on `ruff_python_parser::ParseError`, but
+/// at time of writing, `ruff_db` depends on `ruff_python_parser` instead of
+/// the other way around. And since we want to do this conversion in a couple
+/// places, it makes sense to centralize it _somewhere_. So it's here for now.
+pub fn create_parse_diagnostic(file: File, err: &ruff_python_parser::ParseError) -> Diagnostic {
+    let mut diag = Diagnostic::new(DiagnosticId::InvalidSyntax, Severity::Error, "");
+    let span = Span::from(file).with_range(err.location);
+    diag.annotate(Annotation::primary(span).message(&err.error));
+    diag
 }

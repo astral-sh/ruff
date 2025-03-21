@@ -15,7 +15,7 @@ use red_knot_project::watch::ProjectWatcher;
 use red_knot_project::{watch, Db};
 use red_knot_project::{ProjectDatabase, ProjectMetadata};
 use red_knot_server::run_server;
-use ruff_db::diagnostic::{DisplayDiagnosticConfig, OldDiagnosticTrait, Severity};
+use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig, Severity};
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
 use salsa::plumbing::ZalsaDatabase;
 
@@ -288,7 +288,7 @@ impl MainLoop {
                             let diagnostics_count = result.len();
 
                             for diagnostic in result {
-                                writeln!(stdout, "{}", diagnostic.display(db, &display_config))?;
+                                diagnostic.print(db, &display_config, &mut stdout)?;
 
                                 failed |= diagnostic.severity() >= min_error_severity;
                             }
@@ -359,7 +359,7 @@ enum MainLoopMessage {
     CheckWorkspace,
     CheckCompleted {
         /// The diagnostics that were found during the check.
-        result: Vec<Box<dyn OldDiagnosticTrait>>,
+        result: Vec<Diagnostic>,
         revision: u64,
     },
     ApplyChanges(Vec<watch::ChangeEvent>),
