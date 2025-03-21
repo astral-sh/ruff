@@ -662,7 +662,8 @@ impl<'db> Type<'db> {
             ) => self_callable.is_subtype_of(db, other_callable),
 
             (Type::Callable(CallableType::General(_)), _) => {
-                // TODO: Implement subtyping for general callable types
+                // TODO: Implement subtyping between general callable types and other types like
+                // function literals, bound methods, class literals, `type[]`, etc.)
                 false
             }
 
