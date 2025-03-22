@@ -251,7 +251,7 @@ impl<'db> SemanticIndex<'db> {
         AncestorsIter::new(self, scope)
     }
 
-    /// Returns the [`Definition`] salsa ingredient(s) for `definition_key`.
+    /// Returns the [`definition::Definition`] salsa ingredient(s) for `definition_key`.
     ///
     /// There will only ever be >1 `Definition` associated with a `definition_key`
     /// if the definition is created by a wildcard (`*`) import.
@@ -284,7 +284,8 @@ impl<'db> SemanticIndex<'db> {
             .copied()
     }
 
-    /// Returns the id of the scope that `node` creates. This is different from [`Definition::scope`] which
+    /// Returns the id of the scope that `node` creates.
+    /// This is different from [`definition::Definition::scope`] which
     /// returns the scope in which that definition is defined in.
     #[track_caller]
     pub(crate) fn node_scope(&self, node: NodeWithScopeRef) -> FileScopeId {
