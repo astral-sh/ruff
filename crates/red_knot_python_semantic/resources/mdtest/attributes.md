@@ -539,10 +539,33 @@ class C:
         if (2 + 3) < 4:
             self.x: str = "a"
 
-# TODO: Ideally, this would result in a `unresolved-attribute` error. But mypy and pyright
-# do not support this either (for conditions that can only be resolved to `False` in type
-# inference), so it does not seem to be particularly important.
-reveal_type(C().x)  # revealed: str
+# error: [unresolved-attribute]
+reveal_type(C().x)  # revealed: Unknown
+```
+
+```py
+class C:
+    def __init__(self, cond: bool) -> None:
+        if True:
+            self.x = 1
+        else:
+            self.x = "a"
+
+        if False:
+            self.y = 2
+
+        if cond:
+            return
+
+        self.z = 3
+
+    def set_z(self, z: str) -> None:
+        self.z = z
+
+reveal_type(C().x)  # revealed: Unknown | Literal[1]
+# error: [unresolved-attribute]
+reveal_type(C().y)  # revealed: Unknown
+reveal_type(C().z)  # revealed: Unknown | Literal[3] | str
 ```
 
 #### Diagnostics are reported for the right-hand side of attribute assignments

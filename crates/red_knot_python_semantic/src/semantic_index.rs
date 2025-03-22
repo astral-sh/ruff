@@ -66,6 +66,21 @@ pub(crate) fn symbol_table<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<Sym
     index.symbol_table(scope.file_scope_id(db))
 }
 
+/// Returns the instance attribute table for a specific `scope`.
+#[salsa::tracked]
+pub(crate) fn instance_attribute_table<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+) -> Arc<SymbolTable> {
+    let file = scope.file(db);
+    let _span =
+        tracing::trace_span!("instance_attribute_table", scope=?scope.as_id(), file=%file.path(db))
+            .entered();
+    let index = semantic_index(db, file);
+
+    index.instance_attribute_table(scope.file_scope_id(db))
+}
+
 /// Returns the set of modules that are imported anywhere in `file`.
 ///
 /// This set only considers `import` statements, not `from...import` statements, because:
@@ -129,6 +144,9 @@ pub(crate) struct SemanticIndex<'db> {
     /// List of all symbol tables in this file, indexed by scope.
     symbol_tables: IndexVec<FileScopeId, Arc<SymbolTable>>,
 
+    /// List of all instance attribute tables in this file, indexed by scope.
+    instance_attribute_tables: IndexVec<FileScopeId, Arc<SymbolTable>>,
+
     /// List of all scopes in this file.
     scopes: IndexVec<FileScopeId, Scope>,
 
@@ -178,6 +196,10 @@ impl<'db> SemanticIndex<'db> {
     #[track_caller]
     pub(super) fn symbol_table(&self, scope_id: FileScopeId) -> Arc<SymbolTable> {
         self.symbol_tables[scope_id].clone()
+    }
+
+    pub(super) fn instance_attribute_table(&self, scope_id: FileScopeId) -> Arc<SymbolTable> {
+        self.instance_attribute_tables[scope_id].clone()
     }
 
     /// Returns the use-def map for a specific scope.

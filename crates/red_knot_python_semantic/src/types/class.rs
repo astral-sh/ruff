@@ -3,8 +3,8 @@ use std::sync::{LazyLock, Mutex};
 use crate::{
     module_resolver::file_to_module,
     semantic_index::{
-        attribute_assignment::AttributeAssignment, attribute_assignments, semantic_index,
-        symbol::ScopeId, symbol_table, use_def_map,
+        attribute_assignment::AttributeAssignment, attribute_assignments, instance_attribute_table,
+        semantic_index, symbol::ScopeId, symbol_table, use_def_map,
     },
     symbol::{
         class_symbol, known_module_symbol, symbol_from_bindings, symbol_from_declarations,
@@ -503,8 +503,22 @@ impl<'db> Class<'db> {
             .as_deref()
             .and_then(|assignments| assignments.get(name))?;
 
+        let mut assigned = false;
+
         for attribute_assignment in attribute_assignments {
-            match attribute_assignment {
+            let scope = attribute_assignment.assignment.scope(db);
+            let use_def = use_def_map(db, scope);
+            let table = instance_attribute_table(db, scope);
+            let symbol = table.symbol_id_by_name(name).unwrap();
+            if use_def
+                .is_attribute_assignment_visible(db, symbol, attribute_assignment.definition_id)
+                .is_always_false()
+            {
+                continue;
+            }
+            assigned = true;
+
+            match &attribute_assignment.assignment {
                 AttributeAssignment::Annotated { annotation } => {
                     // We found an annotated assignment of one of the following forms (using 'self' in these
                     // examples, but we support arbitrary names for the first parameters of methods):
@@ -564,7 +578,11 @@ impl<'db> Class<'db> {
             }
         }
 
-        Some(union_of_inferred_types.build())
+        if assigned {
+            Some(union_of_inferred_types.build())
+        } else {
+            None
+        }
     }
 
     /// A helper function for `instance_member` that looks up the `name` attribute only on
