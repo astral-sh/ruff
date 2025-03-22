@@ -235,8 +235,8 @@ impl<'db> SemanticIndex<'db> {
 
     /// Returns an iterator over the descendent scopes of `scope`.
     #[allow(unused)]
-    pub(crate) fn descendent_scopes(&self, scope: FileScopeId) -> DescendentsIter {
-        DescendentsIter::new(self, scope)
+    pub(crate) fn descendent_scopes(&self, scope: FileScopeId) -> DescendantsIter {
+        DescendantsIter::new(self, scope)
     }
 
     /// Returns an iterator over the direct child scopes of `scope`.
@@ -339,12 +339,12 @@ impl<'a> Iterator for AncestorsIter<'a> {
 
 impl FusedIterator for AncestorsIter<'_> {}
 
-pub struct DescendentsIter<'a> {
+pub struct DescendantsIter<'a> {
     next_id: FileScopeId,
     descendants: std::slice::Iter<'a, Scope>,
 }
 
-impl<'a> DescendentsIter<'a> {
+impl<'a> DescendantsIter<'a> {
     fn new(symbol_table: &'a SemanticIndex, scope_id: FileScopeId) -> Self {
         let scope = &symbol_table.scopes[scope_id];
         let scopes = &symbol_table.scopes[scope.descendants()];
@@ -356,15 +356,15 @@ impl<'a> DescendentsIter<'a> {
     }
 }
 
-impl<'a> Iterator for DescendentsIter<'a> {
+impl<'a> Iterator for DescendantsIter<'a> {
     type Item = (FileScopeId, &'a Scope);
 
     fn next(&mut self) -> Option<Self::Item> {
-        let descendent = self.descendants.next()?;
+        let descendant = self.descendants.next()?;
         let id = self.next_id;
         self.next_id = self.next_id + 1;
 
-        Some((id, descendent))
+        Some((id, descendant))
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
@@ -372,18 +372,18 @@ impl<'a> Iterator for DescendentsIter<'a> {
     }
 }
 
-impl FusedIterator for DescendentsIter<'_> {}
+impl FusedIterator for DescendantsIter<'_> {}
 
-impl ExactSizeIterator for DescendentsIter<'_> {}
+impl ExactSizeIterator for DescendantsIter<'_> {}
 
 pub struct ChildrenIter<'a> {
     parent: FileScopeId,
-    descendants: DescendentsIter<'a>,
+    descendants: DescendantsIter<'a>,
 }
 
 impl<'a> ChildrenIter<'a> {
     fn new(module_symbol_table: &'a SemanticIndex, parent: FileScopeId) -> Self {
-        let descendants = DescendentsIter::new(module_symbol_table, parent);
+        let descendants = DescendantsIter::new(module_symbol_table, parent);
 
         Self {
             parent,
