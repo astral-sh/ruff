@@ -149,8 +149,8 @@ D: (E := 4) = (F := 5)  # error: [invalid-type-form]
 for G in [1]:
     ...
 
-for (H := 4).whatever in [2]:
-    ...  # error: [unresolved-attribute]
+for (H := 4).whatever in [2]:  # error: [unresolved-attribute]
+    ...
 
 class I: ...
 
@@ -158,8 +158,8 @@ def J(): ...
 
 type K = int
 
-with () as L:
-    ...  # error: [invalid-context-manager]
+with () as L:  # error: [invalid-context-manager]
+    ...
 
 match 42:
     case {"something": M}:
