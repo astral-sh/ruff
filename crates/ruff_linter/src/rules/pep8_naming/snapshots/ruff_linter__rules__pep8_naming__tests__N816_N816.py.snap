@@ -31,3 +31,19 @@ N816.py:9:1: N816 Variable `mixed_Case` in global scope should not be mixedCase
 10 | myObj1 = collections.namedtuple("MyObj1", ["a", "b"])
 11 | myObj2 = namedtuple("MyObj2", ["a", "b"])
    |
+
+N816.py:17:10: N816 Variable `fN1` in global scope should not be mixedCase
+   |
+15 | # Pattern-matching assignment
+16 | match mixedCase:
+17 |     case fN1 as fN2: ...  # N816
+   |          ^^^ N816
+   |
+
+N816.py:17:17: N816 Variable `fN2` in global scope should not be mixedCase
+   |
+15 | # Pattern-matching assignment
+16 | match mixedCase:
+17 |     case fN1 as fN2: ...  # N816
+   |                 ^^^ N816
+   |
