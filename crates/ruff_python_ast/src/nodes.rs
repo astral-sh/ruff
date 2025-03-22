@@ -4,6 +4,7 @@ use crate::generated::{
     ExprBytesLiteral, ExprDict, ExprFString, ExprList, ExprName, ExprSet, ExprStringLiteral,
     ExprTuple, StmtClassDef,
 };
+use crate::StmtImportFrom;
 use std::borrow::Cow;
 use std::fmt;
 use std::fmt::Debug;
@@ -55,6 +56,12 @@ impl StmtClassDef {
             Some(arguments) => &arguments.keywords,
             None => &[],
         }
+    }
+}
+
+impl StmtImportFrom {
+    pub fn is_wildcard_import(&self) -> bool {
+        matches!(&self.names[..], [Alias { range: _, name, asname: None }] if name == "*")
     }
 }
 

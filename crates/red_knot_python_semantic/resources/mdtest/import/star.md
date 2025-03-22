@@ -17,10 +17,7 @@ X: bool = True
 ```py
 from a import *
 
-# TODO: should not error, should be `bool`
-# error: [unresolved-reference]
-reveal_type(X)  # revealed: Unknown
-
+reveal_type(X)  # revealed: bool
 print(Y)  # error: [unresolved-reference]
 ```
 
@@ -40,8 +37,7 @@ reveal_type(X)  # revealed: Literal[42]
 
 from a import *
 
-# TODO: should reveal `bool`
-reveal_type(X)  # revealed: Literal[42]
+reveal_type(X)  # revealed: bool
 ```
 
 ### Overridden by later definition
@@ -57,12 +53,9 @@ X: bool = True
 ```py
 from a import *
 
-# TODO: should not error, should reveal `bool`
-# error: [unresolved-reference]
-reveal_type(X)  # revealed: Unknown
-
-X = 42
-reveal_type(X)  # revealed: Literal[42]
+reveal_type(X)  # revealed: bool
+X = False
+reveal_type(X)  # revealed: Literal[False]
 ```
 
 ### Reaching across many modules
@@ -90,9 +83,7 @@ from b import *
 ```py
 from c import *
 
-# TODO: should not error, should reveal `bool`
-# error: [unresolved-reference]
-reveal_type(X)  # revealed: Unknown
+reveal_type(X)  # revealed: bool
 ```
 
 ### A wildcard import constitutes a re-export
@@ -120,8 +111,7 @@ from b import Y
 
 ```py
 # `X` is accessible because the `*` import in `c` re-exports it from `c`
-# TODO: should not error
-from c import X  # error: [unresolved-import]
+from c import X
 
 # but `Y` is not because the `from b import Y` import does *not* constitute a re-export
 from c import Y  # error: [unresolved-import]
@@ -140,12 +130,8 @@ X = (Y := 3) + 4
 ```py
 from a import *
 
-# TODO should not error, should reveal `Literal[7] | Unknown`
-# error: [unresolved-reference]
-reveal_type(X)  # revealed: Unknown
-# TODO should not error, should reveal `Literal[3] | Unknown`
-# error: [unresolved-reference]
-reveal_type(Y)  # revealed: Unknown
+reveal_type(X)  # revealed: Unknown | Literal[7]
+reveal_type(Y)  # revealed: Unknown | Literal[3]
 ```
 
 ### Global-scope names starting with underscores
@@ -169,8 +155,6 @@ Y: bool = True
 ```py
 from a import *
 
-# These errors are correct:
-#
 # error: [unresolved-reference]
 reveal_type(_private)  # revealed: Unknown
 # error: [unresolved-reference]
@@ -180,10 +164,7 @@ reveal_type(__dunder__)  # revealed: Unknown
 # error: [unresolved-reference]
 reveal_type(___thunder___)  # revealed: Unknown
 
-# TODO: this error is incorrect (should reveal `bool`):
-#
-# error: [unresolved-reference]
-reveal_type(Y)  # revealed: Unknown
+reveal_type(Y)  # revealed: bool
 ```
 
 ### All public symbols are considered re-exported from `.py` files
@@ -212,11 +193,8 @@ from a import X
 ```py
 from b import *
 
-# TODO: this is a false positive, but we could consider a different opt-in diagnostic
-# (see prose commentary above)
-#
-# error: [unresolved-reference]
-reveal_type(X)  # revealed: Unknown
+# TODO: we could consider an opt-in diagnostic (see prose commentary above)
+reveal_type(X)  # revealed: bool
 ```
 
 ### Only explicit re-exports are considered re-exported from `.pyi` files
@@ -270,11 +248,9 @@ else:
 ```py
 from a import *
 
-# TODO should not error, should reveal `bool`
-# error: [unresolved-reference]
-reveal_type(X)  # revealed: Unknown
+reveal_type(X)  # revealed: bool
 
-# error: [unresolved-reference]
+# TODO: should emit error: [unresolved-reference]
 reveal_type(Y)  # revealed: Unknown
 ```
 
@@ -298,9 +274,7 @@ X: bool = True
 ```py
 from .foo import *
 
-# TODO should not error, should reveal `bool`
-# error: [unresolved-reference]
-reveal_type(X)  # revealed: Unknown
+reveal_type(X)  # revealed: bool
 ```
 
 ## Star imports with `__all__`
@@ -329,9 +303,9 @@ Y: bool = False
 ```py
 from a import *
 
+reveal_type(X)  # revealed: bool
+
 # TODO none of these should error, should all reveal `bool`
-# error: [unresolved-reference]
-reveal_type(X)  # revealed: Unknown
 # error: [unresolved-reference]
 reveal_type(_private)  # revealed: Unknown
 # error: [unresolved-reference]
@@ -341,10 +315,8 @@ reveal_type(__dunder__)  # revealed: Unknown
 # error: [unresolved-reference]
 reveal_type(___thunder___)  # revealed: Unknown
 
-# but this diagnostic is accurate!
-#
-# error: [unresolved-reference]
-reveal_type(Y)  # revealed: Unknown
+# TODO: should emit [unresolved-reference] diagnostic & reveal `Unknown`
+reveal_type(Y)  # revealed: bool
 ```
 
 ### Simple list `__all__`
@@ -363,12 +335,10 @@ Y: bool = False
 ```py
 from a import *
 
-# TODO should not error, should reveal `bool`
-# error: [unresolved-reference]
-reveal_type(X)  # revealed: Unknown
+reveal_type(X)  # revealed: bool
 
-# error: [unresolved-reference]
-reveal_type(Y)  # revealed: Unknown
+# TODO: should emit [unresolved-reference] diagnostic & reveal `Unknown`
+reveal_type(Y)  # revealed: bool
 ```
 
 ### `__all__` with additions later on in the global scope
@@ -409,22 +379,15 @@ F: bool = False
 ```py
 from b import *
 
-# TODO none of these should error, they should all reveal `bool`
-# error: [unresolved-reference]
-reveal_type(A)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(B)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(C)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(D)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(E)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(FOO)  # revealed: Unknown
+reveal_type(A)  # revealed: bool
+reveal_type(B)  # revealed: bool
+reveal_type(C)  # revealed: bool
+reveal_type(D)  # revealed: bool
+reveal_type(E)  # revealed: bool
+reveal_type(FOO)  # revealed: bool
 
-# error: [unresolved-reference]
-reveal_type(F)  # revealed: Unknown
+# TODO should error with [unresolved-reference] & reveal `Unknown`
+reveal_type(F)  # revealed: bool
 ```
 
 ### `__all__` with subtractions later on in the global scope
@@ -447,12 +410,10 @@ B: bool = True
 ```py
 from a import *
 
-# TODO should not error, should reveal `bool`
-# error: [unresolved-reference]
-reveal_type(A)  # revealed: Unknown
+reveal_type(A)  # revealed: bool
 
-# error: [unresolved-reference]
-reveal_type(B)  # revealed: Unknown
+# TODO should emit an [unresolved-reference] diagnostic & reveal `Unknown`
+reveal_type(B)  # revealed: bool
 ```
 
 ### Invalid `__all__`
@@ -508,16 +469,11 @@ __all__ = [f()]
 ```py
 from a import *
 
-# TODO: we should avoid both errors here.
-#
 # At runtime, `f` is imported but `g` is not; to avoid false positives, however,
-# we should treat `a` as though it does not have `__all__` at all,
+# we treat `a` as though it does not have `__all__` at all,
 # which would imply that both symbols would be present.
-#
-# error: [unresolved-reference]
-reveal_type(f)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(g)  # revealed: Unknown
+reveal_type(f)  # revealed: Literal[f]
+reveal_type(g)  # revealed: Literal[g]
 ```
 
 ### `__all__` conditionally defined in a statically known branch
@@ -547,13 +503,10 @@ else:
 ```py
 from a import *
 
-# TODO neither should error, both should be `bool`
-# error: [unresolved-reference]
-reveal_type(X)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(Y)  # revealed: Unknown
+reveal_type(X)  # revealed: bool
+reveal_type(Y)  # revealed: bool
 
-# error: [unresolved-reference]
+# TODO: should error with [unresolved-reference]
 reveal_type(Z)  # revealed: Unknown
 ```
 
@@ -585,13 +538,10 @@ else:
 ```py
 from a import *
 
-# TODO neither should error, both should be `bool`
-# error: [unresolved-reference]
-reveal_type(X)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(Y)  # revealed: Unknown
+reveal_type(X)  # revealed: bool
+reveal_type(Y)  # revealed: bool
 
-# error: [unresolved-reference]
+# TODO should have an [unresolved-reference] diagnostic
 reveal_type(Z)  # revealed: Unknown
 ```
 
@@ -622,10 +572,9 @@ __all__ = []
 from a import *
 from b import *
 
-# error: [unresolved-reference]
-reveal_type(X)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(Y)  # revealed: Unknown
+# TODO: both of these should have [unresolved-reference] diagnostics and reveal `Unknown`
+reveal_type(X)  # revealed: bool
+reveal_type(Y)  # revealed: bool
 ```
 
 ### `__all__` in a stub file
@@ -653,13 +602,10 @@ __all__ = ["X"]
 ```py
 from b import *
 
-# TODO: should not error, should reveal `bool`
-# error: [unresolved-reference]
-reveal_type(X)  # revealed: Unknown
+reveal_type(X)  # revealed: bool
 
-# this error is correct:
-# error: [unresolved-reference]
-reveal_type(Y)  # revealed: Unknown
+# TODO this should have an [unresolved-reference] diagnostic and reveal `Unknown`
+reveal_type(Y)  # revealed: bool
 ```
 
 ## Integration test: `collections.abc`

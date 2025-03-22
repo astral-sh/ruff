@@ -12,10 +12,7 @@ reveal_type(__file__)  # revealed: str | None
 reveal_type(__loader__)  # revealed: LoaderProtocol | None
 reveal_type(__package__)  # revealed: str | None
 reveal_type(__doc__)  # revealed: str | None
-
-# TODO: Should be `ModuleSpec | None`
-# (needs support for `*` imports)
-reveal_type(__spec__)  # revealed: Unknown | None
+reveal_type(__spec__)  # revealed: ModuleSpec | None
 
 reveal_type(__path__)  # revealed: @Todo(generics)
 

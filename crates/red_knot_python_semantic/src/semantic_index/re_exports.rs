@@ -12,27 +12,29 @@ use ruff_python_ast::{
 };
 use rustc_hash::FxHashSet;
 
-use crate::Db;
+use crate::{module_name::module_name_from_import_statement, resolve_module, Db};
 
 #[salsa::tracked(return_ref)]
-fn find_exports(db: &dyn Db, file: File) -> FxHashSet<Name> {
+pub(super) fn find_exports(db: &dyn Db, file: File) -> FxHashSet<Name> {
     let module = parsed_module(db.upcast(), file);
 
     let mut finder = ExportFinder {
+        db,
+        file,
         exports: FxHashSet::default(),
-        is_stub: file.is_stub(db.upcast()),
     };
 
     finder.visit_body(module.suite());
     finder.exports
 }
 
-struct ExportFinder {
+struct ExportFinder<'db> {
+    db: &'db dyn Db,
+    file: File,
     exports: FxHashSet<Name>,
-    is_stub: bool,
 }
 
-impl ExportFinder {
+impl ExportFinder<'_> {
     fn possibly_add_export(&mut self, name: &Name) {
         if name.starts_with('_') {
             return;
@@ -43,10 +45,10 @@ impl ExportFinder {
     }
 }
 
-impl<'db> Visitor<'db> for ExportFinder {
+impl<'db> Visitor<'db> for ExportFinder<'db> {
     fn visit_alias(&mut self, alias: &'db ast::Alias) {
         let ast::Alias { name, asname, .. } = alias;
-        if self.is_stub {
+        if self.file.is_stub(self.db.upcast()) {
             // If the source is a stub, names defined by imports are only exported
             // if they use the explicit `foo as foo` syntax:
             if asname.as_ref() == Some(name) {
@@ -249,6 +251,14 @@ impl<'db> Visitor<'db> for ExportFinder {
                     self.visit_stmt(child);
                 }
             }
+            ast::Stmt::ImportFrom(node) if node.is_wildcard_import() => self.exports.extend(
+                module_name_from_import_statement(self.db, self.file, node)
+                    .ok()
+                    .and_then(|module_name| resolve_module(self.db, &module_name))
+                    .iter()
+                    .flat_map(|module| find_exports(self.db, module.file()))
+                    .cloned(),
+            ),
 
             ast::Stmt::Import(_)
             | ast::Stmt::AugAssign(_)

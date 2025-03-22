@@ -53,9 +53,9 @@ use crate::semantic_index::definition::{
     ExceptHandlerDefinitionKind, ForStmtDefinitionKind, TargetKind, WithItemDefinitionKind,
 };
 use crate::semantic_index::expression::{Expression, ExpressionKind};
-use crate::semantic_index::semantic_index;
 use crate::semantic_index::symbol::{FileScopeId, NodeWithScopeKind, NodeWithScopeRef, ScopeId};
 use crate::semantic_index::SemanticIndex;
+use crate::semantic_index::{semantic_index, symbol_table};
 use crate::symbol::{
     builtins_module_scope, builtins_symbol, explicit_global_symbol,
     module_type_implicit_global_symbol, symbol, symbol_from_bindings, symbol_from_declarations,
@@ -3103,13 +3103,22 @@ impl<'db> TypeInferenceBuilder<'db> {
             return;
         };
 
-        let ast::Alias {
-            range: _,
-            name,
-            asname: _,
-        } = alias;
+        let star_import_info =
+            if let DefinitionKind::StarImport(star_import) = definition.kind(self.db()) {
+                Some((star_import, symbol_table(self.db(), self.scope())))
+            } else {
+                None
+            };
 
-        if name == "*" {
+        let is_meaningful_star_import = star_import_info.is_some();
+
+        let name = if let Some((star_import, symbol_table)) = star_import_info.as_ref() {
+            symbol_table.symbol(star_import.symbol_id()).name()
+        } else {
+            &alias.name.id
+        };
+
+        if import_from.is_wildcard_import() && !is_meaningful_star_import {
             self.add_declaration_with_binding(
                 alias.into(),
                 definition,
@@ -3119,7 +3128,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
 
         // First try loading the requested attribute from the module.
-        if let Symbol::Type(ty, boundness) = module_ty.member(self.db(), &name.id).symbol {
+        if let Symbol::Type(ty, boundness) = module_ty.member(self.db(), name).symbol {
             if boundness == Boundness::PossiblyUnbound {
                 // TODO: Consider loading _both_ the attribute and any submodule and unioning them
                 // together if the attribute exists but is possibly-unbound.
@@ -3165,11 +3174,14 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
         }
 
-        self.context.report_lint(
-            &UNRESOLVED_IMPORT,
-            AnyNodeRef::Alias(alias),
-            format_args!("Module `{module_name}` has no member `{name}`",),
-        );
+        if !is_meaningful_star_import {
+            self.context.report_lint(
+                &UNRESOLVED_IMPORT,
+                AnyNodeRef::Alias(alias),
+                format_args!("Module `{module_name}` has no member `{name}`",),
+            );
+        }
+
         self.add_unknown_declaration_with_binding(alias.into(), definition);
     }
 

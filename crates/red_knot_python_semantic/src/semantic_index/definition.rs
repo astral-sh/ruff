@@ -56,7 +56,7 @@ impl<'db> Definition<'db> {
 pub(crate) enum DefinitionNodeRef<'a> {
     Import(ImportDefinitionNodeRef<'a>),
     ImportFrom(ImportFromDefinitionNodeRef<'a>),
-    ImportStar(&'a ast::StmtImportFrom),
+    ImportStar(StarImportDefinitionNodeRef<'a>),
     For(ForStmtDefinitionNodeRef<'a>),
     Function(&'a ast::StmtFunctionDef),
     Class(&'a ast::StmtClassDef),
@@ -179,10 +179,22 @@ impl<'a> From<MatchPatternDefinitionNodeRef<'a>> for DefinitionNodeRef<'a> {
     }
 }
 
+impl<'a> From<StarImportDefinitionNodeRef<'a>> for DefinitionNodeRef<'a> {
+    fn from(node: StarImportDefinitionNodeRef<'a>) -> Self {
+        Self::ImportStar(node)
+    }
+}
+
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct ImportDefinitionNodeRef<'a> {
     pub(crate) alias: &'a ast::Alias,
     pub(crate) is_reexported: bool,
+}
+
+#[derive(Copy, Clone, Debug)]
+pub(crate) struct StarImportDefinitionNodeRef<'a> {
+    pub(crate) node: &'a ast::StmtImportFrom,
+    pub(crate) symbol_id: ScopedSymbolId,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -264,8 +276,12 @@ impl<'db> DefinitionNodeRef<'db> {
                 alias_index,
                 is_reexported,
             }),
-            DefinitionNodeRef::ImportStar(node) => {
-                DefinitionKind::StarImport(AstNodeRef::new(parsed, node))
+            DefinitionNodeRef::ImportStar(star_import) => {
+                let StarImportDefinitionNodeRef { node, symbol_id } = star_import;
+                DefinitionKind::StarImport(StarImportDefinitionKind {
+                    node: AstNodeRef::new(parsed, node),
+                    symbol_id,
+                })
             }
             DefinitionNodeRef::Function(function) => {
                 DefinitionKind::Function(AstNodeRef::new(parsed, function))
@@ -381,9 +397,9 @@ impl<'db> DefinitionNodeRef<'db> {
                 alias_index,
                 is_reexported: _,
             }) => (&node.names[alias_index]).into(),
-            Self::ImportStar(ast::StmtImportFrom { names, .. }) => {
-                debug_assert_eq!(names.len(), 1);
-                (&names[0]).into()
+            Self::ImportStar(StarImportDefinitionNodeRef { node, .. }) => {
+                debug_assert_eq!(node.names.len(), 1);
+                (&node.names[0]).into()
             }
             Self::Function(node) => node.into(),
             Self::Class(node) => node.into(),
@@ -472,7 +488,7 @@ impl DefinitionCategory {
 pub enum DefinitionKind<'db> {
     Import(ImportDefinitionKind),
     ImportFrom(ImportFromDefinitionKind),
-    StarImport(AstNodeRef<ast::StmtImportFrom>),
+    StarImport(StarImportDefinitionKind),
     Function(AstNodeRef<ast::StmtFunctionDef>),
     Class(AstNodeRef<ast::StmtClassDef>),
     TypeAlias(AstNodeRef<ast::StmtTypeAlias>),
@@ -601,7 +617,22 @@ impl<'db> From<Option<Unpack<'db>>> for TargetKind<'db> {
 }
 
 #[derive(Clone, Debug)]
-#[allow(dead_code)]
+pub struct StarImportDefinitionKind {
+    node: AstNodeRef<ast::StmtImportFrom>,
+    symbol_id: ScopedSymbolId,
+}
+
+impl StarImportDefinitionKind {
+    pub(crate) fn node(&self) -> &ast::StmtImportFrom {
+        self.node.node()
+    }
+
+    pub(crate) fn symbol_id(&self) -> ScopedSymbolId {
+        self.symbol_id
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct MatchPatternDefinitionKind {
     pattern: AstNodeRef<ast::Pattern>,
     identifier: AstNodeRef<ast::Identifier>,

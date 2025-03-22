@@ -11,7 +11,7 @@ use ruff_python_ast::visitor::{walk_expr, walk_pattern, walk_stmt, Visitor};
 use ruff_python_ast::{self as ast, ExprContext};
 
 use crate::ast_node_ref::AstNodeRef;
-use crate::module_name::ModuleName;
+use crate::module_name::{module_name_from_import_statement, ModuleName};
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::ast_ids::AstIdsBuilder;
 use crate::semantic_index::attribute_assignment::{AttributeAssignment, AttributeAssignments};
@@ -37,7 +37,10 @@ use crate::semantic_index::visibility_constraints::{
 };
 use crate::semantic_index::SemanticIndex;
 use crate::unpack::{Unpack, UnpackValue};
-use crate::Db;
+use crate::{resolve_module, Db};
+
+use super::definition::{DefinitionKind, StarImportDefinitionNodeRef};
+use super::re_exports::find_exports;
 
 mod except_handlers;
 
@@ -355,6 +358,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         let kind = unsafe { definition_node.into_owned(self.module.clone()) };
         let category = kind.category(self.file.is_stub(self.db.upcast()));
         let is_reexported = kind.is_reexported();
+        let is_star_import = matches!(kind, DefinitionKind::StarImport(_));
         let definition = Definition::new(
             self.db,
             self.file,
@@ -365,10 +369,13 @@ impl<'db> SemanticIndexBuilder<'db> {
             countme::Count::default(),
         );
 
-        let existing_definition = self
-            .definitions_by_node
-            .insert(definition_node.key(), smallvec::smallvec![definition]);
-        debug_assert_eq!(existing_definition, None);
+        let entry = self.definitions_by_node.entry(definition_node.key());
+
+        debug_assert!(
+            is_star_import || matches!(entry, std::collections::hash_map::Entry::Vacant(_))
+        );
+
+        entry.or_default().push(definition);
 
         if category.is_binding() {
             self.mark_symbol_bound(symbol);
@@ -991,9 +998,36 @@ where
                 }
             }
             ast::Stmt::ImportFrom(node) => {
-                if node.names.len() == 1 && node.names.iter().any(|alias| alias.name.id == "*") {
+                if node.is_wildcard_import() {
+                    // Wildcard imports are invalid syntax everywhere except the top-level scope,
+                    // and thus do not bind any definitions anywhere else
+                    if self.current_scope() == self.scope_stack[0].file_scope_id {
+                        if let Ok(module_name) =
+                            module_name_from_import_statement(self.db, self.file, node)
+                        {
+                            if let Some(module) = resolve_module(self.db, &module_name) {
+                                let exported_names = find_exports(self.db, module.file());
+                                if !exported_names.is_empty() {
+                                    for export in find_exports(self.db, module.file()) {
+                                        let symbol_id = self.add_symbol(export.clone());
+                                        let node_ref =
+                                            StarImportDefinitionNodeRef { node, symbol_id };
+                                        self.add_definition(symbol_id, node_ref);
+                                    }
+                                    return;
+                                }
+                            }
+                        }
+                    }
                     let symbol = self.add_symbol(Name::new_static("*"));
-                    self.add_definition(symbol, DefinitionNodeRef::ImportStar(node));
+                    self.add_definition(
+                        symbol,
+                        ImportFromDefinitionNodeRef {
+                            node,
+                            alias_index: 0,
+                            is_reexported: false,
+                        },
+                    );
                     return;
                 }
 
