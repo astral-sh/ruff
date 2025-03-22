@@ -45,3 +45,75 @@ class Foo: ...
 
 reveal_type(get_foo())  # revealed: Foo
 ```
+
+## Deferred self-reference annotations in a class definition
+
+```py
+from __future__ import annotations
+
+class Foo:
+    this: Foo
+    # error: [unresolved-reference]
+    _ = Foo()
+    # error: [unresolved-reference]
+    [Foo for _ in range(1)]
+
+    def f(self, x: Foo):
+        reveal_type(x)  # revealed: Foo
+
+    def g(self) -> Foo:
+        _: Foo = self
+        return self
+
+    class Bar:
+        foo: Foo
+
+        def f(self, x: Foo) -> Bar:
+            return self
+
+        class Baz[T: Foo]:
+            pass
+
+    def h[T: Bar]():
+        # error: [unresolved-reference]
+        return Bar()
+    type Baz = Foo
+```
+
+## Non-deferred self-reference annotations in a class definition
+
+```py
+class Foo:
+    # error: [unresolved-reference]
+    this: Foo
+    ok: "Foo"
+    # error: [unresolved-reference]
+    _ = Foo()
+    # error: [unresolved-reference]
+    [Foo for _ in range(1)]
+
+    # error: [unresolved-reference]
+    def f(self, x: Foo):
+        reveal_type(x)  # revealed: Unknown
+    # error: [unresolved-reference]
+    def g(self) -> Foo:
+        _: Foo = self
+        return self
+
+    class Bar:
+        # error: [unresolved-reference]
+        foo: Foo
+
+        # error: [unresolved-reference]
+        # error: [unresolved-reference]
+        def f(self, x: Foo) -> Bar:
+            return self
+
+        class Baz[T: Foo]:
+            pass
+
+    def h[T: Bar]():
+        # error: [unresolved-reference]
+        return Bar()
+    type Qux = Foo
+```

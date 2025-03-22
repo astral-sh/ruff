@@ -4055,7 +4055,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             symbol_from_bindings(db, use_def.bindings_at_use(use_id))
         };
 
-        let symbol = SymbolAndQualifiers::from(local_scope_symbol).or_fall_back_to(db, || {
+        let mut symbol = SymbolAndQualifiers::from(local_scope_symbol).or_fall_back_to(db, || {
             let has_bindings_in_this_scope = match symbol_table.symbol_by_name(symbol_name) {
                 Some(symbol) => symbol.is_bound(),
                 None => {
@@ -4090,8 +4090,13 @@ impl<'db> TypeInferenceBuilder<'db> {
                 // Class scopes are not visible to nested scopes, and we need to handle global
                 // scope differently (because an unbound name there falls back to builtins), so
                 // check only function-like scopes.
+                // However, there are exceptions to this rule: deferred types are visible,
+                // and type parameter scopes are evaluated lazily, thus class scopes can be visible.
                 let enclosing_scope_id = enclosing_scope_file_id.to_scope_id(db, current_file);
-                if !enclosing_scope_id.is_function_like(db) {
+                if !enclosing_scope_id.is_function_like(db)
+                    && !self.is_deferred()
+                    && !scope.is_annotation(db)
+                {
                     continue;
                 }
 
@@ -4176,6 +4181,24 @@ impl<'db> TypeInferenceBuilder<'db> {
                     }
                 })
         });
+
+        // If the current scope is an eager scope within the class definition,
+        // the class name is invisible (unless it is deferred) because it has not yet been registered.
+        if !self.is_deferred() && scope.is_eager(db) {
+            if let Some(class_ty) = symbol
+                .symbol
+                .ignore_possibly_unbound()
+                .and_then(Type::into_class_literal)
+            {
+                for (ancestor_scope, _) in self.index.ancestor_scopes(file_scope_id) {
+                    let ancestor_scope = ancestor_scope.to_scope_id(db, self.file());
+                    if ancestor_scope == class_ty.body_scope(db) {
+                        symbol = Symbol::Unbound.into();
+                        break;
+                    }
+                }
+            }
+        }
 
         symbol
             .unwrap_with_diagnostic(|lookup_error| match lookup_error {

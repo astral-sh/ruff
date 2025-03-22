@@ -114,6 +114,14 @@ impl<'db> ScopeId<'db> {
         self.node(db).scope_kind().is_function_like()
     }
 
+    pub(crate) fn is_eager(self, db: &'db dyn Db) -> bool {
+        self.node(db).scope_kind().is_eager()
+    }
+
+    pub(crate) fn is_annotation(self, db: &'db dyn Db) -> bool {
+        self.node(db).scope_kind() == ScopeKind::Annotation
+    }
+
     pub(crate) fn node(self, db: &dyn Db) -> &NodeWithScopeKind {
         self.scope(db).node()
     }
