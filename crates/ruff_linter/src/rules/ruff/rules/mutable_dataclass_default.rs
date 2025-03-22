@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Stmt};
+use ruff_python_ast::{self as ast, Expr, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
@@ -6,7 +6,9 @@ use ruff_python_semantic::analyze::typing::{is_immutable_annotation, is_mutable_
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::rules::ruff::rules::helpers::{dataclass_kind, is_class_var_annotation};
+use crate::rules::ruff::rules::helpers::{
+    dataclass_kind, is_class_var_annotation, is_dataclass_field,
+};
 
 /// ## What it does
 /// Checks for mutable default values in dataclass attributes.
@@ -68,7 +70,7 @@ impl Violation for MutableDataclassDefault {
 pub(crate) fn mutable_dataclass_default(checker: &Checker, class_def: &ast::StmtClassDef) {
     let semantic = checker.semantic();
 
-    if dataclass_kind(class_def, semantic).is_none() {
+    let Some((dataclass_kind, _)) = dataclass_kind(class_def, semantic) else {
         return;
     };
 
@@ -82,13 +84,34 @@ pub(crate) fn mutable_dataclass_default(checker: &Checker, class_def: &ast::Stmt
             continue;
         };
 
-        if is_mutable_expr(value, checker.semantic())
-            && !is_class_var_annotation(annotation, checker.semantic())
-            && !is_immutable_annotation(annotation, checker.semantic(), &[])
+        // Check for direct assignment to a mutable expression (e.g., []).
+        if is_mutable_expr(value, semantic)
+            && !is_class_var_annotation(annotation, semantic)
+            && !is_immutable_annotation(annotation, semantic, &[])
         {
             let diagnostic = Diagnostic::new(MutableDataclassDefault, value.range());
-
             checker.report_diagnostic(diagnostic);
+            continue;
+        }
+
+        // If the value is a call to a dataclass/attrs field helper, check
+        // for an explicit `default` of a mutable expression.
+        if let Expr::Call(ast::ExprCall {
+            func, arguments, ..
+        }) = value.as_ref()
+        {
+            if is_dataclass_field(func, semantic, dataclass_kind) {
+                if let Some(default) = arguments.find_keyword("default") {
+                    if is_mutable_expr(&default.value, semantic)
+                        && !is_class_var_annotation(annotation, semantic)
+                        && !is_immutable_annotation(annotation, semantic, &[])
+                    {
+                        let diagnostic =
+                            Diagnostic::new(MutableDataclassDefault, default.value.range());
+                        checker.report_diagnostic(diagnostic);
+                    }
+                }
+            }
         }
     }
 }

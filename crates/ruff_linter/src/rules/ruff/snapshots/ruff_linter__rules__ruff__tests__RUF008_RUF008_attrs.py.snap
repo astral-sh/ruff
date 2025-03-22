@@ -1,43 +1,78 @@
----
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 snapshot_kind: text
 ---
-RUF008_attrs.py:13:34: RUF008 Do not use mutable default values for dataclass attributes
+RUF008_attrs.py:14:34: RUF008 Do not use mutable default values for dataclass attributes
    |
-11 | @define
-12 | class A:
-13 |     mutable_default: list[int] = []
+12 | @define
+13 | class A:
+14 |     mutable_default: list[int] = []
    |                                  ^^ RUF008
-14 |     immutable_annotation: typing.Sequence[int] = []
-15 |     without_annotation = []
+15 |     immutable_annotation: typing.Sequence[int] = []
+16 |     without_annotation = []
    |
 
-RUF008_attrs.py:23:34: RUF008 Do not use mutable default values for dataclass attributes
+RUF008_attrs.py:19:63: RUF008 Do not use mutable default values for dataclass attributes
    |
-21 | @frozen
-22 | class B:
-23 |     mutable_default: list[int] = []
-   |                                  ^^ RUF008
-24 |     immutable_annotation: Sequence[int] = []
-25 |     without_annotation = []
-   |
-
-RUF008_attrs.py:33:34: RUF008 Do not use mutable default values for dataclass attributes
-   |
-31 | @attr.s
-32 | class C:
-33 |     mutable_default: list[int] = []
-   |                                  ^^ RUF008
-34 |     immutable_annotation: Sequence[int] = []
-35 |     without_annotation = []
+17 |     correct_code: list[int] = KNOWINGLY_MUTABLE_DEFAULT
+18 |     perfectly_fine: list[int] = field(default_factory=list)
+19 |     mutable_default_in_field: list[int] = attrs.field(default=[])
+   |                                                               ^^ RUF008
+20 |     class_variable: typing.ClassVar[list[int]] = []
    |
 
-RUF008_attrs.py:42:34: RUF008 Do not use mutable default values for dataclass attributes
+RUF008_attrs.py:25:34: RUF008 Do not use mutable default values for dataclass attributes
    |
-40 | @s
-41 | class D:
-42 |     mutable_default: list[int] = []
+23 | @frozen
+24 | class B:
+25 |     mutable_default: list[int] = []
    |                                  ^^ RUF008
-43 |     immutable_annotation: Sequence[int] = []
-44 |     without_annotation = []
+26 |     immutable_annotation: Sequence[int] = []
+27 |     without_annotation = []
+   |
+
+RUF008_attrs.py:30:63: RUF008 Do not use mutable default values for dataclass attributes
+   |
+28 |     correct_code: list[int] = KNOWINGLY_MUTABLE_DEFAULT
+29 |     perfectly_fine: list[int] = field(default_factory=list)
+30 |     mutable_default_in_field: list[int] = attrs.field(default=[])
+   |                                                               ^^ RUF008
+31 |     class_variable: ClassVar[list[int]] = []
+   |
+
+RUF008_attrs.py:36:34: RUF008 Do not use mutable default values for dataclass attributes
+   |
+34 | @attr.s
+35 | class C:
+36 |     mutable_default: list[int] = []
+   |                                  ^^ RUF008
+37 |     immutable_annotation: Sequence[int] = []
+38 |     without_annotation = []
+   |
+
+RUF008_attrs.py:41:63: RUF008 Do not use mutable default values for dataclass attributes
+   |
+39 |     correct_code: list[int] = KNOWINGLY_MUTABLE_DEFAULT
+40 |     perfectly_fine: list[int] = field(default_factory=list)
+41 |     mutable_default_in_field: list[int] = attrs.field(default=[])
+   |                                                               ^^ RUF008
+42 |     class_variable: ClassVar[list[int]] = []
+   |
+
+RUF008_attrs.py:47:34: RUF008 Do not use mutable default values for dataclass attributes
+   |
+45 | @s
+46 | class D:
+47 |     mutable_default: list[int] = []
+   |                                  ^^ RUF008
+48 |     immutable_annotation: Sequence[int] = []
+49 |     without_annotation = []
+   |
+
+RUF008_attrs.py:52:63: RUF008 Do not use mutable default values for dataclass attributes
+   |
+50 |     correct_code: list[int] = KNOWINGLY_MUTABLE_DEFAULT
+51 |     perfectly_fine: list[int] = field(default_factory=list)
+52 |     mutable_default_in_field: list[int] = attrs.field(default=[])
+   |                                                               ^^ RUF008
+53 |     class_variable: ClassVar[list[int]] = []
    |
