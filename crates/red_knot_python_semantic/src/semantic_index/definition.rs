@@ -430,10 +430,7 @@ impl<'db> DefinitionNodeRef<'db> {
                 alias_index,
                 is_reexported: _,
             }) => (&node.names[alias_index]).into(),
-            Self::ImportStar(StarImportDefinitionNodeRef { node, .. }) => {
-                debug_assert_eq!(node.names.len(), 1);
-                (&node.names[0]).into()
-            }
+            Self::ImportStar(StarImportDefinitionNodeRef { node, .. }) => (&node.names[0]).into(),
             Self::Function(node) => node.into(),
             Self::Class(node) => node.into(),
             Self::TypeAlias(node) => node.into(),

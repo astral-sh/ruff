@@ -998,40 +998,41 @@ where
                 }
             }
             ast::Stmt::ImportFrom(node) => {
-                if node.is_wildcard_import() {
-                    // Wildcard imports are invalid syntax everywhere except the top-level scope,
-                    // and thus do not bind any definitions anywhere else
-                    if self.current_scope() == self.scope_stack[0].file_scope_id {
-                        if let Ok(module_name) =
-                            module_name_from_import_statement(self.db, self.file, node)
-                        {
-                            if let Some(module) = resolve_module(self.db, &module_name) {
-                                let exported_names = find_exports(self.db, module.file());
-                                if !exported_names.is_empty() {
-                                    for export in find_exports(self.db, module.file()) {
-                                        let symbol_id = self.add_symbol(export.clone());
-                                        let node_ref =
-                                            StarImportDefinitionNodeRef { node, symbol_id };
-                                        self.add_definition(symbol_id, node_ref);
+                for (alias_index, alias) in node.names.iter().enumerate() {
+                    if &alias.name == "*" {
+                        // Wildcard imports are invalid syntax everywhere except the top-level scope,
+                        // and thus do not bind any definitions anywhere else
+                        if self.current_scope() == self.scope_stack[0].file_scope_id {
+                            if let Ok(module_name) =
+                                module_name_from_import_statement(self.db, self.file, node)
+                            {
+                                if let Some(module) = resolve_module(self.db, &module_name) {
+                                    let exported_names = find_exports(self.db, module.file());
+                                    if !exported_names.is_empty() {
+                                        for export in find_exports(self.db, module.file()) {
+                                            let symbol_id = self.add_symbol(export.clone());
+                                            let node_ref =
+                                                StarImportDefinitionNodeRef { node, symbol_id };
+                                            self.add_definition(symbol_id, node_ref);
+                                        }
+                                        continue;
                                     }
-                                    return;
                                 }
                             }
                         }
-                    }
-                    let symbol = self.add_symbol(Name::new_static("*"));
-                    self.add_definition(
-                        symbol,
-                        ImportFromDefinitionNodeRef {
-                            node,
-                            alias_index: 0,
-                            is_reexported: false,
-                        },
-                    );
-                    return;
-                }
 
-                for (alias_index, alias) in node.names.iter().enumerate() {
+                        let symbol = self.add_symbol(Name::new_static("*"));
+                        self.add_definition(
+                            symbol,
+                            ImportFromDefinitionNodeRef {
+                                node,
+                                alias_index: 0,
+                                is_reexported: false,
+                            },
+                        );
+                        continue;
+                    }
+
                     let (symbol_name, is_reexported) = if let Some(asname) = &alias.asname {
                         (&asname.id, asname.id == alias.name.id)
                     } else {

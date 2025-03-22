@@ -3118,7 +3118,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             &alias.name.id
         };
 
-        if import_from.is_wildcard_import() && !is_meaningful_star_import {
+        if &alias.name == "*" && !is_meaningful_star_import {
             self.add_declaration_with_binding(
                 alias.into(),
                 definition,
@@ -3129,7 +3129,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         // First try loading the requested attribute from the module.
         if let Symbol::Type(ty, boundness) = module_ty.member(self.db(), name).symbol {
-            if boundness == Boundness::PossiblyUnbound {
+            if &alias.name != "*" && boundness == Boundness::PossiblyUnbound {
                 // TODO: Consider loading _both_ the attribute and any submodule and unioning them
                 // together if the attribute exists but is possibly-unbound.
                 self.context.report_lint(
@@ -3174,7 +3174,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
         }
 
-        if !is_meaningful_star_import {
+        if &alias.name != "*" {
             self.context.report_lint(
                 &UNRESOLVED_IMPORT,
                 AnyNodeRef::Alias(alias),

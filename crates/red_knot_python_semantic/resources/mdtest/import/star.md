@@ -134,6 +134,81 @@ reveal_type(X)  # revealed: Unknown | Literal[7]
 reveal_type(Y)  # revealed: Unknown | Literal[3]
 ```
 
+### Global-scope symbols defined in many other ways
+
+`a.py`:
+
+```py
+import typing
+from collections import OrderedDict
+from collections import OrderedDict as Foo
+
+A, B = 1, (C := 2)
+D: (E := 4) = (F := 5)  # error: [invalid-type-form]
+
+for G in [1]:
+    ...
+
+for (H := 4).whatever in [2]:
+    ...  # error: [unresolved-attribute]
+
+class I: ...
+
+def J(): ...
+
+type K = int
+
+with () as L:
+    ...  # error: [invalid-context-manager]
+
+match 42:
+    case {"something": M}:
+        ...
+    case [*N]:
+        ...
+    case [O]:
+        ...
+    case P | Q:
+        ...
+    case object(foo=R):
+        ...
+    case object(S):
+        ...
+    case T:
+        ...
+```
+
+`b.py`:
+
+```py
+from a import *
+
+# fmt: off
+
+print((
+    A,
+    B,
+    C,
+    D,
+    E,
+    F,
+    G,  # TODO: could emit diagnostic about being possibly unbound
+    H,
+    I,
+    J,
+    K,
+    L,
+    M,  # TODO: could emit diagnostic about being possibly unbound
+    N,  # TODO: could emit diagnostic about being possibly unbound
+    O,  # TODO: could emit diagnostic about being possibly unbound
+    P,  # TODO: could emit diagnostic about being possibly unbound
+    Q,  # TODO: could emit diagnostic about being possibly unbound
+    R,  # TODO: could emit diagnostic about being possibly unbound
+    S,  # TODO: could emit diagnostic about being possibly unbound
+    T,  # TODO: could emit diagnostic about being possibly unbound
+))
+```
+
 ### Global-scope names starting with underscores
 
 Global-scope names starting with underscores are not imported from a `*` import (unless the module
@@ -656,6 +731,31 @@ def f():
     # error: [unresolved-reference]
     reveal_type(X)  # revealed: Unknown
 ```
+
+### `*` combined with other aliases in the list
+
+`a.py`:
+
+```py
+X: bool = True
+_Y: bool = False
+```
+
+`b.py`:
+
+<!-- blacken-docs:off -->
+
+```py
+from a import *, _Y  # error: [invalid-syntax]
+
+# The import statement above is invalid syntax,
+# but it's pretty obvious that the user wanted to do a `*` import,
+# so we import all public names from `a` anyway, to minimize cascading errors
+reveal_type(X)  # revealed: bool
+reveal_type(_Y)  # revealed: bool
+```
+
+<!-- blacken-docs:on -->
 
 [python language reference for import statements]: https://docs.python.org/3/reference/simple_stmts.html#the-import-statement
 [typing spec]: https://typing.python.org/en/latest/spec/distributing.html#library-interface-public-and-private-symbols

@@ -2,7 +2,7 @@
 
 use crate::generated::{
     ExprBytesLiteral, ExprDict, ExprFString, ExprList, ExprName, ExprSet, ExprStringLiteral,
-    ExprTuple, StmtClassDef, StmtImportFrom,
+    ExprTuple, StmtClassDef,
 };
 use std::borrow::Cow;
 use std::fmt;
@@ -55,12 +55,6 @@ impl StmtClassDef {
             Some(arguments) => &arguments.keywords,
             None => &[],
         }
-    }
-}
-
-impl StmtImportFrom {
-    pub fn is_wildcard_import(&self) -> bool {
-        matches!(&self.names[..], [Alias { range: _, name, asname: None }] if name == "*")
     }
 }
 

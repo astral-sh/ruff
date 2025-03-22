@@ -8,7 +8,7 @@ use ruff_db::{files::File, parsed::parsed_module};
 use ruff_python_ast::{
     self as ast,
     name::Name,
-    visitor::{walk_expr, walk_stmt, Visitor},
+    visitor::{walk_expr, walk_pattern, walk_stmt, Visitor},
 };
 use rustc_hash::FxHashSet;
 
@@ -34,13 +34,35 @@ struct ExportFinder<'db> {
     exports: FxHashSet<Name>,
 }
 
-impl ExportFinder<'_> {
+impl<'db> ExportFinder<'db> {
     fn possibly_add_export(&mut self, name: &Name) {
         if name.starts_with('_') {
             return;
         }
         if !self.exports.contains(name) {
             self.exports.insert(name.clone());
+        }
+    }
+
+    fn visit_target(&mut self, target: &'db ast::Expr) {
+        match target {
+            ast::Expr::Name(ast::ExprName { id, .. }) => {
+                self.possibly_add_export(id);
+            }
+            ast::Expr::Tuple(tuple) => {
+                for element in tuple {
+                    self.visit_target(element);
+                }
+            }
+            ast::Expr::List(list) => {
+                for element in list {
+                    self.visit_target(element);
+                }
+            }
+            ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
+                self.visit_target(value);
+            }
+            _ => self.visit_expr(target),
         }
     }
 }
@@ -67,11 +89,7 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
         } = with_item;
 
         if let Some(var) = optional_vars.as_deref() {
-            if let ast::Expr::Name(ast::ExprName { id, .. }) = var {
-                self.possibly_add_export(id);
-            } else {
-                self.visit_expr(var);
-            }
+            self.visit_target(var);
         }
         self.visit_expr(context_expr);
     }
@@ -96,28 +114,6 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                     }
                 }
             }
-            ast::Pattern::MatchClass(ast::PatternMatchClass {
-                arguments,
-                cls: _,
-                range: _,
-            }) => {
-                let ast::PatternArguments {
-                    patterns,
-                    keywords,
-                    range: _,
-                } = arguments;
-                for pattern in patterns {
-                    self.visit_pattern(pattern);
-                }
-                for ast::PatternKeyword {
-                    pattern,
-                    attr: _,
-                    range: _,
-                } in keywords
-                {
-                    self.visit_pattern(pattern);
-                }
-            }
             ast::Pattern::MatchMapping(ast::PatternMatchMapping {
                 patterns,
                 rest,
@@ -136,11 +132,10 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                     self.possibly_add_export(&name.id);
                 }
             }
-            ast::Pattern::MatchSequence(ast::PatternMatchSequence { patterns, range: _ })
-            | ast::Pattern::MatchOr(ast::PatternMatchOr { patterns, range: _ }) => {
-                for pattern in patterns {
-                    self.visit_pattern(pattern);
-                }
+            ast::Pattern::MatchSequence(_)
+            | ast::Pattern::MatchOr(_)
+            | ast::Pattern::MatchClass(_) => {
+                walk_pattern(self, pattern);
             }
             ast::Pattern::MatchSingleton(_) | ast::Pattern::MatchValue(_) => {}
         }
@@ -195,11 +190,7 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                 range: _,
             }) => {
                 for target in targets {
-                    if let ast::Expr::Name(ast::ExprName { id, .. }) = target {
-                        self.possibly_add_export(id);
-                    } else {
-                        self.visit_expr(target);
-                    }
+                    self.visit_target(target);
                 }
                 self.visit_expr(value);
             }
@@ -210,11 +201,7 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                 simple: _,
                 range: _,
             }) => {
-                if let ast::Expr::Name(ast::ExprName { id, .. }) = &**target {
-                    self.possibly_add_export(id);
-                } else {
-                    self.visit_expr(target);
-                }
+                self.visit_target(target);
                 self.visit_expr(annotation);
                 if let Some(value) = value {
                     self.visit_expr(value);
@@ -226,9 +213,7 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                 value: _,
                 range: _,
             }) => {
-                if let ast::Expr::Name(ast::ExprName { id, .. }) = &**name {
-                    self.possibly_add_export(id);
-                }
+                self.visit_target(name);
                 // Neither walrus expressions nor statements cannot appear in type aliases;
                 // no need to recursively visit the `value` or `type_params`
             }
@@ -240,9 +225,7 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                 range: _,
                 is_async: _,
             }) => {
-                if let ast::Expr::Name(ast::ExprName { id, .. }) = &**target {
-                    self.possibly_add_export(id);
-                }
+                self.visit_target(target);
                 self.visit_expr(iter);
                 for child in body {
                     self.visit_stmt(child);
@@ -251,18 +234,25 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                     self.visit_stmt(child);
                 }
             }
-            ast::Stmt::ImportFrom(node) if node.is_wildcard_import() => self.exports.extend(
-                module_name_from_import_statement(self.db, self.file, node)
-                    .ok()
-                    .and_then(|module_name| resolve_module(self.db, &module_name))
-                    .iter()
-                    .flat_map(|module| find_exports(self.db, module.file()))
-                    .cloned(),
-            ),
+            ast::Stmt::ImportFrom(node) => {
+                for name in &node.names {
+                    if &name.name.id == "*" {
+                        self.exports.extend(
+                            module_name_from_import_statement(self.db, self.file, node)
+                                .ok()
+                                .and_then(|module_name| resolve_module(self.db, &module_name))
+                                .iter()
+                                .flat_map(|module| find_exports(self.db, module.file()))
+                                .cloned(),
+                        );
+                    } else {
+                        self.visit_alias(name);
+                    }
+                }
+            }
 
             ast::Stmt::Import(_)
             | ast::Stmt::AugAssign(_)
-            | ast::Stmt::ImportFrom(_)
             | ast::Stmt::While(_)
             | ast::Stmt::If(_)
             | ast::Stmt::With(_)
@@ -284,20 +274,20 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
     }
 
     fn visit_expr(&mut self, expr: &'db ast::Expr) {
-        if let ast::Expr::Named(ast::ExprNamed {
-            target,
-            value,
-            range: _,
-        }) = expr
-        {
-            if let ast::Expr::Name(ast::ExprName { id, .. }) = &**target {
-                self.possibly_add_export(id);
-            } else {
-                self.visit_expr(target);
+        match expr {
+            ast::Expr::Named(ast::ExprNamed {
+                target,
+                value,
+                range: _,
+            }) => {
+                if let ast::Expr::Name(ast::ExprName { id, .. }) = &**target {
+                    self.possibly_add_export(id);
+                } else {
+                    self.visit_expr(target);
+                }
+                self.visit_expr(value);
             }
-            self.visit_expr(value);
-        } else {
-            walk_expr(self, expr);
+            _ => walk_expr(self, expr),
         }
     }
 }
