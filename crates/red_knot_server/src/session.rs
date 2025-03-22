@@ -13,7 +13,7 @@ use ruff_db::files::{system_path_to_file, File};
 use ruff_db::system::SystemPath;
 use ruff_db::Db;
 
-use crate::edit::{DocumentKey, DocumentVersion, NotebookDocument};
+use crate::document::{DocumentKey, DocumentVersion, NotebookDocument};
 use crate::system::{url_to_any_system_path, AnySystemPath, LSPSystem};
 use crate::{PositionEncoding, TextDocument};
 
@@ -272,7 +272,7 @@ impl DocumentSnapshot {
         self.position_encoding
     }
 
-    pub(crate) fn file(&self, db: &ProjectDatabase) -> Option<File> {
+    pub(crate) fn file(&self, db: &dyn Db) -> Option<File> {
         match url_to_any_system_path(self.document_ref.file_url()).ok()? {
             AnySystemPath::System(path) => system_path_to_file(db, path).ok(),
             AnySystemPath::SystemVirtual(virtual_path) => db

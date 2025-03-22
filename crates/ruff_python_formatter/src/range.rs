@@ -154,7 +154,7 @@ fn find_enclosing_node<'ast>(
     let mut visitor = FindEnclosingNode::new(range, context);
 
     if visitor.enter_node(root).is_traverse() {
-        root.visit_preorder(&mut visitor);
+        root.visit_source_order(&mut visitor);
     }
     visitor.leave_node(root);
 
@@ -314,7 +314,7 @@ fn narrow_range(
     };
 
     if visitor.enter_node(enclosing_node).is_traverse() {
-        enclosing_node.visit_preorder(&mut visitor);
+        enclosing_node.visit_source_order(&mut visitor);
     }
 
     visitor.leave_node(enclosing_node);

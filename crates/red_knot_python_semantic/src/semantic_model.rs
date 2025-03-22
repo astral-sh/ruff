@@ -161,6 +161,7 @@ impl_binding_has_ty!(ast::StmtClassDef);
 impl_binding_has_ty!(ast::Alias);
 impl_binding_has_ty!(ast::Parameter);
 impl_binding_has_ty!(ast::ParameterWithDefault);
+impl_binding_has_ty!(ast::ExceptHandlerExceptHandler);
 
 #[cfg(test)]
 mod tests {
