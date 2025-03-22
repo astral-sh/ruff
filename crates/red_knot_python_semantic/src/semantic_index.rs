@@ -235,8 +235,8 @@ impl<'db> SemanticIndex<'db> {
 
     /// Returns an iterator over the descendent scopes of `scope`.
     #[allow(unused)]
-    pub(crate) fn descendent_scopes(&self, scope: FileScopeId) -> DescendentsIter {
-        DescendentsIter::new(self, scope)
+    pub(crate) fn descendent_scopes(&self, scope: FileScopeId) -> DescendantsIter {
+        DescendantsIter::new(self, scope)
     }
 
     /// Returns an iterator over the direct child scopes of `scope`.
@@ -339,55 +339,55 @@ impl<'a> Iterator for AncestorsIter<'a> {
 
 impl FusedIterator for AncestorsIter<'_> {}
 
-pub struct DescendentsIter<'a> {
+pub struct DescendantsIter<'a> {
     next_id: FileScopeId,
-    descendents: std::slice::Iter<'a, Scope>,
+    descendants: std::slice::Iter<'a, Scope>,
 }
 
-impl<'a> DescendentsIter<'a> {
+impl<'a> DescendantsIter<'a> {
     fn new(symbol_table: &'a SemanticIndex, scope_id: FileScopeId) -> Self {
         let scope = &symbol_table.scopes[scope_id];
-        let scopes = &symbol_table.scopes[scope.descendents()];
+        let scopes = &symbol_table.scopes[scope.descendants()];
 
         Self {
             next_id: scope_id + 1,
-            descendents: scopes.iter(),
+            descendants: scopes.iter(),
         }
     }
 }
 
-impl<'a> Iterator for DescendentsIter<'a> {
+impl<'a> Iterator for DescendantsIter<'a> {
     type Item = (FileScopeId, &'a Scope);
 
     fn next(&mut self) -> Option<Self::Item> {
-        let descendent = self.descendents.next()?;
+        let descendant = self.descendants.next()?;
         let id = self.next_id;
         self.next_id = self.next_id + 1;
 
-        Some((id, descendent))
+        Some((id, descendant))
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        self.descendents.size_hint()
+        self.descendants.size_hint()
     }
 }
 
-impl FusedIterator for DescendentsIter<'_> {}
+impl FusedIterator for DescendantsIter<'_> {}
 
-impl ExactSizeIterator for DescendentsIter<'_> {}
+impl ExactSizeIterator for DescendantsIter<'_> {}
 
 pub struct ChildrenIter<'a> {
     parent: FileScopeId,
-    descendents: DescendentsIter<'a>,
+    descendants: DescendantsIter<'a>,
 }
 
 impl<'a> ChildrenIter<'a> {
     fn new(module_symbol_table: &'a SemanticIndex, parent: FileScopeId) -> Self {
-        let descendents = DescendentsIter::new(module_symbol_table, parent);
+        let descendants = DescendantsIter::new(module_symbol_table, parent);
 
         Self {
             parent,
-            descendents,
+            descendants,
         }
     }
 }
@@ -396,7 +396,7 @@ impl<'a> Iterator for ChildrenIter<'a> {
     type Item = (FileScopeId, &'a Scope);
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.descendents
+        self.descendants
             .find(|(_, scope)| scope.parent() == Some(self.parent))
     }
 }
@@ -1155,9 +1155,9 @@ def x():
 
         let index = semantic_index(&db, file);
 
-        let descendents = index.descendent_scopes(FileScopeId::global());
+        let descendants = index.descendent_scopes(FileScopeId::global());
         assert_eq!(
-            scope_names(descendents, &db, file),
+            scope_names(descendants, &db, file),
             vec!["Test", "foo", "bar", "baz", "x"]
         );
 
