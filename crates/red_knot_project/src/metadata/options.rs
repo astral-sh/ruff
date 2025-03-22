@@ -113,6 +113,7 @@ impl Options {
                         .ok()
                         .map(PythonPath::from_virtual_env_var)
                 })
+                .or_else(PythonPath::from_local_venv)
                 .unwrap_or_else(|| PythonPath::KnownSitePackages(vec![])),
         }
     }
