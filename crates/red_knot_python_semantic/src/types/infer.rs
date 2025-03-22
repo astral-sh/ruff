@@ -1300,7 +1300,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn infer_definition(&mut self, node: impl Into<DefinitionNodeKey>) {
-        for definition in self.index.definition(node) {
+        for definition in self.index.definitions(node) {
             self.extend(infer_definition_types(self.db(), *definition));
         }
     }
@@ -3702,7 +3702,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     fn infer_named_expression(&mut self, named: &ast::ExprNamed) -> Type<'db> {
         // See https://peps.python.org/pep-0572/#differences-between-assignment-expressions-and-assignment-statements
         if named.target.is_name_expr() {
-            let definitions = self.index.definition(named);
+            let definitions = self.index.definitions(named);
             debug_assert_eq!(definitions.len(), 1);
             let result = infer_definition_types(self.db(), definitions[0]);
             self.extend(result);

@@ -178,7 +178,7 @@ impl<'db> InferContext<'db> {
                     .ancestor_scopes(scope_id)
                     .filter_map(|(_, scope)| scope.node().as_function())
                     .filter_map(|function| {
-                        let definitions = index.definition(function);
+                        let definitions = index.definitions(function);
                         debug_assert_eq!(definitions.len(), 1);
                         binding_type(self.db, definitions[0]).into_function_literal()
                     });

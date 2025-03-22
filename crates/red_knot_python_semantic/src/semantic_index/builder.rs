@@ -39,7 +39,7 @@ use crate::semantic_index::SemanticIndex;
 use crate::unpack::{Unpack, UnpackValue};
 use crate::{resolve_module, Db};
 
-use super::definition::{DefinitionKind, StarImportDefinitionNodeRef};
+use super::definition::{DefinitionKind, Definitions, StarImportDefinitionNodeRef};
 use super::re_exports::find_exports;
 
 mod except_handlers;
@@ -90,7 +90,7 @@ pub(super) struct SemanticIndexBuilder<'db> {
     use_def_maps: IndexVec<FileScopeId, UseDefMapBuilder<'db>>,
     scopes_by_node: FxHashMap<NodeWithScopeKey, FileScopeId>,
     scopes_by_expression: FxHashMap<ExpressionNodeKey, FileScopeId>,
-    definitions_by_node: FxHashMap<DefinitionNodeKey, smallvec::SmallVec<[Definition<'db>; 1]>>,
+    definitions_by_node: FxHashMap<DefinitionNodeKey, Definitions<'db>>,
     expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
     imported_modules: FxHashSet<ModuleName>,
     attribute_assignments: FxHashMap<FileScopeId, AttributeAssignments<'db>>,
@@ -776,7 +776,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         // a valid type (and doesn't panic)
         let existing_definition = self.definitions_by_node.insert(
             (&parameter.parameter).into(),
-            smallvec::smallvec![definition],
+            Definitions::single(definition),
         );
         debug_assert_eq!(existing_definition, None);
     }

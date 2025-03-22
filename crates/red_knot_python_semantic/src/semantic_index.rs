@@ -1,6 +1,7 @@
 use std::iter::FusedIterator;
 use std::sync::Arc;
 
+use definition::Definitions;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_index::{IndexSlice, IndexVec};
@@ -14,7 +15,7 @@ use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::ast_ids::AstIds;
 use crate::semantic_index::attribute_assignment::AttributeAssignments;
 use crate::semantic_index::builder::SemanticIndexBuilder;
-use crate::semantic_index::definition::{Definition, DefinitionNodeKey};
+use crate::semantic_index::definition::DefinitionNodeKey;
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::symbol::{
     FileScopeId, NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopedSymbolId, SymbolTable,
@@ -137,7 +138,7 @@ pub(crate) struct SemanticIndex<'db> {
     scopes_by_expression: FxHashMap<ExpressionNodeKey, FileScopeId>,
 
     /// Map from a node creating a definition to its definition.
-    definitions_by_node: FxHashMap<DefinitionNodeKey, smallvec::SmallVec<[Definition<'db>; 1]>>,
+    definitions_by_node: FxHashMap<DefinitionNodeKey, Definitions<'db>>,
 
     /// Map from a standalone expression to its [`Expression`] ingredient.
     expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
@@ -251,12 +252,12 @@ impl<'db> SemanticIndex<'db> {
         AncestorsIter::new(self, scope)
     }
 
-    /// Returns the [`Definition`] salsa ingredient for `definition_key`.
+    /// Returns the [`Definition`] salsa ingredients for `definition_key`.
     #[track_caller]
-    pub(crate) fn definition(
+    pub(crate) fn definitions(
         &self,
         definition_key: impl Into<DefinitionNodeKey>,
-    ) -> &smallvec::SmallVec<[Definition<'db>; 1]> {
+    ) -> &Definitions<'db> {
         &self.definitions_by_node[&definition_key.into()]
     }
 

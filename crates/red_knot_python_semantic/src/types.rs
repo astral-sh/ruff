@@ -4152,7 +4152,7 @@ impl<'db> FunctionType<'db> {
     fn internal_signature(self, db: &'db dyn Db) -> Signature<'db> {
         let scope = self.body_scope(db);
         let function_stmt_node = scope.node(db).expect_function();
-        let definitions = semantic_index(db, scope.file(db)).definition(function_stmt_node);
+        let definitions = semantic_index(db, scope.file(db)).definitions(function_stmt_node);
         debug_assert_eq!(definitions.len(), 1);
         Signature::from_function(db, definitions[0], function_stmt_node)
     }
@@ -4883,7 +4883,7 @@ impl<'db> TypeAliasType<'db> {
         let scope = self.rhs_scope(db);
 
         let type_alias_stmt_node = scope.node(db).expect_type_alias();
-        let definitions = semantic_index(db, scope.file(db)).definition(type_alias_stmt_node);
+        let definitions = semantic_index(db, scope.file(db)).definitions(type_alias_stmt_node);
         debug_assert_eq!(definitions.len(), 1);
 
         definition_expression_type(db, definitions[0], &type_alias_stmt_node.value)
@@ -5648,7 +5648,7 @@ pub(crate) mod tests {
             let function_node = function_body_scope.node(&db).expect_function();
 
             let definitions =
-                semantic_index(&db, function_body_scope.file(&db)).definition(function_node);
+                semantic_index(&db, function_body_scope.file(&db)).definitions(function_node);
             assert_eq!(definitions.len(), 1);
 
             assert_eq!(

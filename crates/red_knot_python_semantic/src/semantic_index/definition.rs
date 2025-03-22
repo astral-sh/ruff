@@ -1,3 +1,5 @@
+use std::ops::Deref;
+
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModule;
 use ruff_python_ast as ast;
@@ -49,6 +51,37 @@ pub struct Definition<'db> {
 impl<'db> Definition<'db> {
     pub(crate) fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
         self.file_scope(db).to_scope_id(db, self.file(db))
+    }
+}
+
+/// One or more [`Definition`]s.
+#[derive(Debug, Default, PartialEq, Eq, salsa::Update)]
+pub struct Definitions<'db>(smallvec::SmallVec<[Definition<'db>; 1]>);
+
+impl<'db> Definitions<'db> {
+    pub(crate) fn single(definition: Definition<'db>) -> Self {
+        Self(smallvec::smallvec![definition])
+    }
+
+    pub(crate) fn push(&mut self, definition: Definition<'db>) {
+        self.0.push(definition);
+    }
+}
+
+impl<'db> Deref for Definitions<'db> {
+    type Target = [Definition<'db>];
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<'a, 'db> IntoIterator for &'a Definitions<'db> {
+    type Item = &'a Definition<'db>;
+    type IntoIter = std::slice::Iter<'a, Definition<'db>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter()
     }
 }
 
