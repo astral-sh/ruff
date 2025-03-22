@@ -19,7 +19,7 @@ use crate::types::diagnostic::{
 use crate::types::signatures::{Parameter, ParameterForm};
 use crate::types::{
     todo_type, BoundMethodType, CallableType, ClassLiteralType, KnownClass, KnownFunction,
-    KnownInstanceType, UnionType,
+    KnownInstanceType, TupleType, TypeVarBoundOrConstraints, TypeVarInstance, UnionType,
 };
 use ruff_db::diagnostic::{OldSecondaryDiagnosticMessage, Span};
 use ruff_python_ast as ast;
@@ -97,7 +97,7 @@ impl<'db> Bindings<'db> {
             element.check_types(db, signature, argument_types);
         }
 
-        self.evaluate_known_cases(db);
+        self.evaluate_known_cases(db, argument_types);
 
         // In order of precedence:
         //
@@ -201,7 +201,11 @@ impl<'db> Bindings<'db> {
 
     /// Evaluates the return type of certain known callables, where we have special-case logic to
     /// determine the return type in a way that isn't directly expressible in the type system.
-    fn evaluate_known_cases(&mut self, db: &'db dyn Db) {
+    fn evaluate_known_cases(
+        &mut self,
+        db: &'db dyn Db,
+        argument_types: &CallArgumentTypes<'_, 'db>,
+    ) {
         // Each special case listed here should have a corresponding clause in `Type::signatures`.
         for binding in &mut self.elements {
             let binding_type = binding.callable_type;
@@ -291,13 +295,41 @@ impl<'db> Bindings<'db> {
                                 }
 
                                 [_, Some(Type::KnownInstance(KnownInstanceType::TypeVar(typevar))), Some(Type::ClassLiteral(ClassLiteralType { class }))]
-                                    if class.is_known(db, KnownClass::TypeVar)
-                                        && function.name(db) == "__name__" =>
+                                    if class.is_known(db, KnownClass::TypeVar) =>
                                 {
-                                    overload.set_return_type(Type::string_literal(
-                                        db,
-                                        typevar.name(db),
-                                    ));
+                                    match function.name(db).as_str() {
+                                        "__name__" => {
+                                            overload.set_return_type(Type::string_literal(
+                                                db,
+                                                typevar.name(db),
+                                            ));
+                                        }
+
+                                        "__bound__" => {
+                                            overload.set_return_type(
+                                                typevar
+                                                    .upper_bound(db)
+                                                    .unwrap_or_else(|| Type::none(db)),
+                                            );
+                                        }
+
+                                        "__constraints__" => {
+                                            overload.set_return_type(TupleType::from_elements(
+                                                db,
+                                                typevar.constraints(db).into_iter().flatten(),
+                                            ));
+                                        }
+
+                                        "__default__" => {
+                                            overload.set_return_type(
+                                                typevar.default_ty(db).unwrap_or_else(|| {
+                                                    KnownClass::NoDefaultType.to_instance(db)
+                                                }),
+                                            );
+                                        }
+
+                                        _ => {}
+                                    }
                                 }
 
                                 [_, Some(_), _]
@@ -468,6 +500,48 @@ impl<'db> Bindings<'db> {
                         if let [Some(arg)] = overload.parameter_types() {
                             overload.set_return_type(arg.to_meta_type(db));
                         }
+                    }
+
+                    Some(KnownClass::TypeVar) => {
+                        let [Some(name), constraints, bound, default, _contravariant, _covariant, _infer_variance] =
+                            overload.parameter_types()
+                        else {
+                            continue;
+                        };
+
+                        // TODO: TypeVar can only be called when the result is immediately
+                        // assigned to a variable. Ideally we would use the `name` from the
+                        // lvalue of this assignment instead of constructing a new one.
+                        let Some(name) = name.into_string_literal() else {
+                            continue;
+                        };
+                        let name = ast::name::Name::new(name.value(db));
+
+                        let bound_or_constraint = match (bound, constraints) {
+                            (Some(bound), None) => {
+                                Some(TypeVarBoundOrConstraints::UpperBound(*bound))
+                            }
+
+                            (None, Some(_constraints)) => {
+                                Some(TypeVarBoundOrConstraints::Constraints(TupleType::new(
+                                    db,
+                                    overload
+                                        .arguments_for_parameter(argument_types, 1)
+                                        .map(|(_, ty)| ty)
+                                        .collect::<Box<_>>(),
+                                )))
+                            }
+
+                            // TODO: Emit a diagnostic that TypeVar cannot be both bounded and
+                            // constrained
+                            (Some(_), Some(_)) => continue,
+
+                            (None, None) => None,
+                        };
+
+                        overload.set_return_type(Type::KnownInstance(KnownInstanceType::TypeVar(
+                            TypeVarInstance::new(db, name, bound_or_constraint, *default),
+                        )));
                     }
 
                     _ => {}
@@ -895,6 +969,20 @@ impl<'db> Binding<'db> {
 
     pub(crate) fn parameter_types(&self) -> &[Option<Type<'db>>] {
         &self.parameter_tys
+    }
+
+    pub(crate) fn arguments_for_parameter<'a>(
+        &'a self,
+        argument_types: &'a CallArgumentTypes<'a, 'db>,
+        parameter_index: usize,
+    ) -> impl Iterator<Item = (Argument<'a>, Type<'db>)> + 'a {
+        argument_types
+            .iter()
+            .zip(&self.argument_parameters)
+            .filter(move |(_, argument_parameter)| {
+                argument_parameter.is_some_and(|ap| ap == parameter_index)
+            })
+            .map(|(arg_and_type, _)| arg_and_type)
     }
 
     fn report_diagnostics(

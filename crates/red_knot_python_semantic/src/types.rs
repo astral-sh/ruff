@@ -767,6 +767,11 @@ impl<'db> Type<'db> {
             (Type::Dynamic(_), _) => true,
             (_, Type::Dynamic(_)) => true,
 
+            // TODO: For now we are treating a TypeVar as Any, and allowing it to be assignable-to
+            // and assignable-from any other type.
+            (_, Type::KnownInstance(KnownInstanceType::TypeVar(_))) => true,
+            (Type::KnownInstance(KnownInstanceType::TypeVar(_)), _) => true,
+
             // All types are assignable to `object`.
             // TODO this special case might be removable once the below cases are comprehensive
             (_, Type::Instance(InstanceType { class })) if class.is_object(db) => true,
@@ -2041,13 +2046,17 @@ impl<'db> Type<'db> {
                 );
 
                 let custom_getattr_result = || {
-                    // Typeshed has a fake `__getattr__` on `types.ModuleType` to help out with dynamic imports.
-                    // We explicitly hide it here to prevent arbitrary attributes from being available on modules.
-                    if self
-                        .into_instance()
-                        .is_some_and(|instance| instance.class.is_known(db, KnownClass::ModuleType))
-                    {
-                        return Symbol::Unbound.into();
+                    if let Some(instance) = self.into_instance() {
+                        match instance.class.known(db) {
+                            // Typeshed has a fake `__getattr__` on `types.ModuleType` to help out with dynamic imports.
+                            // We explicitly hide it here to prevent arbitrary attributes from being available on modules.
+                            Some(KnownClass::ModuleType) => return Symbol::Unbound.into(),
+
+                            // TODO: For now we are treating a TypeVar as Any.
+                            Some(KnownClass::TypeVar) => return Symbol::bound(Type::any()).into(),
+
+                            _ => {}
+                        }
                     }
 
                     self.try_call_dunder(
@@ -2598,6 +2607,56 @@ impl<'db> Type<'db> {
                                 Some(KnownClass::Type.to_instance(db)),
                             ),
                         ],
+                    );
+                    Signatures::single(signature)
+                }
+
+                Some(KnownClass::TypeVar) => {
+                    // ```py
+                    // class TypeVar:
+                    //     def __new__(
+                    //         cls,
+                    //         name: str,
+                    //         *constraints: Any,
+                    //         bound: Any | None = None,
+                    //         contravariant: bool = False,
+                    //         covariant: bool = False,
+                    //         infer_variance: bool = False,
+                    //         default: Any = ...,
+                    //     ) -> Self: ...
+                    // ```
+                    let signature = CallableSignature::single(
+                        self,
+                        Signature::new(
+                            Parameters::new([
+                                Parameter::positional_or_keyword(Name::new_static("name"))
+                                    .with_annotated_type(Type::LiteralString),
+                                Parameter::variadic(Name::new_static("constraints"))
+                                    .type_form()
+                                    .with_annotated_type(Type::any()),
+                                Parameter::keyword_only(Name::new_static("bound"))
+                                    .type_form()
+                                    .with_annotated_type(UnionType::from_elements(
+                                        db,
+                                        [Type::any(), Type::none(db)],
+                                    ))
+                                    .with_default_type(Type::none(db)),
+                                Parameter::keyword_only(Name::new_static("default"))
+                                    .type_form()
+                                    .with_annotated_type(Type::any())
+                                    .with_default_type(KnownClass::NoneType.to_instance(db)),
+                                Parameter::keyword_only(Name::new_static("contravariant"))
+                                    .with_annotated_type(KnownClass::Bool.to_instance(db))
+                                    .with_default_type(Type::BooleanLiteral(false)),
+                                Parameter::keyword_only(Name::new_static("covariant"))
+                                    .with_annotated_type(KnownClass::Bool.to_instance(db))
+                                    .with_default_type(Type::BooleanLiteral(false)),
+                                Parameter::keyword_only(Name::new_static("infer_variance"))
+                                    .with_annotated_type(KnownClass::Bool.to_instance(db))
+                                    .with_default_type(Type::BooleanLiteral(false)),
+                            ]),
+                            Some(KnownClass::TypeVar.to_instance(db)),
+                        ),
                     );
                     Signatures::single(signature)
                 }

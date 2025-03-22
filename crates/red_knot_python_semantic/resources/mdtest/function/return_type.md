@@ -75,8 +75,10 @@ class Foo(ABC):
     # TODO: no error
     # error: [invalid-return-type]
     def f(self) -> int: ...
+    # This currently does not produce an error (which is correct), but not for the right reason: We
+    # are still checking the body of the stub function against the return type, but are currently
+    # treating TypeVars as Any when checking assignability.
     @abstractmethod
-    # error: [invalid-return-type]
     def g[T](self, x: T) -> T: ...
 ```
 
