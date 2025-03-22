@@ -296,7 +296,7 @@ impl Display for DisplayUnionType<'_> {
                     CallableType::General(_) | CallableType::MethodWrapperDunderGet(_),
                 ) = element
                 {
-                    join.entry(&format!("({})", element.display(self.db)));
+                    join.entry(&format_args!("({})", element.display(self.db)));
                 } else {
                     join.entry(&element.display(self.db));
                 }
