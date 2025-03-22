@@ -68,6 +68,28 @@ def bad():
     except Exception as e:
         raise e
 
+def bad():
+    try:
+        process()
+    except MyException:
+        raise
+    except Exception as e:
+        print("foo")
+    except TypeError:
+        raise
+
+def bad():
+    try:
+        process()
+    except MyException:
+        raise
+    except Exception as e:
+        print("foo")
+    except TypeError:
+        raise
+    except ValueError:
+        raise
+
 def fine():
     try:
         process()
