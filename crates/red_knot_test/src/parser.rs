@@ -619,7 +619,7 @@ impl<'s> Parser<'s> {
             {
                 let backtick_start = self.line_index(backtick_offsets.0);
                 bail!(
-                    "File extension of test file path `{explicit_path}` in test `{test_name}` does not match language specified `{lang}` of code block at line `{backtick_start:?}`"
+                    "File extension of test file path `{explicit_path}` in test `{test_name}` does not match language specified `{lang}` of code block at line `{backtick_start}`"
                 );
             }
         }
@@ -752,8 +752,8 @@ impl<'s> Parser<'s> {
         self.source_len - self.cursor.text_len()
     }
 
-    fn line_index(&self, char_index: TextSize) -> TextSize {
-        TextSize::new(self.source.count_lines(TextRange::up_to(char_index)))
+    fn line_index(&self, char_index: TextSize) -> u32 {
+        self.source.count_lines(TextRange::up_to(char_index))
     }
 }
 
