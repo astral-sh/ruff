@@ -532,6 +532,13 @@ impl NodeWithScopeKind {
             _ => None,
         }
     }
+
+    pub const fn as_class(&self) -> Option<&ast::StmtClassDef> {
+        match self {
+            Self::Class(class) => Some(class.node()),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
