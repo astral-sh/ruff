@@ -33,8 +33,6 @@
 //! the query cycle until a fixed-point is reached. Salsa has a built-in fixed limit on the number
 //! of iterations, so if we fail to converge, Salsa will eventually panic. (This should of course
 //! be considered a bug.)
-use std::num::NonZeroU32;
-
 use itertools::{Either, Itertools};
 use ruff_db::diagnostic::{DiagnosticId, Severity};
 use ruff_db::files::File;
@@ -45,8 +43,10 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use salsa;
 use salsa::plumbing::AsId;
 
-use crate::module_name::ModuleName;
-use crate::module_resolver::{file_to_module, resolve_module};
+use crate::module_name::{
+    module_name_from_import_statement, ModuleName, ModuleNameResolutionError,
+};
+use crate::module_resolver::resolve_module;
 use crate::semantic_index::ast_ids::{HasScopedExpressionId, HasScopedUseId, ScopedExpressionId};
 use crate::semantic_index::definition::{
     AssignmentDefinitionKind, Definition, DefinitionKind, DefinitionNodeKey,
@@ -3042,43 +3042,6 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
     }
 
-    /// Given a `from .foo import bar` relative import, resolve the relative module
-    /// we're importing `bar` from into an absolute [`ModuleName`]
-    /// using the name of the module we're currently analyzing.
-    ///
-    /// - `level` is the number of dots at the beginning of the relative module name:
-    ///   - `from .foo.bar import baz` => `level == 1`
-    ///   - `from ...foo.bar import baz` => `level == 3`
-    /// - `tail` is the relative module name stripped of all leading dots:
-    ///   - `from .foo import bar` => `tail == "foo"`
-    ///   - `from ..foo.bar import baz` => `tail == "foo.bar"`
-    fn relative_module_name(
-        &self,
-        tail: Option<&str>,
-        level: NonZeroU32,
-    ) -> Result<ModuleName, ModuleNameResolutionError> {
-        let module = file_to_module(self.db(), self.file())
-            .ok_or(ModuleNameResolutionError::UnknownCurrentModule)?;
-        let mut level = level.get();
-
-        if module.kind().is_package() {
-            level = level.saturating_sub(1);
-        }
-
-        let mut module_name = module
-            .name()
-            .ancestors()
-            .nth(level as usize)
-            .ok_or(ModuleNameResolutionError::TooManyDots)?;
-
-        if let Some(tail) = tail {
-            let tail = ModuleName::new(tail).ok_or(ModuleNameResolutionError::InvalidSyntax)?;
-            module_name.extend(&tail);
-        }
-
-        Ok(module_name)
-    }
-
     fn infer_import_from_definition(
         &mut self,
         import_from: &'db ast::StmtImportFrom,
@@ -3097,24 +3060,13 @@ impl<'db> TypeInferenceBuilder<'db> {
             .unwrap_or_else(|| AnyNodeRef::from(import_from));
         let module = module.as_deref();
 
-        let module_name = if let Some(level) = NonZeroU32::new(*level) {
-            tracing::trace!(
-                "Resolving imported object `{}` from module `{}` relative to file `{}`",
-                alias.name,
-                format_import_from_module(level.get(), module),
-                self.file().path(self.db()),
-            );
-            self.relative_module_name(module, level)
-        } else {
-            tracing::trace!(
-                "Resolving imported object `{}` from module `{}`",
-                alias.name,
-                format_import_from_module(*level, module),
-            );
-            module
-                .and_then(ModuleName::new)
-                .ok_or(ModuleNameResolutionError::InvalidSyntax)
-        };
+        tracing::trace!(
+            "Resolving imported object `{}` from module `{}` into file `{}`",
+            alias.name,
+            format_import_from_module(*level, module),
+            self.file().path(self.db()),
+        );
+        let module_name = module_name_from_import_statement(self.db(), self.file(), import_from);
 
         let module_name = match module_name {
             Ok(module_name) => module_name,
@@ -7164,23 +7116,6 @@ fn format_import_from_module(level: u32, module: Option<&str>) -> String {
         ".".repeat(level as usize),
         module.unwrap_or_default()
     )
-}
-
-/// Various ways in which resolving a [`ModuleName`]
-/// from an [`ast::StmtImport`] or [`ast::StmtImportFrom`] node might fail
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-enum ModuleNameResolutionError {
-    /// The import statement has invalid syntax
-    InvalidSyntax,
-
-    /// We couldn't resolve the file we're currently analyzing back to a module
-    /// (Only necessary for relative import statements)
-    UnknownCurrentModule,
-
-    /// The relative import statement seems to take us outside of the module search path
-    /// (e.g. our current module is `foo.bar`, and the relative import statement in `foo.bar`
-    /// is `from ....baz import spam`)
-    TooManyDots,
 }
 
 /// Struct collecting string parts when inferring a formatted string. Infers a string literal if the
