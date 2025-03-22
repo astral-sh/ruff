@@ -292,7 +292,11 @@ impl Display for DisplayUnionType<'_> {
                     db: self.db,
                 });
             } else {
-                join.entry(&element.display(self.db));
+                if element.is_callable() {
+                    join.entry(&format!("({})", element.display(self.db)));
+                } else {
+                    join.entry(&element.display(self.db));
+                }
             }
         }
 
