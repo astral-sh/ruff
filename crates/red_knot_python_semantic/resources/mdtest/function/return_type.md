@@ -57,11 +57,29 @@ def f() -> int:
 ### In Protocol
 
 ```py
-from typing import Protocol
+from typing import Protocol, TypeVar
 
 class Bar(Protocol):
+    def f(self) -> int: ...
+
+class Baz(Bar):
+    # error: [invalid-return-type]
+    def f(self) -> int: ...
+
+T = TypeVar("T")
+
+class Qux(Protocol[T]):
     # TODO: no error
     # error: [invalid-return-type]
+    def f(self) -> int: ...
+
+class Foo(Protocol):
+    def f[T](self, v: T) -> T: ...
+
+t = (Protocol, int)
+reveal_type(t[0])  # revealed: typing.Protocol
+
+class Lorem(t[0]):
     def f(self) -> int: ...
 ```
 
@@ -72,12 +90,20 @@ from abc import ABC, abstractmethod
 
 class Foo(ABC):
     @abstractmethod
-    # TODO: no error
-    # error: [invalid-return-type]
     def f(self) -> int: ...
     @abstractmethod
-    # error: [invalid-return-type]
     def g[T](self, x: T) -> T: ...
+
+class Bar[T](ABC):
+    @abstractmethod
+    def f(self) -> int: ...
+    @abstractmethod
+    def g[T](self, x: T) -> T: ...
+
+# error: [invalid-return-type]
+def f() -> int: ...
+@abstractmethod  # Semantically meaningless, accepted nevertheless
+def g() -> int: ...
 ```
 
 ### In overload
