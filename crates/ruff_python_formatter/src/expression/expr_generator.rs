@@ -32,7 +32,6 @@ impl FormatRuleWithOptions<ExprGenerator, PyFormatContext<'_>> for FormatExprGen
 pub struct FormatExprGenerator {
     parentheses: GeneratorExpParentheses,
 }
-
 impl FormatNodeRule<ExprGenerator> for FormatExprGenerator {
     fn fmt_fields(&self, item: &ExprGenerator, f: &mut PyFormatter) -> FormatResult<()> {
         let ExprGenerator {
@@ -57,17 +56,21 @@ impl FormatNodeRule<ExprGenerator> for FormatExprGenerator {
         {
             write!(
                 f,
-                [group(&elt.format()), soft_line_break_or_space(), &joined]
+                [width_limit_if_flat(
+                    &format_args!(group(&elt.format()), soft_line_break_or_space(), &joined),
+                    f.options().generator_expression_flat_width_limit().into(),
+                    true,
+                )]
             )
         } else {
             write!(
                 f,
                 [parenthesized(
                     "(",
-                    &group(&format_args!(
-                        group(&elt.format()),
-                        soft_line_break_or_space(),
-                        joined
+                    &group(&width_limit_if_flat(
+                        &format_args!(group(&elt.format()), soft_line_break_or_space(), &joined),
+                        f.options().generator_expression_flat_width_limit().into(),
+                        true,
                     )),
                     ")"
                 )
