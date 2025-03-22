@@ -292,14 +292,10 @@ impl Display for DisplayUnionType<'_> {
                     db: self.db,
                 });
             } else {
-                if let Type::Callable(
-                    CallableType::General(_) | CallableType::MethodWrapperDunderGet(_),
-                ) = element
-                {
-                    join.entry(&format_args!("({})", element.display(self.db)));
-                } else {
-                    join.entry(&element.display(self.db));
-                }
+                join.entry(&DisplayMaybeParenthesizedType {
+                    ty: *element,
+                    db: self.db,
+                });
             }
         }
 
@@ -411,7 +407,28 @@ impl Display for DisplayMaybeNegatedType<'_> {
         if self.negated {
             f.write_str("~")?;
         }
-        self.ty.display(self.db).fmt(f)
+        DisplayMaybeParenthesizedType {
+            ty: self.ty,
+            db: self.db,
+        }
+        .fmt(f)
+    }
+}
+
+struct DisplayMaybeParenthesizedType<'db> {
+    ty: Type<'db>,
+    db: &'db dyn Db,
+}
+
+impl Display for DisplayMaybeParenthesizedType<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        if let Type::Callable(CallableType::General(_) | CallableType::MethodWrapperDunderGet(_)) =
+            self.ty
+        {
+            write!(f, "({})", self.ty.display(self.db))
+        } else {
+            self.ty.display(self.db).fmt(f)
+        }
     }
 }
 
