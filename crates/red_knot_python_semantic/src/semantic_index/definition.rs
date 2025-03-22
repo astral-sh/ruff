@@ -227,6 +227,7 @@ pub(crate) struct ImportDefinitionNodeRef<'a> {
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct StarImportDefinitionNodeRef<'a> {
     pub(crate) node: &'a ast::StmtImportFrom,
+    pub(crate) alias_index: usize,
     pub(crate) symbol_id: ScopedSymbolId,
 }
 
@@ -310,10 +311,15 @@ impl<'db> DefinitionNodeRef<'db> {
                 is_reexported,
             }),
             DefinitionNodeRef::ImportStar(star_import) => {
-                let StarImportDefinitionNodeRef { node, symbol_id } = star_import;
+                let StarImportDefinitionNodeRef {
+                    node,
+                    alias_index,
+                    symbol_id,
+                } = star_import;
                 DefinitionKind::StarImport(StarImportDefinitionKind {
                     node: AstNodeRef::new(parsed, node),
                     symbol_id,
+                    alias_index,
                 })
             }
             DefinitionNodeRef::Function(function) => {
@@ -430,7 +436,11 @@ impl<'db> DefinitionNodeRef<'db> {
                 alias_index,
                 is_reexported: _,
             }) => (&node.names[alias_index]).into(),
-            Self::ImportStar(StarImportDefinitionNodeRef { node, .. }) => (&node.names[0]).into(),
+            Self::ImportStar(StarImportDefinitionNodeRef {
+                node,
+                alias_index,
+                symbol_id: _,
+            }) => (&node.names[alias_index]).into(),
             Self::Function(node) => node.into(),
             Self::Class(node) => node.into(),
             Self::TypeAlias(node) => node.into(),
@@ -558,7 +568,7 @@ impl DefinitionKind<'_> {
         match self {
             DefinitionKind::Import(import) => import.alias().range(),
             DefinitionKind::ImportFrom(import) => import.alias().range(),
-            DefinitionKind::StarImport(import) => import.node().range(),
+            DefinitionKind::StarImport(import) => import.alias().range(),
             DefinitionKind::Function(function) => function.name.range(),
             DefinitionKind::Class(class) => class.name.range(),
             DefinitionKind::TypeAlias(type_alias) => type_alias.name.range(),
@@ -650,11 +660,16 @@ impl<'db> From<Option<Unpack<'db>>> for TargetKind<'db> {
 pub struct StarImportDefinitionKind {
     node: AstNodeRef<ast::StmtImportFrom>,
     symbol_id: ScopedSymbolId,
+    alias_index: usize,
 }
 
 impl StarImportDefinitionKind {
-    pub(crate) fn node(&self) -> &ast::StmtImportFrom {
+    pub(crate) fn import(&self) -> &ast::StmtImportFrom {
         self.node.node()
+    }
+
+    pub(crate) fn alias(&self) -> &ast::Alias {
+        &self.node.node().names[self.alias_index]
     }
 
     pub(crate) fn symbol_id(&self) -> ScopedSymbolId {

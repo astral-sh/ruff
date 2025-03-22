@@ -887,11 +887,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 );
             }
             DefinitionKind::StarImport(import) => {
-                self.infer_import_from_definition(
-                    import.node(),
-                    &import.node().names[0],
-                    definition,
-                );
+                self.infer_import_from_definition(import.import(), import.alias(), definition);
             }
             DefinitionKind::Assignment(assignment) => {
                 self.infer_assignment_definition(assignment, definition);

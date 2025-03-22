@@ -201,7 +201,9 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                 simple: _,
                 range: _,
             }) => {
-                self.visit_target(target);
+                if value.is_some() || self.file.is_stub(self.db.upcast()) {
+                    self.visit_target(target);
+                }
                 self.visit_expr(annotation);
                 if let Some(value) = value {
                     self.visit_expr(value);

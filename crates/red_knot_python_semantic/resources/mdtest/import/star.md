@@ -209,6 +209,31 @@ print((
 ))
 ```
 
+### An annotation without a value is a definition in a stub but not a `.py` file
+
+`a.pyi`:
+
+```pyi
+X: bool
+```
+
+`b.py`:
+
+```py
+Y: bool
+```
+
+`c.py`:
+
+```py
+from a import *
+from b import *
+
+reveal_type(X)  # revealed: bool
+# error: [unresolved-reference]
+reveal_type(Y)  # revealed: Unknown
+```
+
 ### Global-scope names starting with underscores
 
 Global-scope names starting with underscores are not imported from a `*` import (unless the module
@@ -739,6 +764,7 @@ def f():
 ```py
 X: bool = True
 _Y: bool = False
+_Z: bool = True
 ```
 
 `b.py`:
@@ -753,6 +779,18 @@ from a import *, _Y  # error: [invalid-syntax]
 # so we import all public names from `a` anyway, to minimize cascading errors
 reveal_type(X)  # revealed: bool
 reveal_type(_Y)  # revealed: bool
+```
+
+These tests are more to assert that we don't panic on these various kinds of invalid syntax than
+anything else:
+
+`c.py`:
+
+```py
+from a import *, _Y  # error: [invalid-syntax]
+from a import _Y, *, _Z  # error: [invalid-syntax]
+from a import *, _Y as fooo  # error: [invalid-syntax]
+from a import *, *, _Y  # error: [invalid-syntax]
 ```
 
 <!-- blacken-docs:on -->

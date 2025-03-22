@@ -18,10 +18,9 @@ use crate::semantic_index::ast_ids::AstIdsBuilder;
 use crate::semantic_index::attribute_assignment::{AttributeAssignment, AttributeAssignments};
 use crate::semantic_index::definition::{
     AssignmentDefinitionNodeRef, ComprehensionDefinitionNodeRef, Definition, DefinitionCategory,
-    DefinitionKind, DefinitionNodeKey, DefinitionNodeRef, Definitions,
-    ExceptHandlerDefinitionNodeRef, ForStmtDefinitionNodeRef, ImportDefinitionNodeRef,
-    ImportFromDefinitionNodeRef, MatchPatternDefinitionNodeRef, StarImportDefinitionNodeRef,
-    WithItemDefinitionNodeRef,
+    DefinitionNodeKey, DefinitionNodeRef, Definitions, ExceptHandlerDefinitionNodeRef,
+    ForStmtDefinitionNodeRef, ImportDefinitionNodeRef, ImportFromDefinitionNodeRef,
+    MatchPatternDefinitionNodeRef, StarImportDefinitionNodeRef, WithItemDefinitionNodeRef,
 };
 use crate::semantic_index::expression::{Expression, ExpressionKind};
 use crate::semantic_index::predicate::{
@@ -358,7 +357,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         let kind = unsafe { definition_node.into_owned(self.module.clone()) };
         let category = kind.category(self.file.is_stub(self.db.upcast()));
         let is_reexported = kind.is_reexported();
-        let is_star_import = matches!(kind, DefinitionKind::StarImport(_));
+
         let definition = Definition::new(
             self.db,
             self.file,
@@ -369,13 +368,10 @@ impl<'db> SemanticIndexBuilder<'db> {
             countme::Count::default(),
         );
 
-        let entry = self.definitions_by_node.entry(definition_node.key());
-
-        debug_assert!(
-            is_star_import || matches!(entry, std::collections::hash_map::Entry::Vacant(_))
-        );
-
-        entry.or_default().push(definition);
+        self.definitions_by_node
+            .entry(definition_node.key())
+            .or_default()
+            .push(definition);
 
         if category.is_binding() {
             self.mark_symbol_bound(symbol);
@@ -998,24 +994,31 @@ where
                 }
             }
             ast::Stmt::ImportFrom(node) => {
+                let mut found_star = false;
                 for (alias_index, alias) in node.names.iter().enumerate() {
                     if &alias.name == "*" {
-                        // Wildcard imports are invalid syntax everywhere except the top-level scope,
-                        // and thus do not bind any definitions anywhere else
-                        if self.current_scope() == self.scope_stack[0].file_scope_id {
-                            if let Ok(module_name) =
-                                module_name_from_import_statement(self.db, self.file, node)
-                            {
-                                if let Some(module) = resolve_module(self.db, &module_name) {
-                                    let exported_names = find_exports(self.db, module.file());
-                                    if !exported_names.is_empty() {
-                                        for export in find_exports(self.db, module.file()) {
-                                            let symbol_id = self.add_symbol(export.clone());
-                                            let node_ref =
-                                                StarImportDefinitionNodeRef { node, symbol_id };
-                                            self.add_definition(symbol_id, node_ref);
+                        if !found_star {
+                            found_star = true;
+                            // Wildcard imports are invalid syntax everywhere except the top-level scope,
+                            // and thus do not bind any definitions anywhere else
+                            if self.current_scope() == self.scope_stack[0].file_scope_id {
+                                if let Ok(module_name) =
+                                    module_name_from_import_statement(self.db, self.file, node)
+                                {
+                                    if let Some(module) = resolve_module(self.db, &module_name) {
+                                        let exported_names = find_exports(self.db, module.file());
+                                        if !exported_names.is_empty() {
+                                            for export in find_exports(self.db, module.file()) {
+                                                let symbol_id = self.add_symbol(export.clone());
+                                                let node_ref = StarImportDefinitionNodeRef {
+                                                    node,
+                                                    alias_index,
+                                                    symbol_id,
+                                                };
+                                                self.add_definition(symbol_id, node_ref);
+                                            }
+                                            continue;
                                         }
-                                        continue;
                                     }
                                 }
                             }
@@ -1026,7 +1029,7 @@ where
                             symbol,
                             ImportFromDefinitionNodeRef {
                                 node,
-                                alias_index: 0,
+                                alias_index,
                                 is_reexported: false,
                             },
                         );
