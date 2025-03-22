@@ -507,10 +507,7 @@ impl<'s> Parser<'s> {
                             self.process_code_block(
                                 lang,
                                 code,
-                                BacktickOffsets(
-                                    self.line_index(backtick_offset_start),
-                                    self.line_index(backtick_offset_end),
-                                ),
+                                BacktickOffsets(backtick_offset_start, backtick_offset_end),
                             )?;
                         } else {
                             let code_block_start = self.cursor.token_len();
@@ -620,7 +617,7 @@ impl<'s> Parser<'s> {
                     .extension()
                     .is_none_or(|extension| extension.eq_ignore_ascii_case(expected_extension))
             {
-                let backtick_start = backtick_offsets.0;
+                let backtick_start = self.line_index(backtick_offsets.0);
                 bail!(
                     "File extension of test file path `{explicit_path}` in test `{test_name}` does not match language specified `{lang}` of code block at line `{backtick_start:?}`"
                 );
