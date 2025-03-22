@@ -2,9 +2,8 @@
 
 use crate::generated::{
     ExprBytesLiteral, ExprDict, ExprFString, ExprList, ExprName, ExprSet, ExprStringLiteral,
-    ExprTuple, StmtClassDef,
+    ExprTuple, StmtClassDef, StmtImportFrom,
 };
-use crate::StmtImportFrom;
 use std::borrow::Cow;
 use std::fmt;
 use std::fmt::Debug;

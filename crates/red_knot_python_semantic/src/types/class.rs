@@ -128,12 +128,10 @@ impl<'db> Class<'db> {
     #[salsa::tracked(return_ref, cycle_fn=explicit_bases_cycle_recover, cycle_initial=explicit_bases_cycle_initial)]
     fn explicit_bases_query(self, db: &'db dyn Db) -> Box<[Type<'db>]> {
         tracing::trace!("Class::explicit_bases_query: {}", self.name(db));
+
         let class_stmt = self.node(db);
-
         let class_definitions = semantic_index(db, self.file(db)).definitions(class_stmt);
-
         debug_assert_eq!(class_definitions.len(), 1);
-
         let class_definition = class_definitions[0];
 
         class_stmt
@@ -160,12 +158,15 @@ impl<'db> Class<'db> {
     #[salsa::tracked(return_ref)]
     fn decorators(self, db: &'db dyn Db) -> Box<[Type<'db>]> {
         tracing::trace!("Class::decorators: {}", self.name(db));
+
         let class_stmt = self.node(db);
         if class_stmt.decorator_list.is_empty() {
             return Box::new([]);
         }
+
         let class_definitions = semantic_index(db, self.file(db)).definitions(class_stmt);
         debug_assert_eq!(class_definitions.len(), 1);
+
         class_stmt
             .decorator_list
             .iter()
@@ -229,10 +230,15 @@ impl<'db> Class<'db> {
             .as_ref()?
             .find_keyword("metaclass")?
             .value;
+
         let definitions = semantic_index(db, self.file(db)).definitions(class_stmt);
         debug_assert_eq!(definitions.len(), 1);
-        let metaclass_ty = definition_expression_type(db, definitions[0], metaclass_node);
-        Some(metaclass_ty)
+
+        Some(definition_expression_type(
+            db,
+            definitions[0],
+            metaclass_node,
+        ))
     }
 
     /// Return the metaclass of this class, or `type[Unknown]` if the metaclass cannot be inferred.

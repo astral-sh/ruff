@@ -1,7 +1,6 @@
 use std::iter::FusedIterator;
 use std::sync::Arc;
 
-use definition::Definitions;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_index::{IndexSlice, IndexVec};
@@ -15,7 +14,7 @@ use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::ast_ids::AstIds;
 use crate::semantic_index::attribute_assignment::AttributeAssignments;
 use crate::semantic_index::builder::SemanticIndexBuilder;
-use crate::semantic_index::definition::DefinitionNodeKey;
+use crate::semantic_index::definition::{DefinitionNodeKey, Definitions};
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::symbol::{
     FileScopeId, NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopedSymbolId, SymbolTable,
@@ -252,7 +251,10 @@ impl<'db> SemanticIndex<'db> {
         AncestorsIter::new(self, scope)
     }
 
-    /// Returns the [`Definition`] salsa ingredients for `definition_key`.
+    /// Returns the [`Definition`] salsa ingredient(s) for `definition_key`.
+    ///
+    /// There will only ever be >1 `Definition` associated with a `definition_key`
+    /// if the definition is created by a wildcard (`*`) import.
     #[track_caller]
     pub(crate) fn definitions(
         &self,
