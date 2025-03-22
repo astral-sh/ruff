@@ -292,7 +292,10 @@ impl Display for DisplayUnionType<'_> {
                     db: self.db,
                 });
             } else {
-                if element.is_callable() {
+                if let Type::Callable(
+                    CallableType::General(_) | CallableType::MethodWrapperDunderGet(_),
+                ) = element
+                {
                     join.entry(&format!("({})", element.display(self.db)));
                 } else {
                     join.entry(&element.display(self.db));

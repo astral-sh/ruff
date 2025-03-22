@@ -412,10 +412,6 @@ impl<'db> Type<'db> {
         matches!(self, Type::FunctionLiteral(..))
     }
 
-    pub const fn is_callable(&self) -> bool {
-        matches!(self, Type::Callable(..))
-    }
-
     pub const fn into_int_literal(self) -> Option<i64> {
         match self {
             Type::IntLiteral(value) => Some(value),
