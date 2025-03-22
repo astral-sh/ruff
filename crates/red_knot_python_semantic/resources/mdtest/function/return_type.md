@@ -73,7 +73,11 @@ class Qux(Protocol[T]):
     # error: [invalid-return-type]
     def f(self) -> int: ...
 
+class Foo(Protocol):
+    def f[T](self, v: T) -> T: ...
+
 t = (Protocol, int)
+reveal_type(t[0])  # revealed: typing.Protocol
 
 class Lorem(t[0]):
     def f(self) -> int: ...

@@ -54,7 +54,9 @@ use crate::semantic_index::definition::{
 };
 use crate::semantic_index::expression::{Expression, ExpressionKind};
 use crate::semantic_index::semantic_index;
-use crate::semantic_index::symbol::{FileScopeId, NodeWithScopeKind, NodeWithScopeRef, ScopeId};
+use crate::semantic_index::symbol::{
+    FileScopeId, NodeWithScopeKind, NodeWithScopeRef, ScopeId, ScopeKind,
+};
 use crate::semantic_index::SemanticIndex;
 use crate::symbol::{
     builtins_module_scope, builtins_symbol, explicit_global_symbol,
@@ -1228,7 +1230,23 @@ impl<'db> TypeInferenceBuilder<'db> {
                 };
                 let parent_scope = self.index.scope(parent_scope_id);
 
-                let NodeWithScopeKind::Class(node_ref) = parent_scope.node() else {
+                let class_scope = match parent_scope.kind() {
+                    ScopeKind::Class => parent_scope,
+                    ScopeKind::Annotation => {
+                        let Some(class_scope_id) = parent_scope.parent() else {
+                            return false;
+                        };
+                        let potentially_class_scope = self.index.scope(class_scope_id);
+
+                        match potentially_class_scope.kind() {
+                            ScopeKind::Class => potentially_class_scope,
+                            _ => return false,
+                        }
+                    }
+                    _ => return false,
+                };
+
+                let NodeWithScopeKind::Class(node_ref) = class_scope.node() else {
                     return false;
                 };
 
