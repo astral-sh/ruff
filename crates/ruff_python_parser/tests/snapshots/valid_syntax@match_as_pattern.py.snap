@@ -1,18 +1,17 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/ok/match_as_pattern.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
-        range: 0..49,
+        range: 0..60,
         body: [
             Match(
                 StmtMatch {
-                    range: 0..48,
+                    range: 0..32,
                     subject: Name(
                         ExprName {
                             range: 6..9,
@@ -49,11 +48,25 @@ Module(
                                 ),
                             ],
                         },
+                    ],
+                },
+            ),
+            Match(
+                StmtMatch {
+                    range: 33..59,
+                    subject: Name(
+                        ExprName {
+                            range: 39..42,
+                            id: Name("foo"),
+                            ctx: Load,
+                        },
+                    ),
+                    cases: [
                         MatchCase {
-                            range: 37..48,
+                            range: 48..59,
                             pattern: MatchAs(
                                 PatternMatchAs {
-                                    range: 42..43,
+                                    range: 53..54,
                                     pattern: None,
                                     name: None,
                                 },
@@ -62,10 +75,10 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        range: 45..48,
+                                        range: 56..59,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                range: 45..48,
+                                                range: 56..59,
                                             },
                                         ),
                                     },

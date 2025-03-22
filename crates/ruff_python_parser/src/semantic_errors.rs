@@ -61,6 +61,7 @@ impl SemanticSyntaxChecker {
         }
 
         Self::duplicate_type_parameter_name(stmt, ctx);
+        Self::irrefutable_match_case(stmt, ctx);
     }
 
     fn duplicate_type_parameter_name<Ctx: SemanticSyntaxContext>(stmt: &ast::Stmt, ctx: &Ctx) {
@@ -106,6 +107,48 @@ impl SemanticSyntaxChecker {
                     type_param.range(),
                 );
             }
+        }
+    }
+
+    fn irrefutable_match_case<Ctx: SemanticSyntaxContext>(stmt: &ast::Stmt, ctx: &Ctx) {
+        let Stmt::Match(ast::StmtMatch { cases, .. }) = stmt else {
+            return;
+        };
+
+        // test_ok irrefutable_case_pattern_at_end
+        // match x:
+        //     case 2: ...
+        //     case var: ...
+        // match x:
+        //     case 2: ...
+        //     case _: ...
+        // match x:
+        //     case var if True: ...  # don't try to refute a guarded pattern
+        //     case 2: ...
+
+        // test_err irrefutable_case_pattern
+        // match x:
+        //     case var: ...  # capture pattern
+        //     case 2: ...
+        // match x:
+        //     case _: ...
+        //     case 2: ...    # wildcard pattern
+        // match x:
+        //     case var1 as var2: ...  # as pattern with irrefutable left-hand side
+        //     case 2: ...
+        // match x:
+        //     case enum.variant | var: ...  # or pattern with irrefutable part
+        //     case 2: ...
+        for case in cases
+            .iter()
+            .rev()
+            .skip(1)
+            .filter_map(|case| match case.guard {
+                Some(_) => None,
+                None => case.pattern.irrefutable_range(),
+            })
+        {
+            Self::add_error(ctx, SemanticSyntaxErrorKind::IrrefutableCasePattern, case);
         }
     }
 
@@ -219,6 +262,9 @@ impl Display for SemanticSyntaxError {
             SemanticSyntaxErrorKind::DuplicateTypeParameter => {
                 f.write_str("duplicate type parameter")
             }
+            SemanticSyntaxErrorKind::IrrefutableCasePattern => {
+                f.write_str("irrefutable pattern makes remaining patterns unreachable")
+            }
         }
     }
 }
@@ -265,6 +311,26 @@ pub enum SemanticSyntaxErrorKind {
     /// class C[T, T]: ...
     /// ```
     DuplicateTypeParameter,
+
+    /// Represents an irrefutable `case` pattern before the last `case` in a `match` statement.
+    ///
+    /// According to the [Python reference], "a match statement may have at most one irrefutable
+    /// case block, and it must be last."
+    ///
+    /// ## Examples
+    ///
+    /// ```python
+    /// match x:
+    ///     case value: ...  # irrefutable capture pattern
+    ///     case other: ...
+    ///
+    /// match x:
+    ///     case _: ...      # irrefutable wildcard pattern
+    ///     case other: ...
+    /// ```
+    ///
+    /// [Python reference]: https://docs.python.org/3/reference/compound_stmts.html#irrefutable-case-blocks
+    IrrefutableCasePattern,
 }
 
 /// Searches for the first named expression (`x := y`) rebinding one of the `iteration_variables` in

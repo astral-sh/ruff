@@ -1,14 +1,13 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/valid/statement/match.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
-        range: 0..5743,
+        range: 0..5770,
         body: [
             Match(
                 StmtMatch {
@@ -5144,7 +5143,7 @@ Module(
             ),
             Match(
                 StmtMatch {
-                    range: 3946..4163,
+                    range: 3946..3978,
                     subject: Name(
                         ExprName {
                             range: 3952..3953,
@@ -5181,20 +5180,34 @@ Module(
                                 ),
                             ],
                         },
+                    ],
+                },
+            ),
+            Match(
+                StmtMatch {
+                    range: 3979..4016,
+                    subject: Name(
+                        ExprName {
+                            range: 3985..3986,
+                            id: Name("x"),
+                            ctx: Load,
+                        },
+                    ),
+                    cases: [
                         MatchCase {
-                            range: 3983..4007,
+                            range: 3992..4016,
                             pattern: MatchAs(
                                 PatternMatchAs {
-                                    range: 3988..3994,
+                                    range: 3997..4003,
                                     pattern: Some(
                                         MatchAs(
                                             PatternMatchAs {
-                                                range: 3988..3989,
+                                                range: 3997..3998,
                                                 pattern: None,
                                                 name: Some(
                                                     Identifier {
                                                         id: Name("a"),
-                                                        range: 3988..3989,
+                                                        range: 3997..3998,
                                                     },
                                                 ),
                                             },
@@ -5203,7 +5216,7 @@ Module(
                                     name: Some(
                                         Identifier {
                                             id: Name("b"),
-                                            range: 3993..3994,
+                                            range: 4002..4003,
                                         },
                                     ),
                                 },
@@ -5212,32 +5225,46 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        range: 4004..4007,
+                                        range: 4013..4016,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                range: 4004..4007,
+                                                range: 4013..4016,
                                             },
                                         ),
                                     },
                                 ),
                             ],
                         },
+                    ],
+                },
+            ),
+            Match(
+                StmtMatch {
+                    range: 4017..4157,
+                    subject: Name(
+                        ExprName {
+                            range: 4023..4024,
+                            id: Name("x"),
+                            ctx: Load,
+                        },
+                    ),
+                    cases: [
                         MatchCase {
-                            range: 4012..4042,
+                            range: 4030..4060,
                             pattern: MatchAs(
                                 PatternMatchAs {
-                                    range: 4017..4029,
+                                    range: 4035..4047,
                                     pattern: Some(
                                         MatchOr(
                                             PatternMatchOr {
-                                                range: 4017..4022,
+                                                range: 4035..4040,
                                                 patterns: [
                                                     MatchValue(
                                                         PatternMatchValue {
-                                                            range: 4017..4018,
+                                                            range: 4035..4036,
                                                             value: NumberLiteral(
                                                                 ExprNumberLiteral {
-                                                                    range: 4017..4018,
+                                                                    range: 4035..4036,
                                                                     value: Int(
                                                                         1,
                                                                     ),
@@ -5247,10 +5274,10 @@ Module(
                                                     ),
                                                     MatchValue(
                                                         PatternMatchValue {
-                                                            range: 4021..4022,
+                                                            range: 4039..4040,
                                                             value: NumberLiteral(
                                                                 ExprNumberLiteral {
-                                                                    range: 4021..4022,
+                                                                    range: 4039..4040,
                                                                     value: Int(
                                                                         2,
                                                                     ),
@@ -5265,7 +5292,7 @@ Module(
                                     name: Some(
                                         Identifier {
                                             id: Name("two"),
-                                            range: 4026..4029,
+                                            range: 4044..4047,
                                         },
                                     ),
                                 },
@@ -5274,10 +5301,10 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        range: 4039..4042,
+                                        range: 4057..4060,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                range: 4039..4042,
+                                                range: 4057..4060,
                                             },
                                         ),
                                     },
@@ -5285,20 +5312,20 @@ Module(
                             ],
                         },
                         MatchCase {
-                            range: 4047..4078,
+                            range: 4065..4096,
                             pattern: MatchAs(
                                 PatternMatchAs {
-                                    range: 4052..4065,
+                                    range: 4070..4083,
                                     pattern: Some(
                                         MatchValue(
                                             PatternMatchValue {
-                                                range: 4052..4058,
+                                                range: 4070..4076,
                                                 value: BinOp(
                                                     ExprBinOp {
-                                                        range: 4052..4058,
+                                                        range: 4070..4076,
                                                         left: NumberLiteral(
                                                             ExprNumberLiteral {
-                                                                range: 4052..4053,
+                                                                range: 4070..4071,
                                                                 value: Int(
                                                                     1,
                                                                 ),
@@ -5307,7 +5334,7 @@ Module(
                                                         op: Add,
                                                         right: NumberLiteral(
                                                             ExprNumberLiteral {
-                                                                range: 4056..4058,
+                                                                range: 4074..4076,
                                                                 value: Complex {
                                                                     real: 0.0,
                                                                     imag: 3.0,
@@ -5322,7 +5349,7 @@ Module(
                                     name: Some(
                                         Identifier {
                                             id: Name("sum"),
-                                            range: 4062..4065,
+                                            range: 4080..4083,
                                         },
                                     ),
                                 },
@@ -5331,10 +5358,10 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        range: 4075..4078,
+                                        range: 4093..4096,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                range: 4075..4078,
+                                                range: 4093..4096,
                                             },
                                         ),
                                     },
@@ -5342,27 +5369,27 @@ Module(
                             ],
                         },
                         MatchCase {
-                            range: 4083..4110,
+                            range: 4101..4128,
                             pattern: MatchAs(
                                 PatternMatchAs {
-                                    range: 4088..4097,
+                                    range: 4106..4115,
                                     pattern: Some(
                                         MatchValue(
                                             PatternMatchValue {
-                                                range: 4088..4091,
+                                                range: 4106..4109,
                                                 value: Attribute(
                                                     ExprAttribute {
-                                                        range: 4088..4091,
+                                                        range: 4106..4109,
                                                         value: Name(
                                                             ExprName {
-                                                                range: 4088..4089,
+                                                                range: 4106..4107,
                                                                 id: Name("a"),
                                                                 ctx: Load,
                                                             },
                                                         ),
                                                         attr: Identifier {
                                                             id: Name("b"),
-                                                            range: 4090..4091,
+                                                            range: 4108..4109,
                                                         },
                                                         ctx: Load,
                                                     },
@@ -5373,7 +5400,7 @@ Module(
                                     name: Some(
                                         Identifier {
                                             id: Name("ab"),
-                                            range: 4095..4097,
+                                            range: 4113..4115,
                                         },
                                     ),
                                 },
@@ -5382,10 +5409,10 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        range: 4107..4110,
+                                        range: 4125..4128,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                range: 4107..4110,
+                                                range: 4125..4128,
                                             },
                                         ),
                                     },
@@ -5393,37 +5420,14 @@ Module(
                             ],
                         },
                         MatchCase {
-                            range: 4115..4134,
+                            range: 4133..4157,
                             pattern: MatchAs(
                                 PatternMatchAs {
-                                    range: 4120..4121,
-                                    pattern: None,
-                                    name: None,
-                                },
-                            ),
-                            guard: None,
-                            body: [
-                                Expr(
-                                    StmtExpr {
-                                        range: 4131..4134,
-                                        value: EllipsisLiteral(
-                                            ExprEllipsisLiteral {
-                                                range: 4131..4134,
-                                            },
-                                        ),
-                                    },
-                                ),
-                            ],
-                        },
-                        MatchCase {
-                            range: 4139..4163,
-                            pattern: MatchAs(
-                                PatternMatchAs {
-                                    range: 4144..4150,
+                                    range: 4138..4144,
                                     pattern: Some(
                                         MatchAs(
                                             PatternMatchAs {
-                                                range: 4144..4145,
+                                                range: 4138..4139,
                                                 pattern: None,
                                                 name: None,
                                             },
@@ -5432,7 +5436,7 @@ Module(
                                     name: Some(
                                         Identifier {
                                             id: Name("x"),
-                                            range: 4149..4150,
+                                            range: 4143..4144,
                                         },
                                     ),
                                 },
@@ -5441,10 +5445,10 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        range: 4160..4163,
+                                        range: 4154..4157,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                range: 4160..4163,
+                                                range: 4154..4157,
                                             },
                                         ),
                                     },
@@ -5456,27 +5460,64 @@ Module(
             ),
             Match(
                 StmtMatch {
-                    range: 4188..4439,
+                    range: 4158..4190,
                     subject: Name(
                         ExprName {
-                            range: 4194..4195,
+                            range: 4164..4165,
                             id: Name("x"),
                             ctx: Load,
                         },
                     ),
                     cases: [
                         MatchCase {
-                            range: 4201..4226,
+                            range: 4171..4190,
+                            pattern: MatchAs(
+                                PatternMatchAs {
+                                    range: 4176..4177,
+                                    pattern: None,
+                                    name: None,
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Expr(
+                                    StmtExpr {
+                                        range: 4187..4190,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                range: 4187..4190,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ],
+                },
+            ),
+            Match(
+                StmtMatch {
+                    range: 4215..4466,
+                    subject: Name(
+                        ExprName {
+                            range: 4221..4222,
+                            id: Name("x"),
+                            ctx: Load,
+                        },
+                    ),
+                    cases: [
+                        MatchCase {
+                            range: 4228..4253,
                             pattern: MatchSequence(
                                 PatternMatchSequence {
-                                    range: 4206..4213,
+                                    range: 4233..4240,
                                     patterns: [
                                         MatchValue(
                                             PatternMatchValue {
-                                                range: 4206..4207,
+                                                range: 4233..4234,
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        range: 4206..4207,
+                                                        range: 4233..4234,
                                                         value: Int(
                                                             1,
                                                         ),
@@ -5486,10 +5527,10 @@ Module(
                                         ),
                                         MatchValue(
                                             PatternMatchValue {
-                                                range: 4209..4210,
+                                                range: 4236..4237,
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        range: 4209..4210,
+                                                        range: 4236..4237,
                                                         value: Int(
                                                             2,
                                                         ),
@@ -5499,10 +5540,10 @@ Module(
                                         ),
                                         MatchValue(
                                             PatternMatchValue {
-                                                range: 4212..4213,
+                                                range: 4239..4240,
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        range: 4212..4213,
+                                                        range: 4239..4240,
                                                         value: Int(
                                                             3,
                                                         ),
@@ -5517,10 +5558,10 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        range: 4223..4226,
+                                        range: 4250..4253,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                range: 4223..4226,
+                                                range: 4250..4253,
                                             },
                                         ),
                                     },
@@ -5528,17 +5569,17 @@ Module(
                             ],
                         },
                         MatchCase {
-                            range: 4231..4259,
+                            range: 4258..4286,
                             pattern: MatchSequence(
                                 PatternMatchSequence {
-                                    range: 4236..4246,
+                                    range: 4263..4273,
                                     patterns: [
                                         MatchValue(
                                             PatternMatchValue {
-                                                range: 4237..4238,
+                                                range: 4264..4265,
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        range: 4237..4238,
+                                                        range: 4264..4265,
                                                         value: Int(
                                                             1,
                                                         ),
@@ -5548,10 +5589,10 @@ Module(
                                         ),
                                         MatchValue(
                                             PatternMatchValue {
-                                                range: 4240..4241,
+                                                range: 4267..4268,
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        range: 4240..4241,
+                                                        range: 4267..4268,
                                                         value: Int(
                                                             2,
                                                         ),
@@ -5561,10 +5602,10 @@ Module(
                                         ),
                                         MatchValue(
                                             PatternMatchValue {
-                                                range: 4243..4244,
+                                                range: 4270..4271,
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        range: 4243..4244,
+                                                        range: 4270..4271,
                                                         value: Int(
                                                             3,
                                                         ),
@@ -5579,10 +5620,10 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        range: 4256..4259,
+                                        range: 4283..4286,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                range: 4256..4259,
+                                                range: 4283..4286,
                                             },
                                         ),
                                     },
@@ -5590,20 +5631,20 @@ Module(
                             ],
                         },
                         MatchCase {
-                            range: 4264..4304,
+                            range: 4291..4331,
                             pattern: MatchSequence(
                                 PatternMatchSequence {
-                                    range: 4269..4291,
+                                    range: 4296..4318,
                                     patterns: [
                                         MatchValue(
                                             PatternMatchValue {
-                                                range: 4270..4276,
+                                                range: 4297..4303,
                                                 value: BinOp(
                                                     ExprBinOp {
-                                                        range: 4270..4276,
+                                                        range: 4297..4303,
                                                         left: NumberLiteral(
                                                             ExprNumberLiteral {
-                                                                range: 4270..4271,
+                                                                range: 4297..4298,
                                                                 value: Int(
                                                                     1,
                                                                 ),
@@ -5612,7 +5653,7 @@ Module(
                                                         op: Add,
                                                         right: NumberLiteral(
                                                             ExprNumberLiteral {
-                                                                range: 4274..4276,
+                                                                range: 4301..4303,
                                                                 value: Complex {
                                                                     real: 0.0,
                                                                     imag: 2.0,
@@ -5625,38 +5666,38 @@ Module(
                                         ),
                                         MatchAs(
                                             PatternMatchAs {
-                                                range: 4278..4279,
+                                                range: 4305..4306,
                                                 pattern: None,
                                                 name: Some(
                                                     Identifier {
                                                         id: Name("a"),
-                                                        range: 4278..4279,
+                                                        range: 4305..4306,
                                                     },
                                                 ),
                                             },
                                         ),
                                         MatchSingleton(
                                             PatternMatchSingleton {
-                                                range: 4281..4285,
+                                                range: 4308..4312,
                                                 value: None,
                                             },
                                         ),
                                         MatchValue(
                                             PatternMatchValue {
-                                                range: 4287..4290,
+                                                range: 4314..4317,
                                                 value: Attribute(
                                                     ExprAttribute {
-                                                        range: 4287..4290,
+                                                        range: 4314..4317,
                                                         value: Name(
                                                             ExprName {
-                                                                range: 4287..4288,
+                                                                range: 4314..4315,
                                                                 id: Name("a"),
                                                                 ctx: Load,
                                                             },
                                                         ),
                                                         attr: Identifier {
                                                             id: Name("b"),
-                                                            range: 4289..4290,
+                                                            range: 4316..4317,
                                                         },
                                                         ctx: Load,
                                                     },
@@ -5670,10 +5711,10 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        range: 4301..4304,
+                                        range: 4328..4331,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                range: 4301..4304,
+                                                range: 4328..4331,
                                             },
                                         ),
                                     },
@@ -5681,25 +5722,25 @@ Module(
                             ],
                         },
                         MatchCase {
-                            range: 4309..4343,
+                            range: 4336..4370,
                             pattern: MatchAs(
                                 PatternMatchAs {
-                                    range: 4314..4330,
+                                    range: 4341..4357,
                                     pattern: Some(
                                         MatchSequence(
                                             PatternMatchSequence {
-                                                range: 4314..4325,
+                                                range: 4341..4352,
                                                 patterns: [
                                                     MatchAs(
                                                         PatternMatchAs {
-                                                            range: 4315..4321,
+                                                            range: 4342..4348,
                                                             pattern: Some(
                                                                 MatchValue(
                                                                     PatternMatchValue {
-                                                                        range: 4315..4316,
+                                                                        range: 4342..4343,
                                                                         value: NumberLiteral(
                                                                             ExprNumberLiteral {
-                                                                                range: 4315..4316,
+                                                                                range: 4342..4343,
                                                                                 value: Int(
                                                                                     1,
                                                                                 ),
@@ -5711,19 +5752,19 @@ Module(
                                                             name: Some(
                                                                 Identifier {
                                                                     id: Name("X"),
-                                                                    range: 4320..4321,
+                                                                    range: 4347..4348,
                                                                 },
                                                             ),
                                                         },
                                                     ),
                                                     MatchAs(
                                                         PatternMatchAs {
-                                                            range: 4323..4324,
+                                                            range: 4350..4351,
                                                             pattern: None,
                                                             name: Some(
                                                                 Identifier {
                                                                     id: Name("b"),
-                                                                    range: 4323..4324,
+                                                                    range: 4350..4351,
                                                                 },
                                                             ),
                                                         },
@@ -5735,7 +5776,7 @@ Module(
                                     name: Some(
                                         Identifier {
                                             id: Name("S"),
-                                            range: 4329..4330,
+                                            range: 4356..4357,
                                         },
                                     ),
                                 },
@@ -5744,10 +5785,10 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        range: 4340..4343,
+                                        range: 4367..4370,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                range: 4340..4343,
+                                                range: 4367..4370,
                                             },
                                         ),
                                     },
@@ -5755,17 +5796,17 @@ Module(
                             ],
                         },
                         MatchCase {
-                            range: 4348..4380,
+                            range: 4375..4407,
                             pattern: MatchSequence(
                                 PatternMatchSequence {
-                                    range: 4353..4367,
+                                    range: 4380..4394,
                                     patterns: [
                                         MatchValue(
                                             PatternMatchValue {
-                                                range: 4354..4355,
+                                                range: 4381..4382,
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        range: 4354..4355,
+                                                        range: 4381..4382,
                                                         value: Int(
                                                             1,
                                                         ),
@@ -5775,10 +5816,10 @@ Module(
                                         ),
                                         MatchValue(
                                             PatternMatchValue {
-                                                range: 4357..4358,
+                                                range: 4384..4385,
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        range: 4357..4358,
+                                                        range: 4384..4385,
                                                         value: Int(
                                                             2,
                                                         ),
@@ -5788,13 +5829,13 @@ Module(
                                         ),
                                         MatchValue(
                                             PatternMatchValue {
-                                                range: 4360..4366,
+                                                range: 4387..4393,
                                                 value: BinOp(
                                                     ExprBinOp {
-                                                        range: 4360..4366,
+                                                        range: 4387..4393,
                                                         left: NumberLiteral(
                                                             ExprNumberLiteral {
-                                                                range: 4360..4361,
+                                                                range: 4387..4388,
                                                                 value: Int(
                                                                     3,
                                                                 ),
@@ -5803,7 +5844,7 @@ Module(
                                                         op: Add,
                                                         right: NumberLiteral(
                                                             ExprNumberLiteral {
-                                                                range: 4364..4366,
+                                                                range: 4391..4393,
                                                                 value: Complex {
                                                                     real: 0.0,
                                                                     imag: 1.0,
@@ -5821,10 +5862,10 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        range: 4377..4380,
+                                        range: 4404..4407,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                range: 4377..4380,
+                                                range: 4404..4407,
                                             },
                                         ),
                                     },
@@ -5832,21 +5873,21 @@ Module(
                             ],
                         },
                         MatchCase {
-                            range: 4385..4413,
+                            range: 4412..4440,
                             pattern: MatchSequence(
                                 PatternMatchSequence {
-                                    range: 4390..4400,
+                                    range: 4417..4427,
                                     patterns: [
                                         MatchSequence(
                                             PatternMatchSequence {
-                                                range: 4391..4396,
+                                                range: 4418..4423,
                                                 patterns: [
                                                     MatchValue(
                                                         PatternMatchValue {
-                                                            range: 4392..4393,
+                                                            range: 4419..4420,
                                                             value: NumberLiteral(
                                                                 ExprNumberLiteral {
-                                                                    range: 4392..4393,
+                                                                    range: 4419..4420,
                                                                     value: Int(
                                                                         1,
                                                                     ),
@@ -5856,10 +5897,10 @@ Module(
                                                     ),
                                                     MatchValue(
                                                         PatternMatchValue {
-                                                            range: 4394..4395,
+                                                            range: 4421..4422,
                                                             value: NumberLiteral(
                                                                 ExprNumberLiteral {
-                                                                    range: 4394..4395,
+                                                                    range: 4421..4422,
                                                                     value: Int(
                                                                         2,
                                                                     ),
@@ -5872,10 +5913,10 @@ Module(
                                         ),
                                         MatchValue(
                                             PatternMatchValue {
-                                                range: 4398..4399,
+                                                range: 4425..4426,
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        range: 4398..4399,
+                                                        range: 4425..4426,
                                                         value: Int(
                                                             3,
                                                         ),
@@ -5890,10 +5931,10 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        range: 4410..4413,
+                                        range: 4437..4440,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                range: 4410..4413,
+                                                range: 4437..4440,
                                             },
                                         ),
                                     },
@@ -5901,17 +5942,17 @@ Module(
                             ],
                         },
                         MatchCase {
-                            range: 4418..4439,
+                            range: 4445..4466,
                             pattern: MatchSequence(
                                 PatternMatchSequence {
-                                    range: 4423..4426,
+                                    range: 4450..4453,
                                     patterns: [
                                         MatchValue(
                                             PatternMatchValue {
-                                                range: 4424..4425,
+                                                range: 4451..4452,
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        range: 4424..4425,
+                                                        range: 4451..4452,
                                                         value: Int(
                                                             1,
                                                         ),
@@ -5926,10 +5967,10 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        range: 4436..4439,
+                                        range: 4463..4466,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                range: 4436..4439,
+                                                range: 4463..4466,
                                             },
                                         ),
                                     },
@@ -5941,28 +5982,28 @@ Module(
             ),
             Match(
                 StmtMatch {
-                    range: 4460..4589,
+                    range: 4487..4616,
                     subject: Name(
                         ExprName {
-                            range: 4466..4467,
+                            range: 4493..4494,
                             id: Name("x"),
                             ctx: Load,
                         },
                     ),
                     cases: [
                         MatchCase {
-                            range: 4473..4494,
+                            range: 4500..4521,
                             pattern: MatchSequence(
                                 PatternMatchSequence {
-                                    range: 4478..4481,
+                                    range: 4505..4508,
                                     patterns: [
                                         MatchStar(
                                             PatternMatchStar {
-                                                range: 4478..4480,
+                                                range: 4505..4507,
                                                 name: Some(
                                                     Identifier {
                                                         id: Name("a"),
-                                                        range: 4479..4480,
+                                                        range: 4506..4507,
                                                     },
                                                 ),
                                             },
@@ -5974,10 +6015,10 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        range: 4491..4494,
+                                        range: 4518..4521,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                range: 4491..4494,
+                                                range: 4518..4521,
                                             },
                                         ),
                                     },
@@ -5985,14 +6026,14 @@ Module(
                             ],
                         },
                         MatchCase {
-                            range: 4499..4520,
+                            range: 4526..4547,
                             pattern: MatchSequence(
                                 PatternMatchSequence {
-                                    range: 4504..4507,
+                                    range: 4531..4534,
                                     patterns: [
                                         MatchStar(
                                             PatternMatchStar {
-                                                range: 4504..4506,
+                                                range: 4531..4533,
                                                 name: None,
                                             },
                                         ),
@@ -6003,10 +6044,10 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        range: 4517..4520,
+                                        range: 4544..4547,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                range: 4517..4520,
+                                                range: 4544..4547,
                                             },
                                         ),
                                     },
@@ -6014,17 +6055,17 @@ Module(
                             ],
                         },
                         MatchCase {
-                            range: 4525..4556,
+                            range: 4552..4583,
                             pattern: MatchSequence(
                                 PatternMatchSequence {
-                                    range: 4530..4543,
+                                    range: 4557..4570,
                                     patterns: [
                                         MatchValue(
                                             PatternMatchValue {
-                                                range: 4531..4532,
+                                                range: 4558..4559,
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        range: 4531..4532,
+                                                        range: 4558..4559,
                                                         value: Int(
                                                             1,
                                                         ),
@@ -6034,10 +6075,10 @@ Module(
                                         ),
                                         MatchValue(
                                             PatternMatchValue {
-                                                range: 4534..4535,
+                                                range: 4561..4562,
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        range: 4534..4535,
+                                                        range: 4561..4562,
                                                         value: Int(
                                                             2,
                                                         ),
@@ -6047,11 +6088,11 @@ Module(
                                         ),
                                         MatchStar(
                                             PatternMatchStar {
-                                                range: 4537..4542,
+                                                range: 4564..4569,
                                                 name: Some(
                                                     Identifier {
                                                         id: Name("rest"),
-                                                        range: 4538..4542,
+                                                        range: 4565..4569,
                                                     },
                                                 ),
                                             },
@@ -6063,10 +6104,10 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        range: 4553..4556,
+                                        range: 4580..4583,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                range: 4553..4556,
+                                                range: 4580..4583,
                                             },
                                         ),
                                     },
@@ -6074,23 +6115,23 @@ Module(
                             ],
                         },
                         MatchCase {
-                            range: 4561..4589,
+                            range: 4588..4616,
                             pattern: MatchSequence(
                                 PatternMatchSequence {
-                                    range: 4566..4576,
+                                    range: 4593..4603,
                                     patterns: [
                                         MatchStar(
                                             PatternMatchStar {
-                                                range: 4567..4569,
+                                                range: 4594..4596,
                                                 name: None,
                                             },
                                         ),
                                         MatchValue(
                                             PatternMatchValue {
-                                                range: 4571..4572,
+                                                range: 4598..4599,
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        range: 4571..4572,
+                                                        range: 4598..4599,
                                                         value: Int(
                                                             1,
                                                         ),
@@ -6100,10 +6141,10 @@ Module(
                                         ),
                                         MatchValue(
                                             PatternMatchValue {
-                                                range: 4574..4575,
+                                                range: 4601..4602,
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        range: 4574..4575,
+                                                        range: 4601..4602,
                                                         value: Int(
                                                             2,
                                                         ),
@@ -6118,10 +6159,10 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        range: 4586..4589,
+                                        range: 4613..4616,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                range: 4586..4589,
+                                                range: 4613..4616,
                                             },
                                         ),
                                     },
@@ -6133,29 +6174,29 @@ Module(
             ),
             Match(
                 StmtMatch {
-                    range: 4611..4883,
+                    range: 4638..4910,
                     subject: Name(
                         ExprName {
-                            range: 4617..4618,
+                            range: 4644..4645,
                             id: Name("x"),
                             ctx: Load,
                         },
                     ),
                     cases: [
                         MatchCase {
-                            range: 4624..4649,
+                            range: 4651..4676,
                             pattern: MatchClass(
                                 PatternMatchClass {
-                                    range: 4629..4636,
+                                    range: 4656..4663,
                                     cls: Name(
                                         ExprName {
-                                            range: 4629..4634,
+                                            range: 4656..4661,
                                             id: Name("Point"),
                                             ctx: Load,
                                         },
                                     ),
                                     arguments: PatternArguments {
-                                        range: 4634..4636,
+                                        range: 4661..4663,
                                         patterns: [],
                                         keywords: [],
                                     },
@@ -6165,10 +6206,10 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        range: 4646..4649,
+                                        range: 4673..4676,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                range: 4646..4649,
+                                                range: 4673..4676,
                                             },
                                         ),
                                     },
@@ -6176,39 +6217,39 @@ Module(
                             ],
                         },
                         MatchCase {
-                            range: 4654..4683,
+                            range: 4681..4710,
                             pattern: MatchClass(
                                 PatternMatchClass {
-                                    range: 4659..4670,
+                                    range: 4686..4697,
                                     cls: Attribute(
                                         ExprAttribute {
-                                            range: 4659..4668,
+                                            range: 4686..4695,
                                             value: Attribute(
                                                 ExprAttribute {
-                                                    range: 4659..4662,
+                                                    range: 4686..4689,
                                                     value: Name(
                                                         ExprName {
-                                                            range: 4659..4660,
+                                                            range: 4686..4687,
                                                             id: Name("a"),
                                                             ctx: Load,
                                                         },
                                                     ),
                                                     attr: Identifier {
                                                         id: Name("b"),
-                                                        range: 4661..4662,
+                                                        range: 4688..4689,
                                                     },
                                                     ctx: Load,
                                                 },
                                             ),
                                             attr: Identifier {
                                                 id: Name("Point"),
-                                                range: 4663..4668,
+                                                range: 4690..4695,
                                             },
                                             ctx: Load,
                                         },
                                     ),
                                     arguments: PatternArguments {
-                                        range: 4668..4670,
+                                        range: 4695..4697,
                                         patterns: [],
                                         keywords: [],
                                     },
@@ -6218,10 +6259,10 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        range: 4680..4683,
+                                        range: 4707..4710,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                range: 4680..4683,
+                                                range: 4707..4710,
                                             },
                                         ),
                                     },
@@ -6229,33 +6270,33 @@ Module(
                             ],
                         },
                         MatchCase {
-                            range: 4688..4718,
+                            range: 4715..4745,
                             pattern: MatchClass(
                                 PatternMatchClass {
-                                    range: 4693..4705,
+                                    range: 4720..4732,
                                     cls: Name(
                                         ExprName {
-                                            range: 4693..4700,
+                                            range: 4720..4727,
                                             id: Name("Point2D"),
                                             ctx: Load,
                                         },
                                     ),
                                     arguments: PatternArguments {
-                                        range: 4700..4705,
+                                        range: 4727..4732,
                                         patterns: [],
                                         keywords: [
                                             PatternKeyword {
-                                                range: 4701..4704,
+                                                range: 4728..4731,
                                                 attr: Identifier {
                                                     id: Name("x"),
-                                                    range: 4701..4702,
+                                                    range: 4728..4729,
                                                 },
                                                 pattern: MatchValue(
                                                     PatternMatchValue {
-                                                        range: 4703..4704,
+                                                        range: 4730..4731,
                                                         value: NumberLiteral(
                                                             ExprNumberLiteral {
-                                                                range: 4703..4704,
+                                                                range: 4730..4731,
                                                                 value: Int(
                                                                     0,
                                                                 ),
@@ -6272,10 +6313,10 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        range: 4715..4718,
+                                        range: 4742..4745,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                range: 4715..4718,
+                                                range: 4742..4745,
                                             },
                                         ),
                                     },
@@ -6283,33 +6324,33 @@ Module(
                             ],
                         },
                         MatchCase {
-                            range: 4723..4759,
+                            range: 4750..4786,
                             pattern: MatchClass(
                                 PatternMatchClass {
-                                    range: 4728..4746,
+                                    range: 4755..4773,
                                     cls: Name(
                                         ExprName {
-                                            range: 4728..4735,
+                                            range: 4755..4762,
                                             id: Name("Point2D"),
                                             ctx: Load,
                                         },
                                     ),
                                     arguments: PatternArguments {
-                                        range: 4735..4746,
+                                        range: 4762..4773,
                                         patterns: [],
                                         keywords: [
                                             PatternKeyword {
-                                                range: 4736..4739,
+                                                range: 4763..4766,
                                                 attr: Identifier {
                                                     id: Name("x"),
-                                                    range: 4736..4737,
+                                                    range: 4763..4764,
                                                 },
                                                 pattern: MatchValue(
                                                     PatternMatchValue {
-                                                        range: 4738..4739,
+                                                        range: 4765..4766,
                                                         value: NumberLiteral(
                                                             ExprNumberLiteral {
-                                                                range: 4738..4739,
+                                                                range: 4765..4766,
                                                                 value: Int(
                                                                     0,
                                                                 ),
@@ -6319,17 +6360,17 @@ Module(
                                                 ),
                                             },
                                             PatternKeyword {
-                                                range: 4741..4744,
+                                                range: 4768..4771,
                                                 attr: Identifier {
                                                     id: Name("y"),
-                                                    range: 4741..4742,
+                                                    range: 4768..4769,
                                                 },
                                                 pattern: MatchValue(
                                                     PatternMatchValue {
-                                                        range: 4743..4744,
+                                                        range: 4770..4771,
                                                         value: NumberLiteral(
                                                             ExprNumberLiteral {
-                                                                range: 4743..4744,
+                                                                range: 4770..4771,
                                                                 value: Int(
                                                                     0,
                                                                 ),
@@ -6346,10 +6387,10 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        range: 4756..4759,
+                                        range: 4783..4786,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                range: 4756..4759,
+                                                range: 4783..4786,
                                             },
                                         ),
                                     },
@@ -6357,26 +6398,26 @@ Module(
                             ],
                         },
                         MatchCase {
-                            range: 4764..4795,
+                            range: 4791..4822,
                             pattern: MatchClass(
                                 PatternMatchClass {
-                                    range: 4769..4782,
+                                    range: 4796..4809,
                                     cls: Name(
                                         ExprName {
-                                            range: 4769..4776,
+                                            range: 4796..4803,
                                             id: Name("Point2D"),
                                             ctx: Load,
                                         },
                                     ),
                                     arguments: PatternArguments {
-                                        range: 4776..4782,
+                                        range: 4803..4809,
                                         patterns: [
                                             MatchValue(
                                                 PatternMatchValue {
-                                                    range: 4777..4778,
+                                                    range: 4804..4805,
                                                     value: NumberLiteral(
                                                         ExprNumberLiteral {
-                                                            range: 4777..4778,
+                                                            range: 4804..4805,
                                                             value: Int(
                                                                 0,
                                                             ),
@@ -6386,10 +6427,10 @@ Module(
                                             ),
                                             MatchValue(
                                                 PatternMatchValue {
-                                                    range: 4780..4781,
+                                                    range: 4807..4808,
                                                     value: NumberLiteral(
                                                         ExprNumberLiteral {
-                                                            range: 4780..4781,
+                                                            range: 4807..4808,
                                                             value: Int(
                                                                 1,
                                                             ),
@@ -6406,10 +6447,10 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        range: 4792..4795,
+                                        range: 4819..4822,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                range: 4792..4795,
+                                                range: 4819..4822,
                                             },
                                         ),
                                     },
@@ -6417,30 +6458,30 @@ Module(
                             ],
                         },
                         MatchCase {
-                            range: 4800..4838,
+                            range: 4827..4865,
                             pattern: MatchClass(
                                 PatternMatchClass {
-                                    range: 4805..4825,
+                                    range: 4832..4852,
                                     cls: Name(
                                         ExprName {
-                                            range: 4805..4812,
+                                            range: 4832..4839,
                                             id: Name("Point2D"),
                                             ctx: Load,
                                         },
                                     ),
                                     arguments: PatternArguments {
-                                        range: 4812..4825,
+                                        range: 4839..4852,
                                         patterns: [
                                             MatchSequence(
                                                 PatternMatchSequence {
-                                                    range: 4813..4819,
+                                                    range: 4840..4846,
                                                     patterns: [
                                                         MatchValue(
                                                             PatternMatchValue {
-                                                                range: 4814..4815,
+                                                                range: 4841..4842,
                                                                 value: NumberLiteral(
                                                                     ExprNumberLiteral {
-                                                                        range: 4814..4815,
+                                                                        range: 4841..4842,
                                                                         value: Int(
                                                                             0,
                                                                         ),
@@ -6450,10 +6491,10 @@ Module(
                                                         ),
                                                         MatchValue(
                                                             PatternMatchValue {
-                                                                range: 4817..4818,
+                                                                range: 4844..4845,
                                                                 value: NumberLiteral(
                                                                     ExprNumberLiteral {
-                                                                        range: 4817..4818,
+                                                                        range: 4844..4845,
                                                                         value: Int(
                                                                             1,
                                                                         ),
@@ -6467,17 +6508,17 @@ Module(
                                         ],
                                         keywords: [
                                             PatternKeyword {
-                                                range: 4821..4824,
+                                                range: 4848..4851,
                                                 attr: Identifier {
                                                     id: Name("y"),
-                                                    range: 4821..4822,
+                                                    range: 4848..4849,
                                                 },
                                                 pattern: MatchValue(
                                                     PatternMatchValue {
-                                                        range: 4823..4824,
+                                                        range: 4850..4851,
                                                         value: NumberLiteral(
                                                             ExprNumberLiteral {
-                                                                range: 4823..4824,
+                                                                range: 4850..4851,
                                                                 value: Int(
                                                                     1,
                                                                 ),
@@ -6494,10 +6535,10 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        range: 4835..4838,
+                                        range: 4862..4865,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                range: 4835..4838,
+                                                range: 4862..4865,
                                             },
                                         ),
                                     },
@@ -6505,37 +6546,37 @@ Module(
                             ],
                         },
                         MatchCase {
-                            range: 4843..4883,
+                            range: 4870..4910,
                             pattern: MatchClass(
                                 PatternMatchClass {
-                                    range: 4848..4870,
+                                    range: 4875..4897,
                                     cls: Name(
                                         ExprName {
-                                            range: 4848..4855,
+                                            range: 4875..4882,
                                             id: Name("Point2D"),
                                             ctx: Load,
                                         },
                                     ),
                                     arguments: PatternArguments {
-                                        range: 4855..4870,
+                                        range: 4882..4897,
                                         patterns: [],
                                         keywords: [
                                             PatternKeyword {
-                                                range: 4856..4864,
+                                                range: 4883..4891,
                                                 attr: Identifier {
                                                     id: Name("x"),
-                                                    range: 4856..4857,
+                                                    range: 4883..4884,
                                                 },
                                                 pattern: MatchSequence(
                                                     PatternMatchSequence {
-                                                        range: 4858..4864,
+                                                        range: 4885..4891,
                                                         patterns: [
                                                             MatchValue(
                                                                 PatternMatchValue {
-                                                                    range: 4859..4860,
+                                                                    range: 4886..4887,
                                                                     value: NumberLiteral(
                                                                         ExprNumberLiteral {
-                                                                            range: 4859..4860,
+                                                                            range: 4886..4887,
                                                                             value: Int(
                                                                                 0,
                                                                             ),
@@ -6545,10 +6586,10 @@ Module(
                                                             ),
                                                             MatchValue(
                                                                 PatternMatchValue {
-                                                                    range: 4862..4863,
+                                                                    range: 4889..4890,
                                                                     value: NumberLiteral(
                                                                         ExprNumberLiteral {
-                                                                            range: 4862..4863,
+                                                                            range: 4889..4890,
                                                                             value: Int(
                                                                                 1,
                                                                             ),
@@ -6561,17 +6602,17 @@ Module(
                                                 ),
                                             },
                                             PatternKeyword {
-                                                range: 4866..4869,
+                                                range: 4893..4896,
                                                 attr: Identifier {
                                                     id: Name("y"),
-                                                    range: 4866..4867,
+                                                    range: 4893..4894,
                                                 },
                                                 pattern: MatchValue(
                                                     PatternMatchValue {
-                                                        range: 4868..4869,
+                                                        range: 4895..4896,
                                                         value: NumberLiteral(
                                                             ExprNumberLiteral {
-                                                                range: 4868..4869,
+                                                                range: 4895..4896,
                                                                 value: Int(
                                                                     1,
                                                                 ),
@@ -6588,10 +6629,10 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        range: 4880..4883,
+                                        range: 4907..4910,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                range: 4880..4883,
+                                                range: 4907..4910,
                                             },
                                         ),
                                     },
@@ -6603,20 +6644,20 @@ Module(
             ),
             Match(
                 StmtMatch {
-                    range: 4907..5001,
+                    range: 4934..5028,
                     subject: Named(
                         ExprNamed {
-                            range: 4913..4919,
+                            range: 4940..4946,
                             target: Name(
                                 ExprName {
-                                    range: 4913..4914,
+                                    range: 4940..4941,
                                     id: Name("x"),
                                     ctx: Store,
                                 },
                             ),
                             value: Name(
                                 ExprName {
-                                    range: 4918..4919,
+                                    range: 4945..4946,
                                     id: Name("b"),
                                     ctx: Load,
                                 },
@@ -6625,14 +6666,14 @@ Module(
                     ),
                     cases: [
                         MatchCase {
-                            range: 4925..4949,
+                            range: 4952..4976,
                             pattern: MatchMapping(
                                 PatternMatchMapping {
-                                    range: 4930..4936,
+                                    range: 4957..4963,
                                     keys: [
                                         NumberLiteral(
                                             ExprNumberLiteral {
-                                                range: 4931..4932,
+                                                range: 4958..4959,
                                                 value: Int(
                                                     1,
                                                 ),
@@ -6642,7 +6683,7 @@ Module(
                                     patterns: [
                                         MatchAs(
                                             PatternMatchAs {
-                                                range: 4934..4935,
+                                                range: 4961..4962,
                                                 pattern: None,
                                                 name: None,
                                             },
@@ -6655,10 +6696,10 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        range: 4946..4949,
+                                        range: 4973..4976,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                range: 4946..4949,
+                                                range: 4973..4976,
                                             },
                                         ),
                                     },
@@ -6666,18 +6707,18 @@ Module(
                             ],
                         },
                         MatchCase {
-                            range: 4954..5001,
+                            range: 4981..5028,
                             pattern: MatchMapping(
                                 PatternMatchMapping {
-                                    range: 4959..4988,
+                                    range: 4986..5015,
                                     keys: [
                                         StringLiteral(
                                             ExprStringLiteral {
-                                                range: 4960..4962,
+                                                range: 4987..4989,
                                                 value: StringLiteralValue {
                                                     inner: Single(
                                                         StringLiteral {
-                                                            range: 4960..4962,
+                                                            range: 4987..4989,
                                                             value: "",
                                                             flags: StringLiteralFlags {
                                                                 quote_style: Single,
@@ -6691,33 +6732,33 @@ Module(
                                         ),
                                         NoneLiteral(
                                             ExprNoneLiteral {
-                                                range: 4967..4971,
+                                                range: 4994..4998,
                                             },
                                         ),
                                     ],
                                     patterns: [
                                         MatchAs(
                                             PatternMatchAs {
-                                                range: 4964..4965,
+                                                range: 4991..4992,
                                                 pattern: None,
                                                 name: Some(
                                                     Identifier {
                                                         id: Name("a"),
-                                                        range: 4964..4965,
+                                                        range: 4991..4992,
                                                     },
                                                 ),
                                             },
                                         ),
                                         MatchSequence(
                                             PatternMatchSequence {
-                                                range: 4973..4979,
+                                                range: 5000..5006,
                                                 patterns: [
                                                     MatchValue(
                                                         PatternMatchValue {
-                                                            range: 4974..4975,
+                                                            range: 5001..5002,
                                                             value: NumberLiteral(
                                                                 ExprNumberLiteral {
-                                                                    range: 4974..4975,
+                                                                    range: 5001..5002,
                                                                     value: Int(
                                                                         1,
                                                                     ),
@@ -6727,10 +6768,10 @@ Module(
                                                     ),
                                                     MatchValue(
                                                         PatternMatchValue {
-                                                            range: 4977..4978,
+                                                            range: 5004..5005,
                                                             value: NumberLiteral(
                                                                 ExprNumberLiteral {
-                                                                    range: 4977..4978,
+                                                                    range: 5004..5005,
                                                                     value: Int(
                                                                         2,
                                                                     ),
@@ -6745,7 +6786,7 @@ Module(
                                     rest: Some(
                                         Identifier {
                                             id: Name("rest"),
-                                            range: 4983..4987,
+                                            range: 5010..5014,
                                         },
                                     ),
                                 },
@@ -6754,10 +6795,10 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        range: 4998..5001,
+                                        range: 5025..5028,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                range: 4998..5001,
+                                                range: 5025..5028,
                                             },
                                         ),
                                     },
@@ -6769,25 +6810,25 @@ Module(
             ),
             Match(
                 StmtMatch {
-                    range: 5019..5079,
+                    range: 5046..5106,
                     subject: Name(
                         ExprName {
-                            range: 5025..5026,
+                            range: 5052..5053,
                             id: Name("y"),
                             ctx: Load,
                         },
                     ),
                     cases: [
                         MatchCase {
-                            range: 5032..5053,
+                            range: 5059..5080,
                             pattern: MatchAs(
                                 PatternMatchAs {
-                                    range: 5037..5038,
+                                    range: 5064..5065,
                                     pattern: None,
                                     name: Some(
                                         Identifier {
                                             id: Name("a"),
-                                            range: 5037..5038,
+                                            range: 5064..5065,
                                         },
                                     ),
                                 },
@@ -6795,17 +6836,17 @@ Module(
                             guard: Some(
                                 Named(
                                     ExprNamed {
-                                        range: 5042..5048,
+                                        range: 5069..5075,
                                         target: Name(
                                             ExprName {
-                                                range: 5042..5043,
+                                                range: 5069..5070,
                                                 id: Name("b"),
                                                 ctx: Store,
                                             },
                                         ),
                                         value: Name(
                                             ExprName {
-                                                range: 5047..5048,
+                                                range: 5074..5075,
                                                 id: Name("c"),
                                                 ctx: Load,
                                             },
@@ -6816,10 +6857,10 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        range: 5050..5053,
+                                        range: 5077..5080,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                range: 5050..5053,
+                                                range: 5077..5080,
                                             },
                                         ),
                                     },
@@ -6827,15 +6868,15 @@ Module(
                             ],
                         },
                         MatchCase {
-                            range: 5058..5079,
+                            range: 5085..5106,
                             pattern: MatchAs(
                                 PatternMatchAs {
-                                    range: 5063..5064,
+                                    range: 5090..5091,
                                     pattern: None,
                                     name: Some(
                                         Identifier {
                                             id: Name("e"),
-                                            range: 5063..5064,
+                                            range: 5090..5091,
                                         },
                                     ),
                                 },
@@ -6843,10 +6884,10 @@ Module(
                             guard: Some(
                                 Compare(
                                     ExprCompare {
-                                        range: 5069..5074,
+                                        range: 5096..5101,
                                         left: NumberLiteral(
                                             ExprNumberLiteral {
-                                                range: 5069..5070,
+                                                range: 5096..5097,
                                                 value: Int(
                                                     1,
                                                 ),
@@ -6858,7 +6899,7 @@ Module(
                                         comparators: [
                                             NumberLiteral(
                                                 ExprNumberLiteral {
-                                                    range: 5073..5074,
+                                                    range: 5100..5101,
                                                     value: Int(
                                                         2,
                                                     ),
@@ -6871,10 +6912,10 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        range: 5076..5079,
+                                        range: 5103..5106,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                range: 5076..5079,
+                                                range: 5103..5106,
                                             },
                                         ),
                                     },
@@ -6886,20 +6927,20 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 5108..5123,
+                    range: 5135..5150,
                     value: Tuple(
                         ExprTuple {
-                            range: 5108..5123,
+                            range: 5135..5150,
                             elts: [
                                 BinOp(
                                     ExprBinOp {
-                                        range: 5108..5120,
+                                        range: 5135..5147,
                                         left: BinOp(
                                             ExprBinOp {
-                                                range: 5108..5116,
+                                                range: 5135..5143,
                                                 left: Name(
                                                     ExprName {
-                                                        range: 5108..5113,
+                                                        range: 5135..5140,
                                                         id: Name("match"),
                                                         ctx: Load,
                                                     },
@@ -6907,7 +6948,7 @@ Module(
                                                 op: Mult,
                                                 right: Name(
                                                     ExprName {
-                                                        range: 5115..5116,
+                                                        range: 5142..5143,
                                                         id: Name("a"),
                                                         ctx: Load,
                                                     },
@@ -6917,7 +6958,7 @@ Module(
                                         op: Add,
                                         right: Name(
                                             ExprName {
-                                                range: 5119..5120,
+                                                range: 5146..5147,
                                                 id: Name("b"),
                                                 ctx: Load,
                                             },
@@ -6926,7 +6967,7 @@ Module(
                                 ),
                                 Name(
                                     ExprName {
-                                        range: 5122..5123,
+                                        range: 5149..5150,
                                         id: Name("c"),
                                         ctx: Load,
                                     },
@@ -6940,17 +6981,17 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 5149..5166,
+                    range: 5176..5193,
                     value: Tuple(
                         ExprTuple {
-                            range: 5149..5166,
+                            range: 5176..5193,
                             elts: [
                                 BinOp(
                                     ExprBinOp {
-                                        range: 5149..5163,
+                                        range: 5176..5190,
                                         left: Name(
                                             ExprName {
-                                                range: 5149..5154,
+                                                range: 5176..5181,
                                                 id: Name("match"),
                                                 ctx: Load,
                                             },
@@ -6958,10 +6999,10 @@ Module(
                                         op: Mult,
                                         right: BinOp(
                                             ExprBinOp {
-                                                range: 5157..5162,
+                                                range: 5184..5189,
                                                 left: Name(
                                                     ExprName {
-                                                        range: 5157..5158,
+                                                        range: 5184..5185,
                                                         id: Name("a"),
                                                         ctx: Load,
                                                     },
@@ -6969,7 +7010,7 @@ Module(
                                                 op: Add,
                                                 right: Name(
                                                     ExprName {
-                                                        range: 5161..5162,
+                                                        range: 5188..5189,
                                                         id: Name("b"),
                                                         ctx: Load,
                                                     },
@@ -6980,7 +7021,7 @@ Module(
                                 ),
                                 Name(
                                     ExprName {
-                                        range: 5165..5166,
+                                        range: 5192..5193,
                                         id: Name("c"),
                                         ctx: Load,
                                     },
@@ -6994,29 +7035,29 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 5192..5209,
+                    range: 5219..5236,
                     value: Call(
                         ExprCall {
-                            range: 5192..5209,
+                            range: 5219..5236,
                             func: Name(
                                 ExprName {
-                                    range: 5192..5197,
+                                    range: 5219..5224,
                                     id: Name("match"),
                                     ctx: Load,
                                 },
                             ),
                             arguments: Arguments {
-                                range: 5198..5209,
+                                range: 5225..5236,
                                 args: [
                                     Starred(
                                         ExprStarred {
-                                            range: 5199..5205,
+                                            range: 5226..5232,
                                             value: BinOp(
                                                 ExprBinOp {
-                                                    range: 5200..5205,
+                                                    range: 5227..5232,
                                                     left: Name(
                                                         ExprName {
-                                                            range: 5200..5201,
+                                                            range: 5227..5228,
                                                             id: Name("a"),
                                                             ctx: Load,
                                                         },
@@ -7024,7 +7065,7 @@ Module(
                                                     op: Add,
                                                     right: Name(
                                                         ExprName {
-                                                            range: 5204..5205,
+                                                            range: 5231..5232,
                                                             id: Name("b"),
                                                             ctx: Load,
                                                         },
@@ -7036,7 +7077,7 @@ Module(
                                     ),
                                     Name(
                                         ExprName {
-                                            range: 5207..5208,
+                                            range: 5234..5235,
                                             id: Name("c"),
                                             ctx: Load,
                                         },
@@ -7050,16 +7091,16 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 5236..5252,
+                    range: 5263..5279,
                     value: BinOp(
                         ExprBinOp {
-                            range: 5236..5252,
+                            range: 5263..5279,
                             left: BinOp(
                                 ExprBinOp {
-                                    range: 5236..5248,
+                                    range: 5263..5275,
                                     left: Name(
                                         ExprName {
-                                            range: 5236..5241,
+                                            range: 5263..5268,
                                             id: Name("match"),
                                             ctx: Load,
                                         },
@@ -7067,10 +7108,10 @@ Module(
                                     op: Sub,
                                     right: BinOp(
                                         ExprBinOp {
-                                            range: 5243..5248,
+                                            range: 5270..5275,
                                             left: Name(
                                                 ExprName {
-                                                    range: 5243..5244,
+                                                    range: 5270..5271,
                                                     id: Name("a"),
                                                     ctx: Load,
                                                 },
@@ -7078,7 +7119,7 @@ Module(
                                             op: Mult,
                                             right: Name(
                                                 ExprName {
-                                                    range: 5247..5248,
+                                                    range: 5274..5275,
                                                     id: Name("b"),
                                                     ctx: Load,
                                                 },
@@ -7090,7 +7131,7 @@ Module(
                             op: Add,
                             right: Name(
                                 ExprName {
-                                    range: 5251..5252,
+                                    range: 5278..5279,
                                     id: Name("c"),
                                     ctx: Load,
                                 },
@@ -7101,16 +7142,16 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 5279..5297,
+                    range: 5306..5324,
                     value: BinOp(
                         ExprBinOp {
-                            range: 5279..5297,
+                            range: 5306..5324,
                             left: BinOp(
                                 ExprBinOp {
-                                    range: 5279..5293,
+                                    range: 5306..5320,
                                     left: Name(
                                         ExprName {
-                                            range: 5279..5284,
+                                            range: 5306..5311,
                                             id: Name("match"),
                                             ctx: Load,
                                         },
@@ -7118,10 +7159,10 @@ Module(
                                     op: Sub,
                                     right: BinOp(
                                         ExprBinOp {
-                                            range: 5287..5292,
+                                            range: 5314..5319,
                                             left: Name(
                                                 ExprName {
-                                                    range: 5287..5288,
+                                                    range: 5314..5315,
                                                     id: Name("a"),
                                                     ctx: Load,
                                                 },
@@ -7129,7 +7170,7 @@ Module(
                                             op: Mult,
                                             right: Name(
                                                 ExprName {
-                                                    range: 5291..5292,
+                                                    range: 5318..5319,
                                                     id: Name("b"),
                                                     ctx: Load,
                                                 },
@@ -7141,7 +7182,7 @@ Module(
                             op: Add,
                             right: Name(
                                 ExprName {
-                                    range: 5296..5297,
+                                    range: 5323..5324,
                                     id: Name("c"),
                                     ctx: Load,
                                 },
@@ -7152,33 +7193,33 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 5324..5342,
+                    range: 5351..5369,
                     value: BinOp(
                         ExprBinOp {
-                            range: 5324..5342,
+                            range: 5351..5369,
                             left: BinOp(
                                 ExprBinOp {
-                                    range: 5324..5338,
+                                    range: 5351..5365,
                                     left: Call(
                                         ExprCall {
-                                            range: 5324..5334,
+                                            range: 5351..5361,
                                             func: Name(
                                                 ExprName {
-                                                    range: 5324..5329,
+                                                    range: 5351..5356,
                                                     id: Name("match"),
                                                     ctx: Load,
                                                 },
                                             ),
                                             arguments: Arguments {
-                                                range: 5330..5334,
+                                                range: 5357..5361,
                                                 args: [
                                                     UnaryOp(
                                                         ExprUnaryOp {
-                                                            range: 5331..5333,
+                                                            range: 5358..5360,
                                                             op: USub,
                                                             operand: Name(
                                                                 ExprName {
-                                                                    range: 5332..5333,
+                                                                    range: 5359..5360,
                                                                     id: Name("a"),
                                                                     ctx: Load,
                                                                 },
@@ -7193,7 +7234,7 @@ Module(
                                     op: Mult,
                                     right: Name(
                                         ExprName {
-                                            range: 5337..5338,
+                                            range: 5364..5365,
                                             id: Name("b"),
                                             ctx: Load,
                                         },
@@ -7203,7 +7244,7 @@ Module(
                             op: Add,
                             right: Name(
                                 ExprName {
-                                    range: 5341..5342,
+                                    range: 5368..5369,
                                     id: Name("c"),
                                     ctx: Load,
                                 },
@@ -7214,45 +7255,13 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 5370..5380,
+                    range: 5397..5407,
                     value: Attribute(
                         ExprAttribute {
-                            range: 5370..5380,
+                            range: 5397..5407,
                             value: Call(
                                 ExprCall {
-                                    range: 5370..5378,
-                                    func: Name(
-                                        ExprName {
-                                            range: 5370..5375,
-                                            id: Name("match"),
-                                            ctx: Load,
-                                        },
-                                    ),
-                                    arguments: Arguments {
-                                        range: 5376..5378,
-                                        args: [],
-                                        keywords: [],
-                                    },
-                                },
-                            ),
-                            attr: Identifier {
-                                id: Name("a"),
-                                range: 5379..5380,
-                            },
-                            ctx: Load,
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    range: 5397..5409,
-                    value: Attribute(
-                        ExprAttribute {
-                            range: 5397..5409,
-                            value: Call(
-                                ExprCall {
-                                    range: 5397..5407,
+                                    range: 5397..5405,
                                     func: Name(
                                         ExprName {
                                             range: 5397..5402,
@@ -7261,24 +7270,15 @@ Module(
                                         },
                                     ),
                                     arguments: Arguments {
-                                        range: 5403..5407,
-                                        args: [
-                                            Tuple(
-                                                ExprTuple {
-                                                    range: 5404..5406,
-                                                    elts: [],
-                                                    ctx: Load,
-                                                    parenthesized: true,
-                                                },
-                                            ),
-                                        ],
+                                        range: 5403..5405,
+                                        args: [],
                                         keywords: [],
                                     },
                                 },
                             ),
                             attr: Identifier {
                                 id: Name("a"),
-                                range: 5408..5409,
+                                range: 5406..5407,
                             },
                             ctx: Load,
                         },
@@ -7287,26 +7287,26 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 5428..5441,
+                    range: 5424..5436,
                     value: Attribute(
                         ExprAttribute {
-                            range: 5428..5441,
+                            range: 5424..5436,
                             value: Call(
                                 ExprCall {
-                                    range: 5428..5439,
+                                    range: 5424..5434,
                                     func: Name(
                                         ExprName {
-                                            range: 5428..5433,
+                                            range: 5424..5429,
                                             id: Name("match"),
                                             ctx: Load,
                                         },
                                     ),
                                     arguments: Arguments {
-                                        range: 5434..5439,
+                                        range: 5430..5434,
                                         args: [
                                             Tuple(
                                                 ExprTuple {
-                                                    range: 5435..5437,
+                                                    range: 5431..5433,
                                                     elts: [],
                                                     ctx: Load,
                                                     parenthesized: true,
@@ -7319,7 +7319,7 @@ Module(
                             ),
                             attr: Identifier {
                                 id: Name("a"),
-                                range: 5440..5441,
+                                range: 5435..5436,
                             },
                             ctx: Load,
                         },
@@ -7328,23 +7328,64 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 5460..5471,
+                    range: 5455..5468,
                     value: Attribute(
                         ExprAttribute {
-                            range: 5460..5471,
+                            range: 5455..5468,
+                            value: Call(
+                                ExprCall {
+                                    range: 5455..5466,
+                                    func: Name(
+                                        ExprName {
+                                            range: 5455..5460,
+                                            id: Name("match"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    arguments: Arguments {
+                                        range: 5461..5466,
+                                        args: [
+                                            Tuple(
+                                                ExprTuple {
+                                                    range: 5462..5464,
+                                                    elts: [],
+                                                    ctx: Load,
+                                                    parenthesized: true,
+                                                },
+                                            ),
+                                        ],
+                                        keywords: [],
+                                    },
+                                },
+                            ),
+                            attr: Identifier {
+                                id: Name("a"),
+                                range: 5467..5468,
+                            },
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 5487..5498,
+                    value: Attribute(
+                        ExprAttribute {
+                            range: 5487..5498,
                             value: Subscript(
                                 ExprSubscript {
-                                    range: 5460..5469,
+                                    range: 5487..5496,
                                     value: Name(
                                         ExprName {
-                                            range: 5460..5465,
+                                            range: 5487..5492,
                                             id: Name("match"),
                                             ctx: Load,
                                         },
                                     ),
                                     slice: Name(
                                         ExprName {
-                                            range: 5467..5468,
+                                            range: 5494..5495,
                                             id: Name("a"),
                                             ctx: Load,
                                         },
@@ -7354,7 +7395,7 @@ Module(
                             ),
                             attr: Identifier {
                                 id: Name("b"),
-                                range: 5470..5471,
+                                range: 5497..5498,
                             },
                             ctx: Load,
                         },
@@ -7363,27 +7404,27 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 5489..5501,
+                    range: 5516..5528,
                     value: Attribute(
                         ExprAttribute {
-                            range: 5489..5501,
+                            range: 5516..5528,
                             value: Subscript(
                                 ExprSubscript {
-                                    range: 5489..5499,
+                                    range: 5516..5526,
                                     value: Name(
                                         ExprName {
-                                            range: 5489..5494,
+                                            range: 5516..5521,
                                             id: Name("match"),
                                             ctx: Load,
                                         },
                                     ),
                                     slice: Tuple(
                                         ExprTuple {
-                                            range: 5496..5498,
+                                            range: 5523..5525,
                                             elts: [
                                                 Name(
                                                     ExprName {
-                                                        range: 5496..5497,
+                                                        range: 5523..5524,
                                                         id: Name("a"),
                                                         ctx: Load,
                                                     },
@@ -7398,7 +7439,7 @@ Module(
                             ),
                             attr: Identifier {
                                 id: Name("b"),
-                                range: 5500..5501,
+                                range: 5527..5528,
                             },
                             ctx: Load,
                         },
@@ -7407,27 +7448,27 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 5542..5556,
+                    range: 5569..5583,
                     value: Attribute(
                         ExprAttribute {
-                            range: 5542..5556,
+                            range: 5569..5583,
                             value: Subscript(
                                 ExprSubscript {
-                                    range: 5542..5554,
+                                    range: 5569..5581,
                                     value: Name(
                                         ExprName {
-                                            range: 5542..5547,
+                                            range: 5569..5574,
                                             id: Name("match"),
                                             ctx: Load,
                                         },
                                     ),
                                     slice: Tuple(
                                         ExprTuple {
-                                            range: 5549..5553,
+                                            range: 5576..5580,
                                             elts: [
                                                 Name(
                                                     ExprName {
-                                                        range: 5550..5551,
+                                                        range: 5577..5578,
                                                         id: Name("a"),
                                                         ctx: Load,
                                                     },
@@ -7442,7 +7483,7 @@ Module(
                             ),
                             attr: Identifier {
                                 id: Name("b"),
-                                range: 5555..5556,
+                                range: 5582..5583,
                             },
                             ctx: Load,
                         },
@@ -7451,22 +7492,22 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 5577..5594,
+                    range: 5604..5621,
                     value: Subscript(
                         ExprSubscript {
-                            range: 5577..5594,
+                            range: 5604..5621,
                             value: Call(
                                 ExprCall {
-                                    range: 5577..5584,
+                                    range: 5604..5611,
                                     func: Name(
                                         ExprName {
-                                            range: 5577..5582,
+                                            range: 5604..5609,
                                             id: Name("match"),
                                             ctx: Load,
                                         },
                                     ),
                                     arguments: Arguments {
-                                        range: 5582..5584,
+                                        range: 5609..5611,
                                         args: [],
                                         keywords: [],
                                     },
@@ -7474,11 +7515,11 @@ Module(
                             ),
                             slice: Slice(
                                 ExprSlice {
-                                    range: 5585..5593,
+                                    range: 5612..5620,
                                     lower: Some(
                                         Name(
                                             ExprName {
-                                                range: 5585..5586,
+                                                range: 5612..5613,
                                                 id: Name("a"),
                                                 ctx: Load,
                                             },
@@ -7487,7 +7528,7 @@ Module(
                                     upper: Some(
                                         Name(
                                             ExprName {
-                                                range: 5592..5593,
+                                                range: 5619..5620,
                                                 id: Name("b"),
                                                 ctx: Load,
                                             },
@@ -7503,20 +7544,20 @@ Module(
             ),
             If(
                 StmtIf {
-                    range: 5614..5633,
+                    range: 5641..5660,
                     test: Named(
                         ExprNamed {
-                            range: 5617..5627,
+                            range: 5644..5654,
                             target: Name(
                                 ExprName {
-                                    range: 5617..5622,
+                                    range: 5644..5649,
                                     id: Name("match"),
                                     ctx: Store,
                                 },
                             ),
                             value: NumberLiteral(
                                 ExprNumberLiteral {
-                                    range: 5626..5627,
+                                    range: 5653..5654,
                                     value: Int(
                                         1,
                                     ),
@@ -7527,7 +7568,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
-                                range: 5629..5633,
+                                range: 5656..5660,
                             },
                         ),
                     ],
@@ -7536,23 +7577,23 @@ Module(
             ),
             Match(
                 StmtMatch {
-                    range: 5634..5688,
+                    range: 5661..5715,
                     subject: Name(
                         ExprName {
-                            range: 5640..5645,
+                            range: 5667..5672,
                             id: Name("match"),
                             ctx: Load,
                         },
                     ),
                     cases: [
                         MatchCase {
-                            range: 5651..5663,
+                            range: 5678..5690,
                             pattern: MatchValue(
                                 PatternMatchValue {
-                                    range: 5656..5657,
+                                    range: 5683..5684,
                                     value: NumberLiteral(
                                         ExprNumberLiteral {
-                                            range: 5656..5657,
+                                            range: 5683..5684,
                                             value: Int(
                                                 1,
                                             ),
@@ -7564,19 +7605,19 @@ Module(
                             body: [
                                 Pass(
                                     StmtPass {
-                                        range: 5659..5663,
+                                        range: 5686..5690,
                                     },
                                 ),
                             ],
                         },
                         MatchCase {
-                            range: 5668..5688,
+                            range: 5695..5715,
                             pattern: MatchValue(
                                 PatternMatchValue {
-                                    range: 5673..5674,
+                                    range: 5700..5701,
                                     value: NumberLiteral(
                                         ExprNumberLiteral {
-                                            range: 5673..5674,
+                                            range: 5700..5701,
                                             value: Int(
                                                 2,
                                             ),
@@ -7588,7 +7629,7 @@ Module(
                             body: [
                                 Pass(
                                     StmtPass {
-                                        range: 5684..5688,
+                                        range: 5711..5715,
                                     },
                                 ),
                             ],
@@ -7598,11 +7639,11 @@ Module(
             ),
             Assign(
                 StmtAssign {
-                    range: 5689..5725,
+                    range: 5716..5752,
                     targets: [
                         Name(
                             ExprName {
-                                range: 5689..5694,
+                                range: 5716..5721,
                                 id: Name("match"),
                                 ctx: Store,
                             },
@@ -7610,19 +7651,19 @@ Module(
                     ],
                     value: Lambda(
                         ExprLambda {
-                            range: 5697..5725,
+                            range: 5724..5752,
                             parameters: Some(
                                 Parameters {
-                                    range: 5704..5709,
+                                    range: 5731..5736,
                                     posonlyargs: [],
                                     args: [
                                         ParameterWithDefault {
-                                            range: 5704..5709,
+                                            range: 5731..5736,
                                             parameter: Parameter {
-                                                range: 5704..5709,
+                                                range: 5731..5736,
                                                 name: Identifier {
                                                     id: Name("query"),
-                                                    range: 5704..5709,
+                                                    range: 5731..5736,
                                                 },
                                                 annotation: None,
                                             },
@@ -7636,10 +7677,10 @@ Module(
                             ),
                             body: Compare(
                                 ExprCompare {
-                                    range: 5711..5725,
+                                    range: 5738..5752,
                                     left: Name(
                                         ExprName {
-                                            range: 5711..5716,
+                                            range: 5738..5743,
                                             id: Name("query"),
                                             ctx: Load,
                                         },
@@ -7650,7 +7691,7 @@ Module(
                                     comparators: [
                                         Name(
                                             ExprName {
-                                                range: 5720..5725,
+                                                range: 5747..5752,
                                                 id: Name("event"),
                                                 ctx: Load,
                                             },
@@ -7664,36 +7705,36 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 5726..5742,
+                    range: 5753..5769,
                     value: Call(
                         ExprCall {
-                            range: 5726..5742,
+                            range: 5753..5769,
                             func: Name(
                                 ExprName {
-                                    range: 5726..5731,
+                                    range: 5753..5758,
                                     id: Name("print"),
                                     ctx: Load,
                                 },
                             ),
                             arguments: Arguments {
-                                range: 5731..5742,
+                                range: 5758..5769,
                                 args: [
                                     Call(
                                         ExprCall {
-                                            range: 5732..5741,
+                                            range: 5759..5768,
                                             func: Name(
                                                 ExprName {
-                                                    range: 5732..5737,
+                                                    range: 5759..5764,
                                                     id: Name("match"),
                                                     ctx: Load,
                                                 },
                                             ),
                                             arguments: Arguments {
-                                                range: 5737..5741,
+                                                range: 5764..5768,
                                                 args: [
                                                     NumberLiteral(
                                                         ExprNumberLiteral {
-                                                            range: 5738..5740,
+                                                            range: 5765..5767,
                                                             value: Int(
                                                                 12,
                                                             ),
