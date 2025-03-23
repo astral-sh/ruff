@@ -3043,9 +3043,6 @@ impl<'db> TypeInferenceBuilder<'db> {
         alias: &ast::Alias,
         definition: Definition<'db>,
     ) {
-        // TODO:
-        // - Absolute `*` imports (`from collections import *`)
-        // - Relative `*` imports (`from ...foo import *`)
         let ast::StmtImportFrom { module, level, .. } = import_from;
         // For diagnostics, we want to highlight the unresolvable
         // module and not the entire `from ... import ...` statement.

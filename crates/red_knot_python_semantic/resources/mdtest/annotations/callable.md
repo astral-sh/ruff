@@ -4,8 +4,10 @@ References:
 
 - <https://typing.readthedocs.io/en/latest/spec/callables.html#callable>
 
-TODO: Use `collections.abc` as importing from `typing` is deprecated but this requires support for
-`*` imports. See: <https://docs.python.org/3/library/typing.html#deprecated-aliases>.
+Note that `typing.Callable` is deprecated at runtime, in favour of `collections.abc.Callable` (see:
+<https://docs.python.org/3/library/typing.html#deprecated-aliases>). However, removal of
+`typing.Callable` is not currently planned, and the canonical location of the stub for the symbol in
+typeshed is still `typing.pyi`.
 
 ## Invalid forms
 

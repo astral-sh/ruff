@@ -60,23 +60,13 @@ type KeyDiagnosticFields = (
     Severity,
 );
 
-static EXPECTED_DIAGNOSTICS: &[KeyDiagnosticFields] = &[
-    // We don't support `*` imports yet:
-    (
-        DiagnosticId::lint("unresolved-import"),
-        Some("/src/tomllib/_parser.py"),
-        Some(192..200),
-        Cow::Borrowed("Module `collections.abc` has no member `Iterable`"),
-        Severity::Error,
-    ),
-    (
-        DiagnosticId::lint("unused-ignore-comment"),
-        Some("/src/tomllib/_parser.py"),
-        Some(22299..22333),
-        Cow::Borrowed("Unused blanket `type: ignore` directive"),
-        Severity::Warning,
-    ),
-];
+static EXPECTED_DIAGNOSTICS: &[KeyDiagnosticFields] = &[(
+    DiagnosticId::lint("unused-ignore-comment"),
+    Some("/src/tomllib/_parser.py"),
+    Some(22299..22333),
+    Cow::Borrowed("Unused blanket `type: ignore` directive"),
+    Severity::Warning,
+)];
 
 fn tomllib_path(file: &TestFile) -> SystemPathBuf {
     SystemPathBuf::from("src").join(file.name())
