@@ -937,7 +937,7 @@ impl From<snippet::Level> for DisplayAnnotationType {
     }
 }
 
-/// Information whether the header is the initial one or a consequitive one
+/// Information whether the header is the initial one or a consecutive one
 /// for multi-slice cases.
 // TODO: private
 #[derive(Debug, Clone, PartialEq)]

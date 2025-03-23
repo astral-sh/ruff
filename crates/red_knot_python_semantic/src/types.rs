@@ -667,7 +667,7 @@ impl<'db> Type<'db> {
                 false
             }
 
-            // A fully static heterogenous tuple type `A` is a subtype of a fully static heterogeneous tuple type `B`
+            // A fully static heterogeneous tuple type `A` is a subtype of a fully static heterogeneous tuple type `B`
             // iff the two tuple types have the same number of elements and each element-type in `A` is a subtype
             // of the element-type at the same index in `B`. (Now say that 5 times fast.)
             //
@@ -687,7 +687,7 @@ impl<'db> Type<'db> {
             // Other than the special tuple-to-tuple case handled, above,
             // tuple subtyping delegates to `Instance(tuple)` in the same way as the literal types.
             //
-            // All heterogenous tuple types are subtypes of `Instance(<tuple>)`:
+            // All heterogeneous tuple types are subtypes of `Instance(<tuple>)`:
             // `Instance(<some class T>)` expresses "the set of all possible instances of the class `T`";
             // consequently, `Instance(<tuple>)` expresses "the set of all possible instances of the class `tuple`".
             // This type can be spelled in type annotations as `tuple[object, ...]` (since `tuple` is covariant).
@@ -1134,7 +1134,7 @@ impl<'db> Type<'db> {
             }
 
             // for `type[Any]`/`type[Unknown]`/`type[Todo]`, we know the type cannot be any larger than `type`,
-            // so although the type is dynamic we can still determine disjointness in some situations
+            // so although the type is dynamic we can still determine disjointedness in some situations
             (Type::SubclassOf(subclass_of_ty), other)
             | (other, Type::SubclassOf(subclass_of_ty)) => match subclass_of_ty.subclass_of() {
                 ClassBase::Dynamic(_) => {
@@ -1289,7 +1289,7 @@ impl<'db> Type<'db> {
 
             (Type::Callable(CallableType::General(_)), _)
             | (_, Type::Callable(CallableType::General(_))) => {
-                // TODO: Implement disjointness for general callable types
+                // TODO: Implement disjointedness for general callable types
                 false
             }
         }

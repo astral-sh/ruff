@@ -17,7 +17,7 @@ use ruff_db::parsed::ParsedModule;
 /// ## Usage in salsa tracked structs
 /// It's important that [`AstNodeRef`] fields in salsa tracked structs are tracked fields
 /// (attributed with `#[tracked`]). It prevents that the tracked struct gets a new ID
-/// everytime the AST changes, which in turn, invalidates the result of any query
+/// every time the AST changes, which in turn, invalidates the result of any query
 /// that takes said tracked struct as a query argument or returns the tracked struct as part of its result.
 ///
 /// For example, marking the [`AstNodeRef`] as tracked on `Expression`
