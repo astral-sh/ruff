@@ -171,19 +171,19 @@ impl FileScopeId {
 pub struct Scope {
     parent: Option<FileScopeId>,
     node: NodeWithScopeKind,
-    descendents: Range<FileScopeId>,
+    descendants: Range<FileScopeId>,
 }
 
 impl Scope {
     pub(super) fn new(
         parent: Option<FileScopeId>,
         node: NodeWithScopeKind,
-        descendents: Range<FileScopeId>,
+        descendants: Range<FileScopeId>,
     ) -> Self {
         Scope {
             parent,
             node,
-            descendents,
+            descendants,
         }
     }
 
@@ -199,12 +199,12 @@ impl Scope {
         self.node().scope_kind()
     }
 
-    pub fn descendents(&self) -> Range<FileScopeId> {
-        self.descendents.clone()
+    pub fn descendants(&self) -> Range<FileScopeId> {
+        self.descendants.clone()
     }
 
-    pub(super) fn extend_descendents(&mut self, children_end: FileScopeId) {
-        self.descendents = self.descendents.start..children_end;
+    pub(super) fn extend_descendants(&mut self, children_end: FileScopeId) {
+        self.descendants = self.descendants.start..children_end;
     }
 
     pub(crate) fn is_eager(&self) -> bool {
