@@ -1,7 +1,7 @@
 # Eager scopes
 
 Some scopes are executed eagerly: references to variables defined in enclosing scopes are resolved
-_immediately_. This is in constrast to (for instance) function scopes, where those references are
+_immediately_. This is in contrast to (for instance) function scopes, where those references are
 resolved when the function is called.
 
 ## Function definitions

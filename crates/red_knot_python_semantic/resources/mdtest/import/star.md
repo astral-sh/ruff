@@ -222,7 +222,7 @@ reveal_type(X)  # revealed: Unknown
 ### Only explicit re-exports are considered re-exported from `.pyi` files
 
 For `.pyi` files, we should consider all imports private to the stub unless they are included in
-`__all__` or use the explict `from foo import X as X` syntax.
+`__all__` or use the explicit `from foo import X as X` syntax.
 
 `a.pyi`:
 
