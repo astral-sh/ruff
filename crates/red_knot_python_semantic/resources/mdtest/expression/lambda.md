@@ -76,7 +76,7 @@ Using a parameter with default value:
 lambda x=1: reveal_type(x)  # revealed: Unknown | Literal[1]
 ```
 
-Using a variadic paramter:
+Using a variadic parameter:
 
 ```py
 # TODO: should be `tuple[Unknown, ...]` (needs generics)
@@ -97,4 +97,23 @@ expression.
 
 ```py
 reveal_type(lambda a=lambda x, y: 0: 2)  # revealed: (a=(x, y) -> Unknown) -> Unknown
+```
+
+## Assignment
+
+This does not enumerate all combinations of parameter kinds as that should be covered by the
+[subtype tests for callable types](./../type_properties/is_subtype_of.md#callable).
+
+```py
+from typing import Callable
+
+a1: Callable[[], None] = lambda: None
+a2: Callable[[int], None] = lambda x: None
+a3: Callable[[int, int], None] = lambda x, y, z=1: None
+a4: Callable[[int, int], None] = lambda *args: None
+
+# error: [invalid-assignment]
+a5: Callable[[], None] = lambda x: None
+# error: [invalid-assignment]
+a6: Callable[[int], None] = lambda: None
 ```

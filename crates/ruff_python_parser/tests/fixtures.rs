@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::fmt::{Formatter, Write};
 use std::fs;
@@ -5,7 +6,11 @@ use std::path::Path;
 
 use ruff_annotate_snippets::{Level, Renderer, Snippet};
 use ruff_python_ast::visitor::source_order::{walk_module, SourceOrderVisitor, TraversalSignal};
+use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{AnyNodeRef, Mod, PythonVersion};
+use ruff_python_parser::semantic_errors::{
+    SemanticSyntaxCheckerVisitor, SemanticSyntaxContext, SemanticSyntaxError,
+};
 use ruff_python_parser::{parse_unchecked, Mode, ParseErrorType, ParseOptions, Token};
 use ruff_source_file::{LineIndex, OneIndexed, SourceCode};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
@@ -81,6 +86,38 @@ fn test_valid_syntax(input_path: &Path) {
     writeln!(&mut output, "## AST").unwrap();
     writeln!(&mut output, "\n```\n{:#?}\n```", parsed.syntax()).unwrap();
 
+    let parsed = parsed.try_into_module().expect("Parsed with Mode::Module");
+
+    let mut visitor = SemanticSyntaxCheckerVisitor::new(TestContext::default());
+
+    for stmt in parsed.suite() {
+        visitor.visit_stmt(stmt);
+    }
+
+    let semantic_syntax_errors = visitor.into_context().diagnostics.into_inner();
+
+    if !semantic_syntax_errors.is_empty() {
+        let mut message = "Expected no semantic syntax errors for a valid program:\n".to_string();
+
+        let line_index = LineIndex::from_source_text(&source);
+        let source_code = SourceCode::new(&source, &line_index);
+
+        for error in semantic_syntax_errors {
+            writeln!(
+                &mut message,
+                "{}\n",
+                CodeFrame {
+                    range: error.range,
+                    error: &ParseErrorType::OtherError(error.to_string()),
+                    source_code: &source_code,
+                }
+            )
+            .unwrap();
+        }
+
+        panic!("{input_path:?}: {message}");
+    }
+
     insta::with_settings!({
         omit_expression => true,
         input_file => input_path,
@@ -98,11 +135,6 @@ fn test_invalid_syntax(input_path: &Path) {
         ParseOptions::from(Mode::Module).with_target_version(PythonVersion::latest())
     });
     let parsed = parse_unchecked(&source, options);
-
-    assert!(
-        parsed.has_syntax_errors(),
-        "{input_path:?}: Expected parser to generate at least one syntax error for a program containing syntax errors."
-    );
 
     validate_tokens(parsed.tokens(), source.text_len(), input_path);
     validate_ast(parsed.syntax(), source.text_len(), input_path);
@@ -136,6 +168,38 @@ fn test_invalid_syntax(input_path: &Path) {
     }
 
     for error in parsed.unsupported_syntax_errors() {
+        writeln!(
+            &mut output,
+            "{}\n",
+            CodeFrame {
+                range: error.range,
+                error: &ParseErrorType::OtherError(error.to_string()),
+                source_code: &source_code,
+            }
+        )
+        .unwrap();
+    }
+
+    let parsed = parsed.try_into_module().expect("Parsed with Mode::Module");
+
+    let mut visitor = SemanticSyntaxCheckerVisitor::new(TestContext::default());
+
+    for stmt in parsed.suite() {
+        visitor.visit_stmt(stmt);
+    }
+
+    let semantic_syntax_errors = visitor.into_context().diagnostics.into_inner();
+
+    assert!(
+        parsed.has_syntax_errors() || !semantic_syntax_errors.is_empty(),
+        "{input_path:?}: Expected parser to generate at least one syntax error for a program containing syntax errors."
+    );
+
+    if !semantic_syntax_errors.is_empty() {
+        writeln!(&mut output, "## Semantic Syntax Errors\n").unwrap();
+    }
+
+    for error in semantic_syntax_errors {
         writeln!(
             &mut output,
             "{}\n",
@@ -391,5 +455,24 @@ impl<'ast> SourceOrderVisitor<'ast> for ValidateAstVisitor<'ast> {
         self.parents.pop().expect("Expected tree to be balanced");
 
         self.previous = Some(node);
+    }
+}
+
+#[derive(Debug, Default)]
+struct TestContext {
+    diagnostics: RefCell<Vec<SemanticSyntaxError>>,
+}
+
+impl SemanticSyntaxContext for TestContext {
+    fn seen_docstring_boundary(&self) -> bool {
+        false
+    }
+
+    fn python_version(&self) -> PythonVersion {
+        PythonVersion::default()
+    }
+
+    fn report_semantic_error(&self, error: SemanticSyntaxError) {
+        self.diagnostics.borrow_mut().push(error);
     }
 }

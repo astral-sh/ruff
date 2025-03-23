@@ -617,8 +617,9 @@ impl<'s> Parser<'s> {
                     .extension()
                     .is_none_or(|extension| extension.eq_ignore_ascii_case(expected_extension))
             {
+                let backtick_start = self.line_index(backtick_offsets.0);
                 bail!(
-                    "File extension of test file path `{explicit_path}` in test `{test_name}` does not match language specified `{lang}` of code block"
+                    "File extension of test file path `{explicit_path}` in test `{test_name}` does not match language specified `{lang}` of code block at line `{backtick_start}`"
                 );
             }
         }
@@ -749,6 +750,10 @@ impl<'s> Parser<'s> {
     /// Retrieves the current offset of the cursor within the source code.
     fn offset(&self) -> TextSize {
         self.source_len - self.cursor.text_len()
+    }
+
+    fn line_index(&self, char_index: TextSize) -> u32 {
+        self.source.count_lines(TextRange::up_to(char_index))
     }
 }
 
@@ -1221,7 +1226,7 @@ mod tests {
         let err = super::parse("file.md", &source).expect_err("Should fail to parse");
         assert_eq!(
             err.to_string(),
-            "File extension of test file path `a.py` in test `Accidental stub` does not match language specified `pyi` of code block"
+            "File extension of test file path `a.py` in test `Accidental stub` does not match language specified `pyi` of code block at line `5`"
         );
     }
 

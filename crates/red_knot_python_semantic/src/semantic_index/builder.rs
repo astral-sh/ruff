@@ -961,7 +961,7 @@ where
 
                 self.with_type_params(
                     NodeWithScopeRef::TypeAliasTypeParameters(type_alias),
-                    type_alias.type_params.as_ref(),
+                    type_alias.type_params.as_deref(),
                     |builder| {
                         builder.push_scope(NodeWithScopeRef::TypeAlias(type_alias));
                         builder.visit_expr(&type_alias.value);

@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/valid/expressions/arguments.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -1159,7 +1158,7 @@ Module(
                                                     target: Name(
                                                         ExprName {
                                                             range: 562..563,
-                                                            id: Name("x"),
+                                                            id: Name("i"),
                                                             ctx: Store,
                                                         },
                                                     ),

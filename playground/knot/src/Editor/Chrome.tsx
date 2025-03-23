@@ -446,7 +446,7 @@ interface FilesState {
   contents: Readonly<{ [id: FileId]: string }>;
 
   /**
-   * The revision. Gets incremented everytime files changes.
+   * The revision. Gets incremented every time files changes.
    */
   revision: number;
   nextId: FileId;

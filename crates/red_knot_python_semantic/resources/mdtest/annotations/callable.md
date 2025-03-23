@@ -152,6 +152,21 @@ def _(c: Callable[[int, str], int]):
     reveal_type(c)  # revealed: (int, str, /) -> int
 ```
 
+## Union
+
+```py
+from typing import Callable, Union
+
+def _(
+    c: Callable[[Union[int, str]], int] | None,
+    d: None | Callable[[Union[int, str]], int],
+    e: None | Callable[[Union[int, str]], int] | int,
+):
+    reveal_type(c)  # revealed: ((int | str, /) -> int) | None
+    reveal_type(d)  # revealed: None | ((int | str, /) -> int)
+    reveal_type(e)  # revealed: None | ((int | str, /) -> int) | int
+```
+
 ## Nested
 
 A nested `Callable` as one of the parameter types:

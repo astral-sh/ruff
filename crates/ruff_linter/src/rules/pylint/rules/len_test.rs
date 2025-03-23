@@ -31,6 +31,7 @@ use ruff_text_size::Ranged;
 /// Use instead:
 /// ```python
 /// fruits = ["orange", "apple"]
+/// vegetables = []
 ///
 /// if fruits:
 ///     print(fruits)

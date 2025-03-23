@@ -104,7 +104,7 @@ fields = [{ name = "targets", type = "Expr*" }]
 doc = "See also [TypeAlias](https://docs.python.org/3/library/ast.html#ast.TypeAlias)"
 fields = [
   { name = "name", type = "Expr" },
-  { name = "type_params", type = "TypeParams?" },
+  { name = "type_params", type = "Box<crate::TypeParams>?" },
   { name = "value", type = "Expr" },
 ]
 
