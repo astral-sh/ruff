@@ -237,16 +237,20 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                 }
             }
             ast::Stmt::ImportFrom(node) => {
+                let mut found_star = false;
                 for name in &node.names {
                     if &name.name.id == "*" {
-                        self.exports.extend(
-                            module_name_from_import_statement(self.db, self.file, node)
-                                .ok()
-                                .and_then(|module_name| resolve_module(self.db, &module_name))
-                                .iter()
-                                .flat_map(|module| find_exports(self.db, module.file()))
-                                .cloned(),
-                        );
+                        if !found_star {
+                            found_star = true;
+                            self.exports.extend(
+                                module_name_from_import_statement(self.db, self.file, node)
+                                    .ok()
+                                    .and_then(|module_name| resolve_module(self.db, &module_name))
+                                    .iter()
+                                    .flat_map(|module| find_exports(self.db, module.file()))
+                                    .cloned(),
+                            );
+                        }
                     } else {
                         self.visit_alias(name);
                     }

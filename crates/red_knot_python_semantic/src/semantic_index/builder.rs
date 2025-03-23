@@ -346,6 +346,10 @@ impl<'db> SemanticIndexBuilder<'db> {
         self.current_symbol_table().mark_symbol_used(id);
     }
 
+    fn add_entry_for_definition_key(&mut self, key: DefinitionNodeKey) -> &mut Definitions<'db> {
+        self.definitions_by_node.entry(key).or_default()
+    }
+
     fn add_definition(
         &mut self,
         symbol: ScopedSymbolId,
@@ -368,9 +372,7 @@ impl<'db> SemanticIndexBuilder<'db> {
             countme::Count::default(),
         );
 
-        self.definitions_by_node
-            .entry(definition_node.key())
-            .or_default()
+        self.add_entry_for_definition_key(definition_node.key())
             .push(definition);
 
         if category.is_binding() {
@@ -997,39 +999,41 @@ where
                 let mut found_star = false;
                 for (alias_index, alias) in node.names.iter().enumerate() {
                     if &alias.name == "*" {
-                        if !found_star {
-                            found_star = true;
-                            // Wildcard imports are invalid syntax everywhere except the top-level scope,
-                            // and thus do not bind any definitions anywhere else
-                            if self.current_scope() == self.scope_stack[0].file_scope_id {
-                                if let Ok(module_name) =
-                                    module_name_from_import_statement(self.db, self.file, node)
-                                {
-                                    if let Some(module) = resolve_module(self.db, &module_name) {
-                                        let exported_names = find_exports(self.db, module.file());
-                                        if !exported_names.is_empty() {
-                                            for export in find_exports(self.db, module.file()) {
-                                                let symbol_id = self.add_symbol(export.clone());
-                                                let node_ref =
-                                                    StarImportDefinitionNodeRef { node, symbol_id };
-                                                self.add_definition(symbol_id, node_ref);
-                                            }
-                                            continue;
-                                        }
-                                    }
-                                }
-                            }
+                        self.add_entry_for_definition_key(alias.into());
+
+                        if found_star {
+                            continue;
                         }
 
-                        let symbol = self.add_symbol(Name::new_static("*"));
-                        self.add_definition(
-                            symbol,
-                            ImportFromDefinitionNodeRef {
-                                node,
-                                alias_index,
-                                is_reexported: false,
-                            },
-                        );
+                        found_star = true;
+
+                        // Wildcard imports are invalid syntax everywhere except the top-level scope,
+                        // and thus do not bind any definitions anywhere else
+                        if self.current_scope() != self.scope_stack[0].file_scope_id {
+                            continue;
+                        }
+
+                        let Ok(module_name) =
+                            module_name_from_import_statement(self.db, self.file, node)
+                        else {
+                            continue;
+                        };
+
+                        let Some(module) = resolve_module(self.db, &module_name) else {
+                            continue;
+                        };
+
+                        let exported_names = find_exports(self.db, module.file());
+                        if exported_names.is_empty() {
+                            continue;
+                        }
+
+                        for export in find_exports(self.db, module.file()) {
+                            let symbol_id = self.add_symbol(export.clone());
+                            let node_ref = StarImportDefinitionNodeRef { node, symbol_id };
+                            self.add_definition(symbol_id, node_ref);
+                        }
+
                         continue;
                     }
 
