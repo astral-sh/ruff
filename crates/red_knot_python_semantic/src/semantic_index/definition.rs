@@ -227,7 +227,6 @@ pub(crate) struct ImportDefinitionNodeRef<'a> {
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct StarImportDefinitionNodeRef<'a> {
     pub(crate) node: &'a ast::StmtImportFrom,
-    pub(crate) alias_index: usize,
     pub(crate) symbol_id: ScopedSymbolId,
 }
 
@@ -311,15 +310,10 @@ impl<'db> DefinitionNodeRef<'db> {
                 is_reexported,
             }),
             DefinitionNodeRef::ImportStar(star_import) => {
-                let StarImportDefinitionNodeRef {
-                    node,
-                    alias_index,
-                    symbol_id,
-                } = star_import;
+                let StarImportDefinitionNodeRef { node, symbol_id } = star_import;
                 DefinitionKind::StarImport(StarImportDefinitionKind {
                     node: AstNodeRef::new(parsed, node),
                     symbol_id,
-                    alias_index,
                 })
             }
             DefinitionNodeRef::Function(function) => {
@@ -436,11 +430,19 @@ impl<'db> DefinitionNodeRef<'db> {
                 alias_index,
                 is_reexported: _,
             }) => (&node.names[alias_index]).into(),
-            Self::ImportStar(StarImportDefinitionNodeRef {
-                node,
-                alias_index,
-                symbol_id: _,
-            }) => (&node.names[alias_index]).into(),
+
+            // INVARIANT: for an invalid-syntax statement such as `from foo import *, bar, *`,
+            // we only create a `StarImportDefinitionKind` for the *first* `*` alias in the names list.
+            Self::ImportStar(StarImportDefinitionNodeRef { node, symbol_id: _ }) => node
+                .names
+                .iter()
+                .find(|alias| &alias.name == "*")
+                .expect(
+                    "The `StmtImportFrom` node of a `StarImportDefinitionKind` instance \
+                    should always have at least one `alias` with the name `*`.",
+                )
+                .into(),
+
             Self::Function(node) => node.into(),
             Self::Class(node) => node.into(),
             Self::TypeAlias(node) => node.into(),
@@ -660,7 +662,6 @@ impl<'db> From<Option<Unpack<'db>>> for TargetKind<'db> {
 pub struct StarImportDefinitionKind {
     node: AstNodeRef<ast::StmtImportFrom>,
     symbol_id: ScopedSymbolId,
-    alias_index: usize,
 }
 
 impl StarImportDefinitionKind {
@@ -669,7 +670,17 @@ impl StarImportDefinitionKind {
     }
 
     pub(crate) fn alias(&self) -> &ast::Alias {
-        &self.node.node().names[self.alias_index]
+        // INVARIANT: for an invalid-syntax statement such as `from foo import *, bar, *`,
+        // we only create a `StarImportDefinitionKind` for the *first* `*` alias in the names list.
+        self.node
+            .node()
+            .names
+            .iter()
+            .find(|alias| &alias.name == "*")
+            .expect(
+                "The `StmtImportFrom` node of a `StarImportDefinitionKind` instance \
+                should always have at least one `alias` with the name `*`.",
+            )
     }
 
     pub(crate) fn symbol_id(&self) -> ScopedSymbolId {

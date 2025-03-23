@@ -1010,11 +1010,8 @@ where
                                         if !exported_names.is_empty() {
                                             for export in find_exports(self.db, module.file()) {
                                                 let symbol_id = self.add_symbol(export.clone());
-                                                let node_ref = StarImportDefinitionNodeRef {
-                                                    node,
-                                                    alias_index,
-                                                    symbol_id,
-                                                };
+                                                let node_ref =
+                                                    StarImportDefinitionNodeRef { node, symbol_id };
                                                 self.add_definition(symbol_id, node_ref);
                                             }
                                             continue;
