@@ -183,8 +183,9 @@ In a non-stub file, without stringified forward references, this raises a `NameE
 ```py
 class Base[T]: ...
 
-# error: [unresolved-reference]
+# TODO: the unresolved-reference error is correct, the non-subscriptable is not
 # error: [non-subscriptable]
+# error: [unresolved-reference]
 class Sub(Base[Sub]): ...
 ```
 
