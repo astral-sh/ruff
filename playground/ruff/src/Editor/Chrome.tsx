@@ -1,3 +1,4 @@
+import ruffSchema from "../../../../ruff.schema.json";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { Header, useTheme, setupMonaco } from "shared";
 import { persist, persistLocal, restore, stringify } from "./settings";
@@ -106,7 +107,11 @@ async function startPlayground(): Promise<{
   await initRuff();
   const monaco = await loader.init();
 
-  setupMonaco(monaco);
+  setupMonaco(monaco, {
+    uri: "https://raw.githubusercontent.com/astral-sh/ruff/main/ruff.schema.json",
+    fileMatch: ["ruff.json"],
+    schema: ruffSchema,
+  });
 
   const response = await restore();
   const [settingsSource, pythonSource] = response ?? [

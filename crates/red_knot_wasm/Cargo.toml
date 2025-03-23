@@ -20,10 +20,10 @@ default = ["console_error_panic_hook"]
 
 [dependencies]
 red_knot_project = { workspace = true, default-features = false, features = ["deflate"] }
+red_knot_python_semantic = { workspace = true }
 
 ruff_db = { workspace = true, default-features = false, features = [] }
 ruff_notebook = { workspace = true }
-ruff_python_ast = { workspace = true }
 ruff_source_file = { workspace = true }
 ruff_text_size = { workspace = true }
 
@@ -34,6 +34,7 @@ log = { workspace = true }
 # Not a direct dependency but required to enable the `wasm_js` feature.
 # See https://docs.rs/getrandom/latest/getrandom/#webassembly-support
 getrandom = { workspace = true, features = ["wasm_js"] }
+serde-wasm-bindgen = { workspace = true }
 
 wasm-bindgen = { workspace = true }
 

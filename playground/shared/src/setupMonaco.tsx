@@ -3,7 +3,6 @@
  */
 
 import { Monaco } from "@monaco-editor/react";
-import schema from "../../../ruff.schema.json";
 
 export const WHITE = "#ffffff";
 export const RADIATE = "#d7ff64";
@@ -26,7 +25,14 @@ export const LUNAR = "#fbf2fc";
 export const ASTEROID = "#e3cee3";
 export const CRATER = "#f0dfdf";
 
-export function setupMonaco(monaco: Monaco) {
+export function setupMonaco(
+  monaco: Monaco,
+  settingsSchema: {
+    fileMatch: [string];
+    uri: string;
+    schema: object;
+  },
+) {
   defineAyuThemes(monaco);
   defineFirLanguage(monaco);
   defineRustPythonTokensLanguage(monaco);
@@ -34,13 +40,7 @@ export function setupMonaco(monaco: Monaco) {
   defineCommentsLanguage(monaco);
 
   monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
-    schemas: [
-      {
-        uri: "https://raw.githubusercontent.com/astral-sh/ruff/main/ruff.schema.json",
-        fileMatch: ["*"],
-        schema,
-      },
-    ],
+    schemas: [settingsSchema],
   });
 }
 
