@@ -1250,6 +1250,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     return false;
                 };
 
+                // TODO move this to `Class` once we add proper `Protocol` support
                 node_ref.bases().iter().any(|base| {
                     matches!(
                         self.file_expression_type(base),
