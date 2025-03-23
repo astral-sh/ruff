@@ -846,6 +846,7 @@ pub enum KnownClass {
     TypeAliasType,
     NoDefaultType,
     NewType,
+    Sized,
     // TODO: This can probably be removed when we have support for protocols
     SupportsIndex,
     // Collections
@@ -923,6 +924,7 @@ impl<'db> KnownClass {
             | Self::DefaultDict
             | Self::Deque
             | Self::Float
+            | Self::Sized
             | Self::Classmethod => Truthiness::Ambiguous,
         }
     }
@@ -967,6 +969,7 @@ impl<'db> KnownClass {
             Self::Counter => "Counter",
             Self::DefaultDict => "defaultdict",
             Self::Deque => "deque",
+            Self::Sized => "Sized",
             Self::OrderedDict => "OrderedDict",
             // For example, `typing.List` is defined as `List = _Alias()` in typeshed
             Self::StdlibAlias => "_Alias",
@@ -1127,9 +1130,11 @@ impl<'db> KnownClass {
             | Self::MethodWrapperType
             | Self::WrapperDescriptorType => KnownModule::Types,
             Self::NoneType => KnownModule::Typeshed,
-            Self::SpecialForm | Self::TypeVar | Self::StdlibAlias | Self::SupportsIndex => {
-                KnownModule::Typing
-            }
+            Self::SpecialForm
+            | Self::TypeVar
+            | Self::StdlibAlias
+            | Self::SupportsIndex
+            | Self::Sized => KnownModule::Typing,
             Self::TypeAliasType | Self::TypeVarTuple | Self::ParamSpec | Self::NewType => {
                 KnownModule::TypingExtensions
             }
@@ -1207,6 +1212,7 @@ impl<'db> KnownClass {
             | Self::TypeVar
             | Self::ParamSpec
             | Self::TypeVarTuple
+            | Self::Sized
             | Self::NewType => false,
         }
     }
@@ -1259,6 +1265,7 @@ impl<'db> KnownClass {
             | Self::TypeVar
             | Self::ParamSpec
             | Self::TypeVarTuple
+            | Self::Sized
             | Self::NewType => false,
         }
     }
@@ -1311,6 +1318,7 @@ impl<'db> KnownClass {
             "_SpecialForm" => Self::SpecialForm,
             "_NoDefaultType" => Self::NoDefaultType,
             "SupportsIndex" => Self::SupportsIndex,
+            "Sized" => Self::Sized,
             "_version_info" => Self::VersionInfo,
             "ellipsis" if Program::get(db).python_version(db) <= PythonVersion::PY39 => {
                 Self::EllipsisType
@@ -1370,6 +1378,7 @@ impl<'db> KnownClass {
             | Self::SupportsIndex
             | Self::ParamSpec
             | Self::TypeVarTuple
+            | Self::Sized
             | Self::NewType => matches!(module, KnownModule::Typing | KnownModule::TypingExtensions),
         }
     }

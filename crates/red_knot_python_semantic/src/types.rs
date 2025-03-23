@@ -887,6 +887,19 @@ impl<'db> Type<'db> {
                 }
             }
 
+            // TODO: ditto for avoiding false positives when checking function calls with `Sized` parameters.
+            (lhs, Type::Instance(InstanceType { class }))
+                if class.is_known(db, KnownClass::Sized) =>
+            {
+                matches!(
+                    lhs.to_meta_type(db).member(db, "__len__"),
+                    SymbolAndQualifiers {
+                        symbol: Symbol::Type(..),
+                        ..
+                    }
+                )
+            }
+
             // TODO other types containing gradual forms (e.g. generics containing Any/Unknown)
             _ => self.is_subtype_of(db, target),
         }

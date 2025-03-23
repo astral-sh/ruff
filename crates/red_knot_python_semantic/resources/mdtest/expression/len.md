@@ -229,6 +229,6 @@ reveal_type(len(SecondRequiredArgument()))  # revealed: Literal[1]
 ```py
 class NoDunderLen: ...
 
-# TODO: Emit a diagnostic
+# error: [invalid-argument-type]
 reveal_type(len(NoDunderLen()))  # revealed: int
 ```

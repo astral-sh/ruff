@@ -551,6 +551,7 @@ reveal_type(C().x)  # revealed: str
 class C:
     def __init__(self) -> None:
         # error: [too-many-positional-arguments]
+        # error: [invalid-argument-type]
         self.x: int = len(1, 2, 3)
 ```
 

@@ -306,12 +306,13 @@ For `.pyi` files, we should consider all imports private to the stub unless they
 
 ```pyi
 X: bool = True
+Y: bool = True
 ```
 
 `b.pyi`:
 
 ```pyi
-from a import X
+from a import X, Y as Y
 ```
 
 `c.py`:
@@ -323,6 +324,8 @@ from b import *
 #
 # error: [unresolved-reference]
 reveal_type(X)  # revealed: Unknown
+
+reveal_type(Y)  # revealed: bool
 ```
 
 ### Symbols in statically known branches
@@ -717,11 +720,8 @@ are present due to `*` imports.
 import typing
 import collections.abc
 
-# TODO these should not error, should not reveal `Unknown`
-# error: [unresolved-attribute]
-reveal_type(collections.abc.Sequence)  # revealed: Unknown
-# error: [unresolved-attribute]
-reveal_type(collections.abc.Callable)  # revealed: Unknown
+reveal_type(collections.abc.Sequence)  # revealed: Literal[Sequence]
+reveal_type(collections.abc.Callable)  # revealed: typing.Callable
 ```
 
 ## Invalid `*` imports

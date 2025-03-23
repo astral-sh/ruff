@@ -73,7 +73,7 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
         if self.file.is_stub(self.db.upcast()) {
             // If the source is a stub, names defined by imports are only exported
             // if they use the explicit `foo as foo` syntax:
-            if asname.as_ref() == Some(name) {
+            if asname.as_ref().is_some_and(|asname| asname.id == name.id) {
                 self.possibly_add_export(&name.id);
             }
         } else {
