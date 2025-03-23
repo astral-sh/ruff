@@ -76,7 +76,7 @@ Using a parameter with default value:
 lambda x=1: reveal_type(x)  # revealed: Unknown | Literal[1]
 ```
 
-Using a variadic paramter:
+Using a variadic parameter:
 
 ```py
 # TODO: should be `tuple[Unknown, ...]` (needs generics)

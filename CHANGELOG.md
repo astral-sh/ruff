@@ -1421,11 +1421,11 @@ The following rules have been stabilized and are no longer in preview:
 
 The following behaviors have been stabilized:
 
-- [`cancel-scope-no-checkpoint`](https://docs.astral.sh/ruff/rules/cancel-scope-no-checkpoint/) (`ASYNC100`): Support `asyncio` and `anyio` context mangers.
-- [`async-function-with-timeout`](https://docs.astral.sh/ruff/rules/async-function-with-timeout/) (`ASYNC109`): Support `asyncio` and `anyio` context mangers.
-- [`async-busy-wait`](https://docs.astral.sh/ruff/rules/async-busy-wait/) (`ASYNC110`): Support `asyncio` and `anyio` context mangers.
-- [`async-zero-sleep`](https://docs.astral.sh/ruff/rules/async-zero-sleep/) (`ASYNC115`): Support `anyio` context mangers.
-- [`long-sleep-not-forever`](https://docs.astral.sh/ruff/rules/long-sleep-not-forever/) (`ASYNC116`): Support `anyio` context mangers.
+- [`cancel-scope-no-checkpoint`](https://docs.astral.sh/ruff/rules/cancel-scope-no-checkpoint/) (`ASYNC100`): Support `asyncio` and `anyio` context managers.
+- [`async-function-with-timeout`](https://docs.astral.sh/ruff/rules/async-function-with-timeout/) (`ASYNC109`): Support `asyncio` and `anyio` context managers.
+- [`async-busy-wait`](https://docs.astral.sh/ruff/rules/async-busy-wait/) (`ASYNC110`): Support `asyncio` and `anyio` context managers.
+- [`async-zero-sleep`](https://docs.astral.sh/ruff/rules/async-zero-sleep/) (`ASYNC115`): Support `anyio` context managers.
+- [`long-sleep-not-forever`](https://docs.astral.sh/ruff/rules/long-sleep-not-forever/) (`ASYNC116`): Support `anyio` context managers.
 
 The following fixes have been stabilized:
 

@@ -491,7 +491,7 @@ enum DeclaredAndInferredType<'db> {
 /// [`TypeInferenceBuilder`] just for that definition, and we merge the returned [`TypeInference`]
 /// into the one we are currently building for the entire scope. Using the query in this way
 /// ensures that if we first infer types for some scattered definitions in a scope, and later for
-/// the entire scope, we don't re-infer any types, we re-use the cached inference for those
+/// the entire scope, we don't re-infer any types, we reuse the cached inference for those
 /// definitions and their sub-expressions.
 ///
 /// Functions with a name like `infer_*_definition` take both a node and a [`Definition`], and are
