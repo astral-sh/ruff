@@ -223,6 +223,7 @@ pub(crate) fn find_go_to_target(root: AnyNodeRef, offset: TextSize) -> Option<Go
 }
 
 /// Information associated with a text range.
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub(crate) struct RangeInfo<T> {
     pub range: FileRange,
     pub info: T,
@@ -330,19 +331,20 @@ impl HasNavigationTargets for Type<'_> {
             Type::ClassLiteral(class) => class.navigation_targets(db),
             Type::Instance(instance) => instance.navigation_targets(db),
             Type::KnownInstance(instance) => instance.navigation_targets(db),
+            Type::StringLiteral(_)
+            | Type::AlwaysTruthy
+            | Type::AlwaysFalsy
+            | Type::IntLiteral(_)
+            | Type::BooleanLiteral(_)
+            | Type::LiteralString
+            | Type::BytesLiteral(_)
+            | Type::SliceLiteral(_) => self.to_meta_type(db).navigation_targets(db),
+
             Type::Dynamic(_)
             | Type::SubclassOf(_)
             | Type::Never
             | Type::Callable(_)
             | Type::Intersection(_)
-            | Type::AlwaysTruthy
-            | Type::AlwaysFalsy
-            | Type::IntLiteral(_)
-            | Type::BooleanLiteral(_)
-            | Type::StringLiteral(_)
-            | Type::LiteralString
-            | Type::BytesLiteral(_)
-            | Type::SliceLiteral(_)
             | Type::Tuple(_) => NavigationTargets::empty(),
         }
     }
@@ -407,7 +409,7 @@ impl HasNavigationTargets for KnownInstanceType<'_> {
                 })
             }
 
-            // TODO: Resolve the target from typeshed
+            // TODO: Track the definition of `KnownInstance` and navigate to their definition.
             KnownInstanceType::Annotated
             | KnownInstanceType::Literal
             | KnownInstanceType::LiteralString
@@ -448,6 +450,321 @@ impl HasNavigationTargets for KnownInstanceType<'_> {
             | KnownInstanceType::TypeGuard
             | KnownInstanceType::TypeIs
             | KnownInstanceType::ReadOnly => NavigationTargets::empty(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::semantic::goto::go_to_type_definition;
+    use crate::tests::TestDb;
+    use insta::assert_snapshot;
+    use red_knot_python_semantic::{Program, ProgramSettings, PythonPath, SearchPathSettings};
+    use ruff_db::diagnostic::{
+        Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, DisplayDiagnosticConfig, LintName,
+        Severity, Span, SubDiagnostic,
+    };
+    use ruff_db::files::{system_path_to_file, File};
+    use ruff_db::system::{DbWithWritableSystem, SystemPathBuf};
+    use ruff_python_ast::PythonVersion;
+    use ruff_text_size::{Ranged, TextSize};
+
+    #[test]
+    fn goto_type_of_expression_with_class_type() {
+        let test = goto_test(
+            r#"
+            class Test: ...
+
+            a<CURSOR>b = Test()
+            "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @r###"
+        info: lint:goto-type-definition: Type definition
+         --> /main.py:2:19
+          |
+        2 |             class Test: ...
+          |                   ^^^^
+        3 |
+        4 |             ab = Test()
+          |
+        info: Source
+         --> /main.py:4:13
+          |
+        2 |             class Test: ...
+        3 |
+        4 |             ab = Test()
+          |             ^^
+          |
+        "###);
+    }
+
+    #[test]
+    fn goto_type_of_expression_with_function_type() {
+        let test = goto_test(
+            r#"
+            def foo(a, b): ...
+
+            ab = foo
+
+            a<CURSOR>b
+        "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @r###"
+        info: lint:goto-type-definition: Type definition
+         --> /main.py:2:17
+          |
+        2 |             def foo(a, b): ...
+          |                 ^^^
+        3 |
+        4 |             ab = foo
+          |
+        info: Source
+         --> /main.py:6:13
+          |
+        4 |             ab = foo
+        5 |
+        6 |             ab
+          |             ^^
+          |
+        "###);
+    }
+
+    #[test]
+    fn goto_type_of_expression_with_union_type() {
+        let test = goto_test(
+            r#"
+
+            def foo(a, b): ...
+
+            def bar(a, b): ...
+
+            if random.choice():
+                a = foo
+            else:
+                a = bar
+
+            a<CURSOR>
+            "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @r###"
+        info: lint:goto-type-definition: Type definition
+         --> /main.py:3:17
+          |
+        3 |             def foo(a, b): ...
+          |                 ^^^
+        4 |
+        5 |             def bar(a, b): ...
+          |
+        info: Source
+          --> /main.py:12:13
+           |
+        10 |                 a = bar
+        11 |
+        12 |             a
+           |             ^
+           |
+        info: lint:goto-type-definition: Type definition
+         --> /main.py:5:17
+          |
+        3 |             def foo(a, b): ...
+        4 |
+        5 |             def bar(a, b): ...
+          |                 ^^^
+        6 |
+        7 |             if random.choice():
+          |
+        info: Source
+          --> /main.py:12:13
+           |
+        10 |                 a = bar
+        11 |
+        12 |             a
+           |             ^
+           |
+        "###);
+    }
+
+    #[test]
+    fn goto_type_of_expression_with_literal_type() {
+        let test = goto_test(
+            r#"
+            a: str = "test"
+
+            a<CURSOR>
+            "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @r###"
+        info: lint:goto-type-definition: Type definition
+           --> stdlib/builtins.pyi:443:7
+            |
+        441 |     def __getitem__(self, key: int, /) -> str | int | None: ...
+        442 |
+        443 | class str(Sequence[str]):
+            |       ^^^
+        444 |     @overload
+        445 |     def __new__(cls, object: object = ...) -> Self: ...
+            |
+        info: Source
+         --> /main.py:4:13
+          |
+        2 |             a: str = "test"
+        3 |
+        4 |             a
+          |             ^
+          |
+        "###);
+    }
+
+    #[test]
+    fn goto_type_of_expression_with_builtin() {
+        let test = goto_test(
+            r#"
+            def foo(a: str):
+                a<CURSOR>
+            "#,
+        );
+
+        // FIXME: This should go to `str`
+        assert_snapshot!(test.goto_type_definition(), @r###"
+        info: lint:goto-type-definition: Type definition
+           --> stdlib/builtins.pyi:443:7
+            |
+        441 |     def __getitem__(self, key: int, /) -> str | int | None: ...
+        442 |
+        443 | class str(Sequence[str]):
+            |       ^^^
+        444 |     @overload
+        445 |     def __new__(cls, object: object = ...) -> Self: ...
+            |
+        info: Source
+         --> /main.py:3:17
+          |
+        2 |             def foo(a: str):
+        3 |                 a
+          |                 ^
+          |
+        "###);
+    }
+
+    #[test]
+    fn goto_type_definition_cursor_between_object_and_attribute() {
+        let test = goto_test(
+            r#"
+            class X:
+                def foo(a, b): ...
+
+            x = X()
+
+            x<CURSOR>.foo()
+            "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @r###"
+        info: lint:goto-type-definition: Type definition
+         --> /main.py:2:19
+          |
+        2 |             class X:
+          |                   ^
+        3 |                 def foo(a, b): ...
+          |
+        info: Source
+         --> /main.py:7:13
+          |
+        5 |             x = X()
+        6 |
+        7 |             x.foo()
+          |             ^
+          |
+        "###);
+    }
+    fn goto_test(source: &str) -> GotoTest {
+        let mut db = TestDb::new();
+        let cursor_offset = source.find("<CURSOR>").expect(
+            "`source`` should contain a `<CURSOR>` marker, indicating the position of the cursor.",
+        );
+
+        let mut content = source[..cursor_offset].to_string();
+        content.push_str(&source[cursor_offset + "<CURSOR>".len()..]);
+
+        db.write_file("main.py", &content)
+            .expect("write to memory file system to be successful");
+
+        let file = system_path_to_file(&db, "main.py").expect("newly written file to existing");
+
+        Program::from_settings(
+            &db,
+            ProgramSettings {
+                python_version: PythonVersion::latest(),
+                python_platform: Default::default(),
+                search_paths: SearchPathSettings {
+                    extra_paths: vec![],
+                    src_roots: vec![SystemPathBuf::from("/")],
+                    custom_typeshed: None,
+                    python_path: PythonPath::KnownSitePackages(vec![]),
+                },
+            },
+        )
+        .expect("Default settings to be valid");
+
+        GotoTest {
+            db,
+            cursor_offset: TextSize::try_from(cursor_offset)
+                .expect("source to be smaller than 4GB"),
+            file,
+        }
+    }
+
+    struct GotoTest {
+        db: TestDb,
+        cursor_offset: TextSize,
+        file: File,
+    }
+
+    impl GotoTest {
+        fn goto_type_definition(&self) -> String {
+            let Some(type_definitions) =
+                go_to_type_definition(&self.db, self.file, self.cursor_offset)
+            else {
+                return "No type definitions found".to_string();
+            };
+
+            let mut buf = vec![];
+
+            let mut source = SubDiagnostic::new(Severity::Info, "Source");
+            source.annotate(Annotation::primary(
+                Span::from(type_definitions.range.file())
+                    .with_range(type_definitions.range.range()),
+            ));
+
+            for target in type_definitions.info {
+                let mut diagnostic = Diagnostic::new(
+                    DiagnosticId::Lint(LintName::of("goto-type-definition")),
+                    Severity::Info,
+                    "Type definition".to_string(),
+                );
+                diagnostic.annotate(Annotation::primary(
+                    Span::from(target.file).with_range(target.focus_range),
+                ));
+                diagnostic.sub(source.clone());
+
+                diagnostic
+                    .print(
+                        &self.db,
+                        &DisplayDiagnosticConfig::default()
+                            .color(false)
+                            .format(DiagnosticFormat::Full),
+                        &mut buf,
+                    )
+                    .unwrap()
+            }
+
+            source.printed();
+
+            String::from_utf8(buf).unwrap()
         }
     }
 }
