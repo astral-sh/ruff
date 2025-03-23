@@ -697,10 +697,10 @@ class Base:
         self.defined_in_init: str | None = "value in base"
 
 class Intermediate(Base):
-    # Re-declaring base class attributes with the *same *type is fine:
+    # Redeclaring base class attributes with the *same *type is fine:
     base_class_attribute_1: str | None = None
 
-    # Re-declaring them with a *narrower type* is unsound, because modifications
+    # Redeclaring them with a *narrower type* is unsound, because modifications
     # through a `Base` reference could violate that constraint.
     #
     # Mypy does not report an error here, but pyright does: "… overrides symbol
@@ -712,7 +712,7 @@ class Intermediate(Base):
     # TODO: This should be an error
     base_class_attribute_2: str
 
-    # Re-declaring attributes with a *wider type* directly violates LSP.
+    # Redeclaring attributes with a *wider type* directly violates LSP.
     #
     # In this case, both mypy and pyright report an error.
     #

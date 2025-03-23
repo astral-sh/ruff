@@ -17,7 +17,7 @@ reveal_type(Bar)  # revealed: Literal[Bar]
 reveal_type(Bar.__mro__)  # revealed: tuple[Literal[Bar], Literal[Foo], Literal[object]]
 ```
 
-## Access to attributes declarated in stubs
+## Access to attributes declared in stubs
 
 Unlike regular Python modules, stub files often omit the right-hand side in declarations, including
 in class scope. However, from the perspective of the type checker, we have to treat them as bindings
