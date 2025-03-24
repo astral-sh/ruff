@@ -339,7 +339,7 @@ Module(
   |
 1 | match x:
 2 |     case var: ...  # capture pattern
-  |          ^^^ Syntax Error: irrefutable pattern makes remaining patterns unreachable
+  |          ^^^ Syntax Error: name capture `var` makes remaining patterns unreachable
 3 |     case 2: ...
 4 | match x:
   |
@@ -349,7 +349,7 @@ Module(
 3 |     case 2: ...
 4 | match x:
 5 |     case _: ...
-  |          ^ Syntax Error: irrefutable pattern makes remaining patterns unreachable
+  |          ^ Syntax Error: wildcard makes remaining patterns unreachable
 6 |     case 2: ...    # wildcard pattern
 7 | match x:
   |
@@ -359,7 +359,7 @@ Module(
  6 |     case 2: ...    # wildcard pattern
  7 | match x:
  8 |     case var1 as var2: ...  # as pattern with irrefutable left-hand side
-   |          ^^^^ Syntax Error: irrefutable pattern makes remaining patterns unreachable
+   |          ^^^^ Syntax Error: name capture `var1` makes remaining patterns unreachable
  9 |     case 2: ...
 10 | match x:
    |
@@ -369,6 +369,6 @@ Module(
  9 |     case 2: ...
 10 | match x:
 11 |     case enum.variant | var: ...  # or pattern with irrefutable part
-   |                         ^^^ Syntax Error: irrefutable pattern makes remaining patterns unreachable
+   |                         ^^^ Syntax Error: name capture `var` makes remaining patterns unreachable
 12 |     case 2: ...
    |

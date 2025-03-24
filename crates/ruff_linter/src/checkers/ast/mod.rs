@@ -549,14 +549,14 @@ impl SemanticSyntaxContext for Checker<'_> {
             }
             SemanticSyntaxErrorKind::ReboundComprehensionVariable
             | SemanticSyntaxErrorKind::DuplicateTypeParameter
-            | SemanticSyntaxErrorKind::IrrefutableCasePattern
+            | SemanticSyntaxErrorKind::IrrefutableCasePattern(_)
                 if self.settings.preview.is_enabled() =>
             {
                 self.semantic_errors.borrow_mut().push(error);
             }
             SemanticSyntaxErrorKind::ReboundComprehensionVariable
             | SemanticSyntaxErrorKind::DuplicateTypeParameter
-            | SemanticSyntaxErrorKind::IrrefutableCasePattern => {}
+            | SemanticSyntaxErrorKind::IrrefutableCasePattern(_) => {}
         }
     }
 }

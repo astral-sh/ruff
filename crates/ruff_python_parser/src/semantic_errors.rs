@@ -9,7 +9,7 @@ use std::fmt::Display;
 use ruff_python_ast::{
     self as ast,
     visitor::{walk_expr, Visitor},
-    Expr, PythonVersion, Stmt, StmtExpr, StmtImportFrom,
+    Expr, IrrefutablePatternKind, PythonVersion, Stmt, StmtExpr, StmtImportFrom,
 };
 use ruff_text_size::{Ranged, TextRange};
 
@@ -150,10 +150,14 @@ impl SemanticSyntaxChecker {
             .skip(1)
             .filter_map(|case| match case.guard {
                 Some(_) => None,
-                None => case.pattern.irrefutable_range(),
+                None => case.pattern.irrefutable_pattern(),
             })
         {
-            Self::add_error(ctx, SemanticSyntaxErrorKind::IrrefutableCasePattern, case);
+            Self::add_error(
+                ctx,
+                SemanticSyntaxErrorKind::IrrefutableCasePattern(case.kind),
+                case.range,
+            );
         }
     }
 
@@ -257,7 +261,7 @@ pub struct SemanticSyntaxError {
 
 impl Display for SemanticSyntaxError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.kind {
+        match &self.kind {
             SemanticSyntaxErrorKind::LateFutureImport => {
                 f.write_str("__future__ imports must be at the top of the file")
             }
@@ -267,14 +271,23 @@ impl Display for SemanticSyntaxError {
             SemanticSyntaxErrorKind::DuplicateTypeParameter => {
                 f.write_str("duplicate type parameter")
             }
-            SemanticSyntaxErrorKind::IrrefutableCasePattern => {
-                f.write_str("irrefutable pattern makes remaining patterns unreachable")
-            }
+            SemanticSyntaxErrorKind::IrrefutableCasePattern(kind) => match kind {
+                // These error messages are taken from CPython's syntax errors
+                IrrefutablePatternKind::Name(name) => {
+                    write!(
+                        f,
+                        "name capture `{name}` makes remaining patterns unreachable"
+                    )
+                }
+                IrrefutablePatternKind::Wildcard => {
+                    f.write_str("wildcard makes remaining patterns unreachable")
+                }
+            },
         }
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum SemanticSyntaxErrorKind {
     /// Represents the use of a `__future__` import after the beginning of a file.
     ///
@@ -335,7 +348,7 @@ pub enum SemanticSyntaxErrorKind {
     /// ```
     ///
     /// [Python reference]: https://docs.python.org/3/reference/compound_stmts.html#irrefutable-case-blocks
-    IrrefutableCasePattern,
+    IrrefutableCasePattern(IrrefutablePatternKind),
 }
 
 /// Searches for the first named expression (`x := y`) rebinding one of the `iteration_variables` in
