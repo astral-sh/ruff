@@ -225,7 +225,7 @@ pub struct SemanticSyntaxError {
 
 impl Display for SemanticSyntaxError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.kind {
+        match &self.kind {
             SemanticSyntaxErrorKind::LateFutureImport => {
                 f.write_str("__future__ imports must be at the top of the file")
             }
@@ -235,14 +235,14 @@ impl Display for SemanticSyntaxError {
             SemanticSyntaxErrorKind::DuplicateTypeParameter => {
                 f.write_str("duplicate type parameter")
             }
-            SemanticSyntaxErrorKind::MultipleCaseAssignment => {
-                f.write_str("multiple assignments in pattern")
+            SemanticSyntaxErrorKind::MultipleCaseAssignment(name) => {
+                write!(f, "multiple assignments to name `{name}` in pattern")
             }
         }
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum SemanticSyntaxErrorKind {
     /// Represents the use of a `__future__` import after the beginning of a file.
     ///
@@ -295,7 +295,7 @@ pub enum SemanticSyntaxErrorKind {
     ///     case x as x: ...
     ///     case Class(x=1, x=2): ...
     /// ```
-    MultipleCaseAssignment,
+    MultipleCaseAssignment(ast::name::Name),
 }
 
 /// Searches for the first named expression (`x := y`) rebinding one of the `iteration_variables` in
@@ -335,7 +335,7 @@ impl<'a, Ctx: SemanticSyntaxContext> MultipleCaseAssignmentVisitor<'a, Ctx> {
             if n1.id == n2.id {
                 SemanticSyntaxChecker::add_error(
                     self.ctx,
-                    SemanticSyntaxErrorKind::MultipleCaseAssignment,
+                    SemanticSyntaxErrorKind::MultipleCaseAssignment(n2.id.clone()),
                     n2.range,
                 );
             }

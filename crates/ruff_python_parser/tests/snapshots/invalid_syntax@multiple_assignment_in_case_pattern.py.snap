@@ -630,7 +630,7 @@ Module(
   |
 1 | match 2:
 2 |     case x as x: ...  # MatchAs
-  |               ^ Syntax Error: multiple assignments in pattern
+  |               ^ Syntax Error: multiple assignments to name `x` in pattern
 3 |     case [y, z, y]: ...  # MatchSequence
 4 |     case [y, z, *y]: ...  # MatchSequence
   |
@@ -640,7 +640,7 @@ Module(
 1 | match 2:
 2 |     case x as x: ...  # MatchAs
 3 |     case [y, z, y]: ...  # MatchSequence
-  |                 ^ Syntax Error: multiple assignments in pattern
+  |                 ^ Syntax Error: multiple assignments to name `y` in pattern
 4 |     case [y, z, *y]: ...  # MatchSequence
 5 |     case [y, y, y]: ...  # MatchSequence multiple
   |
@@ -650,7 +650,7 @@ Module(
 2 |     case x as x: ...  # MatchAs
 3 |     case [y, z, y]: ...  # MatchSequence
 4 |     case [y, z, *y]: ...  # MatchSequence
-  |                  ^ Syntax Error: multiple assignments in pattern
+  |                  ^ Syntax Error: multiple assignments to name `y` in pattern
 5 |     case [y, y, y]: ...  # MatchSequence multiple
 6 |     case {1: x, 2: x}: ...  # MatchMapping duplicate pattern
   |
@@ -660,7 +660,7 @@ Module(
 3 |     case [y, z, y]: ...  # MatchSequence
 4 |     case [y, z, *y]: ...  # MatchSequence
 5 |     case [y, y, y]: ...  # MatchSequence multiple
-  |              ^ Syntax Error: multiple assignments in pattern
+  |              ^ Syntax Error: multiple assignments to name `y` in pattern
 6 |     case {1: x, 2: x}: ...  # MatchMapping duplicate pattern
 7 |     case {1: x, **x}: ...  # MatchMapping duplicate in **rest
   |
@@ -670,7 +670,7 @@ Module(
 3 |     case [y, z, y]: ...  # MatchSequence
 4 |     case [y, z, *y]: ...  # MatchSequence
 5 |     case [y, y, y]: ...  # MatchSequence multiple
-  |                 ^ Syntax Error: multiple assignments in pattern
+  |                 ^ Syntax Error: multiple assignments to name `y` in pattern
 6 |     case {1: x, 2: x}: ...  # MatchMapping duplicate pattern
 7 |     case {1: x, **x}: ...  # MatchMapping duplicate in **rest
   |
@@ -680,7 +680,7 @@ Module(
 4 |     case [y, z, *y]: ...  # MatchSequence
 5 |     case [y, y, y]: ...  # MatchSequence multiple
 6 |     case {1: x, 2: x}: ...  # MatchMapping duplicate pattern
-  |                    ^ Syntax Error: multiple assignments in pattern
+  |                    ^ Syntax Error: multiple assignments to name `x` in pattern
 7 |     case {1: x, **x}: ...  # MatchMapping duplicate in **rest
 8 |     case Class(x, x): ...  # MatchClass positional
   |
@@ -690,7 +690,7 @@ Module(
 5 |     case [y, y, y]: ...  # MatchSequence multiple
 6 |     case {1: x, 2: x}: ...  # MatchMapping duplicate pattern
 7 |     case {1: x, **x}: ...  # MatchMapping duplicate in **rest
-  |                   ^ Syntax Error: multiple assignments in pattern
+  |                   ^ Syntax Error: multiple assignments to name `x` in pattern
 8 |     case Class(x, x): ...  # MatchClass positional
 9 |     case Class(x=1, x=2): ...  # MatchClass keyword
   |
@@ -700,7 +700,7 @@ Module(
  6 |     case {1: x, 2: x}: ...  # MatchMapping duplicate pattern
  7 |     case {1: x, **x}: ...  # MatchMapping duplicate in **rest
  8 |     case Class(x, x): ...  # MatchClass positional
-   |                   ^ Syntax Error: multiple assignments in pattern
+   |                   ^ Syntax Error: multiple assignments to name `x` in pattern
  9 |     case Class(x=1, x=2): ...  # MatchClass keyword
 10 |     case [x] | {1: x} | Class(x=1, x=2): ...  # MatchOr
    |
@@ -710,7 +710,7 @@ Module(
  7 |     case {1: x, **x}: ...  # MatchMapping duplicate in **rest
  8 |     case Class(x, x): ...  # MatchClass positional
  9 |     case Class(x=1, x=2): ...  # MatchClass keyword
-   |                     ^ Syntax Error: multiple assignments in pattern
+   |                     ^ Syntax Error: multiple assignments to name `x` in pattern
 10 |     case [x] | {1: x} | Class(x=1, x=2): ...  # MatchOr
    |
 
@@ -719,5 +719,5 @@ Module(
  8 |     case Class(x, x): ...  # MatchClass positional
  9 |     case Class(x=1, x=2): ...  # MatchClass keyword
 10 |     case [x] | {1: x} | Class(x=1, x=2): ...  # MatchOr
-   |                                    ^ Syntax Error: multiple assignments in pattern
+   |                                    ^ Syntax Error: multiple assignments to name `x` in pattern
    |
