@@ -54,24 +54,32 @@ impl SemanticSyntaxChecker {
     }
 
     fn check_stmt<Ctx: SemanticSyntaxContext>(&mut self, stmt: &ast::Stmt, ctx: &Ctx) {
-        if let Stmt::ImportFrom(StmtImportFrom { range, module, .. }) = stmt {
-            if self.seen_futures_boundary && matches!(module.as_deref(), Some("__future__")) {
-                Self::add_error(ctx, SemanticSyntaxErrorKind::LateFutureImport, *range);
+        match stmt {
+            Stmt::ImportFrom(StmtImportFrom { range, module, .. }) => {
+                if self.seen_futures_boundary && matches!(module.as_deref(), Some("__future__")) {
+                    Self::add_error(ctx, SemanticSyntaxErrorKind::LateFutureImport, *range);
+                }
             }
+            Stmt::Match(match_stmt) => {
+                Self::irrefutable_match_case(match_stmt, ctx);
+            }
+            Stmt::FunctionDef(ast::StmtFunctionDef { type_params, .. }) => {
+                Self::duplicate_type_parameter_name(type_params.as_ref().map(|v| &**v), ctx);
+            }
+            Stmt::ClassDef(ast::StmtClassDef { type_params, .. }) => {
+                Self::duplicate_type_parameter_name(type_params.as_ref().map(|v| &**v), ctx);
+            }
+            Stmt::TypeAlias(ast::StmtTypeAlias { type_params, .. }) => {
+                Self::duplicate_type_parameter_name(type_params.as_ref().map(|v| &**v), ctx);
+            }
+            _ => {}
         }
-
-        Self::duplicate_type_parameter_name(stmt, ctx);
-        Self::irrefutable_match_case(stmt, ctx);
     }
 
-    fn duplicate_type_parameter_name<Ctx: SemanticSyntaxContext>(stmt: &ast::Stmt, ctx: &Ctx) {
-        let (Stmt::FunctionDef(ast::StmtFunctionDef { type_params, .. })
-        | Stmt::ClassDef(ast::StmtClassDef { type_params, .. })
-        | Stmt::TypeAlias(ast::StmtTypeAlias { type_params, .. })) = stmt
-        else {
-            return;
-        };
-
+    fn duplicate_type_parameter_name<Ctx: SemanticSyntaxContext>(
+        type_params: Option<&ast::TypeParams>,
+        ctx: &Ctx,
+    ) {
         let Some(type_params) = type_params else {
             return;
         };
@@ -110,11 +118,7 @@ impl SemanticSyntaxChecker {
         }
     }
 
-    fn irrefutable_match_case<Ctx: SemanticSyntaxContext>(stmt: &ast::Stmt, ctx: &Ctx) {
-        let Stmt::Match(ast::StmtMatch { cases, .. }) = stmt else {
-            return;
-        };
-
+    fn irrefutable_match_case<Ctx: SemanticSyntaxContext>(stmt: &ast::StmtMatch, ctx: &Ctx) {
         // test_ok irrefutable_case_pattern_at_end
         // match x:
         //     case 2: ...
@@ -139,7 +143,8 @@ impl SemanticSyntaxChecker {
         // match x:
         //     case enum.variant | var: ...  # or pattern with irrefutable part
         //     case 2: ...
-        for case in cases
+        for case in stmt
+            .cases
             .iter()
             .rev()
             .skip(1)
