@@ -49,6 +49,7 @@ mod class_base;
 mod context;
 mod diagnostic;
 mod display;
+mod generics;
 mod infer;
 mod mro;
 mod narrow;
