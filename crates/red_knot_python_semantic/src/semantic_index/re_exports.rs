@@ -3,6 +3,18 @@
 //!
 //! For example, if a module `foo` contains `from bar import *`, which symbols from the global
 //! scope of `bar` are imported into the global namespace of `foo`?
+//!
+//! ## Why is this a separate query rather than a part of semantic indexing?
+//!
+//! This query is called by the [`super::SemanticIndexBuilder`] in order to add the correct
+//! [`super::Definition`]s to the semantic index of a module `foo` if `foo` has a
+//! `from bar import *` statement in its global namespace. Adding the correct `Definition`s to
+//! `foo`'s [`super::SemanticIndex`] requires knowing which symbols are exported from `bar`.
+//!
+//! If we determined the set of exported names during semantic indexing rather than as a
+//! separate query, we would need to complete semantic indexing on `bar` in order to
+//! complete analysis of the global namespace of `foo`. Since semantic indexing is somewhat
+//! expensive, this would be undesirable. A separate query allows us to avoid this issue.
 
 use ruff_db::{files::File, parsed::parsed_module};
 use ruff_python_ast::{
@@ -17,14 +29,7 @@ use crate::{module_name::ModuleName, resolve_module, Db};
 #[salsa::tracked(return_ref)]
 pub(super) fn exported_names(db: &dyn Db, file: File) -> FxHashSet<Name> {
     let module = parsed_module(db.upcast(), file);
-
-    let mut finder = ExportFinder {
-        db,
-        file,
-        visiting_stub_file: file.is_stub(db.upcast()),
-        exports: FxHashSet::default(),
-    };
-
+    let mut finder = ExportFinder::new(db, file);
     finder.visit_body(module.suite());
     finder.exports
 }
@@ -36,7 +41,16 @@ struct ExportFinder<'db> {
     exports: FxHashSet<Name>,
 }
 
-impl ExportFinder<'_> {
+impl<'db> ExportFinder<'db> {
+    fn new(db: &'db dyn Db, file: File) -> Self {
+        Self {
+            db,
+            file,
+            visiting_stub_file: file.is_stub(db.upcast()),
+            exports: FxHashSet::default(),
+        }
+    }
+
     fn possibly_add_export(&mut self, name: &Name) {
         if name.starts_with('_') {
             return;

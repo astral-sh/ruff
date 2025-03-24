@@ -560,6 +560,13 @@ impl DefinitionKind<'_> {
         }
     }
 
+    pub(crate) const fn as_star_import(&self) -> Option<&StarImportDefinitionKind> {
+        match self {
+            DefinitionKind::StarImport(import) => Some(import),
+            _ => None,
+        }
+    }
+
     /// Returns the [`TextRange`] of the definition target.
     ///
     /// A definition target would mainly be the node representing the symbol being defined i.e.,

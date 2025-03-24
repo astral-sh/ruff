@@ -51,11 +51,11 @@ use crate::semantic_index::definition::{
     ExceptHandlerDefinitionKind, ForStmtDefinitionKind, TargetKind, WithItemDefinitionKind,
 };
 use crate::semantic_index::expression::{Expression, ExpressionKind};
+use crate::semantic_index::semantic_index;
 use crate::semantic_index::symbol::{
     FileScopeId, NodeWithScopeKind, NodeWithScopeRef, ScopeId, ScopeKind,
 };
 use crate::semantic_index::SemanticIndex;
-use crate::semantic_index::{semantic_index, symbol_table};
 use crate::symbol::{
     builtins_module_scope, builtins_symbol, explicit_global_symbol,
     module_type_implicit_global_symbol, symbol, symbol_from_bindings, symbol_from_declarations,
@@ -3161,12 +3161,15 @@ impl<'db> TypeInferenceBuilder<'db> {
             return;
         };
 
-        let star_import_info =
-            if let DefinitionKind::StarImport(star_import) = definition.kind(self.db()) {
-                Some((star_import, symbol_table(self.db(), self.scope())))
-            } else {
-                None
-            };
+        let star_import_info = definition
+            .kind(self.db())
+            .as_star_import()
+            .map(|star_import| {
+                let symbol_table = self
+                    .index
+                    .symbol_table(self.scope().file_scope_id(self.db()));
+                (star_import, symbol_table)
+            });
 
         let name = if let Some((star_import, symbol_table)) = star_import_info.as_ref() {
             symbol_table.symbol(star_import.symbol_id()).name()
