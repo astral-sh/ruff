@@ -138,6 +138,19 @@ function FileEntry({ name, onClicked, onRenamed, selected }: FileEntryProps) {
     }
   };
 
+  const extension = name.split(".").pop()?.toLowerCase();
+
+  const icon =
+    extension === "py" || extension === "pyi" ? (
+      <Icons.Python width={12} height={12} />
+    ) : extension === "json" ? (
+      <Icons.Json width={12} height={12} />
+    ) : extension === "ipynb" ? (
+      <Icons.Jupyter width={12} height={12} />
+    ) : (
+      <Icons.File width={12} height={12} />
+    );
+
   return (
     <button
       onClick={() => {
@@ -150,7 +163,7 @@ function FileEntry({ name, onClicked, onRenamed, selected }: FileEntryProps) {
       className="flex gap-2 items-center py-4 cursor-pointer"
     >
       <span className="inline-block flex-none" aria-hidden>
-        <Icons.Python width={12} height={12} />
+        {icon}
       </span>
       {newName == null ? (
         <span className="inline-block">{name}</span>
@@ -168,7 +181,7 @@ function FileEntry({ name, onClicked, onRenamed, selected }: FileEntryProps) {
 
             switch (event.key) {
               case "Enter":
-                handleRenamed(newName);
+                event.currentTarget.blur();
                 return;
               case "Escape":
                 setNewName(null);

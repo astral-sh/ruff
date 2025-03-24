@@ -235,7 +235,7 @@ impl<'db> SemanticIndexBuilder<'db> {
 
         let children_end = self.scopes.next_index();
         let popped_scope = &mut self.scopes[popped_scope_id];
-        popped_scope.extend_descendents(children_end);
+        popped_scope.extend_descendants(children_end);
 
         if !popped_scope.is_eager() {
             return popped_scope_id;
@@ -936,9 +936,6 @@ where
                     self.visit_decorator(decorator);
                 }
 
-                let symbol = self.add_symbol(class.name.id.clone());
-                self.add_definition(symbol, class);
-
                 self.with_type_params(
                     NodeWithScopeRef::ClassTypeParameters(class),
                     class.type_params.as_deref(),
@@ -953,6 +950,10 @@ where
                         builder.pop_scope()
                     },
                 );
+
+                // In Python runtime semantics, a class is registered after its scope is evaluated.
+                let symbol = self.add_symbol(class.name.id.clone());
+                self.add_definition(symbol, class);
             }
             ast::Stmt::TypeAlias(type_alias) => {
                 let symbol = self.add_symbol(

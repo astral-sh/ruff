@@ -34,7 +34,7 @@ impl PyProject {
         content: &str,
         source: ValueSource,
     ) -> Result<Self, PyProjectError> {
-        let _guard = ValueSourceGuard::new(source);
+        let _guard = ValueSourceGuard::new(source, true);
         toml::from_str(content).map_err(PyProjectError::TomlSyntax)
     }
 }

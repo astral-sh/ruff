@@ -19,6 +19,7 @@ pub enum ValueSource {
     /// Ideally, we'd use [`ruff_db::files::File`] but we can't because the database hasn't been
     /// created when loading the configuration.
     File(Arc<SystemPathBuf>),
+
     /// The value comes from a CLI argument, while it's left open if specified using a short argument,
     /// long argument (`--extra-paths`) or `--config key=value`.
     Cli,
@@ -41,18 +42,18 @@ thread_local! {
     /// Use the [`ValueSourceGuard`] to initialize the thread local before calling into any
     /// deserialization code. It ensures that the thread local variable gets cleaned up
     /// once deserialization is done (once the guard gets dropped).
-    static VALUE_SOURCE: RefCell<Option<ValueSource>> = const { RefCell::new(None) };
+    static VALUE_SOURCE: RefCell<Option<(ValueSource, bool)>> = const { RefCell::new(None) };
 }
 
 /// Guard to safely change the [`VALUE_SOURCE`] for the current thread.
 #[must_use]
 pub(super) struct ValueSourceGuard {
-    prev_value: Option<ValueSource>,
+    prev_value: Option<(ValueSource, bool)>,
 }
 
 impl ValueSourceGuard {
-    pub(super) fn new(source: ValueSource) -> Self {
-        let prev = VALUE_SOURCE.replace(Some(source));
+    pub(super) fn new(source: ValueSource, is_toml: bool) -> Self {
+        let prev = VALUE_SOURCE.replace(Some((source, is_toml)));
         Self { prev_value: prev }
     }
 }
@@ -265,18 +266,24 @@ where
     where
         D: Deserializer<'de>,
     {
-        let spanned: Spanned<T> = Spanned::deserialize(deserializer)?;
-        let span = spanned.span();
-        let range = TextRange::new(
-            TextSize::try_from(span.start).expect("Configuration file to be smaller than 4GB"),
-            TextSize::try_from(span.end).expect("Configuration file to be smaller than 4GB"),
-        );
+        VALUE_SOURCE.with_borrow(|source| {
+            let (source, has_span) = source.clone().unwrap();
 
-        Ok(VALUE_SOURCE.with_borrow(|source| {
-            let source = source.clone().unwrap();
+            if has_span {
+                let spanned: Spanned<T> = Spanned::deserialize(deserializer)?;
+                let span = spanned.span();
+                let range = TextRange::new(
+                    TextSize::try_from(span.start)
+                        .expect("Configuration file to be smaller than 4GB"),
+                    TextSize::try_from(span.end)
+                        .expect("Configuration file to be smaller than 4GB"),
+                );
 
-            Self::with_range(spanned.into_inner(), source, range)
-        }))
+                Ok(Self::with_range(spanned.into_inner(), source, range))
+            } else {
+                Ok(Self::new(T::deserialize(deserializer)?, source))
+            }
+        })
     }
 }
 

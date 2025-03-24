@@ -4215,6 +4215,10 @@ pub enum KnownFunction {
     /// `typing(_extensions).overload`
     Overload,
 
+    /// `abc.abstractmethod`
+    #[strum(serialize = "abstractmethod")]
+    AbstractMethod,
+
     /// `inspect.getattr_static`
     GetattrStatic,
 
@@ -4269,6 +4273,9 @@ impl KnownFunction {
             | Self::Final
             | Self::NoTypeCheck => {
                 matches!(module, KnownModule::Typing | KnownModule::TypingExtensions)
+            }
+            Self::AbstractMethod => {
+                matches!(module, KnownModule::Abc)
             }
             Self::GetattrStatic => module.is_inspect(),
             Self::IsAssignableTo
@@ -5663,6 +5670,8 @@ pub(crate) mod tests {
                 | KnownFunction::Repr
                 | KnownFunction::IsInstance
                 | KnownFunction::IsSubclass => KnownModule::Builtins,
+
+                KnownFunction::AbstractMethod => KnownModule::Abc,
 
                 KnownFunction::GetattrStatic => KnownModule::Inspect,
 

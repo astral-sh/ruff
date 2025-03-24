@@ -1,15 +1,12 @@
 #![cfg(target_arch = "wasm32")]
 
+use red_knot_wasm::{Position, Workspace};
 use wasm_bindgen_test::wasm_bindgen_test;
-
-use red_knot_wasm::{Position, PythonVersion, Settings, Workspace};
 
 #[wasm_bindgen_test]
 fn check() {
-    let settings = Settings {
-        python_version: PythonVersion::Py312,
-    };
-    let mut workspace = Workspace::new("/", &settings).expect("Workspace to be created");
+    let mut workspace =
+        Workspace::new("/", js_sys::JSON::parse("{}").unwrap()).expect("Workspace to be created");
 
     workspace
         .open_file("test.py", "import random22\n")

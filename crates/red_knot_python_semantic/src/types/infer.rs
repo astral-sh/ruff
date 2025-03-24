@@ -51,8 +51,11 @@ use crate::semantic_index::definition::{
     ExceptHandlerDefinitionKind, ForStmtDefinitionKind, TargetKind, WithItemDefinitionKind,
 };
 use crate::semantic_index::expression::{Expression, ExpressionKind};
-use crate::semantic_index::symbol::{FileScopeId, NodeWithScopeKind, NodeWithScopeRef, ScopeId};
-use crate::semantic_index::{semantic_index, symbol_table, SemanticIndex};
+use crate::semantic_index::symbol::{
+    FileScopeId, NodeWithScopeKind, NodeWithScopeRef, ScopeId, ScopeKind,
+};
+use crate::semantic_index::SemanticIndex;
+use crate::semantic_index::{semantic_index, symbol_table};
 use crate::symbol::{
     builtins_module_scope, builtins_symbol, explicit_global_symbol,
     module_type_implicit_global_symbol, symbol, symbol_from_bindings, symbol_from_declarations,
@@ -1207,15 +1210,57 @@ impl<'db> TypeInferenceBuilder<'db> {
                     _ => false,
                 }
             }
-            let is_overload = function.decorator_list.iter().any(|decorator| {
+
+            let is_overload_or_abstract = function.decorator_list.iter().any(|decorator| {
                 let decorator_type = self.file_expression_type(&decorator.expression);
 
-                decorator_type
-                    .into_function_literal()
-                    .is_some_and(|f| f.is_known(self.db(), KnownFunction::Overload))
+                match decorator_type {
+                    Type::FunctionLiteral(function) => matches!(
+                        function.known(self.db()),
+                        Some(KnownFunction::Overload | KnownFunction::AbstractMethod)
+                    ),
+                    _ => false,
+                }
             });
-            // TODO: Protocol / abstract methods can have empty bodies
-            if (self.in_stub() || is_overload)
+
+            let class_inherits_protocol_directly = (|| -> bool {
+                let current_scope_id = self.scope().file_scope_id(self.db());
+                let current_scope = self.index.scope(current_scope_id);
+                let Some(parent_scope_id) = current_scope.parent() else {
+                    return false;
+                };
+                let parent_scope = self.index.scope(parent_scope_id);
+
+                let class_scope = match parent_scope.kind() {
+                    ScopeKind::Class => parent_scope,
+                    ScopeKind::Annotation => {
+                        let Some(class_scope_id) = parent_scope.parent() else {
+                            return false;
+                        };
+                        let potentially_class_scope = self.index.scope(class_scope_id);
+
+                        match potentially_class_scope.kind() {
+                            ScopeKind::Class => potentially_class_scope,
+                            _ => return false,
+                        }
+                    }
+                    _ => return false,
+                };
+
+                let NodeWithScopeKind::Class(node_ref) = class_scope.node() else {
+                    return false;
+                };
+
+                // TODO move this to `Class` once we add proper `Protocol` support
+                node_ref.bases().iter().any(|base| {
+                    matches!(
+                        self.file_expression_type(base),
+                        Type::KnownInstance(KnownInstanceType::Protocol)
+                    )
+                })
+            })();
+
+            if (self.in_stub() || is_overload_or_abstract || class_inherits_protocol_directly)
                 && self.return_types_and_ranges.is_empty()
                 && is_stub_suite(&function.body)
             {
