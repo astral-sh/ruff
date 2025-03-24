@@ -64,7 +64,7 @@ impl ProjectMetadata {
     }
 
     /// Loads a project from a set of options with an optional pyproject-project table.
-    pub(crate) fn from_options(
+    pub fn from_options(
         mut options: Options,
         root: SystemPathBuf,
         project: Option<&Project>,

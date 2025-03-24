@@ -1,11 +1,12 @@
 use std::any::Any;
 
 use js_sys::{Error, JsString};
-use red_knot_project::metadata::options::{EnvironmentOptions, Options};
-use red_knot_project::metadata::value::RangedValue;
+use red_knot_project::metadata::options::Options;
+use red_knot_project::metadata::value::ValueSource;
 use red_knot_project::watch::{ChangeEvent, ChangedKind, CreatedKind, DeletedKind};
 use red_knot_project::ProjectMetadata;
 use red_knot_project::{Db, ProjectDatabase};
+use red_knot_python_semantic::Program;
 use ruff_db::diagnostic::{DisplayDiagnosticConfig, OldDiagnosticTrait};
 use ruff_db::files::{system_path_to_file, File};
 use ruff_db::source::{line_index, source_text};
@@ -39,62 +40,75 @@ pub fn run() {
 pub struct Workspace {
     db: ProjectDatabase,
     system: WasmSystem,
-    options: Options,
 }
 
 #[wasm_bindgen]
 impl Workspace {
     #[wasm_bindgen(constructor)]
-    pub fn new(root: &str, settings: &Settings) -> Result<Workspace, Error> {
+    pub fn new(root: &str, options: JsValue) -> Result<Workspace, Error> {
+        let options = Options::deserialize_with(
+            ValueSource::Cli,
+            serde_wasm_bindgen::Deserializer::from(options),
+        )
+        .map_err(into_error)?;
+
         let system = WasmSystem::new(SystemPath::new(root));
 
-        let mut workspace =
-            ProjectMetadata::discover(SystemPath::new(root), &system).map_err(into_error)?;
+        let project = ProjectMetadata::from_options(options, SystemPathBuf::from(root), None)
+            .map_err(into_error)?;
 
-        let options = Options {
-            environment: Some(EnvironmentOptions {
-                python_version: Some(RangedValue::cli(settings.python_version.into())),
-                ..EnvironmentOptions::default()
-            }),
-            ..Options::default()
-        };
+        let db = ProjectDatabase::new(project, system.clone()).map_err(into_error)?;
 
-        workspace.apply_cli_options(options.clone());
+        Ok(Self { db, system })
+    }
 
-        let db = ProjectDatabase::new(workspace, system.clone()).map_err(into_error)?;
+    #[wasm_bindgen(js_name = "updateOptions")]
+    pub fn update_options(&mut self, options: JsValue) -> Result<(), Error> {
+        let options = Options::deserialize_with(
+            ValueSource::Cli,
+            serde_wasm_bindgen::Deserializer::from(options),
+        )
+        .map_err(into_error)?;
 
-        Ok(Self {
-            db,
-            system,
+        let project = ProjectMetadata::from_options(
             options,
-        })
+            self.db.project().root(&self.db).to_path_buf(),
+            None,
+        )
+        .map_err(into_error)?;
+
+        let program_settings = project.to_program_settings(&self.system);
+        Program::get(&self.db)
+            .update_from_settings(&mut self.db, program_settings)
+            .map_err(into_error)?;
+
+        self.db.project().reload(&mut self.db, project);
+
+        Ok(())
     }
 
     #[wasm_bindgen(js_name = "openFile")]
     pub fn open_file(&mut self, path: &str, contents: &str) -> Result<FileHandle, Error> {
-        let path = SystemPath::new(path);
+        let path = SystemPath::absolute(path, self.db.project().root(&self.db));
 
         self.system
             .fs
-            .write_file_all(path, contents)
+            .write_file_all(&path, contents)
             .map_err(into_error)?;
 
         self.db.apply_changes(
             vec![ChangeEvent::Created {
-                path: path.to_path_buf(),
+                path: path.clone(),
                 kind: CreatedKind::File,
             }],
-            Some(&self.options),
+            None,
         );
 
-        let file = system_path_to_file(&self.db, path).expect("File to exist");
+        let file = system_path_to_file(&self.db, &path).expect("File to exist");
 
         self.db.project().open_file(&mut self.db, file);
 
-        Ok(FileHandle {
-            file,
-            path: path.to_path_buf(),
-        })
+        Ok(FileHandle { path, file })
     }
 
     #[wasm_bindgen(js_name = "updateFile")]
@@ -119,7 +133,7 @@ impl Workspace {
                     kind: ChangedKind::FileMetadata,
                 },
             ],
-            Some(&self.options),
+            None,
         );
 
         Ok(())
@@ -140,7 +154,7 @@ impl Workspace {
                 path: file_id.path.to_path_buf(),
                 kind: DeletedKind::File,
             }],
-            Some(&self.options),
+            None,
         );
 
         Ok(())
@@ -199,18 +213,6 @@ impl FileHandle {
     #[wasm_bindgen(js_name = toString)]
     pub fn js_to_string(&self) -> String {
         format!("file(id: {:?}, path: {})", self.file, self.path)
-    }
-}
-
-#[wasm_bindgen]
-pub struct Settings {
-    pub python_version: PythonVersion,
-}
-#[wasm_bindgen]
-impl Settings {
-    #[wasm_bindgen(constructor)]
-    pub fn new(python_version: PythonVersion) -> Self {
-        Self { python_version }
     }
 }
 
@@ -332,33 +334,6 @@ impl From<ruff_text_size::TextRange> for TextRange {
     }
 }
 
-#[wasm_bindgen]
-#[derive(Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Default)]
-pub enum PythonVersion {
-    Py37,
-    Py38,
-    #[default]
-    Py39,
-    Py310,
-    Py311,
-    Py312,
-    Py313,
-}
-
-impl From<PythonVersion> for ruff_python_ast::PythonVersion {
-    fn from(value: PythonVersion) -> Self {
-        match value {
-            PythonVersion::Py37 => Self::PY37,
-            PythonVersion::Py38 => Self::PY38,
-            PythonVersion::Py39 => Self::PY39,
-            PythonVersion::Py310 => Self::PY310,
-            PythonVersion::Py311 => Self::PY311,
-            PythonVersion::Py312 => Self::PY312,
-            PythonVersion::Py313 => Self::PY313,
-        }
-    }
-}
-
 #[derive(Debug, Clone)]
 struct WasmSystem {
     fs: MemoryFileSystem,
@@ -454,17 +429,4 @@ impl System for WasmSystem {
 
 fn not_found() -> std::io::Error {
     std::io::Error::new(std::io::ErrorKind::NotFound, "No such file or directory")
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::PythonVersion;
-
-    #[test]
-    fn same_default_as_python_version() {
-        assert_eq!(
-            ruff_python_ast::PythonVersion::from(PythonVersion::default()),
-            ruff_python_ast::PythonVersion::default()
-        );
-    }
 }
