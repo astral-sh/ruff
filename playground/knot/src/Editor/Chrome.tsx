@@ -15,13 +15,8 @@ import {
   HorizontalResizeHandle,
   VerticalResizeHandle,
 } from "shared";
-import initRedKnot, {
-  Diagnostic,
-  FileHandle,
-  Settings,
-  PythonVersion,
-  Workspace,
-} from "red_knot_wasm";
+import knotSchema from "../../../../knot.schema.json";
+import initRedKnot, { Diagnostic, FileHandle, Workspace } from "red_knot_wasm";
 import { loader } from "@monaco-editor/react";
 import { Panel, PanelGroup } from "react-resizable-panels";
 import { Files } from "./Files";
@@ -36,6 +31,8 @@ import Diagnostics from "./Diagnostics";
 import { editor } from "monaco-editor";
 import IStandaloneCodeEditor = editor.IStandaloneCodeEditor;
 
+const SETTINGS_FILE = "knot.json";
+
 interface CheckResult {
   diagnostics: Diagnostic[];
   error: string | null;
@@ -45,6 +42,7 @@ interface CheckResult {
 export default function Chrome() {
   const initPromise = useRef<null | Promise<void>>(null);
   const [workspace, setWorkspace] = useState<null | Workspace>(null);
+  const [updateError, setUpdateError] = useState<string | null>(null);
   const [files, dispatchFiles] = useReducer(filesReducer, {
     index: [],
     contents: Object.create(null),
@@ -60,6 +58,10 @@ export default function Chrome() {
   const editorRef = useRef<IStandaloneCodeEditor | null>(null);
   const [version, setVersion] = useState("");
   const [theme, setTheme] = useTheme();
+
+  const fileName = useMemo(() => {
+    return files.index.find((file) => file.id === files.selected)?.name ?? null;
+  }, [files.index, files.selected]);
 
   usePersistLocally(files);
 
@@ -77,13 +79,17 @@ export default function Chrome() {
   if (initPromise.current == null) {
     initPromise.current = startPlayground()
       .then(({ version, workspace: fetchedWorkspace }) => {
-        const settings = new Settings(PythonVersion.Py312);
-        const workspace = new Workspace("/", settings);
+        const workspace = new Workspace("/", {});
+
         setVersion(version);
         setWorkspace(workspace);
 
         for (const [name, content] of Object.entries(fetchedWorkspace.files)) {
-          const handle = workspace.openFile(name, content);
+          let handle = null;
+          if (name !== SETTINGS_FILE) {
+            handle = workspace.openFile(name, content);
+          }
+
           dispatchFiles({ type: "add", handle, name, content });
         }
 
@@ -109,23 +115,34 @@ export default function Chrome() {
         id: files.selected,
         content: source,
       });
-    },
-    [files.selected],
-  );
 
-  const handleFileClicked = useCallback(
-    (file: FileId) => {
-      if (workspace != null && files.selected != null) {
-        workspace.updateFile(
-          files.handles[files.selected],
-          files.contents[files.selected],
-        );
+      const handle = files.handles[files.selected];
+
+      if (handle != null) {
+        try {
+          workspace?.updateFile(handle, source);
+          setUpdateError(null);
+        } catch (error) {
+          setUpdateError(`Failed to update file: ${formatError(error)}`);
+        }
+      } else if (fileName === SETTINGS_FILE) {
+        try {
+          const settings = JSON.parse(source);
+          workspace?.updateOptions(settings);
+          setUpdateError(null);
+        } catch (error) {
+          setUpdateError(
+            `Failed to update 'knot.json' options: ${formatError(error)}`,
+          );
+        }
       }
-
-      dispatchFiles({ type: "selectFile", id: file });
     },
-    [workspace, files.contents, files.handles, files.selected],
+    [files.selected, workspace, files.handles, fileName],
   );
+
+  const handleFileClicked = useCallback((file: FileId) => {
+    dispatchFiles({ type: "selectFile", id: file });
+  }, []);
 
   const handleFileAdded = useCallback(
     (name: string) => {
@@ -133,23 +150,24 @@ export default function Chrome() {
         return;
       }
 
-      if (files.selected != null) {
-        workspace.updateFile(
-          files.handles[files.selected],
-          files.contents[files.selected],
-        );
+      let handle = null;
+
+      if (name !== SETTINGS_FILE) {
+        handle = workspace.openFile(name, "");
       }
 
-      const handle = workspace.openFile(name, "");
       dispatchFiles({ type: "add", name, handle, content: "" });
     },
-    [workspace, files.handles, files.contents, files.selected],
+    [workspace],
   );
 
   const handleFileRemoved = useCallback(
     (file: FileId) => {
       if (workspace != null) {
-        workspace.closeFile(files.handles[file]);
+        const handle = files.handles[file];
+        if (handle != null) {
+          workspace.closeFile(handle);
+        }
       }
 
       dispatchFiles({ type: "remove", id: file });
@@ -163,8 +181,15 @@ export default function Chrome() {
         return;
       }
 
-      workspace.closeFile(files.handles[file]);
-      const newHandle = workspace.openFile(newName, files.contents[file]);
+      const handle = files.handles[file];
+      let newHandle: FileHandle | null = null;
+      if (handle != null) {
+        workspace.closeFile(handle);
+      }
+
+      if (newName !== SETTINGS_FILE) {
+        newHandle = workspace.openFile(newName, files.contents[file]);
+      }
 
       editorRef.current?.focus();
 
@@ -208,6 +233,7 @@ export default function Chrome() {
   }, []);
 
   const checkResult = useCheckResult(files, workspace, secondaryTool);
+  const error = updateError ?? checkResult.error;
 
   return (
     <main className="flex flex-col h-full bg-ayu-background dark:bg-ayu-background-dark">
@@ -243,11 +269,12 @@ export default function Chrome() {
                   <Editor
                     theme={theme}
                     visible={true}
-                    onMount={handleEditorMount}
+                    fileName={fileName ?? "lib.py"}
                     source={files.contents[files.selected]}
-                    onChange={handleSourceChanged}
                     diagnostics={checkResult.diagnostics}
                     workspace={workspace}
+                    onMount={handleEditorMount}
+                    onChange={handleSourceChanged}
                   />
                   <VerticalResizeHandle />
                 </Panel>
@@ -291,7 +318,7 @@ export default function Chrome() {
         </>
       ) : null}
 
-      {checkResult.error ? (
+      {error ? (
         <div
           style={{
             position: "fixed",
@@ -300,12 +327,25 @@ export default function Chrome() {
             bottom: "10%",
           }}
         >
-          <ErrorMessage>{checkResult.error}</ErrorMessage>
+          <ErrorMessage>{error}</ErrorMessage>
         </div>
       ) : null}
     </main>
   );
 }
+
+const DEFAULT_SETTINGS = JSON.stringify(
+  {
+    environment: {
+      "python-version": "3.13",
+    },
+    rules: {
+      "division-by-zero": "error",
+    },
+  },
+  null,
+  4,
+);
 
 // Run once during startup. Initializes monaco, loads the wasm file, and restores the previous editor state.
 async function startPlayground(): Promise<{
@@ -315,12 +355,19 @@ async function startPlayground(): Promise<{
   await initRedKnot();
   const monaco = await loader.init();
 
-  setupMonaco(monaco);
+  setupMonaco(monaco, {
+    uri: "https://raw.githubusercontent.com/astral-sh/ruff/main/knot.schema.json",
+    fileMatch: ["knot.json"],
+    schema: knotSchema,
+  });
 
   const restored = await restore();
 
   const workspace = restored ?? {
-    files: { "main.py": "import os" },
+    files: {
+      "main.py": "import os",
+      "knot.json": DEFAULT_SETTINGS,
+    },
     current: "main.py",
   };
 
@@ -367,8 +414,14 @@ function useCheckResult(
     }
 
     const currentHandle = files.handles[files.selected];
-    // Update the workspace content but use the deferred value to avoid too frequent updates.
-    workspace.updateFile(currentHandle, deferredContent);
+
+    if (currentHandle == null) {
+      return {
+        diagnostics: [],
+        error: null,
+        secondary: null,
+      };
+    }
 
     try {
       const diagnostics = workspace.checkFile(currentHandle);
@@ -409,7 +462,7 @@ function useCheckResult(
 
       return {
         diagnostics: [],
-        error: (e as Error).message,
+        error: formatError(e),
         secondary: null,
       };
     }
@@ -437,8 +490,11 @@ interface FilesState {
 
   /**
    * The database file handles by file id.
+   *
+   * Files without a file handle are well-known files that are only handled by the
+   * playground (e.g. knot.json)
    */
-  handles: Readonly<{ [id: FileId]: FileHandle }>;
+  handles: Readonly<{ [id: FileId]: FileHandle | null }>;
 
   /**
    * The content per file indexed by file id.
@@ -446,7 +502,7 @@ interface FilesState {
   contents: Readonly<{ [id: FileId]: string }>;
 
   /**
-   * The revision. Gets incremented everytime files changes.
+   * The revision. Gets incremented every time files changes.
    */
   revision: number;
   nextId: FileId;
@@ -455,7 +511,7 @@ interface FilesState {
 type FileAction =
   | {
       type: "add";
-      handle: FileHandle;
+      handle: FileHandle | null;
       /// The file name
       name: string;
       content: string;
@@ -465,7 +521,7 @@ type FileAction =
       id: FileId;
       content: string;
     }
-  | { type: "rename"; id: FileId; to: string; newHandle: FileHandle }
+  | { type: "rename"; id: FileId; to: string; newHandle: FileHandle | null }
   | {
       type: "remove";
       id: FileId;
@@ -584,4 +640,11 @@ function serializeFiles(files: FilesState): {
   }
 
   return { files: serializedFiles, current: selected };
+}
+
+function formatError(error: unknown): string {
+  const message = error instanceof Error ? error.message : `${error}`;
+  return message.startsWith("Error: ")
+    ? message.slice("Error: ".length)
+    : message;
 }

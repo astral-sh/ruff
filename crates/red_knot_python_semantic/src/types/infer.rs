@@ -54,14 +54,16 @@ use crate::semantic_index::definition::{
 };
 use crate::semantic_index::expression::{Expression, ExpressionKind};
 use crate::semantic_index::semantic_index;
-use crate::semantic_index::symbol::{FileScopeId, NodeWithScopeKind, NodeWithScopeRef, ScopeId};
+use crate::semantic_index::symbol::{
+    FileScopeId, NodeWithScopeKind, NodeWithScopeRef, ScopeId, ScopeKind,
+};
 use crate::semantic_index::SemanticIndex;
 use crate::symbol::{
     builtins_module_scope, builtins_symbol, explicit_global_symbol,
     module_type_implicit_global_symbol, symbol, symbol_from_bindings, symbol_from_declarations,
     typing_extensions_symbol, Boundness, LookupError,
 };
-use crate::types::call::{Argument, CallArguments, CallError};
+use crate::types::call::{Argument, Bindings, CallArgumentTypes, CallArguments, CallError};
 use crate::types::diagnostic::{
     report_implicit_return_type, report_invalid_arguments_to_annotated,
     report_invalid_arguments_to_callable, report_invalid_assignment,
@@ -79,12 +81,12 @@ use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     class::MetaclassErrorKind, todo_type, Class, DynamicType, FunctionType, InstanceType,
     IntersectionBuilder, IntersectionType, KnownClass, KnownFunction, KnownInstanceType,
-    MetaclassCandidate, Parameter, Parameters, SliceLiteralType, SubclassOfType, Symbol,
-    SymbolAndQualifiers, Truthiness, TupleType, Type, TypeAliasType, TypeAndQualifiers,
+    MetaclassCandidate, Parameter, ParameterForm, Parameters, SliceLiteralType, SubclassOfType,
+    Symbol, SymbolAndQualifiers, Truthiness, TupleType, Type, TypeAliasType, TypeAndQualifiers,
     TypeArrayDisplay, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarInstance, UnionBuilder,
     UnionType,
 };
-use crate::types::{CallableType, GeneralCallableType, ParameterKind, Signature};
+use crate::types::{CallableType, GeneralCallableType, Signature};
 use crate::unpack::Unpack;
 use crate::util::subscript::{PyIndex, PySlice};
 use crate::Db;
@@ -102,7 +104,7 @@ use super::slots::check_class_slots;
 use super::string_annotation::{
     parse_string_annotation, BYTE_STRING_TYPE_ANNOTATION, FSTRING_TYPE_ANNOTATION,
 };
-use super::{CallDunderError, ParameterExpectation, ParameterExpectations};
+use super::CallDunderError;
 
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
 /// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
@@ -491,7 +493,7 @@ enum DeclaredAndInferredType<'db> {
 /// [`TypeInferenceBuilder`] just for that definition, and we merge the returned [`TypeInference`]
 /// into the one we are currently building for the entire scope. Using the query in this way
 /// ensures that if we first infer types for some scattered definitions in a scope, and later for
-/// the entire scope, we don't re-infer any types, we re-use the cached inference for those
+/// the entire scope, we don't re-infer any types, we reuse the cached inference for those
 /// definitions and their sub-expressions.
 ///
 /// Functions with a name like `infer_*_definition` take both a node and a [`Definition`], and are
@@ -1141,7 +1143,9 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.infer_type_parameters(type_params);
 
         if let Some(arguments) = class.arguments.as_deref() {
-            self.infer_arguments(arguments, ParameterExpectations::default());
+            let call_arguments = Self::parse_arguments(arguments);
+            let argument_forms = vec![Some(ParameterForm::Value); call_arguments.len()];
+            self.infer_argument_types(arguments, call_arguments, &argument_forms);
         }
     }
 
@@ -1205,15 +1209,57 @@ impl<'db> TypeInferenceBuilder<'db> {
                     _ => false,
                 }
             }
-            let is_overload = function.decorator_list.iter().any(|decorator| {
+
+            let is_overload_or_abstract = function.decorator_list.iter().any(|decorator| {
                 let decorator_type = self.file_expression_type(&decorator.expression);
 
-                decorator_type
-                    .into_function_literal()
-                    .is_some_and(|f| f.is_known(self.db(), KnownFunction::Overload))
+                match decorator_type {
+                    Type::FunctionLiteral(function) => matches!(
+                        function.known(self.db()),
+                        Some(KnownFunction::Overload | KnownFunction::AbstractMethod)
+                    ),
+                    _ => false,
+                }
             });
-            // TODO: Protocol / abstract methods can have empty bodies
-            if (self.in_stub() || is_overload)
+
+            let class_inherits_protocol_directly = (|| -> bool {
+                let current_scope_id = self.scope().file_scope_id(self.db());
+                let current_scope = self.index.scope(current_scope_id);
+                let Some(parent_scope_id) = current_scope.parent() else {
+                    return false;
+                };
+                let parent_scope = self.index.scope(parent_scope_id);
+
+                let class_scope = match parent_scope.kind() {
+                    ScopeKind::Class => parent_scope,
+                    ScopeKind::Annotation => {
+                        let Some(class_scope_id) = parent_scope.parent() else {
+                            return false;
+                        };
+                        let potentially_class_scope = self.index.scope(class_scope_id);
+
+                        match potentially_class_scope.kind() {
+                            ScopeKind::Class => potentially_class_scope,
+                            _ => return false,
+                        }
+                    }
+                    _ => return false,
+                };
+
+                let NodeWithScopeKind::Class(node_ref) = class_scope.node() else {
+                    return false;
+                };
+
+                // TODO move this to `Class` once we add proper `Protocol` support
+                node_ref.bases().iter().any(|base| {
+                    matches!(
+                        self.file_expression_type(base),
+                        Type::KnownInstance(KnownInstanceType::Protocol)
+                    )
+                })
+            })();
+
+            if (self.in_stub() || is_overload_or_abstract || class_inherits_protocol_directly)
                 && self.return_types_and_ranges.is_empty()
                 && is_stub_suite(&function.body)
             {
@@ -1517,7 +1563,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     ) {
         if let Some(annotation) = parameter.annotation() {
             let _annotated_ty = self.file_expression_type(annotation);
-            // TODO `tuple[annotated_ty, ...]`
+            // TODO `tuple[annotated_type, ...]`
             let ty = KnownClass::Tuple.to_instance(self.db());
             self.add_declaration_with_binding(
                 parameter.into(),
@@ -1548,7 +1594,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     ) {
         if let Some(annotation) = parameter.annotation() {
             let _annotated_ty = self.file_expression_type(annotation);
-            // TODO `dict[str, annotated_ty]`
+            // TODO `dict[str, annotated_type]`
             let ty = KnownClass::Dict.to_instance(self.db());
             self.add_declaration_with_binding(
                 parameter.into(),
@@ -2276,7 +2322,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         let successful_call = meta_dunder_set
                             .try_call(
                                 db,
-                                &CallArguments::positional([meta_attr_ty, object_ty, value_ty]),
+                                CallArgumentTypes::positional([meta_attr_ty, object_ty, value_ty]),
                             )
                             .is_ok();
 
@@ -2375,7 +2421,11 @@ impl<'db> TypeInferenceBuilder<'db> {
                             let successful_call = meta_dunder_set
                                 .try_call(
                                     db,
-                                    &CallArguments::positional([meta_attr_ty, object_ty, value_ty]),
+                                    CallArgumentTypes::positional([
+                                        meta_attr_ty,
+                                        object_ty,
+                                        value_ty,
+                                    ]),
                                 )
                                 .is_ok();
 
@@ -2783,7 +2833,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let call = target_type.try_call_dunder(
                     db,
                     op.in_place_dunder(),
-                    &CallArguments::positional([value_type]),
+                    CallArgumentTypes::positional([value_type]),
                 );
 
                 match call {
@@ -3144,6 +3194,15 @@ impl<'db> TypeInferenceBuilder<'db> {
             asname: _,
         } = alias;
 
+        if name == "*" {
+            self.add_declaration_with_binding(
+                alias.into(),
+                definition,
+                &DeclaredAndInferredType::AreTheSame(Type::Never),
+            );
+            return;
+        }
+
         // First try loading the requested attribute from the module.
         if let Symbol::Type(ty, boundness) = module_ty.member(self.db(), &name.id).symbol {
             if boundness == Boundness::PossiblyUnbound {
@@ -3232,50 +3291,65 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.infer_expression(expression)
     }
 
-    fn infer_arguments<'a>(
-        &mut self,
-        arguments: &'a ast::Arguments,
-        parameter_expectations: ParameterExpectations,
-    ) -> CallArguments<'a, 'db> {
+    fn parse_arguments(arguments: &ast::Arguments) -> CallArguments<'_> {
         arguments
             .arguments_source_order()
-            .enumerate()
-            .map(|(index, arg_or_keyword)| {
-                let infer_argument_type = match parameter_expectations.expectation_at_index(index) {
-                    ParameterExpectation::TypeExpression => Self::infer_type_expression,
-                    ParameterExpectation::ValueExpression => Self::infer_expression,
-                };
-
+            .map(|arg_or_keyword| {
                 match arg_or_keyword {
                     ast::ArgOrKeyword::Arg(arg) => match arg {
-                        ast::Expr::Starred(ast::ExprStarred {
-                            value,
-                            range: _,
-                            ctx: _,
-                        }) => {
-                            let ty = infer_argument_type(self, value);
-                            self.store_expression_type(arg, ty);
-                            Argument::Variadic(ty)
-                        }
+                        ast::Expr::Starred(ast::ExprStarred { .. }) => Argument::Variadic,
                         // TODO diagnostic if after a keyword argument
-                        _ => Argument::Positional(infer_argument_type(self, arg)),
+                        _ => Argument::Positional,
                     },
-                    ast::ArgOrKeyword::Keyword(ast::Keyword {
-                        arg,
-                        value,
-                        range: _,
-                    }) => {
-                        let ty = infer_argument_type(self, value);
+                    ast::ArgOrKeyword::Keyword(ast::Keyword { arg, .. }) => {
                         if let Some(arg) = arg {
-                            Argument::Keyword { name: &arg.id, ty }
+                            Argument::Keyword(&arg.id)
                         } else {
                             // TODO diagnostic if not last
-                            Argument::Keywords(ty)
+                            Argument::Keywords
                         }
                     }
                 }
             })
             .collect()
+    }
+
+    fn infer_argument_types<'a>(
+        &mut self,
+        ast_arguments: &ast::Arguments,
+        arguments: CallArguments<'a>,
+        argument_forms: &[Option<ParameterForm>],
+    ) -> CallArgumentTypes<'a, 'db> {
+        let mut ast_arguments = ast_arguments.arguments_source_order();
+        CallArgumentTypes::new(arguments, |index, _| {
+            let arg_or_keyword = ast_arguments
+                .next()
+                .expect("argument lists should have consistent lengths");
+            match arg_or_keyword {
+                ast::ArgOrKeyword::Arg(arg) => match arg {
+                    ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
+                        let ty = self.infer_argument_type(value, argument_forms[index]);
+                        self.store_expression_type(arg, ty);
+                        ty
+                    }
+                    _ => self.infer_argument_type(arg, argument_forms[index]),
+                },
+                ast::ArgOrKeyword::Keyword(ast::Keyword { value, .. }) => {
+                    self.infer_argument_type(value, argument_forms[index])
+                }
+            }
+        })
+    }
+
+    fn infer_argument_type(
+        &mut self,
+        ast_argument: &ast::Expr,
+        form: Option<ParameterForm>,
+    ) -> Type<'db> {
+        match form {
+            None | Some(ParameterForm::Value) => self.infer_expression(ast_argument),
+            Some(ParameterForm::Type) => self.infer_type_expression(ast_argument),
+        }
     }
 
     fn infer_optional_expression(&mut self, expression: Option<&ast::Expr>) -> Option<Type<'db>> {
@@ -3769,64 +3843,44 @@ impl<'db> TypeInferenceBuilder<'db> {
             let positional_only = parameters
                 .posonlyargs
                 .iter()
-                .map(|parameter| {
-                    Parameter::new(
-                        None,
-                        ParameterKind::PositionalOnly {
-                            name: Some(parameter.name().id.clone()),
-                            default_ty: parameter
-                                .default()
-                                .map(|default| self.infer_expression(default)),
-                        },
-                    )
+                .map(|param| {
+                    let mut parameter = Parameter::positional_only(Some(param.name().id.clone()));
+                    if let Some(default) = param.default() {
+                        parameter = parameter.with_default_type(self.infer_expression(default));
+                    }
+                    parameter
                 })
                 .collect::<Vec<_>>();
             let positional_or_keyword = parameters
                 .args
                 .iter()
-                .map(|parameter| {
-                    Parameter::new(
-                        None,
-                        ParameterKind::PositionalOrKeyword {
-                            name: parameter.name().id.clone(),
-                            default_ty: parameter
-                                .default()
-                                .map(|default| self.infer_expression(default)),
-                        },
-                    )
+                .map(|param| {
+                    let mut parameter = Parameter::positional_or_keyword(param.name().id.clone());
+                    if let Some(default) = param.default() {
+                        parameter = parameter.with_default_type(self.infer_expression(default));
+                    }
+                    parameter
                 })
                 .collect::<Vec<_>>();
-            let variadic = parameters.vararg.as_ref().map(|parameter| {
-                Parameter::new(
-                    None,
-                    ParameterKind::Variadic {
-                        name: parameter.name.id.clone(),
-                    },
-                )
-            });
+            let variadic = parameters
+                .vararg
+                .as_ref()
+                .map(|param| Parameter::variadic(param.name().id.clone()));
             let keyword_only = parameters
                 .kwonlyargs
                 .iter()
-                .map(|parameter| {
-                    Parameter::new(
-                        None,
-                        ParameterKind::KeywordOnly {
-                            name: parameter.name().id.clone(),
-                            default_ty: parameter
-                                .default()
-                                .map(|default| self.infer_expression(default)),
-                        },
-                    )
+                .map(|param| {
+                    let mut parameter = Parameter::keyword_only(param.name().id.clone());
+                    if let Some(default) = param.default() {
+                        parameter = parameter.with_default_type(self.infer_expression(default));
+                    }
+                    parameter
                 })
                 .collect::<Vec<_>>();
-            let keyword_variadic = parameters.kwarg.as_ref().map(|parameter| {
-                Parameter::new(
-                    None,
-                    ParameterKind::KeywordVariadic {
-                        name: parameter.name.id.clone(),
-                    },
-                )
-            });
+            let keyword_variadic = parameters
+                .kwarg
+                .as_ref()
+                .map(|param| Parameter::keyword_variadic(param.name().id.clone()));
 
             Parameters::new(
                 positional_only
@@ -3856,16 +3910,17 @@ impl<'db> TypeInferenceBuilder<'db> {
             arguments,
         } = call_expression;
 
+        // We don't call `Type::try_call`, because we want to perform type inference on the
+        // arguments after matching them to parameters, but before checking that the argument types
+        // are assignable to any parameter annotations.
+        let mut call_arguments = Self::parse_arguments(arguments);
         let function_type = self.infer_expression(func);
+        let signatures = function_type.signatures(self.db());
+        let bindings = Bindings::match_parameters(signatures, &mut call_arguments);
+        let mut call_argument_types =
+            self.infer_argument_types(arguments, call_arguments, &bindings.argument_forms);
 
-        let parameter_expectations = function_type
-            .into_function_literal()
-            .and_then(|f| f.known(self.db()))
-            .map(KnownFunction::parameter_expectations)
-            .unwrap_or_default();
-
-        let call_arguments = self.infer_arguments(arguments, parameter_expectations);
-        match function_type.try_call(self.db(), &call_arguments) {
+        match bindings.check_types(self.db(), &mut call_argument_types) {
             Ok(bindings) => {
                 for binding in &bindings {
                     let Some(known_function) = binding
@@ -3882,7 +3937,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                     match known_function {
                         KnownFunction::RevealType => {
-                            if let [revealed_type] = overload.parameter_types() {
+                            if let [Some(revealed_type)] = overload.parameter_types() {
                                 self.context.report_diagnostic(
                                     call_expression,
                                     DiagnosticId::RevealedType,
@@ -3896,7 +3951,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                             }
                         }
                         KnownFunction::AssertType => {
-                            if let [actual_ty, asserted_ty] = overload.parameter_types() {
+                            if let [Some(actual_ty), Some(asserted_ty)] = overload.parameter_types()
+                            {
                                 if !actual_ty.is_gradual_equivalent_to(self.db(), *asserted_ty) {
                                     self.context.report_lint(
                                             &TYPE_ASSERTION_FAILURE,
@@ -3911,7 +3967,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             }
                         }
                         KnownFunction::StaticAssert => {
-                            if let [parameter_ty, message] = overload.parameter_types() {
+                            if let [Some(parameter_ty), message] = overload.parameter_types() {
                                 let truthiness = match parameter_ty.try_bool(self.db()) {
                                     Ok(truthiness) => truthiness,
                                     Err(err) => {
@@ -3934,8 +3990,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 };
 
                                 if !truthiness.is_always_true() {
-                                    if let Some(message) =
-                                        message.into_string_literal().map(|s| &**s.value(self.db()))
+                                    if let Some(message) = message
+                                        .and_then(Type::into_string_literal)
+                                        .map(|s| &**s.value(self.db()))
                                     {
                                         self.context.report_lint(
                                             &STATIC_ASSERT_ERROR,
@@ -4359,7 +4416,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 match operand_type.try_call_dunder(
                     self.db(),
                     unary_dunder_method,
-                    &CallArguments::none(),
+                    CallArgumentTypes::none(),
                 ) {
                     Ok(outcome) => outcome.return_type(self.db()),
                     Err(e) => {
@@ -4641,7 +4698,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             .try_call_dunder(
                                 self.db(),
                                 reflected_dunder,
-                                &CallArguments::positional([left_ty]),
+                                CallArgumentTypes::positional([left_ty]),
                             )
                             .map(|outcome| outcome.return_type(self.db()))
                             .or_else(|_| {
@@ -4649,7 +4706,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                     .try_call_dunder(
                                         self.db(),
                                         op.dunder(),
-                                        &CallArguments::positional([right_ty]),
+                                        CallArgumentTypes::positional([right_ty]),
                                     )
                                     .map(|outcome| outcome.return_type(self.db()))
                             })
@@ -4661,7 +4718,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     .try_call_dunder(
                         self.db(),
                         op.dunder(),
-                        &CallArguments::positional([right_ty]),
+                        CallArgumentTypes::positional([right_ty]),
                     )
                     .map(|outcome| outcome.return_type(self.db()))
                     .ok();
@@ -4674,7 +4731,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             .try_call_dunder(
                                 self.db(),
                                 op.reflected_dunder(),
-                                &CallArguments::positional([left_ty]),
+                                CallArgumentTypes::positional([left_ty]),
                             )
                             .map(|outcome| outcome.return_type(self.db()))
                             .ok()
@@ -5325,7 +5382,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     .try_call_dunder(
                         db,
                         op.dunder(),
-                        &CallArguments::positional([Type::Instance(right)]),
+                        CallArgumentTypes::positional([Type::Instance(right)]),
                     )
                     .map(|outcome| outcome.return_type(db))
                     .ok()
@@ -5374,7 +5431,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                 contains_dunder
                     .try_call(
                         db,
-                        &CallArguments::positional([Type::Instance(right), Type::Instance(left)]),
+                        CallArgumentTypes::positional([
+                            Type::Instance(right),
+                            Type::Instance(left),
+                        ]),
                     )
                     .map(|bindings| bindings.return_type(db))
                     .ok()
@@ -5650,7 +5710,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 match value_ty.try_call_dunder(
                     self.db(),
                     "__getitem__",
-                    &CallArguments::positional([slice_ty]),
+                    CallArgumentTypes::positional([slice_ty]),
                 ) {
                     Ok(outcome) => return outcome.return_type(self.db()),
                     Err(err @ CallDunderError::PossiblyUnbound { .. }) => {
@@ -5671,7 +5731,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             value_node,
                             format_args!(
                                 "Method `__getitem__` of type `{}` is not callable on object of type `{}`",
-                                bindings.callable_type.display(self.db()),
+                                bindings.callable_type().display(self.db()),
                                 value_ty.display(self.db()),
                             ),
                         );
@@ -5712,7 +5772,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                             match ty.try_call(
                                 self.db(),
-                                &CallArguments::positional([value_ty, slice_ty]),
+                                CallArgumentTypes::positional([value_ty, slice_ty]),
                             ) {
                                 Ok(bindings) => return bindings.return_type(self.db()),
                                 Err(CallError(_, bindings)) => {
@@ -5721,7 +5781,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                         value_node,
                                         format_args!(
                                             "Method `__class_getitem__` of type `{}` is not callable on object of type `{}`",
-                                            bindings.callable_type.display(self.db()),
+                                            bindings.callable_type().display(self.db()),
                                             value_ty.display(self.db()),
                                         ),
                                     );
@@ -6981,13 +7041,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     Parameters::todo()
                 } else {
                     Parameters::new(parameter_types.iter().map(|param_type| {
-                        Parameter::new(
-                            Some(*param_type),
-                            ParameterKind::PositionalOnly {
-                                name: None,
-                                default_ty: None,
-                            },
-                        )
+                        Parameter::positional_only(None).with_annotated_type(*param_type)
                     }))
                 }
             }

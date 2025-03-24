@@ -266,7 +266,7 @@ mod flaky {
     );
 
     // Equal element sets of unions implies equivalence
-    // flaky at laest in part because of https://github.com/astral-sh/ruff/issues/15513
+    // flaky at least in part because of https://github.com/astral-sh/ruff/issues/15513
     type_property_test!(
         union_equivalence_not_order_dependent, db,
         forall types s, t, u.

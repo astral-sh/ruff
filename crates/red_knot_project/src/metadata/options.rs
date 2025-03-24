@@ -37,9 +37,17 @@ pub struct Options {
 
 impl Options {
     pub(crate) fn from_toml_str(content: &str, source: ValueSource) -> Result<Self, KnotTomlError> {
-        let _guard = ValueSourceGuard::new(source);
+        let _guard = ValueSourceGuard::new(source, true);
         let options = toml::from_str(content)?;
         Ok(options)
+    }
+
+    pub fn deserialize_with<'de, D>(source: ValueSource, deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let _guard = ValueSourceGuard::new(source, false);
+        Self::deserialize(deserializer)
     }
 
     pub(crate) fn to_program_settings(

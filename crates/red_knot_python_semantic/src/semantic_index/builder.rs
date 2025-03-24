@@ -229,7 +229,7 @@ impl<'db> SemanticIndexBuilder<'db> {
 
         let children_end = self.scopes.next_index();
         let popped_scope = &mut self.scopes[popped_scope_id];
-        popped_scope.extend_descendents(children_end);
+        popped_scope.extend_descendants(children_end);
 
         if !popped_scope.is_eager() {
             return popped_scope_id;
@@ -986,7 +986,7 @@ where
 
                 self.with_type_params(
                     NodeWithScopeRef::TypeAliasTypeParameters(type_alias),
-                    type_alias.type_params.as_ref(),
+                    type_alias.type_params.as_deref(),
                     |builder| {
                         builder.push_scope(NodeWithScopeRef::TypeAlias(type_alias));
                         builder.visit_expr(&type_alias.value);

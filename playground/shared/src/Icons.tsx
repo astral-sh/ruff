@@ -23,11 +23,17 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE
 
-export function File() {
+export function File({
+  width = 24,
+  height = 24,
+}: {
+  width?: number;
+  height?: number;
+}) {
   return (
     <svg
-      width="24"
-      height="24"
+      width={width}
+      height={height}
       viewBox="0 0 16 16"
       xmlns="http://www.w3.org/2000/svg"
     >
@@ -124,6 +130,7 @@ export function FormatterIR() {
     </svg>
   );
 }
+
 export function Comments() {
   return (
     <svg
@@ -174,7 +181,6 @@ export function Close() {
 }
 
 // https://github.com/material-extensions/vscode-material-icon-theme/blob/main/icons/python.svg
-// or use https://github.com/vscode-icons/vscode-icons/blob/master/icons/file_type_python.svg?short_path=677f216
 export function Python({
   height = 24,
   width = 24,
@@ -197,6 +203,55 @@ export function Python({
         fill="#fdd835"
         d="M17.959 7v2.68a2.85 2.85 0 0 1-2.85 2.859H9.86A2.85 2.85 0 0 0 7 15.389v3.75a2.86 2.86 0 0 0 2.86 2.86h4.28A2.86 2.86 0 0 0 17 19.14v-1.68h-4.291c-.39 0-.709-.57-.709-.96h7.14A2.86 2.86 0 0 0 22 13.64V9.86A2.86 2.86 0 0 0 19.14 7zM8.32 11.513l-.004.004c.012-.002.025-.001.038-.004zm6.54 7.276c.39 0 .71.3.71.89a.71.71 0 0 1-.71.71c-.4 0-.72-.12-.72-.71s.32-.89.72-.89z"
       />
+    </svg>
+  );
+}
+
+/** https://github.com/material-extensions/vscode-material-icon-theme/blob/main/icons/json.svg */
+export function Json({
+  height = 24,
+  width = 24,
+}: {
+  height?: number;
+  width?: number;
+}) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 -960 960 960"
+      width={width}
+      height={height}
+    >
+      <path
+        fill="#f9a825"
+        d="M560-160v-80h120q17 0 28.5-11.5T720-280v-80q0-38 22-69t58-44v-14q-36-13-58-44t-22-69v-80q0-17-11.5-28.5T680-720H560v-80h120q50 0 85 35t35 85v80q0 17 11.5 28.5T840-560h40v160h-40q-17 0-28.5 11.5T800-360v80q0 50-35 85t-85 35zm-280 0q-50 0-85-35t-35-85v-80q0-17-11.5-28.5T120-400H80v-160h40q17 0 28.5-11.5T160-600v-80q0-50 35-85t85-35h120v80H280q-17 0-28.5 11.5T240-680v80q0 38-22 69t-58 44v14q36 13 58 44t22 69v80q0 17 11.5 28.5T280-240h120v80z"
+      />
+    </svg>
+  );
+}
+
+/** https://github.com/material-extensions/vscode-material-icon-theme/blob/main/icons/jupyter.svg **/
+export function Jupyter({
+  height = 24,
+  width = 24,
+}: {
+  height?: number;
+  width?: number;
+}) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 32 32"
+      width={width}
+      height={height}
+    >
+      <path
+        fill="#f57c00"
+        d="M6.2 18a22.7 22.7 0 0 0 9.8 2 22.7 22.7 0 0 0 9.8-2 10.002 10.002 0 0 1-19.6 0m19.6-4a22.7 22.7 0 0 0-9.8-2 22.7 22.7 0 0 0-9.8 2 10.002 10.002 0 0 1 19.6 0"
+      />
+      <circle cx="27" cy="5" r="3" fill="#757575" />
+      <circle cx="5" cy="27" r="3" fill="#9e9e9e" />
+      <circle cx="5" cy="5" r="3" fill="#616161" />
     </svg>
   );
 }

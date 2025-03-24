@@ -11,7 +11,7 @@ use crate::{
         Boundness, LookupError, LookupResult, Symbol, SymbolAndQualifiers,
     },
     types::{
-        definition_expression_type, CallArguments, CallError, CallErrorKind, DynamicType,
+        definition_expression_type, CallArgumentTypes, CallError, CallErrorKind, DynamicType,
         MetaclassCandidate, TupleType, UnionBuilder, UnionType,
     },
     Db, KnownModule, Program,
@@ -279,13 +279,13 @@ impl<'db> Class<'db> {
             let namespace = KnownClass::Dict.to_instance(db);
 
             // TODO: Other keyword arguments?
-            let arguments = CallArguments::positional([name, bases, namespace]);
+            let arguments = CallArgumentTypes::positional([name, bases, namespace]);
 
-            let return_ty_result = match metaclass.try_call(db, &arguments) {
+            let return_ty_result = match metaclass.try_call(db, arguments) {
                 Ok(bindings) => Ok(bindings.return_type(db)),
 
                 Err(CallError(CallErrorKind::NotCallable, bindings)) => Err(MetaclassError {
-                    kind: MetaclassErrorKind::NotCallable(bindings.callable_type),
+                    kind: MetaclassErrorKind::NotCallable(bindings.callable_type()),
                 }),
 
                 // TODO we should also check for binding errors that would indicate the metaclass

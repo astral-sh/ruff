@@ -224,6 +224,9 @@ impl SearchPaths {
 
         let site_packages_paths = match python_path {
             PythonPath::SysPrefix(sys_prefix, origin) => {
+                tracing::debug!(
+                    "Discovering site-packages paths from sys-prefix `{sys_prefix}` ({origin}')"
+                );
                 // TODO: We may want to warn here if the venv's python version is older
                 //  than the one resolved in the program settings because it indicates
                 //  that the `target-version` is incorrectly configured or that the

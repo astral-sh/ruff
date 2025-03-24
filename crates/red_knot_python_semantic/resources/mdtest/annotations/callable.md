@@ -152,6 +152,39 @@ def _(c: Callable[[int, str], int]):
     reveal_type(c)  # revealed: (int, str, /) -> int
 ```
 
+## Union
+
+```py
+from typing import Callable, Union
+
+def _(
+    c: Callable[[Union[int, str]], int] | None,
+    d: None | Callable[[Union[int, str]], int],
+    e: None | Callable[[Union[int, str]], int] | int,
+):
+    reveal_type(c)  # revealed: ((int | str, /) -> int) | None
+    reveal_type(d)  # revealed: None | ((int | str, /) -> int)
+    reveal_type(e)  # revealed: None | ((int | str, /) -> int) | int
+```
+
+## Intersection
+
+```py
+from typing import Callable, Union
+from knot_extensions import Intersection, Not
+
+def _(
+    c: Intersection[Callable[[Union[int, str]], int], int],
+    d: Intersection[int, Callable[[Union[int, str]], int]],
+    e: Intersection[int, Callable[[Union[int, str]], int], str],
+    f: Intersection[Not[Callable[[int, str], Intersection[int, str]]]],
+):
+    reveal_type(c)  # revealed: ((int | str, /) -> int) & int
+    reveal_type(d)  # revealed: int & ((int | str, /) -> int)
+    reveal_type(e)  # revealed: int & ((int | str, /) -> int) & str
+    reveal_type(f)  # revealed: ~((int, str, /) -> int & str)
+```
+
 ## Nested
 
 A nested `Callable` as one of the parameter types:

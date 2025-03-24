@@ -1055,6 +1055,52 @@ def mvce(keys, values):
 }
 
 #[test]
+fn show_statistics_syntax_errors() {
+    let mut cmd = RuffCheck::default()
+        .args(["--statistics", "--target-version=py39", "--preview"])
+        .build();
+
+    // ParseError
+    assert_cmd_snapshot!(
+        cmd.pass_stdin("x ="),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    1		syntax-error
+    Found 1 error.
+
+    ----- stderr -----
+    ");
+
+    // match before 3.10, UnsupportedSyntaxError
+    assert_cmd_snapshot!(
+        cmd.pass_stdin("match 2:\n  case 1: ..."),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    1		syntax-error
+    Found 1 error.
+
+    ----- stderr -----
+    ");
+
+    // rebound comprehension variable, SemanticSyntaxError
+    assert_cmd_snapshot!(
+        cmd.pass_stdin("[x := 1 for x in range(0)]"),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    1		syntax-error
+    Found 1 error.
+
+    ----- stderr -----
+    ");
+}
+
+#[test]
 fn preview_enabled_prefix() {
     // All the RUF9XX test rules should be triggered
     let mut cmd = RuffCheck::default()

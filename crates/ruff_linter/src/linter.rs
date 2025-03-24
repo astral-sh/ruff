@@ -6,6 +6,7 @@ use std::path::Path;
 use anyhow::{anyhow, Result};
 use colored::Colorize;
 use itertools::Itertools;
+use ruff_python_parser::semantic_errors::SemanticSyntaxError;
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::Diagnostic;
@@ -43,9 +44,9 @@ pub struct LinterResult {
     /// Flag indicating that the parsed source code does not contain any
     /// [`ParseError`]s
     has_valid_syntax: bool,
-    /// Flag indicating that the parsed source code does not contain any
-    /// [`UnsupportedSyntaxError`]s
-    has_no_unsupported_syntax_errors: bool,
+    /// Flag indicating that the parsed source code does not contain any [`ParseError`]s,
+    /// [`UnsupportedSyntaxError`]s, or [`SemanticSyntaxError`]s.
+    has_no_syntax_errors: bool,
 }
 
 impl LinterResult {
@@ -62,7 +63,7 @@ impl LinterResult {
     ///
     /// See [`LinterResult::has_valid_syntax`] for a version specific to [`ParseError`]s.
     pub fn has_no_syntax_errors(&self) -> bool {
-        self.has_valid_syntax() && self.has_no_unsupported_syntax_errors
+        self.has_valid_syntax() && self.has_no_syntax_errors
     }
 
     /// Returns `true` if the parsed source code is valid i.e., it has no [`ParseError`]s.
@@ -113,6 +114,9 @@ pub fn check_path(
 ) -> Vec<Message> {
     // Aggregate all diagnostics.
     let mut diagnostics = vec![];
+
+    // Aggregate all semantic syntax errors.
+    let mut semantic_syntax_errors = vec![];
 
     let tokens = parsed.tokens();
     let comment_ranges = indexer.comment_ranges();
@@ -172,35 +176,33 @@ pub fn check_path(
 
     // Run the AST-based rules only if there are no syntax errors.
     if parsed.has_valid_syntax() {
-        let use_ast = settings
-            .rules
-            .iter_enabled()
-            .any(|rule_code| rule_code.lint_source().is_ast());
+        let cell_offsets = source_kind.as_ipy_notebook().map(Notebook::cell_offsets);
+        let notebook_index = source_kind.as_ipy_notebook().map(Notebook::index);
+
+        let (new_diagnostics, new_semantic_syntax_errors) = check_ast(
+            parsed,
+            locator,
+            stylist,
+            indexer,
+            &directives.noqa_line_for,
+            settings,
+            noqa,
+            path,
+            package,
+            source_type,
+            cell_offsets,
+            notebook_index,
+            target_version,
+        );
+        diagnostics.extend(new_diagnostics);
+        semantic_syntax_errors.extend(new_semantic_syntax_errors);
+
         let use_imports = !directives.isort.skip_file
             && settings
                 .rules
                 .iter_enabled()
                 .any(|rule_code| rule_code.lint_source().is_imports());
-        if use_ast || use_imports || use_doc_lines {
-            let cell_offsets = source_kind.as_ipy_notebook().map(Notebook::cell_offsets);
-            let notebook_index = source_kind.as_ipy_notebook().map(Notebook::index);
-            if use_ast {
-                diagnostics.extend(check_ast(
-                    parsed,
-                    locator,
-                    stylist,
-                    indexer,
-                    &directives.noqa_line_for,
-                    settings,
-                    noqa,
-                    path,
-                    package,
-                    source_type,
-                    cell_offsets,
-                    notebook_index,
-                    target_version,
-                ));
-            }
+        if use_imports || use_doc_lines {
             if use_imports {
                 let import_diagnostics = check_imports(
                     parsed,
@@ -368,6 +370,7 @@ pub fn check_path(
         diagnostics,
         parsed.errors(),
         syntax_errors,
+        &semantic_syntax_errors,
         path,
         locator,
         directives,
@@ -482,9 +485,9 @@ pub fn lint_only(
     );
 
     LinterResult {
-        messages,
         has_valid_syntax: parsed.has_valid_syntax(),
-        has_no_unsupported_syntax_errors: parsed.unsupported_syntax_errors().is_empty(),
+        has_no_syntax_errors: !messages.iter().any(Message::is_syntax_error),
+        messages,
     }
 }
 
@@ -493,6 +496,7 @@ fn diagnostics_to_messages(
     diagnostics: Vec<Diagnostic>,
     parse_errors: &[ParseError],
     unsupported_syntax_errors: &[UnsupportedSyntaxError],
+    semantic_syntax_errors: &[SemanticSyntaxError],
     path: &Path,
     locator: &Locator,
     directives: &Directives,
@@ -514,6 +518,11 @@ fn diagnostics_to_messages(
         .chain(unsupported_syntax_errors.iter().map(|syntax_error| {
             Message::from_unsupported_syntax_error(syntax_error, file.deref().clone())
         }))
+        .chain(
+            semantic_syntax_errors
+                .iter()
+                .map(|error| Message::from_semantic_syntax_error(error, file.deref().clone())),
+        )
         .chain(diagnostics.into_iter().map(|diagnostic| {
             let noqa_offset = directives.noqa_line_for.resolve(diagnostic.start());
             Message::from_diagnostic(diagnostic, file.deref().clone(), noqa_offset)
@@ -545,7 +554,7 @@ pub fn lint_fix<'a>(
     let mut has_valid_syntax = false;
 
     // Track whether the _initial_ source code has no unsupported syntax errors.
-    let mut has_no_unsupported_syntax_errors = false;
+    let mut has_no_syntax_errors = false;
 
     let target_version = settings.resolve_target_version(path);
 
@@ -589,12 +598,12 @@ pub fn lint_fix<'a>(
 
         if iterations == 0 {
             has_valid_syntax = parsed.has_valid_syntax();
-            has_no_unsupported_syntax_errors = parsed.unsupported_syntax_errors().is_empty();
+            has_no_syntax_errors = !messages.iter().any(Message::is_syntax_error);
         } else {
             // If the source code had no syntax errors on the first pass, but
             // does on a subsequent pass, then we've introduced a
             // syntax error. Return the original code.
-            if has_valid_syntax && has_no_unsupported_syntax_errors {
+            if has_valid_syntax && has_no_syntax_errors {
                 if let Some(error) = parsed.errors().first() {
                     report_fix_syntax_error(
                         path,
@@ -636,7 +645,7 @@ pub fn lint_fix<'a>(
             result: LinterResult {
                 messages,
                 has_valid_syntax,
-                has_no_unsupported_syntax_errors,
+                has_no_syntax_errors,
             },
             transformed,
             fixed,
