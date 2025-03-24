@@ -9,7 +9,7 @@ use std::fmt::Display;
 use ruff_python_ast::{
     self as ast,
     visitor::{walk_expr, Visitor},
-    Expr, PythonVersion, Stmt, StmtExpr, StmtImportFrom,
+    Expr, Pattern, PythonVersion, Stmt, StmtExpr, StmtImportFrom,
 };
 use ruff_text_size::{Ranged, TextRange};
 
@@ -61,6 +61,7 @@ impl SemanticSyntaxChecker {
         }
 
         Self::duplicate_type_parameter_name(stmt, ctx);
+        Self::multiple_case_assignment(stmt, ctx);
     }
 
     fn duplicate_type_parameter_name<Ctx: SemanticSyntaxContext>(stmt: &ast::Stmt, ctx: &Ctx) {
@@ -106,6 +107,20 @@ impl SemanticSyntaxChecker {
                     type_param.range(),
                 );
             }
+        }
+    }
+
+    fn multiple_case_assignment<Ctx: SemanticSyntaxContext>(stmt: &Stmt, ctx: &Ctx) {
+        let Stmt::Match(ast::StmtMatch { cases, .. }) = stmt else {
+            return;
+        };
+
+        for case in cases {
+            let mut visitor = MultipleCaseAssignmentVisitor {
+                names: Vec::new(),
+                ctx,
+            };
+            visitor.visit_pattern(&case.pattern);
         }
     }
 
@@ -219,6 +234,9 @@ impl Display for SemanticSyntaxError {
             SemanticSyntaxErrorKind::DuplicateTypeParameter => {
                 f.write_str("duplicate type parameter")
             }
+            SemanticSyntaxErrorKind::MultipleCaseAssignment => {
+                f.write_str("multiple assignments in pattern")
+            }
         }
     }
 }
@@ -265,6 +283,18 @@ pub enum SemanticSyntaxErrorKind {
     /// class C[T, T]: ...
     /// ```
     DuplicateTypeParameter,
+
+    /// Represents a duplicate binding in a `case` pattern of a `match` statement.
+    ///
+    /// ## Examples
+    ///
+    /// ```python
+    /// match x:
+    ///     case [x, y, x]: ...
+    ///     case x as x: ...
+    ///     case Class(x=1, x=2): ...
+    /// ```
+    MultipleCaseAssignment,
 }
 
 /// Searches for the first named expression (`x := y`) rebinding one of the `iteration_variables` in
@@ -288,6 +318,99 @@ impl Visitor<'_> for ReboundComprehensionVisitor<'_> {
             };
         }
         walk_expr(self, expr);
+    }
+}
+
+struct MultipleCaseAssignmentVisitor<'a, Ctx> {
+    names: Vec<&'a ast::Identifier>,
+    ctx: &'a Ctx,
+}
+
+impl<'a, Ctx: SemanticSyntaxContext> MultipleCaseAssignmentVisitor<'a, Ctx> {
+    /// Check if `other` is present in `self.names` and emit an error if so.
+    fn push(&mut self, other: &'a ast::Identifier) {
+        for ident in &self.names {
+            if other.id == ident.id {
+                let range = if ident.range.start() > other.range.start() {
+                    ident.range
+                } else {
+                    other.range
+                };
+                SemanticSyntaxChecker::add_error(
+                    self.ctx,
+                    SemanticSyntaxErrorKind::MultipleCaseAssignment,
+                    range,
+                );
+                return;
+            }
+        }
+        self.names.push(other);
+    }
+
+    fn visit_pattern(&mut self, pattern: &'a Pattern) {
+        // test_err multiple_assignment_in_case_pattern
+        // match 2:
+        //     case x as x: ...  # MatchAs
+        //     case [y, z, y]: ...  # MatchSequence
+        //     case [y, z, *y]: ...  # MatchSequence
+        //     case [y, y, y]: ...  # MatchSequence multiple
+        //     case {1: x, 2: x}: ...  # MatchMapping duplicate pattern
+        //     case {1: x, **x}: ...  # MatchMapping duplicate in **rest
+        //     case Class(x, x): ...  # MatchClass positional
+        //     case Class(x=1, x=2): ...  # MatchClass keyword
+        //     case [x] | {1: x} | Class(x=1, x=2): ...  # MatchOr
+
+        // test_ok multiple_assignment_in_case_pattern
+        // match 2:
+        //     case Class(x) | [x] | x: ...
+        match pattern {
+            Pattern::MatchValue(_) | Pattern::MatchSingleton(_) => {}
+            Pattern::MatchStar(ast::PatternMatchStar { name, .. }) => {
+                if let Some(name) = name {
+                    self.push(name);
+                }
+            }
+            Pattern::MatchSequence(ast::PatternMatchSequence { patterns, .. }) => {
+                for pattern in patterns {
+                    self.visit_pattern(pattern);
+                }
+            }
+            Pattern::MatchMapping(ast::PatternMatchMapping { patterns, rest, .. }) => {
+                for pattern in patterns {
+                    self.visit_pattern(pattern);
+                }
+                if let Some(rest) = rest {
+                    self.push(rest);
+                }
+            }
+            Pattern::MatchClass(ast::PatternMatchClass { arguments, .. }) => {
+                for pattern in &arguments.patterns {
+                    self.visit_pattern(pattern);
+                }
+                for keyword in &arguments.keywords {
+                    self.push(&keyword.attr);
+                    self.visit_pattern(&keyword.pattern);
+                }
+            }
+            Pattern::MatchAs(ast::PatternMatchAs { pattern, name, .. }) => {
+                if let Some(name) = name {
+                    self.push(name);
+                }
+                if let Some(pattern) = pattern {
+                    self.visit_pattern(pattern);
+                }
+            }
+            Pattern::MatchOr(ast::PatternMatchOr { patterns, .. }) => {
+                // each of these patterns should be visited separately
+                for pattern in patterns {
+                    let mut visitor = Self {
+                        names: Vec::new(),
+                        ctx: self.ctx,
+                    };
+                    visitor.visit_pattern(pattern);
+                }
+            }
+        }
     }
 }
 
