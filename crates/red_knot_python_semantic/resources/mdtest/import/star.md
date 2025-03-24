@@ -834,6 +834,35 @@ reveal_type(g)  # revealed: Unknown
 reveal_type(h)  # revealed: Unknown
 ```
 
+## Cyclic star imports
+
+Believe it or not, this code does _not_ raise an exception at runtime!
+
+`a.py`:
+
+```py
+from b import *
+
+A: bool = True
+```
+
+`b.py`:
+
+```py
+from a import *
+
+B: bool = True
+```
+
+`c.py`:
+
+```py
+from a import *
+
+reveal_type(A)  # revealed: bool
+reveal_type(B)  # revealed: bool
+```
+
 ## Integration test: `collections.abc`
 
 The `collections.abc` standard-library module provides a good integration test, as all its symbols
