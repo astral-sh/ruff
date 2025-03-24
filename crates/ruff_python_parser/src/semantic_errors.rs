@@ -331,15 +331,10 @@ impl<'a, Ctx: SemanticSyntaxContext> MultipleCaseAssignmentVisitor<'a, Ctx> {
     fn push(&mut self, other: &'a ast::Identifier) {
         for ident in &self.names {
             if other.id == ident.id {
-                let range = if ident.range.start() > other.range.start() {
-                    ident.range
-                } else {
-                    other.range
-                };
                 SemanticSyntaxChecker::add_error(
                     self.ctx,
                     SemanticSyntaxErrorKind::MultipleCaseAssignment,
-                    range,
+                    other.range,
                 );
                 return;
             }
@@ -393,11 +388,11 @@ impl<'a, Ctx: SemanticSyntaxContext> MultipleCaseAssignmentVisitor<'a, Ctx> {
                 }
             }
             Pattern::MatchAs(ast::PatternMatchAs { pattern, name, .. }) => {
-                if let Some(name) = name {
-                    self.push(name);
-                }
                 if let Some(pattern) = pattern {
                     self.visit_pattern(pattern);
+                }
+                if let Some(name) = name {
+                    self.push(name);
                 }
             }
             Pattern::MatchOr(ast::PatternMatchOr { patterns, .. }) => {
