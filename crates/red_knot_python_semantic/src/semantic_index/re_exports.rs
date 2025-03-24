@@ -34,35 +34,13 @@ struct ExportFinder<'db> {
     exports: FxHashSet<Name>,
 }
 
-impl<'db> ExportFinder<'db> {
+impl ExportFinder<'_> {
     fn possibly_add_export(&mut self, name: &Name) {
         if name.starts_with('_') {
             return;
         }
         if !self.exports.contains(name) {
             self.exports.insert(name.clone());
-        }
-    }
-
-    fn visit_target(&mut self, target: &'db ast::Expr) {
-        match target {
-            ast::Expr::Name(ast::ExprName { id, .. }) => {
-                self.possibly_add_export(id);
-            }
-            ast::Expr::Tuple(tuple) => {
-                for element in tuple {
-                    self.visit_target(element);
-                }
-            }
-            ast::Expr::List(list) => {
-                for element in list {
-                    self.visit_target(element);
-                }
-            }
-            ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
-                self.visit_target(value);
-            }
-            _ => self.visit_expr(target),
         }
     }
 }
@@ -79,19 +57,6 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
         } else {
             self.possibly_add_export(&asname.as_ref().unwrap_or(name).id);
         }
-    }
-
-    fn visit_with_item(&mut self, with_item: &'db ast::WithItem) {
-        let ast::WithItem {
-            context_expr,
-            optional_vars,
-            range: _,
-        } = with_item;
-
-        if let Some(var) = optional_vars.as_deref() {
-            self.visit_target(var);
-        }
-        self.visit_expr(context_expr);
     }
 
     fn visit_pattern(&mut self, pattern: &'db ast::Pattern) {
@@ -146,17 +111,14 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
             ast::Stmt::ClassDef(ast::StmtClassDef {
                 name,
                 decorator_list,
-                type_params,
                 arguments,
-                body: _, // We don't want to visit the body of the class
+                type_params: _, // We don't want to visit the type params of the class
+                body: _,        // We don't want to visit the body of the class
                 range: _,
             }) => {
                 self.possibly_add_export(&name.id);
                 for decorator in decorator_list {
                     self.visit_decorator(decorator);
-                }
-                if let Some(type_params) = type_params {
-                    self.visit_type_params(type_params);
                 }
                 if let Some(arguments) = arguments {
                     self.visit_arguments(arguments);
@@ -167,8 +129,8 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                 decorator_list,
                 parameters,
                 returns,
-                type_params,
-                body: _, // We don't want to visit the body of the function
+                type_params: _, // We don't want to visit the type params of the function
+                body: _,        // We don't want to visit the body of the function
                 range: _,
                 is_async: _,
             }) => {
@@ -180,19 +142,6 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                 if let Some(returns) = returns {
                     self.visit_expr(returns);
                 }
-                if let Some(type_params) = type_params {
-                    self.visit_type_params(type_params);
-                }
-            }
-            ast::Stmt::Assign(ast::StmtAssign {
-                targets,
-                value,
-                range: _,
-            }) => {
-                for target in targets {
-                    self.visit_target(target);
-                }
-                self.visit_expr(value);
             }
             ast::Stmt::AnnAssign(ast::StmtAnnAssign {
                 target,
@@ -202,7 +151,7 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                 range: _,
             }) => {
                 if value.is_some() || self.file.is_stub(self.db.upcast()) {
-                    self.visit_target(target);
+                    self.visit_expr(target);
                 }
                 self.visit_expr(annotation);
                 if let Some(value) = value {
@@ -215,26 +164,9 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                 value: _,
                 range: _,
             }) => {
-                self.visit_target(name);
+                self.visit_expr(name);
                 // Neither walrus expressions nor statements cannot appear in type aliases;
                 // no need to recursively visit the `value` or `type_params`
-            }
-            ast::Stmt::For(ast::StmtFor {
-                target,
-                iter,
-                body,
-                orelse,
-                range: _,
-                is_async: _,
-            }) => {
-                self.visit_target(target);
-                self.visit_expr(iter);
-                for child in body {
-                    self.visit_stmt(child);
-                }
-                for child in orelse {
-                    self.visit_stmt(child);
-                }
             }
             ast::Stmt::ImportFrom(node) => {
                 let mut found_star = false;
@@ -265,6 +197,8 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
             | ast::Stmt::Assert(_)
             | ast::Stmt::Try(_)
             | ast::Stmt::Expr(_)
+            | ast::Stmt::For(_)
+            | ast::Stmt::Assign(_)
             | ast::Stmt::Match(_) => walk_stmt(self, stmt),
 
             ast::Stmt::Global(_)
@@ -281,18 +215,85 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
 
     fn visit_expr(&mut self, expr: &'db ast::Expr) {
         match expr {
-            ast::Expr::Named(ast::ExprNamed {
-                target,
+            ast::Expr::Name(ast::ExprName { id, ctx, range: _ }) => {
+                if ctx.is_store() {
+                    self.possibly_add_export(id);
+                }
+            }
+
+            ast::Expr::SetComp(ast::ExprSetComp {
+                elt,
+                generators,
+                range: _,
+            })
+            | ast::Expr::ListComp(ast::ExprListComp {
+                elt,
+                generators,
+                range: _,
+            })
+            | ast::Expr::Generator(ast::ExprGenerator {
+                elt,
+                generators,
+                range: _,
+                parenthesized: _,
+            }) => {
+                let mut walrus_finder = WalrusFinder {
+                    export_finder: self,
+                };
+                walrus_finder.visit_expr(elt);
+                for generator in generators {
+                    walrus_finder.visit_comprehension(generator);
+                }
+            }
+
+            ast::Expr::DictComp(ast::ExprDictComp {
+                key,
                 value,
+                generators,
                 range: _,
             }) => {
-                if let ast::Expr::Name(ast::ExprName { id, .. }) = &**target {
-                    self.possibly_add_export(id);
-                } else {
-                    self.visit_expr(target);
+                let mut walrus_finder = WalrusFinder {
+                    export_finder: self,
+                };
+                walrus_finder.visit_expr(key);
+                walrus_finder.visit_expr(value);
+                for generator in generators {
+                    walrus_finder.visit_comprehension(generator);
                 }
-                self.visit_expr(value);
             }
+
+            _ => walk_expr(self, expr),
+        }
+    }
+}
+
+struct WalrusFinder<'a, 'db> {
+    export_finder: &'a mut ExportFinder<'db>,
+}
+
+impl<'db> Visitor<'db> for WalrusFinder<'_, 'db> {
+    fn visit_expr(&mut self, expr: &'db ast::Expr) {
+        match expr {
+            ast::Expr::DictComp(_)
+            | ast::Expr::SetComp(_)
+            | ast::Expr::ListComp(_)
+            | ast::Expr::Generator(_) => {}
+
+            ast::Expr::Named(ast::ExprNamed {
+                target,
+                value: _,
+                range: _,
+            }) => {
+                if let ast::Expr::Name(ast::ExprName {
+                    id,
+                    ctx: ast::ExprContext::Store,
+                    range: _,
+                }) = &**target
+                {
+                    self.export_finder.possibly_add_export(id);
+                }
+            }
+
             _ => walk_expr(self, expr),
         }
     }

@@ -212,6 +212,60 @@ print((
 ))
 ```
 
+### Definitions in comprehension-like scopes are not global definitions
+
+Except for some cases involving walrus expressions.
+
+`a.py`:
+
+```py
+class Iterator:
+    def __next__(self) -> int:
+        return 42
+
+class Iterable:
+    def __iter__(self) -> Iterator:
+        return Iterator()
+
+[a for a in Iterable()]
+{b for b in Iterable()}
+{c: c for c in Iterable()}
+(d for d in Iterable())
+
+[(e := f * 2) for f in Iterable()]
+[g for h in Iterable() if (g := h - 10) > 0]
+{(i := j * 2): (k := j * 3) for j in Iterable()}
+```
+
+`b.py`:
+
+```py
+from a import *
+
+# error: [unresolved-reference]
+reveal_type(a)  # revealed: Unknown
+# error: [unresolved-reference]
+reveal_type(b)  # revealed: Unknown
+# error: [unresolved-reference]
+reveal_type(c)  # revealed: Unknown
+# error: [unresolved-reference]
+reveal_type(d)  # revealed: Unknown
+# error: [unresolved-reference]
+reveal_type(f)  # revealed: Unknown
+# error: [unresolved-reference]
+reveal_type(h)  # revealed: Unknown
+# error: [unresolved-reference]
+reveal_type(j)  # revealed: Unknown
+
+# TODO: these should all reveal `int`
+# (we don't generally model elsewhere in red-knot that bindings from walruses
+# "leak" from comprehension scopes into outer scopes, but we should)
+reveal_type(e)  # revealed: Unknown
+reveal_type(g)  # revealed: Unknown
+reveal_type(i)  # revealed: Unknown
+reveal_type(k)  # revealed: Unknown
+```
+
 ### An annotation without a value is a definition in a stub but not a `.py` file
 
 `a.pyi`:
