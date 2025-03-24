@@ -354,11 +354,44 @@ impl<'db> SemanticIndexBuilder<'db> {
         self.definitions_by_node.entry(key).or_default()
     }
 
+    /// Add a [`Definition`] associated with the `definition_node` AST node.
+    ///
+    /// ## Panics
+    ///
+    /// This method panics if `debug_assertions` are enabled and the `definition_node` AST node
+    /// already has a [`Definition`] associated with it. This is an important invariant to maintain
+    /// for all nodes *except* [`ast::Alias`] nodes representing `*` imports.
     fn add_definition(
         &mut self,
         symbol: ScopedSymbolId,
-        definition_node: impl Into<DefinitionNodeRef<'db>>,
+        definition_node: impl Into<DefinitionNodeRef<'db>> + std::fmt::Debug + Copy,
     ) -> Definition<'db> {
+        let (definition, num_definitions) =
+            self.push_additional_definition(symbol, definition_node);
+        debug_assert_eq!(
+            num_definitions,
+            1,
+            "Attempted to create multiple `Definition`s associated with AST node {definition_node:?}"
+        );
+        definition
+    }
+
+    /// Push a new [`Definition`] onto the list of definitions
+    /// associated with the `definition_node` AST node.
+    ///
+    /// Returns a 2-element tuple, where the first element is the newly created [`Definition`]
+    /// and the second element is the number of definitions that are now associated with
+    /// `definition_node`.
+    ///
+    /// This method should only be used when adding a definition associated with a `*` import.
+    /// All other nodes can only ever be associated with exactly 1 or 0 [`Definition`]s.
+    /// For any node other than an [`ast::Alias`] representing a `*` import,
+    /// prefer to use `self.add_definition()`, which ensures that this invariant is maintained.
+    fn push_additional_definition(
+        &mut self,
+        symbol: ScopedSymbolId,
+        definition_node: impl Into<DefinitionNodeRef<'db>>,
+    ) -> (Definition<'db>, usize) {
         let definition_node: DefinitionNodeRef<'_> = definition_node.into();
         #[allow(unsafe_code)]
         // SAFETY: `definition_node` is guaranteed to be a child of `self.module`
@@ -376,8 +409,11 @@ impl<'db> SemanticIndexBuilder<'db> {
             countme::Count::default(),
         );
 
-        self.add_entry_for_definition_key(definition_node.key())
-            .push(definition);
+        let num_definitions = {
+            let definitions = self.add_entry_for_definition_key(definition_node.key());
+            definitions.push(definition);
+            definitions.len()
+        };
 
         if category.is_binding() {
             self.mark_symbol_bound(symbol);
@@ -399,7 +435,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         try_node_stack_manager.record_definition(self);
         self.try_node_context_stack_manager = try_node_stack_manager;
 
-        definition
+        (definition, num_definitions)
     }
 
     fn record_expression_narrowing_constraint(
@@ -1043,7 +1079,7 @@ where
                         for export in exported_names(self.db, module.file()) {
                             let symbol_id = self.add_symbol(export.clone());
                             let node_ref = StarImportDefinitionNodeRef { node, symbol_id };
-                            self.add_definition(symbol_id, node_ref);
+                            self.push_additional_definition(symbol_id, node_ref);
                         }
 
                         continue;
