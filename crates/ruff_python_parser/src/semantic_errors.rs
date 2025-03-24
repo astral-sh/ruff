@@ -121,6 +121,7 @@ impl SemanticSyntaxChecker {
                 ctx,
             };
             visitor.visit_pattern(&case.pattern);
+            visitor.emit_errors();
         }
     }
 
@@ -327,19 +328,18 @@ struct MultipleCaseAssignmentVisitor<'a, Ctx> {
 }
 
 impl<'a, Ctx: SemanticSyntaxContext> MultipleCaseAssignmentVisitor<'a, Ctx> {
-    /// Check if `other` is present in `self.names` and emit an error if so.
-    fn push(&mut self, other: &'a ast::Identifier) {
-        for ident in &self.names {
-            if other.id == ident.id {
+    /// Emit [`SemanticSyntaxError`]s for every duplicate variable assignment.
+    fn emit_errors(mut self) {
+        self.names.sort_by_key(|name| &name.id);
+        for (n1, n2) in self.names.iter().zip(self.names.iter().skip(1)) {
+            if n1.id == n2.id {
                 SemanticSyntaxChecker::add_error(
                     self.ctx,
                     SemanticSyntaxErrorKind::MultipleCaseAssignment,
-                    other.range,
+                    n2.range,
                 );
-                return;
             }
         }
-        self.names.push(other);
     }
 
     fn visit_pattern(&mut self, pattern: &'a Pattern) {
@@ -362,7 +362,7 @@ impl<'a, Ctx: SemanticSyntaxContext> MultipleCaseAssignmentVisitor<'a, Ctx> {
             Pattern::MatchValue(_) | Pattern::MatchSingleton(_) => {}
             Pattern::MatchStar(ast::PatternMatchStar { name, .. }) => {
                 if let Some(name) = name {
-                    self.push(name);
+                    self.names.push(name);
                 }
             }
             Pattern::MatchSequence(ast::PatternMatchSequence { patterns, .. }) => {
@@ -375,7 +375,7 @@ impl<'a, Ctx: SemanticSyntaxContext> MultipleCaseAssignmentVisitor<'a, Ctx> {
                     self.visit_pattern(pattern);
                 }
                 if let Some(rest) = rest {
-                    self.push(rest);
+                    self.names.push(rest);
                 }
             }
             Pattern::MatchClass(ast::PatternMatchClass { arguments, .. }) => {
@@ -383,7 +383,7 @@ impl<'a, Ctx: SemanticSyntaxContext> MultipleCaseAssignmentVisitor<'a, Ctx> {
                     self.visit_pattern(pattern);
                 }
                 for keyword in &arguments.keywords {
-                    self.push(&keyword.attr);
+                    self.names.push(&keyword.attr);
                     self.visit_pattern(&keyword.pattern);
                 }
             }
@@ -392,7 +392,7 @@ impl<'a, Ctx: SemanticSyntaxContext> MultipleCaseAssignmentVisitor<'a, Ctx> {
                     self.visit_pattern(pattern);
                 }
                 if let Some(name) = name {
-                    self.push(name);
+                    self.names.push(name);
                 }
             }
             Pattern::MatchOr(ast::PatternMatchOr { patterns, .. }) => {
@@ -403,6 +403,7 @@ impl<'a, Ctx: SemanticSyntaxContext> MultipleCaseAssignmentVisitor<'a, Ctx> {
                         ctx: self.ctx,
                     };
                     visitor.visit_pattern(pattern);
+                    visitor.emit_errors();
                 }
             }
         }
