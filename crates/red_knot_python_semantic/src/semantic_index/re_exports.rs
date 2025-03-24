@@ -15,6 +15,10 @@
 //! separate query, we would need to complete semantic indexing on `bar` in order to
 //! complete analysis of the global namespace of `foo`. Since semantic indexing is somewhat
 //! expensive, this would be undesirable. A separate query allows us to avoid this issue.
+//!
+//! An additional concern is that the recursive nature of this query means that it must be able
+//! to handle cycles. We do this using fixpoint iteration; adding fixpoint iteration to the
+//! whole [`super::semantic_index()`] query would probably be prohibitively expensive.
 
 use ruff_db::{files::File, parsed::parsed_module};
 use ruff_python_ast::{
@@ -26,7 +30,20 @@ use rustc_hash::FxHashSet;
 
 use crate::{module_name::ModuleName, resolve_module, Db};
 
-#[salsa::tracked(return_ref)]
+fn exports_cycle_recover(
+    _db: &dyn Db,
+    _value: &FxHashSet<Name>,
+    _count: u32,
+    _file: File,
+) -> salsa::CycleRecoveryAction<FxHashSet<Name>> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn exports_cycle_initial(_db: &dyn Db, _file: File) -> FxHashSet<Name> {
+    FxHashSet::default()
+}
+
+#[salsa::tracked(return_ref, cycle_fn=exports_cycle_recover, cycle_initial=exports_cycle_initial)]
 pub(super) fn exported_names(db: &dyn Db, file: File) -> FxHashSet<Name> {
     let module = parsed_module(db.upcast(), file);
     let mut finder = ExportFinder::new(db, file);
