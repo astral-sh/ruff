@@ -99,7 +99,7 @@ export default function Chrome() {
         }
 
         if (!hasSettings) {
-          workspace.updateOptions(null);
+          updateOptions(workspace, null, setUpdateError);
         }
 
         dispatchFiles({
