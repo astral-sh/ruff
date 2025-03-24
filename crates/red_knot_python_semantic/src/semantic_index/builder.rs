@@ -249,7 +249,16 @@ impl<'db> SemanticIndexBuilder<'db> {
                 continue;
             }
 
+            let mut undefined_symbols = vec![];
+
             for nested_symbol in self.symbol_tables[popped_scope_id].symbols() {
+                let mut push_undefined_symbol = || {
+                    if (enclosing_scope_kind.is_eager() || enclosing_scope_kind.is_module())
+                        && nested_symbol.name() != "reveal_type"
+                    {
+                        undefined_symbols.push(nested_symbol.name().clone());
+                    }
+                };
                 // Skip this symbol if this enclosing scope doesn't contain any bindings for
                 // it, or if the nested scope _does_.
                 if nested_symbol.is_bound() {
@@ -258,15 +267,34 @@ impl<'db> SemanticIndexBuilder<'db> {
                 let Some(enclosing_symbol_id) =
                     enclosing_symbol_table.symbol_id_by_name(nested_symbol.name())
                 else {
+                    push_undefined_symbol();
                     continue;
                 };
                 let enclosing_symbol = enclosing_symbol_table.symbol(enclosing_symbol_id);
                 if !enclosing_symbol.is_bound() {
+                    push_undefined_symbol();
                     continue;
                 }
 
                 // Snapshot the bindings of this symbol that are visible at this point in this
                 // enclosing scope.
+                let key = EagerBindingsKey {
+                    enclosing_scope: enclosing_scope_id,
+                    enclosing_symbol: enclosing_symbol_id,
+                    nested_scope: popped_scope_id,
+                };
+                let eager_bindings = self.use_def_maps[enclosing_scope_id]
+                    .snapshot_eager_bindings(enclosing_symbol_id);
+                self.eager_bindings.insert(key, eager_bindings);
+            }
+
+            // We also need to snapshot the fact that there are no visible bindings in this enclosing scope.
+            for undefined_symbol in undefined_symbols {
+                let (enclosing_symbol_id, added) =
+                    self.symbol_tables[enclosing_scope_id].add_symbol(undefined_symbol);
+                if added {
+                    self.use_def_maps[enclosing_scope_id].add_symbol(enclosing_symbol_id);
+                }
                 let key = EagerBindingsKey {
                     enclosing_scope: enclosing_scope_id,
                     enclosing_symbol: enclosing_symbol_id,

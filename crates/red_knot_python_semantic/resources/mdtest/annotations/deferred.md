@@ -57,6 +57,7 @@ class Foo:
     _ = Foo()
     # error: [unresolved-reference]
     [Foo for _ in range(1)]
+    a = int
 
     def f(self, x: Foo):
         reveal_type(x)  # revealed: Foo
@@ -67,12 +68,23 @@ class Foo:
 
     class Bar:
         foo: Foo
+        b = int
 
-        def f(self, x: Foo) -> Bar:
+        def f(self, x: Foo):
             return self
+        # error: [unresolved-reference]
+        def g(self) -> Bar:
+            return self
+        # error: [unresolved-reference]
+        def h[T: Bar](self):
+            pass
 
         class Baz[T: Foo]:
             pass
+
+        # error: [unresolved-reference]
+        type S = a
+        type T = b
 
     def h[T: Bar]():
         # error: [unresolved-reference]
@@ -91,6 +103,7 @@ class Foo:
     _ = Foo()
     # error: [unresolved-reference]
     [Foo for _ in range(1)]
+    a = int
 
     # error: [unresolved-reference]
     def f(self, x: Foo):
@@ -103,14 +116,24 @@ class Foo:
     class Bar:
         # error: [unresolved-reference]
         foo: Foo
+        b = int
 
         # error: [unresolved-reference]
-        # error: [unresolved-reference]
-        def f(self, x: Foo) -> Bar:
+        def f(self, x: Foo):
             return self
+        # error: [unresolved-reference]
+        def g(self) -> Bar:
+            return self
+        # error: [unresolved-reference]
+        def h[T: Bar](self):
+            pass
 
         class Baz[T: Foo]:
             pass
+
+        # error: [unresolved-reference]
+        type S = a
+        type T = b
 
     def h[T: Bar]():
         # error: [unresolved-reference]

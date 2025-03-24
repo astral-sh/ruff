@@ -114,12 +114,8 @@ impl<'db> ScopeId<'db> {
         self.node(db).scope_kind().is_function_like()
     }
 
-    pub(crate) fn is_eager(self, db: &'db dyn Db) -> bool {
-        self.node(db).scope_kind().is_eager()
-    }
-
-    pub(crate) fn is_annotation(self, db: &'db dyn Db) -> bool {
-        self.node(db).scope_kind() == ScopeKind::Annotation
+    pub(crate) fn is_type_parameter(self, db: &'db dyn Db) -> bool {
+        self.node(db).scope_kind().is_type_parameter()
     }
 
     pub(crate) fn node(self, db: &dyn Db) -> &NodeWithScopeKind {
@@ -258,6 +254,14 @@ impl ScopeKind {
 
     pub(crate) fn is_class(self) -> bool {
         matches!(self, ScopeKind::Class)
+    }
+
+    pub(crate) fn is_module(self) -> bool {
+        matches!(self, ScopeKind::Module)
+    }
+
+    pub(crate) fn is_type_parameter(self) -> bool {
+        matches!(self, ScopeKind::Annotation | ScopeKind::TypeAlias)
     }
 }
 

@@ -157,7 +157,7 @@ the right-hand side is not a subtype of the left-hand side, `lhs.__add__` will t
 
 ```py
 class A:
-    def __add__(self, other: B) -> int:
+    def __add__(self, other: "B") -> int:
         return 42
 
 class B:

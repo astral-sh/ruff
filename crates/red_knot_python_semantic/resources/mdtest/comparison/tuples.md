@@ -382,12 +382,12 @@ arbitrary objects to a `bool`, but a comparison of tuples will fail if the resul
 pair of elements at equivalent positions cannot be converted to a `bool`:
 
 ```py
+class NotBoolable:
+    __bool__: None = None
+
 class A:
     def __eq__(self, other) -> NotBoolable:
         return NotBoolable()
-
-class NotBoolable:
-    __bool__: None = None
 
 # error: [unsupported-bool-conversion]
 (A(),) == (A(),)

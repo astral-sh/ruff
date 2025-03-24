@@ -867,7 +867,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
         let index = semantic_index(&db, file);
         let global_table = index.symbol_table(FileScopeId::global());
 
-        assert_eq!(names(&global_table), vec!["iter1"]);
+        assert_eq!(names(&global_table), vec!["iter1", "iter2"]);
 
         let [(comprehension_scope_id, comprehension_scope)] = index
             .child_scopes(FileScopeId::global())
