@@ -875,7 +875,16 @@ impl<'src> Parser<'src> {
 
         // test_err star_slices
         // array[*start:*end]
-        if let Expr::Tuple(ast::ExprTuple { elts, .. }) = &slice {
+
+        // test_ok parenthesized_star_index_py310
+        // # parse_options: {"target-version": "3.10"}
+        // out[(*(slice(None) for _ in range(2)), *ind)] = 1
+        if let Expr::Tuple(ast::ExprTuple {
+            elts,
+            parenthesized: false,
+            ..
+        }) = &slice
+        {
             for elt in elts.iter().filter(|elt| elt.is_starred_expr()) {
                 self.add_unsupported_syntax_error(
                     UnsupportedSyntaxErrorKind::StarExpressionInIndex,
