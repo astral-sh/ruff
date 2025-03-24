@@ -262,9 +262,10 @@ reveal_type(h)  # revealed: Unknown
 # error: [unresolved-reference]
 reveal_type(j)  # revealed: Unknown
 
-# TODO: these should all reveal `int`
-# (we don't generally model elsewhere in red-knot that bindings from walruses
-# "leak" from comprehension scopes into outer scopes, but we should)
+# TODO: these should all reveal `Unknown | int`.
+# (We don't generally model elsewhere in red-knot that bindings from walruses
+# "leak" from comprehension scopes into outer scopes, but we should.)
+# See https://github.com/astral-sh/ruff/issues/16954
 reveal_type(g)  # revealed: Unknown
 reveal_type(i)  # revealed: Unknown
 reveal_type(k)  # revealed: Unknown
@@ -406,17 +407,27 @@ if sys.version_info >= (3, 11):
     X: bool = True
 else:
     Y: bool = False
+    Z: int = 42
 ```
 
 `b.py`:
 
 ```py
+Z: bool = True
+
 from a import *
 
 reveal_type(X)  # revealed: bool
 
 # TODO: should emit error: [unresolved-reference]
 reveal_type(Y)  # revealed: Unknown
+
+# TODO: The `*` import should not be considered a redefinition
+# of the global variable in this module, as the symbol in
+# the `a` module is in a branch that is statically known
+# to be dead code given the `python-version` configuration.
+# Thus this should reveal `Literal[True]`.
+reveal_type(Z)  # revealed: Unknown
 ```
 
 ### Relative `*` imports
@@ -771,6 +782,38 @@ reveal_type(X)  # revealed: bool
 
 # TODO this should have an [unresolved-reference] diagnostic and reveal `Unknown`
 reveal_type(Y)  # revealed: bool
+```
+
+## `global` statements in non-global scopes
+
+A `global` statement in a nested function scope, combined with a definition in the same function
+scope of the name that was declared `global`, can add a symbol to the global namespace.
+
+`a.py`:
+
+```py
+def f():
+    global g, h
+
+    g: bool = True
+
+f()
+```
+
+`b.py`:
+
+```py
+from a import *
+
+reveal_type(f)  # revealed: Literal[f]
+
+# TODO: false positive, should be `bool` with no diagnostic
+# error: [unresolved-reference]
+reveal_type(g)  # revealed: Unknown
+
+# this diagnostic is accurate, though!
+# error: [unresolved-reference]
+reveal_type(h)  # revealed: Unknown
 ```
 
 ## Integration test: `collections.abc`

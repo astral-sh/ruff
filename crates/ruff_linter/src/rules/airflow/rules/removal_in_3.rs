@@ -241,21 +241,9 @@ fn check_call_arguments(checker: &Checker, qualified_name: &QualifiedName, argum
                             Some("logical_date"),
                         ));
                     }
-                    ["airflow", .., "operators", "datetime", "BranchDateTimeOperator"] => {
-                        checker.report_diagnostics(diagnostic_for_argument(
-                            arguments,
-                            "use_task_execution_day",
-                            Some("use_task_logical_date"),
-                        ));
-                    }
-                    ["airflow", .., "operators", "weekday", "DayOfWeekSensor"] => {
-                        checker.report_diagnostics(diagnostic_for_argument(
-                            arguments,
-                            "use_task_execution_day",
-                            Some("use_task_logical_date"),
-                        ));
-                    }
-                    ["airflow", .., "operators", "weekday", "BranchDayOfWeekOperator"] => {
+                    ["airflow", .., "operators", "datetime", "BranchDateTimeOperator"]
+                    | ["airflow", .., "operators", "weekday", "DayOfWeekSensor" | "BranchDayOfWeekOperator"] =>
+                    {
                         checker.report_diagnostics(diagnostic_for_argument(
                             arguments,
                             "use_task_execution_day",
