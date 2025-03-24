@@ -1048,7 +1048,7 @@ where
                         //
                         // The reason why maintaining this invariant requires special handling here
                         // is that some `Alias` nodes may be associated with 0 definitions:
-                        // - If the import statement has multiple `*` names in the `names` list
+                        // - If the import statement has invalid syntax: multiple `*` names in the `names` list
                         //   (e.g. `from foo import *, bar, *`)
                         // - If the `*` import refers to a module that has 0 exported names.
                         // - If the module being imported from cannot be resolved.
