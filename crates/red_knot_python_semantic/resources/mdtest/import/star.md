@@ -148,6 +148,201 @@ reveal_type(X)  # revealed: Unknown
 reveal_type(Y)  # revealed: Unknown
 ```
 
+### Global-scope symbols defined in many other ways
+
+`a.py`:
+
+```py
+import typing
+from collections import OrderedDict
+from collections import OrderedDict as Foo
+
+A, B = 1, (C := 2)
+D: (E := 4) = (F := 5)  # error: [invalid-type-form]
+
+for G in [1]:
+    ...
+
+for (H := 4).whatever in [2]:  # error: [unresolved-attribute]
+    ...
+
+class I: ...
+
+def J(): ...
+
+type K = int
+
+with () as L:  # error: [invalid-context-manager]
+    ...
+
+match 42:
+    case {"something": M}:
+        ...
+    case [*N]:
+        ...
+    case [O]:
+        ...
+    case P | Q:
+        ...
+    case object(foo=R):
+        ...
+    case object(S):
+        ...
+    case T:
+        ...
+```
+
+`b.py`:
+
+```py
+from a import *
+
+# fmt: off
+
+print((
+    # TODO: false positive
+    A,  # error: [unresolved-reference]
+    # TODO: false positive
+    B,  # error: [unresolved-reference]
+    # TODO: false positive
+    C,  # error: [unresolved-reference]
+    # TODO: false positive
+    D,  # error: [unresolved-reference]
+    # TODO: false positive
+    E,  # error: [unresolved-reference]
+    # TODO: false positive
+    F,  # error: [unresolved-reference]
+    # TODO: could emit diagnostic about being possibly unbound, but this is a false positive
+    G,  # error: [unresolved-reference] "Name `G` used when not defined"
+    # TODO: false positive
+    H,  # error: [unresolved-reference]
+    # TODO: false positive
+    I,  # error: [unresolved-reference]
+    # TODO: false positive
+    J,  # error: [unresolved-reference]
+    # TODO: false positive
+    K,  # error: [unresolved-reference]
+    # TODO: false positive
+    L,  # error: [unresolved-reference]
+    # TODO: could emit diagnostic about being possibly unbound, but this is a false positive
+    M,  # error: [unresolved-reference] "Name `M` used when not defined"
+    # TODO: could emit diagnostic about being possibly unbound, but this is a false positive
+    N,  # error: [unresolved-reference] "Name `N` used when not defined"
+    # TODO: could emit diagnostic about being possibly unbound, but this is a false positive
+    O,  # error: [unresolved-reference] "Name `O` used when not defined"
+    # TODO: could emit diagnostic about being possibly unbound, but this is a false positive
+    P,  # error: [unresolved-reference] "Name `P` used when not defined"
+    # TODO: could emit diagnostic about being possibly unbound, but this is a false positive
+    Q,  # error: [unresolved-reference] "Name `Q` used when not defined"
+    # TODO: could emit diagnostic about being possibly unbound, but this is a false positive
+    R,  # error: [unresolved-reference] "Name `R` used when not defined"
+    # TODO: could emit diagnostic about being possibly unbound, but this is a false positive
+    S,  # error: [unresolved-reference] "Name `S` used when not defined"
+    # TODO: could emit diagnostic about being possibly unbound, but this is a false positive
+    T,  # error: [unresolved-reference] "Name `T` used when not defined"
+    # TODO: false positive
+    typing,  # error: [unresolved-reference]
+    # TODO: false positive
+    OrderedDict,  # error: [unresolved-reference]
+    # TODO: false positive
+    Foo,  # error: [unresolved-reference]
+))
+```
+
+### Definitions in function-like scopes are not global definitions
+
+Except for some cases involving walrus expressions inside comprehension scopes.
+
+`a.py`:
+
+```py
+class Iterator:
+    def __next__(self) -> int:
+        return 42
+
+class Iterable:
+    def __iter__(self) -> Iterator:
+        return Iterator()
+
+[a for a in Iterable()]
+{b for b in Iterable()}
+{c: c for c in Iterable()}
+(d for d in Iterable())
+lambda e: (f := 42)
+
+# Definitions created by walruses in a comprehension scope are unique;
+# they "leak out" of the scope and are stored in the surrounding scope
+[(g := h * 2) for h in Iterable()]
+[i for j in Iterable() if (i := j - 10) > 0]
+{(k := l * 2): (m := l * 3) for l in Iterable()}
+```
+
+`b.py`:
+
+```py
+from a import *
+
+# error: [unresolved-reference]
+reveal_type(a)  # revealed: Unknown
+# error: [unresolved-reference]
+reveal_type(b)  # revealed: Unknown
+# error: [unresolved-reference]
+reveal_type(c)  # revealed: Unknown
+# error: [unresolved-reference]
+reveal_type(d)  # revealed: Unknown
+# error: [unresolved-reference]
+reveal_type(e)  # revealed: Unknown
+# error: [unresolved-reference]
+reveal_type(f)  # revealed: Unknown
+# error: [unresolved-reference]
+reveal_type(h)  # revealed: Unknown
+# error: [unresolved-reference]
+reveal_type(j)  # revealed: Unknown
+
+# TODO: these should all reveal `Unknown | int` and should not have diagnostics.
+# (We don't generally model elsewhere in red-knot that bindings from walruses
+# "leak" from comprehension scopes into outer scopes, but we should.)
+# See https://github.com/astral-sh/ruff/issues/16954
+#
+# error: [unresolved-reference]
+reveal_type(g)  # revealed: Unknown
+# error: [unresolved-reference]
+reveal_type(i)  # revealed: Unknown
+# error: [unresolved-reference]
+reveal_type(k)  # revealed: Unknown
+# error: [unresolved-reference]
+reveal_type(m)  # revealed: Unknown
+```
+
+### An annotation without a value is a definition in a stub but not a `.py` file
+
+`a.pyi`:
+
+```pyi
+X: bool
+```
+
+`b.py`:
+
+```py
+Y: bool
+```
+
+`c.py`:
+
+```py
+from a import *
+from b import *
+
+# TODO: this is a false positive, should reveal `bool`
+# error: [unresolved-reference]
+reveal_type(X)  # revealed: Unknown
+
+# but this diagnostic is accurate!
+# error: [unresolved-reference]
+reveal_type(Y)  # revealed: Unknown
+```
+
 ### Global-scope names starting with underscores
 
 Global-scope names starting with underscores are not imported from a `*` import (unless the module
@@ -263,11 +458,14 @@ if sys.version_info >= (3, 11):
     X: bool = True
 else:
     Y: bool = False
+    Z: int = 42
 ```
 
 `b.py`:
 
 ```py
+Z: bool = True
+
 from a import *
 
 # TODO should not error, should reveal `bool`
@@ -276,6 +474,12 @@ reveal_type(X)  # revealed: Unknown
 
 # error: [unresolved-reference]
 reveal_type(Y)  # revealed: Unknown
+
+# The `*` import should not be considered a redefinition
+# of the global variable in this module, as the symbol in
+# the `a` module is in a branch that is statically known
+# to be dead code given the `python-version` configuration.
+reveal_type(Z)  # revealed: Literal[True]
 ```
 
 ### Relative `*` imports
@@ -662,6 +866,40 @@ reveal_type(X)  # revealed: Unknown
 reveal_type(Y)  # revealed: Unknown
 ```
 
+## `global` statements in non-global scopes
+
+A `global` statement in a nested function scope, combined with a definition in the same function
+scope of the name that was declared `global`, can add a symbol to the global namespace.
+
+`a.py`:
+
+```py
+def f():
+    global g, h
+
+    g: bool = True
+
+f()
+```
+
+`b.py`:
+
+```py
+from a import *
+
+# TODO: false positive, should be `Literal[f]` with no diagnostic
+# error: [unresolved-reference]
+reveal_type(f)  # revealed: Unknown
+
+# TODO: false positive, should be `bool` with no diagnostic
+# error: [unresolved-reference]
+reveal_type(g)  # revealed: Unknown
+
+# this diagnostic is accurate, though!
+# error: [unresolved-reference]
+reveal_type(h)  # revealed: Unknown
+```
+
 ## Integration test: `collections.abc`
 
 The `collections.abc` standard-library module provides a good integration test, as all its symbols
@@ -710,6 +948,47 @@ def f():
     # error: [unresolved-reference]
     reveal_type(X)  # revealed: Unknown
 ```
+
+### `*` combined with other aliases in the list
+
+`a.py`:
+
+```py
+X: bool = True
+_Y: bool = False
+_Z: bool = True
+```
+
+`b.py`:
+
+<!-- blacken-docs:off -->
+
+```py
+from a import *, _Y  # error: [invalid-syntax]
+
+# The import statement above is invalid syntax,
+# but it's pretty obvious that the user wanted to do a `*` import,
+# so we should import all public names from `a` anyway, to minimize cascading errors
+#
+# TODO: get rid of this error, reveal `bool`
+# error: [unresolved-reference]
+reveal_type(X)  # revealed: Unknown
+reveal_type(_Y)  # revealed: bool
+```
+
+These tests are more to assert that we don't panic on these various kinds of invalid syntax than
+anything else:
+
+`c.py`:
+
+```py
+from a import *, _Y  # error: [invalid-syntax]
+from a import _Y, *, _Z  # error: [invalid-syntax]
+from a import *, _Y as fooo  # error: [invalid-syntax]
+from a import *, *, _Y  # error: [invalid-syntax]
+```
+
+<!-- blacken-docs:on -->
 
 [python language reference for import statements]: https://docs.python.org/3/reference/simple_stmts.html#the-import-statement
 [typing spec]: https://typing.python.org/en/latest/spec/distributing.html#library-interface-public-and-private-symbols
