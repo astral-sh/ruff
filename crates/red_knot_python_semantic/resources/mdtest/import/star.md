@@ -242,15 +242,7 @@ list(((o := p * 2) for p in Iterable()))
 
 # A walrus expression nested inside several scopes *still* leaks out
 # to the global scope:
-[
-    [
-        [
-            [(q := r) for r in Iterable()]
-        ]
-        for _ in range(42)
-    ]
-    for _ in range(42)
-]
+[[[[(q := r) for r in Iterable()]] for _ in range(42)] for _ in range(42)]
 
 # A walrus inside a lambda inside a comprehension does not leak out
 [(lambda s=s: (t := 42))() for s in Iterable()]
