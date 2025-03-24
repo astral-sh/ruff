@@ -77,7 +77,7 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                 self.possibly_add_export(&name.id);
             }
         } else {
-            self.possibly_add_export(&name.id);
+            self.possibly_add_export(&asname.as_ref().unwrap_or(name).id);
         }
     }
 

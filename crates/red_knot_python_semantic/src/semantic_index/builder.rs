@@ -149,6 +149,10 @@ impl<'db> SemanticIndexBuilder<'db> {
         self.current_scope_info().file_scope_id
     }
 
+    fn current_scope_is_global_scope(&self) -> bool {
+        self.scope_stack.len() == 1
+    }
+
     /// Returns the scope ID of the surrounding class body scope if the current scope
     /// is a method inside a class body. Returns `None` otherwise, e.g. if the current
     /// scope is a function body outside of a class, or if the current scope is not a
@@ -999,6 +1003,18 @@ where
                 let mut found_star = false;
                 for (alias_index, alias) in node.names.iter().enumerate() {
                     if &alias.name == "*" {
+                        // The following line maintains the invariant that every AST node that
+                        // implements `Into<DefinitionNodeKey>` must have an entry in the
+                        // `definitions_by_node` map. Maintaining this invariant ensures that
+                        // `SemanticIndex::definitions` can always look up the definitions for a
+                        // given AST node without panicking.
+                        //
+                        // The reason why maintaining this invariant requires special handling here
+                        // is that some `Alias` nodes may be associated with 0 definitions:
+                        // - If the import statement has multiple `*` names in the `names` list
+                        //   (e.g. `from foo import *, bar, *`)
+                        // - If the `*` import refers to a module that has 0 exported names.
+                        // - If the module being imported from cannot be resolved.
                         self.add_entry_for_definition_key(alias.into());
 
                         if found_star {
@@ -1009,7 +1025,7 @@ where
 
                         // Wildcard imports are invalid syntax everywhere except the top-level scope,
                         // and thus do not bind any definitions anywhere else
-                        if self.current_scope() != self.scope_stack[0].file_scope_id {
+                        if !self.current_scope_is_global_scope() {
                             continue;
                         }
 

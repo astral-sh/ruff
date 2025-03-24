@@ -206,6 +206,9 @@ print((
     R,  # TODO: could emit diagnostic about being possibly unbound
     S,  # TODO: could emit diagnostic about being possibly unbound
     T,  # TODO: could emit diagnostic about being possibly unbound
+    typing,
+    OrderedDict,
+    Foo,
 ))
 ```
 

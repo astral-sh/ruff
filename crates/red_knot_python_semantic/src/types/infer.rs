@@ -1294,15 +1294,9 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
     }
 
-    fn infer_definition(&mut self, node: impl Into<DefinitionNodeKey>) {
-        let definitions = self.index.definitions(node);
-        debug_assert_eq!(
-            definitions.len(),
-            1,
-            "A `DefinitionNodeKey` should always be associated with exactly one `Definition` \
-            unless it is a `*` import"
-        );
-        self.extend(infer_definition_types(self.db(), definitions[0]));
+    fn infer_definition(&mut self, node: impl Into<DefinitionNodeKey> + std::fmt::Debug + Copy) {
+        let definition = self.index.expect_single_definition(node);
+        self.extend(infer_definition_types(self.db(), definition));
     }
 
     fn infer_function_definition_statement(&mut self, function: &ast::StmtFunctionDef) {
@@ -3709,11 +3703,10 @@ impl<'db> TypeInferenceBuilder<'db> {
     fn infer_named_expression(&mut self, named: &ast::ExprNamed) -> Type<'db> {
         // See https://peps.python.org/pep-0572/#differences-between-assignment-expressions-and-assignment-statements
         if named.target.is_name_expr() {
-            let definitions = self.index.definitions(named);
-            debug_assert_eq!(definitions.len(), 1);
-            let result = infer_definition_types(self.db(), definitions[0]);
+            let definition = self.index.expect_single_definition(named);
+            let result = infer_definition_types(self.db(), definition);
             self.extend(result);
-            result.binding_type(definitions[0])
+            result.binding_type(definition)
         } else {
             // For syntactically invalid targets, we still need to run type inference:
             self.infer_expression(&named.target);

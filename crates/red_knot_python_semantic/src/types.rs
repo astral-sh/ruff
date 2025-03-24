@@ -4174,9 +4174,9 @@ impl<'db> FunctionType<'db> {
     fn internal_signature(self, db: &'db dyn Db) -> Signature<'db> {
         let scope = self.body_scope(db);
         let function_stmt_node = scope.node(db).expect_function();
-        let definitions = semantic_index(db, scope.file(db)).definitions(function_stmt_node);
-        debug_assert_eq!(definitions.len(), 1);
-        Signature::from_function(db, definitions[0], function_stmt_node)
+        let definition =
+            semantic_index(db, scope.file(db)).expect_single_definition(function_stmt_node);
+        Signature::from_function(db, definition, function_stmt_node)
     }
 
     pub fn is_known(self, db: &'db dyn Db, known_function: KnownFunction) -> bool {
@@ -4928,12 +4928,10 @@ impl<'db> TypeAliasType<'db> {
     #[salsa::tracked]
     pub fn value_type(self, db: &'db dyn Db) -> Type<'db> {
         let scope = self.rhs_scope(db);
-
         let type_alias_stmt_node = scope.node(db).expect_type_alias();
-        let definitions = semantic_index(db, scope.file(db)).definitions(type_alias_stmt_node);
-        debug_assert_eq!(definitions.len(), 1);
-
-        definition_expression_type(db, definitions[0], &type_alias_stmt_node.value)
+        let definition =
+            semantic_index(db, scope.file(db)).expect_single_definition(type_alias_stmt_node);
+        definition_expression_type(db, definition, &type_alias_stmt_node.value)
     }
 }
 
@@ -5694,12 +5692,11 @@ pub(crate) mod tests {
 
             let function_node = function_body_scope.node(&db).expect_function();
 
-            let definitions =
-                semantic_index(&db, function_body_scope.file(&db)).definitions(function_node);
-            assert_eq!(definitions.len(), 1);
+            let function_definition = semantic_index(&db, function_body_scope.file(&db))
+                .expect_single_definition(function_node);
 
             assert_eq!(
-                KnownFunction::try_from_definition_and_name(&db, definitions[0], function_name),
+                KnownFunction::try_from_definition_and_name(&db, function_definition, function_name),
                 Some(function),
                 "The strum `EnumString` implementation appears to be incorrect for `{function_name}`"
             );

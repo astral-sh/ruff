@@ -14,7 +14,7 @@ use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::ast_ids::AstIds;
 use crate::semantic_index::attribute_assignment::AttributeAssignments;
 use crate::semantic_index::builder::SemanticIndexBuilder;
-use crate::semantic_index::definition::{DefinitionNodeKey, Definitions};
+use crate::semantic_index::definition::{Definition, DefinitionNodeKey, Definitions};
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::symbol::{
     FileScopeId, NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopedSymbolId, SymbolTable,
@@ -261,6 +261,27 @@ impl<'db> SemanticIndex<'db> {
         definition_key: impl Into<DefinitionNodeKey>,
     ) -> &Definitions<'db> {
         &self.definitions_by_node[&definition_key.into()]
+    }
+
+    /// Returns the [`definition::Definition`] salsa ingredient for `definition_key`.
+    ///
+    /// ## Panics
+    ///
+    /// If the number of definitions associated with the key is not exactly 1 and
+    /// the `debug_assertions` feature is enabled, this method will panic.
+    #[track_caller]
+    pub(crate) fn expect_single_definition(
+        &self,
+        definition_key: impl Into<DefinitionNodeKey> + std::fmt::Debug + Copy,
+    ) -> Definition<'db> {
+        let definitions = self.definitions(definition_key);
+        debug_assert_eq!(
+            definitions.len(),
+            1,
+            "Expected exactly one definition to be associated with AST node {definition_key:?} but found {}",
+            definitions.len()
+        );
+        definitions[0]
     }
 
     /// Returns the [`Expression`] ingredient for an expression node.

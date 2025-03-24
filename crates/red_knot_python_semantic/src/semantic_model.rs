@@ -168,9 +168,7 @@ impl HasType for ast::Alias {
             return Type::Never;
         }
         let index = semantic_index(model.db, model.file);
-        let definitions = index.definitions(self);
-        debug_assert_eq!(definitions.len(), 1);
-        binding_type(model.db, definitions[0])
+        binding_type(model.db, index.expect_single_definition(self))
     }
 }
 
