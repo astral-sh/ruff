@@ -21,6 +21,7 @@ pub(super) fn exported_names(db: &dyn Db, file: File) -> FxHashSet<Name> {
     let mut finder = ExportFinder {
         db,
         file,
+        visiting_stub_file: file.is_stub(db.upcast()),
         exports: FxHashSet::default(),
     };
 
@@ -31,6 +32,7 @@ pub(super) fn exported_names(db: &dyn Db, file: File) -> FxHashSet<Name> {
 struct ExportFinder<'db> {
     db: &'db dyn Db,
     file: File,
+    visiting_stub_file: bool,
     exports: FxHashSet<Name>,
 }
 
@@ -39,16 +41,14 @@ impl ExportFinder<'_> {
         if name.starts_with('_') {
             return;
         }
-        if !self.exports.contains(name) {
-            self.exports.insert(name.clone());
-        }
+        self.exports.insert(name.clone());
     }
 }
 
 impl<'db> Visitor<'db> for ExportFinder<'db> {
     fn visit_alias(&mut self, alias: &'db ast::Alias) {
         let ast::Alias { name, asname, .. } = alias;
-        if self.file.is_stub(self.db.upcast()) {
+        if self.visiting_stub_file {
             // If the source is a stub, names defined by imports are only exported
             // if they use the explicit `foo as foo` syntax:
             if asname.as_ref().is_some_and(|asname| asname.id == name.id) {
@@ -150,7 +150,7 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                 simple: _,
                 range: _,
             }) => {
-                if value.is_some() || self.file.is_stub(self.db.upcast()) {
+                if value.is_some() || self.visiting_stub_file {
                     self.visit_expr(target);
                 }
                 self.visit_expr(annotation);
