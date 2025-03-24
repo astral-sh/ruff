@@ -33,8 +33,6 @@
 //! the query cycle until a fixed-point is reached. Salsa has a built-in fixed limit on the number
 //! of iterations, so if we fail to converge, Salsa will eventually panic. (This should of course
 //! be considered a bug.)
-use std::num::NonZeroU32;
-
 use itertools::{Either, Itertools};
 use ruff_db::diagnostic::{DiagnosticId, Severity};
 use ruff_db::files::File;
@@ -45,8 +43,8 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use salsa;
 use salsa::plumbing::AsId;
 
-use crate::module_name::ModuleName;
-use crate::module_resolver::{file_to_module, resolve_module};
+use crate::module_name::{ModuleName, ModuleNameResolutionError};
+use crate::module_resolver::resolve_module;
 use crate::semantic_index::ast_ids::{HasScopedExpressionId, HasScopedUseId, ScopedExpressionId};
 use crate::semantic_index::definition::{
     AssignmentDefinitionKind, Definition, DefinitionKind, DefinitionNodeKey,
@@ -889,6 +887,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                     definition,
                 );
             }
+            DefinitionKind::StarImport(import) => {
+                self.infer_import_from_definition(import.import(), import.alias(), definition);
+            }
             DefinitionKind::Assignment(assignment) => {
                 self.infer_assignment_definition(assignment, definition);
             }
@@ -1336,8 +1337,8 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
     }
 
-    fn infer_definition(&mut self, node: impl Into<DefinitionNodeKey>) {
-        let definition = self.index.definition(node);
+    fn infer_definition(&mut self, node: impl Into<DefinitionNodeKey> + std::fmt::Debug + Copy) {
+        let definition = self.index.expect_single_definition(node);
         let result = infer_definition_types(self.db(), definition);
         self.extend(result);
     }
@@ -3027,7 +3028,18 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = import;
 
         for alias in names {
-            self.infer_definition(alias);
+            let definitions = self.index.definitions(alias);
+            if definitions.is_empty() {
+                // If the module couldn't be resolved while constructing the semantic index,
+                // this node won't have any definitions associated with it -- but we need to
+                // make sure that we still emit the diagnostic for the unresolvable module,
+                // since this will cause the import to fail at runtime.
+                self.resolve_import_from_module(import, alias);
+            } else {
+                for definition in definitions {
+                    self.extend(infer_definition_types(self.db(), *definition));
+                }
+            }
         }
     }
 
@@ -3079,52 +3091,13 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
     }
 
-    /// Given a `from .foo import bar` relative import, resolve the relative module
-    /// we're importing `bar` from into an absolute [`ModuleName`]
-    /// using the name of the module we're currently analyzing.
-    ///
-    /// - `level` is the number of dots at the beginning of the relative module name:
-    ///   - `from .foo.bar import baz` => `level == 1`
-    ///   - `from ...foo.bar import baz` => `level == 3`
-    /// - `tail` is the relative module name stripped of all leading dots:
-    ///   - `from .foo import bar` => `tail == "foo"`
-    ///   - `from ..foo.bar import baz` => `tail == "foo.bar"`
-    fn relative_module_name(
-        &self,
-        tail: Option<&str>,
-        level: NonZeroU32,
-    ) -> Result<ModuleName, ModuleNameResolutionError> {
-        let module = file_to_module(self.db(), self.file())
-            .ok_or(ModuleNameResolutionError::UnknownCurrentModule)?;
-        let mut level = level.get();
-
-        if module.kind().is_package() {
-            level = level.saturating_sub(1);
-        }
-
-        let mut module_name = module
-            .name()
-            .ancestors()
-            .nth(level as usize)
-            .ok_or(ModuleNameResolutionError::TooManyDots)?;
-
-        if let Some(tail) = tail {
-            let tail = ModuleName::new(tail).ok_or(ModuleNameResolutionError::InvalidSyntax)?;
-            module_name.extend(&tail);
-        }
-
-        Ok(module_name)
-    }
-
-    fn infer_import_from_definition(
+    /// Resolve the [`ModuleName`], and the type of the module, being referred to by an
+    /// [`ast::StmtImportFrom`] node. Emit a diagnostic if the module cannot be resolved.
+    fn resolve_import_from_module(
         &mut self,
-        import_from: &'db ast::StmtImportFrom,
+        import_from: &ast::StmtImportFrom,
         alias: &ast::Alias,
-        definition: Definition<'db>,
-    ) {
-        // TODO:
-        // - Absolute `*` imports (`from collections import *`)
-        // - Relative `*` imports (`from ...foo import *`)
+    ) -> Option<(ModuleName, Type<'db>)> {
         let ast::StmtImportFrom { module, level, .. } = import_from;
         // For diagnostics, we want to highlight the unresolvable
         // module and not the entire `from ... import ...` statement.
@@ -3134,32 +3107,20 @@ impl<'db> TypeInferenceBuilder<'db> {
             .unwrap_or_else(|| AnyNodeRef::from(import_from));
         let module = module.as_deref();
 
-        let module_name = if let Some(level) = NonZeroU32::new(*level) {
-            tracing::trace!(
-                "Resolving imported object `{}` from module `{}` relative to file `{}`",
-                alias.name,
-                format_import_from_module(level.get(), module),
-                self.file().path(self.db()),
-            );
-            self.relative_module_name(module, level)
-        } else {
-            tracing::trace!(
-                "Resolving imported object `{}` from module `{}`",
-                alias.name,
-                format_import_from_module(*level, module),
-            );
-            module
-                .and_then(ModuleName::new)
-                .ok_or(ModuleNameResolutionError::InvalidSyntax)
-        };
+        tracing::trace!(
+            "Resolving imported object `{}` from module `{}` into file `{}`",
+            alias.name,
+            format_import_from_module(*level, module),
+            self.file().path(self.db()),
+        );
+        let module_name = ModuleName::from_import_statement(self.db(), self.file(), import_from);
 
         let module_name = match module_name {
             Ok(module_name) => module_name,
             Err(ModuleNameResolutionError::InvalidSyntax) => {
                 tracing::debug!("Failed to resolve import due to invalid syntax");
                 // Invalid syntax diagnostics are emitted elsewhere.
-                self.add_unknown_declaration_with_binding(alias.into(), definition);
-                return;
+                return None;
             }
             Err(ModuleNameResolutionError::TooManyDots) => {
                 tracing::debug!(
@@ -3167,8 +3128,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     format_import_from_module(*level, module),
                 );
                 report_unresolved_module(&self.context, module_ref, *level, module);
-                self.add_unknown_declaration_with_binding(alias.into(), definition);
-                return;
+                return None;
             }
             Err(ModuleNameResolutionError::UnknownCurrentModule) => {
                 tracing::debug!(
@@ -3177,35 +3137,51 @@ impl<'db> TypeInferenceBuilder<'db> {
                     self.file().path(self.db())
                 );
                 report_unresolved_module(&self.context, module_ref, *level, module);
-                self.add_unknown_declaration_with_binding(alias.into(), definition);
-                return;
+                return None;
             }
         };
 
         let Some(module_ty) = self.module_type_from_name(&module_name) else {
             report_unresolved_module(&self.context, module_ref, *level, module);
+            return None;
+        };
+
+        Some((module_name, module_ty))
+    }
+
+    fn infer_import_from_definition(
+        &mut self,
+        import_from: &'db ast::StmtImportFrom,
+        alias: &ast::Alias,
+        definition: Definition<'db>,
+    ) {
+        let Some((module_name, module_ty)) = self.resolve_import_from_module(import_from, alias)
+        else {
             self.add_unknown_declaration_with_binding(alias.into(), definition);
             return;
         };
 
-        let ast::Alias {
-            range: _,
-            name,
-            asname: _,
-        } = alias;
+        // The indirection of having `star_import_info` as a separate variable
+        // is required in order to make the borrow checker happy.
+        let star_import_info = definition
+            .kind(self.db())
+            .as_star_import()
+            .map(|star_import| {
+                let symbol_table = self
+                    .index
+                    .symbol_table(self.scope().file_scope_id(self.db()));
+                (star_import, symbol_table)
+            });
 
-        if name == "*" {
-            self.add_declaration_with_binding(
-                alias.into(),
-                definition,
-                &DeclaredAndInferredType::AreTheSame(Type::Never),
-            );
-            return;
-        }
+        let name = if let Some((star_import, symbol_table)) = star_import_info.as_ref() {
+            symbol_table.symbol(star_import.symbol_id()).name()
+        } else {
+            &alias.name.id
+        };
 
         // First try loading the requested attribute from the module.
-        if let Symbol::Type(ty, boundness) = module_ty.member(self.db(), &name.id).symbol {
-            if boundness == Boundness::PossiblyUnbound {
+        if let Symbol::Type(ty, boundness) = module_ty.member(self.db(), name).symbol {
+            if &alias.name != "*" && boundness == Boundness::PossiblyUnbound {
                 // TODO: Consider loading _both_ the attribute and any submodule and unioning them
                 // together if the attribute exists but is possibly-unbound.
                 self.context.report_lint(
@@ -3250,11 +3226,14 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
         }
 
-        self.context.report_lint(
-            &UNRESOLVED_IMPORT,
-            AnyNodeRef::Alias(alias),
-            format_args!("Module `{module_name}` has no member `{name}`",),
-        );
+        if &alias.name != "*" {
+            self.context.report_lint(
+                &UNRESOLVED_IMPORT,
+                AnyNodeRef::Alias(alias),
+                format_args!("Module `{module_name}` has no member `{name}`",),
+            );
+        }
+
         self.add_unknown_declaration_with_binding(alias.into(), definition);
     }
 
@@ -3775,7 +3754,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     fn infer_named_expression(&mut self, named: &ast::ExprNamed) -> Type<'db> {
         // See https://peps.python.org/pep-0572/#differences-between-assignment-expressions-and-assignment-statements
         if named.target.is_name_expr() {
-            let definition = self.index.definition(named);
+            let definition = self.index.expect_single_definition(named);
             let result = infer_definition_types(self.db(), definition);
             self.extend(result);
             result.binding_type(definition)
@@ -7200,23 +7179,6 @@ fn format_import_from_module(level: u32, module: Option<&str>) -> String {
         ".".repeat(level as usize),
         module.unwrap_or_default()
     )
-}
-
-/// Various ways in which resolving a [`ModuleName`]
-/// from an [`ast::StmtImport`] or [`ast::StmtImportFrom`] node might fail
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-enum ModuleNameResolutionError {
-    /// The import statement has invalid syntax
-    InvalidSyntax,
-
-    /// We couldn't resolve the file we're currently analyzing back to a module
-    /// (Only necessary for relative import statements)
-    UnknownCurrentModule,
-
-    /// The relative import statement seems to take us outside of the module search path
-    /// (e.g. our current module is `foo.bar`, and the relative import statement in `foo.bar`
-    /// is `from ....baz import spam`)
-    TooManyDots,
 }
 
 /// Struct collecting string parts when inferring a formatted string. Infers a string literal if the

@@ -887,6 +887,19 @@ impl<'db> Type<'db> {
                 }
             }
 
+            // TODO: ditto for avoiding false positives when checking function calls with `Sized` parameters.
+            (lhs, Type::Instance(InstanceType { class }))
+                if class.is_known(db, KnownClass::Sized) =>
+            {
+                matches!(
+                    lhs.to_meta_type(db).member(db, "__len__"),
+                    SymbolAndQualifiers {
+                        symbol: Symbol::Type(..),
+                        ..
+                    }
+                )
+            }
+
             (
                 Type::Callable(CallableType::General(self_callable)),
                 Type::Callable(CallableType::General(target_callable)),
@@ -4161,7 +4174,8 @@ impl<'db> FunctionType<'db> {
     fn internal_signature(self, db: &'db dyn Db) -> Signature<'db> {
         let scope = self.body_scope(db);
         let function_stmt_node = scope.node(db).expect_function();
-        let definition = semantic_index(db, scope.file(db)).definition(function_stmt_node);
+        let definition =
+            semantic_index(db, scope.file(db)).expect_single_definition(function_stmt_node);
         Signature::from_function(db, definition, function_stmt_node)
     }
 
@@ -4921,10 +4935,9 @@ impl<'db> TypeAliasType<'db> {
     #[salsa::tracked]
     pub fn value_type(self, db: &'db dyn Db) -> Type<'db> {
         let scope = self.rhs_scope(db);
-
         let type_alias_stmt_node = scope.node(db).expect_type_alias();
-        let definition = semantic_index(db, scope.file(db)).definition(type_alias_stmt_node);
-
+        let definition =
+            semantic_index(db, scope.file(db)).expect_single_definition(type_alias_stmt_node);
         definition_expression_type(db, definition, &type_alias_stmt_node.value)
     }
 }
@@ -5688,8 +5701,8 @@ pub(crate) mod tests {
 
             let function_node = function_body_scope.node(&db).expect_function();
 
-            let function_definition =
-                semantic_index(&db, function_body_scope.file(&db)).definition(function_node);
+            let function_definition = semantic_index(&db, function_body_scope.file(&db))
+                .expect_single_definition(function_node);
 
             assert_eq!(
                 KnownFunction::try_from_definition_and_name(&db, function_definition, function_name),
