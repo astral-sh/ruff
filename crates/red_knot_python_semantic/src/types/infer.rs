@@ -76,6 +76,7 @@ use crate::types::diagnostic::{
     INVALID_TYPE_VARIABLE_CONSTRAINTS, POSSIBLY_UNBOUND_IMPORT, UNDEFINED_REVEAL,
     UNRESOLVED_ATTRIBUTE, UNRESOLVED_IMPORT, UNSUPPORTED_OPERATOR,
 };
+use crate::types::generics::GenericContext;
 use crate::types::mro::MroErrorKind;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
@@ -1633,6 +1634,10 @@ impl<'db> TypeInferenceBuilder<'db> {
             self.infer_decorator(decorator);
         }
 
+        let generic_context = type_params.as_ref().map(|type_params| {
+            GenericContext::from_type_params(self.db(), self.index, type_params)
+        });
+
         let body_scope = self
             .index
             .node_scope(NodeWithScopeRef::Class(class_node))
@@ -1640,7 +1645,13 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         let maybe_known_class = KnownClass::try_from_file_and_name(self.db(), self.file(), name);
 
-        let class = Class::new(self.db(), &name.id, body_scope, maybe_known_class);
+        let class = Class::new(
+            self.db(),
+            &name.id,
+            generic_context,
+            body_scope,
+            maybe_known_class,
+        );
         let class_ty = Type::class_literal(class);
 
         self.add_declaration_with_binding(

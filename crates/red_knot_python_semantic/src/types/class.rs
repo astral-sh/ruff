@@ -27,6 +27,7 @@ use super::{
     KnownFunction, Mro, MroError, MroIterator, SubclassOfType, Truthiness, Type, TypeAliasType,
     TypeQualifiers, TypeVarInstance,
 };
+use crate::types::generics::GenericContext;
 
 /// Representation of a runtime class object.
 ///
@@ -38,6 +39,7 @@ pub struct Class<'db> {
     #[return_ref]
     pub(crate) name: ast::name::Name,
 
+    generic_context: Option<GenericContext<'db>>,
     body_scope: ScopeId<'db>,
 
     pub(crate) known: Option<KnownClass>,
