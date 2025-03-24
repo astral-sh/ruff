@@ -238,6 +238,22 @@ lambda e: (f := 42)
 [(g := h * 2) for h in Iterable()]
 [i for j in Iterable() if (i := j - 10) > 0]
 {(k := l * 2): (m := l * 3) for l in Iterable()}
+list(((o := p * 2) for p in Iterable()))
+
+# A walrus expression nested inside several scopes *still* leaks out
+# to the global scope:
+[
+    [
+        [
+            [(q := r) for r in Iterable()]
+        ]
+        for _ in range(42)
+    ]
+    for _ in range(42)
+]
+
+# A walrus inside a lambda inside a comprehension does not leak out
+[(lambda s=s: (t := 42))() for s in Iterable()]
 ```
 
 `b.py`:
@@ -261,6 +277,14 @@ reveal_type(f)  # revealed: Unknown
 reveal_type(h)  # revealed: Unknown
 # error: [unresolved-reference]
 reveal_type(j)  # revealed: Unknown
+# error: [unresolved-reference]
+reveal_type(p)  # revealed: Unknown
+# error: [unresolved-reference]
+reveal_type(r)  # revealed: Unknown
+# error: [unresolved-reference]
+reveal_type(s)  # revealed: Unknown
+# error: [unresolved-reference]
+reveal_type(t)  # revealed: Unknown
 
 # TODO: these should all reveal `Unknown | int`.
 # (We don't generally model elsewhere in red-knot that bindings from walruses
@@ -270,6 +294,8 @@ reveal_type(g)  # revealed: Unknown
 reveal_type(i)  # revealed: Unknown
 reveal_type(k)  # revealed: Unknown
 reveal_type(m)  # revealed: Unknown
+reveal_type(o)  # revealed: Unknown
+reveal_type(q)  # revealed: Unknown
 ```
 
 ### An annotation without a value is a definition in a stub but not a `.py` file

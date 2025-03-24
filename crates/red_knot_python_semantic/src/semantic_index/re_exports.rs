@@ -286,13 +286,9 @@ struct WalrusFinder<'a, 'db> {
 impl<'db> Visitor<'db> for WalrusFinder<'_, 'db> {
     fn visit_expr(&mut self, expr: &'db ast::Expr) {
         match expr {
-            // anything that creates a nested scope or that cannot contain a walrus
-            // can be short-circuited
-            ast::Expr::DictComp(_)
-            | ast::Expr::SetComp(_)
-            | ast::Expr::ListComp(_)
-            | ast::Expr::Generator(_)
-            | ast::Expr::Lambda(_)
+            // It's important for us to short-circuit here for lambdas specifically,
+            // as walruses cannot leak out of the body of a lambda function.
+            ast::Expr::Lambda(_)
             | ast::Expr::BooleanLiteral(_)
             | ast::Expr::NoneLiteral(_)
             | ast::Expr::NumberLiteral(_)
@@ -316,7 +312,14 @@ impl<'db> Visitor<'db> for WalrusFinder<'_, 'db> {
                 }
             }
 
-            ast::Expr::BoolOp(_)
+            // We must recurse inside nested comprehensions,
+            // as even a walrus inside a comprehension inside a comprehension in the global scope
+            // will leak out into the global scope
+            ast::Expr::DictComp(_)
+            | ast::Expr::SetComp(_)
+            | ast::Expr::ListComp(_)
+            | ast::Expr::Generator(_)
+            | ast::Expr::BoolOp(_)
             | ast::Expr::BinOp(_)
             | ast::Expr::UnaryOp(_)
             | ast::Expr::If(_)
