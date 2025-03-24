@@ -29,7 +29,7 @@ use crate::{module_name::ModuleName, resolve_module, Db};
 #[salsa::tracked(return_ref)]
 pub(super) fn exported_names(db: &dyn Db, file: File) -> FxHashSet<Name> {
     let module = parsed_module(db.upcast(), file);
-    let mut finder = ExportFinder::new(db, file);
+    let mut finder = ExportFinder::new(db, file, ScopeKind::Global, FxHashSet::default());
     finder.visit_body(module.suite());
     finder.exports
 }
@@ -38,16 +38,20 @@ struct ExportFinder<'db> {
     db: &'db dyn Db,
     file: File,
     visiting_stub_file: bool,
+    scope_kind: ScopeKind,
     exports: FxHashSet<Name>,
+    global_declarations_in_scope: FxHashSet<&'db Name>,
 }
 
 impl<'db> ExportFinder<'db> {
-    fn new(db: &'db dyn Db, file: File) -> Self {
+    fn new(db: &'db dyn Db, file: File, scope_kind: ScopeKind, exports: FxHashSet<Name>) -> Self {
         Self {
             db,
             file,
             visiting_stub_file: file.is_stub(db.upcast()),
-            exports: FxHashSet::default(),
+            scope_kind,
+            exports,
+            global_declarations_in_scope: FxHashSet::default(),
         }
     }
 
@@ -55,13 +59,32 @@ impl<'db> ExportFinder<'db> {
         if name.starts_with('_') {
             return;
         }
+        if self.scope_kind.is_not_global() && !self.global_declarations_in_scope.contains(name) {
+            return;
+        }
         self.exports.insert(name.clone());
+    }
+
+    fn visit_inner_scope(&mut self, body: &'db [ast::Stmt]) {
+        let mut inner_visitor = ExportFinder::new(
+            self.db,
+            self.file,
+            ScopeKind::NotGlobal,
+            std::mem::take(&mut self.exports),
+        );
+        inner_visitor.visit_body(body);
+        self.exports = inner_visitor.exports;
     }
 }
 
 impl<'db> Visitor<'db> for ExportFinder<'db> {
     fn visit_alias(&mut self, alias: &'db ast::Alias) {
-        let ast::Alias { name, asname, .. } = alias;
+        let ast::Alias {
+            name,
+            asname,
+            range: _,
+        } = alias;
+
         if self.visiting_stub_file {
             // If the source is a stub, names defined by imports are only exported
             // if they use the explicit `foo as foo` syntax:
@@ -126,8 +149,8 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                 name,
                 decorator_list,
                 arguments,
+                body,
                 type_params: _, // We don't want to visit the type params of the class
-                body: _,        // We don't want to visit the body of the class
                 range: _,
             }) => {
                 self.possibly_add_export(&name.id);
@@ -137,14 +160,16 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                 if let Some(arguments) = arguments {
                     self.visit_arguments(arguments);
                 }
+                self.visit_inner_scope(body);
             }
+
             ast::Stmt::FunctionDef(ast::StmtFunctionDef {
                 name,
                 decorator_list,
                 parameters,
                 returns,
+                body,
                 type_params: _, // We don't want to visit the type params of the function
-                body: _,        // We don't want to visit the body of the function
                 range: _,
                 is_async: _,
             }) => {
@@ -156,7 +181,9 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                 if let Some(returns) = returns {
                     self.visit_expr(returns);
                 }
+                self.visit_inner_scope(body);
             }
+
             ast::Stmt::AnnAssign(ast::StmtAnnAssign {
                 target,
                 value,
@@ -172,6 +199,7 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                     self.visit_expr(value);
                 }
             }
+
             ast::Stmt::TypeAlias(ast::StmtTypeAlias {
                 name,
                 type_params: _,
@@ -182,11 +210,12 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                 // Neither walrus expressions nor statements cannot appear in type aliases;
                 // no need to recursively visit the `value` or `type_params`
             }
+
             ast::Stmt::ImportFrom(node) => {
                 let mut found_star = false;
                 for name in &node.names {
                     if &name.name.id == "*" {
-                        if !found_star {
+                        if !found_star && self.scope_kind.is_global() {
                             found_star = true;
                             self.exports.extend(
                                 ModuleName::from_import_statement(self.db, self.file, node)
@@ -203,6 +232,13 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                 }
             }
 
+            ast::Stmt::Global(ast::StmtGlobal { names, range: _ }) => {
+                if self.scope_kind.is_not_global() {
+                    self.global_declarations_in_scope
+                        .extend(names.iter().map(|name| &name.id));
+                }
+            }
+
             ast::Stmt::Import(_)
             | ast::Stmt::AugAssign(_)
             | ast::Stmt::While(_)
@@ -215,8 +251,7 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
             | ast::Stmt::Assign(_)
             | ast::Stmt::Match(_) => walk_stmt(self, stmt),
 
-            ast::Stmt::Global(_)
-            | ast::Stmt::Raise(_)
+            ast::Stmt::Raise(_)
             | ast::Stmt::Return(_)
             | ast::Stmt::Break(_)
             | ast::Stmt::Continue(_)
@@ -339,5 +374,21 @@ impl<'db> Visitor<'db> for WalrusFinder<'_, 'db> {
             | ast::Expr::Set(_)
             | ast::Expr::Await(_) => walk_expr(self, expr),
         }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ScopeKind {
+    Global,
+    NotGlobal,
+}
+
+impl ScopeKind {
+    const fn is_global(self) -> bool {
+        matches!(self, ScopeKind::Global)
+    }
+
+    const fn is_not_global(self) -> bool {
+        matches!(self, ScopeKind::NotGlobal)
     }
 }

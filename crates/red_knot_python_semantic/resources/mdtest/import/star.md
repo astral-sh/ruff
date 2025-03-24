@@ -807,6 +807,8 @@ reveal_type(Y)  # revealed: bool
 A `global` statement in a nested function scope, combined with a definition in the same function
 scope of the name that was declared `global`, can add a symbol to the global namespace.
 
+### Simple `global` statements
+
 `a.py`:
 
 ```py
@@ -816,6 +818,11 @@ def f():
     g: bool = True
 
 f()
+
+class Foo:
+    global i, j
+
+    i: bool = True
 ```
 
 `b.py`:
@@ -825,13 +832,70 @@ from a import *
 
 reveal_type(f)  # revealed: Literal[f]
 
-# TODO: false positive, should be `bool` with no diagnostic
-# error: [unresolved-reference]
+# TODO: these should both reveal `bool` (depends on https://github.com/astral-sh/ruff/issues/15385)
 reveal_type(g)  # revealed: Unknown
+reveal_type(i)  # revealed: Unknown
 
-# this diagnostic is accurate, though!
+# these diagnostics are accurate, though!
 # error: [unresolved-reference]
 reveal_type(h)  # revealed: Unknown
+# error: [unresolved-reference]
+reveal_type(j)  # revealed: Unknown
+```
+
+### `global` statements only apply to the immediate scope they are in
+
+Here, the `foo` variable in the nested `g` function is not a global variable. `foo` is declared as
+global for the immediate scope of `f`, but not for the scope of the nested `g` function.
+
+`a.py`:
+
+```py
+def f():
+    global foo
+
+    def g():
+        foo = 42
+    g()
+
+f()
+
+# error: [unresolved-reference]
+reveal_type(foo)  # revealed: Unknown
+```
+
+`b.py`:
+
+```py
+from a import *
+
+# error: [unresolved-reference]
+reveal_type(foo)  # revealed: Unknown
+```
+
+### `global` statements that appear after assignment to a value
+
+These are invalid syntax. Considering them exported anyway might reduce the risk of cascading
+diagnostics from a single error, but it would also significantly complicate our implementation. For
+now, we do not consider them exported.
+
+`a.py`:
+
+```py
+def f():
+    x = 42
+    global x  # TODO: should emit a diagnostic about invalid syntax (https://github.com/astral-sh/ruff/issues/11934)
+
+f()
+```
+
+`b.py`:
+
+```py
+from a import *
+
+# error: [unresolved-reference]
+reveal_type(x)  # revealed: Unknown
 ```
 
 ## Integration test: `collections.abc`
@@ -878,6 +942,29 @@ def f():
 
     # error: [unresolved-reference]
     reveal_type(X)  # revealed: Unknown
+```
+
+By the same token, `*` imports in inner scopes do not affect our consideration of what the public
+symbols are in that module's global scope, even if the names that would have been imported by the
+`*` import (if it was valid syntax) are declared `global` in the inner scope.
+
+`c.py`:
+
+```py
+def f():
+    global X
+
+    # TODO: we should emit a syntax errror here (tracked by https://github.com/astral-sh/ruff/issues/11934)
+    from a import *
+```
+
+`d.py`:
+
+```py
+from c import *
+
+# error: [unresolved-reference]
+reveal_type(X)  # revealed: Unknown
 ```
 
 ### `*` combined with other aliases in the list
