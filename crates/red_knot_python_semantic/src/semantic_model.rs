@@ -149,9 +149,8 @@ macro_rules! impl_binding_has_ty {
             #[inline]
             fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
                 let index = semantic_index(model.db, model.file);
-                let definitions = index.definitions(self);
-                debug_assert_eq!(definitions.len(), 1);
-                binding_type(model.db, definitions[0])
+                let binding = index.expect_single_definition(self);
+                binding_type(model.db, binding)
             }
         }
     };

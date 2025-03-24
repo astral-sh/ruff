@@ -212,9 +212,9 @@ print((
 ))
 ```
 
-### Definitions in comprehension-like scopes are not global definitions
+### Definitions in function-like scopes are not global definitions
 
-Except for some cases involving walrus expressions.
+Except for some cases involving walrus expressions inside comprehension scopes.
 
 `a.py`:
 
@@ -231,10 +231,13 @@ class Iterable:
 {b for b in Iterable()}
 {c: c for c in Iterable()}
 (d for d in Iterable())
+lambda e: (f := 42)
 
-[(e := f * 2) for f in Iterable()]
-[g for h in Iterable() if (g := h - 10) > 0]
-{(i := j * 2): (k := j * 3) for j in Iterable()}
+# Definitions created by walruses in a comprehension scope are unique;
+# they "leak out" of the scope and are stored in the surrounding scope
+[(g := h * 2) for h in Iterable()]
+[i for j in Iterable() if (i := j - 10) > 0]
+{(k := l * 2): (m := l * 3) for l in Iterable()}
 ```
 
 `b.py`:
@@ -251,6 +254,8 @@ reveal_type(c)  # revealed: Unknown
 # error: [unresolved-reference]
 reveal_type(d)  # revealed: Unknown
 # error: [unresolved-reference]
+reveal_type(e)  # revealed: Unknown
+# error: [unresolved-reference]
 reveal_type(f)  # revealed: Unknown
 # error: [unresolved-reference]
 reveal_type(h)  # revealed: Unknown
@@ -260,10 +265,10 @@ reveal_type(j)  # revealed: Unknown
 # TODO: these should all reveal `int`
 # (we don't generally model elsewhere in red-knot that bindings from walruses
 # "leak" from comprehension scopes into outer scopes, but we should)
-reveal_type(e)  # revealed: Unknown
 reveal_type(g)  # revealed: Unknown
 reveal_type(i)  # revealed: Unknown
 reveal_type(k)  # revealed: Unknown
+reveal_type(m)  # revealed: Unknown
 ```
 
 ### An annotation without a value is a definition in a stub but not a `.py` file

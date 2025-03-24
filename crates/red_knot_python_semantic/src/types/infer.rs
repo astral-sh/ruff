@@ -1339,7 +1339,8 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     fn infer_definition(&mut self, node: impl Into<DefinitionNodeKey> + std::fmt::Debug + Copy) {
         let definition = self.index.expect_single_definition(node);
-        self.extend(infer_definition_types(self.db(), definition));
+        let result = infer_definition_types(self.db(), definition);
+        self.extend(result);
     }
 
     fn infer_function_definition_statement(&mut self, function: &ast::StmtFunctionDef) {

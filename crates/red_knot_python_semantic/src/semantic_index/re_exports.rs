@@ -221,48 +221,46 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                 }
             }
 
-            ast::Expr::SetComp(ast::ExprSetComp {
-                elt,
-                generators,
-                range: _,
-            })
-            | ast::Expr::ListComp(ast::ExprListComp {
-                elt,
-                generators,
-                range: _,
-            })
-            | ast::Expr::Generator(ast::ExprGenerator {
-                elt,
-                generators,
-                range: _,
-                parenthesized: _,
-            }) => {
+            ast::Expr::Lambda(_)
+            | ast::Expr::BooleanLiteral(_)
+            | ast::Expr::NoneLiteral(_)
+            | ast::Expr::NumberLiteral(_)
+            | ast::Expr::BytesLiteral(_)
+            | ast::Expr::EllipsisLiteral(_)
+            | ast::Expr::StringLiteral(_) => {}
+
+            // Walrus definitions "leak" from comprehension scopes into the comprehension's
+            // enclosing scope; they thus need special handling
+            ast::Expr::SetComp(_)
+            | ast::Expr::ListComp(_)
+            | ast::Expr::Generator(_)
+            | ast::Expr::DictComp(_) => {
                 let mut walrus_finder = WalrusFinder {
                     export_finder: self,
                 };
-                walrus_finder.visit_expr(elt);
-                for generator in generators {
-                    walrus_finder.visit_comprehension(generator);
-                }
+                walk_expr(&mut walrus_finder, expr);
             }
 
-            ast::Expr::DictComp(ast::ExprDictComp {
-                key,
-                value,
-                generators,
-                range: _,
-            }) => {
-                let mut walrus_finder = WalrusFinder {
-                    export_finder: self,
-                };
-                walrus_finder.visit_expr(key);
-                walrus_finder.visit_expr(value);
-                for generator in generators {
-                    walrus_finder.visit_comprehension(generator);
-                }
-            }
-
-            _ => walk_expr(self, expr),
+            ast::Expr::BoolOp(_)
+            | ast::Expr::Named(_)
+            | ast::Expr::BinOp(_)
+            | ast::Expr::UnaryOp(_)
+            | ast::Expr::If(_)
+            | ast::Expr::Attribute(_)
+            | ast::Expr::Subscript(_)
+            | ast::Expr::Starred(_)
+            | ast::Expr::Call(_)
+            | ast::Expr::Compare(_)
+            | ast::Expr::Yield(_)
+            | ast::Expr::YieldFrom(_)
+            | ast::Expr::FString(_)
+            | ast::Expr::Tuple(_)
+            | ast::Expr::List(_)
+            | ast::Expr::Slice(_)
+            | ast::Expr::IpyEscapeCommand(_)
+            | ast::Expr::Dict(_)
+            | ast::Expr::Set(_)
+            | ast::Expr::Await(_) => walk_expr(self, expr),
         }
     }
 }
@@ -274,10 +272,20 @@ struct WalrusFinder<'a, 'db> {
 impl<'db> Visitor<'db> for WalrusFinder<'_, 'db> {
     fn visit_expr(&mut self, expr: &'db ast::Expr) {
         match expr {
+            // anything that creates a nested scope or that cannot contain a walrus
+            // can be short-circuited
             ast::Expr::DictComp(_)
             | ast::Expr::SetComp(_)
             | ast::Expr::ListComp(_)
-            | ast::Expr::Generator(_) => {}
+            | ast::Expr::Generator(_)
+            | ast::Expr::Lambda(_)
+            | ast::Expr::BooleanLiteral(_)
+            | ast::Expr::NoneLiteral(_)
+            | ast::Expr::NumberLiteral(_)
+            | ast::Expr::BytesLiteral(_)
+            | ast::Expr::EllipsisLiteral(_)
+            | ast::Expr::StringLiteral(_)
+            | ast::Expr::Name(_) => {}
 
             ast::Expr::Named(ast::ExprNamed {
                 target,
@@ -294,7 +302,25 @@ impl<'db> Visitor<'db> for WalrusFinder<'_, 'db> {
                 }
             }
 
-            _ => walk_expr(self, expr),
+            ast::Expr::BoolOp(_)
+            | ast::Expr::BinOp(_)
+            | ast::Expr::UnaryOp(_)
+            | ast::Expr::If(_)
+            | ast::Expr::Attribute(_)
+            | ast::Expr::Subscript(_)
+            | ast::Expr::Starred(_)
+            | ast::Expr::Call(_)
+            | ast::Expr::Compare(_)
+            | ast::Expr::Yield(_)
+            | ast::Expr::YieldFrom(_)
+            | ast::Expr::FString(_)
+            | ast::Expr::Tuple(_)
+            | ast::Expr::List(_)
+            | ast::Expr::Slice(_)
+            | ast::Expr::IpyEscapeCommand(_)
+            | ast::Expr::Dict(_)
+            | ast::Expr::Set(_)
+            | ast::Expr::Await(_) => walk_expr(self, expr),
         }
     }
 }
