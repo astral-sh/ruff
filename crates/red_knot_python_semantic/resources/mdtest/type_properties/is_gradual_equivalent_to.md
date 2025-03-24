@@ -133,4 +133,25 @@ static_assert(not is_gradual_equivalent_to(CallableTypeFromFunction[variadic_arg
 static_assert(not is_gradual_equivalent_to(CallableTypeFromFunction[variadic_kwargs], Callable[..., Any]))
 ```
 
+Parameter names, default values, and it's kind should also be considered when checking for gradual
+equivalence.
+
+```py
+def f1(a): ...
+def f2(b): ...
+
+static_assert(not is_gradual_equivalent_to(CallableTypeFromFunction[f1], CallableTypeFromFunction[f2]))
+
+def f3(a=1): ...
+def f4(a=2): ...
+def f5(a): ...
+
+static_assert(is_gradual_equivalent_to(CallableTypeFromFunction[f3], CallableTypeFromFunction[f4]))
+static_assert(not is_gradual_equivalent_to(CallableTypeFromFunction[f3], CallableTypeFromFunction[f5]))
+
+def f6(a, /): ...
+
+static_assert(not is_gradual_equivalent_to(CallableTypeFromFunction[f1], CallableTypeFromFunction[f6]))
+```
+
 [materializations]: https://typing.readthedocs.io/en/latest/spec/glossary.html#term-materialize
