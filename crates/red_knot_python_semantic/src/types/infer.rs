@@ -3161,6 +3161,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             return;
         };
 
+        // The indirection of having `star_import_info` as a separate variable
+        // is required in order to make the borrow checker happy.
         let star_import_info = definition
             .kind(self.db())
             .as_star_import()
