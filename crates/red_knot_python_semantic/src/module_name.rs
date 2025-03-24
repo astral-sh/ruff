@@ -211,6 +211,29 @@ impl ModuleName {
     pub fn ancestors(&self) -> impl Iterator<Item = Self> {
         std::iter::successors(Some(self.clone()), Self::parent)
     }
+
+    pub(crate) fn from_import_statement<'db>(
+        db: &'db dyn Db,
+        importing_file: File,
+        node: &'db ast::StmtImportFrom,
+    ) -> Result<Self, ModuleNameResolutionError> {
+        let ast::StmtImportFrom {
+            module,
+            level,
+            names: _,
+            range: _,
+        } = node;
+
+        let module = module.as_deref();
+
+        if let Some(level) = NonZeroU32::new(*level) {
+            relative_module_name(db, importing_file, module, level)
+        } else {
+            module
+                .and_then(Self::new)
+                .ok_or(ModuleNameResolutionError::InvalidSyntax)
+        }
+    }
 }
 
 impl Deref for ModuleName {
@@ -276,29 +299,6 @@ fn relative_module_name(
     }
 
     Ok(module_name)
-}
-
-pub(crate) fn module_name_from_import_statement<'db>(
-    db: &'db dyn Db,
-    importing_file: File,
-    node: &'db ast::StmtImportFrom,
-) -> Result<ModuleName, ModuleNameResolutionError> {
-    let ast::StmtImportFrom {
-        module,
-        level,
-        names: _,
-        range: _,
-    } = node;
-
-    let module = module.as_deref();
-
-    if let Some(level) = NonZeroU32::new(*level) {
-        relative_module_name(db, importing_file, module, level)
-    } else {
-        module
-            .and_then(ModuleName::new)
-            .ok_or(ModuleNameResolutionError::InvalidSyntax)
-    }
 }
 
 /// Various ways in which resolving a [`ModuleName`]

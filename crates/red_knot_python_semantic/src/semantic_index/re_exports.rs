@@ -12,10 +12,10 @@ use ruff_python_ast::{
 };
 use rustc_hash::FxHashSet;
 
-use crate::{module_name::module_name_from_import_statement, resolve_module, Db};
+use crate::{module_name::ModuleName, resolve_module, Db};
 
 #[salsa::tracked(return_ref)]
-pub(super) fn find_exports(db: &dyn Db, file: File) -> FxHashSet<Name> {
+pub(super) fn exported_names(db: &dyn Db, file: File) -> FxHashSet<Name> {
     let module = parsed_module(db.upcast(), file);
 
     let mut finder = ExportFinder {
@@ -175,11 +175,11 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                         if !found_star {
                             found_star = true;
                             self.exports.extend(
-                                module_name_from_import_statement(self.db, self.file, node)
+                                ModuleName::from_import_statement(self.db, self.file, node)
                                     .ok()
                                     .and_then(|module_name| resolve_module(self.db, &module_name))
                                     .iter()
-                                    .flat_map(|module| find_exports(self.db, module.file()))
+                                    .flat_map(|module| exported_names(self.db, module.file()))
                                     .cloned(),
                             );
                         }

@@ -11,7 +11,7 @@ use ruff_python_ast::visitor::{walk_expr, walk_pattern, walk_stmt, Visitor};
 use ruff_python_ast::{self as ast, ExprContext};
 
 use crate::ast_node_ref::AstNodeRef;
-use crate::module_name::{module_name_from_import_statement, ModuleName};
+use crate::module_name::ModuleName;
 use crate::module_resolver::resolve_module;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::ast_ids::AstIdsBuilder;
@@ -26,7 +26,7 @@ use crate::semantic_index::expression::{Expression, ExpressionKind};
 use crate::semantic_index::predicate::{
     PatternPredicate, PatternPredicateKind, Predicate, PredicateNode, ScopedPredicateId,
 };
-use crate::semantic_index::re_exports::find_exports;
+use crate::semantic_index::re_exports::exported_names;
 use crate::semantic_index::symbol::{
     FileScopeId, NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopeKind, ScopedSymbolId,
     SymbolTableBuilder,
@@ -1030,7 +1030,7 @@ where
                         }
 
                         let Ok(module_name) =
-                            module_name_from_import_statement(self.db, self.file, node)
+                            ModuleName::from_import_statement(self.db, self.file, node)
                         else {
                             continue;
                         };
@@ -1039,12 +1039,7 @@ where
                             continue;
                         };
 
-                        let exported_names = find_exports(self.db, module.file());
-                        if exported_names.is_empty() {
-                            continue;
-                        }
-
-                        for export in find_exports(self.db, module.file()) {
+                        for export in exported_names(self.db, module.file()) {
                             let symbol_id = self.add_symbol(export.clone());
                             let node_ref = StarImportDefinitionNodeRef { node, symbol_id };
                             self.add_definition(symbol_id, node_ref);

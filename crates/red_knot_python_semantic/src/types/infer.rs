@@ -43,9 +43,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use salsa;
 use salsa::plumbing::AsId;
 
-use crate::module_name::{
-    module_name_from_import_statement, ModuleName, ModuleNameResolutionError,
-};
+use crate::module_name::{ModuleName, ModuleNameResolutionError};
 use crate::module_resolver::resolve_module;
 use crate::semantic_index::ast_ids::{HasScopedExpressionId, HasScopedUseId, ScopedExpressionId};
 use crate::semantic_index::definition::{
@@ -2986,8 +2984,10 @@ impl<'db> TypeInferenceBuilder<'db> {
         for alias in names {
             let definitions = self.index.definitions(alias);
             if definitions.is_empty() {
-                // Ensure `from foo import *` is flagged as invalid if `foo` can't be resolved,
-                // *even if* `foo` is an empty module (and thus has no `Definition`s associated with it)
+                // If the module couldn't be resolved while constructing the semantic index,
+                // this node won't have any definitions associated with it -- but we need to
+                // make sure that we still emit the diagnostic for the unresolvable module,
+                // since this will cause the import to fail at runtime.
                 self.resolve_import_from_module(import, alias);
             } else {
                 for definition in definitions {
@@ -3067,7 +3067,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             format_import_from_module(*level, module),
             self.file().path(self.db()),
         );
-        let module_name = module_name_from_import_statement(self.db(), self.file(), import_from);
+        let module_name = ModuleName::from_import_statement(self.db(), self.file(), import_from);
 
         let module_name = match module_name {
             Ok(module_name) => module_name,
