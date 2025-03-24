@@ -13,8 +13,6 @@ class C[T]: ...
 A class that inherits from a generic class, and fills its type parameters with typevars, is generic:
 
 ```py
-# TODO: no error
-# error: [non-subscriptable]
 class D[U](C[U]): ...
 ```
 
@@ -22,8 +20,6 @@ A class that inherits from a generic class, but fills its type parameters with c
 _not_ generic:
 
 ```py
-# TODO: no error
-# error: [non-subscriptable]
 class E(C[int]): ...
 ```
 
@@ -65,9 +61,7 @@ The type parameter can be specified explicitly:
 class C[T]:
     x: T
 
-# TODO: no error
 # TODO: revealed: C[int]
-# error: [non-subscriptable]
 reveal_type(C[int]())  # revealed: C
 ```
 
@@ -131,16 +125,11 @@ propagate through:
 class Base[T]:
     x: T | None = None
 
-# TODO: no error
-# error: [non-subscriptable]
 class Sub[U](Base[U]): ...
 
-# TODO: no error
 # TODO: revealed: int | None
-# error: [non-subscriptable]
 reveal_type(Base[int].x)  # revealed: T | None
 # TODO: revealed: int | None
-# error: [non-subscriptable]
 reveal_type(Sub[int].x)  # revealed: T | None
 ```
 
@@ -155,8 +144,6 @@ Here, `Sub` is not a generic class, since it fills its superclass's type paramet
 
 ```pyi
 class Base[T]: ...
-# TODO: no error
-# error: [non-subscriptable]
 class Sub(Base[Sub]): ...
 
 reveal_type(Sub)  # revealed: Literal[Sub]
@@ -169,8 +156,6 @@ A similar case can work in a non-stub file, if forward references are stringifie
 ```py
 class Base[T]: ...
 
-# TODO: no error
-# error: [non-subscriptable]
 class Sub(Base["Sub"]): ...
 
 reveal_type(Sub)  # revealed: Literal[Sub]
@@ -183,8 +168,6 @@ In a non-stub file, without stringified forward references, this raises a `NameE
 ```py
 class Base[T]: ...
 
-# TODO: the unresolved-reference error is correct, the non-subscriptable is not
-# error: [non-subscriptable]
 # error: [unresolved-reference]
 class Sub(Base[Sub]): ...
 ```

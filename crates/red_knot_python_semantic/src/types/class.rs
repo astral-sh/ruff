@@ -39,7 +39,7 @@ pub struct Class<'db> {
     #[return_ref]
     pub(crate) name: ast::name::Name,
 
-    generic_context: Option<GenericContext<'db>>,
+    pub(crate) generic_context: Option<GenericContext<'db>>,
     body_scope: ScopeId<'db>,
 
     pub(crate) known: Option<KnownClass>,
