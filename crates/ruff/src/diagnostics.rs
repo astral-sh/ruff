@@ -387,7 +387,7 @@ pub(crate) fn lint_stdin(
 
                 match fix_mode {
                     flags::FixMode::Diff | flags::FixMode::Generate => {}
-                    flags::FixMode::Apply => write!(&mut io::stdout().lock(), "{}", contents)?,
+                    flags::FixMode::Apply => write!(&mut io::stdout().lock(), "{contents}")?,
                 }
 
                 return Ok(Diagnostics {
