@@ -139,4 +139,10 @@ class Foo:
         # error: [unresolved-reference]
         return Bar()
     type Qux = Foo
+
+def _():
+    class C:
+        # error: [unresolved-reference]
+        def f(self) -> C:
+            return self
 ```

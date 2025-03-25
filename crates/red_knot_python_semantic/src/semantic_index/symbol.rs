@@ -114,6 +114,10 @@ impl<'db> ScopeId<'db> {
         self.node(db).scope_kind().is_function_like()
     }
 
+    pub(crate) fn is_eager(self, db: &'db dyn Db) -> bool {
+        self.node(db).scope_kind().is_eager()
+    }
+
     pub(crate) fn is_type_parameter(self, db: &'db dyn Db) -> bool {
         self.node(db).scope_kind().is_type_parameter()
     }
@@ -230,9 +234,8 @@ pub enum ScopeKind {
 impl ScopeKind {
     pub(crate) fn is_eager(self) -> bool {
         match self {
-            ScopeKind::Class | ScopeKind::Comprehension => true,
-            ScopeKind::Module
-            | ScopeKind::Annotation
+            ScopeKind::Module | ScopeKind::Class | ScopeKind::Comprehension => true,
+            ScopeKind::Annotation
             | ScopeKind::Function
             | ScopeKind::Lambda
             | ScopeKind::TypeAlias => false,
@@ -254,10 +257,6 @@ impl ScopeKind {
 
     pub(crate) fn is_class(self) -> bool {
         matches!(self, ScopeKind::Class)
-    }
-
-    pub(crate) fn is_module(self) -> bool {
-        matches!(self, ScopeKind::Module)
     }
 
     pub(crate) fn is_type_parameter(self) -> bool {

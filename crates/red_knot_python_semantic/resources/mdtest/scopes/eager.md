@@ -278,6 +278,14 @@ def _():
             [reveal_type(x) for a in range(1)]
 
     x = 2
+
+x = 1
+
+def _():
+    class C:
+        # revealed: Unknown | Literal[1]
+        [reveal_type(x) for _ in [1]]
+        x = 2
 ```
 
 ### Eager scope within a lazy scope
