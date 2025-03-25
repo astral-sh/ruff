@@ -95,20 +95,24 @@ pub(crate) fn mutable_dataclass_default(checker: &Checker, class_def: &ast::Stmt
         }
 
         // If the value is a call to a dataclass/attrs field helper, check
-        // for an explicit `default` of a mutable expression.
-        if let Expr::Call(ast::ExprCall {
-            func, arguments, ..
-        }) = value.as_ref()
-        {
-            if is_dataclass_field(func, semantic, dataclass_kind) {
-                if let Some(default) = arguments.find_keyword("default") {
-                    if is_mutable_expr(&default.value, semantic)
-                        && !is_class_var_annotation(annotation, semantic)
-                        && !is_immutable_annotation(annotation, semantic, &[])
-                    {
-                        let diagnostic =
-                            Diagnostic::new(MutableDataclassDefault, default.value.range());
-                        checker.report_diagnostic(diagnostic);
+        // for an explicit `default` of a mutable expression. Only emit
+        // diagnostics for this case in preview mode, since it's an expansion
+        // of the existing `RUF008` rule.
+        if checker.settings.preview.is_enabled() {
+            if let Expr::Call(ast::ExprCall {
+                func, arguments, ..
+            }) = value.as_ref()
+            {
+                if is_dataclass_field(func, semantic, dataclass_kind) {
+                    if let Some(default) = arguments.find_keyword("default") {
+                        if is_mutable_expr(&default.value, semantic)
+                            && !is_class_var_annotation(annotation, semantic)
+                            && !is_immutable_annotation(annotation, semantic, &[])
+                        {
+                            let diagnostic =
+                                Diagnostic::new(MutableDataclassDefault, default.value.range());
+                            checker.report_diagnostic(diagnostic);
+                        }
                     }
                 }
             }

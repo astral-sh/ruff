@@ -1,0 +1,79 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+snapshot_kind: text
+---
+RUF008_attrs.py:14:34: RUF008 Do not use mutable default values for dataclass attributes
+   |
+12 | @define
+13 | class A:
+14 |     mutable_default: list[int] = []
+   |                                  ^^ RUF008
+15 |     immutable_annotation: typing.Sequence[int] = []
+16 |     without_annotation = []
+   |
+
+RUF008_attrs.py:19:63: RUF008 Do not use mutable default values for dataclass attributes
+   |
+17 |     correct_code: list[int] = KNOWINGLY_MUTABLE_DEFAULT
+18 |     perfectly_fine: list[int] = field(default_factory=list)
+19 |     mutable_default_in_field: list[int] = attrs.field(default=[])
+   |                                                               ^^ RUF008
+20 |     class_variable: typing.ClassVar[list[int]] = []
+   |
+
+RUF008_attrs.py:25:34: RUF008 Do not use mutable default values for dataclass attributes
+   |
+23 | @frozen
+24 | class B:
+25 |     mutable_default: list[int] = []
+   |                                  ^^ RUF008
+26 |     immutable_annotation: Sequence[int] = []
+27 |     without_annotation = []
+   |
+
+RUF008_attrs.py:30:63: RUF008 Do not use mutable default values for dataclass attributes
+   |
+28 |     correct_code: list[int] = KNOWINGLY_MUTABLE_DEFAULT
+29 |     perfectly_fine: list[int] = field(default_factory=list)
+30 |     mutable_default_in_field: list[int] = attrs.field(default=[])
+   |                                                               ^^ RUF008
+31 |     class_variable: ClassVar[list[int]] = []
+   |
+
+RUF008_attrs.py:36:34: RUF008 Do not use mutable default values for dataclass attributes
+   |
+34 | @attr.s
+35 | class C:
+36 |     mutable_default: list[int] = []
+   |                                  ^^ RUF008
+37 |     immutable_annotation: Sequence[int] = []
+38 |     without_annotation = []
+   |
+
+RUF008_attrs.py:41:63: RUF008 Do not use mutable default values for dataclass attributes
+   |
+39 |     correct_code: list[int] = KNOWINGLY_MUTABLE_DEFAULT
+40 |     perfectly_fine: list[int] = field(default_factory=list)
+41 |     mutable_default_in_field: list[int] = attrs.field(default=[])
+   |                                                               ^^ RUF008
+42 |     class_variable: ClassVar[list[int]] = []
+   |
+
+RUF008_attrs.py:46:34: RUF008 Do not use mutable default values for dataclass attributes
+   |
+44 | @s
+45 | class D:
+46 |     mutable_default: list[int] = []
+   |                                  ^^ RUF008
+47 |     immutable_annotation: Sequence[int] = []
+48 |     without_annotation = []
+   |
+
+RUF008_attrs.py:51:63: RUF008 Do not use mutable default values for dataclass attributes
+   |
+49 |     correct_code: list[int] = KNOWINGLY_MUTABLE_DEFAULT
+50 |     perfectly_fine: list[int] = field(default_factory=list)
+51 |     mutable_default_in_field: list[int] = attrs.field(default=[])
+   |                                                               ^^ RUF008
+52 |     class_variable: ClassVar[list[int]] = []
+   |

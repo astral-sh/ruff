@@ -427,6 +427,8 @@ mod tests {
     #[test_case(Rule::UnnecessaryRegularExpression, Path::new("RUF055_0.py"))]
     #[test_case(Rule::UnnecessaryRegularExpression, Path::new("RUF055_1.py"))]
     #[test_case(Rule::UnnecessaryRegularExpression, Path::new("RUF055_2.py"))]
+    #[test_case(Rule::MutableDataclassDefault, Path::new("RUF008.py"))]
+    #[test_case(Rule::MutableDataclassDefault, Path::new("RUF008_attrs.py"))]
     #[test_case(Rule::PytestRaisesAmbiguousPattern, Path::new("RUF043.py"))]
     #[test_case(Rule::UnnecessaryRound, Path::new("RUF057.py"))]
     #[test_case(Rule::DataclassEnum, Path::new("RUF049.py"))]

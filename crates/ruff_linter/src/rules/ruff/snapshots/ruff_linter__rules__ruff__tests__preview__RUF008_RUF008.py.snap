@@ -11,6 +11,15 @@ RUF008.py:10:34: RUF008 Do not use mutable default values for dataclass attribut
 12 |     without_annotation = []
    |
 
+RUF008.py:15:57: RUF008 Do not use mutable default values for dataclass attributes
+   |
+13 |     correct_code: list[int] = KNOWINGLY_MUTABLE_DEFAULT
+14 |     perfectly_fine: list[int] = field(default_factory=list)
+15 |     mutable_default_in_field: list[int] = field(default=[])
+   |                                                         ^^ RUF008
+16 |     class_variable: typing.ClassVar[list[int]] = []
+   |
+
 RUF008.py:21:34: RUF008 Do not use mutable default values for dataclass attributes
    |
 19 | @dataclass
@@ -19,6 +28,15 @@ RUF008.py:21:34: RUF008 Do not use mutable default values for dataclass attribut
    |                                  ^^ RUF008
 22 |     immutable_annotation: Sequence[int] = []
 23 |     without_annotation = []
+   |
+
+RUF008.py:26:57: RUF008 Do not use mutable default values for dataclass attributes
+   |
+24 |     correct_code: list[int] = KNOWINGLY_MUTABLE_DEFAULT
+25 |     perfectly_fine: list[int] = field(default_factory=list)
+26 |     mutable_default_in_field: list[int] = field(default=[])
+   |                                                         ^^ RUF008
+27 |     class_variable: ClassVar[list[int]] = []
    |
 
 RUF008.py:33:36: RUF008 Do not use mutable default values for dataclass attributes
@@ -39,6 +57,15 @@ RUF008.py:34:52: RUF008 Do not use mutable default values for dataclass attribut
    |                                                    ^^ RUF008
 35 |     without_annotation = []
 36 |     correct_code: 'list[int]' = KNOWINGLY_MUTABLE_DEFAULT
+   |
+
+RUF008.py:38:59: RUF008 Do not use mutable default values for dataclass attributes
+   |
+36 |     correct_code: 'list[int]' = KNOWINGLY_MUTABLE_DEFAULT
+37 |     perfectly_fine: 'list[int]' = field(default_factory=list)
+38 |     mutable_default_in_field: 'list[int]' = field(default=[])
+   |                                                           ^^ RUF008
+39 |     class_variable: 'typing.ClassVar[list[int]]'= []
    |
 
 RUF008.py:39:51: RUF008 Do not use mutable default values for dataclass attributes
