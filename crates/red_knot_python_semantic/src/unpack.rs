@@ -107,3 +107,11 @@ pub(crate) enum UnpackKind {
     /// An expression that is being assigned to a target.
     Assign,
 }
+
+#[derive(Clone, Copy, Debug, Hash, PartialEq, salsa::Update)]
+pub(crate) enum UnpackPosition {
+    /// The unpacking is the first element in the unpacking list
+    First,
+    /// All subsequent unpackings
+    Subsequent,
+}
