@@ -2235,7 +2235,7 @@ unfixable = ["RUF"]
 }
 
 #[test]
-fn pyproject_toml_stdin_syntax_error() -> Result<()> {
+fn pyproject_toml_stdin_syntax_error() {
     let mut cmd = RuffCheck::default()
         .args(["--stdin-filename", "pyproject.toml", "--select", "RUF200"])
         .build();
@@ -2258,12 +2258,10 @@ fn pyproject_toml_stdin_syntax_error() -> Result<()> {
     ----- stderr -----
     "
     );
-
-    Ok(())
 }
 
 #[test]
-fn pyproject_toml_stdin_schema_error() -> Result<()> {
+fn pyproject_toml_stdin_schema_error() {
     let mut cmd = RuffCheck::default()
         .args(["--stdin-filename", "pyproject.toml", "--select", "RUF200"])
         .build();
@@ -2286,12 +2284,10 @@ fn pyproject_toml_stdin_schema_error() -> Result<()> {
     ----- stderr -----
     "
     );
-
-    Ok(())
 }
 
 #[test]
-fn pyproject_toml_stdin_no_applicable_rules_selected() -> Result<()> {
+fn pyproject_toml_stdin_no_applicable_rules_selected() {
     let mut cmd = RuffCheck::default()
         .args(["--stdin-filename", "pyproject.toml"])
         .build();
@@ -2307,12 +2303,10 @@ fn pyproject_toml_stdin_no_applicable_rules_selected() -> Result<()> {
     ----- stderr -----
     "
     );
-
-    Ok(())
 }
 
 #[test]
-fn pyproject_toml_stdin_no_errors() -> Result<()> {
+fn pyproject_toml_stdin_no_errors() {
     let mut cmd = RuffCheck::default()
         .args(["--stdin-filename", "pyproject.toml"])
         .build();
@@ -2328,12 +2322,10 @@ fn pyproject_toml_stdin_no_errors() -> Result<()> {
     ----- stderr -----
     "
     );
-
-    Ok(())
 }
 
 #[test]
-fn pyproject_toml_stdin_schema_error_fix() -> Result<()> {
+fn pyproject_toml_stdin_schema_error_fix() {
     let mut cmd = RuffCheck::default()
         .args([
             "--stdin-filename",
@@ -2362,12 +2354,10 @@ fn pyproject_toml_stdin_schema_error_fix() -> Result<()> {
     Found 1 error.
     "
     );
-
-    Ok(())
 }
 
 #[test]
-fn pyproject_toml_stdin_schema_error_fix_diff() -> Result<()> {
+fn pyproject_toml_stdin_schema_error_fix_diff() {
     let mut cmd = RuffCheck::default()
         .args([
             "--stdin-filename",
@@ -2389,6 +2379,4 @@ fn pyproject_toml_stdin_schema_error_fix_diff() -> Result<()> {
     ----- stderr -----
     "
     );
-
-    Ok(())
 }
