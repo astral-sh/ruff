@@ -328,17 +328,6 @@ struct MultipleCaseAssignmentVisitor<'a, Ctx> {
 }
 
 impl<'a, Ctx: SemanticSyntaxContext> MultipleCaseAssignmentVisitor<'a, Ctx> {
-    /// Emit [`SemanticSyntaxError`]s for every duplicate variable assignment.
-    fn push(&mut self, ident: &'a ast::Identifier) {
-        if !self.names.insert(&ident.id) {
-            SemanticSyntaxChecker::add_error(
-                self.ctx,
-                SemanticSyntaxErrorKind::MultipleCaseAssignment(ident.id.clone()),
-                ident.range(),
-            );
-        }
-    }
-
     fn visit_pattern(&mut self, pattern: &'a Pattern) {
         // test_err multiple_assignment_in_case_pattern
         // match 2:
@@ -355,7 +344,7 @@ impl<'a, Ctx: SemanticSyntaxContext> MultipleCaseAssignmentVisitor<'a, Ctx> {
             Pattern::MatchValue(_) | Pattern::MatchSingleton(_) => {}
             Pattern::MatchStar(ast::PatternMatchStar { name, .. }) => {
                 if let Some(name) = name {
-                    self.push(name);
+                    self.insert(name);
                 }
             }
             Pattern::MatchSequence(ast::PatternMatchSequence { patterns, .. }) => {
@@ -368,7 +357,7 @@ impl<'a, Ctx: SemanticSyntaxContext> MultipleCaseAssignmentVisitor<'a, Ctx> {
                     self.visit_pattern(pattern);
                 }
                 if let Some(rest) = rest {
-                    self.push(rest);
+                    self.insert(rest);
                 }
             }
             Pattern::MatchClass(ast::PatternMatchClass { arguments, .. }) => {
@@ -376,7 +365,7 @@ impl<'a, Ctx: SemanticSyntaxContext> MultipleCaseAssignmentVisitor<'a, Ctx> {
                     self.visit_pattern(pattern);
                 }
                 for keyword in &arguments.keywords {
-                    self.push(&keyword.attr);
+                    self.insert(&keyword.attr);
                     self.visit_pattern(&keyword.pattern);
                 }
             }
@@ -385,7 +374,7 @@ impl<'a, Ctx: SemanticSyntaxContext> MultipleCaseAssignmentVisitor<'a, Ctx> {
                     self.visit_pattern(pattern);
                 }
                 if let Some(name) = name {
-                    self.push(name);
+                    self.insert(name);
                 }
             }
             Pattern::MatchOr(ast::PatternMatchOr { patterns, .. }) => {
@@ -404,6 +393,18 @@ impl<'a, Ctx: SemanticSyntaxContext> MultipleCaseAssignmentVisitor<'a, Ctx> {
                     visitor.visit_pattern(pattern);
                 }
             }
+        }
+    }
+
+    /// Add an identifier to the set of visited names in `self` and emit a [`SemanticSyntaxError`]
+    /// if `ident` has already been seen.
+    fn insert(&mut self, ident: &'a ast::Identifier) {
+        if !self.names.insert(&ident.id) {
+            SemanticSyntaxChecker::add_error(
+                self.ctx,
+                SemanticSyntaxErrorKind::MultipleCaseAssignment(ident.id.clone()),
+                ident.range(),
+            );
         }
     }
 }
