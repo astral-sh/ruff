@@ -553,6 +553,9 @@ impl<'db> Type<'db> {
         }
 
         match (self, target) {
+            // Everything is a subtype of `object`.
+            (_, ty) if ty.is_object(db) => true,
+
             // We should have handled these immediately above.
             (Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => {
                 unreachable!("Non-fully-static types do not participate in subtyping!")
@@ -573,14 +576,6 @@ impl<'db> Type<'db> {
                 .elements(db)
                 .iter()
                 .any(|&elem_ty| self.is_subtype_of(db, elem_ty)),
-
-            // `object` is the only type that can be known to be a supertype of any intersection,
-            // even an intersection with no positive elements
-            (Type::Intersection(_), Type::Instance(InstanceType { class }))
-                if class.is_object(db) =>
-            {
-                true
-            }
 
             // If both sides are intersections we need to handle the right side first
             // (A & B & C) is a subtype of (A & B) because the left is a subtype of both A and B,
@@ -769,7 +764,7 @@ impl<'db> Type<'db> {
 
             // All types are assignable to `object`.
             // TODO this special case might be removable once the below cases are comprehensive
-            (_, Type::Instance(InstanceType { class })) if class.is_object(db) => true,
+            (_, ty) if ty.is_object(db) => true,
 
             // A union is assignable to a type T iff every element of the union is assignable to T.
             (Type::Union(union), ty) => union
