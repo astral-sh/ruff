@@ -554,7 +554,7 @@ impl<'db> Type<'db> {
 
         match (self, target) {
             // Everything is a subtype of `object`.
-            (_, ty) if ty.is_object(db) => true,
+            (_, Type::Instance(InstanceType { class })) if class.is_object(db) => true,
 
             // We should have handled these immediately above.
             (Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => {
@@ -764,7 +764,7 @@ impl<'db> Type<'db> {
 
             // All types are assignable to `object`.
             // TODO this special case might be removable once the below cases are comprehensive
-            (_, ty) if ty.is_object(db) => true,
+            (_, Type::Instance(InstanceType { class })) if class.is_object(db) => true,
 
             // A union is assignable to a type T iff every element of the union is assignable to T.
             (Type::Union(union), ty) => union
