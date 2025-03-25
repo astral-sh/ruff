@@ -633,10 +633,14 @@ impl<'db> Type<'db> {
                 KnownClass::Slice.to_instance(db).is_subtype_of(db, target)
             }
 
+            (Type::FunctionLiteral(self_function_literal), Type::Callable(_)) => {
+                self_function_literal
+                    .into_callable_type(db)
+                    .is_subtype_of(db, target)
+            }
+
             // A `FunctionLiteral` type is a single-valued type like the other literals handled above,
             // so it also, for now, just delegates to its instance fallback.
-            // This will change in a way similar to the `LiteralString`/`StringLiteral()` case above
-            // when we add support for `typing.Callable`.
             (Type::FunctionLiteral(_), _) => KnownClass::FunctionType
                 .to_instance(db)
                 .is_subtype_of(db, target),

@@ -494,10 +494,32 @@ Return types are covariant.
 
 ```py
 from typing import Callable
-from knot_extensions import is_subtype_of, static_assert
+from knot_extensions import is_subtype_of, static_assert, TypeOf
 
 static_assert(is_subtype_of(Callable[[], int], Callable[[], float]))
 static_assert(not is_subtype_of(Callable[[], float], Callable[[], int]))
+```
+
+### Optional return type
+
+```py
+from typing import Callable
+from knot_extensions import is_subtype_of, static_assert, TypeOf
+
+flag: bool = True
+
+def optional_return_type() -> int | None:
+    if flag:
+        return 1
+    return None
+
+def required_return_type() -> int:
+    return 1
+
+static_assert(not is_subtype_of(TypeOf[optional_return_type], TypeOf[required_return_type]))
+# TypeOf[some_function] is a singleton function-literal type,  not a general callable type
+static_assert(not is_subtype_of(TypeOf[required_return_type], TypeOf[optional_return_type]))
+static_assert(is_subtype_of(TypeOf[optional_return_type], Callable[[], int | None]))
 ```
 
 ### Parameter types
@@ -507,13 +529,20 @@ Parameter types are contravariant.
 #### Positional-only
 
 ```py
-from knot_extensions import CallableTypeFromFunction, is_subtype_of, static_assert
+from typing import Callable
+from knot_extensions import CallableTypeFromFunction, is_subtype_of, static_assert, TypeOf
 
 def float_param(a: float, /) -> None: ...
 def int_param(a: int, /) -> None: ...
 
 static_assert(is_subtype_of(CallableTypeFromFunction[float_param], CallableTypeFromFunction[int_param]))
 static_assert(not is_subtype_of(CallableTypeFromFunction[int_param], CallableTypeFromFunction[float_param]))
+
+static_assert(is_subtype_of(TypeOf[int_param], Callable[[int], None]))
+static_assert(is_subtype_of(TypeOf[float_param], Callable[[float], None]))
+
+static_assert(not is_subtype_of(Callable[[int], None], TypeOf[int_param]))
+static_assert(not is_subtype_of(Callable[[float], None], TypeOf[float_param]))
 ```
 
 Parameter name is not required to be the same for positional-only parameters at the same position:
@@ -533,6 +562,10 @@ def multi_param2(b: int, c: bool, a: str, /) -> None: ...
 
 static_assert(is_subtype_of(CallableTypeFromFunction[multi_param1], CallableTypeFromFunction[multi_param2]))
 static_assert(not is_subtype_of(CallableTypeFromFunction[multi_param2], CallableTypeFromFunction[multi_param1]))
+
+static_assert(is_subtype_of(TypeOf[multi_param1], Callable[[float, int, str], None]))
+
+static_assert(not is_subtype_of(Callable[[float, int, str], None], TypeOf[multi_param1]))
 ```
 
 #### Positional-only with default value
@@ -541,7 +574,8 @@ If the parameter has a default value, it's treated as optional. This means that 
 corresponding position in the supertype does not need to have a default value.
 
 ```py
-from knot_extensions import CallableTypeFromFunction, is_subtype_of, static_assert
+from typing import Callable
+from knot_extensions import CallableTypeFromFunction, is_subtype_of, static_assert, TypeOf
 
 def float_with_default(a: float = 1, /) -> None: ...
 def int_with_default(a: int = 1, /) -> None: ...
@@ -552,6 +586,13 @@ static_assert(not is_subtype_of(CallableTypeFromFunction[int_with_default], Call
 
 static_assert(is_subtype_of(CallableTypeFromFunction[int_with_default], CallableTypeFromFunction[int_without_default]))
 static_assert(not is_subtype_of(CallableTypeFromFunction[int_without_default], CallableTypeFromFunction[int_with_default]))
+
+static_assert(is_subtype_of(TypeOf[int_with_default], Callable[[int], None]))
+static_assert(is_subtype_of(TypeOf[int_with_default], Callable[[], None]))
+static_assert(is_subtype_of(TypeOf[float_with_default], Callable[[float], None]))
+
+static_assert(not is_subtype_of(Callable[[int], None], TypeOf[int_with_default]))
+static_assert(not is_subtype_of(Callable[[float], None], TypeOf[float_with_default]))
 ```
 
 As the parameter itself is optional, it can be omitted in the supertype:
