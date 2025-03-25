@@ -398,7 +398,7 @@ pub(crate) fn lint_stdin(
                 });
             }
 
-            _ => return Ok(Diagnostics::default()),
+            SourceType::Toml(_) => return Ok(Diagnostics::default()),
         },
         Some(language) => PySourceType::from(language),
     };
