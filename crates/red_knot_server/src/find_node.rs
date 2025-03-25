@@ -1,7 +1,7 @@
 use ruff_python_ast as ast;
 use ruff_python_ast::visitor::source_order;
 use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal};
-use ruff_python_ast::AnyNodeRef;
+use ruff_python_ast::{AnyNodeRef, Keyword};
 use ruff_text_size::{Ranged, TextRange};
 use std::fmt;
 use std::fmt::Formatter;
@@ -84,6 +84,14 @@ pub(crate) fn covering_node(root: AnyNodeRef, range: TextRange) -> CoveringNode 
             source_order::walk_alias(self, alias);
 
             self.visit_identifier(&alias.name);
+        }
+
+        fn visit_keyword(&mut self, keyword: &'a Keyword) {
+            source_order::walk_keyword(self, keyword);
+
+            if let Some(arg) = keyword.arg.as_ref() {
+                self.visit_identifier(arg)
+            }
         }
     }
 

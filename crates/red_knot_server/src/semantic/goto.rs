@@ -19,18 +19,18 @@ pub(crate) fn go_to_type_definition(
     offset: TextSize,
 ) -> Option<RangeInfo<NavigationTargets>> {
     let root = parsed_module(db.upcast(), file);
-    let go_to_target = find_go_to_target(root.syntax().into(), offset)?;
+    let goto_target = find_goto_target(root.syntax().into(), offset)?;
 
     let model = SemanticModel::new(db, file);
 
-    let ty = match go_to_target {
-        GoToTarget::Expression(expression) => expression.inferred_type(&model),
-        GoToTarget::FunctionDef(function) => function.inferred_type(&model),
-        GoToTarget::ClassDef(class) => class.inferred_type(&model),
-        GoToTarget::Parameter(parameter) => parameter.inferred_type(&model),
-        GoToTarget::Alias(alias) => alias.inferred_type(&model),
-        GoToTarget::ExceptVariable(except) => except.inferred_type(&model),
-        GoToTarget::KeywordArgument(argument) => {
+    let ty = match goto_target {
+        GotoTarget::Expression(expression) => expression.inferred_type(&model),
+        GotoTarget::FunctionDef(function) => function.inferred_type(&model),
+        GotoTarget::ClassDef(class) => class.inferred_type(&model),
+        GotoTarget::Parameter(parameter) => parameter.inferred_type(&model),
+        GotoTarget::Alias(alias) => alias.inferred_type(&model),
+        GotoTarget::ExceptVariable(except) => except.inferred_type(&model),
+        GotoTarget::KeywordArgument(argument) => {
             // TODO: Pyright resolves the declared type of the matching parameter. This seems more accurate
             // than using the inferred value.
             argument.value.inferred_type(&model)
@@ -40,32 +40,32 @@ pub(crate) fn go_to_type_definition(
         // This may require improving type inference (e.g. it currently doesn't handle `...rest`)
         // but it also requires a new API to query the type because implementing `HasType` for `PatternMatchMapping`
         // is ambiguous.
-        GoToTarget::PatternMatchRest(_)
-        | GoToTarget::PatternKeywordArgument(_)
-        | GoToTarget::PatternMatchStarName(_)
-        | GoToTarget::PatternMatchAsName(_) => return None,
+        GotoTarget::PatternMatchRest(_)
+        | GotoTarget::PatternKeywordArgument(_)
+        | GotoTarget::PatternMatchStarName(_)
+        | GotoTarget::PatternMatchAsName(_) => return None,
 
         // TODO: Resolve the module; The type inference already does all the work
         // but type isn't stored anywhere. We should either extract the logic
         // for resolving the module from a ImportFromStmt or store the type during semantic analysis
-        GoToTarget::ImportedModule(_) => return None,
+        GotoTarget::ImportedModule(_) => return None,
 
         // Targets without a type definition.
-        GoToTarget::TypeParamTypeVarName(_)
-        | GoToTarget::TypeParamParamSpecName(_)
-        | GoToTarget::TypeParamTypeVarTupleName(_) => return None,
+        GotoTarget::TypeParamTypeVarName(_)
+        | GotoTarget::TypeParamParamSpecName(_)
+        | GotoTarget::TypeParamTypeVarTupleName(_) => return None,
     };
 
     tracing::debug!("Inferred type of covering node is {}", ty.display(db));
 
     Some(RangeInfo {
-        range: FileRange::new(file, go_to_target.range()),
+        range: FileRange::new(file, goto_target.range()),
         info: ty.navigation_targets(db),
     })
 }
 
 #[derive(Clone, Copy, Debug)]
-pub(crate) enum GoToTarget<'a> {
+pub(crate) enum GotoTarget<'a> {
     Expression(ast::ExprRef<'a>),
     FunctionDef(&'a ast::StmtFunctionDef),
     ClassDef(&'a ast::StmtClassDef),
@@ -153,61 +153,61 @@ pub(crate) enum GoToTarget<'a> {
     TypeParamTypeVarTupleName(&'a ast::TypeParamTypeVarTuple),
 }
 
-impl Ranged for GoToTarget<'_> {
+impl Ranged for GotoTarget<'_> {
     fn range(&self) -> TextRange {
         match self {
-            GoToTarget::Expression(expression) => expression.range(),
-            GoToTarget::FunctionDef(function) => function.name.range,
-            GoToTarget::ClassDef(class) => class.name.range,
-            GoToTarget::Parameter(parameter) => parameter.name.range,
-            GoToTarget::Alias(alias) => alias.name.range,
-            GoToTarget::ImportedModule(module) => module.module.as_ref().unwrap().range,
-            GoToTarget::ExceptVariable(except) => except.name.as_ref().unwrap().range,
-            GoToTarget::KeywordArgument(keyword) => keyword.arg.as_ref().unwrap().range,
-            GoToTarget::PatternMatchRest(rest) => rest.rest.as_ref().unwrap().range,
-            GoToTarget::PatternKeywordArgument(keyword) => keyword.attr.range,
-            GoToTarget::PatternMatchStarName(star) => star.name.as_ref().unwrap().range,
-            GoToTarget::PatternMatchAsName(as_name) => as_name.name.as_ref().unwrap().range,
-            GoToTarget::TypeParamTypeVarName(type_var) => type_var.name.range,
-            GoToTarget::TypeParamParamSpecName(spec) => spec.name.range,
-            GoToTarget::TypeParamTypeVarTupleName(tuple) => tuple.name.range,
+            GotoTarget::Expression(expression) => expression.range(),
+            GotoTarget::FunctionDef(function) => function.name.range,
+            GotoTarget::ClassDef(class) => class.name.range,
+            GotoTarget::Parameter(parameter) => parameter.name.range,
+            GotoTarget::Alias(alias) => alias.name.range,
+            GotoTarget::ImportedModule(module) => module.module.as_ref().unwrap().range,
+            GotoTarget::ExceptVariable(except) => except.name.as_ref().unwrap().range,
+            GotoTarget::KeywordArgument(keyword) => keyword.arg.as_ref().unwrap().range,
+            GotoTarget::PatternMatchRest(rest) => rest.rest.as_ref().unwrap().range,
+            GotoTarget::PatternKeywordArgument(keyword) => keyword.attr.range,
+            GotoTarget::PatternMatchStarName(star) => star.name.as_ref().unwrap().range,
+            GotoTarget::PatternMatchAsName(as_name) => as_name.name.as_ref().unwrap().range,
+            GotoTarget::TypeParamTypeVarName(type_var) => type_var.name.range,
+            GotoTarget::TypeParamParamSpecName(spec) => spec.name.range,
+            GotoTarget::TypeParamTypeVarTupleName(tuple) => tuple.name.range,
         }
     }
 }
 
-pub(crate) fn find_go_to_target(root: AnyNodeRef, offset: TextSize) -> Option<GoToTarget> {
+pub(crate) fn find_goto_target(root: AnyNodeRef, offset: TextSize) -> Option<GotoTarget> {
     let covering_node = covering_node(root, TextRange::empty(offset));
     tracing::trace!("Covering node is of kind {:?}", covering_node.node().kind());
 
     match covering_node.node() {
         AnyNodeRef::Identifier(_) => match covering_node.parent() {
-            Some(AnyNodeRef::StmtFunctionDef(function)) => Some(GoToTarget::FunctionDef(function)),
-            Some(AnyNodeRef::StmtClassDef(class)) => Some(GoToTarget::ClassDef(class)),
-            Some(AnyNodeRef::Parameter(parameter)) => Some(GoToTarget::Parameter(parameter)),
-            Some(AnyNodeRef::Alias(alias)) => Some(GoToTarget::Alias(alias)),
-            Some(AnyNodeRef::StmtImportFrom(from)) => Some(GoToTarget::ImportedModule(from)),
+            Some(AnyNodeRef::StmtFunctionDef(function)) => Some(GotoTarget::FunctionDef(function)),
+            Some(AnyNodeRef::StmtClassDef(class)) => Some(GotoTarget::ClassDef(class)),
+            Some(AnyNodeRef::Parameter(parameter)) => Some(GotoTarget::Parameter(parameter)),
+            Some(AnyNodeRef::Alias(alias)) => Some(GotoTarget::Alias(alias)),
+            Some(AnyNodeRef::StmtImportFrom(from)) => Some(GotoTarget::ImportedModule(from)),
             Some(AnyNodeRef::ExceptHandlerExceptHandler(handler)) => {
-                Some(GoToTarget::ExceptVariable(handler))
+                Some(GotoTarget::ExceptVariable(handler))
             }
-            Some(AnyNodeRef::Keyword(keyword)) => Some(GoToTarget::KeywordArgument(keyword)),
+            Some(AnyNodeRef::Keyword(keyword)) => Some(GotoTarget::KeywordArgument(keyword)),
             Some(AnyNodeRef::PatternMatchMapping(mapping)) => {
-                Some(GoToTarget::PatternMatchRest(mapping))
+                Some(GotoTarget::PatternMatchRest(mapping))
             }
             Some(AnyNodeRef::PatternKeyword(keyword)) => {
-                Some(GoToTarget::PatternKeywordArgument(keyword))
+                Some(GotoTarget::PatternKeywordArgument(keyword))
             }
             Some(AnyNodeRef::PatternMatchStar(star)) => {
-                Some(GoToTarget::PatternMatchStarName(star))
+                Some(GotoTarget::PatternMatchStarName(star))
             }
             Some(AnyNodeRef::PatternMatchAs(as_pattern)) => {
-                Some(GoToTarget::PatternMatchAsName(as_pattern))
+                Some(GotoTarget::PatternMatchAsName(as_pattern))
             }
-            Some(AnyNodeRef::TypeParamTypeVar(var)) => Some(GoToTarget::TypeParamTypeVarName(var)),
+            Some(AnyNodeRef::TypeParamTypeVar(var)) => Some(GotoTarget::TypeParamTypeVarName(var)),
             Some(AnyNodeRef::TypeParamParamSpec(bound)) => {
-                Some(GoToTarget::TypeParamParamSpecName(bound))
+                Some(GotoTarget::TypeParamParamSpecName(bound))
             }
             Some(AnyNodeRef::TypeParamTypeVarTuple(var_tuple)) => {
-                Some(GoToTarget::TypeParamTypeVarTupleName(var_tuple))
+                Some(GotoTarget::TypeParamTypeVarTupleName(var_tuple))
             }
             None => None,
             Some(parent) => {
@@ -218,7 +218,8 @@ pub(crate) fn find_go_to_target(root: AnyNodeRef, offset: TextSize) -> Option<Go
                 None
             }
         },
-        node => node.as_expr_ref().map(GoToTarget::Expression),
+        // AnyNodeRef::Keyword(keyword) => Some(GotoTarget::KeywordArgument(keyword)),
+        node => node.as_expr_ref().map(GotoTarget::Expression),
     }
 }
 
@@ -465,7 +466,7 @@ mod tests {
         Severity, Span, SubDiagnostic,
     };
     use ruff_db::files::{system_path_to_file, File};
-    use ruff_db::system::{DbWithWritableSystem, SystemPathBuf};
+    use ruff_db::system::{DbWithWritableSystem, SystemPath, SystemPathBuf};
     use ruff_python_ast::PythonVersion;
     use ruff_text_size::{Ranged, TextSize};
 
@@ -588,6 +589,36 @@ mod tests {
     }
 
     #[test]
+    fn goto_type_of_expression_with_module() {
+        let mut test = goto_test(
+            r#"
+            import lib
+
+            lib<CURSOR>
+            "#,
+        );
+
+        test.write_file("lib.py", "a = 10").unwrap();
+
+        assert_snapshot!(test.goto_type_definition(), @r###"
+        info: lint:goto-type-definition: Type definition
+         --> /lib.py:1:1
+          |
+        1 | a = 10
+          | ^
+          |
+        info: Source
+         --> /main.py:4:13
+          |
+        2 |             import lib
+        3 |
+        4 |             lib
+          |             ^^^
+          |
+        "###);
+    }
+
+    #[test]
     fn goto_type_of_expression_with_literal_type() {
         let test = goto_test(
             r#"
@@ -615,6 +646,159 @@ mod tests {
         3 |
         4 |             a
           |             ^
+          |
+        "###);
+    }
+
+    #[test]
+    fn goto_type_of_expression_with_type_var_type() {
+        let test = goto_test(
+            r#"
+            type Alias[T: int = bool] = list[T<CURSOR>]
+            "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @r###"
+        info: lint:goto-type-definition: Type definition
+         --> /main.py:2:24
+          |
+        2 |             type Alias[T: int = bool] = list[T]
+          |                        ^
+          |
+        info: Source
+         --> /main.py:2:46
+          |
+        2 |             type Alias[T: int = bool] = list[T]
+          |                                              ^
+          |
+        "###);
+    }
+
+    #[test]
+    fn goto_type_of_expression_with_type_param_spec() {
+        let test = goto_test(
+            r#"
+            type Alias[**P = [int, str]] = Callable[P<CURSOR>, int]
+            "#,
+        );
+
+        // TODO: Goto type definition currently doesn't work for type param specs
+        // because the inference doesn't support them yet.
+        // This snapshot should show a single target pointing to `T`
+        assert_snapshot!(test.goto_type_definition(), @"No type definitions found");
+    }
+
+    #[test]
+    fn goto_type_of_expression_with_type_var_tuple() {
+        let test = goto_test(
+            r#"
+            type Alias[*Ts = ()] = tuple[*Ts<CURSOR>]
+            "#,
+        );
+
+        // TODO: Goto type definition currently doesn't work for type var tuples
+        // because the inference doesn't support them yet.
+        // This snapshot should show a single target pointing to `T`
+        assert_snapshot!(test.goto_type_definition(), @"No type definitions found");
+    }
+
+    #[test]
+    fn goto_type_on_keyword_argument() {
+        let test = goto_test(
+            r#"
+            def test(a: str): ...
+            
+            test(a<CURSOR>= "123")
+            "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @r###"
+        info: lint:goto-type-definition: Type definition
+           --> stdlib/builtins.pyi:443:7
+            |
+        441 |     def __getitem__(self, key: int, /) -> str | int | None: ...
+        442 |
+        443 | class str(Sequence[str]):
+            |       ^^^
+        444 |     @overload
+        445 |     def __new__(cls, object: object = ...) -> Self: ...
+            |
+        info: Source
+         --> /main.py:4:18
+          |
+        2 |             def test(a: str): ...
+        3 |             
+        4 |             test(a= "123")
+          |                  ^
+          |
+        "###);
+    }
+
+    #[test]
+    fn goto_type_on_incorrectly_typed_keyword_argument() {
+        let test = goto_test(
+            r#"
+            def test(a: str): ...
+
+            test(a<CURSOR>= 123)
+            "#,
+        );
+
+        // TODO: This should jump to `str` and not `int` because
+        //   the keyword is typed as a string. It's only the passed argument that
+        //   is an int. Navigating to `str` would match pyright's behavior.
+        assert_snapshot!(test.goto_type_definition(), @r###"
+        info: lint:goto-type-definition: Type definition
+           --> stdlib/builtins.pyi:234:7
+            |
+        232 | _LiteralInteger = _PositiveInteger | _NegativeInteger | Literal[0]  # noqa: Y026  # TODO: Use TypeAlias once mypy bugs are fixed
+        233 |
+        234 | class int:
+            |       ^^^
+        235 |     @overload
+        236 |     def __new__(cls, x: ConvertibleToInt = ..., /) -> Self: ...
+            |
+        info: Source
+         --> /main.py:4:18
+          |
+        2 |             def test(a: str): ...
+        3 |
+        4 |             test(a= 123)
+          |                  ^
+          |
+        "###);
+    }
+
+    #[test]
+    fn goto_type_on_kwargs() {
+        let test = goto_test(
+            r#"
+            def f(name: str): ...
+
+kwargs = { "name": "test"}
+
+f(**kwargs<CURSOR>)
+            "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @r###"
+        info: lint:goto-type-definition: Type definition
+            --> stdlib/builtins.pyi:1098:7
+             |
+        1096 |         def __class_getitem__(cls, item: Any, /) -> GenericAlias: ...
+        1097 |
+        1098 | class dict(MutableMapping[_KT, _VT]):
+             |       ^^^^
+        1099 |     # __init__ should be kept roughly in line with `collections.UserDict.__init__`, which has similar semantics
+        1100 |     # Also multiprocessing.managers.SyncManager.dict()
+             |
+        info: Source
+         --> /main.py:6:5
+          |
+        4 | kwargs = { "name": "test"}
+        5 |
+        6 | f(**kwargs)
+          |     ^^^^^^
           |
         "###);
     }
@@ -681,6 +865,36 @@ mod tests {
           |
         "###);
     }
+
+    #[test]
+    fn goto_between_call_arguments() {
+        let test = goto_test(
+            r#"
+            def foo(a, b): ...
+
+            foo<CURSOR>()
+            "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @r###"
+        info: lint:goto-type-definition: Type definition
+         --> /main.py:2:19
+          |
+        2 |             class X:
+          |                   ^
+        3 |                 def foo(a, b): ...
+          |
+        info: Source
+         --> /main.py:7:13
+          |
+        5 |             x = X()
+        6 |
+        7 |             x.foo()
+          |             ^
+          |
+        "###);
+    }
+
     fn goto_test(source: &str) -> GotoTest {
         let mut db = TestDb::new();
         let cursor_offset = source.find("<CURSOR>").expect(
@@ -725,22 +939,32 @@ mod tests {
     }
 
     impl GotoTest {
+        fn write_file(
+            &mut self,
+            path: impl AsRef<SystemPath>,
+            content: &str,
+        ) -> std::io::Result<()> {
+            self.db.write_file(path, content)
+        }
+
         fn goto_type_definition(&self) -> String {
-            let Some(type_definitions) =
-                go_to_type_definition(&self.db, self.file, self.cursor_offset)
+            let Some(targets) = go_to_type_definition(&self.db, self.file, self.cursor_offset)
             else {
-                return "No type definitions found".to_string();
+                return "No goto target found".to_string();
             };
+
+            if targets.info.is_empty() {
+                return "No type definitions found".to_string();
+            }
 
             let mut buf = vec![];
 
             let mut source = SubDiagnostic::new(Severity::Info, "Source");
             source.annotate(Annotation::primary(
-                Span::from(type_definitions.range.file())
-                    .with_range(type_definitions.range.range()),
+                Span::from(targets.range.file()).with_range(targets.range.range()),
             ));
 
-            for target in type_definitions.info {
+            for target in targets.info {
                 let mut diagnostic = Diagnostic::new(
                     DiagnosticId::Lint(LintName::of("goto-type-definition")),
                     Severity::Info,
