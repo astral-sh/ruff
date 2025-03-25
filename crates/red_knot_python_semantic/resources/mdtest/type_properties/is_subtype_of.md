@@ -494,10 +494,31 @@ Return types are covariant.
 
 ```py
 from typing import Callable
-from knot_extensions import is_subtype_of, static_assert
+from knot_extensions import is_subtype_of, static_assert, TypeOf
 
 static_assert(is_subtype_of(Callable[[], int], Callable[[], float]))
 static_assert(not is_subtype_of(Callable[[], float], Callable[[], int]))
+```
+
+### Optional return type
+
+```py
+from typing import Callable
+from knot_extensions import is_subtype_of, static_assert, TypeOf
+
+flag: bool = True
+
+def optional_return_type() -> int | None:
+    if flag:
+        return 1
+    return None
+
+def required_return_type() -> int:
+    return 1
+
+static_assert(not is_subtype_of(TypeOf[optional_return_type], TypeOf[required_return_type]))
+static_assert(is_subtype_of(TypeOf[required_return_type], TypeOf[optional_return_type]))
+static_assert(is_subtype_of(TypeOf[optional_return_type], Callable[[], int | None]))
 ```
 
 ### Parameter types
