@@ -12,6 +12,7 @@ use ruff_python_ast::{
     Expr, Pattern, PythonVersion, Stmt, StmtExpr, StmtImportFrom,
 };
 use ruff_text_size::{Ranged, TextRange};
+use rustc_hash::FxHashSet;
 
 #[derive(Debug)]
 pub struct SemanticSyntaxChecker {
@@ -117,11 +118,10 @@ impl SemanticSyntaxChecker {
 
         for case in cases {
             let mut visitor = MultipleCaseAssignmentVisitor {
-                names: Vec::new(),
+                names: FxHashSet::default(),
                 ctx,
             };
             visitor.visit_pattern(&case.pattern);
-            visitor.emit_errors();
         }
     }
 
@@ -323,22 +323,19 @@ impl Visitor<'_> for ReboundComprehensionVisitor<'_> {
 }
 
 struct MultipleCaseAssignmentVisitor<'a, Ctx> {
-    names: Vec<&'a ast::Identifier>,
+    names: FxHashSet<&'a ast::name::Name>,
     ctx: &'a Ctx,
 }
 
 impl<'a, Ctx: SemanticSyntaxContext> MultipleCaseAssignmentVisitor<'a, Ctx> {
     /// Emit [`SemanticSyntaxError`]s for every duplicate variable assignment.
-    fn emit_errors(mut self) {
-        self.names.sort_by_key(|name| &name.id);
-        for (n1, n2) in self.names.iter().zip(self.names.iter().skip(1)) {
-            if n1.id == n2.id {
-                SemanticSyntaxChecker::add_error(
-                    self.ctx,
-                    SemanticSyntaxErrorKind::MultipleCaseAssignment(n2.id.clone()),
-                    n2.range,
-                );
-            }
+    fn push(&mut self, ident: &'a ast::Identifier) {
+        if !self.names.insert(&ident.id) {
+            SemanticSyntaxChecker::add_error(
+                self.ctx,
+                SemanticSyntaxErrorKind::MultipleCaseAssignment(ident.id.clone()),
+                ident.range(),
+            );
         }
     }
 
@@ -354,15 +351,11 @@ impl<'a, Ctx: SemanticSyntaxContext> MultipleCaseAssignmentVisitor<'a, Ctx> {
         //     case Class(x, x): ...  # MatchClass positional
         //     case Class(x=1, x=2): ...  # MatchClass keyword
         //     case [x] | {1: x} | Class(x=1, x=2): ...  # MatchOr
-
-        // test_ok multiple_assignment_in_case_pattern
-        // match 2:
-        //     case Class(x) | [x] | x: ...
         match pattern {
             Pattern::MatchValue(_) | Pattern::MatchSingleton(_) => {}
             Pattern::MatchStar(ast::PatternMatchStar { name, .. }) => {
                 if let Some(name) = name {
-                    self.names.push(name);
+                    self.push(name);
                 }
             }
             Pattern::MatchSequence(ast::PatternMatchSequence { patterns, .. }) => {
@@ -375,7 +368,7 @@ impl<'a, Ctx: SemanticSyntaxContext> MultipleCaseAssignmentVisitor<'a, Ctx> {
                     self.visit_pattern(pattern);
                 }
                 if let Some(rest) = rest {
-                    self.names.push(rest);
+                    self.push(rest);
                 }
             }
             Pattern::MatchClass(ast::PatternMatchClass { arguments, .. }) => {
@@ -383,7 +376,7 @@ impl<'a, Ctx: SemanticSyntaxContext> MultipleCaseAssignmentVisitor<'a, Ctx> {
                     self.visit_pattern(pattern);
                 }
                 for keyword in &arguments.keywords {
-                    self.names.push(&keyword.attr);
+                    self.push(&keyword.attr);
                     self.visit_pattern(&keyword.pattern);
                 }
             }
@@ -392,18 +385,23 @@ impl<'a, Ctx: SemanticSyntaxContext> MultipleCaseAssignmentVisitor<'a, Ctx> {
                     self.visit_pattern(pattern);
                 }
                 if let Some(name) = name {
-                    self.names.push(name);
+                    self.push(name);
                 }
             }
             Pattern::MatchOr(ast::PatternMatchOr { patterns, .. }) => {
-                // each of these patterns should be visited separately
+                // each of these patterns should be visited separately because patterns can only be
+                // duplicated within a single arm of the or pattern. For example, the case below is
+                // a valid pattern.
+
+                // test_ok multiple_assignment_in_case_pattern
+                // match 2:
+                //     case Class(x) | [x] | x: ...
                 for pattern in patterns {
                     let mut visitor = Self {
-                        names: Vec::new(),
+                        names: FxHashSet::default(),
                         ctx: self.ctx,
                     };
                     visitor.visit_pattern(pattern);
-                    visitor.emit_errors();
                 }
             }
         }
