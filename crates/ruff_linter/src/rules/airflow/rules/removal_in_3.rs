@@ -1,4 +1,5 @@
 use crate::checkers::ast::Checker;
+use crate::importer::ImportRequest;
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::map_callable;
@@ -59,24 +60,29 @@ impl Violation for Airflow3Removal {
             Replacement::Message(message) => {
                 format!("`{deprecated}` is removed in Airflow 3.0; {message}")
             }
+            Replacement::AutoImport { path, name } => format!("Use `{path}`.`{name}` instead"),
         }
     }
 
     fn fix_title(&self) -> Option<String> {
         let Airflow3Removal { replacement, .. } = self;
-        if let Replacement::Name(name) = replacement {
-            Some(format!("Use `{name}` instead"))
-        } else {
-            None
+        match replacement {
+            Replacement::Name(name) => Some(format!("Use `{name}` instead")),
+            Replacement::AutoImport { path, name } => Some(format!("Use `{path}.{name}` instead")),
+            _ => None,
         }
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 enum Replacement {
     None,
     Name(&'static str),
     Message(&'static str),
+    AutoImport {
+        path: &'static str,
+        name: &'static str,
+    },
 }
 
 /// AIR302
@@ -574,7 +580,10 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             Replacement::Name("airflow.api_connexion.security.requires_access_*")
         }
         ["airflow", "api_connexion", "security", "requires_access_dataset"] => {
-            Replacement::Name("airflow.api_connexion.security.requires_access_asset")
+            Replacement::AutoImport {
+                path: "airflow.api_connexion.security",
+                name: "requires_access_asset",
+            }
         }
 
         // airflow.auth.managers
@@ -904,13 +913,27 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         _ => return,
     };
 
-    checker.report_diagnostic(Diagnostic::new(
+    let mut diagnostic = Diagnostic::new(
         Airflow3Removal {
             deprecated: qualified_name.to_string(),
-            replacement,
+            replacement: replacement.clone(),
         },
         range,
-    ));
+    );
+
+    if let Replacement::AutoImport { path, name } = replacement {
+        diagnostic.try_set_fix(|| {
+            let (import_edit, binding) = checker.importer().get_or_import_symbol(
+                &ImportRequest::import_from(path, name),
+                expr.start(),
+                checker.semantic(),
+            )?;
+            let replacement_edit = Edit::range_replacement(binding, range);
+            Ok(Fix::safe_edits(import_edit, [replacement_edit]))
+        });
+    };
+
+    checker.report_diagnostic(diagnostic);
 }
 
 /// Check whether a customized Airflow plugin contains removed extensions.

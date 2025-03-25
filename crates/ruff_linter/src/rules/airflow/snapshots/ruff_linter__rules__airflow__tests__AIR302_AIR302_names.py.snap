@@ -85,7 +85,7 @@ AIR302_names.py:125:1: AIR302 `airflow.api_connexion.security.requires_access` i
     |
     = help: Use `airflow.api_connexion.security.requires_access_*` instead
 
-AIR302_names.py:125:18: AIR302 `airflow.api_connexion.security.requires_access_dataset` is removed in Airflow 3.0
+AIR302_names.py:125:18: AIR302 [*] Use `airflow.api_connexion.security`.`requires_access_asset` instead
     |
 124 | # airflow.api_connexion.security
 125 | requires_access, requires_access_dataset
@@ -94,6 +94,25 @@ AIR302_names.py:125:18: AIR302 `airflow.api_connexion.security.requires_access_d
 127 | # airflow.auth.managers
     |
     = help: Use `airflow.api_connexion.security.requires_access_asset` instead
+
+ℹ Safe fix
+12  12  | from airflow import (
+13  13  |     Dataset as DatasetFromRoot,
+14  14  | )
+15      |-from airflow.api_connexion.security import requires_access, requires_access_dataset
+    15  |+from airflow.api_connexion.security import requires_access, requires_access_dataset, requires_access_asset
+16  16  | from airflow.auth.managers.base_auth_manager import is_authorized_dataset
+17  17  | from airflow.auth.managers.models.resource_details import DatasetDetails
+18  18  | from airflow.configuration import (
+--------------------------------------------------------------------------------
+122 122 | DatasetFromRoot()
+123 123 | 
+124 124 | # airflow.api_connexion.security
+125     |-requires_access, requires_access_dataset
+    125 |+requires_access, requires_access_asset
+126 126 | 
+127 127 | # airflow.auth.managers
+128 128 | is_authorized_dataset
 
 AIR302_names.py:128:1: AIR302 `airflow.auth.managers.base_auth_manager.is_authorized_dataset` is removed in Airflow 3.0
     |
