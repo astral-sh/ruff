@@ -20,7 +20,7 @@ use crate::{AsMode, Mode};
 ///
 /// let options = ParseOptions::from(PySourceType::Python);
 /// ```
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct ParseOptions {
     /// Specify the mode in which the code will be parsed.
     pub(crate) mode: Mode,
@@ -33,6 +33,10 @@ impl ParseOptions {
     pub fn with_target_version(mut self, target_version: PythonVersion) -> Self {
         self.target_version = target_version;
         self
+    }
+
+    pub fn target_version(&self) -> PythonVersion {
+        self.target_version
     }
 }
 

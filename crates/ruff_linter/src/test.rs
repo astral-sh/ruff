@@ -111,7 +111,7 @@ pub(crate) fn test_contents<'a>(
     let source_type = PySourceType::from(path);
     let target_version = settings.resolve_target_version(path);
     let options = ParseOptions::from(source_type).with_target_version(target_version);
-    let parsed = ruff_python_parser::parse_unchecked(source_kind.source_code(), options.clone())
+    let parsed = ruff_python_parser::parse_unchecked(source_kind.source_code(), options)
         .try_into_module()
         .expect("PySourceType always parses into a module");
     let locator = Locator::new(source_kind.source_code());
@@ -174,10 +174,9 @@ pub(crate) fn test_contents<'a>(
 
             transformed = Cow::Owned(transformed.updated(fixed_contents, &source_map));
 
-            let parsed =
-                ruff_python_parser::parse_unchecked(transformed.source_code(), options.clone())
-                    .try_into_module()
-                    .expect("PySourceType always parses into a module");
+            let parsed = ruff_python_parser::parse_unchecked(transformed.source_code(), options)
+                .try_into_module()
+                .expect("PySourceType always parses into a module");
             let locator = Locator::new(transformed.source_code());
             let stylist = Stylist::from_tokens(parsed.tokens(), locator.contents());
             let indexer = Indexer::from_tokens(parsed.tokens(), locator.contents());

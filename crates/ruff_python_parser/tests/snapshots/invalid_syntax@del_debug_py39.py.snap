@@ -1,0 +1,36 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/del_debug_py39.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..57,
+        body: [
+            Delete(
+                StmtDelete {
+                    range: 43..56,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 47..56,
+                                id: Name("__debug__"),
+                                ctx: Del,
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Semantic Syntax Errors
+
+  |
+1 | # parse_options: {"target-version": "3.9"}
+2 | del __debug__
+  |     ^^^^^^^^^ Syntax Error: cannot delete `__debug__` on Python 3.9 (syntax was removed in 3.9)
+  |

@@ -9,7 +9,8 @@ use std::fmt::Display;
 use ruff_python_ast::{
     self as ast,
     visitor::{walk_expr, Visitor},
-    Expr, IrrefutablePatternKind, Pattern, PythonVersion, Stmt, StmtExpr, StmtImportFrom,
+    Expr, ExprContext, IrrefutablePatternKind, Pattern, PythonVersion, Stmt, StmtExpr,
+    StmtImportFrom,
 };
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
@@ -207,6 +208,51 @@ impl SemanticSyntaxChecker {
                 Self::check_generator_expr(key, generators, ctx);
                 Self::check_generator_expr(value, generators, ctx);
             }
+            Expr::Name(ast::ExprName {
+                range,
+                id,
+                ctx: expr_ctx,
+            }) => {
+                // test_err write_to_debug
+                // del __debug__
+                // del x, y, __debug__, z
+                // __debug__ = 1
+                // x, y, __debug__, z = 1, 2, 3, 4
+
+                // test_err del_debug_py39
+                // # parse_options: {"target-version": "3.9"}
+                // del __debug__
+
+                // test_ok del_debug_py38
+                // # parse_options: {"target-version": "3.8"}
+                // del __debug__
+
+                // test_ok read_from_debug
+                // if __debug__: ...
+                // x = __debug__
+                if id == "__debug__" {
+                    match expr_ctx {
+                        ExprContext::Store => Self::add_error(
+                            ctx,
+                            SemanticSyntaxErrorKind::WriteToDebug(WriteToDebugKind::Store),
+                            *range,
+                        ),
+                        ExprContext::Del => {
+                            let version = ctx.python_version();
+                            if version >= PythonVersion::PY39 {
+                                Self::add_error(
+                                    ctx,
+                                    SemanticSyntaxErrorKind::WriteToDebug(
+                                        WriteToDebugKind::Delete(version),
+                                    ),
+                                    *range,
+                                );
+                            }
+                        }
+                        _ => {}
+                    };
+                }
+            }
             _ => {}
         }
     }
@@ -292,6 +338,12 @@ impl Display for SemanticSyntaxError {
                     f.write_str("wildcard makes remaining patterns unreachable")
                 }
             },
+            SemanticSyntaxErrorKind::WriteToDebug(kind) => match kind {
+                WriteToDebugKind::Store => f.write_str("cannot assign to `__debug__`"),
+                WriteToDebugKind::Delete(python_version) => {
+                    write!(f, "cannot delete `__debug__` on Python {python_version} (syntax was removed in 3.9)")
+                }
+            },
         }
     }
 }
@@ -370,6 +422,26 @@ pub enum SemanticSyntaxErrorKind {
     ///
     /// [Python reference]: https://docs.python.org/3/reference/compound_stmts.html#irrefutable-case-blocks
     IrrefutableCasePattern(IrrefutablePatternKind),
+
+    /// Represents a write to `__debug__` (either an `ExprContext::Store` or `ExprContext::Del`).
+    ///
+    /// ## Examples
+    ///
+    /// ```python
+    /// del __debug__
+    /// __debug__ = False
+    /// ```
+    ///
+    /// See [BPO 45000] for more information.
+    ///
+    /// [BPO 45000]: https://github.com/python/cpython/issues/89163
+    WriteToDebug(WriteToDebugKind),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum WriteToDebugKind {
+    Store,
+    Delete(PythonVersion),
 }
 
 /// Searches for the first named expression (`x := y`) rebinding one of the `iteration_variables` in
