@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/airflow/mod.rs
+snapshot_kind: text
 ---
 AIR302_names.py:107:1: AIR302 `airflow.PY36` is removed in Airflow 3.0
     |
@@ -85,7 +86,7 @@ AIR302_names.py:111:1: AIR302 `airflow.api_connexion.security.requires_access` i
     |
     = help: Use `airflow.api_connexion.security.requires_access_*` instead
 
-AIR302_names.py:111:18: AIR302 `airflow.api_connexion.security.requires_access_dataset` is removed in Airflow 3.0
+AIR302_names.py:111:18: AIR302 [*] Use `airflow.api_connexion.security`.`requires_access_asset` instead
     |
 110 | # airflow.api_connexion.security
 111 | requires_access, requires_access_dataset
@@ -94,6 +95,25 @@ AIR302_names.py:111:18: AIR302 `airflow.api_connexion.security.requires_access_d
 113 | # airflow.auth.managers
     |
     = help: Use `airflow.api_connexion.security.requires_access_asset` instead
+
+ℹ Safe fix
+12  12  | from airflow import (
+13  13  |     Dataset as DatasetFromRoot,
+14  14  | )
+15      |-from airflow.api_connexion.security import requires_access, requires_access_dataset
+    15  |+from airflow.api_connexion.security import requires_access, requires_access_dataset, requires_access_asset
+16  16  | from airflow.auth.managers.base_auth_manager import is_authorized_dataset
+17  17  | from airflow.auth.managers.models.resource_details import DatasetDetails
+18  18  | from airflow.configuration import (
+--------------------------------------------------------------------------------
+108 108 | DatasetFromRoot()
+109 109 | 
+110 110 | # airflow.api_connexion.security
+111     |-requires_access, requires_access_dataset
+    111 |+requires_access, requires_access_asset
+112 112 | 
+113 113 | # airflow.auth.managers
+114 114 | is_authorized_dataset
 
 AIR302_names.py:114:1: AIR302 `airflow.auth.managers.base_auth_manager.is_authorized_dataset` is removed in Airflow 3.0
     |
@@ -881,91 +901,102 @@ AIR302_names.py:279:1: AIR302 `airflow.utils.helpers.chain` is removed in Airflo
 278 | #  airflow.utils.helpers
 279 | chain
     | ^^^^^ AIR302
-280 | cross_downstream
+280 | chain_linear
+281 | cross_downstream
     |
     = help: Use `airflow.sdk.chain` instead
 
-AIR302_names.py:280:1: AIR302 `airflow.utils.helpers.cross_downstream` is removed in Airflow 3.0
+AIR302_names.py:280:1: AIR302 `airflow.models.baseoperator.chain_linear` is removed in Airflow 3.0
     |
 278 | #  airflow.utils.helpers
 279 | chain
-280 | cross_downstream
+280 | chain_linear
+    | ^^^^^^^^^^^^ AIR302
+281 | cross_downstream
+    |
+    = help: Use `airflow.sdk.chain_linear` instead
+
+AIR302_names.py:281:1: AIR302 `airflow.utils.helpers.cross_downstream` is removed in Airflow 3.0
+    |
+279 | chain
+280 | chain_linear
+281 | cross_downstream
     | ^^^^^^^^^^^^^^^^ AIR302
-281 |
-282 | # airflow.utils.state
+282 |
+283 | # airflow.utils.state
     |
     = help: Use `airflow.sdk.cross_downstream` instead
 
-AIR302_names.py:283:1: AIR302 `airflow.utils.state.SHUTDOWN` is removed in Airflow 3.0
+AIR302_names.py:284:1: AIR302 `airflow.utils.state.SHUTDOWN` is removed in Airflow 3.0
     |
-282 | # airflow.utils.state
-283 | SHUTDOWN
+283 | # airflow.utils.state
+284 | SHUTDOWN
     | ^^^^^^^^ AIR302
-284 | terminating_states
+285 | terminating_states
     |
 
-AIR302_names.py:284:1: AIR302 `airflow.utils.state.terminating_states` is removed in Airflow 3.0
+AIR302_names.py:285:1: AIR302 `airflow.utils.state.terminating_states` is removed in Airflow 3.0
     |
-282 | # airflow.utils.state
-283 | SHUTDOWN
-284 | terminating_states
+283 | # airflow.utils.state
+284 | SHUTDOWN
+285 | terminating_states
     | ^^^^^^^^^^^^^^^^^^ AIR302
-285 |
-286 | #  airflow.utils.trigger_rule
+286 |
+287 | #  airflow.utils.trigger_rule
     |
 
-AIR302_names.py:287:13: AIR302 `airflow.utils.trigger_rule.TriggerRule.DUMMY` is removed in Airflow 3.0
+AIR302_names.py:288:13: AIR302 `airflow.utils.trigger_rule.TriggerRule.DUMMY` is removed in Airflow 3.0
     |
-286 | #  airflow.utils.trigger_rule
-287 | TriggerRule.DUMMY
+287 | #  airflow.utils.trigger_rule
+288 | TriggerRule.DUMMY
     |             ^^^^^ AIR302
-288 | TriggerRule.NONE_FAILED_OR_SKIPPED
+289 | TriggerRule.NONE_FAILED_OR_SKIPPED
     |
 
-AIR302_names.py:288:13: AIR302 `airflow.utils.trigger_rule.TriggerRule.NONE_FAILED_OR_SKIPPED` is removed in Airflow 3.0
+AIR302_names.py:289:13: AIR302 `airflow.utils.trigger_rule.TriggerRule.NONE_FAILED_OR_SKIPPED` is removed in Airflow 3.0
     |
-286 | #  airflow.utils.trigger_rule
-287 | TriggerRule.DUMMY
-288 | TriggerRule.NONE_FAILED_OR_SKIPPED
+287 | #  airflow.utils.trigger_rule
+288 | TriggerRule.DUMMY
+289 | TriggerRule.NONE_FAILED_OR_SKIPPED
     |             ^^^^^^^^^^^^^^^^^^^^^^ AIR302
-289 |
-290 | # airflow.www.auth
+290 |
+291 | # airflow.www.auth
     |
 
-AIR302_names.py:291:1: AIR302 `airflow.www.auth.has_access` is removed in Airflow 3.0
+AIR302_names.py:292:1: AIR302 `airflow.www.auth.has_access` is removed in Airflow 3.0
     |
-290 | # airflow.www.auth
-291 | has_access
+291 | # airflow.www.auth
+292 | has_access
     | ^^^^^^^^^^ AIR302
-292 | has_access_dataset
+293 | has_access_dataset
     |
     = help: Use `airflow.www.auth.has_access_*` instead
 
-AIR302_names.py:292:1: AIR302 `airflow.www.auth.has_access_dataset` is removed in Airflow 3.0
+AIR302_names.py:293:1: AIR302 `airflow.www.auth.has_access_dataset` is removed in Airflow 3.0
     |
-290 | # airflow.www.auth
-291 | has_access
-292 | has_access_dataset
+291 | # airflow.www.auth
+292 | has_access
+293 | has_access_dataset
     | ^^^^^^^^^^^^^^^^^^ AIR302
-293 |
-294 | # airflow.www.utils
+294 |
+295 | # airflow.www.utils
     |
     = help: Use `airflow.www.auth.has_access_dataset.has_access_asset` instead
 
-AIR302_names.py:295:1: AIR302 `airflow.www.utils.get_sensitive_variables_fields` is removed in Airflow 3.0
+AIR302_names.py:296:1: AIR302 `airflow.www.utils.get_sensitive_variables_fields` is removed in Airflow 3.0
     |
-294 | # airflow.www.utils
-295 | get_sensitive_variables_fields
+295 | # airflow.www.utils
+296 | get_sensitive_variables_fields
     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ AIR302
-296 | should_hide_value_for_key
+297 | should_hide_value_for_key
     |
     = help: Use `airflow.utils.log.secrets_masker.get_sensitive_variables_fields` instead
 
-AIR302_names.py:296:1: AIR302 `airflow.www.utils.should_hide_value_for_key` is removed in Airflow 3.0
+AIR302_names.py:297:1: AIR302 `airflow.www.utils.should_hide_value_for_key` is removed in Airflow 3.0
     |
-294 | # airflow.www.utils
-295 | get_sensitive_variables_fields
-296 | should_hide_value_for_key
+295 | # airflow.www.utils
+296 | get_sensitive_variables_fields
+297 | should_hide_value_for_key
     | ^^^^^^^^^^^^^^^^^^^^^^^^^ AIR302
     |
     = help: Use `airflow.utils.log.secrets_masker.should_hide_value_for_key` instead
