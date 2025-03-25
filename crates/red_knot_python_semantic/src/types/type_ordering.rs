@@ -82,6 +82,8 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         ) => Ordering::Equal,
         (Type::Callable(CallableType::WrapperDescriptorDunderGet), _) => Ordering::Less,
         (_, Type::Callable(CallableType::WrapperDescriptorDunderGet)) => Ordering::Greater,
+        (Type::Callable(CallableType::SpecializeClass(_)), _) => Ordering::Less,
+        (_, Type::Callable(CallableType::SpecializeClass(_))) => Ordering::Greater,
 
         (Type::Callable(CallableType::General(_)), Type::Callable(CallableType::General(_))) => {
             Ordering::Equal

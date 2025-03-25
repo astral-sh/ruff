@@ -110,6 +110,13 @@ impl Display for DisplayRepresentation<'_> {
             Type::Callable(CallableType::WrapperDescriptorDunderGet) => {
                 f.write_str("<wrapper-descriptor `__get__` of `function` objects>")
             }
+            Type::Callable(CallableType::SpecializeClass(class)) => {
+                write!(
+                    f,
+                    "<specialize-generic of `{class}`>",
+                    class = class.name(self.db)
+                )
+            }
             Type::Union(union) => union.display(self.db).fmt(f),
             Type::Intersection(intersection) => intersection.display(self.db).fmt(f),
             Type::IntLiteral(n) => n.fmt(f),

@@ -321,6 +321,11 @@ impl<'db> Bindings<'db> {
                     }
                 }
 
+                Type::Callable(CallableType::SpecializeClass(class)) => {
+                    // TODO: Actually, you know, specialize the class
+                    overload.set_return_type(Type::class_literal(class));
+                }
+
                 Type::FunctionLiteral(function_type) => match function_type.known(db) {
                     Some(KnownFunction::IsEquivalentTo) => {
                         if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {

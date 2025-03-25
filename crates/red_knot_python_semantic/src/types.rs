@@ -656,6 +656,7 @@ impl<'db> Type<'db> {
                     .to_instance(db)
                     .is_subtype_of(db, target)
             }
+            (Type::Callable(CallableType::SpecializeClass(_)), _) => self == target,
 
             (
                 Type::Callable(CallableType::General(self_callable)),
@@ -1037,7 +1038,8 @@ impl<'db> Type<'db> {
                 | Type::Callable(
                     CallableType::BoundMethod(..)
                     | CallableType::MethodWrapperDunderGet(..)
-                    | CallableType::WrapperDescriptorDunderGet,
+                    | CallableType::WrapperDescriptorDunderGet
+                    | CallableType::SpecializeClass(..),
                 )
                 | Type::ModuleLiteral(..)
                 | Type::ClassLiteral(..)
@@ -1051,7 +1053,8 @@ impl<'db> Type<'db> {
                 | Type::Callable(
                     CallableType::BoundMethod(..)
                     | CallableType::MethodWrapperDunderGet(..)
-                    | CallableType::WrapperDescriptorDunderGet,
+                    | CallableType::WrapperDescriptorDunderGet
+                    | CallableType::SpecializeClass(..),
                 )
                 | Type::ModuleLiteral(..)
                 | Type::ClassLiteral(..)
@@ -1251,6 +1254,9 @@ impl<'db> Type<'db> {
                 Type::Callable(CallableType::WrapperDescriptorDunderGet),
             ) => !KnownClass::WrapperDescriptorType.is_subclass_of(db, class),
 
+            (Type::Callable(CallableType::SpecializeClass(_)), Type::Instance(_))
+            | (Type::Instance(_), Type::Callable(CallableType::SpecializeClass(_))) => true,
+
             (Type::ModuleLiteral(..), other @ Type::Instance(..))
             | (other @ Type::Instance(..), Type::ModuleLiteral(..)) => {
                 // Modules *can* actually be instances of `ModuleType` subclasses
@@ -1305,7 +1311,8 @@ impl<'db> Type<'db> {
             | Type::Callable(
                 CallableType::BoundMethod(_)
                 | CallableType::MethodWrapperDunderGet(_)
-                | CallableType::WrapperDescriptorDunderGet,
+                | CallableType::WrapperDescriptorDunderGet
+                | CallableType::SpecializeClass(_),
             )
             | Type::ModuleLiteral(..)
             | Type::IntLiteral(_)
@@ -1375,7 +1382,8 @@ impl<'db> Type<'db> {
             | Type::Callable(
                 CallableType::BoundMethod(_)
                 | CallableType::MethodWrapperDunderGet(_)
-                | CallableType::WrapperDescriptorDunderGet,
+                | CallableType::WrapperDescriptorDunderGet
+                | CallableType::SpecializeClass(_),
             )
             | Type::ClassLiteral(..)
             | Type::ModuleLiteral(..)
@@ -1424,7 +1432,8 @@ impl<'db> Type<'db> {
             | Type::Callable(
                 CallableType::BoundMethod(..)
                 | CallableType::MethodWrapperDunderGet(..)
-                | CallableType::WrapperDescriptorDunderGet,
+                | CallableType::WrapperDescriptorDunderGet
+                | CallableType::SpecializeClass(..),
             )
             | Type::ModuleLiteral(..)
             | Type::ClassLiteral(..)
@@ -1486,6 +1495,12 @@ impl<'db> Type<'db> {
             }
 
             Type::Dynamic(_) | Type::Never => Some(Symbol::bound(self).into()),
+
+            Type::ClassLiteral(ClassLiteralType { class })
+                if name == "__class_getitem__" && class.generic_context(db).is_some() =>
+            {
+                Some(Symbol::bound(Type::Callable(CallableType::SpecializeClass(*class))).into())
+            }
 
             Type::ClassLiteral(class_literal @ ClassLiteralType { class }) => {
                 match (class.known(db), name) {
@@ -1636,7 +1651,8 @@ impl<'db> Type<'db> {
                     .to_instance(db)
                     .instance_member(db, name)
             }
-            Type::Callable(CallableType::General(_)) => {
+            Type::Callable(CallableType::SpecializeClass(_))
+            | Type::Callable(CallableType::General(_)) => {
                 KnownClass::Object.to_instance(db).instance_member(db, name)
             }
 
@@ -1990,7 +2006,8 @@ impl<'db> Type<'db> {
                     .to_instance(db)
                     .member(db, &name)
             }
-            Type::Callable(CallableType::General(_)) => {
+            Type::Callable(CallableType::SpecializeClass(_))
+            | Type::Callable(CallableType::General(_)) => {
                 KnownClass::Object.to_instance(db).member(db, &name)
             }
 
@@ -2437,6 +2454,16 @@ impl<'db> Type<'db> {
                     ],
                 );
                 Signatures::single(signature)
+            }
+
+            Type::Callable(CallableType::SpecializeClass(class)) => {
+                let generic_context = class
+                    .generic_context(db)
+                    .expect("should not be able to specialize non-generic class");
+                Signatures::single(CallableSignature::single(
+                    self,
+                    generic_context.signature(db, Type::class_literal(class)),
+                ))
             }
 
             Type::FunctionLiteral(function_type) => match function_type.known(db) {
@@ -3154,7 +3181,8 @@ impl<'db> Type<'db> {
             Type::Callable(CallableType::WrapperDescriptorDunderGet) => {
                 KnownClass::WrapperDescriptorType.to_class_literal(db)
             }
-            Type::Callable(CallableType::General(_)) => KnownClass::Type.to_instance(db),
+            Type::Callable(CallableType::SpecializeClass(_))
+            | Type::Callable(CallableType::General(_)) => KnownClass::Type.to_instance(db),
             Type::ModuleLiteral(_) => KnownClass::ModuleType.to_class_literal(db),
             Type::Tuple(_) => KnownClass::Tuple.to_class_literal(db),
             Type::ClassLiteral(ClassLiteralType { class }) => class.metaclass(db),
@@ -4858,6 +4886,9 @@ pub enum CallableType<'db> {
     /// type. We currently add this as a separate variant because `FunctionType.__get__`
     /// is an overloaded method and we do not support `@overload` yet.
     WrapperDescriptorDunderGet,
+
+    /// A special callable that specializes a generic class using subscription.
+    SpecializeClass(Class<'db>),
 }
 
 #[salsa::interned(debug)]
@@ -5478,6 +5509,10 @@ impl<'db> TupleType<'db> {
 
     pub fn len(&self, db: &'db dyn Db) -> usize {
         self.elements(db).len()
+    }
+
+    pub fn iter(&self, db: &'db dyn Db) -> impl Iterator<Item = Type<'db>> + 'db + '_ {
+        self.elements(db).iter().copied()
     }
 }
 

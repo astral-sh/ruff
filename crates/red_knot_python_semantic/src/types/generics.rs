@@ -1,7 +1,11 @@
 use ruff_python_ast as ast;
 
 use crate::semantic_index::SemanticIndex;
-use crate::types::{declaration_type, KnownInstanceType, Type, TypeVarInstance};
+use crate::types::signatures::{Parameter, Parameters, Signature};
+use crate::types::{
+    declaration_type, KnownInstanceType, Type, TypeVarBoundOrConstraints, TypeVarInstance,
+    UnionType,
+};
 use crate::Db;
 
 /// A list of formal type variables for a generic function, class, or type alias.
@@ -42,5 +46,31 @@ impl<'db> GenericContext<'db> {
             ast::TypeParam::ParamSpec(_) => None,
             ast::TypeParam::TypeVarTuple(_) => None,
         }
+    }
+
+    pub(crate) fn signature(&self, db: &'db dyn Db, class: Type<'db>) -> Signature<'db> {
+        let parameters = Parameters::new(
+            std::iter::once(Parameter::positional_only(None).with_annotated_type(class)).chain(
+                self.variables
+                    .iter()
+                    .map(|typevar| Self::parameter_from_typevar(db, typevar)),
+            ),
+        );
+        Signature::new(parameters, None)
+    }
+
+    fn parameter_from_typevar(db: &'db dyn Db, typevar: &TypeVarInstance<'db>) -> Parameter<'db> {
+        let mut parameter = Parameter::positional_only(Some(typevar.name(db).clone()));
+        match typevar.bound_or_constraints(db) {
+            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                parameter = parameter.with_annotated_type(bound);
+            }
+            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                parameter = parameter
+                    .with_annotated_type(UnionType::from_elements(db, constraints.iter(db)));
+            }
+            None => {}
+        }
+        parameter
     }
 }
