@@ -517,7 +517,8 @@ def required_return_type() -> int:
     return 1
 
 static_assert(not is_subtype_of(TypeOf[optional_return_type], TypeOf[required_return_type]))
-static_assert(is_subtype_of(TypeOf[required_return_type], TypeOf[optional_return_type]))
+# TypeOf[some_function] is a singleton function-literal type,  not a general callable type
+static_assert(not is_subtype_of(TypeOf[required_return_type], TypeOf[optional_return_type]))
 static_assert(is_subtype_of(TypeOf[optional_return_type], Callable[[], int | None]))
 ```
 
