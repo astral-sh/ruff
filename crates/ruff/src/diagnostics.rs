@@ -29,6 +29,7 @@ use ruff_text_size::{TextRange, TextSize};
 use ruff_workspace::Settings;
 
 use crate::cache::{Cache, FileCacheKey, LintCacheData};
+use crate::stdin::parrot_stdin;
 
 #[derive(Debug, Default, PartialEq)]
 pub(crate) struct Diagnostics {
@@ -367,8 +368,7 @@ pub(crate) fn lint_path(
     })
 }
 
-/// Generate `Diagnostic`s from source code content derived from
-/// stdin.
+/// Generate `Diagnostic`s from source code content derived from stdin.
 pub(crate) fn lint_stdin(
     path: Option<&Path>,
     package: Option<PackageRoot<'_>>,
@@ -377,13 +377,28 @@ pub(crate) fn lint_stdin(
     noqa: flags::Noqa,
     fix_mode: flags::FixMode,
 ) -> Result<Diagnostics> {
-    // TODO(charlie): Support `pyproject.toml`.
     let source_type = match path.and_then(|path| settings.linter.extension.get(path)) {
         None => match path.map(SourceType::from).unwrap_or_default() {
             SourceType::Python(source_type) => source_type,
-            SourceType::Toml(_) => {
-                return Ok(Diagnostics::default());
+
+            SourceType::Toml(source_type) if source_type.is_pyproject() => {
+                let path = path.unwrap().to_string_lossy();
+                let source_file = SourceFileBuilder::new(path, contents).finish();
+
+                match fix_mode {
+                    flags::FixMode::Apply => parrot_stdin()?,
+                    flags::FixMode::Diff => {}
+                    flags::FixMode::Generate => {}
+                }
+
+                return Ok(Diagnostics {
+                    messages: lint_pyproject_toml(source_file, &settings.linter),
+                    fixed: FixMap::default(),
+                    notebook_indexes: FxHashMap::default(),
+                });
             }
+
+            _ => return Ok(Diagnostics::default()),
         },
         Some(language) => PySourceType::from(language),
     };
