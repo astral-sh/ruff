@@ -2342,7 +2342,8 @@ fn pyproject_toml_stdin_schema_error_fix() {
     success: false
     exit_code: 1
     ----- stdout -----
-
+    [project]
+    name = 1
     ----- stderr -----
     pyproject.toml:2:8: RUF200 Failed to parse pyproject.toml: invalid type: integer `1`, expected a string
       |
@@ -2352,6 +2353,31 @@ fn pyproject_toml_stdin_schema_error_fix() {
       |
 
     Found 1 error.
+    "
+    );
+}
+
+#[test]
+fn pyproject_toml_stdin_schema_error_fix_only() {
+    let mut cmd = RuffCheck::default()
+        .args([
+            "--stdin-filename",
+            "pyproject.toml",
+            "--select",
+            "RUF200",
+            "--fix-only",
+        ])
+        .build();
+
+    assert_cmd_snapshot!(
+        cmd.pass_stdin("[project]\nname = 1"),
+        @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    [project]
+    name = 1
+    ----- stderr -----
     "
     );
 }

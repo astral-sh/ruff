@@ -29,7 +29,6 @@ use ruff_text_size::{TextRange, TextSize};
 use ruff_workspace::Settings;
 
 use crate::cache::{Cache, FileCacheKey, LintCacheData};
-use crate::stdin::parrot_stdin;
 
 #[derive(Debug, Default, PartialEq)]
 pub(crate) struct Diagnostics {
@@ -382,18 +381,18 @@ pub(crate) fn lint_stdin(
             SourceType::Python(source_type) => source_type,
 
             SourceType::Toml(source_type) if source_type.is_pyproject() => {
-                let path = path.unwrap().to_string_lossy();
-                let source_file = SourceFileBuilder::new(path, contents).finish();
+                let path = path.unwrap();
+                let source_file =
+                    SourceFileBuilder::new(path.to_string_lossy(), contents.clone()).finish();
 
                 match fix_mode {
-                    flags::FixMode::Apply => parrot_stdin()?,
-                    flags::FixMode::Diff => {}
-                    flags::FixMode::Generate => {}
+                    flags::FixMode::Diff | flags::FixMode::Generate => {}
+                    flags::FixMode::Apply => write!(&mut io::stdout().lock(), "{}", contents)?,
                 }
 
                 return Ok(Diagnostics {
                     messages: lint_pyproject_toml(source_file, &settings.linter),
-                    fixed: FixMap::default(),
+                    fixed: FixMap::from_iter([(fs::relativize_path(path), FixTable::default())]),
                     notebook_indexes: FxHashMap::default(),
                 });
             }
