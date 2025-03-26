@@ -149,6 +149,11 @@ function RunWithPyiodide({
       }
 
       try {
+        // Patch up reveal types
+        pyodide.runPython(`
+        import builtins
+        builtins.reveal_type = print`);
+
         pyodide.runPython(main);
         setOutput(stdout);
       } catch (e) {
