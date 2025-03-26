@@ -505,24 +505,6 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         Some(NarrowingConstraints::from_iter([(symbol, ty)]))
     }
 
-    fn evaluate_match_pattern_value(
-        &mut self,
-        subject: Expression<'db>,
-        value: Expression<'db>,
-    ) -> Option<NarrowingConstraints<'db>> {
-        // TODO: DRY
-        let ast::ExprName { id, .. } = subject.node_ref(self.db).as_name_expr()?;
-        let symbol = self
-            .symbols()
-            .symbol_id_by_name(id)
-            .expect("We should always have a symbol for every `Name` node");
-        let ty = infer_same_file_expression_type(self.db, value);
-        let mut constraints = NarrowingConstraints::default();
-        constraints.insert(symbol, ty);
-
-        Some(constraints)
-    }
-
     fn evaluate_bool_op(
         &mut self,
         expr_bool_op: &ExprBoolOp,
