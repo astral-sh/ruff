@@ -63,27 +63,21 @@ impl SemanticSyntaxChecker {
             Stmt::Match(match_stmt) => {
                 Self::irrefutable_match_case(match_stmt, ctx);
             }
-            Stmt::FunctionDef(ast::StmtFunctionDef { type_params, .. }) => {
-                Self::duplicate_type_parameter_name(type_params.as_ref().map(|v| &**v), ctx);
-            }
-            Stmt::ClassDef(ast::StmtClassDef { type_params, .. }) => {
-                Self::duplicate_type_parameter_name(type_params.as_ref().map(|v| &**v), ctx);
-            }
-            Stmt::TypeAlias(ast::StmtTypeAlias { type_params, .. }) => {
-                Self::duplicate_type_parameter_name(type_params.as_ref().map(|v| &**v), ctx);
+            Stmt::FunctionDef(ast::StmtFunctionDef { type_params, .. })
+            | Stmt::ClassDef(ast::StmtClassDef { type_params, .. })
+            | Stmt::TypeAlias(ast::StmtTypeAlias { type_params, .. }) => {
+                if let Some(type_params) = type_params {
+                    Self::duplicate_type_parameter_name(type_params, ctx);
+                }
             }
             _ => {}
         }
     }
 
     fn duplicate_type_parameter_name<Ctx: SemanticSyntaxContext>(
-        type_params: Option<&ast::TypeParams>,
+        type_params: &ast::TypeParams,
         ctx: &Ctx,
     ) {
-        let Some(type_params) = type_params else {
-            return;
-        };
-
         if type_params.len() < 2 {
             return;
         }
