@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/airflow/mod.rs
-snapshot_kind: text
 ---
 AIR302_class_attribute.py:24:21: AIR302 `airflow.Dataset` is removed in Airflow 3.0
    |
@@ -329,7 +328,7 @@ AIR302_class_attribute.py:50:11: AIR302 `airflow.lineage.hook.DatasetLineageInfo
    |
    = help: Use `airflow.lineage.hook.AssetLineageInfo` instead
 
-AIR302_class_attribute.py:51:9: AIR302 `dataset` is removed in Airflow 3.0
+AIR302_class_attribute.py:51:9: AIR302 [*] `dataset` is removed in Airflow 3.0
    |
 49 | # airflow.lineage.hook
 50 | dl_info = DatasetLineageInfo()
@@ -339,6 +338,16 @@ AIR302_class_attribute.py:51:9: AIR302 `dataset` is removed in Airflow 3.0
 53 | hlc = HookLineageCollector()
    |
    = help: Use `asset` instead
+
+ℹ Safe fix
+48 48 | 
+49 49 | # airflow.lineage.hook
+50 50 | dl_info = DatasetLineageInfo()
+51    |-dl_info.dataset
+   51 |+dl_info.asset
+52 52 | 
+53 53 | hlc = HookLineageCollector()
+54 54 | hlc.create_dataset()
 
 AIR302_class_attribute.py:54:5: AIR302 [*] `create_dataset` is removed in Airflow 3.0
    |
@@ -525,7 +534,7 @@ AIR302_class_attribute.py:79:15: AIR302 [*] `get_connections` is removed in Airf
 81 81 | not_an_error = NotAir302SecretError()
 82 82 | not_an_error.get_conn_uri()
 
-AIR302_class_attribute.py:87:4: AIR302 `dataset_factories` is removed in Airflow 3.0
+AIR302_class_attribute.py:87:4: AIR302 [*] `dataset_factories` is removed in Airflow 3.0
    |
 85 | pm = ProvidersManager()
 86 | pm.initialize_providers_asset_uri_resources()
@@ -536,7 +545,17 @@ AIR302_class_attribute.py:87:4: AIR302 `dataset_factories` is removed in Airflow
    |
    = help: Use `asset_factories` instead
 
-AIR302_class_attribute.py:88:4: AIR302 `dataset_factories` is removed in Airflow 3.0
+ℹ Safe fix
+84 84 | # airflow.providers_manager
+85 85 | pm = ProvidersManager()
+86 86 | pm.initialize_providers_asset_uri_resources()
+87    |-pm.dataset_factories
+   87 |+pm.asset_factories
+88 88 | pm.dataset_factories
+89 89 | pm.dataset_uri_handlers
+90 90 | pm.dataset_to_openlineage_converters
+
+AIR302_class_attribute.py:88:4: AIR302 [*] `dataset_factories` is removed in Airflow 3.0
    |
 86 | pm.initialize_providers_asset_uri_resources()
 87 | pm.dataset_factories
@@ -547,7 +566,17 @@ AIR302_class_attribute.py:88:4: AIR302 `dataset_factories` is removed in Airflow
    |
    = help: Use `asset_factories` instead
 
-AIR302_class_attribute.py:89:4: AIR302 `dataset_uri_handlers` is removed in Airflow 3.0
+ℹ Safe fix
+85 85 | pm = ProvidersManager()
+86 86 | pm.initialize_providers_asset_uri_resources()
+87 87 | pm.dataset_factories
+88    |-pm.dataset_factories
+   88 |+pm.asset_factories
+89 89 | pm.dataset_uri_handlers
+90 90 | pm.dataset_to_openlineage_converters
+91 91 | 
+
+AIR302_class_attribute.py:89:4: AIR302 [*] `dataset_uri_handlers` is removed in Airflow 3.0
    |
 87 | pm.dataset_factories
 88 | pm.dataset_factories
@@ -557,7 +586,17 @@ AIR302_class_attribute.py:89:4: AIR302 `dataset_uri_handlers` is removed in Airf
    |
    = help: Use `asset_uri_handlers` instead
 
-AIR302_class_attribute.py:90:4: AIR302 `dataset_to_openlineage_converters` is removed in Airflow 3.0
+ℹ Safe fix
+86 86 | pm.initialize_providers_asset_uri_resources()
+87 87 | pm.dataset_factories
+88 88 | pm.dataset_factories
+89    |-pm.dataset_uri_handlers
+   89 |+pm.asset_uri_handlers
+90 90 | pm.dataset_to_openlineage_converters
+91 91 | 
+92 92 | # airflow.secrets.base_secrets
+
+AIR302_class_attribute.py:90:4: AIR302 [*] `dataset_to_openlineage_converters` is removed in Airflow 3.0
    |
 88 | pm.dataset_factories
 89 | pm.dataset_uri_handlers
@@ -567,6 +606,16 @@ AIR302_class_attribute.py:90:4: AIR302 `dataset_to_openlineage_converters` is re
 92 | # airflow.secrets.base_secrets
    |
    = help: Use `asset_to_openlineage_converters` instead
+
+ℹ Safe fix
+87 87 | pm.dataset_factories
+88 88 | pm.dataset_factories
+89 89 | pm.dataset_uri_handlers
+90    |-pm.dataset_to_openlineage_converters
+   90 |+pm.asset_to_openlineage_converters
+91 91 | 
+92 92 | # airflow.secrets.base_secrets
+93 93 | base_secret_backend = BaseSecretsBackend()
 
 AIR302_class_attribute.py:94:21: AIR302 [*] `get_conn_uri` is removed in Airflow 3.0
    |
