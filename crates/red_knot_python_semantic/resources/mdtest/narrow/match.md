@@ -82,8 +82,13 @@ match x:
         reveal_type(x)  # revealed: Literal[42]
     case 6.0:
         reveal_type(x)  # revealed: float
+<<<<<<< HEAD
     case 1j:
         reveal_type(x)  # revealed: complex
+=======
+    case 1 + 1j:
+        reveal_type(x)  # revealed: int | float | complex
+>>>>>>> bf3ccec66 (add narrowing for match value patterns)
     case b"foo":
         reveal_type(x)  # revealed: Literal[b"foo"]
 
