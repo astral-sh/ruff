@@ -9,9 +9,10 @@ use std::fmt::Display;
 use ruff_python_ast::{
     self as ast,
     visitor::{walk_expr, Visitor},
-    Expr, IrrefutablePatternKind, PythonVersion, Stmt, StmtExpr, StmtImportFrom,
+    Expr, IrrefutablePatternKind, Pattern, PythonVersion, Stmt, StmtExpr, StmtImportFrom,
 };
 use ruff_text_size::{Ranged, TextRange};
+use rustc_hash::FxHashSet;
 
 #[derive(Debug)]
 pub struct SemanticSyntaxChecker {
@@ -62,6 +63,7 @@ impl SemanticSyntaxChecker {
             }
             Stmt::Match(match_stmt) => {
                 Self::irrefutable_match_case(match_stmt, ctx);
+                Self::multiple_case_assignment(match_stmt, ctx);
             }
             Stmt::FunctionDef(ast::StmtFunctionDef { type_params, .. })
             | Stmt::ClassDef(ast::StmtClassDef { type_params, .. })
@@ -109,6 +111,16 @@ impl SemanticSyntaxChecker {
                     type_param.range(),
                 );
             }
+        }
+    }
+
+    fn multiple_case_assignment<Ctx: SemanticSyntaxContext>(stmt: &ast::StmtMatch, ctx: &Ctx) {
+        for case in &stmt.cases {
+            let mut visitor = MultipleCaseAssignmentVisitor {
+                names: FxHashSet::default(),
+                ctx,
+            };
+            visitor.visit_pattern(&case.pattern);
         }
     }
 
@@ -265,6 +277,9 @@ impl Display for SemanticSyntaxError {
             SemanticSyntaxErrorKind::DuplicateTypeParameter => {
                 f.write_str("duplicate type parameter")
             }
+            SemanticSyntaxErrorKind::MultipleCaseAssignment(name) => {
+                write!(f, "multiple assignments to name `{name}` in pattern")
+            }
             SemanticSyntaxErrorKind::IrrefutableCasePattern(kind) => match kind {
                 // These error messages are taken from CPython's syntax errors
                 IrrefutablePatternKind::Name(name) => {
@@ -324,6 +339,18 @@ pub enum SemanticSyntaxErrorKind {
     /// ```
     DuplicateTypeParameter,
 
+    /// Represents a duplicate binding in a `case` pattern of a `match` statement.
+    ///
+    /// ## Examples
+    ///
+    /// ```python
+    /// match x:
+    ///     case [x, y, x]: ...
+    ///     case x as x: ...
+    ///     case Class(x=1, x=2): ...
+    /// ```
+    MultipleCaseAssignment(ast::name::Name),
+
     /// Represents an irrefutable `case` pattern before the last `case` in a `match` statement.
     ///
     /// According to the [Python reference], "a match statement may have at most one irrefutable
@@ -366,6 +393,93 @@ impl Visitor<'_> for ReboundComprehensionVisitor<'_> {
             };
         }
         walk_expr(self, expr);
+    }
+}
+
+struct MultipleCaseAssignmentVisitor<'a, Ctx> {
+    names: FxHashSet<&'a ast::name::Name>,
+    ctx: &'a Ctx,
+}
+
+impl<'a, Ctx: SemanticSyntaxContext> MultipleCaseAssignmentVisitor<'a, Ctx> {
+    fn visit_pattern(&mut self, pattern: &'a Pattern) {
+        // test_err multiple_assignment_in_case_pattern
+        // match 2:
+        //     case [y, z, y]: ...  # MatchSequence
+        //     case [y, z, *y]: ...  # MatchSequence
+        //     case [y, y, y]: ...  # MatchSequence multiple
+        //     case {1: x, 2: x}: ...  # MatchMapping duplicate pattern
+        //     case {1: x, **x}: ...  # MatchMapping duplicate in **rest
+        //     case Class(x, x): ...  # MatchClass positional
+        //     case Class(x=1, x=2): ...  # MatchClass keyword
+        //     case [x] | {1: x} | Class(x=1, x=2): ...  # MatchOr
+        //     case x as x: ...  # MatchAs
+        match pattern {
+            Pattern::MatchValue(_) | Pattern::MatchSingleton(_) => {}
+            Pattern::MatchStar(ast::PatternMatchStar { name, .. }) => {
+                if let Some(name) = name {
+                    self.insert(name);
+                }
+            }
+            Pattern::MatchSequence(ast::PatternMatchSequence { patterns, .. }) => {
+                for pattern in patterns {
+                    self.visit_pattern(pattern);
+                }
+            }
+            Pattern::MatchMapping(ast::PatternMatchMapping { patterns, rest, .. }) => {
+                for pattern in patterns {
+                    self.visit_pattern(pattern);
+                }
+                if let Some(rest) = rest {
+                    self.insert(rest);
+                }
+            }
+            Pattern::MatchClass(ast::PatternMatchClass { arguments, .. }) => {
+                for pattern in &arguments.patterns {
+                    self.visit_pattern(pattern);
+                }
+                for keyword in &arguments.keywords {
+                    self.insert(&keyword.attr);
+                    self.visit_pattern(&keyword.pattern);
+                }
+            }
+            Pattern::MatchAs(ast::PatternMatchAs { pattern, name, .. }) => {
+                if let Some(pattern) = pattern {
+                    self.visit_pattern(pattern);
+                }
+                if let Some(name) = name {
+                    self.insert(name);
+                }
+            }
+            Pattern::MatchOr(ast::PatternMatchOr { patterns, .. }) => {
+                // each of these patterns should be visited separately because patterns can only be
+                // duplicated within a single arm of the or pattern. For example, the case below is
+                // a valid pattern.
+
+                // test_ok multiple_assignment_in_case_pattern
+                // match 2:
+                //     case Class(x) | [x] | x: ...
+                for pattern in patterns {
+                    let mut visitor = Self {
+                        names: FxHashSet::default(),
+                        ctx: self.ctx,
+                    };
+                    visitor.visit_pattern(pattern);
+                }
+            }
+        }
+    }
+
+    /// Add an identifier to the set of visited names in `self` and emit a [`SemanticSyntaxError`]
+    /// if `ident` has already been seen.
+    fn insert(&mut self, ident: &'a ast::Identifier) {
+        if !self.names.insert(&ident.id) {
+            SemanticSyntaxChecker::add_error(
+                self.ctx,
+                SemanticSyntaxErrorKind::MultipleCaseAssignment(ident.id.clone()),
+                ident.range(),
+            );
+        }
     }
 }
 

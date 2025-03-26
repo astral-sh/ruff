@@ -549,6 +549,7 @@ impl SemanticSyntaxContext for Checker<'_> {
             }
             SemanticSyntaxErrorKind::ReboundComprehensionVariable
             | SemanticSyntaxErrorKind::DuplicateTypeParameter
+            | SemanticSyntaxErrorKind::MultipleCaseAssignment(_)
             | SemanticSyntaxErrorKind::IrrefutableCasePattern(_)
                 if self.settings.preview.is_enabled() =>
             {
@@ -556,6 +557,7 @@ impl SemanticSyntaxContext for Checker<'_> {
             }
             SemanticSyntaxErrorKind::ReboundComprehensionVariable
             | SemanticSyntaxErrorKind::DuplicateTypeParameter
+            | SemanticSyntaxErrorKind::MultipleCaseAssignment(_)
             | SemanticSyntaxErrorKind::IrrefutableCasePattern(_) => {}
         }
     }
