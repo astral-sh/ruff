@@ -9,7 +9,7 @@ use std::fmt::Display;
 use ruff_python_ast::{
     self as ast,
     visitor::{walk_expr, Visitor},
-    Expr, Pattern,IrrefutablePatternKind, PythonVersion, Stmt, StmtExpr, StmtImportFrom,
+    Expr, IrrefutablePatternKind, Pattern, PythonVersion, Stmt, StmtExpr, StmtImportFrom,
 };
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
@@ -63,6 +63,7 @@ impl SemanticSyntaxChecker {
             }
             Stmt::Match(match_stmt) => {
                 Self::irrefutable_match_case(match_stmt, ctx);
+                Self::multiple_case_assignment(match_stmt, ctx);
             }
             Stmt::FunctionDef(ast::StmtFunctionDef { type_params, .. })
             | Stmt::ClassDef(ast::StmtClassDef { type_params, .. })
@@ -73,8 +74,6 @@ impl SemanticSyntaxChecker {
             }
             _ => {}
         }
-
-        Self::multiple_case_assignment(stmt, ctx);
     }
 
     fn duplicate_type_parameter_name<Ctx: SemanticSyntaxContext>(
@@ -115,12 +114,8 @@ impl SemanticSyntaxChecker {
         }
     }
 
-    fn multiple_case_assignment<Ctx: SemanticSyntaxContext>(stmt: &Stmt, ctx: &Ctx) {
-        let Stmt::Match(ast::StmtMatch { cases, .. }) = stmt else {
-            return;
-        };
-
-        for case in cases {
+    fn multiple_case_assignment<Ctx: SemanticSyntaxContext>(stmt: &ast::StmtMatch, ctx: &Ctx) {
+        for case in &stmt.cases {
             let mut visitor = MultipleCaseAssignmentVisitor {
                 names: FxHashSet::default(),
                 ctx,
