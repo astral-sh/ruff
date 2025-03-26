@@ -1974,7 +1974,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     let tuple = TupleType::new(
                         self.db(),
                         elts.iter()
-                            .map(|expr| self.infer_type_expression(expr))
+                            .map(|expr| self.infer_expression(expr))
                             .collect::<Box<_>>(),
                     );
                     let constraints = TypeVarBoundOrConstraints::Constraints(tuple);
@@ -5711,11 +5711,11 @@ impl<'db> TypeInferenceBuilder<'db> {
                 // If the class defines `__getitem__`, return its return type.
                 //
                 // See: https://docs.python.org/3/reference/datamodel.html#class-getitem-versus-getitem
-                match value_ty.try_call_dunder(
+                let arguments = CallArgumentTypes::from_arguments([Argument::subscript_argument(
                     self.db(),
-                    "__getitem__",
-                    CallArgumentTypes::positional([slice_ty]),
-                ) {
+                    slice_ty,
+                )]);
+                match value_ty.try_call_dunder(self.db(), "__getitem__", arguments) {
                     Ok(outcome) => return outcome.return_type(self.db()),
                     Err(err @ CallDunderError::PossiblyUnbound { .. }) => {
                         self.context.report_lint(
@@ -5774,21 +5774,14 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 );
                             }
 
-                            match ty.try_call(
-                                self.db(),
-                                CallArgumentTypes::positional([value_ty, slice_ty]),
-                            ) {
+                            let arguments = CallArgumentTypes::from_arguments([
+                                (Argument::Synthetic, value_ty),
+                                Argument::subscript_argument(self.db(), slice_ty),
+                            ]);
+                            match ty.try_call(self.db(), arguments) {
                                 Ok(bindings) => return bindings.return_type(self.db()),
                                 Err(CallError(_, bindings)) => {
-                                    self.context.report_lint(
-                                        &CALL_NON_CALLABLE,
-                                        value_node,
-                                        format_args!(
-                                            "Method `__class_getitem__` of type `{}` is not callable on object of type `{}`",
-                                            bindings.callable_type().display(self.db()),
-                                            value_ty.display(self.db()),
-                                        ),
-                                    );
+                                    bindings.report_diagnostics(&self.context, value_node.into());
                                     return bindings.return_type(self.db());
                                 }
                             }
@@ -5798,12 +5791,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                     if let Type::ClassLiteral(ClassLiteralType { class }) = value_ty {
                         if class.is_known(self.db(), KnownClass::Type) {
                             return KnownClass::GenericAlias.to_instance(self.db());
-                        }
-
-                        if class.generic_context(self.db()).is_some() {
-                            // TODO: specialize the generic class using these explicit type
-                            // variable assignments
-                            return value_ty;
                         }
                     }
 
@@ -7512,7 +7499,7 @@ mod tests {
 
         check_typevar("T", None, None, None);
         check_typevar("U", Some("A"), None, None);
-        check_typevar("V", None, Some(&["A", "B"]), None);
+        check_typevar("V", None, Some(&["Literal[A]", "Literal[B]"]), None);
         check_typevar("W", None, None, Some("A"));
         check_typevar("X", Some("A"), None, Some("A1"));
 

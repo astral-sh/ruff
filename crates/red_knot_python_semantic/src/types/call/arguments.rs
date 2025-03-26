@@ -1,7 +1,9 @@
+use std::borrow::Cow;
 use std::collections::VecDeque;
 use std::ops::{Deref, DerefMut};
 
 use super::Type;
+use crate::Db;
 
 /// Arguments for a single call, in source order.
 #[derive(Clone, Debug, Default)]
@@ -32,6 +34,29 @@ impl<'a> CallArguments<'a> {
     pub(crate) fn iter(&self) -> impl Iterator<Item = Argument<'a>> + '_ {
         self.0.iter().copied()
     }
+
+    /// Unpacks any subscript tuple arguments into distinct arguments.
+    pub(crate) fn unpack_subscript_tuples(&self) -> Cow<'_, CallArguments<'a>> {
+        // If there are no subscript tuples, we can use the existing argument list as-is.
+        if self
+            .0
+            .iter()
+            .all(|argument| !matches!(argument, Argument::PositionalSubscriptTuple(_)))
+        {
+            return Cow::Borrowed(self);
+        }
+
+        let mut arguments = VecDeque::with_capacity(self.0.len());
+        for argument in self.iter() {
+            match argument {
+                Argument::PositionalSubscriptTuple(count) => {
+                    arguments.extend(std::iter::repeat_n(Argument::Positional, count))
+                }
+                _ => arguments.push_back(argument),
+            }
+        }
+        Cow::Owned(CallArguments(arguments))
+    }
 }
 
 impl<'a> FromIterator<Argument<'a>> for CallArguments<'a> {
@@ -46,6 +71,8 @@ pub(crate) enum Argument<'a> {
     Synthetic,
     /// A positional argument.
     Positional,
+    /// A positional argument that is a packed tuple of multiple subscript expression arguments.
+    PositionalSubscriptTuple(usize),
     /// A starred positional argument (e.g. `*args`).
     Variadic,
     /// A keyword argument (e.g. `a=1`).
@@ -54,7 +81,23 @@ pub(crate) enum Argument<'a> {
     Keywords,
 }
 
+impl Argument<'_> {
+    pub(crate) fn subscript_argument<'db>(
+        db: &'db dyn Db,
+        slice_type: Type<'db>,
+    ) -> (Self, Type<'db>) {
+        match slice_type {
+            Type::Tuple(tuple) => (
+                Argument::PositionalSubscriptTuple(tuple.len(db)),
+                slice_type,
+            ),
+            _ => (Argument::Positional, slice_type),
+        }
+    }
+}
+
 /// Arguments for a single call, in source order, along with inferred types for each argument.
+#[derive(Clone)]
 pub(crate) struct CallArgumentTypes<'a, 'db> {
     arguments: CallArguments<'a>,
     types: VecDeque<Type<'db>>,
@@ -65,6 +108,16 @@ impl<'a, 'db> CallArgumentTypes<'a, 'db> {
     pub(crate) fn none() -> Self {
         let arguments = CallArguments::default();
         let types = VecDeque::default();
+        Self { arguments, types }
+    }
+
+    /// Create a [`CallArgumentTypes`] from an iterator over non-variadic positional argument
+    /// types.
+    pub(crate) fn from_arguments(
+        arguments: impl IntoIterator<Item = (Argument<'a>, Type<'db>)>,
+    ) -> Self {
+        let (arguments, types): (VecDeque<_>, VecDeque<_>) = arguments.into_iter().collect();
+        let arguments = CallArguments(arguments);
         Self { arguments, types }
     }
 
@@ -111,6 +164,37 @@ impl<'a, 'db> CallArgumentTypes<'a, 'db> {
 
     pub(crate) fn iter(&self) -> impl Iterator<Item = (Argument<'a>, Type<'db>)> + '_ {
         self.arguments.iter().zip(self.types.iter().copied())
+    }
+
+    /// Unpacks any subscript tuple arguments into distinct arguments.
+    pub(crate) fn unpack_subscript_tuples(
+        &self,
+        db: &'db dyn Db,
+    ) -> Cow<'_, CallArgumentTypes<'a, 'db>> {
+        // If there are no subscript tuples, we can use the existing argument list as-is.
+        if self
+            .arguments
+            .iter()
+            .all(|argument| !matches!(argument, Argument::PositionalSubscriptTuple(_)))
+        {
+            return Cow::Borrowed(self);
+        }
+
+        let mut types = VecDeque::with_capacity(self.types.len());
+        for (argument, ty) in self.iter() {
+            match (argument, ty) {
+                (Argument::PositionalSubscriptTuple(_), Type::Tuple(tuple)) => {
+                    for ty in tuple.iter(db) {
+                        types.push_back(ty);
+                    }
+                }
+                _ => types.push_back(ty),
+            }
+        }
+        Cow::Owned(CallArgumentTypes {
+            arguments: self.arguments.unpack_subscript_tuples().into_owned(),
+            types,
+        })
     }
 }
 

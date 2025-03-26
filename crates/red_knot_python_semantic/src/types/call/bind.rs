@@ -3,6 +3,8 @@
 //! [signatures][crate::types::signatures], we have to handle the fact that the callable might be a
 //! union of types, each of which might contain multiple overloads.
 
+use std::borrow::Cow;
+
 use smallvec::SmallVec;
 
 use super::{
@@ -547,10 +549,12 @@ impl<'db> CallableBinding<'db> {
             // two phases.
             //
             // [1] https://github.com/python/typing/pull/1839
+            let callable_type = signature.callable_type;
             let overloads = signature
                 .into_iter()
                 .map(|signature| {
                     Binding::match_parameters(
+                        callable_type,
                         signature,
                         arguments,
                         argument_forms,
@@ -577,8 +581,9 @@ impl<'db> CallableBinding<'db> {
         // If this callable is a bound method, prepend the self instance onto the arguments list
         // before checking.
         argument_types.with_self(signature.bound_type, |argument_types| {
+            let callable_type = signature.callable_type;
             for (signature, overload) in signature.iter().zip(&mut self.overloads) {
-                overload.check_types(db, signature, argument_types);
+                overload.check_types(db, callable_type, signature, argument_types);
             }
         });
     }
@@ -716,11 +721,30 @@ pub(crate) struct Binding<'db> {
 
 impl<'db> Binding<'db> {
     fn match_parameters(
+        callable_type: Type<'db>,
         signature: &Signature<'db>,
         arguments: &CallArguments<'_>,
         argument_forms: &mut [Option<ParameterForm>],
         conflicting_forms: &mut [bool],
     ) -> Self {
+        // Special case: you explicitly specialize a generic class via a subscript expression,
+        // Class[T1, T2, ...]. This ends up calling a `__class_getitem__` method, defined on
+        // `type`, which specializes the class. Like all subscript expressions, multiple arguments
+        // are packed into a tuple before calling `__class_getitem__`.
+        //
+        // We would rather treat this as `__class_getitem__` taking in a distinct parameter for
+        // each type variable. This gives us better error messages if parameter matching fails, and
+        // makes it easier to type-check the arguments against any type parameter bounds or
+        // constraints.
+        let arguments = if matches!(
+            callable_type,
+            Type::Callable(CallableType::SpecializeClass(_))
+        ) {
+            arguments.unpack_subscript_tuples()
+        } else {
+            Cow::Borrowed(arguments)
+        };
+
         let parameters = signature.parameters();
         // The parameter that each argument is matched with.
         let mut argument_parameters = vec![None; arguments.len()];
@@ -743,7 +767,9 @@ impl<'db> Binding<'db> {
         };
         for (argument_index, argument) in arguments.iter().enumerate() {
             let (index, parameter, positional) = match argument {
-                Argument::Positional | Argument::Synthetic => {
+                Argument::Positional
+                | Argument::PositionalSubscriptTuple(_)
+                | Argument::Synthetic => {
                     if matches!(argument, Argument::Synthetic) {
                         num_synthetic_args += 1;
                     }
@@ -840,9 +866,28 @@ impl<'db> Binding<'db> {
     fn check_types(
         &mut self,
         db: &'db dyn Db,
+        callable_type: Type<'db>,
         signature: &Signature<'db>,
         argument_types: &CallArgumentTypes<'_, 'db>,
     ) {
+        // Special case: you explicitly specialize a generic class via a subscript expression,
+        // Class[T1, T2, ...]. This ends up calling a `__class_getitem__` method, defined on
+        // `type`, which specializes the class. Like all subscript expressions, multiple arguments
+        // are packed into a tuple before calling `__class_getitem__`.
+        //
+        // We would rather treat this as `__class_getitem__` taking in a distinct parameter for
+        // each type variable. This gives us better error messages if parameter matching fails, and
+        // makes it easier to type-check the arguments against any type parameter bounds or
+        // constraints.
+        let argument_types = if matches!(
+            callable_type,
+            Type::Callable(CallableType::SpecializeClass(_))
+        ) {
+            argument_types.unpack_subscript_tuples(db)
+        } else {
+            Cow::Borrowed(argument_types)
+        };
+
         let parameters = signature.parameters();
         let mut num_synthetic_args = 0;
         let get_argument_index = |argument_index: usize, num_synthetic_args: usize| {
@@ -953,6 +998,10 @@ impl<'db> CallableDescription<'db> {
             Type::Callable(CallableType::WrapperDescriptorDunderGet) => Some(CallableDescription {
                 kind: "wrapper descriptor",
                 name: "FunctionType.__get__",
+            }),
+            Type::Callable(CallableType::SpecializeClass(class)) => Some(CallableDescription {
+                kind: "explicit specialization of class",
+                name: class.name(db),
             }),
             _ => None,
         }

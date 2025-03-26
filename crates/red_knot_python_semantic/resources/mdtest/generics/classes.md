@@ -53,7 +53,7 @@ class D(C[T]): ...
 
 (Examples `E` and `F` from above do not have analogues in the legacy syntax.)
 
-## Inferring generic class parameters
+## Specializing generic classes explicitly
 
 The type parameter can be specified explicitly:
 
@@ -65,9 +65,50 @@ class C[T]:
 reveal_type(C[int]())  # revealed: C
 ```
 
+The specialization must match the generic types:
+
+```py
+# error: [too-many-positional-arguments] "Too many positional arguments to explicit specialization of class `C`: expected 2, got 3"
+reveal_type(C[int, int]())  # revealed: Unknown
+```
+
+If the type variable has an upper bound, the specialized type must satisfy that bound:
+
+```py
+class Bounded[T: int]:
+    x: T
+
+# TODO: revealed: Bounded[int]
+reveal_type(Bounded[int]())  # revealed: Bounded
+
+# TODO: error: [invalid-argument]
+reveal_type(Bounded[str]())  # revealed: Bounded
+```
+
+If the type variable is constrained, the specialized type must satisfy those constraints:
+
+```py
+class Constrained[T: (int, str)]:
+    x: T
+
+# TODO: revealed: Constrained[int]
+reveal_type(Constrained[int]())  # revealed: Constrained
+
+# TODO: revealed: Constrained[str]
+reveal_type(Constrained[str]())  # revealed: Constrained
+
+# error: [invalid-argument-type]
+reveal_type(Constrained[object]())  # revealed: Unknown
+```
+
+## Inferring generic class parameters
+
 We can infer the type parameter from a type context:
 
 ```py
+class C[T]:
+    x: T
+
 c: C[int] = C()
 # TODO: revealed: C[int]
 reveal_type(c)  # revealed: C

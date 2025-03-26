@@ -62,8 +62,9 @@ impl<'db> GenericContext<'db> {
     fn parameter_from_typevar(db: &'db dyn Db, typevar: &TypeVarInstance<'db>) -> Parameter<'db> {
         let mut parameter = Parameter::positional_only(Some(typevar.name(db).clone()));
         match typevar.bound_or_constraints(db) {
-            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                parameter = parameter.with_annotated_type(bound);
+            Some(TypeVarBoundOrConstraints::UpperBound(_)) => {
+                // TODO: This should be TypeForm[bound]
+                parameter = parameter.with_annotated_type(Type::any());
             }
             Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
                 parameter = parameter
