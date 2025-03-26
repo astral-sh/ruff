@@ -4,6 +4,7 @@ import { Theme } from "shared";
 export enum SecondaryTool {
   "AST" = "AST",
   "Tokens" = "Tokens",
+  "Run" = "Run",
 }
 
 export type SecondaryPanelResult =
