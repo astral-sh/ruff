@@ -16,9 +16,9 @@ use crate::checkers::ast::Checker;
 /// almost never what a user is looking for. Airflow 3 changes this the default
 /// to *None*, and would break existing DAGs using the implicit default.
 ///
-/// If your DAG does not have an explicit `schedule` argument, Airflow 2
+/// If your dag does not have an explicit `schedule` argument, Airflow 2
 /// schedules a run for it every day (at the time determined by `start_date`).
-/// Such a DAG will no longer be scheduled on Airflow 3 at all, without any
+/// Such a dag will no longer be scheduled on Airflow 3 at all, without any
 /// exceptions or other messages visible to the user.
 ///
 /// ## Example
@@ -49,7 +49,7 @@ impl Violation for AirflowDagNoScheduleArgument {
     }
 }
 
-/// AIR301
+/// AIR201
 pub(crate) fn dag_no_schedule_argument(checker: &Checker, expr: &Expr) {
     if !checker.semantic().seen_module(Modules::AIRFLOW) {
         return;
