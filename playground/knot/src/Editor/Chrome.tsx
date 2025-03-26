@@ -12,7 +12,7 @@ import {
   Theme,
   VerticalResizeHandle,
 } from "shared";
-import { Diagnostic, Workspace } from "red_knot_wasm";
+import type { Diagnostic, Workspace } from "red_knot_wasm";
 import { Panel, PanelGroup } from "react-resizable-panels";
 import { Files } from "./Files";
 import SecondarySideBar from "./SecondarySideBar";
@@ -181,6 +181,7 @@ export default function Chrome({
                   minSize={10}
                 >
                   <SecondaryPanel
+                    files={files}
                     theme={theme}
                     tool={secondaryTool}
                     result={checkResult.secondary}
@@ -245,6 +246,13 @@ function useCheckResult(
             secondary = {
               status: "ok",
               content: workspace.tokens(currentHandle),
+            };
+            break;
+
+          case "Run":
+            secondary = {
+              status: "ok",
+              content: "",
             };
             break;
         }
