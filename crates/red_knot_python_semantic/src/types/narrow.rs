@@ -474,26 +474,31 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         }
     }
 
+    fn get_subject_symbol(&self, subject: Expression<'db>) -> Option<ScopedSymbolId> {
+        let ast::ExprName { id, .. } = subject.node_ref(self.db).as_name_expr()?;
+        let symbol = self
+            .symbols()
+            .symbol_id_by_name(id)
+            .expect("We should always have a symbol for every `Name` node");
+
+        Some(symbol)
+    }
+
     fn evaluate_match_pattern_singleton(
         &mut self,
         subject: Expression<'db>,
         singleton: ast::Singleton,
     ) -> Option<NarrowingConstraints<'db>> {
-        if let Some(ast::ExprName { id, .. }) = subject.node_ref(self.db).as_name_expr() {
-            // SAFETY: we should always have a symbol for every Name node.
-            let symbol = self.symbols().symbol_id_by_name(id).unwrap();
+        let symbol = self.get_subject_symbol(subject)?;
 
-            let ty = match singleton {
-                ast::Singleton::None => Type::none(self.db),
-                ast::Singleton::True => Type::BooleanLiteral(true),
-                ast::Singleton::False => Type::BooleanLiteral(false),
-            };
-            let mut constraints = NarrowingConstraints::default();
-            constraints.insert(symbol, ty);
-            Some(constraints)
-        } else {
-            None
-        }
+        let ty = match singleton {
+            ast::Singleton::None => Type::none(self.db),
+            ast::Singleton::True => Type::BooleanLiteral(true),
+            ast::Singleton::False => Type::BooleanLiteral(false),
+        };
+        let mut constraints = NarrowingConstraints::default();
+        constraints.insert(symbol, ty);
+        Some(constraints)
     }
 
     fn evaluate_match_pattern_class(
@@ -501,11 +506,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         subject: Expression<'db>,
         cls: Expression<'db>,
     ) -> Option<NarrowingConstraints<'db>> {
-        let ast::ExprName { id, .. } = subject.node_ref(self.db).as_name_expr()?;
-        let symbol = self
-            .symbols()
-            .symbol_id_by_name(id)
-            .expect("We should always have a symbol for every `Name` node");
+        let symbol = self.get_subject_symbol(subject)?;
         let ty = infer_same_file_expression_type(self.db, cls).to_instance(self.db)?;
 
         let mut constraints = NarrowingConstraints::default();
@@ -518,12 +519,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         subject: Expression<'db>,
         value: Expression<'db>,
     ) -> Option<NarrowingConstraints<'db>> {
-        // TODO: DRY
-        let ast::ExprName { id, .. } = subject.node_ref(self.db).as_name_expr()?;
-        let symbol = self
-            .symbols()
-            .symbol_id_by_name(id)
-            .expect("We should always have a symbol for every `Name` node");
+        let symbol = self.get_subject_symbol(subject)?;
         let ty = infer_same_file_expression_type(self.db, value);
         let mut constraints = NarrowingConstraints::default();
         constraints.insert(symbol, ty);
