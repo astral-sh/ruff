@@ -68,6 +68,10 @@ static_assert(not is_gradual_equivalent_to(tuple[str, int], tuple[int, str]))
 
 ## Callable
 
+The examples provided below are only a subset of the possible cases and only include the ones with
+gradual types. The cases with fully static types and using different combinations of parameter kinds
+are covered in the [equivalence tests](./is_equivalent_to.md#callable).
+
 ```py
 from knot_extensions import Unknown, CallableTypeFromFunction, is_gradual_equivalent_to, static_assert
 from typing import Any, Callable
@@ -94,7 +98,7 @@ static_assert(is_gradual_equivalent_to(CallableTypeFromFunction[f1], Callable[[]
 And, similarly for parameters with no annotations.
 
 ```py
-def f2(a, b) -> None:
+def f2(a, b, /) -> None:
     return
 
 static_assert(is_gradual_equivalent_to(CallableTypeFromFunction[f2], Callable[[Any, Any], None]))
@@ -115,8 +119,8 @@ static_assert(is_gradual_equivalent_to(CallableTypeFromFunction[variadic_without
 static_assert(is_gradual_equivalent_to(CallableTypeFromFunction[variadic_with_annotation], Callable[..., Any]))
 ```
 
-But, a function with either `*args` or `**kwargs` is not gradual equivalent to a callable with `...`
-as the parameter type.
+But, a function with either `*args` or `**kwargs` (and not both) is not gradual equivalent to a
+callable with `...` as the parameter type.
 
 ```py
 def variadic_args(*args):
@@ -127,6 +131,27 @@ def variadic_kwargs(**kwargs):
 
 static_assert(not is_gradual_equivalent_to(CallableTypeFromFunction[variadic_args], Callable[..., Any]))
 static_assert(not is_gradual_equivalent_to(CallableTypeFromFunction[variadic_kwargs], Callable[..., Any]))
+```
+
+Parameter names, default values, and it's kind should also be considered when checking for gradual
+equivalence.
+
+```py
+def f1(a): ...
+def f2(b): ...
+
+static_assert(not is_gradual_equivalent_to(CallableTypeFromFunction[f1], CallableTypeFromFunction[f2]))
+
+def f3(a=1): ...
+def f4(a=2): ...
+def f5(a): ...
+
+static_assert(is_gradual_equivalent_to(CallableTypeFromFunction[f3], CallableTypeFromFunction[f4]))
+static_assert(not is_gradual_equivalent_to(CallableTypeFromFunction[f3], CallableTypeFromFunction[f5]))
+
+def f6(a, /): ...
+
+static_assert(not is_gradual_equivalent_to(CallableTypeFromFunction[f1], CallableTypeFromFunction[f6]))
 ```
 
 [materializations]: https://typing.readthedocs.io/en/latest/spec/glossary.html#term-materialize

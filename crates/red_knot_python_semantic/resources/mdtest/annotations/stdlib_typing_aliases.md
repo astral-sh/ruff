@@ -81,8 +81,7 @@ reveal_type(DictSubclass.__mro__)
 
 class SetSubclass(typing.Set): ...
 
-# TODO: should have `Generic`, should not have `Unknown`
-# revealed: tuple[Literal[SetSubclass], Literal[set], Unknown, Literal[object]]
+# revealed: tuple[Literal[SetSubclass], Literal[set], Literal[MutableSet], Literal[AbstractSet], Literal[Collection], Literal[Iterable], Literal[Container], @Todo(protocol), Literal[object]]
 reveal_type(SetSubclass.__mro__)
 
 class FrozenSetSubclass(typing.FrozenSet): ...
@@ -114,8 +113,7 @@ reveal_type(DefaultDictSubclass.__mro__)
 
 class DequeSubclass(typing.Deque): ...
 
-# TODO: Should be (DequeSubclass, deque, MutableSequence, Sequence, Reversible, Collection, Sized, Iterable, Container, Generic, object)
-# revealed: tuple[Literal[DequeSubclass], Literal[deque], Unknown, Literal[object]]
+# revealed: tuple[Literal[DequeSubclass], Literal[deque], Literal[MutableSequence], Literal[Sequence], Literal[Reversible], Literal[Collection], Literal[Iterable], Literal[Container], @Todo(protocol), Literal[object]]
 reveal_type(DequeSubclass.__mro__)
 
 class OrderedDictSubclass(typing.OrderedDict): ...

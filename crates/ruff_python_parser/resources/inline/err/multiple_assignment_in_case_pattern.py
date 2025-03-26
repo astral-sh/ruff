@@ -1,5 +1,4 @@
 match 2:
-    case x as x: ...  # MatchAs
     case [y, z, y]: ...  # MatchSequence
     case [y, z, *y]: ...  # MatchSequence
     case [y, y, y]: ...  # MatchSequence multiple
@@ -8,3 +7,4 @@ match 2:
     case Class(x, x): ...  # MatchClass positional
     case Class(x=1, x=2): ...  # MatchClass keyword
     case [x] | {1: x} | Class(x=1, x=2): ...  # MatchOr
+    case x as x: ...  # MatchAs

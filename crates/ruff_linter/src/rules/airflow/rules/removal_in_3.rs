@@ -241,21 +241,9 @@ fn check_call_arguments(checker: &Checker, qualified_name: &QualifiedName, argum
                             Some("logical_date"),
                         ));
                     }
-                    ["airflow", .., "operators", "datetime", "BranchDateTimeOperator"] => {
-                        checker.report_diagnostics(diagnostic_for_argument(
-                            arguments,
-                            "use_task_execution_day",
-                            Some("use_task_logical_date"),
-                        ));
-                    }
-                    ["airflow", .., "operators", "weekday", "DayOfWeekSensor"] => {
-                        checker.report_diagnostics(diagnostic_for_argument(
-                            arguments,
-                            "use_task_execution_day",
-                            Some("use_task_logical_date"),
-                        ));
-                    }
-                    ["airflow", .., "operators", "weekday", "BranchDayOfWeekOperator"] => {
+                    ["airflow", .., "operators", "datetime", "BranchDateTimeOperator"]
+                    | ["airflow", .., "operators", "weekday", "DayOfWeekSensor" | "BranchDayOfWeekOperator"] =>
+                    {
                         checker.report_diagnostics(diagnostic_for_argument(
                             arguments,
                             "use_task_execution_day",
@@ -288,29 +276,27 @@ fn check_class_attribute(checker: &Checker, attribute_expr: &ExprAttribute) {
 
     let replacement = match *qualname.segments() {
         ["airflow", "providers_manager", "ProvidersManager"] => match attr.as_str() {
-            "dataset_factories" => Some(Replacement::Name("asset_factories")),
-            "dataset_uri_handlers" => Some(Replacement::Name("asset_uri_handlers")),
+            "dataset_factories" => Replacement::Name("asset_factories"),
+            "dataset_uri_handlers" => Replacement::Name("asset_uri_handlers"),
             "dataset_to_openlineage_converters" => {
-                Some(Replacement::Name("asset_to_openlineage_converters"))
+                Replacement::Name("asset_to_openlineage_converters")
             }
-            _ => None,
+            _ => return,
         },
         ["airflow", "lineage", "hook", "DatasetLineageInfo"] => match attr.as_str() {
-            "dataset" => Some(Replacement::Name("asset")),
-            _ => None,
+            "dataset" => Replacement::Name("asset"),
+            _ => return,
         },
-        _ => None,
+        _ => return,
     };
 
-    if let Some(replacement) = replacement {
-        checker.report_diagnostic(Diagnostic::new(
-            Airflow3Removal {
-                deprecated: attr.to_string(),
-                replacement,
-            },
-            attr.range(),
-        ));
-    }
+    checker.report_diagnostic(Diagnostic::new(
+        Airflow3Removal {
+            deprecated: attr.to_string(),
+            replacement,
+        },
+        attr.range(),
+    ));
 }
 
 /// Checks whether an Airflow 3.0–removed context key is used in a function decorated with `@task`.
@@ -465,68 +451,66 @@ fn check_method(checker: &Checker, call_expr: &ExprCall) {
 
     let replacement = match qualname.segments() {
         ["airflow", "datasets", "manager", "DatasetManager"] => match attr.as_str() {
-            "register_dataset_change" => Some(Replacement::Name("register_asset_change")),
-            "create_datasets" => Some(Replacement::Name("create_assets")),
-            "notify_dataset_created" => Some(Replacement::Name("notify_asset_created")),
-            "notify_dataset_changed" => Some(Replacement::Name("notify_asset_changed")),
-            "notify_dataset_alias_created" => Some(Replacement::Name("notify_asset_alias_created")),
-            _ => None,
+            "register_dataset_change" => Replacement::Name("register_asset_change"),
+            "create_datasets" => Replacement::Name("create_assets"),
+            "notify_dataset_created" => Replacement::Name("notify_asset_created"),
+            "notify_dataset_changed" => Replacement::Name("notify_asset_changed"),
+            "notify_dataset_alias_created" => Replacement::Name("notify_asset_alias_created"),
+            _ => return,
         },
         ["airflow", "lineage", "hook", "HookLineageCollector"] => match attr.as_str() {
-            "create_dataset" => Some(Replacement::Name("create_asset")),
-            "add_input_dataset" => Some(Replacement::Name("add_input_asset")),
-            "add_output_dataset" => Some(Replacement::Name("add_output_asset")),
-            "collected_datasets" => Some(Replacement::Name("collected_assets")),
-            _ => None,
+            "create_dataset" => Replacement::Name("create_asset"),
+            "add_input_dataset" => Replacement::Name("add_input_asset"),
+            "add_output_dataset" => Replacement::Name("add_output_asset"),
+            "collected_datasets" => Replacement::Name("collected_assets"),
+            _ => return,
         },
         ["airflow", "providers", "amazon", "auth_manager", "aws_auth_manager", "AwsAuthManager"] => {
             match attr.as_str() {
-                "is_authorized_dataset" => Some(Replacement::Name("is_authorized_asset")),
-                _ => None,
+                "is_authorized_dataset" => Replacement::Name("is_authorized_asset"),
+                _ => return,
             }
         }
         ["airflow", "providers_manager", "ProvidersManager"] => match attr.as_str() {
-            "initialize_providers_dataset_uri_resources" => Some(Replacement::Name(
-                "initialize_providers_asset_uri_resources",
-            )),
-            _ => None,
+            "initialize_providers_dataset_uri_resources" => {
+                Replacement::Name("initialize_providers_asset_uri_resources")
+            }
+            _ => return,
         },
         ["airflow", "secrets", "local_filesystem", "LocalFilesystemBackend"] => match attr.as_str()
         {
-            "get_connections" => Some(Replacement::Name("get_connection")),
-            _ => None,
+            "get_connections" => Replacement::Name("get_connection"),
+            _ => return,
         },
         ["airflow", "datasets", ..] | ["airflow", "Dataset"] => match attr.as_str() {
-            "iter_datasets" => Some(Replacement::Name("iter_assets")),
-            "iter_dataset_aliases" => Some(Replacement::Name("iter_asset_aliases")),
-            _ => None,
+            "iter_datasets" => Replacement::Name("iter_assets"),
+            "iter_dataset_aliases" => Replacement::Name("iter_asset_aliases"),
+            _ => return,
         },
         segments => {
             if is_airflow_secret_backend(segments) {
                 match attr.as_str() {
-                    "get_conn_uri" => Some(Replacement::Name("get_conn_value")),
-                    "get_connections" => Some(Replacement::Name("get_connection")),
-                    _ => None,
+                    "get_conn_uri" => Replacement::Name("get_conn_value"),
+                    "get_connections" => Replacement::Name("get_connection"),
+                    _ => return,
                 }
             } else if is_airflow_hook(segments) {
                 match attr.as_str() {
-                    "get_connections" => Some(Replacement::Name("get_connection")),
-                    _ => None,
+                    "get_connections" => Replacement::Name("get_connection"),
+                    _ => return,
                 }
             } else {
-                None
+                return;
             }
         }
     };
-    if let Some(replacement) = replacement {
-        checker.report_diagnostic(Diagnostic::new(
-            Airflow3Removal {
-                deprecated: attr.to_string(),
-                replacement,
-            },
-            attr.range(),
-        ));
-    }
+    checker.report_diagnostic(Diagnostic::new(
+        Airflow3Removal {
+            deprecated: attr.to_string(),
+            replacement,
+        },
+        attr.range(),
+    ));
 }
 
 /// Check whether a removed Airflow name is used.

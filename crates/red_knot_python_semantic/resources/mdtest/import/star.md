@@ -17,10 +17,7 @@ X: bool = True
 ```py
 from a import *
 
-# TODO: should not error, should be `bool`
-# error: [unresolved-reference]
-reveal_type(X)  # revealed: Unknown
-
+reveal_type(X)  # revealed: bool
 print(Y)  # error: [unresolved-reference]
 ```
 
@@ -40,8 +37,7 @@ reveal_type(X)  # revealed: Literal[42]
 
 from a import *
 
-# TODO: should reveal `bool`
-reveal_type(X)  # revealed: Literal[42]
+reveal_type(X)  # revealed: bool
 ```
 
 ### Overridden by later definition
@@ -57,12 +53,9 @@ X: bool = True
 ```py
 from a import *
 
-# TODO: should not error, should reveal `bool`
-# error: [unresolved-reference]
-reveal_type(X)  # revealed: Unknown
-
-X = 42
-reveal_type(X)  # revealed: Literal[42]
+reveal_type(X)  # revealed: bool
+X = False
+reveal_type(X)  # revealed: Literal[False]
 ```
 
 ### Reaching across many modules
@@ -90,9 +83,7 @@ from b import *
 ```py
 from c import *
 
-# TODO: should not error, should reveal `bool`
-# error: [unresolved-reference]
-reveal_type(X)  # revealed: Unknown
+reveal_type(X)  # revealed: bool
 ```
 
 ### A wildcard import constitutes a re-export
@@ -120,8 +111,7 @@ from b import Y
 
 ```py
 # `X` is accessible because the `*` import in `c` re-exports it from `c`
-# TODO: should not error
-from c import X  # error: [unresolved-import]
+from c import X
 
 # but `Y` is not because the `from b import Y` import does *not* constitute a re-export
 from c import Y  # error: [unresolved-import]
@@ -140,10 +130,187 @@ X = (Y := 3) + 4
 ```py
 from a import *
 
-# TODO should not error, should reveal `Literal[7] | Unknown`
+reveal_type(X)  # revealed: Unknown | Literal[7]
+reveal_type(Y)  # revealed: Unknown | Literal[3]
+```
+
+### Global-scope symbols defined in many other ways
+
+`a.py`:
+
+```py
+import typing
+from collections import OrderedDict
+from collections import OrderedDict as Foo
+
+A, B = 1, (C := 2)
+D: (E := 4) = (F := 5)  # error: [invalid-type-form]
+
+for G in [1]:
+    ...
+
+for (H := 4).whatever in [2]:  # error: [unresolved-attribute]
+    ...
+
+class I: ...
+
+def J(): ...
+
+type K = int
+
+with () as L:  # error: [invalid-context-manager]
+    ...
+
+match 42:
+    case {"something": M}:
+        ...
+    case [*N]:
+        ...
+    case [O]:
+        ...
+    case P | Q:
+        ...
+    case object(foo=R):
+        ...
+    case object(S):
+        ...
+    case T:
+        ...
+```
+
+`b.py`:
+
+```py
+from a import *
+
+# fmt: off
+
+print((
+    A,
+    B,
+    C,
+    D,
+    E,
+    F,
+    G,  # TODO: could emit diagnostic about being possibly unbound
+    H,
+    I,
+    J,
+    K,
+    L,
+    M,  # TODO: could emit diagnostic about being possibly unbound
+    N,  # TODO: could emit diagnostic about being possibly unbound
+    O,  # TODO: could emit diagnostic about being possibly unbound
+    P,  # TODO: could emit diagnostic about being possibly unbound
+    Q,  # TODO: could emit diagnostic about being possibly unbound
+    R,  # TODO: could emit diagnostic about being possibly unbound
+    S,  # TODO: could emit diagnostic about being possibly unbound
+    T,  # TODO: could emit diagnostic about being possibly unbound
+    typing,
+    OrderedDict,
+    Foo,
+))
+```
+
+### Definitions in function-like scopes are not global definitions
+
+Except for some cases involving walrus expressions inside comprehension scopes.
+
+`a.py`:
+
+```py
+class Iterator:
+    def __next__(self) -> int:
+        return 42
+
+class Iterable:
+    def __iter__(self) -> Iterator:
+        return Iterator()
+
+[a for a in Iterable()]
+{b for b in Iterable()}
+{c: c for c in Iterable()}
+(d for d in Iterable())
+lambda e: (f := 42)
+
+# Definitions created by walruses in a comprehension scope are unique;
+# they "leak out" of the scope and are stored in the surrounding scope
+[(g := h * 2) for h in Iterable()]
+[i for j in Iterable() if (i := j - 10) > 0]
+{(k := l * 2): (m := l * 3) for l in Iterable()}
+list(((o := p * 2) for p in Iterable()))
+
+# A walrus expression nested inside several scopes *still* leaks out
+# to the global scope:
+[[[[(q := r) for r in Iterable()]] for _ in range(42)] for _ in range(42)]
+
+# A walrus inside a lambda inside a comprehension does not leak out
+[(lambda s=s: (t := 42))() for s in Iterable()]
+```
+
+`b.py`:
+
+```py
+from a import *
+
 # error: [unresolved-reference]
-reveal_type(X)  # revealed: Unknown
-# TODO should not error, should reveal `Literal[3] | Unknown`
+reveal_type(a)  # revealed: Unknown
+# error: [unresolved-reference]
+reveal_type(b)  # revealed: Unknown
+# error: [unresolved-reference]
+reveal_type(c)  # revealed: Unknown
+# error: [unresolved-reference]
+reveal_type(d)  # revealed: Unknown
+# error: [unresolved-reference]
+reveal_type(e)  # revealed: Unknown
+# error: [unresolved-reference]
+reveal_type(f)  # revealed: Unknown
+# error: [unresolved-reference]
+reveal_type(h)  # revealed: Unknown
+# error: [unresolved-reference]
+reveal_type(j)  # revealed: Unknown
+# error: [unresolved-reference]
+reveal_type(p)  # revealed: Unknown
+# error: [unresolved-reference]
+reveal_type(r)  # revealed: Unknown
+# error: [unresolved-reference]
+reveal_type(s)  # revealed: Unknown
+# error: [unresolved-reference]
+reveal_type(t)  # revealed: Unknown
+
+# TODO: these should all reveal `Unknown | int`.
+# (We don't generally model elsewhere in red-knot that bindings from walruses
+# "leak" from comprehension scopes into outer scopes, but we should.)
+# See https://github.com/astral-sh/ruff/issues/16954
+reveal_type(g)  # revealed: Unknown
+reveal_type(i)  # revealed: Unknown
+reveal_type(k)  # revealed: Unknown
+reveal_type(m)  # revealed: Unknown
+reveal_type(o)  # revealed: Unknown
+reveal_type(q)  # revealed: Unknown
+```
+
+### An annotation without a value is a definition in a stub but not a `.py` file
+
+`a.pyi`:
+
+```pyi
+X: bool
+```
+
+`b.py`:
+
+```py
+Y: bool
+```
+
+`c.py`:
+
+```py
+from a import *
+from b import *
+
+reveal_type(X)  # revealed: bool
 # error: [unresolved-reference]
 reveal_type(Y)  # revealed: Unknown
 ```
@@ -169,8 +336,6 @@ Y: bool = True
 ```py
 from a import *
 
-# These errors are correct:
-#
 # error: [unresolved-reference]
 reveal_type(_private)  # revealed: Unknown
 # error: [unresolved-reference]
@@ -180,10 +345,7 @@ reveal_type(__dunder__)  # revealed: Unknown
 # error: [unresolved-reference]
 reveal_type(___thunder___)  # revealed: Unknown
 
-# TODO: this error is incorrect (should reveal `bool`):
-#
-# error: [unresolved-reference]
-reveal_type(Y)  # revealed: Unknown
+reveal_type(Y)  # revealed: bool
 ```
 
 ### All public symbols are considered re-exported from `.py` files
@@ -212,11 +374,8 @@ from a import X
 ```py
 from b import *
 
-# TODO: this is a false positive, but we could consider a different opt-in diagnostic
-# (see prose commentary above)
-#
-# error: [unresolved-reference]
-reveal_type(X)  # revealed: Unknown
+# TODO: we could consider an opt-in diagnostic (see prose commentary above)
+reveal_type(X)  # revealed: bool
 ```
 
 ### Only explicit re-exports are considered re-exported from `.pyi` files
@@ -228,12 +387,13 @@ For `.pyi` files, we should consider all imports private to the stub unless they
 
 ```pyi
 X: bool = True
+Y: bool = True
 ```
 
 `b.pyi`:
 
 ```pyi
-from a import X
+from a import X, Y as Y
 ```
 
 `c.py`:
@@ -245,6 +405,8 @@ from b import *
 #
 # error: [unresolved-reference]
 reveal_type(X)  # revealed: Unknown
+
+reveal_type(Y)  # revealed: bool
 ```
 
 ### Symbols in statically known branches
@@ -263,19 +425,27 @@ if sys.version_info >= (3, 11):
     X: bool = True
 else:
     Y: bool = False
+    Z: int = 42
 ```
 
 `b.py`:
 
 ```py
+Z: bool = True
+
 from a import *
 
-# TODO should not error, should reveal `bool`
-# error: [unresolved-reference]
-reveal_type(X)  # revealed: Unknown
+reveal_type(X)  # revealed: bool
 
-# error: [unresolved-reference]
+# TODO: should emit error: [unresolved-reference]
 reveal_type(Y)  # revealed: Unknown
+
+# TODO: The `*` import should not be considered a redefinition
+# of the global variable in this module, as the symbol in
+# the `a` module is in a branch that is statically known
+# to be dead code given the `python-version` configuration.
+# Thus this should reveal `Literal[True]`.
+reveal_type(Z)  # revealed: Unknown
 ```
 
 ### Relative `*` imports
@@ -298,9 +468,7 @@ X: bool = True
 ```py
 from .foo import *
 
-# TODO should not error, should reveal `bool`
-# error: [unresolved-reference]
-reveal_type(X)  # revealed: Unknown
+reveal_type(X)  # revealed: bool
 ```
 
 ## Star imports with `__all__`
@@ -329,9 +497,9 @@ Y: bool = False
 ```py
 from a import *
 
+reveal_type(X)  # revealed: bool
+
 # TODO none of these should error, should all reveal `bool`
-# error: [unresolved-reference]
-reveal_type(X)  # revealed: Unknown
 # error: [unresolved-reference]
 reveal_type(_private)  # revealed: Unknown
 # error: [unresolved-reference]
@@ -341,10 +509,8 @@ reveal_type(__dunder__)  # revealed: Unknown
 # error: [unresolved-reference]
 reveal_type(___thunder___)  # revealed: Unknown
 
-# but this diagnostic is accurate!
-#
-# error: [unresolved-reference]
-reveal_type(Y)  # revealed: Unknown
+# TODO: should emit [unresolved-reference] diagnostic & reveal `Unknown`
+reveal_type(Y)  # revealed: bool
 ```
 
 ### Simple list `__all__`
@@ -363,12 +529,10 @@ Y: bool = False
 ```py
 from a import *
 
-# TODO should not error, should reveal `bool`
-# error: [unresolved-reference]
-reveal_type(X)  # revealed: Unknown
+reveal_type(X)  # revealed: bool
 
-# error: [unresolved-reference]
-reveal_type(Y)  # revealed: Unknown
+# TODO: should emit [unresolved-reference] diagnostic & reveal `Unknown`
+reveal_type(Y)  # revealed: bool
 ```
 
 ### `__all__` with additions later on in the global scope
@@ -409,22 +573,15 @@ F: bool = False
 ```py
 from b import *
 
-# TODO none of these should error, they should all reveal `bool`
-# error: [unresolved-reference]
-reveal_type(A)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(B)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(C)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(D)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(E)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(FOO)  # revealed: Unknown
+reveal_type(A)  # revealed: bool
+reveal_type(B)  # revealed: bool
+reveal_type(C)  # revealed: bool
+reveal_type(D)  # revealed: bool
+reveal_type(E)  # revealed: bool
+reveal_type(FOO)  # revealed: bool
 
-# error: [unresolved-reference]
-reveal_type(F)  # revealed: Unknown
+# TODO should error with [unresolved-reference] & reveal `Unknown`
+reveal_type(F)  # revealed: bool
 ```
 
 ### `__all__` with subtractions later on in the global scope
@@ -447,12 +604,10 @@ B: bool = True
 ```py
 from a import *
 
-# TODO should not error, should reveal `bool`
-# error: [unresolved-reference]
-reveal_type(A)  # revealed: Unknown
+reveal_type(A)  # revealed: bool
 
-# error: [unresolved-reference]
-reveal_type(B)  # revealed: Unknown
+# TODO should emit an [unresolved-reference] diagnostic & reveal `Unknown`
+reveal_type(B)  # revealed: bool
 ```
 
 ### Invalid `__all__`
@@ -508,16 +663,11 @@ __all__ = [f()]
 ```py
 from a import *
 
-# TODO: we should avoid both errors here.
-#
 # At runtime, `f` is imported but `g` is not; to avoid false positives, however,
-# we should treat `a` as though it does not have `__all__` at all,
+# we treat `a` as though it does not have `__all__` at all,
 # which would imply that both symbols would be present.
-#
-# error: [unresolved-reference]
-reveal_type(f)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(g)  # revealed: Unknown
+reveal_type(f)  # revealed: Literal[f]
+reveal_type(g)  # revealed: Literal[g]
 ```
 
 ### `__all__` conditionally defined in a statically known branch
@@ -547,13 +697,10 @@ else:
 ```py
 from a import *
 
-# TODO neither should error, both should be `bool`
-# error: [unresolved-reference]
-reveal_type(X)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(Y)  # revealed: Unknown
+reveal_type(X)  # revealed: bool
+reveal_type(Y)  # revealed: bool
 
-# error: [unresolved-reference]
+# TODO: should error with [unresolved-reference]
 reveal_type(Z)  # revealed: Unknown
 ```
 
@@ -585,13 +732,10 @@ else:
 ```py
 from a import *
 
-# TODO neither should error, both should be `bool`
-# error: [unresolved-reference]
-reveal_type(X)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(Y)  # revealed: Unknown
+reveal_type(X)  # revealed: bool
+reveal_type(Y)  # revealed: bool
 
-# error: [unresolved-reference]
+# TODO should have an [unresolved-reference] diagnostic
 reveal_type(Z)  # revealed: Unknown
 ```
 
@@ -622,10 +766,9 @@ __all__ = []
 from a import *
 from b import *
 
-# error: [unresolved-reference]
-reveal_type(X)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(Y)  # revealed: Unknown
+# TODO: both of these should have [unresolved-reference] diagnostics and reveal `Unknown`
+reveal_type(X)  # revealed: bool
+reveal_type(Y)  # revealed: bool
 ```
 
 ### `__all__` in a stub file
@@ -653,13 +796,71 @@ __all__ = ["X"]
 ```py
 from b import *
 
-# TODO: should not error, should reveal `bool`
-# error: [unresolved-reference]
-reveal_type(X)  # revealed: Unknown
+reveal_type(X)  # revealed: bool
 
-# this error is correct:
+# TODO this should have an [unresolved-reference] diagnostic and reveal `Unknown`
+reveal_type(Y)  # revealed: bool
+```
+
+## `global` statements in non-global scopes
+
+A `global` statement in a nested function scope, combined with a definition in the same function
+scope of the name that was declared `global`, can add a symbol to the global namespace.
+
+`a.py`:
+
+```py
+def f():
+    global g, h
+
+    g: bool = True
+
+f()
+```
+
+`b.py`:
+
+```py
+from a import *
+
+reveal_type(f)  # revealed: Literal[f]
+
+# TODO: false positive, should be `bool` with no diagnostic
 # error: [unresolved-reference]
-reveal_type(Y)  # revealed: Unknown
+reveal_type(g)  # revealed: Unknown
+
+# this diagnostic is accurate, though!
+# error: [unresolved-reference]
+reveal_type(h)  # revealed: Unknown
+```
+
+## Cyclic star imports
+
+Believe it or not, this code does _not_ raise an exception at runtime!
+
+`a.py`:
+
+```py
+from b import *
+
+A: bool = True
+```
+
+`b.py`:
+
+```py
+from a import *
+
+B: bool = True
+```
+
+`c.py`:
+
+```py
+from a import *
+
+reveal_type(A)  # revealed: bool
+reveal_type(B)  # revealed: bool
 ```
 
 ## Integration test: `collections.abc`
@@ -671,11 +872,8 @@ are present due to `*` imports.
 import typing
 import collections.abc
 
-# TODO these should not error, should not reveal `Unknown`
-# error: [unresolved-attribute]
-reveal_type(collections.abc.Sequence)  # revealed: Unknown
-# error: [unresolved-attribute]
-reveal_type(collections.abc.Callable)  # revealed: Unknown
+reveal_type(collections.abc.Sequence)  # revealed: Literal[Sequence]
+reveal_type(collections.abc.Callable)  # revealed: typing.Callable
 ```
 
 ## Invalid `*` imports
@@ -710,6 +908,44 @@ def f():
     # error: [unresolved-reference]
     reveal_type(X)  # revealed: Unknown
 ```
+
+### `*` combined with other aliases in the list
+
+`a.py`:
+
+```py
+X: bool = True
+_Y: bool = False
+_Z: bool = True
+```
+
+`b.py`:
+
+<!-- blacken-docs:off -->
+
+```py
+from a import *, _Y  # error: [invalid-syntax]
+
+# The import statement above is invalid syntax,
+# but it's pretty obvious that the user wanted to do a `*` import,
+# so we import all public names from `a` anyway, to minimize cascading errors
+reveal_type(X)  # revealed: bool
+reveal_type(_Y)  # revealed: bool
+```
+
+These tests are more to assert that we don't panic on these various kinds of invalid syntax than
+anything else:
+
+`c.py`:
+
+```py
+from a import *, _Y  # error: [invalid-syntax]
+from a import _Y, *, _Z  # error: [invalid-syntax]
+from a import *, _Y as fooo  # error: [invalid-syntax]
+from a import *, *, _Y  # error: [invalid-syntax]
+```
+
+<!-- blacken-docs:on -->
 
 [python language reference for import statements]: https://docs.python.org/3/reference/simple_stmts.html#the-import-statement
 [typing spec]: https://typing.python.org/en/latest/spec/distributing.html#library-interface-public-and-private-symbols

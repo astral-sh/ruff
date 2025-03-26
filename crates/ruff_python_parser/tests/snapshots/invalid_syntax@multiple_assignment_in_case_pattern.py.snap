@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/err/multiple_assignment_in_case_pattern.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -23,84 +22,43 @@ Module(
                     ),
                     cases: [
                         MatchCase {
-                            range: 13..29,
-                            pattern: MatchAs(
-                                PatternMatchAs {
-                                    range: 18..24,
-                                    pattern: Some(
-                                        MatchAs(
-                                            PatternMatchAs {
-                                                range: 18..19,
-                                                pattern: None,
-                                                name: Some(
-                                                    Identifier {
-                                                        id: Name("x"),
-                                                        range: 18..19,
-                                                    },
-                                                ),
-                                            },
-                                        ),
-                                    ),
-                                    name: Some(
-                                        Identifier {
-                                            id: Name("x"),
-                                            range: 23..24,
-                                        },
-                                    ),
-                                },
-                            ),
-                            guard: None,
-                            body: [
-                                Expr(
-                                    StmtExpr {
-                                        range: 26..29,
-                                        value: EllipsisLiteral(
-                                            ExprEllipsisLiteral {
-                                                range: 26..29,
-                                            },
-                                        ),
-                                    },
-                                ),
-                            ],
-                        },
-                        MatchCase {
-                            range: 45..64,
+                            range: 13..32,
                             pattern: MatchSequence(
                                 PatternMatchSequence {
-                                    range: 50..59,
+                                    range: 18..27,
                                     patterns: [
                                         MatchAs(
                                             PatternMatchAs {
-                                                range: 51..52,
+                                                range: 19..20,
                                                 pattern: None,
                                                 name: Some(
                                                     Identifier {
                                                         id: Name("y"),
-                                                        range: 51..52,
+                                                        range: 19..20,
                                                     },
                                                 ),
                                             },
                                         ),
                                         MatchAs(
                                             PatternMatchAs {
-                                                range: 54..55,
+                                                range: 22..23,
                                                 pattern: None,
                                                 name: Some(
                                                     Identifier {
                                                         id: Name("z"),
-                                                        range: 54..55,
+                                                        range: 22..23,
                                                     },
                                                 ),
                                             },
                                         ),
                                         MatchAs(
                                             PatternMatchAs {
-                                                range: 57..58,
+                                                range: 25..26,
                                                 pattern: None,
                                                 name: Some(
                                                     Identifier {
                                                         id: Name("y"),
-                                                        range: 57..58,
+                                                        range: 25..26,
                                                     },
                                                 ),
                                             },
@@ -112,10 +70,10 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        range: 61..64,
+                                        range: 29..32,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                range: 61..64,
+                                                range: 29..32,
                                             },
                                         ),
                                     },
@@ -123,42 +81,42 @@ Module(
                             ],
                         },
                         MatchCase {
-                            range: 86..106,
+                            range: 54..74,
                             pattern: MatchSequence(
                                 PatternMatchSequence {
-                                    range: 91..101,
+                                    range: 59..69,
                                     patterns: [
                                         MatchAs(
                                             PatternMatchAs {
-                                                range: 92..93,
+                                                range: 60..61,
                                                 pattern: None,
                                                 name: Some(
                                                     Identifier {
                                                         id: Name("y"),
-                                                        range: 92..93,
+                                                        range: 60..61,
                                                     },
                                                 ),
                                             },
                                         ),
                                         MatchAs(
                                             PatternMatchAs {
-                                                range: 95..96,
+                                                range: 63..64,
                                                 pattern: None,
                                                 name: Some(
                                                     Identifier {
                                                         id: Name("z"),
-                                                        range: 95..96,
+                                                        range: 63..64,
                                                     },
                                                 ),
                                             },
                                         ),
                                         MatchStar(
                                             PatternMatchStar {
-                                                range: 98..100,
+                                                range: 66..68,
                                                 name: Some(
                                                     Identifier {
                                                         id: Name("y"),
-                                                        range: 99..100,
+                                                        range: 67..68,
                                                     },
                                                 ),
                                             },
@@ -170,10 +128,10 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        range: 103..106,
+                                        range: 71..74,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                range: 103..106,
+                                                range: 71..74,
                                             },
                                         ),
                                     },
@@ -181,43 +139,43 @@ Module(
                             ],
                         },
                         MatchCase {
-                            range: 128..147,
+                            range: 96..115,
                             pattern: MatchSequence(
                                 PatternMatchSequence {
-                                    range: 133..142,
+                                    range: 101..110,
                                     patterns: [
                                         MatchAs(
                                             PatternMatchAs {
-                                                range: 134..135,
+                                                range: 102..103,
                                                 pattern: None,
                                                 name: Some(
                                                     Identifier {
                                                         id: Name("y"),
-                                                        range: 134..135,
+                                                        range: 102..103,
                                                     },
                                                 ),
                                             },
                                         ),
                                         MatchAs(
                                             PatternMatchAs {
-                                                range: 137..138,
+                                                range: 105..106,
                                                 pattern: None,
                                                 name: Some(
                                                     Identifier {
                                                         id: Name("y"),
-                                                        range: 137..138,
+                                                        range: 105..106,
                                                     },
                                                 ),
                                             },
                                         ),
                                         MatchAs(
                                             PatternMatchAs {
-                                                range: 140..141,
+                                                range: 108..109,
                                                 pattern: None,
                                                 name: Some(
                                                     Identifier {
                                                         id: Name("y"),
-                                                        range: 140..141,
+                                                        range: 108..109,
                                                     },
                                                 ),
                                             },
@@ -229,10 +187,10 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        range: 144..147,
+                                        range: 112..115,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                range: 144..147,
+                                                range: 112..115,
                                             },
                                         ),
                                     },
@@ -240,14 +198,14 @@ Module(
                             ],
                         },
                         MatchCase {
-                            range: 178..200,
+                            range: 146..168,
                             pattern: MatchMapping(
                                 PatternMatchMapping {
-                                    range: 183..195,
+                                    range: 151..163,
                                     keys: [
                                         NumberLiteral(
                                             ExprNumberLiteral {
-                                                range: 184..185,
+                                                range: 152..153,
                                                 value: Int(
                                                     1,
                                                 ),
@@ -255,7 +213,7 @@ Module(
                                         ),
                                         NumberLiteral(
                                             ExprNumberLiteral {
-                                                range: 190..191,
+                                                range: 158..159,
                                                 value: Int(
                                                     2,
                                                 ),
@@ -265,24 +223,24 @@ Module(
                                     patterns: [
                                         MatchAs(
                                             PatternMatchAs {
-                                                range: 187..188,
+                                                range: 155..156,
                                                 pattern: None,
                                                 name: Some(
                                                     Identifier {
                                                         id: Name("x"),
-                                                        range: 187..188,
+                                                        range: 155..156,
                                                     },
                                                 ),
                                             },
                                         ),
                                         MatchAs(
                                             PatternMatchAs {
-                                                range: 193..194,
+                                                range: 161..162,
                                                 pattern: None,
                                                 name: Some(
                                                     Identifier {
                                                         id: Name("x"),
-                                                        range: 193..194,
+                                                        range: 161..162,
                                                     },
                                                 ),
                                             },
@@ -295,10 +253,10 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        range: 197..200,
+                                        range: 165..168,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                range: 197..200,
+                                                range: 165..168,
                                             },
                                         ),
                                     },
@@ -306,14 +264,14 @@ Module(
                             ],
                         },
                         MatchCase {
-                            range: 239..260,
+                            range: 207..228,
                             pattern: MatchMapping(
                                 PatternMatchMapping {
-                                    range: 244..255,
+                                    range: 212..223,
                                     keys: [
                                         NumberLiteral(
                                             ExprNumberLiteral {
-                                                range: 245..246,
+                                                range: 213..214,
                                                 value: Int(
                                                     1,
                                                 ),
@@ -323,12 +281,12 @@ Module(
                                     patterns: [
                                         MatchAs(
                                             PatternMatchAs {
-                                                range: 248..249,
+                                                range: 216..217,
                                                 pattern: None,
                                                 name: Some(
                                                     Identifier {
                                                         id: Name("x"),
-                                                        range: 248..249,
+                                                        range: 216..217,
                                                     },
                                                 ),
                                             },
@@ -337,7 +295,7 @@ Module(
                                     rest: Some(
                                         Identifier {
                                             id: Name("x"),
-                                            range: 253..254,
+                                            range: 221..222,
                                         },
                                     ),
                                 },
@@ -346,10 +304,10 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        range: 257..260,
+                                        range: 225..228,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                range: 257..260,
+                                                range: 225..228,
                                             },
                                         ),
                                     },
@@ -357,40 +315,40 @@ Module(
                             ],
                         },
                         MatchCase {
-                            range: 301..322,
+                            range: 269..290,
                             pattern: MatchClass(
                                 PatternMatchClass {
-                                    range: 306..317,
+                                    range: 274..285,
                                     cls: Name(
                                         ExprName {
-                                            range: 306..311,
+                                            range: 274..279,
                                             id: Name("Class"),
                                             ctx: Load,
                                         },
                                     ),
                                     arguments: PatternArguments {
-                                        range: 311..317,
+                                        range: 279..285,
                                         patterns: [
                                             MatchAs(
                                                 PatternMatchAs {
-                                                    range: 312..313,
+                                                    range: 280..281,
                                                     pattern: None,
                                                     name: Some(
                                                         Identifier {
                                                             id: Name("x"),
-                                                            range: 312..313,
+                                                            range: 280..281,
                                                         },
                                                     ),
                                                 },
                                             ),
                                             MatchAs(
                                                 PatternMatchAs {
-                                                    range: 315..316,
+                                                    range: 283..284,
                                                     pattern: None,
                                                     name: Some(
                                                         Identifier {
                                                             id: Name("x"),
-                                                            range: 315..316,
+                                                            range: 283..284,
                                                         },
                                                     ),
                                                 },
@@ -404,10 +362,10 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        range: 319..322,
+                                        range: 287..290,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                range: 319..322,
+                                                range: 287..290,
                                             },
                                         ),
                                     },
@@ -415,33 +373,33 @@ Module(
                             ],
                         },
                         MatchCase {
-                            range: 352..377,
+                            range: 320..345,
                             pattern: MatchClass(
                                 PatternMatchClass {
-                                    range: 357..372,
+                                    range: 325..340,
                                     cls: Name(
                                         ExprName {
-                                            range: 357..362,
+                                            range: 325..330,
                                             id: Name("Class"),
                                             ctx: Load,
                                         },
                                     ),
                                     arguments: PatternArguments {
-                                        range: 362..372,
+                                        range: 330..340,
                                         patterns: [],
                                         keywords: [
                                             PatternKeyword {
-                                                range: 363..366,
+                                                range: 331..334,
                                                 attr: Identifier {
                                                     id: Name("x"),
-                                                    range: 363..364,
+                                                    range: 331..332,
                                                 },
                                                 pattern: MatchValue(
                                                     PatternMatchValue {
-                                                        range: 365..366,
+                                                        range: 333..334,
                                                         value: NumberLiteral(
                                                             ExprNumberLiteral {
-                                                                range: 365..366,
+                                                                range: 333..334,
                                                                 value: Int(
                                                                     1,
                                                                 ),
@@ -451,17 +409,17 @@ Module(
                                                 ),
                                             },
                                             PatternKeyword {
-                                                range: 368..371,
+                                                range: 336..339,
                                                 attr: Identifier {
                                                     id: Name("x"),
-                                                    range: 368..369,
+                                                    range: 336..337,
                                                 },
                                                 pattern: MatchValue(
                                                     PatternMatchValue {
-                                                        range: 370..371,
+                                                        range: 338..339,
                                                         value: NumberLiteral(
                                                             ExprNumberLiteral {
-                                                                range: 370..371,
+                                                                range: 338..339,
                                                                 value: Int(
                                                                     2,
                                                                 ),
@@ -478,10 +436,10 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        range: 374..377,
+                                        range: 342..345,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                range: 374..377,
+                                                range: 342..345,
                                             },
                                         ),
                                     },
@@ -489,23 +447,23 @@ Module(
                             ],
                         },
                         MatchCase {
-                            range: 404..444,
+                            range: 372..412,
                             pattern: MatchOr(
                                 PatternMatchOr {
-                                    range: 409..439,
+                                    range: 377..407,
                                     patterns: [
                                         MatchSequence(
                                             PatternMatchSequence {
-                                                range: 409..412,
+                                                range: 377..380,
                                                 patterns: [
                                                     MatchAs(
                                                         PatternMatchAs {
-                                                            range: 410..411,
+                                                            range: 378..379,
                                                             pattern: None,
                                                             name: Some(
                                                                 Identifier {
                                                                     id: Name("x"),
-                                                                    range: 410..411,
+                                                                    range: 378..379,
                                                                 },
                                                             ),
                                                         },
@@ -515,11 +473,11 @@ Module(
                                         ),
                                         MatchMapping(
                                             PatternMatchMapping {
-                                                range: 415..421,
+                                                range: 383..389,
                                                 keys: [
                                                     NumberLiteral(
                                                         ExprNumberLiteral {
-                                                            range: 416..417,
+                                                            range: 384..385,
                                                             value: Int(
                                                                 1,
                                                             ),
@@ -529,12 +487,12 @@ Module(
                                                 patterns: [
                                                     MatchAs(
                                                         PatternMatchAs {
-                                                            range: 419..420,
+                                                            range: 387..388,
                                                             pattern: None,
                                                             name: Some(
                                                                 Identifier {
                                                                     id: Name("x"),
-                                                                    range: 419..420,
+                                                                    range: 387..388,
                                                                 },
                                                             ),
                                                         },
@@ -545,30 +503,30 @@ Module(
                                         ),
                                         MatchClass(
                                             PatternMatchClass {
-                                                range: 424..439,
+                                                range: 392..407,
                                                 cls: Name(
                                                     ExprName {
-                                                        range: 424..429,
+                                                        range: 392..397,
                                                         id: Name("Class"),
                                                         ctx: Load,
                                                     },
                                                 ),
                                                 arguments: PatternArguments {
-                                                    range: 429..439,
+                                                    range: 397..407,
                                                     patterns: [],
                                                     keywords: [
                                                         PatternKeyword {
-                                                            range: 430..433,
+                                                            range: 398..401,
                                                             attr: Identifier {
                                                                 id: Name("x"),
-                                                                range: 430..431,
+                                                                range: 398..399,
                                                             },
                                                             pattern: MatchValue(
                                                                 PatternMatchValue {
-                                                                    range: 432..433,
+                                                                    range: 400..401,
                                                                     value: NumberLiteral(
                                                                         ExprNumberLiteral {
-                                                                            range: 432..433,
+                                                                            range: 400..401,
                                                                             value: Int(
                                                                                 1,
                                                                             ),
@@ -578,17 +536,17 @@ Module(
                                                             ),
                                                         },
                                                         PatternKeyword {
-                                                            range: 435..438,
+                                                            range: 403..406,
                                                             attr: Identifier {
                                                                 id: Name("x"),
-                                                                range: 435..436,
+                                                                range: 403..404,
                                                             },
                                                             pattern: MatchValue(
                                                                 PatternMatchValue {
-                                                                    range: 437..438,
+                                                                    range: 405..406,
                                                                     value: NumberLiteral(
                                                                         ExprNumberLiteral {
-                                                                            range: 437..438,
+                                                                            range: 405..406,
                                                                             value: Int(
                                                                                 2,
                                                                             ),
@@ -602,6 +560,47 @@ Module(
                                             },
                                         ),
                                     ],
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Expr(
+                                    StmtExpr {
+                                        range: 409..412,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                range: 409..412,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                        MatchCase {
+                            range: 428..444,
+                            pattern: MatchAs(
+                                PatternMatchAs {
+                                    range: 433..439,
+                                    pattern: Some(
+                                        MatchAs(
+                                            PatternMatchAs {
+                                                range: 433..434,
+                                                pattern: None,
+                                                name: Some(
+                                                    Identifier {
+                                                        id: Name("x"),
+                                                        range: 433..434,
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                    ),
+                                    name: Some(
+                                        Identifier {
+                                            id: Name("x"),
+                                            range: 438..439,
+                                        },
+                                    ),
                                 },
                             ),
                             guard: None,
@@ -629,95 +628,95 @@ Module(
 
   |
 1 | match 2:
-2 |     case x as x: ...  # MatchAs
-  |               ^ Syntax Error: multiple assignments to name `x` in pattern
-3 |     case [y, z, y]: ...  # MatchSequence
-4 |     case [y, z, *y]: ...  # MatchSequence
+2 |     case [y, z, y]: ...  # MatchSequence
+  |                 ^ Syntax Error: multiple assignments to name `y` in pattern
+3 |     case [y, z, *y]: ...  # MatchSequence
+4 |     case [y, y, y]: ...  # MatchSequence multiple
   |
 
 
   |
 1 | match 2:
-2 |     case x as x: ...  # MatchAs
-3 |     case [y, z, y]: ...  # MatchSequence
-  |                 ^ Syntax Error: multiple assignments to name `y` in pattern
-4 |     case [y, z, *y]: ...  # MatchSequence
-5 |     case [y, y, y]: ...  # MatchSequence multiple
-  |
-
-
-  |
-2 |     case x as x: ...  # MatchAs
-3 |     case [y, z, y]: ...  # MatchSequence
-4 |     case [y, z, *y]: ...  # MatchSequence
+2 |     case [y, z, y]: ...  # MatchSequence
+3 |     case [y, z, *y]: ...  # MatchSequence
   |                  ^ Syntax Error: multiple assignments to name `y` in pattern
-5 |     case [y, y, y]: ...  # MatchSequence multiple
-6 |     case {1: x, 2: x}: ...  # MatchMapping duplicate pattern
+4 |     case [y, y, y]: ...  # MatchSequence multiple
+5 |     case {1: x, 2: x}: ...  # MatchMapping duplicate pattern
   |
 
 
   |
-3 |     case [y, z, y]: ...  # MatchSequence
-4 |     case [y, z, *y]: ...  # MatchSequence
-5 |     case [y, y, y]: ...  # MatchSequence multiple
+2 |     case [y, z, y]: ...  # MatchSequence
+3 |     case [y, z, *y]: ...  # MatchSequence
+4 |     case [y, y, y]: ...  # MatchSequence multiple
   |              ^ Syntax Error: multiple assignments to name `y` in pattern
-6 |     case {1: x, 2: x}: ...  # MatchMapping duplicate pattern
-7 |     case {1: x, **x}: ...  # MatchMapping duplicate in **rest
+5 |     case {1: x, 2: x}: ...  # MatchMapping duplicate pattern
+6 |     case {1: x, **x}: ...  # MatchMapping duplicate in **rest
   |
 
 
   |
-3 |     case [y, z, y]: ...  # MatchSequence
-4 |     case [y, z, *y]: ...  # MatchSequence
-5 |     case [y, y, y]: ...  # MatchSequence multiple
+2 |     case [y, z, y]: ...  # MatchSequence
+3 |     case [y, z, *y]: ...  # MatchSequence
+4 |     case [y, y, y]: ...  # MatchSequence multiple
   |                 ^ Syntax Error: multiple assignments to name `y` in pattern
-6 |     case {1: x, 2: x}: ...  # MatchMapping duplicate pattern
-7 |     case {1: x, **x}: ...  # MatchMapping duplicate in **rest
+5 |     case {1: x, 2: x}: ...  # MatchMapping duplicate pattern
+6 |     case {1: x, **x}: ...  # MatchMapping duplicate in **rest
   |
 
 
   |
-4 |     case [y, z, *y]: ...  # MatchSequence
-5 |     case [y, y, y]: ...  # MatchSequence multiple
-6 |     case {1: x, 2: x}: ...  # MatchMapping duplicate pattern
+3 |     case [y, z, *y]: ...  # MatchSequence
+4 |     case [y, y, y]: ...  # MatchSequence multiple
+5 |     case {1: x, 2: x}: ...  # MatchMapping duplicate pattern
   |                    ^ Syntax Error: multiple assignments to name `x` in pattern
-7 |     case {1: x, **x}: ...  # MatchMapping duplicate in **rest
-8 |     case Class(x, x): ...  # MatchClass positional
+6 |     case {1: x, **x}: ...  # MatchMapping duplicate in **rest
+7 |     case Class(x, x): ...  # MatchClass positional
   |
 
 
   |
-5 |     case [y, y, y]: ...  # MatchSequence multiple
-6 |     case {1: x, 2: x}: ...  # MatchMapping duplicate pattern
-7 |     case {1: x, **x}: ...  # MatchMapping duplicate in **rest
+4 |     case [y, y, y]: ...  # MatchSequence multiple
+5 |     case {1: x, 2: x}: ...  # MatchMapping duplicate pattern
+6 |     case {1: x, **x}: ...  # MatchMapping duplicate in **rest
   |                   ^ Syntax Error: multiple assignments to name `x` in pattern
-8 |     case Class(x, x): ...  # MatchClass positional
-9 |     case Class(x=1, x=2): ...  # MatchClass keyword
+7 |     case Class(x, x): ...  # MatchClass positional
+8 |     case Class(x=1, x=2): ...  # MatchClass keyword
+  |
+
+
+  |
+5 |     case {1: x, 2: x}: ...  # MatchMapping duplicate pattern
+6 |     case {1: x, **x}: ...  # MatchMapping duplicate in **rest
+7 |     case Class(x, x): ...  # MatchClass positional
+  |                   ^ Syntax Error: multiple assignments to name `x` in pattern
+8 |     case Class(x=1, x=2): ...  # MatchClass keyword
+9 |     case [x] | {1: x} | Class(x=1, x=2): ...  # MatchOr
   |
 
 
    |
- 6 |     case {1: x, 2: x}: ...  # MatchMapping duplicate pattern
- 7 |     case {1: x, **x}: ...  # MatchMapping duplicate in **rest
- 8 |     case Class(x, x): ...  # MatchClass positional
-   |                   ^ Syntax Error: multiple assignments to name `x` in pattern
- 9 |     case Class(x=1, x=2): ...  # MatchClass keyword
-10 |     case [x] | {1: x} | Class(x=1, x=2): ...  # MatchOr
-   |
-
-
-   |
- 7 |     case {1: x, **x}: ...  # MatchMapping duplicate in **rest
- 8 |     case Class(x, x): ...  # MatchClass positional
- 9 |     case Class(x=1, x=2): ...  # MatchClass keyword
+ 6 |     case {1: x, **x}: ...  # MatchMapping duplicate in **rest
+ 7 |     case Class(x, x): ...  # MatchClass positional
+ 8 |     case Class(x=1, x=2): ...  # MatchClass keyword
    |                     ^ Syntax Error: multiple assignments to name `x` in pattern
-10 |     case [x] | {1: x} | Class(x=1, x=2): ...  # MatchOr
+ 9 |     case [x] | {1: x} | Class(x=1, x=2): ...  # MatchOr
+10 |     case x as x: ...  # MatchAs
    |
 
 
    |
- 8 |     case Class(x, x): ...  # MatchClass positional
- 9 |     case Class(x=1, x=2): ...  # MatchClass keyword
-10 |     case [x] | {1: x} | Class(x=1, x=2): ...  # MatchOr
+ 7 |     case Class(x, x): ...  # MatchClass positional
+ 8 |     case Class(x=1, x=2): ...  # MatchClass keyword
+ 9 |     case [x] | {1: x} | Class(x=1, x=2): ...  # MatchOr
    |                                    ^ Syntax Error: multiple assignments to name `x` in pattern
+10 |     case x as x: ...  # MatchAs
+   |
+
+
+   |
+ 8 |     case Class(x=1, x=2): ...  # MatchClass keyword
+ 9 |     case [x] | {1: x} | Class(x=1, x=2): ...  # MatchOr
+10 |     case x as x: ...  # MatchAs
+   |               ^ Syntax Error: multiple assignments to name `x` in pattern
    |

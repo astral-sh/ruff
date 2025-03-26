@@ -84,13 +84,22 @@ export default function Chrome() {
         setVersion(version);
         setWorkspace(workspace);
 
+        let hasSettings = false;
+
         for (const [name, content] of Object.entries(fetchedWorkspace.files)) {
           let handle = null;
-          if (name !== SETTINGS_FILE) {
+          if (name === SETTINGS_FILE) {
+            updateOptions(workspace, content, setUpdateError);
+            hasSettings = true;
+          } else {
             handle = workspace.openFile(name, content);
           }
 
           dispatchFiles({ type: "add", handle, name, content });
+        }
+
+        if (!hasSettings) {
+          updateOptions(workspace, null, setUpdateError);
         }
 
         dispatchFiles({
@@ -119,25 +128,12 @@ export default function Chrome() {
       const handle = files.handles[files.selected];
 
       if (handle != null) {
-        try {
-          workspace?.updateFile(handle, source);
-          setUpdateError(null);
-        } catch (error) {
-          setUpdateError(`Failed to update file: ${formatError(error)}`);
-        }
+        updateFile(workspace, handle, source, setUpdateError);
       } else if (fileName === SETTINGS_FILE) {
-        try {
-          const settings = JSON.parse(source);
-          workspace?.updateOptions(settings);
-          setUpdateError(null);
-        } catch (error) {
-          setUpdateError(
-            `Failed to update 'knot.json' options: ${formatError(error)}`,
-          );
-        }
+        updateOptions(workspace, source, setUpdateError);
       }
     },
-    [files.selected, workspace, files.handles, fileName],
+    [files.selected, files.handles, fileName, workspace],
   );
 
   const handleFileClicked = useCallback((file: FileId) => {
@@ -152,7 +148,9 @@ export default function Chrome() {
 
       let handle = null;
 
-      if (name !== SETTINGS_FILE) {
+      if (name === SETTINGS_FILE) {
+        updateOptions(workspace, "{}", setUpdateError);
+      } else {
         handle = workspace.openFile(name, "");
       }
 
@@ -165,7 +163,9 @@ export default function Chrome() {
     (file: FileId) => {
       if (workspace != null) {
         const handle = files.handles[file];
-        if (handle != null) {
+        if (handle == null) {
+          updateOptions(workspace, null, setUpdateError);
+        } else {
           workspace.closeFile(handle);
         }
       }
@@ -183,11 +183,15 @@ export default function Chrome() {
 
       const handle = files.handles[file];
       let newHandle: FileHandle | null = null;
-      if (handle != null) {
+      if (handle == null) {
+        updateOptions(workspace, null, setUpdateError);
+      } else {
         workspace.closeFile(handle);
       }
 
-      if (newName !== SETTINGS_FILE) {
+      if (newName === SETTINGS_FILE) {
+        updateOptions(workspace, files.contents[file], setUpdateError);
+      } else {
         newHandle = workspace.openFile(newName, files.contents[file]);
       }
 
@@ -267,6 +271,7 @@ export default function Chrome() {
               <PanelGroup id="vertical" direction="vertical">
                 <Panel minSize={10} className="my-2" order={0}>
                   <Editor
+                    key={fileName}
                     theme={theme}
                     visible={true}
                     fileName={fileName ?? "lib.py"}
@@ -647,4 +652,42 @@ function formatError(error: unknown): string {
   return message.startsWith("Error: ")
     ? message.slice("Error: ".length)
     : message;
+}
+
+function updateOptions(
+  workspace: Workspace | null,
+  content: string | null,
+  setError: (error: string | null) => void,
+) {
+  if (workspace == null) {
+    return;
+  }
+
+  content = content ?? DEFAULT_SETTINGS;
+
+  try {
+    const settings = JSON.parse(content);
+    workspace?.updateOptions(settings);
+    setError(null);
+  } catch (error) {
+    setError(`Failed to update 'knot.json' options: ${formatError(error)}`);
+  }
+}
+
+function updateFile(
+  workspace: Workspace | null,
+  handle: FileHandle,
+  content: string,
+  setError: (error: string | null) => void,
+) {
+  if (workspace == null) {
+    return;
+  }
+
+  try {
+    workspace.updateFile(handle, content);
+    setError(null);
+  } catch (error) {
+    setError(`Failed to update file: ${formatError(error)}`);
+  }
 }

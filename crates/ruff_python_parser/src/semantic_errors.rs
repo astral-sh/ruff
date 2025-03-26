@@ -9,7 +9,7 @@ use std::fmt::Display;
 use ruff_python_ast::{
     self as ast,
     visitor::{walk_expr, Visitor},
-    Expr, Pattern, PythonVersion, Stmt, StmtExpr, StmtImportFrom,
+    Expr, Pattern,IrrefutablePatternKind, PythonVersion, Stmt, StmtExpr, StmtImportFrom,
 };
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
@@ -55,28 +55,32 @@ impl SemanticSyntaxChecker {
     }
 
     fn check_stmt<Ctx: SemanticSyntaxContext>(&mut self, stmt: &ast::Stmt, ctx: &Ctx) {
-        if let Stmt::ImportFrom(StmtImportFrom { range, module, .. }) = stmt {
-            if self.seen_futures_boundary && matches!(module.as_deref(), Some("__future__")) {
-                Self::add_error(ctx, SemanticSyntaxErrorKind::LateFutureImport, *range);
+        match stmt {
+            Stmt::ImportFrom(StmtImportFrom { range, module, .. }) => {
+                if self.seen_futures_boundary && matches!(module.as_deref(), Some("__future__")) {
+                    Self::add_error(ctx, SemanticSyntaxErrorKind::LateFutureImport, *range);
+                }
             }
+            Stmt::Match(match_stmt) => {
+                Self::irrefutable_match_case(match_stmt, ctx);
+            }
+            Stmt::FunctionDef(ast::StmtFunctionDef { type_params, .. })
+            | Stmt::ClassDef(ast::StmtClassDef { type_params, .. })
+            | Stmt::TypeAlias(ast::StmtTypeAlias { type_params, .. }) => {
+                if let Some(type_params) = type_params {
+                    Self::duplicate_type_parameter_name(type_params, ctx);
+                }
+            }
+            _ => {}
         }
 
-        Self::duplicate_type_parameter_name(stmt, ctx);
         Self::multiple_case_assignment(stmt, ctx);
     }
 
-    fn duplicate_type_parameter_name<Ctx: SemanticSyntaxContext>(stmt: &ast::Stmt, ctx: &Ctx) {
-        let (Stmt::FunctionDef(ast::StmtFunctionDef { type_params, .. })
-        | Stmt::ClassDef(ast::StmtClassDef { type_params, .. })
-        | Stmt::TypeAlias(ast::StmtTypeAlias { type_params, .. })) = stmt
-        else {
-            return;
-        };
-
-        let Some(type_params) = type_params else {
-            return;
-        };
-
+    fn duplicate_type_parameter_name<Ctx: SemanticSyntaxContext>(
+        type_params: &ast::TypeParams,
+        ctx: &Ctx,
+    ) {
         if type_params.len() < 2 {
             return;
         }
@@ -122,6 +126,49 @@ impl SemanticSyntaxChecker {
                 ctx,
             };
             visitor.visit_pattern(&case.pattern);
+        }
+    }
+
+    fn irrefutable_match_case<Ctx: SemanticSyntaxContext>(stmt: &ast::StmtMatch, ctx: &Ctx) {
+        // test_ok irrefutable_case_pattern_at_end
+        // match x:
+        //     case 2: ...
+        //     case var: ...
+        // match x:
+        //     case 2: ...
+        //     case _: ...
+        // match x:
+        //     case var if True: ...  # don't try to refute a guarded pattern
+        //     case 2: ...
+
+        // test_err irrefutable_case_pattern
+        // match x:
+        //     case var: ...  # capture pattern
+        //     case 2: ...
+        // match x:
+        //     case _: ...
+        //     case 2: ...    # wildcard pattern
+        // match x:
+        //     case var1 as var2: ...  # as pattern with irrefutable left-hand side
+        //     case 2: ...
+        // match x:
+        //     case enum.variant | var: ...  # or pattern with irrefutable part
+        //     case 2: ...
+        for case in stmt
+            .cases
+            .iter()
+            .rev()
+            .skip(1)
+            .filter_map(|case| match case.guard {
+                Some(_) => None,
+                None => case.pattern.irrefutable_pattern(),
+            })
+        {
+            Self::add_error(
+                ctx,
+                SemanticSyntaxErrorKind::IrrefutableCasePattern(case.kind),
+                case.range,
+            );
         }
     }
 
@@ -238,6 +285,18 @@ impl Display for SemanticSyntaxError {
             SemanticSyntaxErrorKind::MultipleCaseAssignment(name) => {
                 write!(f, "multiple assignments to name `{name}` in pattern")
             }
+            SemanticSyntaxErrorKind::IrrefutableCasePattern(kind) => match kind {
+                // These error messages are taken from CPython's syntax errors
+                IrrefutablePatternKind::Name(name) => {
+                    write!(
+                        f,
+                        "name capture `{name}` makes remaining patterns unreachable"
+                    )
+                }
+                IrrefutablePatternKind::Wildcard => {
+                    f.write_str("wildcard makes remaining patterns unreachable")
+                }
+            },
         }
     }
 }
@@ -296,6 +355,26 @@ pub enum SemanticSyntaxErrorKind {
     ///     case Class(x=1, x=2): ...
     /// ```
     MultipleCaseAssignment(ast::name::Name),
+
+    /// Represents an irrefutable `case` pattern before the last `case` in a `match` statement.
+    ///
+    /// According to the [Python reference], "a match statement may have at most one irrefutable
+    /// case block, and it must be last."
+    ///
+    /// ## Examples
+    ///
+    /// ```python
+    /// match x:
+    ///     case value: ...  # irrefutable capture pattern
+    ///     case other: ...
+    ///
+    /// match x:
+    ///     case _: ...      # irrefutable wildcard pattern
+    ///     case other: ...
+    /// ```
+    ///
+    /// [Python reference]: https://docs.python.org/3/reference/compound_stmts.html#irrefutable-case-blocks
+    IrrefutableCasePattern(IrrefutablePatternKind),
 }
 
 /// Searches for the first named expression (`x := y`) rebinding one of the `iteration_variables` in
@@ -331,7 +410,6 @@ impl<'a, Ctx: SemanticSyntaxContext> MultipleCaseAssignmentVisitor<'a, Ctx> {
     fn visit_pattern(&mut self, pattern: &'a Pattern) {
         // test_err multiple_assignment_in_case_pattern
         // match 2:
-        //     case x as x: ...  # MatchAs
         //     case [y, z, y]: ...  # MatchSequence
         //     case [y, z, *y]: ...  # MatchSequence
         //     case [y, y, y]: ...  # MatchSequence multiple
@@ -340,6 +418,7 @@ impl<'a, Ctx: SemanticSyntaxContext> MultipleCaseAssignmentVisitor<'a, Ctx> {
         //     case Class(x, x): ...  # MatchClass positional
         //     case Class(x=1, x=2): ...  # MatchClass keyword
         //     case [x] | {1: x} | Class(x=1, x=2): ...  # MatchOr
+        //     case x as x: ...  # MatchAs
         match pattern {
             Pattern::MatchValue(_) | Pattern::MatchSingleton(_) => {}
             Pattern::MatchStar(ast::PatternMatchStar { name, .. }) => {
