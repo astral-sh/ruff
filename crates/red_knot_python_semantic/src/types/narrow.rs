@@ -238,8 +238,11 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
             PatternPredicateKind::Class(cls, _guard) => {
                 self.evaluate_match_pattern_class(subject, *cls)
             }
+            PatternPredicateKind::Value(expr, _guard) => {
+                self.evaluate_match_pattern_value(subject, *expr)
+            }
             // TODO: support more pattern kinds
-            PatternPredicateKind::Value(..) | PatternPredicateKind::Unsupported => None,
+            PatternPredicateKind::Unsupported => None,
         }
     }
 
@@ -507,6 +510,24 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
 
         let mut constraints = NarrowingConstraints::default();
         constraints.insert(symbol, ty);
+        Some(constraints)
+    }
+
+    fn evaluate_match_pattern_value(
+        &mut self,
+        subject: Expression<'db>,
+        value: Expression<'db>,
+    ) -> Option<NarrowingConstraints<'db>> {
+        // TODO: DRY
+        let ast::ExprName { id, .. } = subject.node_ref(self.db).as_name_expr()?;
+        let symbol = self
+            .symbols()
+            .symbol_id_by_name(id)
+            .expect("We should always have a symbol for every `Name` node");
+        let ty = infer_same_file_expression_type(self.db, value);
+        let mut constraints = NarrowingConstraints::default();
+        constraints.insert(symbol, ty);
+
         Some(constraints)
     }
 

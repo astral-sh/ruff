@@ -64,3 +64,53 @@ match x:
 
 reveal_type(x)  # revealed: object
 ```
+
+## Value patterns
+
+```py
+def get_object() -> object:
+    return object()
+
+x = get_object()
+
+reveal_type(x)  # revealed: object
+
+match x:
+    case "foo":
+        reveal_type(x)  # revealed: Literal["foo"]
+    case 42:
+        reveal_type(x)  # revealed: Literal[42]
+    case 6.0:
+        reveal_type(x)  # revealed: float
+    case 1 + 1j:
+        reveal_type(x)  # revealed: int | float | complex
+    case b"foo":
+        reveal_type(x)  # revealed: Literal[b"foo"]
+
+reveal_type(x)  # revealed: object
+```
+
+## Value patterns with guard
+
+```py
+def get_object() -> object:
+    return object()
+
+x = get_object()
+
+reveal_type(x)  # revealed: object
+
+match x:
+    case "foo" if reveal_type(x):  # revealed: Literal["foo"]
+        pass
+    case 42 if reveal_type(x):  # revealed: Literal[42]
+        pass
+    case 6.0 if reveal_type(x):  # revealed: float
+        pass
+    case 1 + 1j if reveal_type(x):  # revealed: int | float | complex
+        pass
+    case b"foo" if reveal_type(x):  # revealed: Literal[b"foo"]
+        pass
+
+reveal_type(x)  # revealed: object
+```
