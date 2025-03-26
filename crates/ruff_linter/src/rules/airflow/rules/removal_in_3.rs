@@ -72,7 +72,7 @@ impl Violation for Airflow3Removal {
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 enum Replacement {
     None,
     Name(&'static str),
@@ -504,13 +504,21 @@ fn check_method(checker: &Checker, call_expr: &ExprCall) {
             }
         }
     };
-    checker.report_diagnostic(Diagnostic::new(
+
+    let mut diagnostic = Diagnostic::new(
         Airflow3Removal {
             deprecated: attr.to_string(),
-            replacement,
+            replacement: replacement.clone(),
         },
         attr.range(),
-    ));
+    );
+    if let Replacement::Name(name) = replacement {
+        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+            name.to_string(),
+            attr.range(),
+        )));
+    }
+    checker.report_diagnostic(diagnostic);
 }
 
 /// Check whether a removed Airflow name is used.
