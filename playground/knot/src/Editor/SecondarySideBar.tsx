@@ -3,6 +3,7 @@ import { SecondaryTool } from "./SecondaryPanel";
 
 interface Props {
   selected: SecondaryTool | null;
+
   onSelected(tool: SecondaryTool): void;
 }
 
@@ -25,6 +26,14 @@ export default function SecondarySideBar({ selected, onSelected }: Props) {
         onClick={() => onSelected(SecondaryTool.Tokens)}
       >
         <Icons.Token />
+      </SideBarEntry>
+      <SideBarEntry
+        title="Run"
+        position={"right"}
+        selected={selected === SecondaryTool.Run}
+        onClick={() => onSelected(SecondaryTool.Run)}
+      >
+        <Icons.Run />
       </SideBarEntry>
     </SideBar>
   );

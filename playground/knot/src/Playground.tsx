@@ -11,7 +11,6 @@ import {
 import { ErrorMessage, Header, setupMonaco, useTheme } from "shared";
 import { FileHandle, Workspace } from "red_knot_wasm";
 import { persist, persistLocal, restore } from "./Editor/persist";
-import initRedKnot from "../red_knot_wasm";
 import { loader } from "@monaco-editor/react";
 import knotSchema from "../../../knot.schema.json";
 import Chrome, { formatError } from "./Editor/Chrome";
@@ -399,7 +398,8 @@ export interface InitializedPlayground {
 
 // Run once during startup. Initializes monaco, loads the wasm file, and restores the previous editor state.
 async function startPlayground(): Promise<InitializedPlayground> {
-  await initRedKnot();
+  const red_knot = await import("../red_knot_wasm");
+  await red_knot.default();
   const monaco = await loader.init();
 
   setupMonaco(monaco, {

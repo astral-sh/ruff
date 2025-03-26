@@ -1,9 +1,14 @@
 import MonacoEditor from "@monaco-editor/react";
-import { Theme } from "shared";
+import { AstralButton, Theme } from "shared";
+import { ReadonlyFiles } from "../Playground";
+import { Suspense, use, useState } from "react";
+import { loadPyodide, PyodideInterface } from "pyodide";
+import classNames from "classnames";
 
 export enum SecondaryTool {
   "AST" = "AST",
   "Tokens" = "Tokens",
+  "Run" = "Run",
 }
 
 export type SecondaryPanelResult =
@@ -12,6 +17,7 @@ export type SecondaryPanelResult =
   | { status: "error"; error: string };
 
 export interface SecondaryPanelProps {
+  files: ReadonlyFiles;
   tool: SecondaryTool;
   result: SecondaryPanelResult;
   theme: Theme;
@@ -20,23 +26,32 @@ export interface SecondaryPanelProps {
 export default function SecondaryPanel({
   tool,
   result,
+  files,
   theme,
 }: SecondaryPanelProps) {
   return (
     <div className="flex flex-col h-full">
-      <div className="flex-grow">
-        <Content tool={tool} result={result} theme={theme} />
-      </div>
+      <Content
+        tool={tool}
+        result={result}
+        theme={theme}
+        files={files}
+        revision={files.revision}
+      />
     </div>
   );
 }
 
 function Content({
+  files,
   tool,
   result,
   theme,
+  revision,
 }: {
   tool: SecondaryTool;
+  files: ReadonlyFiles;
+  revision: number;
   result: SecondaryPanelResult;
   theme: Theme;
 }) {
@@ -54,25 +69,124 @@ function Content({
           case "Tokens":
             language = "RustPythonTokens";
             break;
+
+          case "Run":
+            return <Run theme={theme} files={files} key={`${revision}`} />;
         }
 
         return (
-          <MonacoEditor
-            options={{
-              readOnly: true,
-              minimap: { enabled: false },
-              fontSize: 14,
-              roundedSelection: false,
-              scrollBeyondLastLine: false,
-              contextmenu: false,
-            }}
-            language={language}
-            value={result.content}
-            theme={theme === "light" ? "Ayu-Light" : "Ayu-Dark"}
-          />
+          <div className="flex-grow">
+            <MonacoEditor
+              options={{
+                readOnly: true,
+                minimap: { enabled: false },
+                fontSize: 14,
+                roundedSelection: false,
+                scrollBeyondLastLine: false,
+                contextmenu: false,
+              }}
+              language={language}
+              value={result.content}
+              theme={theme === "light" ? "Ayu-Light" : "Ayu-Dark"}
+            />
+          </div>
         );
       case "error":
-        return <code className="whitespace-pre-wrap">{result.error}</code>;
+        return (
+          <div className="flex-grow">
+            <code className="whitespace-pre-wrap">{result.error}</code>
+          </div>
+        );
     }
   }
+}
+
+let pyodidePromise: Promise<PyodideInterface> | null = null;
+
+function Run({ files, theme }: { files: ReadonlyFiles; theme: Theme }) {
+  if (pyodidePromise == null) {
+    pyodidePromise = loadPyodide();
+  }
+
+  return (
+    <Suspense fallback={<div className="text-center">Loading</div>}>
+      <RunWithPyiodide
+        theme={theme}
+        files={files}
+        pyodidePromise={pyodidePromise}
+      />
+    </Suspense>
+  );
+}
+
+function RunWithPyiodide({
+  files,
+  pyodidePromise,
+  theme,
+}: {
+  files: ReadonlyFiles;
+  theme: Theme;
+  pyodidePromise: Promise<PyodideInterface>;
+}) {
+  const pyodide = use(pyodidePromise);
+
+  const [output, setOutput] = useState<string | null>(null);
+
+  if (output == null) {
+    const handleRun = () => {
+      let stdout = "";
+
+      pyodide.setStdout({
+        batched(output) {
+          stdout += output + "\n";
+        },
+      });
+
+      const main = files.selected == null ? "" : files.contents[files.selected];
+
+      for (const file of files.index) {
+        pyodide.FS.writeFile(file.name, files.contents[file.id]);
+      }
+
+      try {
+        // Patch up reveal types
+        pyodide.runPython(`
+        import builtins
+        builtins.reveal_type = print`);
+
+        pyodide.runPython(main);
+        setOutput(stdout);
+      } catch (e) {
+        setOutput(`Failed to run Python script: ${e}`);
+      }
+    };
+    return (
+      <div className="flex flex-auto flex-col justify-center  items-center">
+        <AstralButton
+          type="button"
+          className="flex-none leading-6 py-1.5 px-3 shadow-xs"
+          onClick={handleRun}
+        >
+          <span
+            className="inset-0 flex items-center justify-center"
+            aria-hidden="false"
+          >
+            Run...
+          </span>
+        </AstralButton>
+      </div>
+    );
+  }
+  return (
+    <pre
+      className={classNames(
+        "m-2",
+        "text-sm",
+        "whitespace-pre",
+        theme === "dark" ? "text-white" : null,
+      )}
+    >
+      {output}
+    </pre>
+  );
 }
