@@ -1029,5 +1029,24 @@ static_assert(is_subtype_of(CallableTypeFromFunction[mixed], CallableTypeFromFun
 static_assert(not is_subtype_of(CallableTypeFromFunction[empty], CallableTypeFromFunction[mixed]))
 ```
 
+### Classes with __call__
+
+#### Normal instance method
+
+```py
+from typing import Callable
+from knot_extensions import TypeOf, is_subtype_of, static_assert, is_assignable_to
+
+class A:
+    def __call__(self, a: int) -> int:
+        return a
+
+static_assert(is_subtype_of(TypeOf[A], Callable[[int], int]))
+static_assert(not is_subtype_of(Callable[[int], int], TypeOf[A]))
+
+static_assert(is_assignable_to(A, Callable[[int], int]))
+static_assert(not is_assignable_to(Callable[[int], int], A))
+```
+
 [special case for float and complex]: https://typing.readthedocs.io/en/latest/spec/special-types.html#special-cases-for-float-and-complex
 [typing documentation]: https://typing.readthedocs.io/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence
