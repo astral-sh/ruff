@@ -1,34 +1,40 @@
+use crate::db::tests::TestDb;
 use crate::types::property_tests::type_generation::Ty;
 use crate::types::KnownClass;
 use quickcheck::{Arbitrary, Gen};
-use std::fmt;
+use std::{fmt, sync::OnceLock};
+
+use super::setup::get_cached_db;
 
 /// A wrapper for a type that implements the `quickcheck::Arbitrary` trait.
 /// This struct enables the generation of arbitrary types for property test.
 #[derive(Clone)]
-pub(crate) struct QuickcheckArgument<T: ArbitraryRule> {
+pub(crate) struct BoundedType<T: TypeBound> {
     pub ty: Ty,
     _marker: std::marker::PhantomData<T>,
 }
 
-impl<Rule: ArbitraryRule + Clone + 'static> Arbitrary for QuickcheckArgument<Rule> {
-    fn arbitrary(g: &mut Gen) -> Self {
-        const MAX_SIZE: u32 = 2;
-        QuickcheckArgument {
-            ty: Rule::generate_type_recursively(g, MAX_SIZE),
+impl<Bound: TypeBound> BoundedType<Bound> {
+    fn new(ty: Ty) -> Self {
+        BoundedType {
+            ty,
             _marker: std::marker::PhantomData,
         }
     }
+}
+
+impl<Bound: TypeBound + Clone + 'static> Arbitrary for BoundedType<Bound> {
+    fn arbitrary(g: &mut Gen) -> Self {
+        const MAX_SIZE: u32 = 2;
+        BoundedType::new(Bound::generate_type_recursively(g, MAX_SIZE))
+    }
 
     fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
-        Box::new(Rule::shrink(&self.ty).map(move |ty| QuickcheckArgument {
-            ty,
-            _marker: std::marker::PhantomData,
-        }))
+        Box::new(Bound::shrink(&self.ty).map(BoundedType::new))
     }
 }
 
-impl<Rule: ArbitraryRule> fmt::Debug for QuickcheckArgument<Rule> {
+impl<Bound: TypeBound> fmt::Debug for BoundedType<Bound> {
     // for quickcheck to print the type name
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:?}", self.ty)
@@ -36,19 +42,14 @@ impl<Rule: ArbitraryRule> fmt::Debug for QuickcheckArgument<Rule> {
 }
 
 /// Note that `Vec<Ty>` don't have a `shrink` implementation, so we need to wrap each type
-/// in a `QuickcheckArgument` and apply its `shrink` implementation.
-fn shrink_types<Rule>(types: Vec<Ty>) -> Box<dyn Iterator<Item = Vec<Ty>>>
+/// in a `BoundedType` and apply its `shrink` implementation.
+fn shrink_types<Bound>(types: Vec<Ty>) -> Box<dyn Iterator<Item = Vec<Ty>>>
 where
-    Rule: ArbitraryRule,
-    QuickcheckArgument<Rule>: Arbitrary,
+    Bound: TypeBound,
+    BoundedType<Bound>: Arbitrary,
 {
-    let wrapped_vec: Vec<QuickcheckArgument<Rule>> = types
-        .into_iter()
-        .map(|ty| QuickcheckArgument::<Rule> {
-            ty,
-            _marker: std::marker::PhantomData,
-        })
-        .collect();
+    let wrapped_vec: Vec<BoundedType<Bound>> =
+        types.into_iter().map(BoundedType::<Bound>::new).collect();
 
     Box::new(
         wrapped_vec
@@ -57,10 +58,15 @@ where
     )
 }
 
-pub(crate) trait ArbitraryRule: Clone + 'static {
+pub(crate) trait TypeBound: Clone + 'static {
+    fn type_pool() -> &'static [Ty];
+
     /// Generate an arbitrary singular type only.
     /// This is a type that is not a Union, Tuple, or Intersection
-    fn generate_singular_type(g: &mut Gen) -> Ty;
+    fn generate_singular_type(g: &mut Gen) -> Ty {
+        let pool = Self::type_pool();
+        g.choose(pool).unwrap().clone()
+    }
 
     /// Generate an arbitrary type recursively.
     ///
@@ -165,138 +171,105 @@ pub(crate) trait ArbitraryRule: Clone + 'static {
     }
 }
 
-/// A constraint that allows any type.
+static TYPE_POOL: &[Ty] = &[
+    Ty::Never,
+    Ty::Unknown,
+    Ty::None,
+    Ty::Any,
+    Ty::IntLiteral(0),
+    Ty::IntLiteral(1),
+    Ty::IntLiteral(-1),
+    Ty::BooleanLiteral(true),
+    Ty::BooleanLiteral(false),
+    Ty::StringLiteral(""),
+    Ty::StringLiteral("a"),
+    Ty::LiteralString,
+    Ty::BytesLiteral(""),
+    Ty::BytesLiteral("\x00"),
+    Ty::KnownClassInstance(KnownClass::Object),
+    Ty::KnownClassInstance(KnownClass::Str),
+    Ty::KnownClassInstance(KnownClass::Int),
+    Ty::KnownClassInstance(KnownClass::Bool),
+    Ty::KnownClassInstance(KnownClass::List),
+    Ty::KnownClassInstance(KnownClass::Tuple),
+    Ty::KnownClassInstance(KnownClass::FunctionType),
+    Ty::KnownClassInstance(KnownClass::SpecialForm),
+    Ty::KnownClassInstance(KnownClass::TypeVar),
+    Ty::KnownClassInstance(KnownClass::TypeAliasType),
+    Ty::KnownClassInstance(KnownClass::NoDefaultType),
+    Ty::TypingLiteral,
+    Ty::BuiltinClassLiteral("str"),
+    Ty::BuiltinClassLiteral("int"),
+    Ty::BuiltinClassLiteral("bool"),
+    Ty::BuiltinClassLiteral("object"),
+    Ty::BuiltinInstance("type"),
+    Ty::AbcInstance("ABC"),
+    Ty::AbcInstance("ABCMeta"),
+    Ty::SubclassOfAny,
+    Ty::SubclassOfBuiltinClass("object"),
+    Ty::SubclassOfBuiltinClass("str"),
+    Ty::SubclassOfBuiltinClass("type"),
+    Ty::AbcClassLiteral("ABC"),
+    Ty::AbcClassLiteral("ABCMeta"),
+    Ty::SubclassOfAbcClass("ABC"),
+    Ty::SubclassOfAbcClass("ABCMeta"),
+    Ty::AlwaysTruthy,
+    Ty::AlwaysFalsy,
+    Ty::BuiltinsFunction("chr"),
+    Ty::BuiltinsFunction("ascii"),
+    Ty::BuiltinsBoundMethod {
+        class: "str",
+        method: "isascii",
+    },
+    Ty::BuiltinsBoundMethod {
+        class: "int",
+        method: "bit_length",
+    },
+];
+
+fn filter_type_pool(predicate: fn(db: &TestDb, ty: &Ty) -> bool) -> &'static [Ty] {
+    let db = get_cached_db();
+    let pool = TYPE_POOL
+        .iter()
+        .filter(|ty| predicate(&db, ty))
+        .cloned()
+        .collect::<Vec<Ty>>();
+
+    assert!(!pool.is_empty(), "No types found in the pool");
+
+    Box::leak(pool.into_boxed_slice())
+}
+
 #[derive(Debug, Clone)]
 pub(crate) struct AnyTy;
 
-impl ArbitraryRule for AnyTy {
-    fn generate_singular_type(g: &mut Gen) -> Ty {
-        // We could select a random integer here, but this would make it much less
-        // likely to explore interesting edge cases:
-        let int_lit = Ty::IntLiteral(*g.choose(&[-2, -1, 0, 1, 2]).unwrap());
-        let bool_lit = Ty::BooleanLiteral(bool::arbitrary(g));
-        g.choose(&[
-            Ty::Never,
-            Ty::Unknown,
-            Ty::None,
-            Ty::Any,
-            int_lit,
-            bool_lit,
-            Ty::StringLiteral(""),
-            Ty::StringLiteral("a"),
-            Ty::LiteralString,
-            Ty::BytesLiteral(""),
-            Ty::BytesLiteral("\x00"),
-            Ty::KnownClassInstance(KnownClass::Object),
-            Ty::KnownClassInstance(KnownClass::Str),
-            Ty::KnownClassInstance(KnownClass::Int),
-            Ty::KnownClassInstance(KnownClass::Bool),
-            Ty::KnownClassInstance(KnownClass::List),
-            Ty::KnownClassInstance(KnownClass::Tuple),
-            Ty::KnownClassInstance(KnownClass::FunctionType),
-            Ty::KnownClassInstance(KnownClass::SpecialForm),
-            Ty::KnownClassInstance(KnownClass::TypeVar),
-            Ty::KnownClassInstance(KnownClass::TypeAliasType),
-            Ty::KnownClassInstance(KnownClass::NoDefaultType),
-            Ty::TypingLiteral,
-            Ty::BuiltinClassLiteral("str"),
-            Ty::BuiltinClassLiteral("int"),
-            Ty::BuiltinClassLiteral("bool"),
-            Ty::BuiltinClassLiteral("object"),
-            Ty::BuiltinInstance("type"),
-            Ty::AbcInstance("ABC"),
-            Ty::AbcInstance("ABCMeta"),
-            Ty::SubclassOfAny,
-            Ty::SubclassOfBuiltinClass("object"),
-            Ty::SubclassOfBuiltinClass("str"),
-            Ty::SubclassOfBuiltinClass("type"),
-            Ty::AbcClassLiteral("ABC"),
-            Ty::AbcClassLiteral("ABCMeta"),
-            Ty::SubclassOfAbcClass("ABC"),
-            Ty::SubclassOfAbcClass("ABCMeta"),
-            Ty::AlwaysTruthy,
-            Ty::AlwaysFalsy,
-            Ty::BuiltinsFunction("chr"),
-            Ty::BuiltinsFunction("ascii"),
-            Ty::BuiltinsBoundMethod {
-                class: "str",
-                method: "isascii",
-            },
-            Ty::BuiltinsBoundMethod {
-                class: "int",
-                method: "bit_length",
-            },
-        ])
-        .unwrap()
-        .clone()
+impl TypeBound for AnyTy {
+    fn type_pool() -> &'static [Ty] {
+        TYPE_POOL
     }
 }
 
-/// A constraint that passes `t.is_fully_static()`.
+/// A type that satisfy `is_fully_static`.
 #[derive(Debug, Clone)]
 pub(crate) struct FullyStaticTy;
 
-impl ArbitraryRule for FullyStaticTy {
-    fn generate_singular_type(g: &mut Gen) -> Ty {
-        let int_lit = Ty::IntLiteral(*g.choose(&[-2, -1, 0, 1, 2]).unwrap());
-        let bool_lit = Ty::BooleanLiteral(bool::arbitrary(g));
-        g.choose(&[
-            Ty::Never,
-            Ty::BuiltinsFunction("chr"),
-            Ty::BuiltinsFunction("ascii"),
-            Ty::BuiltinsBoundMethod {
-                class: "str",
-                method: "isascii",
-            },
-            Ty::BuiltinsBoundMethod {
-                class: "int",
-                method: "bit_length",
-            },
-            int_lit,
-            bool_lit,
-            Ty::StringLiteral(""),
-            Ty::StringLiteral("a"),
-            Ty::LiteralString,
-            Ty::BytesLiteral(""),
-            Ty::BytesLiteral("\x00"),
-            Ty::KnownClassInstance(KnownClass::Object),
-            Ty::KnownClassInstance(KnownClass::Str),
-            Ty::KnownClassInstance(KnownClass::Int),
-            Ty::AlwaysFalsy,
-            Ty::AlwaysTruthy,
-        ])
-        .unwrap()
-        .clone()
+static FULLY_STATIC_TYPE_POOL: OnceLock<&[Ty]> = OnceLock::new();
+impl TypeBound for FullyStaticTy {
+    fn type_pool() -> &'static [Ty] {
+        FULLY_STATIC_TYPE_POOL
+            .get_or_init(|| filter_type_pool(|db, ty| ty.clone().into_type(db).is_fully_static(db)))
     }
 }
 
-/// A constraint that passes `t.is_singleton()`
+/// A type that satisfy `is_singleton`.
 #[derive(Debug, Clone)]
 pub(crate) struct SingletonTy;
 
-impl ArbitraryRule for SingletonTy {
-    fn generate_singular_type(g: &mut Gen) -> Ty {
-        g.choose(&[
-            Ty::BooleanLiteral(true),
-            Ty::BooleanLiteral(false),
-            Ty::BuiltinsFunction("chr"),
-            Ty::BuiltinsFunction("ascii"),
-            Ty::BuiltinsBoundMethod {
-                class: "str",
-                method: "isascii",
-            },
-            Ty::BuiltinsBoundMethod {
-                class: "int",
-                method: "bit_length",
-            },
-            Ty::KnownClassInstance(KnownClass::NoneType),
-            Ty::KnownClassInstance(KnownClass::EllipsisType),
-            Ty::KnownClassInstance(KnownClass::NoDefaultType),
-            Ty::KnownClassInstance(KnownClass::VersionInfo),
-            Ty::KnownClassInstance(KnownClass::TypeAliasType),
-        ])
-        .unwrap()
-        .clone()
+static SINGLETON_TYPE_POOL: OnceLock<&[Ty]> = OnceLock::new();
+impl TypeBound for SingletonTy {
+    fn type_pool() -> &'static [Ty] {
+        SINGLETON_TYPE_POOL
+            .get_or_init(|| filter_type_pool(|db, ty| ty.clone().into_type(db).is_singleton(db)))
     }
 
     fn generate_type_recursively(g: &mut Gen, _: u32) -> Ty {
