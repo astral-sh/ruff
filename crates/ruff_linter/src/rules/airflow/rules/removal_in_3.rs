@@ -276,29 +276,27 @@ fn check_class_attribute(checker: &Checker, attribute_expr: &ExprAttribute) {
 
     let replacement = match *qualname.segments() {
         ["airflow", "providers_manager", "ProvidersManager"] => match attr.as_str() {
-            "dataset_factories" => Some(Replacement::Name("asset_factories")),
-            "dataset_uri_handlers" => Some(Replacement::Name("asset_uri_handlers")),
+            "dataset_factories" => Replacement::Name("asset_factories"),
+            "dataset_uri_handlers" => Replacement::Name("asset_uri_handlers"),
             "dataset_to_openlineage_converters" => {
-                Some(Replacement::Name("asset_to_openlineage_converters"))
+                Replacement::Name("asset_to_openlineage_converters")
             }
-            _ => None,
+            _ => return,
         },
         ["airflow", "lineage", "hook", "DatasetLineageInfo"] => match attr.as_str() {
-            "dataset" => Some(Replacement::Name("asset")),
-            _ => None,
+            "dataset" => Replacement::Name("asset"),
+            _ => return,
         },
-        _ => None,
+        _ => return,
     };
 
-    if let Some(replacement) = replacement {
-        checker.report_diagnostic(Diagnostic::new(
-            Airflow3Removal {
-                deprecated: attr.to_string(),
-                replacement,
-            },
-            attr.range(),
-        ));
-    }
+    checker.report_diagnostic(Diagnostic::new(
+        Airflow3Removal {
+            deprecated: attr.to_string(),
+            replacement,
+        },
+        attr.range(),
+    ));
 }
 
 /// Checks whether an Airflow 3.0–removed context key is used in a function decorated with `@task`.
