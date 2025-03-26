@@ -86,7 +86,7 @@ impl ResolvedReference {
             .intersects(SemanticModelFlags::DUNDER_ALL_DEFINITION)
     }
 
-    /// Return `true` if the model is in the r.h.s. of a [PEP 695] type alias.
+    /// Return `true` if the context is in the r.h.s. of a [PEP 695] type alias.
     ///
     /// [PEP 695]: https://peps.python.org/pep-0695/#generic-type-alias
     pub const fn in_deferred_type_alias_value(&self) -> bool {
