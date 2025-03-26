@@ -1,7 +1,7 @@
-import { FileId } from "./Chrome";
 import { Icons, Theme } from "shared";
 import classNames from "classnames";
 import { useState } from "react";
+import { FileId } from "../Playground";
 
 export interface Props {
   // The file names
