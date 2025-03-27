@@ -4,8 +4,10 @@ References:
 
 - <https://typing.readthedocs.io/en/latest/spec/callables.html#callable>
 
-TODO: Use `collections.abc` as importing from `typing` is deprecated but this requires support for
-`*` imports. See: <https://docs.python.org/3/library/typing.html#deprecated-aliases>.
+Note that `typing.Callable` is deprecated at runtime, in favour of `collections.abc.Callable` (see:
+<https://docs.python.org/3/library/typing.html#deprecated-aliases>). However, removal of
+`typing.Callable` is not currently planned, and the canonical location of the stub for the symbol in
+typeshed is still `typing.pyi`.
 
 ## Invalid forms
 
@@ -150,6 +152,39 @@ from typing import Callable
 
 def _(c: Callable[[int, str], int]):
     reveal_type(c)  # revealed: (int, str, /) -> int
+```
+
+## Union
+
+```py
+from typing import Callable, Union
+
+def _(
+    c: Callable[[Union[int, str]], int] | None,
+    d: None | Callable[[Union[int, str]], int],
+    e: None | Callable[[Union[int, str]], int] | int,
+):
+    reveal_type(c)  # revealed: ((int | str, /) -> int) | None
+    reveal_type(d)  # revealed: None | ((int | str, /) -> int)
+    reveal_type(e)  # revealed: None | ((int | str, /) -> int) | int
+```
+
+## Intersection
+
+```py
+from typing import Callable, Union
+from knot_extensions import Intersection, Not
+
+def _(
+    c: Intersection[Callable[[Union[int, str]], int], int],
+    d: Intersection[int, Callable[[Union[int, str]], int]],
+    e: Intersection[int, Callable[[Union[int, str]], int], str],
+    f: Intersection[Not[Callable[[int, str], Intersection[int, str]]]],
+):
+    reveal_type(c)  # revealed: ((int | str, /) -> int) & int
+    reveal_type(d)  # revealed: int & ((int | str, /) -> int)
+    reveal_type(e)  # revealed: int & ((int | str, /) -> int) & str
+    reveal_type(f)  # revealed: ~((int, str, /) -> int & str)
 ```
 
 ## Nested

@@ -37,9 +37,17 @@ pub struct Options {
 
 impl Options {
     pub(crate) fn from_toml_str(content: &str, source: ValueSource) -> Result<Self, KnotTomlError> {
-        let _guard = ValueSourceGuard::new(source);
+        let _guard = ValueSourceGuard::new(source, true);
         let options = toml::from_str(content)?;
         Ok(options)
+    }
+
+    pub fn deserialize_with<'de, D>(source: ValueSource, deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let _guard = ValueSourceGuard::new(source, false);
+        Self::deserialize(deserializer)
     }
 
     pub(crate) fn to_program_settings(
@@ -106,9 +114,14 @@ impl Options {
             custom_typeshed: typeshed.map(|path| path.absolute(project_root, system)),
             python_path: python
                 .map(|python_path| {
-                    PythonPath::SysPrefix(python_path.absolute(project_root, system))
+                    PythonPath::from_cli_flag(python_path.absolute(project_root, system))
                 })
-                .unwrap_or(PythonPath::KnownSitePackages(vec![])),
+                .or_else(|| {
+                    std::env::var("VIRTUAL_ENV")
+                        .ok()
+                        .map(PythonPath::from_virtual_env_var)
+                })
+                .unwrap_or_else(|| PythonPath::KnownSitePackages(vec![])),
         }
     }
 

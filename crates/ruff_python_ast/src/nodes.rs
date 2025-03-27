@@ -2244,12 +2244,33 @@ impl Pattern {
     ///
     /// [irrefutable pattern]: https://peps.python.org/pep-0634/#irrefutable-case-blocks
     pub fn is_irrefutable(&self) -> bool {
+        self.irrefutable_pattern().is_some()
+    }
+
+    /// Return `Some(IrrefutablePattern)` if `self` is irrefutable or `None` otherwise.
+    pub fn irrefutable_pattern(&self) -> Option<IrrefutablePattern> {
         match self {
-            Pattern::MatchAs(PatternMatchAs { pattern: None, .. }) => true,
+            Pattern::MatchAs(PatternMatchAs {
+                pattern,
+                name,
+                range,
+            }) => match pattern {
+                Some(pattern) => pattern.irrefutable_pattern(),
+                None => match name {
+                    Some(name) => Some(IrrefutablePattern {
+                        kind: IrrefutablePatternKind::Name(name.id.clone()),
+                        range: *range,
+                    }),
+                    None => Some(IrrefutablePattern {
+                        kind: IrrefutablePatternKind::Wildcard,
+                        range: *range,
+                    }),
+                },
+            },
             Pattern::MatchOr(PatternMatchOr { patterns, .. }) => {
-                patterns.iter().any(Pattern::is_irrefutable)
+                patterns.iter().find_map(Pattern::irrefutable_pattern)
             }
-            _ => false,
+            _ => None,
         }
     }
 
@@ -2275,6 +2296,17 @@ impl Pattern {
             _ => false,
         }
     }
+}
+
+pub struct IrrefutablePattern {
+    pub kind: IrrefutablePatternKind,
+    pub range: TextRange,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum IrrefutablePatternKind {
+    Name(Name),
+    Wildcard,
 }
 
 /// See also [MatchValue](https://docs.python.org/3/library/ast.html#ast.MatchValue)

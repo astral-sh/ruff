@@ -398,7 +398,7 @@ impl DunderReplacement {
             "__or__" => Some(Self::Operator(
                 "|",
                 "Use `|` operator",
-                OperatorPrecedence::BitXorOr,
+                OperatorPrecedence::BitOr,
             )),
             "__rshift__" => Some(Self::Operator(
                 ">>",
@@ -418,7 +418,7 @@ impl DunderReplacement {
             "__xor__" => Some(Self::Operator(
                 "^",
                 "Use `^` operator",
-                OperatorPrecedence::BitXorOr,
+                OperatorPrecedence::BitXor,
             )),
 
             "__radd__" => Some(Self::ROperator(
@@ -454,7 +454,7 @@ impl DunderReplacement {
             "__ror__" => Some(Self::ROperator(
                 "|",
                 "Use `|` operator",
-                OperatorPrecedence::BitXorOr,
+                OperatorPrecedence::BitOr,
             )),
             "__rrshift__" => Some(Self::ROperator(
                 ">>",
@@ -474,7 +474,7 @@ impl DunderReplacement {
             "__rxor__" => Some(Self::ROperator(
                 "^",
                 "Use `^` operator",
-                OperatorPrecedence::BitXorOr,
+                OperatorPrecedence::BitXor,
             )),
 
             "__aiter__" => Some(Self::Builtin("aiter", "Use `aiter()` builtin")),

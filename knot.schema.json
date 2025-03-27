@@ -240,6 +240,16 @@
             }
           ]
         },
+        "conflicting-argument-forms": {
+          "title": "detects when an argument is used as both a value and a type form in a call",
+          "description": "## What it does\nChecks whether an argument is used as both a value and a type form in a call",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "conflicting-declarations": {
           "title": "detects conflicting declarations",
           "description": "TODO #14889",

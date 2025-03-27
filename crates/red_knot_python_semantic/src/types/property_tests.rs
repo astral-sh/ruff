@@ -103,12 +103,6 @@ mod stable {
         forall types s, t. s.is_subtype_of(db, t) && t.is_subtype_of(db, s) => s.is_equivalent_to(db, t)
     );
 
-    // If `S <: T`, then `~T <: ~S`.
-    type_property_test!(
-        negation_reverses_subtype_order, db,
-        forall types s, t. s.is_subtype_of(db, t) => t.negate(db).is_subtype_of(db, s.negate(db))
-    );
-
     // `T` is not disjoint from itself, unless `T` is `Never`.
     type_property_test!(
         disjoint_from_is_irreflexive, db,
@@ -266,7 +260,7 @@ mod flaky {
     );
 
     // Equal element sets of unions implies equivalence
-    // flaky at laest in part because of https://github.com/astral-sh/ruff/issues/15513
+    // flaky at least in part because of https://github.com/astral-sh/ruff/issues/15513
     type_property_test!(
         union_equivalence_not_order_dependent, db,
         forall types s, t, u.
@@ -285,5 +279,20 @@ mod flaky {
         constituent_members_of_union_is_not_disjoint_from_that_union, db,
         forall types s, t.
             !s.is_disjoint_from(db, union(db, [s, t])) && !t.is_disjoint_from(db, union(db, [s, t]))
+    );
+
+    // If `S <: T`, then `~T <: ~S`.
+    //
+    // DO NOT STABILISE this test until the mdtests here pass:
+    // https://github.com/astral-sh/ruff/blob/2711e08eb8eb38d1ce323aae0517fede371cba15/crates/red_knot_python_semantic/resources/mdtest/type_properties/is_subtype_of.md?plain=1#L276-L315
+    //
+    // This test has flakes relating to those subtyping and simplification tests
+    // (see https://github.com/astral-sh/ruff/issues/16913), but it is hard to
+    // reliably trigger the flakes when running this test manually as the flakes
+    // occur very rarely (even running the test with several million seeds does
+    // not always reliably reproduce the flake).
+    type_property_test!(
+        negation_reverses_subtype_order, db,
+        forall types s, t. s.is_subtype_of(db, t) => t.negate(db).is_subtype_of(db, s.negate(db))
     );
 }

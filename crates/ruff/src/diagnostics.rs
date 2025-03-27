@@ -263,48 +263,56 @@ pub(crate) fn lint_path(
     };
 
     // Lint the file.
-    let (
-        LinterResult {
-            messages,
-            has_syntax_error: has_error,
-        },
-        transformed,
-        fixed,
-    ) = if matches!(fix_mode, flags::FixMode::Apply | flags::FixMode::Diff) {
-        if let Ok(FixerResult {
-            result,
-            transformed,
-            fixed,
-        }) = lint_fix(
-            path,
-            package,
-            noqa,
-            unsafe_fixes,
-            settings,
-            &source_kind,
-            source_type,
-        ) {
-            if !fixed.is_empty() {
-                match fix_mode {
-                    flags::FixMode::Apply => transformed.write(&mut File::create(path)?)?,
-                    flags::FixMode::Diff => {
-                        write!(
-                            &mut io::stdout().lock(),
-                            "{}",
-                            source_kind.diff(&transformed, Some(path)).unwrap()
-                        )?;
+    let (result, transformed, fixed) =
+        if matches!(fix_mode, flags::FixMode::Apply | flags::FixMode::Diff) {
+            if let Ok(FixerResult {
+                result,
+                transformed,
+                fixed,
+            }) = lint_fix(
+                path,
+                package,
+                noqa,
+                unsafe_fixes,
+                settings,
+                &source_kind,
+                source_type,
+            ) {
+                if !fixed.is_empty() {
+                    match fix_mode {
+                        flags::FixMode::Apply => transformed.write(&mut File::create(path)?)?,
+                        flags::FixMode::Diff => {
+                            write!(
+                                &mut io::stdout().lock(),
+                                "{}",
+                                source_kind.diff(&transformed, Some(path)).unwrap()
+                            )?;
+                        }
+                        flags::FixMode::Generate => {}
                     }
-                    flags::FixMode::Generate => {}
                 }
-            }
-            let transformed = if let Cow::Owned(transformed) = transformed {
-                transformed
+                let transformed = if let Cow::Owned(transformed) = transformed {
+                    transformed
+                } else {
+                    source_kind
+                };
+                (result, transformed, fixed)
             } else {
-                source_kind
-            };
-            (result, transformed, fixed)
+                // If we fail to fix, lint the original source code.
+                let result = lint_only(
+                    path,
+                    package,
+                    settings,
+                    noqa,
+                    &source_kind,
+                    source_type,
+                    ParseSource::None,
+                );
+                let transformed = source_kind;
+                let fixed = FxHashMap::default();
+                (result, transformed, fixed)
+            }
         } else {
-            // If we fail to fix, lint the original source code.
             let result = lint_only(
                 path,
                 package,
@@ -317,21 +325,10 @@ pub(crate) fn lint_path(
             let transformed = source_kind;
             let fixed = FxHashMap::default();
             (result, transformed, fixed)
-        }
-    } else {
-        let result = lint_only(
-            path,
-            package,
-            settings,
-            noqa,
-            &source_kind,
-            source_type,
-            ParseSource::None,
-        );
-        let transformed = source_kind;
-        let fixed = FxHashMap::default();
-        (result, transformed, fixed)
-    };
+        };
+
+    let has_error = result.has_syntax_errors();
+    let messages = result.messages;
 
     if let Some((cache, relative_path, key)) = caching {
         // We don't cache parsing errors.

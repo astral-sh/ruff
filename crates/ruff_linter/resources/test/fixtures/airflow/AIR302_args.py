@@ -85,7 +85,7 @@ def decorator_deprecated_operator_args():
     bdow_op >> bdow_op2
 
 
-# deprecated filename_template arugment in FileTaskHandler
+# deprecated filename_template argument in FileTaskHandler
 S3TaskHandler(filename_template="/tmp/test")
 HdfsTaskHandler(filename_template="/tmp/test")
 ElasticsearchTaskHandler(filename_template="/tmp/test")

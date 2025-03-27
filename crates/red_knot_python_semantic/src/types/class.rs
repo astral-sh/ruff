@@ -11,7 +11,7 @@ use crate::{
         Boundness, LookupError, LookupResult, Symbol, SymbolAndQualifiers,
     },
     types::{
-        definition_expression_type, CallArguments, CallError, CallErrorKind, DynamicType,
+        definition_expression_type, CallArgumentTypes, CallError, CallErrorKind, DynamicType,
         MetaclassCandidate, TupleType, UnionBuilder, UnionType,
     },
     Db, KnownModule, Program,
@@ -128,9 +128,10 @@ impl<'db> Class<'db> {
     #[salsa::tracked(return_ref, cycle_fn=explicit_bases_cycle_recover, cycle_initial=explicit_bases_cycle_initial)]
     fn explicit_bases_query(self, db: &'db dyn Db) -> Box<[Type<'db>]> {
         tracing::trace!("Class::explicit_bases_query: {}", self.name(db));
-        let class_stmt = self.node(db);
 
-        let class_definition = semantic_index(db, self.file(db)).definition(class_stmt);
+        let class_stmt = self.node(db);
+        let class_definition =
+            semantic_index(db, self.file(db)).expect_single_definition(class_stmt);
 
         class_stmt
             .bases()
@@ -156,11 +157,15 @@ impl<'db> Class<'db> {
     #[salsa::tracked(return_ref)]
     fn decorators(self, db: &'db dyn Db) -> Box<[Type<'db>]> {
         tracing::trace!("Class::decorators: {}", self.name(db));
+
         let class_stmt = self.node(db);
         if class_stmt.decorator_list.is_empty() {
             return Box::new([]);
         }
-        let class_definition = semantic_index(db, self.file(db)).definition(class_stmt);
+
+        let class_definition =
+            semantic_index(db, self.file(db)).expect_single_definition(class_stmt);
+
         class_stmt
             .decorator_list
             .iter()
@@ -224,9 +229,15 @@ impl<'db> Class<'db> {
             .as_ref()?
             .find_keyword("metaclass")?
             .value;
-        let class_definition = semantic_index(db, self.file(db)).definition(class_stmt);
-        let metaclass_ty = definition_expression_type(db, class_definition, metaclass_node);
-        Some(metaclass_ty)
+
+        let class_definition =
+            semantic_index(db, self.file(db)).expect_single_definition(class_stmt);
+
+        Some(definition_expression_type(
+            db,
+            class_definition,
+            metaclass_node,
+        ))
     }
 
     /// Return the metaclass of this class, or `type[Unknown]` if the metaclass cannot be inferred.
@@ -279,13 +290,13 @@ impl<'db> Class<'db> {
             let namespace = KnownClass::Dict.to_instance(db);
 
             // TODO: Other keyword arguments?
-            let arguments = CallArguments::positional([name, bases, namespace]);
+            let arguments = CallArgumentTypes::positional([name, bases, namespace]);
 
-            let return_ty_result = match metaclass.try_call(db, &arguments) {
+            let return_ty_result = match metaclass.try_call(db, arguments) {
                 Ok(bindings) => Ok(bindings.return_type(db)),
 
                 Err(CallError(CallErrorKind::NotCallable, bindings)) => Err(MetaclassError {
-                    kind: MetaclassErrorKind::NotCallable(bindings.callable_type),
+                    kind: MetaclassErrorKind::NotCallable(bindings.callable_type()),
                 }),
 
                 // TODO we should also check for binding errors that would indicate the metaclass
@@ -630,7 +641,7 @@ impl<'db> Class<'db> {
 
                     let bindings = use_def.public_bindings(symbol_id);
                     let inferred = symbol_from_bindings(db, bindings);
-                    let has_binding: bool = !inferred.is_unbound();
+                    let has_binding = !inferred.is_unbound();
 
                     if has_binding {
                         // The attribute is declared and bound in the class body.
@@ -866,8 +877,12 @@ pub enum KnownClass {
     StdlibAlias,
     SpecialForm,
     TypeVar,
+    ParamSpec,
+    TypeVarTuple,
     TypeAliasType,
     NoDefaultType,
+    NewType,
+    Sized,
     // TODO: This can probably be removed when we have support for protocols
     SupportsIndex,
     // Collections
@@ -888,6 +903,10 @@ impl<'db> KnownClass {
         matches!(self, Self::Bool)
     }
 
+    pub(crate) const fn is_special_form(self) -> bool {
+        matches!(self, Self::SpecialForm)
+    }
+
     /// Determine whether instances of this class are always truthy, always falsy,
     /// or have an ambiguous truthiness.
     pub(crate) const fn bool(self) -> Truthiness {
@@ -906,6 +925,8 @@ impl<'db> KnownClass {
             | Self::VersionInfo
             | Self::TypeAliasType
             | Self::TypeVar
+            | Self::ParamSpec
+            | Self::TypeVarTuple
             | Self::WrapperDescriptorType
             | Self::MethodWrapperType => Truthiness::AlwaysTrue,
 
@@ -919,6 +940,7 @@ impl<'db> KnownClass {
             | Self::Str
             | Self::List
             | Self::GenericAlias
+            | Self::NewType
             | Self::StdlibAlias
             | Self::SupportsIndex
             | Self::Set
@@ -938,6 +960,7 @@ impl<'db> KnownClass {
             | Self::DefaultDict
             | Self::Deque
             | Self::Float
+            | Self::Sized
             | Self::Classmethod => Truthiness::Ambiguous,
         }
     }
@@ -972,13 +995,17 @@ impl<'db> KnownClass {
             Self::NoneType => "NoneType",
             Self::SpecialForm => "_SpecialForm",
             Self::TypeVar => "TypeVar",
+            Self::ParamSpec => "ParamSpec",
+            Self::TypeVarTuple => "TypeVarTuple",
             Self::TypeAliasType => "TypeAliasType",
             Self::NoDefaultType => "_NoDefaultType",
+            Self::NewType => "NewType",
             Self::SupportsIndex => "SupportsIndex",
             Self::ChainMap => "ChainMap",
             Self::Counter => "Counter",
             Self::DefaultDict => "defaultdict",
             Self::Deque => "deque",
+            Self::Sized => "Sized",
             Self::OrderedDict => "OrderedDict",
             // For example, `typing.List` is defined as `List = _Alias()` in typeshed
             Self::StdlibAlias => "_Alias",
@@ -1139,10 +1166,14 @@ impl<'db> KnownClass {
             | Self::MethodWrapperType
             | Self::WrapperDescriptorType => KnownModule::Types,
             Self::NoneType => KnownModule::Typeshed,
-            Self::SpecialForm | Self::TypeVar | Self::StdlibAlias | Self::SupportsIndex => {
-                KnownModule::Typing
+            Self::SpecialForm
+            | Self::TypeVar
+            | Self::StdlibAlias
+            | Self::SupportsIndex
+            | Self::Sized => KnownModule::Typing,
+            Self::TypeAliasType | Self::TypeVarTuple | Self::ParamSpec | Self::NewType => {
+                KnownModule::TypingExtensions
             }
-            Self::TypeAliasType => KnownModule::TypingExtensions,
             Self::NoDefaultType => {
                 let python_version = Program::get(db).python_version(db);
 
@@ -1175,46 +1206,50 @@ impl<'db> KnownClass {
     /// Return true if all instances of this `KnownClass` compare equal.
     pub(super) const fn is_single_valued(self) -> bool {
         match self {
-            KnownClass::NoneType
-            | KnownClass::NoDefaultType
-            | KnownClass::VersionInfo
-            | KnownClass::EllipsisType
-            | KnownClass::TypeAliasType => true,
+            Self::NoneType
+            | Self::NoDefaultType
+            | Self::VersionInfo
+            | Self::EllipsisType
+            | Self::TypeAliasType => true,
 
-            KnownClass::Bool
-            | KnownClass::Object
-            | KnownClass::Bytes
-            | KnownClass::Type
-            | KnownClass::Int
-            | KnownClass::Float
-            | KnownClass::Complex
-            | KnownClass::Str
-            | KnownClass::List
-            | KnownClass::Tuple
-            | KnownClass::Set
-            | KnownClass::FrozenSet
-            | KnownClass::Dict
-            | KnownClass::Slice
-            | KnownClass::Range
-            | KnownClass::Property
-            | KnownClass::BaseException
-            | KnownClass::BaseExceptionGroup
-            | KnownClass::Classmethod
-            | KnownClass::GenericAlias
-            | KnownClass::ModuleType
-            | KnownClass::FunctionType
-            | KnownClass::MethodType
-            | KnownClass::MethodWrapperType
-            | KnownClass::WrapperDescriptorType
-            | KnownClass::SpecialForm
-            | KnownClass::ChainMap
-            | KnownClass::Counter
-            | KnownClass::DefaultDict
-            | KnownClass::Deque
-            | KnownClass::OrderedDict
-            | KnownClass::SupportsIndex
-            | KnownClass::StdlibAlias
-            | KnownClass::TypeVar => false,
+            Self::Bool
+            | Self::Object
+            | Self::Bytes
+            | Self::Type
+            | Self::Int
+            | Self::Float
+            | Self::Complex
+            | Self::Str
+            | Self::List
+            | Self::Tuple
+            | Self::Set
+            | Self::FrozenSet
+            | Self::Dict
+            | Self::Slice
+            | Self::Range
+            | Self::Property
+            | Self::BaseException
+            | Self::BaseExceptionGroup
+            | Self::Classmethod
+            | Self::GenericAlias
+            | Self::ModuleType
+            | Self::FunctionType
+            | Self::MethodType
+            | Self::MethodWrapperType
+            | Self::WrapperDescriptorType
+            | Self::SpecialForm
+            | Self::ChainMap
+            | Self::Counter
+            | Self::DefaultDict
+            | Self::Deque
+            | Self::OrderedDict
+            | Self::SupportsIndex
+            | Self::StdlibAlias
+            | Self::TypeVar
+            | Self::ParamSpec
+            | Self::TypeVarTuple
+            | Self::Sized
+            | Self::NewType => false,
         }
     }
 
@@ -1263,7 +1298,11 @@ impl<'db> KnownClass {
             | Self::BaseException
             | Self::BaseExceptionGroup
             | Self::Classmethod
-            | Self::TypeVar => false,
+            | Self::TypeVar
+            | Self::ParamSpec
+            | Self::TypeVarTuple
+            | Self::Sized
+            | Self::NewType => false,
         }
     }
 
@@ -1301,8 +1340,11 @@ impl<'db> KnownClass {
             "MethodType" => Self::MethodType,
             "MethodWrapperType" => Self::MethodWrapperType,
             "WrapperDescriptorType" => Self::WrapperDescriptorType,
+            "NewType" => Self::NewType,
             "TypeAliasType" => Self::TypeAliasType,
             "TypeVar" => Self::TypeVar,
+            "ParamSpec" => Self::ParamSpec,
+            "TypeVarTuple" => Self::TypeVarTuple,
             "ChainMap" => Self::ChainMap,
             "Counter" => Self::Counter,
             "defaultdict" => Self::DefaultDict,
@@ -1312,6 +1354,7 @@ impl<'db> KnownClass {
             "_SpecialForm" => Self::SpecialForm,
             "_NoDefaultType" => Self::NoDefaultType,
             "SupportsIndex" => Self::SupportsIndex,
+            "Sized" => Self::Sized,
             "_version_info" => Self::VersionInfo,
             "ellipsis" if Program::get(db).python_version(db) <= PythonVersion::PY39 => {
                 Self::EllipsisType
@@ -1364,9 +1407,15 @@ impl<'db> KnownClass {
             | Self::MethodWrapperType
             | Self::WrapperDescriptorType => module == self.canonical_module(db),
             Self::NoneType => matches!(module, KnownModule::Typeshed | KnownModule::Types),
-            Self::SpecialForm | Self::TypeVar | Self::TypeAliasType | Self::NoDefaultType | Self::SupportsIndex => {
-                matches!(module, KnownModule::Typing | KnownModule::TypingExtensions)
-            }
+            Self::SpecialForm
+            | Self::TypeVar
+            | Self::TypeAliasType
+            | Self::NoDefaultType
+            | Self::SupportsIndex
+            | Self::ParamSpec
+            | Self::TypeVarTuple
+            | Self::Sized
+            | Self::NewType => matches!(module, KnownModule::Typing | KnownModule::TypingExtensions),
         }
     }
 }

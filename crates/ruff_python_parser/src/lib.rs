@@ -85,6 +85,7 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 mod error;
 pub mod lexer;
 mod parser;
+pub mod semantic_errors;
 mod string;
 mod token;
 mod token_set;

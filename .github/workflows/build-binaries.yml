@@ -49,7 +49,7 @@ jobs:
       - name: "Prep README.md"
         run: python scripts/transform_readme.py --target pypi
       - name: "Build sdist"
-        uses: PyO3/maturin-action@36db84001d74475ad1b8e6613557ae4ee2dc3598 # v1
+        uses: PyO3/maturin-action@22fe573c6ed0c03ab9b84e631cbfa49bddf6e20e # v1
         with:
           command: sdist
           args: --out dist
@@ -59,7 +59,7 @@ jobs:
           "${MODULE_NAME}" --help
           python -m "${MODULE_NAME}" --help
       - name: "Upload sdist"
-        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: wheels-sdist
           path: dist
@@ -79,12 +79,12 @@ jobs:
       - name: "Prep README.md"
         run: python scripts/transform_readme.py --target pypi
       - name: "Build wheels - x86_64"
-        uses: PyO3/maturin-action@36db84001d74475ad1b8e6613557ae4ee2dc3598 # v1
+        uses: PyO3/maturin-action@22fe573c6ed0c03ab9b84e631cbfa49bddf6e20e # v1
         with:
           target: x86_64
           args: --release --locked --out dist
       - name: "Upload wheels"
-        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: wheels-macos-x86_64
           path: dist
@@ -99,7 +99,7 @@ jobs:
           tar czvf $ARCHIVE_FILE $ARCHIVE_NAME
           shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
-        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: artifacts-macos-x86_64
           path: |
@@ -121,7 +121,7 @@ jobs:
       - name: "Prep README.md"
         run: python scripts/transform_readme.py --target pypi
       - name: "Build wheels - aarch64"
-        uses: PyO3/maturin-action@36db84001d74475ad1b8e6613557ae4ee2dc3598 # v1
+        uses: PyO3/maturin-action@22fe573c6ed0c03ab9b84e631cbfa49bddf6e20e # v1
         with:
           target: aarch64
           args: --release --locked --out dist
@@ -131,7 +131,7 @@ jobs:
           ruff --help
           python -m ruff --help
       - name: "Upload wheels"
-        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: wheels-aarch64-apple-darwin
           path: dist
@@ -146,7 +146,7 @@ jobs:
           tar czvf $ARCHIVE_FILE $ARCHIVE_NAME
           shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
-        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: artifacts-aarch64-apple-darwin
           path: |
@@ -177,7 +177,7 @@ jobs:
       - name: "Prep README.md"
         run: python scripts/transform_readme.py --target pypi
       - name: "Build wheels"
-        uses: PyO3/maturin-action@36db84001d74475ad1b8e6613557ae4ee2dc3598 # v1
+        uses: PyO3/maturin-action@22fe573c6ed0c03ab9b84e631cbfa49bddf6e20e # v1
         with:
           target: ${{ matrix.platform.target }}
           args: --release --locked --out dist
@@ -192,7 +192,7 @@ jobs:
           "${MODULE_NAME}" --help
           python -m "${MODULE_NAME}" --help
       - name: "Upload wheels"
-        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: wheels-${{ matrix.platform.target }}
           path: dist
@@ -203,7 +203,7 @@ jobs:
           7z a $ARCHIVE_FILE ./target/${{ matrix.platform.target }}/release/ruff.exe
           sha256sum $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
-        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: artifacts-${{ matrix.platform.target }}
           path: |
@@ -230,7 +230,7 @@ jobs:
       - name: "Prep README.md"
         run: python scripts/transform_readme.py --target pypi
       - name: "Build wheels"
-        uses: PyO3/maturin-action@36db84001d74475ad1b8e6613557ae4ee2dc3598 # v1
+        uses: PyO3/maturin-action@22fe573c6ed0c03ab9b84e631cbfa49bddf6e20e # v1
         with:
           target: ${{ matrix.target }}
           manylinux: auto
@@ -242,7 +242,7 @@ jobs:
           "${MODULE_NAME}" --help
           python -m "${MODULE_NAME}" --help
       - name: "Upload wheels"
-        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: wheels-${{ matrix.target }}
           path: dist
@@ -260,7 +260,7 @@ jobs:
           tar czvf $ARCHIVE_FILE $ARCHIVE_NAME
           shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
-        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: artifacts-${{ matrix.target }}
           path: |
@@ -304,7 +304,7 @@ jobs:
       - name: "Prep README.md"
         run: python scripts/transform_readme.py --target pypi
       - name: "Build wheels"
-        uses: PyO3/maturin-action@36db84001d74475ad1b8e6613557ae4ee2dc3598 # v1
+        uses: PyO3/maturin-action@22fe573c6ed0c03ab9b84e631cbfa49bddf6e20e # v1
         with:
           target: ${{ matrix.platform.target }}
           manylinux: auto
@@ -325,7 +325,7 @@ jobs:
             pip3 install ${{ env.PACKAGE_NAME }} --no-index --find-links dist/ --force-reinstall
             ruff --help
       - name: "Upload wheels"
-        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: wheels-${{ matrix.platform.target }}
           path: dist
@@ -343,7 +343,7 @@ jobs:
           tar czvf $ARCHIVE_FILE $ARCHIVE_NAME
           shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
-        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: artifacts-${{ matrix.platform.target }}
           path: |
@@ -370,7 +370,7 @@ jobs:
       - name: "Prep README.md"
         run: python scripts/transform_readme.py --target pypi
       - name: "Build wheels"
-        uses: PyO3/maturin-action@36db84001d74475ad1b8e6613557ae4ee2dc3598 # v1
+        uses: PyO3/maturin-action@22fe573c6ed0c03ab9b84e631cbfa49bddf6e20e # v1
         with:
           target: ${{ matrix.target }}
           manylinux: musllinux_1_2
@@ -387,7 +387,7 @@ jobs:
             .venv/bin/pip3 install ${{ env.PACKAGE_NAME }} --no-index --find-links dist/ --force-reinstall
             .venv/bin/${{ env.MODULE_NAME }} --help
       - name: "Upload wheels"
-        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: wheels-${{ matrix.target }}
           path: dist
@@ -405,7 +405,7 @@ jobs:
           tar czvf $ARCHIVE_FILE $ARCHIVE_NAME
           shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
-        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: artifacts-${{ matrix.target }}
           path: |
@@ -435,7 +435,7 @@ jobs:
       - name: "Prep README.md"
         run: python scripts/transform_readme.py --target pypi
       - name: "Build wheels"
-        uses: PyO3/maturin-action@36db84001d74475ad1b8e6613557ae4ee2dc3598 # v1
+        uses: PyO3/maturin-action@22fe573c6ed0c03ab9b84e631cbfa49bddf6e20e # v1
         with:
           target: ${{ matrix.platform.target }}
           manylinux: musllinux_1_2
@@ -454,7 +454,7 @@ jobs:
             .venv/bin/pip3 install ${{ env.PACKAGE_NAME }} --no-index --find-links dist/ --force-reinstall
             .venv/bin/${{ env.MODULE_NAME }} --help
       - name: "Upload wheels"
-        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: wheels-${{ matrix.platform.target }}
           path: dist
@@ -472,7 +472,7 @@ jobs:
           tar czvf $ARCHIVE_FILE $ARCHIVE_NAME
           shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
-        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: artifacts-${{ matrix.platform.target }}
           path: |

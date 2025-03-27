@@ -292,7 +292,10 @@ impl Display for DisplayUnionType<'_> {
                     db: self.db,
                 });
             } else {
-                join.entry(&element.display(self.db));
+                join.entry(&DisplayMaybeParenthesizedType {
+                    ty: *element,
+                    db: self.db,
+                });
             }
         }
 
@@ -404,7 +407,28 @@ impl Display for DisplayMaybeNegatedType<'_> {
         if self.negated {
             f.write_str("~")?;
         }
-        self.ty.display(self.db).fmt(f)
+        DisplayMaybeParenthesizedType {
+            ty: self.ty,
+            db: self.db,
+        }
+        .fmt(f)
+    }
+}
+
+struct DisplayMaybeParenthesizedType<'db> {
+    ty: Type<'db>,
+    db: &'db dyn Db,
+}
+
+impl Display for DisplayMaybeParenthesizedType<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        if let Type::Callable(CallableType::General(_) | CallableType::MethodWrapperDunderGet(_)) =
+            self.ty
+        {
+            write!(f, "({})", self.ty.display(self.db))
+        } else {
+            self.ty.display(self.db).fmt(f)
+        }
     }
 }
 
@@ -476,8 +500,7 @@ mod tests {
 
     use crate::db::tests::setup_db;
     use crate::types::{
-        KnownClass, Parameter, ParameterKind, Parameters, Signature, SliceLiteralType,
-        StringLiteralType, Type,
+        KnownClass, Parameter, Parameters, Signature, SliceLiteralType, StringLiteralType, Type,
     };
     use crate::Db;
 
@@ -574,13 +597,7 @@ mod tests {
         assert_eq!(
             display_signature(
                 &db,
-                [Parameter::new(
-                    Some(Type::none(&db)),
-                    ParameterKind::PositionalOnly {
-                        name: None,
-                        default_ty: None
-                    }
-                )],
+                [Parameter::positional_only(None).with_annotated_type(Type::none(&db))],
                 Some(Type::none(&db))
             ),
             "(None, /) -> None"
@@ -591,20 +608,11 @@ mod tests {
             display_signature(
                 &db,
                 [
-                    Parameter::new(
-                        None,
-                        ParameterKind::PositionalOrKeyword {
-                            name: Name::new_static("x"),
-                            default_ty: Some(KnownClass::Int.to_instance(&db))
-                        }
-                    ),
-                    Parameter::new(
-                        Some(KnownClass::Str.to_instance(&db)),
-                        ParameterKind::PositionalOrKeyword {
-                            name: Name::new_static("y"),
-                            default_ty: Some(KnownClass::Str.to_instance(&db))
-                        }
-                    )
+                    Parameter::positional_or_keyword(Name::new_static("x"))
+                        .with_default_type(KnownClass::Int.to_instance(&db)),
+                    Parameter::positional_or_keyword(Name::new_static("y"))
+                        .with_annotated_type(KnownClass::Str.to_instance(&db))
+                        .with_default_type(KnownClass::Str.to_instance(&db)),
                 ],
                 Some(Type::none(&db))
             ),
@@ -616,20 +624,8 @@ mod tests {
             display_signature(
                 &db,
                 [
-                    Parameter::new(
-                        None,
-                        ParameterKind::PositionalOnly {
-                            name: Some(Name::new_static("x")),
-                            default_ty: None
-                        }
-                    ),
-                    Parameter::new(
-                        None,
-                        ParameterKind::PositionalOnly {
-                            name: Some(Name::new_static("y")),
-                            default_ty: None
-                        }
-                    )
+                    Parameter::positional_only(Some(Name::new_static("x"))),
+                    Parameter::positional_only(Some(Name::new_static("y"))),
                 ],
                 Some(Type::none(&db))
             ),
@@ -641,20 +637,8 @@ mod tests {
             display_signature(
                 &db,
                 [
-                    Parameter::new(
-                        None,
-                        ParameterKind::PositionalOnly {
-                            name: Some(Name::new_static("x")),
-                            default_ty: None
-                        }
-                    ),
-                    Parameter::new(
-                        None,
-                        ParameterKind::PositionalOrKeyword {
-                            name: Name::new_static("y"),
-                            default_ty: None
-                        }
-                    )
+                    Parameter::positional_only(Some(Name::new_static("x"))),
+                    Parameter::positional_or_keyword(Name::new_static("y")),
                 ],
                 Some(Type::none(&db))
             ),
@@ -666,20 +650,8 @@ mod tests {
             display_signature(
                 &db,
                 [
-                    Parameter::new(
-                        None,
-                        ParameterKind::KeywordOnly {
-                            name: Name::new_static("x"),
-                            default_ty: None
-                        }
-                    ),
-                    Parameter::new(
-                        None,
-                        ParameterKind::KeywordOnly {
-                            name: Name::new_static("y"),
-                            default_ty: None
-                        }
-                    )
+                    Parameter::keyword_only(Name::new_static("x")),
+                    Parameter::keyword_only(Name::new_static("y")),
                 ],
                 Some(Type::none(&db))
             ),
@@ -691,20 +663,8 @@ mod tests {
             display_signature(
                 &db,
                 [
-                    Parameter::new(
-                        None,
-                        ParameterKind::PositionalOrKeyword {
-                            name: Name::new_static("x"),
-                            default_ty: None
-                        }
-                    ),
-                    Parameter::new(
-                        None,
-                        ParameterKind::KeywordOnly {
-                            name: Name::new_static("y"),
-                            default_ty: None
-                        }
-                    )
+                    Parameter::positional_or_keyword(Name::new_static("x")),
+                    Parameter::keyword_only(Name::new_static("y")),
                 ],
                 Some(Type::none(&db))
             ),
@@ -716,74 +676,28 @@ mod tests {
             display_signature(
                 &db,
                 [
-                    Parameter::new(
-                        None,
-                        ParameterKind::PositionalOnly {
-                            name: Some(Name::new_static("a")),
-                            default_ty: None
-                        },
-                    ),
-                    Parameter::new(
-                        Some(KnownClass::Int.to_instance(&db)),
-                        ParameterKind::PositionalOnly {
-                            name: Some(Name::new_static("b")),
-                            default_ty: None
-                        },
-                    ),
-                    Parameter::new(
-                        None,
-                        ParameterKind::PositionalOnly {
-                            name: Some(Name::new_static("c")),
-                            default_ty: Some(Type::IntLiteral(1)),
-                        },
-                    ),
-                    Parameter::new(
-                        Some(KnownClass::Int.to_instance(&db)),
-                        ParameterKind::PositionalOnly {
-                            name: Some(Name::new_static("d")),
-                            default_ty: Some(Type::IntLiteral(2)),
-                        },
-                    ),
-                    Parameter::new(
-                        None,
-                        ParameterKind::PositionalOrKeyword {
-                            name: Name::new_static("e"),
-                            default_ty: Some(Type::IntLiteral(3)),
-                        },
-                    ),
-                    Parameter::new(
-                        Some(KnownClass::Int.to_instance(&db)),
-                        ParameterKind::PositionalOrKeyword {
-                            name: Name::new_static("f"),
-                            default_ty: Some(Type::IntLiteral(4)),
-                        },
-                    ),
-                    Parameter::new(
-                        Some(Type::object(&db)),
-                        ParameterKind::Variadic {
-                            name: Name::new_static("args")
-                        },
-                    ),
-                    Parameter::new(
-                        None,
-                        ParameterKind::KeywordOnly {
-                            name: Name::new_static("g"),
-                            default_ty: Some(Type::IntLiteral(5)),
-                        },
-                    ),
-                    Parameter::new(
-                        Some(KnownClass::Int.to_instance(&db)),
-                        ParameterKind::KeywordOnly {
-                            name: Name::new_static("h"),
-                            default_ty: Some(Type::IntLiteral(6)),
-                        },
-                    ),
-                    Parameter::new(
-                        Some(KnownClass::Str.to_instance(&db)),
-                        ParameterKind::KeywordVariadic {
-                            name: Name::new_static("kwargs")
-                        },
-                    ),
+                    Parameter::positional_only(Some(Name::new_static("a"))),
+                    Parameter::positional_only(Some(Name::new_static("b")))
+                        .with_annotated_type(KnownClass::Int.to_instance(&db)),
+                    Parameter::positional_only(Some(Name::new_static("c")))
+                        .with_default_type(Type::IntLiteral(1)),
+                    Parameter::positional_only(Some(Name::new_static("d")))
+                        .with_annotated_type(KnownClass::Int.to_instance(&db))
+                        .with_default_type(Type::IntLiteral(2)),
+                    Parameter::positional_or_keyword(Name::new_static("e"))
+                        .with_default_type(Type::IntLiteral(3)),
+                    Parameter::positional_or_keyword(Name::new_static("f"))
+                        .with_annotated_type(KnownClass::Int.to_instance(&db))
+                        .with_default_type(Type::IntLiteral(4)),
+                    Parameter::variadic(Name::new_static("args"))
+                        .with_annotated_type(Type::object(&db)),
+                    Parameter::keyword_only(Name::new_static("g"))
+                        .with_default_type(Type::IntLiteral(5)),
+                    Parameter::keyword_only(Name::new_static("h"))
+                        .with_annotated_type(KnownClass::Int.to_instance(&db))
+                        .with_default_type(Type::IntLiteral(6)),
+                    Parameter::keyword_variadic(Name::new_static("kwargs"))
+                        .with_annotated_type(KnownClass::Str.to_instance(&db)),
                 ],
                 Some(KnownClass::Bytes.to_instance(&db))
             ),

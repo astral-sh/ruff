@@ -894,7 +894,7 @@ struct PrinterState<'a> {
     line_suffixes: LineSuffixes<'a>,
     verbatim_markers: Vec<TextRange>,
     group_modes: GroupModes,
-    // Re-used queue to measure if a group fits. Optimisation to avoid re-allocating a new
+    // Reused queue to measure if a group fits. Optimisation to avoid re-allocating a new
     // vec every time a group gets measured
     fits_stack: Vec<StackFrame>,
     fits_queue: Vec<std::slice::Iter<'a, FormatElement>>,

@@ -12,7 +12,7 @@ use red_knot_python_semantic::{resolve_module, ModuleName, PythonPlatform};
 use ruff_db::files::{system_path_to_file, File, FileError};
 use ruff_db::source::source_text;
 use ruff_db::system::{
-    OsSystem, System, SystemPath, SystemPathBuf, UserConfigDirectoryOverrideGuard,
+    file_time_now, OsSystem, System, SystemPath, SystemPathBuf, UserConfigDirectoryOverrideGuard,
 };
 use ruff_db::{Db as _, Upcast};
 use ruff_python_ast::PythonVersion;
@@ -462,7 +462,7 @@ fn update_file(path: impl AsRef<SystemPath>, content: &str) -> anyhow::Result<()
 
         std::thread::sleep(Duration::from_nanos(10));
 
-        filetime::set_file_handle_times(&file, None, Some(filetime::FileTime::now()))?;
+        filetime::set_file_handle_times(&file, None, Some(file_time_now()))?;
     }
 }
 

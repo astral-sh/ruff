@@ -12,6 +12,7 @@ use ruff_python_ast::{self as ast, ExprContext};
 
 use crate::ast_node_ref::AstNodeRef;
 use crate::module_name::ModuleName;
+use crate::module_resolver::resolve_module;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::ast_ids::AstIdsBuilder;
 use crate::semantic_index::attribute_assignment::{
@@ -19,14 +20,15 @@ use crate::semantic_index::attribute_assignment::{
 };
 use crate::semantic_index::definition::{
     AssignmentDefinitionNodeRef, ComprehensionDefinitionNodeRef, Definition, DefinitionCategory,
-    DefinitionNodeKey, DefinitionNodeRef, ExceptHandlerDefinitionNodeRef, ForStmtDefinitionNodeRef,
-    ImportDefinitionNodeRef, ImportFromDefinitionNodeRef, MatchPatternDefinitionNodeRef,
-    WithItemDefinitionNodeRef,
+    DefinitionNodeKey, DefinitionNodeRef, Definitions, ExceptHandlerDefinitionNodeRef,
+    ForStmtDefinitionNodeRef, ImportDefinitionNodeRef, ImportFromDefinitionNodeRef,
+    MatchPatternDefinitionNodeRef, StarImportDefinitionNodeRef, WithItemDefinitionNodeRef,
 };
 use crate::semantic_index::expression::{Expression, ExpressionKind};
 use crate::semantic_index::predicate::{
     PatternPredicate, PatternPredicateKind, Predicate, PredicateNode, ScopedPredicateId,
 };
+use crate::semantic_index::re_exports::exported_names;
 use crate::semantic_index::symbol::{
     FileScopeId, NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopeKind, ScopedSymbolId,
     SymbolTableBuilder,
@@ -90,7 +92,7 @@ pub(super) struct SemanticIndexBuilder<'db> {
     use_def_maps: IndexVec<FileScopeId, UseDefMapBuilder<'db>>,
     scopes_by_node: FxHashMap<NodeWithScopeKey, FileScopeId>,
     scopes_by_expression: FxHashMap<ExpressionNodeKey, FileScopeId>,
-    definitions_by_node: FxHashMap<DefinitionNodeKey, Definition<'db>>,
+    definitions_by_node: FxHashMap<DefinitionNodeKey, Definitions<'db>>,
     expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
     imported_modules: FxHashSet<ModuleName>,
     attribute_assignments: FxHashMap<FileScopeId, AttributeAssignments<'db>>,
@@ -149,6 +151,10 @@ impl<'db> SemanticIndexBuilder<'db> {
 
     fn current_scope(&self) -> FileScopeId {
         self.current_scope_info().file_scope_id
+    }
+
+    fn current_scope_is_global_scope(&self) -> bool {
+        self.scope_stack.len() == 1
     }
 
     /// Returns the scope ID of the surrounding class body scope if the current scope
@@ -235,7 +241,7 @@ impl<'db> SemanticIndexBuilder<'db> {
 
         let children_end = self.scopes.next_index();
         let popped_scope = &mut self.scopes[popped_scope_id];
-        popped_scope.extend_descendents(children_end);
+        popped_scope.extend_descendants(children_end);
 
         if !popped_scope.is_eager() {
             return popped_scope_id;
@@ -363,17 +369,55 @@ impl<'db> SemanticIndexBuilder<'db> {
         self.current_symbol_table().mark_symbol_used(id);
     }
 
+    fn add_entry_for_definition_key(&mut self, key: DefinitionNodeKey) -> &mut Definitions<'db> {
+        self.definitions_by_node.entry(key).or_default()
+    }
+
+    /// Add a [`Definition`] associated with the `definition_node` AST node.
+    ///
+    /// ## Panics
+    ///
+    /// This method panics if `debug_assertions` are enabled and the `definition_node` AST node
+    /// already has a [`Definition`] associated with it. This is an important invariant to maintain
+    /// for all nodes *except* [`ast::Alias`] nodes representing `*` imports.
     fn add_definition(
         &mut self,
         symbol: ScopedSymbolId,
-        definition_node: impl Into<DefinitionNodeRef<'db>>,
+        definition_node: impl Into<DefinitionNodeRef<'db>> + std::fmt::Debug + Copy,
     ) -> Definition<'db> {
+        let (definition, num_definitions) =
+            self.push_additional_definition(symbol, definition_node);
+        debug_assert_eq!(
+            num_definitions,
+            1,
+            "Attempted to create multiple `Definition`s associated with AST node {definition_node:?}"
+        );
+        definition
+    }
+
+    /// Push a new [`Definition`] onto the list of definitions
+    /// associated with the `definition_node` AST node.
+    ///
+    /// Returns a 2-element tuple, where the first element is the newly created [`Definition`]
+    /// and the second element is the number of definitions that are now associated with
+    /// `definition_node`.
+    ///
+    /// This method should only be used when adding a definition associated with a `*` import.
+    /// All other nodes can only ever be associated with exactly 1 or 0 [`Definition`]s.
+    /// For any node other than an [`ast::Alias`] representing a `*` import,
+    /// prefer to use `self.add_definition()`, which ensures that this invariant is maintained.
+    fn push_additional_definition(
+        &mut self,
+        symbol: ScopedSymbolId,
+        definition_node: impl Into<DefinitionNodeRef<'db>>,
+    ) -> (Definition<'db>, usize) {
         let definition_node: DefinitionNodeRef<'_> = definition_node.into();
         #[allow(unsafe_code)]
         // SAFETY: `definition_node` is guaranteed to be a child of `self.module`
         let kind = unsafe { definition_node.into_owned(self.module.clone()) };
         let category = kind.category(self.file.is_stub(self.db.upcast()));
         let is_reexported = kind.is_reexported();
+
         let definition = Definition::new(
             self.db,
             self.file,
@@ -384,10 +428,11 @@ impl<'db> SemanticIndexBuilder<'db> {
             countme::Count::default(),
         );
 
-        let existing_definition = self
-            .definitions_by_node
-            .insert(definition_node.key(), definition);
-        debug_assert_eq!(existing_definition, None);
+        let num_definitions = {
+            let definitions = self.add_entry_for_definition_key(definition_node.key());
+            definitions.push(definition);
+            definitions.len()
+        };
 
         if category.is_binding() {
             self.mark_symbol_bound(symbol);
@@ -409,7 +454,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         try_node_stack_manager.record_definition(self);
         self.try_node_context_stack_manager = try_node_stack_manager;
 
-        definition
+        (definition, num_definitions)
     }
 
     fn add_attribute_definition(&mut self, symbol: ScopedSymbolId) -> ScopedDefinitionId {
@@ -797,9 +842,10 @@ impl<'db> SemanticIndexBuilder<'db> {
         // Insert a mapping from the inner Parameter node to the same definition. This
         // ensures that calling `HasType::inferred_type` on the inner parameter returns
         // a valid type (and doesn't panic)
-        let existing_definition = self
-            .definitions_by_node
-            .insert((&parameter.parameter).into(), definition);
+        let existing_definition = self.definitions_by_node.insert(
+            (&parameter.parameter).into(),
+            Definitions::single(definition),
+        );
         debug_assert_eq!(existing_definition, None);
     }
 
@@ -964,9 +1010,6 @@ where
                     self.visit_decorator(decorator);
                 }
 
-                let symbol = self.add_symbol(class.name.id.clone());
-                self.add_definition(symbol, class);
-
                 self.with_type_params(
                     NodeWithScopeRef::ClassTypeParameters(class),
                     class.type_params.as_deref(),
@@ -981,6 +1024,10 @@ where
                         builder.pop_scope()
                     },
                 );
+
+                // In Python runtime semantics, a class is registered after its scope is evaluated.
+                let symbol = self.add_symbol(class.name.id.clone());
+                self.add_definition(symbol, class);
             }
             ast::Stmt::TypeAlias(type_alias) => {
                 let symbol = self.add_symbol(
@@ -995,7 +1042,7 @@ where
 
                 self.with_type_params(
                     NodeWithScopeRef::TypeAliasTypeParameters(type_alias),
-                    type_alias.type_params.as_ref(),
+                    type_alias.type_params.as_deref(),
                     |builder| {
                         builder.push_scope(NodeWithScopeRef::TypeAlias(type_alias));
                         builder.visit_expr(&type_alias.value);
@@ -1028,7 +1075,54 @@ where
                 }
             }
             ast::Stmt::ImportFrom(node) => {
+                let mut found_star = false;
                 for (alias_index, alias) in node.names.iter().enumerate() {
+                    if &alias.name == "*" {
+                        // The following line maintains the invariant that every AST node that
+                        // implements `Into<DefinitionNodeKey>` must have an entry in the
+                        // `definitions_by_node` map. Maintaining this invariant ensures that
+                        // `SemanticIndex::definitions` can always look up the definitions for a
+                        // given AST node without panicking.
+                        //
+                        // The reason why maintaining this invariant requires special handling here
+                        // is that some `Alias` nodes may be associated with 0 definitions:
+                        // - If the import statement has invalid syntax: multiple `*` names in the `names` list
+                        //   (e.g. `from foo import *, bar, *`)
+                        // - If the `*` import refers to a module that has 0 exported names.
+                        // - If the module being imported from cannot be resolved.
+                        self.add_entry_for_definition_key(alias.into());
+
+                        if found_star {
+                            continue;
+                        }
+
+                        found_star = true;
+
+                        // Wildcard imports are invalid syntax everywhere except the top-level scope,
+                        // and thus do not bind any definitions anywhere else
+                        if !self.current_scope_is_global_scope() {
+                            continue;
+                        }
+
+                        let Ok(module_name) =
+                            ModuleName::from_import_statement(self.db, self.file, node)
+                        else {
+                            continue;
+                        };
+
+                        let Some(module) = resolve_module(self.db, &module_name) else {
+                            continue;
+                        };
+
+                        for export in exported_names(self.db, module.file()) {
+                            let symbol_id = self.add_symbol(export.clone());
+                            let node_ref = StarImportDefinitionNodeRef { node, symbol_id };
+                            self.push_additional_definition(symbol_id, node_ref);
+                        }
+
+                        continue;
+                    }
+
                     let (symbol_name, is_reexported) = if let Some(asname) = &alias.asname {
                         (&asname.id, asname.id == alias.name.id)
                     } else {

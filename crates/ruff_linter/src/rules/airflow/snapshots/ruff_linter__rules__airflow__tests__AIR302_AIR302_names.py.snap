@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/airflow/mod.rs
-assertion_line: 29
 ---
 AIR302_names.py:107:1: AIR302 `airflow.PY36` is removed in Airflow 3.0
     |
@@ -74,7 +73,7 @@ AIR302_names.py:108:1: AIR302 `airflow.Dataset` is removed in Airflow 3.0
 109 |
 110 | # airflow.api_connexion.security
     |
-    = help: Use `airflow.sdk.definitions.asset.Asset` instead
+    = help: Use `airflow.sdk.Asset` instead
 
 AIR302_names.py:111:1: AIR302 `airflow.api_connexion.security.requires_access` is removed in Airflow 3.0
     |
@@ -197,7 +196,7 @@ AIR302_names.py:125:1: AIR302 `airflow.datasets.Dataset` is removed in Airflow 3
 126 | DatasetAlias()
 127 | DatasetAliasEvent()
     |
-    = help: Use `airflow.sdk.definitions.asset.Asset` instead
+    = help: Use `airflow.sdk.Asset` instead
 
 AIR302_names.py:126:1: AIR302 `airflow.datasets.DatasetAlias` is removed in Airflow 3.0
     |
@@ -208,7 +207,7 @@ AIR302_names.py:126:1: AIR302 `airflow.datasets.DatasetAlias` is removed in Airf
 127 | DatasetAliasEvent()
 128 | DatasetAll()
     |
-    = help: Use `airflow.sdk.definitions.asset.AssetAlias` instead
+    = help: Use `airflow.sdk.AssetAlias` instead
 
 AIR302_names.py:127:1: AIR302 `airflow.datasets.DatasetAliasEvent` is removed in Airflow 3.0
     |
@@ -229,7 +228,7 @@ AIR302_names.py:128:1: AIR302 `airflow.datasets.DatasetAll` is removed in Airflo
 129 | DatasetAny()
 130 | Metadata()
     |
-    = help: Use `airflow.sdk.definitions.asset.AssetAll` instead
+    = help: Use `airflow.sdk.AssetAll` instead
 
 AIR302_names.py:129:1: AIR302 `airflow.datasets.DatasetAny` is removed in Airflow 3.0
     |
@@ -240,7 +239,7 @@ AIR302_names.py:129:1: AIR302 `airflow.datasets.DatasetAny` is removed in Airflo
 130 | Metadata()
 131 | expand_alias_to_datasets
     |
-    = help: Use `airflow.sdk.definitions.asset.AssetAny` instead
+    = help: Use `airflow.sdk.AssetAny` instead
 
 AIR302_names.py:130:1: AIR302 `airflow.datasets.metadata.Metadata` is removed in Airflow 3.0
     |
@@ -250,7 +249,7 @@ AIR302_names.py:130:1: AIR302 `airflow.datasets.metadata.Metadata` is removed in
     | ^^^^^^^^ AIR302
 131 | expand_alias_to_datasets
     |
-    = help: Use `airflow.sdk.definitions.asset.metadata.Metadata` instead
+    = help: Use `airflow.sdk.Metadata` instead
 
 AIR302_names.py:131:1: AIR302 `airflow.datasets.expand_alias_to_datasets` is removed in Airflow 3.0
     |
@@ -261,7 +260,7 @@ AIR302_names.py:131:1: AIR302 `airflow.datasets.expand_alias_to_datasets` is rem
 132 |
 133 | # airflow.datasets.manager
     |
-    = help: Use `airflow.sdk.definitions.asset.expand_alias_to_assets` instead
+    = help: Use `airflow.sdk.expand_alias_to_assets` instead
 
 AIR302_names.py:135:1: AIR302 `airflow.datasets.manager.dataset_manager` is removed in Airflow 3.0
     |

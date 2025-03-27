@@ -7,7 +7,7 @@ use ruff_db::{
 };
 use ruff_text_size::{Ranged, TextRange};
 
-use super::{binding_type, KnownFunction, TypeCheckDiagnostic, TypeCheckDiagnostics};
+use super::{binding_type, KnownFunction, Type, TypeCheckDiagnostic, TypeCheckDiagnostics};
 
 use crate::semantic_index::semantic_index;
 use crate::semantic_index::symbol::ScopeId;
@@ -177,9 +177,8 @@ impl<'db> InferContext<'db> {
                 let mut function_scope_tys = index
                     .ancestor_scopes(scope_id)
                     .filter_map(|(_, scope)| scope.node().as_function())
-                    .filter_map(|function| {
-                        binding_type(self.db, index.definition(function)).into_function_literal()
-                    });
+                    .map(|node| binding_type(self.db, index.expect_single_definition(node)))
+                    .filter_map(Type::into_function_literal);
 
                 // Iterate over all functions and test if any is decorated with `@no_type_check`.
                 function_scope_tys.any(|function_ty| {

@@ -1,11 +1,3 @@
-function truncate(str: string, length: number) {
-  if (str.length > length) {
-    return str.slice(0, length) + "...";
-  } else {
-    return str;
-  }
-}
-
 export function ErrorMessage({ children }: { children: string }) {
   return (
     <div
@@ -14,12 +6,9 @@ export function ErrorMessage({ children }: { children: string }) {
     >
       <p className="font-bold">Error</p>
       <p className="block sm:inline">
-        {truncate(
-          children.startsWith("Error: ")
-            ? children.slice("Error: ".length)
-            : children,
-          120,
-        )}
+        {children.startsWith("Error: ")
+          ? children.slice("Error: ".length)
+          : children}
       </p>
     </div>
   );
