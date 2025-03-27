@@ -7,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/valid/statement/assignment.py
 ```
 Module(
     ModModule {
-        range: 0..724,
+        range: 0..723,
         body: [
             Assign(
                 StmtAssign {
