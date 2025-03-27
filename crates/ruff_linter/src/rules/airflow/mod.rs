@@ -13,7 +13,7 @@ mod tests {
     use crate::{assert_messages, settings};
 
     #[test_case(Rule::AirflowVariableNameTaskIdMismatch, Path::new("AIR001.py"))]
-    #[test_case(Rule::AirflowDagNoScheduleArgument, Path::new("AIR201.py"))]
+    #[test_case(Rule::AirflowDagNoScheduleArgument, Path::new("AIR002.py"))]
     #[test_case(Rule::Airflow3Removal, Path::new("AIR302_args.py"))]
     #[test_case(Rule::Airflow3Removal, Path::new("AIR302_names.py"))]
     #[test_case(Rule::Airflow3Removal, Path::new("AIR302_class_attribute.py"))]
