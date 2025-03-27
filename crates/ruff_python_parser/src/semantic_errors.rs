@@ -92,32 +92,14 @@ impl SemanticSyntaxChecker {
                 // def __debug__(): ...  # function name
                 // def f[__debug__](): ...  # type parameter name
                 // def f(__debug__): ...  # parameter name
-                if name == "__debug__" {
-                    Self::add_error(
-                        ctx,
-                        SemanticSyntaxErrorKind::WriteToDebug(WriteToDebugKind::Store),
-                        name.range,
-                    );
-                }
+                Self::check_identifier(name, ctx);
                 if let Some(type_params) = type_params {
                     for type_param in type_params.iter() {
-                        if type_param.name() == "__debug__" {
-                            Self::add_error(
-                                ctx,
-                                SemanticSyntaxErrorKind::WriteToDebug(WriteToDebugKind::Store),
-                                type_param.name().range,
-                            );
-                        }
+                        Self::check_identifier(type_param.name(), ctx);
                     }
                 }
                 for parameter in parameters {
-                    if parameter.name() == "__debug__" {
-                        Self::add_error(
-                            ctx,
-                            SemanticSyntaxErrorKind::WriteToDebug(WriteToDebugKind::Store),
-                            parameter.name().range,
-                        );
-                    }
+                    Self::check_identifier(parameter.name(), ctx);
                 }
             }
             Stmt::ClassDef(ast::StmtClassDef {
@@ -126,22 +108,10 @@ impl SemanticSyntaxChecker {
                 // test_err debug_shadow_class
                 // class __debug__: ...  # class name
                 // class C[__debug__]: ...  # type parameter name
-                if name == "__debug__" {
-                    Self::add_error(
-                        ctx,
-                        SemanticSyntaxErrorKind::WriteToDebug(WriteToDebugKind::Store),
-                        name.range,
-                    );
-                }
+                Self::check_identifier(name, ctx);
                 if let Some(type_params) = type_params {
                     for type_param in type_params.iter() {
-                        if type_param.name() == "__debug__" {
-                            Self::add_error(
-                                ctx,
-                                SemanticSyntaxErrorKind::WriteToDebug(WriteToDebugKind::Store),
-                                type_param.name().range,
-                            );
-                        }
+                        Self::check_identifier(type_param.name(), ctx);
                     }
                 }
             }
@@ -153,13 +123,7 @@ impl SemanticSyntaxChecker {
                 // type __debug__ = list[int]  # visited as an Expr but still flagged
                 // type Debug[__debug__] = str
                 for type_param in type_params.iter() {
-                    if type_param.name() == "__debug__" {
-                        Self::add_error(
-                            ctx,
-                            SemanticSyntaxErrorKind::WriteToDebug(WriteToDebugKind::Store),
-                            type_param.name().range,
-                        );
-                    }
+                    Self::check_identifier(type_param.name(), ctx);
                 }
             }
             Stmt::Import(ast::StmtImport { names, .. })
@@ -175,21 +139,11 @@ impl SemanticSyntaxChecker {
                 // from __debug__ import Some
                 // from x import __debug__ as debug
                 for name in names {
-                    if *name.name == *"__debug__" && name.asname.is_none() {
-                        Self::add_error(
-                            ctx,
-                            SemanticSyntaxErrorKind::WriteToDebug(WriteToDebugKind::Store),
-                            name.range,
-                        );
+                    if name.asname.is_none() {
+                        Self::check_identifier(&name.name, ctx);
                     }
                     if let Some(name) = &name.asname {
-                        if *name == *"__debug__" {
-                            Self::add_error(
-                                ctx,
-                                SemanticSyntaxErrorKind::WriteToDebug(WriteToDebugKind::Store),
-                                name.range,
-                            );
-                        }
+                        Self::check_identifier(name, ctx);
                     }
                 }
             }
@@ -202,19 +156,25 @@ impl SemanticSyntaxChecker {
                     .filter_map(ast::ExceptHandler::as_except_handler)
                 {
                     if let Some(name) = &handler.name {
-                        if name == "__debug__" {
-                            Self::add_error(
-                                ctx,
-                                SemanticSyntaxErrorKind::WriteToDebug(WriteToDebugKind::Store),
-                                name.range,
-                            );
-                        }
+                        Self::check_identifier(name, ctx);
                     }
                 }
             }
             // test_err debug_shadow_with
             // with open("foo.txt") as __debug__: ...
             _ => {}
+        }
+    }
+
+    /// Check if `ident` is equal to `__debug__` and emit a
+    /// [`SemanticSyntaxErrorKind::WriteToDebug`] if so.
+    fn check_identifier<Ctx: SemanticSyntaxContext>(ident: &ast::Identifier, ctx: &Ctx) {
+        if ident.id == "__debug__" {
+            Self::add_error(
+                ctx,
+                SemanticSyntaxErrorKind::WriteToDebug(WriteToDebugKind::Store),
+                ident.range,
+            );
         }
     }
 
@@ -700,13 +660,7 @@ impl<'a, Ctx: SemanticSyntaxContext> MultipleCaseAssignmentVisitor<'a, Ctx> {
         // test_err debug_shadow_match
         // match x:
         //     case __debug__: ...
-        if ident.id == "__debug__" {
-            SemanticSyntaxChecker::add_error(
-                self.ctx,
-                SemanticSyntaxErrorKind::WriteToDebug(WriteToDebugKind::Store),
-                ident.range(),
-            );
-        }
+        SemanticSyntaxChecker::check_identifier(ident, self.ctx);
     }
 }
 
