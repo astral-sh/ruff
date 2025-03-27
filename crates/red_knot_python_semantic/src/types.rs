@@ -553,9 +553,6 @@ impl<'db> Type<'db> {
         }
 
         match (self, target) {
-            // Everything is a subtype of `object`.
-            (_, Type::Instance(InstanceType { class })) if class.is_object(db) => true,
-
             // We should have handled these immediately above.
             (Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => {
                 unreachable!("Non-fully-static types do not participate in subtyping!")
@@ -566,6 +563,9 @@ impl<'db> Type<'db> {
             // No other fully static type is a subtype of `Never`.
             (Type::Never, _) => true,
             (_, Type::Never) => false,
+
+            // Everything is a subtype of `object`.
+            (_, Type::Instance(InstanceType { class })) if class.is_object(db) => true,
 
             (Type::Union(union), _) => union
                 .elements(db)
