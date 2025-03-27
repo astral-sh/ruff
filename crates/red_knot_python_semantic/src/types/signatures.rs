@@ -10,6 +10,9 @@
 //! argument types and return types. For each callable type in the union, the call expression's
 //! arguments must match _at least one_ overload.
 
+use std::fmt::Debug;
+use std::hash::Hash;
+
 use smallvec::{smallvec, SmallVec};
 
 use super::{definition_expression_type, DynamicType, Type};
@@ -162,7 +165,7 @@ impl<'db> CallableSignature<'db> {
     pub(crate) fn dynamic(signature_type: Type<'db>) -> Self {
         let signature = Signature {
             parameters: Parameters::gradual_form(),
-            return_ty: Some(signature_type),
+            return_type: Some(SignatureReturnType::Annotated(signature_type)),
         };
         Self::single(signature_type, signature)
     }
@@ -173,7 +176,7 @@ impl<'db> CallableSignature<'db> {
         let signature_type = todo_type!(reason);
         let signature = Signature {
             parameters: Parameters::todo(),
-            return_ty: Some(signature_type),
+            return_type: Some(SignatureReturnType::Annotated(signature_type)),
         };
         Self::single(signature_type, signature)
     }
@@ -203,6 +206,23 @@ impl<'a, 'db> IntoIterator for &'a CallableSignature<'db> {
     }
 }
 
+pub(crate) type SpecialCaseReturnType = for<'db> fn(&'db dyn Db, &[Option<Type<'db>>]) -> Type<'db>;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, salsa::Update)]
+pub(crate) enum SignatureReturnType<'db> {
+    Annotated(Type<'db>),
+    SpecialCase(SpecialCaseReturnType),
+}
+
+impl<'db> SignatureReturnType<'db> {
+    pub(crate) fn as_type(&self) -> Option<Type<'db>> {
+        match self {
+            SignatureReturnType::Annotated(ty) => Some(*ty),
+            SignatureReturnType::SpecialCase(_) => None,
+        }
+    }
+}
+
 /// The signature of one of the overloads of a callable.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
 pub struct Signature<'db> {
@@ -217,15 +237,33 @@ pub struct Signature<'db> {
     parameters: Parameters<'db>,
 
     /// Annotated return type, if any.
-    pub(crate) return_ty: Option<Type<'db>>,
+    pub(crate) return_type: Option<SignatureReturnType<'db>>,
 }
 
 impl<'db> Signature<'db> {
-    pub(crate) fn new(parameters: Parameters<'db>, return_ty: Option<Type<'db>>) -> Self {
+    pub(crate) fn new(parameters: Parameters<'db>) -> Self {
         Self {
             parameters,
-            return_ty,
+            return_type: None,
         }
+    }
+
+    pub(crate) fn with_annotated_return_type(mut self, return_type: Type<'db>) -> Self {
+        self.return_type = Some(SignatureReturnType::Annotated(return_type));
+        self
+    }
+
+    pub(crate) fn with_optional_annotated_return_type(
+        mut self,
+        return_type: Option<Type<'db>>,
+    ) -> Self {
+        self.return_type = return_type.map(SignatureReturnType::Annotated);
+        self
+    }
+
+    pub(crate) fn with_special_return_type(mut self, f: SpecialCaseReturnType) -> Self {
+        self.return_type = Some(SignatureReturnType::SpecialCase(f));
+        self
     }
 
     /// Return a todo signature: (*args: Todo, **kwargs: Todo) -> Todo
@@ -233,7 +271,7 @@ impl<'db> Signature<'db> {
     pub(crate) fn todo(reason: &'static str) -> Self {
         Signature {
             parameters: Parameters::todo(),
-            return_ty: Some(todo_type!(reason)),
+            return_type: Some(SignatureReturnType::Annotated(todo_type!(reason))),
         }
     }
 
@@ -243,12 +281,12 @@ impl<'db> Signature<'db> {
         definition: Definition<'db>,
         function_node: &ast::StmtFunctionDef,
     ) -> Self {
-        let return_ty = function_node.returns.as_ref().map(|returns| {
-            if function_node.is_async {
+        let return_type = function_node.returns.as_ref().map(|returns| {
+            SignatureReturnType::Annotated(if function_node.is_async {
                 todo_type!("generic types.CoroutineType")
             } else {
                 definition_expression_type(db, definition, returns.as_ref())
-            }
+            })
         });
 
         Self {
@@ -257,7 +295,7 @@ impl<'db> Signature<'db> {
                 definition,
                 function_node.parameters.as_ref(),
             ),
-            return_ty,
+            return_type,
         }
     }
 
@@ -766,7 +804,7 @@ mod tests {
 
         let sig = func.internal_signature(&db);
 
-        assert!(sig.return_ty.is_none());
+        assert!(sig.return_type.is_none());
         assert_params(&sig, &[]);
     }
 
@@ -789,7 +827,15 @@ mod tests {
 
         let sig = func.internal_signature(&db);
 
-        assert_eq!(sig.return_ty.unwrap().display(&db).to_string(), "bytes");
+        assert_eq!(
+            sig.return_type
+                .as_ref()
+                .and_then(SignatureReturnType::as_type)
+                .unwrap()
+                .display(&db)
+                .to_string(),
+            "bytes"
+        );
         assert_params(
             &sig,
             &[

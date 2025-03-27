@@ -7,7 +7,7 @@ use ruff_python_ast::str::{Quote, TripleQuotes};
 use ruff_python_literal::escape::AsciiEscape;
 
 use crate::types::class_base::ClassBase;
-use crate::types::signatures::{Parameter, Parameters, Signature};
+use crate::types::signatures::{Parameter, Parameters, Signature, SignatureReturnType};
 use crate::types::{
     CallableType, ClassLiteralType, InstanceType, IntersectionType, KnownClass, StringLiteralType,
     Type, UnionType,
@@ -164,7 +164,7 @@ impl<'db> Signature<'db> {
     fn display(&'db self, db: &'db dyn Db) -> DisplaySignature<'db> {
         DisplaySignature {
             parameters: self.parameters(),
-            return_ty: self.return_ty,
+            return_type: self.return_type,
             db,
         }
     }
@@ -172,7 +172,7 @@ impl<'db> Signature<'db> {
 
 struct DisplaySignature<'db> {
     parameters: &'db Parameters<'db>,
-    return_ty: Option<Type<'db>>,
+    return_type: Option<SignatureReturnType<'db>>,
     db: &'db dyn Db,
 }
 
@@ -208,11 +208,12 @@ impl Display for DisplaySignature<'_> {
             join.finish()?;
         }
 
-        write!(
-            f,
-            ") -> {}",
-            self.return_ty.unwrap_or(Type::unknown()).display(self.db)
-        )?;
+        f.write_str(")")?;
+        match &self.return_type {
+            Some(SignatureReturnType::Annotated(ty)) => write!(f, " -> {}", ty.display(self.db))?,
+            Some(SignatureReturnType::SpecialCase(_)) => f.write_str(" -> <special>")?,
+            None => {}
+        }
 
         Ok(())
     }
@@ -573,9 +574,10 @@ mod tests {
     fn display_signature<'db>(
         db: &dyn Db,
         parameters: impl IntoIterator<Item = Parameter<'db>>,
-        return_ty: Option<Type<'db>>,
+        return_type: Option<Type<'db>>,
     ) -> String {
-        Signature::new(Parameters::new(parameters), return_ty)
+        Signature::new(Parameters::new(parameters))
+            .with_optional_annotated_return_type(return_type)
             .display(db)
             .to_string()
     }

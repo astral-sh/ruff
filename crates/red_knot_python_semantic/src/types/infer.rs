@@ -3878,7 +3878,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         // rather than eagerly computing a return type without knowing the argument types.
         Type::Callable(CallableType::General(GeneralCallableType::new(
             self.db(),
-            Signature::new(parameters, Some(Type::unknown())),
+            Signature::new(parameters).with_annotated_return_type(Type::unknown()),
         )))
     }
 
@@ -6678,7 +6678,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let callable_type = if let (Some(parameters), Some(return_type), true) =
                     (parameters, return_type, correct_argument_number)
                 {
-                    GeneralCallableType::new(db, Signature::new(parameters, Some(return_type)))
+                    GeneralCallableType::new(
+                        db,
+                        Signature::new(parameters).with_annotated_return_type(return_type),
+                    )
                 } else {
                     GeneralCallableType::unknown(db)
                 };

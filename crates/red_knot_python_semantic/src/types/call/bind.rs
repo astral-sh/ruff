@@ -16,7 +16,7 @@ use crate::types::diagnostic::{
     NO_MATCHING_OVERLOAD, PARAMETER_ALREADY_ASSIGNED, TOO_MANY_POSITIONAL_ARGUMENTS,
     UNKNOWN_ARGUMENT,
 };
-use crate::types::signatures::{Parameter, ParameterForm};
+use crate::types::signatures::{Parameter, ParameterForm, SignatureReturnType};
 use crate::types::{
     todo_type, BoundMethodType, CallableType, ClassLiteralType, KnownClass, KnownFunction,
     KnownInstanceType, UnionType,
@@ -695,7 +695,7 @@ impl<'db> CallableBinding<'db> {
 #[derive(Debug)]
 pub(crate) struct Binding<'db> {
     /// Return type of the call.
-    return_ty: Type<'db>,
+    return_type: Type<'db>,
 
     /// The formal parameter that each argument is matched with, in argument source order, or
     /// `None` if the argument was not matched to any parameter.
@@ -825,7 +825,7 @@ impl<'db> Binding<'db> {
         }
 
         Self {
-            return_ty: signature.return_ty.unwrap_or(Type::unknown()),
+            return_type: Type::unknown(),
             argument_parameters: argument_parameters.into_boxed_slice(),
             parameter_tys: vec![None; parameters.len()].into_boxed_slice(),
             errors,
@@ -883,14 +883,24 @@ impl<'db> Binding<'db> {
                 self.parameter_tys[parameter_index] = Some(union);
             }
         }
+
+        if self.errors.is_empty() {
+            match &signature.return_type {
+                Some(SignatureReturnType::Annotated(ty)) => self.return_type = *ty,
+                Some(SignatureReturnType::SpecialCase(f)) => {
+                    self.return_type = f(&self.parameter_tys);
+                }
+                None => {}
+            }
+        }
     }
 
     pub(crate) fn set_return_type(&mut self, return_ty: Type<'db>) {
-        self.return_ty = return_ty;
+        self.return_type = return_ty;
     }
 
     pub(crate) fn return_type(&self) -> Type<'db> {
-        self.return_ty
+        self.return_type
     }
 
     pub(crate) fn parameter_types(&self) -> &[Option<Type<'db>>] {
