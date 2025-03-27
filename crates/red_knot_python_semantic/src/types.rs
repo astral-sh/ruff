@@ -5481,6 +5481,10 @@ impl<'db> TupleType<'db> {
     pub fn len(&self, db: &'db dyn Db) -> usize {
         self.elements(db).len()
     }
+
+    pub fn iter(&self, db: &'db dyn Db) -> impl Iterator<Item = Type<'db>> + 'db + '_ {
+        self.elements(db).iter().copied()
+    }
 }
 
 // Make sure that the `Type` enum does not grow unexpectedly.

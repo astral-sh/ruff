@@ -53,7 +53,7 @@ class D(C[T]): ...
 
 (Examples `E` and `F` from above do not have analogues in the legacy syntax.)
 
-## Inferring generic class parameters
+## Specializing generic classes explicitly
 
 The type parameter can be specified explicitly:
 
@@ -65,9 +65,72 @@ class C[T]:
 reveal_type(C[int]())  # revealed: C
 ```
 
+The specialization must match the generic types:
+
+```py
+# error: [too-many-positional-arguments] "Too many positional arguments to class `C`: expected 1, got 2"
+reveal_type(C[int, int]())  # revealed: Unknown
+```
+
+If the type variable has an upper bound, the specialized type must satisfy that bound:
+
+```py
+class Bounded[T: int]: ...
+class BoundedByUnion[T: int | str]: ...
+class IntSubclass(int): ...
+
+# TODO: revealed: Bounded[int]
+reveal_type(Bounded[int]())  # revealed: Bounded
+
+# TODO: revealed: Bounded[IntSubclass]
+reveal_type(Bounded[IntSubclass]())  # revealed: Bounded
+
+# error: [invalid-argument-type] "Object of type `str` cannot be assigned to parameter 1 (`T`) of class `Bounded`; expected type `int`"
+reveal_type(Bounded[str]())  # revealed: Unknown
+
+# error:  [invalid-argument-type] "Object of type `int | str` cannot be assigned to parameter 1 (`T`) of class `Bounded`; expected type `int`"
+reveal_type(Bounded[int | str]())  # revealed: Unknown
+
+# TODO: revealed: BoundedByUnion[int]
+reveal_type(BoundedByUnion[int]())  # revealed: BoundedByUnion
+
+# TODO: revealed: BoundedByUnion[IntSubclass]
+reveal_type(BoundedByUnion[IntSubclass]())  # revealed: BoundedByUnion
+
+# TODO: revealed: BoundedByUnion[str]
+reveal_type(BoundedByUnion[str]())  # revealed: BoundedByUnion
+
+# TODO: revealed: BoundedByUnion[int | str]
+reveal_type(BoundedByUnion[int | str]())  # revealed: BoundedByUnion
+```
+
+If the type variable is constrained, the specialized type must satisfy those constraints:
+
+```py
+class Constrained[T: (int, str)]: ...
+
+# TODO: revealed: Constrained[int]
+reveal_type(Constrained[int]())  # revealed: Constrained
+
+# TODO: error: [invalid-argument-type]
+# TODO: revealed: Unknown
+reveal_type(Constrained[IntSubclass]())  # revealed: Constrained
+
+# TODO: revealed: Constrained[str]
+reveal_type(Constrained[str]())  # revealed: Constrained
+
+# error: [invalid-argument-type] "Object of type `object` cannot be assigned to parameter 1 (`T`) of class `Constrained`; expected type `int | str`"
+reveal_type(Constrained[object]())  # revealed: Unknown
+```
+
+## Inferring generic class parameters
+
 We can infer the type parameter from a type context:
 
 ```py
+class C[T]:
+    x: T
+
 c: C[int] = C()
 # TODO: revealed: C[int]
 reveal_type(c)  # revealed: C

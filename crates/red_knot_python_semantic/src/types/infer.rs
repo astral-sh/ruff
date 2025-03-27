@@ -84,7 +84,7 @@ use crate::types::{
     Truthiness, TupleType, Type, TypeAliasType, TypeAndQualifiers, TypeArrayDisplay,
     TypeQualifiers, TypeVarBoundOrConstraints, TypeVarInstance, UnionBuilder, UnionType,
 };
-use crate::types::{CallableType, GeneralCallableType, Signature};
+use crate::types::{CallableSignature, CallableType, GeneralCallableType, Signature, Signatures};
 use crate::unpack::{Unpack, UnpackPosition};
 use crate::util::subscript::{PyIndex, PySlice};
 use crate::Db;
@@ -5568,9 +5568,53 @@ impl<'db> TypeInferenceBuilder<'db> {
             ctx: _,
         } = subscript;
 
+        // HACK ALERT: If we are subscripting a generic class, short-circuit the rest of the
+        // subscript inference logic and treat this as an explicit specialization.
+        // TODO: Move this logic into a custom callable, and update `find_name_in_mro` to return
+        // this callable as the `__class_getitem__` method on `type`. That probably requires
+        // updating all of the subscript logic below to use custom callables for all of the _other_
+        // special cases, too.
         let value_ty = self.infer_expression(value);
+        if let Type::ClassLiteral(ClassLiteralType { class }) = value_ty {
+            if let Some(generic_context) = class.generic_context(self.db()) {
+                return self.infer_explicit_class_specialization(
+                    subscript,
+                    value_ty,
+                    &generic_context,
+                    slice,
+                );
+            }
+        }
+
         let slice_ty = self.infer_expression(slice);
         self.infer_subscript_expression_types(value, value_ty, slice_ty)
+    }
+
+    fn infer_explicit_class_specialization(
+        &mut self,
+        subscript: &ast::ExprSubscript,
+        value_ty: Type<'db>,
+        generic_context: &GenericContext<'db>,
+        slice_node: &ast::Expr,
+    ) -> Type<'db> {
+        let mut call_argument_types = match slice_node {
+            ast::Expr::Tuple(tuple) => CallArgumentTypes::positional(
+                tuple.elts.iter().map(|elt| self.infer_type_expression(elt)),
+            ),
+            _ => CallArgumentTypes::positional([self.infer_type_expression(slice_node)]),
+        };
+        let signatures = Signatures::single(CallableSignature::single(
+            value_ty,
+            generic_context.signature(self.db()),
+        ));
+        if let Err(CallError(_, bindings)) =
+            Bindings::match_parameters(signatures, &mut call_argument_types)
+                .check_types(self.db(), &mut call_argument_types)
+        {
+            bindings.report_diagnostics(&self.context, subscript.into());
+            return Type::unknown();
+        }
+        value_ty
     }
 
     fn infer_subscript_expression_types(
