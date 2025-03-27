@@ -1,13 +1,19 @@
+use std::sync::Arc;
+
 use ruff_python_ast as ast;
 
 use crate::semantic_index::SemanticIndex;
-use crate::types::{declaration_type, KnownInstanceType, Type, TypeVarInstance};
+use crate::types::signatures::{Parameter, Parameters, Signature};
+use crate::types::{
+    declaration_type, KnownInstanceType, Type, TypeVarBoundOrConstraints, TypeVarInstance,
+    UnionType,
+};
 use crate::Db;
 
 /// A list of formal type variables for a generic function, class, or type alias.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct GenericContext<'db> {
-    variables: Box<[TypeVarInstance<'db>]>,
+    variables: Arc<[TypeVarInstance<'db>]>,
 }
 
 impl<'db> GenericContext<'db> {
@@ -42,5 +48,32 @@ impl<'db> GenericContext<'db> {
             ast::TypeParam::ParamSpec(_) => None,
             ast::TypeParam::TypeVarTuple(_) => None,
         }
+    }
+
+    pub(crate) fn signature(&self, db: &'db dyn Db) -> Signature<'db> {
+        let parameters = Parameters::new(
+            self.variables
+                .iter()
+                .map(|typevar| Self::parameter_from_typevar(db, *typevar)),
+        );
+        Signature::new(parameters, None)
+    }
+
+    fn parameter_from_typevar(db: &'db dyn Db, typevar: TypeVarInstance<'db>) -> Parameter<'db> {
+        let mut parameter = Parameter::positional_only(Some(typevar.name(db).clone()));
+        match typevar.bound_or_constraints(db) {
+            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                // TODO: This should be a type form.
+                parameter = parameter.with_annotated_type(bound);
+            }
+            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                // TODO: This should be a new type variant where only these exact types are
+                // assignable, and not subclasses of them.
+                parameter = parameter
+                    .with_annotated_type(UnionType::from_elements(db, constraints.iter(db)));
+            }
+            None => {}
+        }
+        parameter
     }
 }
