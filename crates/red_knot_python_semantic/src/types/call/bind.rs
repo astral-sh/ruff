@@ -736,22 +736,19 @@ impl<'db> Binding<'db> {
         // each type variable. This gives us better error messages if parameter matching fails, and
         // makes it easier to type-check the arguments against any type parameter bounds or
         // constraints.
-        let arguments = if matches!(
+        let unpack_subscript_tuples = matches!(
             callable_type,
             Type::Callable(CallableType::SpecializeClass(_))
-        ) {
-            arguments.unpack_subscript_tuples()
-        } else {
-            Cow::Borrowed(arguments)
-        };
+        );
 
         BindingBuilder::new(
             signature,
             arguments.len(),
             argument_forms,
             conflicting_forms,
+            unpack_subscript_tuples,
         )
-        .build(arguments.as_ref())
+        .build(arguments)
     }
 }
 
@@ -768,6 +765,7 @@ struct BindingBuilder<'a, 'db> {
     next_positional: usize,
     first_excess_positional: Option<usize>,
     num_synthetic_args: usize,
+    unpack_subscript_tuples: bool,
 }
 
 impl<'a, 'db> BindingBuilder<'a, 'db> {
@@ -776,6 +774,7 @@ impl<'a, 'db> BindingBuilder<'a, 'db> {
         argument_count: usize,
         argument_forms: &'a mut [Option<ParameterForm>],
         conflicting_forms: &'a mut [bool],
+        unpack_subscript_tuples: bool,
     ) -> Self {
         let parameters = signature.parameters();
 
@@ -790,6 +789,7 @@ impl<'a, 'db> BindingBuilder<'a, 'db> {
             next_positional: 0,
             first_excess_positional: None,
             num_synthetic_args: 0,
+            unpack_subscript_tuples,
         }
     }
 
@@ -876,11 +876,13 @@ impl<'a, 'db> BindingBuilder<'a, 'db> {
     fn build(mut self, arguments: &'a CallArguments<'_>) -> Binding<'db> {
         for (argument_index, argument) in arguments.iter().enumerate() {
             match argument {
-                Argument::Positional => self.match_positional(argument_index, false),
-                Argument::PositionalSubscriptTuple(count) => {
+                Argument::PositionalSubscriptTuple(count) if self.unpack_subscript_tuples => {
                     for _ in 0..count {
                         self.match_positional(argument_index, false);
                     }
+                }
+                Argument::Positional | Argument::PositionalSubscriptTuple(_) => {
+                    self.match_positional(argument_index, false)
                 }
                 Argument::Synthetic => self.match_positional(argument_index, true),
                 Argument::Keyword(name) => self.match_keyword(argument_index, name),
