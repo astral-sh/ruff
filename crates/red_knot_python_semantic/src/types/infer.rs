@@ -5543,20 +5543,6 @@ impl<'db> TypeInferenceBuilder<'db> {
         slice_ty: Type<'db>,
     ) -> Type<'db> {
         match (value_ty, slice_ty) {
-            (
-                Type::Instance(instance),
-                Type::IntLiteral(_) | Type::BooleanLiteral(_) | Type::SliceLiteral(_),
-            ) if instance
-                .class()
-                .is_known(self.db(), KnownClass::VersionInfo) =>
-            {
-                self.infer_subscript_expression_types(
-                    value_node,
-                    Type::version_info_tuple(self.db()),
-                    slice_ty,
-                )
-            }
-
             // Ex) Given `("a", "b", "c", "d")[1]`, return `"b"`
             (Type::Tuple(tuple_ty), Type::IntLiteral(int)) if i32::try_from(int).is_ok() => {
                 let elements = tuple_ty.elements(self.db());
@@ -5698,6 +5684,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         return err.fallback_return_type(self.db());
                     }
                     Err(CallDunderError::CallError(_, bindings)) => {
+                        bindings.report_diagnostics(&self.context, value_node.into());
                         self.context.report_lint(
                             &CALL_NON_CALLABLE,
                             value_node,

@@ -659,6 +659,7 @@ impl<'db> Type<'db> {
                     .to_instance(db)
                     .is_subtype_of(db, target)
             }
+            (Type::Callable(CallableType::SpecializedGetitem), _) => self == target,
 
             (
                 Type::Callable(CallableType::General(self_callable)),
@@ -1053,7 +1054,8 @@ impl<'db> Type<'db> {
                 | Type::Callable(
                     CallableType::BoundMethod(..)
                     | CallableType::MethodWrapperDunderGet(..)
-                    | CallableType::WrapperDescriptorDunderGet,
+                    | CallableType::WrapperDescriptorDunderGet
+                    | CallableType::SpecializedGetitem,
                 )
                 | Type::ModuleLiteral(..)
                 | Type::ClassLiteral(..)
@@ -1067,7 +1069,8 @@ impl<'db> Type<'db> {
                 | Type::Callable(
                     CallableType::BoundMethod(..)
                     | CallableType::MethodWrapperDunderGet(..)
-                    | CallableType::WrapperDescriptorDunderGet,
+                    | CallableType::WrapperDescriptorDunderGet
+                    | CallableType::SpecializedGetitem,
                 )
                 | Type::ModuleLiteral(..)
                 | Type::ClassLiteral(..)
@@ -1267,6 +1270,9 @@ impl<'db> Type<'db> {
                 Type::Callable(CallableType::WrapperDescriptorDunderGet),
             ) => !KnownClass::WrapperDescriptorType.is_subclass_of(db, class),
 
+            (Type::Callable(CallableType::SpecializedGetitem), Type::Instance(_))
+            | (Type::Instance(_), Type::Callable(CallableType::SpecializedGetitem)) => true,
+
             (Type::ModuleLiteral(..), other @ Type::Instance(..))
             | (other @ Type::Instance(..), Type::ModuleLiteral(..)) => {
                 // Modules *can* actually be instances of `ModuleType` subclasses
@@ -1321,7 +1327,8 @@ impl<'db> Type<'db> {
             | Type::Callable(
                 CallableType::BoundMethod(_)
                 | CallableType::MethodWrapperDunderGet(_)
-                | CallableType::WrapperDescriptorDunderGet,
+                | CallableType::WrapperDescriptorDunderGet
+                | CallableType::SpecializedGetitem,
             )
             | Type::ModuleLiteral(..)
             | Type::IntLiteral(_)
@@ -1391,7 +1398,8 @@ impl<'db> Type<'db> {
             | Type::Callable(
                 CallableType::BoundMethod(_)
                 | CallableType::MethodWrapperDunderGet(_)
-                | CallableType::WrapperDescriptorDunderGet,
+                | CallableType::WrapperDescriptorDunderGet
+                | CallableType::SpecializedGetitem,
             )
             | Type::ClassLiteral(..)
             | Type::ModuleLiteral(..)
@@ -1440,7 +1448,8 @@ impl<'db> Type<'db> {
             | Type::Callable(
                 CallableType::BoundMethod(..)
                 | CallableType::MethodWrapperDunderGet(..)
-                | CallableType::WrapperDescriptorDunderGet,
+                | CallableType::WrapperDescriptorDunderGet
+                | CallableType::SpecializedGetitem,
             )
             | Type::ModuleLiteral(..)
             | Type::ClassLiteral(..)
@@ -1513,6 +1522,7 @@ impl<'db> Type<'db> {
                         // Hard code this knowledge, as we look up `__set__` and `__delete__` on `FunctionType` often.
                         Some(Symbol::Unbound.into())
                     }
+
                     // TODO:
                     // We currently hard-code the knowledge that the following known classes are not
                     // descriptors, i.e. that they have no `__get__` method. This is not wrong and
@@ -1652,7 +1662,8 @@ impl<'db> Type<'db> {
                     .to_instance(db)
                     .instance_member(db, name)
             }
-            Type::Callable(CallableType::General(_)) => {
+            Type::Callable(CallableType::SpecializedGetitem)
+            | Type::Callable(CallableType::General(_)) => {
                 KnownClass::Object.to_instance(db).instance_member(db, name)
             }
 
@@ -2006,21 +2017,31 @@ impl<'db> Type<'db> {
                     .to_instance(db)
                     .member(db, &name)
             }
-            Type::Callable(CallableType::General(_)) => {
+            Type::Callable(CallableType::SpecializedGetitem)
+            | Type::Callable(CallableType::General(_)) => {
                 KnownClass::Object.to_instance(db).member(db, &name)
             }
 
             Type::Instance(InstanceType { class })
-                if matches!(name.as_str(), "major" | "minor")
+                if matches!(name_str, "__getitem__" | "major" | "minor")
                     && class.is_known(db, KnownClass::VersionInfo) =>
             {
-                let python_version = Program::get(db).python_version(db);
-                let segment = if name == "major" {
-                    python_version.major
-                } else {
-                    python_version.minor
-                };
-                Symbol::bound(Type::IntLiteral(segment.into())).into()
+                match name_str {
+                    "__getitem__" => {
+                        Symbol::bound(Type::Callable(CallableType::SpecializedGetitem)).into()
+                    }
+                    "major" => {
+                        let python_version = Program::get(db).python_version(db);
+                        let segment = python_version.major;
+                        Symbol::bound(Type::IntLiteral(segment.into())).into()
+                    }
+                    "minor" => {
+                        let python_version = Program::get(db).python_version(db);
+                        let segment = python_version.minor;
+                        Symbol::bound(Type::IntLiteral(segment.into())).into()
+                    }
+                    _ => unreachable!(),
+                }
             }
 
             Type::IntLiteral(_) if matches!(name_str, "real" | "numerator") => {
@@ -2451,6 +2472,20 @@ impl<'db> Type<'db> {
                             None,
                         ),
                     ],
+                );
+                Signatures::single(signature)
+            }
+
+            Type::Callable(CallableType::SpecializedGetitem) => {
+                let signature = CallableSignature::from_overloads(
+                    self,
+                    [Signature::new(
+                        Parameters::new([Parameter::positional_only(Some(Name::new_static(
+                            "slice",
+                        )))
+                        .with_annotated_type(KnownClass::Int.to_instance(db))]),
+                        None,
+                    )],
                 );
                 Signatures::single(signature)
             }
@@ -3170,7 +3205,8 @@ impl<'db> Type<'db> {
             Type::Callable(CallableType::WrapperDescriptorDunderGet) => {
                 KnownClass::WrapperDescriptorType.to_class_literal(db)
             }
-            Type::Callable(CallableType::General(_)) => KnownClass::Type.to_instance(db),
+            Type::Callable(CallableType::SpecializedGetitem)
+            | Type::Callable(CallableType::General(_)) => KnownClass::Type.to_instance(db),
             Type::ModuleLiteral(_) => KnownClass::ModuleType.to_class_literal(db),
             Type::Tuple(_) => KnownClass::Tuple.to_class_literal(db),
             Type::ClassLiteral(ClassLiteralType { class }) => class.metaclass(db),
@@ -4857,6 +4893,9 @@ pub enum CallableType<'db> {
     /// type. We currently add this as a separate variant because `FunctionType.__get__`
     /// is an overloaded method and we do not support `@overload` yet.
     WrapperDescriptorDunderGet,
+
+    /// Represents specialized `__getitem__` methods
+    SpecializedGetitem,
 }
 
 #[salsa::interned(debug)]
