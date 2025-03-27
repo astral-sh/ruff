@@ -2018,6 +2018,10 @@ impl<'db> Type<'db> {
                 Symbol::bound(Type::IntLiteral(segment.into())).into()
             }
 
+            Type::Instance(InstanceType { class }) if class.is_known(db, KnownClass::Super) => {
+                SymbolAndQualifiers::todo("super() support")
+            }
+
             Type::IntLiteral(_) if matches!(name_str, "real" | "numerator") => {
                 Symbol::bound(self).into()
             }
@@ -2103,6 +2107,10 @@ impl<'db> Type<'db> {
 
                 if name == "__mro__" {
                     return class_attr_plain;
+                }
+
+                if self.is_subtype_of(db, KnownClass::Enum.to_subclass_of(db)) {
+                    return SymbolAndQualifiers::todo("Attribute access on enum classes");
                 }
 
                 let class_attr_fallback = Self::try_call_dunder_get_on_attribute(
