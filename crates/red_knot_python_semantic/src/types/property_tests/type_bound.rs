@@ -6,6 +6,8 @@ use std::{fmt, sync::OnceLock};
 
 use super::setup::get_cached_db;
 
+const RANDOM_TRY_LIMIT: u32 = 1000;
+
 /// A wrapper for a type that implements the `quickcheck::Arbitrary` trait.
 /// This struct enables the generation of arbitrary types for property test.
 #[derive(Clone)]
@@ -26,11 +28,25 @@ impl<Bound: TypeBound> BoundedType<Bound> {
 impl<Bound: TypeBound + Clone + 'static> Arbitrary for BoundedType<Bound> {
     fn arbitrary(g: &mut Gen) -> Self {
         const MAX_SIZE: u32 = 2;
-        BoundedType::new(Bound::generate_type_recursively(g, MAX_SIZE))
+
+        let db = get_cached_db();
+        for _ in 0..RANDOM_TRY_LIMIT {
+            let ty = Bound::generate_type_recursively(g, MAX_SIZE);
+            if Bound::check_property(&db, ty.clone()) {
+                return BoundedType::new(ty);
+            }
+        }
+
+        panic!("Failed to generate a type that satisfies the property");
     }
 
     fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
-        Box::new(Bound::shrink(&self.ty).map(BoundedType::new))
+        let db = get_cached_db();
+        Box::new(
+            Bound::shrink(&self.ty)
+                .filter(move |ty| Bound::check_property(&db, ty.clone()))
+                .map(BoundedType::new),
+        )
     }
 }
 
@@ -59,6 +75,7 @@ where
 }
 
 pub(crate) trait TypeBound: Clone + 'static {
+    fn check_property(db: &TestDb, ty: Ty) -> bool;
     fn type_pool() -> &'static [Ty];
 
     /// Generate an arbitrary singular type only.
@@ -227,11 +244,11 @@ static TYPE_POOL: &[Ty] = &[
     },
 ];
 
-fn filter_type_pool(predicate: fn(db: &TestDb, ty: &Ty) -> bool) -> &'static [Ty] {
+fn filter_type_pool(predicate: fn(db: &TestDb, ty: Ty) -> bool) -> &'static [Ty] {
     let db = get_cached_db();
     let pool = TYPE_POOL
         .iter()
-        .filter(|ty| predicate(&db, ty))
+        .filter(|&ty| predicate(&db, ty.clone()))
         .cloned()
         .collect::<Vec<Ty>>();
 
@@ -241,9 +258,13 @@ fn filter_type_pool(predicate: fn(db: &TestDb, ty: &Ty) -> bool) -> &'static [Ty
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct AnyTy;
+pub(crate) struct GradualTy;
 
-impl TypeBound for AnyTy {
+impl TypeBound for GradualTy {
+    fn check_property(_: &TestDb, _: Ty) -> bool {
+        true
+    }
+
     fn type_pool() -> &'static [Ty] {
         TYPE_POOL
     }
@@ -255,9 +276,27 @@ pub(crate) struct FullyStaticTy;
 
 static FULLY_STATIC_TYPE_POOL: OnceLock<&[Ty]> = OnceLock::new();
 impl TypeBound for FullyStaticTy {
+    fn check_property(db: &TestDb, ty: Ty) -> bool {
+        ty.into_type(db).is_fully_static(db)
+    }
+
     fn type_pool() -> &'static [Ty] {
-        FULLY_STATIC_TYPE_POOL
-            .get_or_init(|| filter_type_pool(|db, ty| ty.clone().into_type(db).is_fully_static(db)))
+        FULLY_STATIC_TYPE_POOL.get_or_init(|| filter_type_pool(Self::check_property))
+    }
+}
+
+/// A type that satisfy `!is_fully_static`.
+#[derive(Debug, Clone)]
+pub(crate) struct NonFullyStaticTy;
+
+static NON_FULLY_STATIC_TYPE_POOL: OnceLock<&[Ty]> = OnceLock::new();
+impl TypeBound for NonFullyStaticTy {
+    fn check_property(db: &TestDb, ty: Ty) -> bool {
+        !ty.into_type(db).is_fully_static(db)
+    }
+
+    fn type_pool() -> &'static [Ty] {
+        NON_FULLY_STATIC_TYPE_POOL.get_or_init(|| filter_type_pool(Self::check_property))
     }
 }
 
@@ -267,9 +306,12 @@ pub(crate) struct SingletonTy;
 
 static SINGLETON_TYPE_POOL: OnceLock<&[Ty]> = OnceLock::new();
 impl TypeBound for SingletonTy {
+    fn check_property(db: &TestDb, ty: Ty) -> bool {
+        ty.into_type(db).is_singleton(db)
+    }
+
     fn type_pool() -> &'static [Ty] {
-        SINGLETON_TYPE_POOL
-            .get_or_init(|| filter_type_pool(|db, ty| ty.clone().into_type(db).is_singleton(db)))
+        SINGLETON_TYPE_POOL.get_or_init(|| filter_type_pool(Self::check_property))
     }
 
     fn generate_type_recursively(g: &mut Gen, _: u32) -> Ty {
