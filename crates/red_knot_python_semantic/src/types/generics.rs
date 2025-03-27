@@ -74,4 +74,19 @@ impl<'db> GenericContext<'db> {
         }
         parameter
     }
+
+    pub(crate) fn specialize(
+        self,
+        db: &'db dyn Db,
+        types: Box<[Type<'db>]>,
+    ) -> Specialization<'db> {
+        Specialization::new(db, self, types)
+    }
+}
+
+/// An assignment of a specific type to each type variable in a generic scope.
+#[salsa::tracked(debug)]
+pub(crate) struct Specialization<'db> {
+    generic_context: GenericContext<'db>,
+    types: Box<[Type<'db>]>,
 }

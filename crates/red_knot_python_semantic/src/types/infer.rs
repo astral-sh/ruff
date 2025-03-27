@@ -5607,13 +5607,30 @@ impl<'db> TypeInferenceBuilder<'db> {
             value_ty,
             generic_context.signature(self.db()),
         ));
-        if let Err(CallError(_, bindings)) =
-            Bindings::match_parameters(signatures, &mut call_argument_types)
-                .check_types(self.db(), &mut call_argument_types)
+        let bindings = match Bindings::match_parameters(signatures, &mut call_argument_types)
+            .check_types(self.db(), &mut call_argument_types)
         {
-            bindings.report_diagnostics(&self.context, subscript.into());
-            return Type::unknown();
-        }
+            Ok(bindings) => bindings,
+            Err(CallError(_, bindings)) => {
+                bindings.report_diagnostics(&self.context, subscript.into());
+                return Type::unknown();
+            }
+        };
+        let callable = bindings
+            .into_iter()
+            .next()
+            .expect("valid bindings should have one callable");
+        let (_, overload) = callable
+            .matching_overload()
+            .expect("valid bindings should have matching overload");
+        let _specialization = generic_context.specialize(
+            self.db(),
+            overload
+                .parameter_types()
+                .iter()
+                .map(|ty| ty.unwrap_or(Type::unknown()))
+                .collect(),
+        );
         value_ty
     }
 
