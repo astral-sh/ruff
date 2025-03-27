@@ -367,8 +367,7 @@ pub(crate) fn lint_path(
     })
 }
 
-/// Generate `Diagnostic`s from source code content derived from
-/// stdin.
+/// Generate `Diagnostic`s from source code content derived from stdin.
 pub(crate) fn lint_stdin(
     path: Option<&Path>,
     package: Option<PackageRoot<'_>>,
@@ -377,13 +376,37 @@ pub(crate) fn lint_stdin(
     noqa: flags::Noqa,
     fix_mode: flags::FixMode,
 ) -> Result<Diagnostics> {
-    // TODO(charlie): Support `pyproject.toml`.
     let source_type = match path.and_then(|path| settings.linter.extension.get(path)) {
         None => match path.map(SourceType::from).unwrap_or_default() {
             SourceType::Python(source_type) => source_type,
-            SourceType::Toml(_) => {
-                return Ok(Diagnostics::default());
+
+            SourceType::Toml(source_type) if source_type.is_pyproject() => {
+                if !settings
+                    .linter
+                    .rules
+                    .iter_enabled()
+                    .any(|rule_code| rule_code.lint_source().is_pyproject_toml())
+                {
+                    return Ok(Diagnostics::default());
+                }
+
+                let path = path.unwrap();
+                let source_file =
+                    SourceFileBuilder::new(path.to_string_lossy(), contents.clone()).finish();
+
+                match fix_mode {
+                    flags::FixMode::Diff | flags::FixMode::Generate => {}
+                    flags::FixMode::Apply => write!(&mut io::stdout().lock(), "{contents}")?,
+                }
+
+                return Ok(Diagnostics {
+                    messages: lint_pyproject_toml(source_file, &settings.linter),
+                    fixed: FixMap::from_iter([(fs::relativize_path(path), FixTable::default())]),
+                    notebook_indexes: FxHashMap::default(),
+                });
             }
+
+            SourceType::Toml(_) => return Ok(Diagnostics::default()),
         },
         Some(language) => PySourceType::from(language),
     };
