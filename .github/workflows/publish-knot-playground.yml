@@ -8,10 +8,10 @@ on:
     branches: [main]
     paths:
       - "crates/red_knot*/**"
-      - "crates/ruff_db"
-      - "crates/ruff_python_ast"
-      - "crates/ruff_python_parser"
-      - "playground"
+      - "crates/ruff_db/**"
+      - "crates/ruff_python_ast/**"
+      - "crates/ruff_python_parser/**"
+      - "playground/**"
       - ".github/workflows/publish-knot-playground.yml"
 
 concurrency:
